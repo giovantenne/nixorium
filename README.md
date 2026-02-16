@@ -29,7 +29,7 @@ Copy the binary cache private key (`secret-key`) into the repo folder. It is alr
 
 Copy the admin SSH private key (`id_ed25519`) to `~/.ssh/id_ed25519`:
 ```sh
-cp admin_id_ed25519 ~/.ssh/id_ed25519
+cp id_ed25519 ~/.ssh/id_ed25519
 chmod 600 ~/.ssh/id_ed25519
 ```
 
