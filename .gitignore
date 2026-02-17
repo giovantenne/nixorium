@@ -2,3 +2,4 @@ secret-key
 id_ed25519
 veyon-private-key.pem
 result*
+assets/ipxe/snponly.efi
