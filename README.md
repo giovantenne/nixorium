@@ -36,6 +36,8 @@ install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
 ## 2. Prepare the controller (pc99)
 All commands below run from `~/nixos-config` on `pc99`.
 
+Before running the preparation script, customize `networkBase` and `pcCount` in `flake.nix` if needed.
+
 One-command preparation (recommended):
 ```sh
 ./scripts/prepare-pc99.sh
@@ -57,54 +59,11 @@ Log files are also written to:
 - `/tmp/harmonia.log`
 - `/tmp/pxe-proxy.log`
 
-Note: static IP removal/restore is intentionally manual.
-
-Manual step-by-step (alternative):
-
-Update `masterDhcpIp`, `networkBase`, `pcCount`, and `ifaceName` at the top of `flake.nix` (`masterHostNumber` is fixed to `99`):
-```sh
-ip -4 addr                  # find the DHCP address
-vim flake.nix               # edit masterDhcpIp and other settings
-```
-
-Rebuild pc99 to apply the new settings:
-```sh
-sudo nixos-rebuild switch --flake .#pc99 --no-write-lock-file
-```
-
-Build the netboot artifacts:
-```sh
-nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
-nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
-nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
-```
-
-Copy iPXE UEFI bootstrap (`snp.efi` in nixpkgs) into the path expected by this repo (`assets/ipxe/snponly.efi`) with a single command:
-```sh
-nix build nixpkgs#ipxe --out-link result-ipxe-bin && install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
-```
-
-Pre-build all client closures so installs work offline via the local cache:
-```sh
-nix build .#nixosConfigurations.pc{01..30}.config.system.build.toplevel
-```
-
 ## 3. Network install (PXE/Netboot)
-Temporarily remove the static IP so pc99 uses only its DHCP address during installs (it returns after a reboot):
+The network services are started by `./scripts/prepare-pc99.sh` in a tmux session.
+To monitor them live:
 ```sh
-STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' flake.nix).$(awk '/masterHostNumber =/ { gsub(/;/, "", $3); print $3; exit }' flake.nix)
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' flake.nix)
-sudo ip addr del "${STATIC_IP}/24" dev "${IFACE}"
-```
-
-Start the local services in two separate terminals:
-```sh
-# Terminal 1: Binary cache
-./scripts/run-harmonia.sh
-```
-```sh
-# Terminal 2: ProxyDHCP + TFTP + HTTP netboot (Clonezilla-style with external DHCP)
-sudo ./scripts/run-pxe-proxy.sh
+tmux attach -t lab-netboot
 ```
 
 On each client PC, enable UEFI network boot. The PC will boot into a NixOS ramdisk.
@@ -116,13 +75,6 @@ cd /installer/repo
 ```
 Where `XX` is the PC number (e.g., `./setup.sh 5` for `pc05`).
 `setup.sh` auto-selects the disk if only one is present; if multiple disks are present, it asks for a choice and requires a final confirmation before wiping it.
-
-When all clients are installed, restore the static IP on pc99 (or just reboot it):
-```sh
-STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' flake.nix).$(awk '/masterHostNumber =/ { gsub(/;/, "", $3); print $3; exit }' flake.nix)
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' flake.nix)
-sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
-```
 
 ## 4. Partitioning and Boot (Disko)
 Declarative disk config is in `disko-uefi.nix`. All machines must boot in **UEFI mode**.
