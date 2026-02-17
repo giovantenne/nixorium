@@ -109,9 +109,9 @@ Disk layout:
   - `@home-informatica` -> `/home/informatica`
   - `@snapshots` -> `/var/lib/home-snapshots`
 
-`systemd-boot` is enabled with a 5-second menu timeout. If a Windows UEFI
-installation exists on another disk and is exposed by firmware/NVRAM as
-`Windows Boot Manager`, it appears in the boot menu automatically.
+`GRUB` is enabled in UEFI mode with a 5-second timeout and `os-prober` enabled.
+Windows 11 installations on other disks are detected when GRUB is regenerated
+(`nixos-install` / `nixos-rebuild switch`).
 
 ## 5. Home Reset and Snapshots
 The `informatica` home directory resets to a clean template on every boot:

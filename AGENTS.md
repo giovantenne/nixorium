@@ -102,7 +102,7 @@ Use only the arguments the module actually needs:
 ```
 
 ### Attribute Sets
-- Dot-path notation for one-liners: `boot.loader.systemd-boot.enable = true;`
+- Dot-path notation for one-liners: `boot.loader.grub.enable = true;`
 - Nested set notation for grouped settings:
   ```nix
   services.pipewire = {
