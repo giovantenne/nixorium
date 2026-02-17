@@ -85,6 +85,9 @@ picture-options='zoom'
 [org/gnome/desktop/screensaver]
 picture-uri='file://${PICK}'
 picture-options='zoom'
+
+[org/gnome/nautilus/icon-view]
+default-zoom-level='small'
 EOF
     dconf compile "$DCONF_DIR/user" "$KEYFILE_DIR"
     rm -rf "$KEYFILE_DIR"

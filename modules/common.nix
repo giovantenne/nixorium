@@ -85,6 +85,7 @@
     [org.gnome.nautilus.icon-view]
     default-zoom-level='small'
   '';
+  services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.nautilus ];
 
   # Disable GNOME initial setup and welcome
   services.gnome.gnome-initial-setup.enable = false;
