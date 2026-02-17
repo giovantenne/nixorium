@@ -17,10 +17,12 @@
       # Static IP network base (each PC gets networkBase.N)
       networkBase = "10.22.9";
       pcCount = 30;
-      masterHostNumber = 99;
       # Shared interface name on lab PCs
       ifaceName = "enp0s3";
       # =======================
+
+      # Fixed controller host number (do not edit)
+      masterHostNumber = 99;
 
       masterHostName = "pc${toString masterHostNumber}";
       masterIp = "${networkBase}.${toString masterHostNumber}";

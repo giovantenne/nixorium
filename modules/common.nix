@@ -277,6 +277,7 @@
     vscode
     gcc
     tig
+    tmux
     imagemagick
     ghostscript
     tectonic

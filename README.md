@@ -36,7 +36,32 @@ install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
 ## 2. Prepare the controller (pc99)
 All commands below run from `~/nixos-config` on `pc99`.
 
-Update `masterDhcpIp`, `networkBase`, `pcCount`, `masterHostNumber`, and `ifaceName` at the top of `flake.nix`:
+One-command preparation (recommended):
+```sh
+./scripts/prepare-pc99.sh
+```
+This script:
+- checks prerequisites (including `tmux`)
+- auto-configures `masterDhcpIp` if still set to `MASTER_DHCP_IP`
+- rebuilds `pc99`
+- builds netboot artifacts
+- generates `assets/ipxe/snponly.efi` automatically
+- pre-builds all client closures
+- starts `run-harmonia.sh` and `run-pxe-proxy.sh` in a `tmux` session with live logs
+
+Live logs:
+```sh
+tmux attach -t lab-netboot
+```
+Log files are also written to:
+- `/tmp/harmonia.log`
+- `/tmp/pxe-proxy.log`
+
+Note: static IP removal/restore is intentionally manual.
+
+Manual step-by-step (alternative):
+
+Update `masterDhcpIp`, `networkBase`, `pcCount`, and `ifaceName` at the top of `flake.nix` (`masterHostNumber` is fixed to `99`):
 ```sh
 ip -4 addr                  # find the DHCP address
 vim flake.nix               # edit masterDhcpIp and other settings
