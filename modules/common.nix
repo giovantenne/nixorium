@@ -78,6 +78,12 @@
     [org.gnome.mutter.keybindings]
     toggle-tiled-left=['<Super>Left']
     toggle-tiled-right=['<Super>Right']
+
+    [org.gnome.desktop.input-sources]
+    sources=[('xkb', 'it')]
+
+    [org.gnome.nautilus.icon-view]
+    default-zoom-level='small'
   '';
 
   # Disable GNOME initial setup and welcome
