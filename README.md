@@ -30,8 +30,7 @@ Copy the binary cache private key (`secret-key`) into the repo folder. It is alr
 
 Copy the admin SSH private key (`id_ed25519`) to `~/.ssh/id_ed25519`:
 ```sh
-cp id_ed25519 ~/.ssh/id_ed25519
-chmod 600 ~/.ssh/id_ed25519
+install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
 ```
 
 ## 2. Prepare the controller (pc99)
