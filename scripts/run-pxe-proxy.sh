@@ -14,6 +14,7 @@ fi
 IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' flake.nix)
 MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' flake.nix)
 CMDLINE=$(grep '^kernel ' result-ipxe/netboot.ipxe | sed 's/^kernel [^ ]* //')
+PROXY_SUBNET=$(ip -4 route show dev "${IFACE}" proto kernel scope link | awk '{ print $1; exit }' | cut -d/ -f1)
 
 if [[ -z "${IFACE}" ]]; then
   echo "Error: ifaceName not found in flake.nix." >&2
@@ -22,6 +23,11 @@ fi
 
 if [[ -z "${MASTER_IP}" || "${MASTER_IP}" == "MASTER_DHCP_IP" ]]; then
   echo "Error: masterDhcpIp not configured in flake.nix." >&2
+  exit 1
+fi
+
+if [[ -z "${PROXY_SUBNET}" ]]; then
+  echo "Error: could not detect IPv4 subnet for interface ${IFACE}." >&2
   exit 1
 fi
 
@@ -69,7 +75,7 @@ interface=${IFACE}
 enable-tftp
 tftp-root=${WORK_DIR}/tftp
 
-dhcp-range=${IFACE},proxy
+dhcp-range=${PROXY_SUBNET},proxy
 
 dhcp-match=set:efi64,option:client-arch,6
 dhcp-match=set:efi64,option:client-arch,7
