@@ -3,5 +3,3 @@ id_ed25519
 veyon-private-key.pem
 result*
 assets/ipxe/snponly.efi
-assets/ipxe/snp.efi
-assets/ipxe/ipxe.efi
