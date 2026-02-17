@@ -54,9 +54,9 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
 ```
 
-Copy `snponly.efi` into `assets/ipxe/` with a single command:
+Copy iPXE UEFI bootstrap (`snp.efi` in nixpkgs) into the path expected by this repo (`assets/ipxe/snponly.efi`) with a single command:
 ```sh
-nix build nixpkgs#ipxe --out-link result-ipxe-bin && install -D -m 0644 "$(find -L result-ipxe-bin -type f -name snponly.efi | head -n1)" assets/ipxe/snponly.efi
+nix build nixpkgs#ipxe --out-link result-ipxe-bin && install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
 ```
 
 Pre-build all client closures so installs work offline via the local cache:
