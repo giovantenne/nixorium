@@ -5,6 +5,10 @@
 
   # Bootloader: GRUB on MBR for BIOS systems (device set by disko)
   boot.loader.grub.enable = true;
+  boot.loader.grub.useOSProber = true;
+
+  # NTFS support for os-prober to detect Windows installations
+  boot.supportedFilesystems = [ "ntfs" ];
 
   # Enable networking
   networking.networkmanager.enable = true;
