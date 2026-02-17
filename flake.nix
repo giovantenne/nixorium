@@ -40,7 +40,7 @@
       hostModules = [
         { nixpkgs.overlays = [ labOverlay ]; }
         disko.nixosModules.disko
-        ./disko-bios.nix
+        ./disko-uefi.nix
         ./modules/hardware.nix
         ./modules/common.nix
         ./modules/users.nix

@@ -5,9 +5,10 @@ This repository manages a 31-PC NixOS lab, optimized for network installation (N
 - Controller (`pc99`): `PXE/Netboot`, local `binary cache`, `Colmena` orchestration.
 - Nodes (Lab PCs): 30 workstations with `Btrfs` filesystem.
 - Networking: installs and updates over `LAN` only, no internet on client PCs.
+- Boot mode: **UEFI only**.
 
 ## 1. First setup at school (master PC)
-Bootstrap the master PC (`pc99`) from a USB installer, using temporary internet access on the first boot. **BIOS/Legacy boot is required** — disable UEFI in BIOS settings if needed.
+Bootstrap the master PC (`pc99`) from a USB installer, using temporary internet access on the first boot. **UEFI boot is required**.
 
 From the live USB, partition and install:
 ```sh
@@ -54,13 +55,16 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
 ```
 
+Place iPXE bootstrap binaries into `assets/ipxe/`:
+- `snponly.efi`
+
 Pre-build all client closures so installs work offline via the local cache:
 ```sh
 nix build .#nixosConfigurations.pc{01..30}.config.system.build.toplevel
 ```
 
 ## 3. Network install (PXE/Netboot)
-Temporarily remove the static IP so pixiecore sees only the DHCP address (it returns after a reboot):
+Temporarily remove the static IP so pc99 uses only its DHCP address during installs (it returns after a reboot):
 ```sh
 STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' flake.nix).$(awk '/masterHostNumber =/ { gsub(/;/, "", $3); print $3; exit }' flake.nix)
 IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' flake.nix)
@@ -73,12 +77,11 @@ Start the local services in two separate terminals:
 ./scripts/run-harmonia.sh
 ```
 ```sh
-# Terminal 2: PXE server
-CMDLINE=$(grep '^kernel ' result-ipxe/netboot.ipxe | sed 's/^kernel [^ ]* //')
-sudo nix run nixpkgs#pixiecore -- boot result-kernel/bzImage result-initrd/initrd --cmdline "$CMDLINE"
+# Terminal 2: ProxyDHCP + TFTP + HTTP netboot (Clonezilla-style with external DHCP)
+sudo ./scripts/run-pxe-proxy.sh
 ```
 
-On each client PC, enable PXE/Network boot in BIOS. The PC will boot into a NixOS ramdisk.
+On each client PC, enable UEFI network boot. The PC will boot into a NixOS ramdisk.
 
 On the booted client, run the installer:
 ```sh
@@ -96,14 +99,18 @@ sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 ```
 
 ## 4. Partitioning and Boot (Disko)
-Declarative disk config is in `disko-bios.nix`. All machines must boot in **BIOS/Legacy mode**.
+Declarative disk config is in `disko-uefi.nix`. All machines must boot in **UEFI mode**.
 
-GRUB installs to the MBR of the selected install disk.
+Disk layout:
+- EFI System Partition (FAT32) mounted at `/boot`
+- Btrfs root partition labeled `nixos` with subvolumes:
+  - `@root` -> `/`
+  - `@home-informatica` -> `/home/informatica`
+  - `@snapshots` -> `/var/lib/home-snapshots`
 
-Target disk: selected at install time from detected disks with Btrfs label `nixos` and subvolumes:
-- `@root` -> `/`
-- `@home-informatica` -> `/home/informatica`
-- `@snapshots` -> `/var/lib/home-snapshots`
+`systemd-boot` is enabled with a 5-second menu timeout. If a Windows UEFI
+installation exists on another disk and is exposed by firmware/NVRAM as
+`Windows Boot Manager`, it appears in the boot menu automatically.
 
 ## 5. Home Reset and Snapshots
 The `informatica` home directory resets to a clean template on every boot:

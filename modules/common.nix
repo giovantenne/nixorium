@@ -3,12 +3,12 @@
   # Enable flakes and nix-command
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  # Bootloader: GRUB on MBR for BIOS systems (device set by disko)
-  boot.loader.grub.enable = true;
-  boot.loader.grub.useOSProber = true;
-
-  # NTFS support for os-prober to detect Windows installations
-  boot.supportedFilesystems = [ "ntfs" ];
+  # UEFI bootloader
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.configurationLimit = 10;
+  boot.loader.timeout = 5;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.loader.efi.efiSysMountPoint = "/boot";
 
   # Enable networking
   networking.networkmanager.enable = true;
@@ -264,6 +264,7 @@
     curl
     bat
     docker-compose
+    dnsmasq
     eza
     fd
     fzf

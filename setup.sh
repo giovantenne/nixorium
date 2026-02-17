@@ -125,17 +125,17 @@ fi
 
 echo "Using binary cache at ${MASTER_IP}:5000"
 
-# Detect UEFI or BIOS
+# Detect UEFI
 if [ -d /sys/firmware/efi ]; then
-  echo "Error: UEFI boot not supported. Disable UEFI in BIOS settings." >&2
-  exit 1
+  echo "Detected UEFI boot"
 else
-  echo "Detected BIOS boot"
+  echo "Error: BIOS/Legacy boot is not supported. Enable UEFI in firmware settings." >&2
+  exit 1
 fi
 
 TEMP_DISKO_FILE=$(mktemp)
 trap 'rm -f "$TEMP_DISKO_FILE"' EXIT
-sed -E "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" ./disko-bios.nix > "$TEMP_DISKO_FILE"
+sed -E "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" ./disko-uefi.nix > "$TEMP_DISKO_FILE"
 
 echo "Partitioning disk..."
 sudo disko --mode disko "$TEMP_DISKO_FILE"

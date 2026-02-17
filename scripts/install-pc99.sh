@@ -9,7 +9,7 @@ fi
 
 INSTALL_DISK="${1:-}"
 FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixos-lab}"
-DISKO_URL="${DISKO_URL:-https://raw.githubusercontent.com/giovantenne/nixos-lab/master/disko-bios.nix}"
+DISKO_URL="${DISKO_URL:-https://raw.githubusercontent.com/giovantenne/nixos-lab/master/disko-uefi.nix}"
 AVAILABLE_DISKS=()
 
 prompt_input() {
@@ -59,12 +59,12 @@ is_available_disk() {
   return 1
 }
 
-# Detect UEFI or BIOS
+# Detect UEFI
 if [ -d /sys/firmware/efi ]; then
-  echo "Error: UEFI boot not supported. Disable UEFI in BIOS settings." >&2
-  exit 1
+  echo "Detected UEFI boot"
 else
-  echo "Detected BIOS boot"
+  echo "Error: BIOS/Legacy boot is not supported. Enable UEFI in firmware settings." >&2
+  exit 1
 fi
 
 mapfile -t AVAILABLE_DISKS < <(
