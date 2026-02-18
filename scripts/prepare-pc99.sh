@@ -40,6 +40,11 @@ extract_flake_string() {
   awk -F'"' -v key="$KEY" '$0 ~ key" =" { print $2; exit }' "$FLAKE_FILE"
 }
 
+extract_flake_number() {
+  local KEY="$1"
+  awk -v key="$KEY" '$0 ~ key" =" { gsub(/[^0-9]/, ""); print; exit }' "$FLAKE_FILE"
+}
+
 detect_master_dhcp_ip() {
   local IFACE="$1"
   local DETECTED
@@ -60,6 +65,7 @@ require_cmd ip
 require_cmd awk
 require_cmd sed
 require_cmd install
+require_cmd seq
 require_cmd sudo
 
 if [[ ! -f "$FLAKE_FILE" ]]; then
@@ -115,7 +121,18 @@ install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
 log_ok "snponly.efi installed"
 
 log_step "Step 6/8: Pre-building all client closures"
-nix build .#nixosConfigurations.pc{01..30}.config.system.build.toplevel
+PC_COUNT=$(extract_flake_number "pcCount")
+if [[ -z "$PC_COUNT" ]]; then
+  log_err "pcCount not found in flake.nix."
+  exit 1
+fi
+
+CLIENT_TARGETS=()
+for PC_NUMBER in $(seq 1 "$PC_COUNT"); do
+  CLIENT_TARGETS+=(".#nixosConfigurations.pc$(printf "%02d" "$PC_NUMBER").config.system.build.toplevel")
+done
+
+nix build --max-jobs 1 "${CLIENT_TARGETS[@]}"
 log_ok "Client closures pre-built"
 
 log_step "Step 7/8: Preparing service startup (no static IP changes performed)"

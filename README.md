@@ -55,6 +55,7 @@ Live logs:
 ```sh
 tmux attach -t lab-netboot
 ```
+To close a stuck pane in tmux, press `Ctrl+b`, then `x`, and confirm with `y`.
 Log files are also written to:
 - `/tmp/harmonia.log`
 - `/tmp/pxe-proxy.log`
