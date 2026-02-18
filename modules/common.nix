@@ -63,6 +63,13 @@
     [org.gnome.shell.extensions.dash-to-dock]
     show-trash=false
 
+    [org.gnome.desktop.session]
+    idle-delay=uint32 0
+
+    [org.gnome.desktop.screensaver]
+    lock-enabled=true
+    lock-delay=uint32 0
+
     [org.gnome.settings-daemon.plugins.power]
     sleep-inactive-ac-type='nothing'
     sleep-inactive-battery-type='nothing'
@@ -259,6 +266,17 @@
     mode = "0755";
   };
 
+  # Screensaver scripts and ASCII art logo
+  environment.etc."lab/screensaver.txt".source = ../assets/meucci.txt;
+  environment.etc."lab/cmd-screensaver.sh" = {
+    source = ../scripts/cmd-screensaver.sh;
+    mode = "0755";
+  };
+  environment.etc."lab/launch-screensaver.sh" = {
+    source = ../scripts/launch-screensaver.sh;
+    mode = "0755";
+  };
+
   # Ristretto wallpapers for random selection at home-reset
   environment.etc."lab/backgrounds/1-ristretto.jpg".source = ../assets/backgrounds/1-ristretto.jpg;
   environment.etc."lab/backgrounds/2-ristretto.jpg".source = ../assets/backgrounds/2-ristretto.jpg;
@@ -299,6 +317,7 @@
     unzip
     python3
     python3Packages.pip
+    python3Packages.terminaltexteffects
     python3Packages.virtualenv
     luarocks
     lua-language-server
@@ -322,6 +341,27 @@
     gnomeExtensions.dash-to-dock
     yaru-theme
   ];
+
+  # Screensaver monitor script
+  environment.etc."lab/screensaver-monitor.sh" = {
+    source = ../scripts/screensaver-monitor.sh;
+    mode = "0755";
+  };
+
+  # Screensaver: watch for GNOME idle (screensaver ActiveChanged signal)
+  # and launch the TTE screensaver in a fullscreen Ghostty window.
+  systemd.user.services.lab-screensaver = {
+    description = "ITIS Meucci TTE screensaver";
+    wantedBy = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "/etc/lab/screensaver-monitor.sh";
+      Restart = "on-failure";
+      RestartSec = 5;
+    };
+    path = [ pkgs.bash pkgs.glib pkgs.gnugrep pkgs.procps pkgs.ghostty pkgs.python3Packages.terminaltexteffects pkgs.ncurses pkgs.systemd ];
+  };
 
   systemd.user.services.lab-gnome-setup = {
     description = "Lab GNOME favorites and welcome setup";
