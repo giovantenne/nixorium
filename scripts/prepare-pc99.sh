@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 FLAKE_FILE="${REPO_ROOT}/flake.nix"
-TMUX_SESSION="lab-netboot"
 
 BLUE='\033[1;34m'
 GREEN='\033[1;32m'
@@ -45,25 +44,11 @@ extract_flake_number() {
   awk -v key="$KEY" '$0 ~ key" =" { gsub(/[^0-9]/, ""); print; exit }' "$FLAKE_FILE"
 }
 
-detect_master_dhcp_ip() {
-  local IFACE="$1"
-  local DETECTED
-
-  DETECTED=$(ip -4 -o addr show dev "$IFACE" | awk '/ dynamic / { split($4, a, "/"); print a[1]; exit }')
-  if [[ -n "$DETECTED" ]]; then
-    echo "$DETECTED"
-    return 0
-  fi
-
-  DETECTED=$(ip -4 -o addr show dev "$IFACE" | awk '{ split($4, a, "/"); print a[1]; exit }')
-  echo "$DETECTED"
-}
-
-log_step "Step 1/8: Checking prerequisites"
+# ── Step 1/7: Prerequisites ──────────────────────────────────────────
+log_step "Step 1/7: Checking prerequisites"
 require_cmd nix
 require_cmd ip
 require_cmd awk
-require_cmd sed
 require_cmd install
 require_cmd seq
 require_cmd sudo
@@ -79,48 +64,60 @@ if [[ ! -f "${REPO_ROOT}/secret-key" ]]; then
 fi
 log_ok "Prerequisites check complete"
 
-log_step "Step 2/8: Reading settings from flake.nix"
+# ── Step 2/7: Read and validate settings from flake.nix ──────────────
+log_step "Step 2/7: Reading settings from flake.nix"
 IFACE_NAME=$(extract_flake_string "ifaceName")
 NETWORK_BASE=$(extract_flake_string "networkBase")
 MASTER_DHCP_IP=$(extract_flake_string "masterDhcpIp")
-MASTER_STATIC_IP="${NETWORK_BASE}.99"
+MASTER_HOST_NUMBER=$(extract_flake_number "masterHostNumber")
 
 if [[ -z "$IFACE_NAME" ]]; then
   log_err "ifaceName not found in flake.nix."
   exit 1
 fi
 
-if [[ "$MASTER_DHCP_IP" == "MASTER_DHCP_IP" || -z "$MASTER_DHCP_IP" ]]; then
-  log_warn "masterDhcpIp is not configured; attempting auto-detection on ${IFACE_NAME}"
-  DETECTED_DHCP_IP=$(detect_master_dhcp_ip "$IFACE_NAME")
-  if [[ -z "$DETECTED_DHCP_IP" ]]; then
-    log_err "Could not detect DHCP IP on interface ${IFACE_NAME}."
-    exit 1
-  fi
-  log_step "Updating masterDhcpIp to ${DETECTED_DHCP_IP}"
-  sed -i -E "s#masterDhcpIp = \".*\";#masterDhcpIp = \"${DETECTED_DHCP_IP}\";#" "$FLAKE_FILE"
-  MASTER_DHCP_IP="$DETECTED_DHCP_IP"
-  log_ok "flake.nix updated"
-else
-  log_ok "masterDhcpIp already configured: ${MASTER_DHCP_IP}"
+if [[ -z "$NETWORK_BASE" ]]; then
+  log_err "networkBase not found in flake.nix."
+  exit 1
 fi
 
-log_step "Step 3/8: Rebuilding pc99"
+if [[ -z "$MASTER_HOST_NUMBER" ]]; then
+  log_err "masterHostNumber not found in flake.nix."
+  exit 1
+fi
+
+if [[ "$MASTER_DHCP_IP" == "MASTER_DHCP_IP" || -z "$MASTER_DHCP_IP" ]]; then
+  log_err "masterDhcpIp is not configured in flake.nix."
+  log_err "Edit flake.nix first: set masterDhcpIp to the DHCP address of this machine."
+  log_err "Run 'ip -4 addr show dev ${IFACE_NAME}' to find it."
+  exit 1
+fi
+
+MASTER_STATIC_IP="${NETWORK_BASE}.${MASTER_HOST_NUMBER}"
+log_ok "Interface: ${IFACE_NAME}"
+log_ok "DHCP IP: ${MASTER_DHCP_IP}"
+log_ok "Static IP: ${MASTER_STATIC_IP}"
+
+# ── Step 3/7: Rebuild pc99 ───────────────────────────────────────────
+log_step "Step 3/7: Rebuilding pc99"
 sudo nixos-rebuild switch --flake .#pc99 --no-write-lock-file
 log_ok "pc99 rebuild completed"
 
-log_step "Step 4/8: Building netboot artifacts"
+# ── Step 4/7: Build netboot artifacts ────────────────────────────────
+log_step "Step 4/7: Building netboot artifacts"
 nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
 log_ok "Netboot artifacts ready"
 
-log_step "Step 5/8: Ensuring iPXE bootstrap binary (assets/ipxe/snponly.efi)"
+# ── Step 5/7: iPXE bootstrap binary ─────────────────────────────────
+log_step "Step 5/7: Ensuring iPXE bootstrap binary (assets/ipxe/snponly.efi)"
 nix build nixpkgs#ipxe --out-link result-ipxe-bin
 install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
 log_ok "snponly.efi installed"
 
-log_step "Step 6/8: Pre-building all client closures"
+# ── Step 6/7: Pre-build all client closures ──────────────────────────
+log_step "Step 6/7: Pre-building all client closures"
 PC_COUNT=$(extract_flake_number "pcCount")
 if [[ -z "$PC_COUNT" ]]; then
   log_err "pcCount not found in flake.nix."
@@ -135,21 +132,29 @@ done
 nix build --max-jobs 1 "${CLIENT_TARGETS[@]}"
 log_ok "Client closures pre-built"
 
-log_step "Step 7/8: Preparing service startup (no static IP changes performed)"
-log_warn "If needed, remove/add static IP manually as documented in README."
-log_step "Using MASTER_DHCP_IP=${MASTER_DHCP_IP}, MASTER_STATIC_IP=${MASTER_STATIC_IP}, IFACE=${IFACE_NAME}"
-
-log_step "Step 8/8: Starting Harmonia + PXE Proxy in tmux session '${TMUX_SESSION}'"
-require_cmd tmux
-if tmux has-session -t "${TMUX_SESSION}" 2>/dev/null; then
-  log_warn "Existing tmux session '${TMUX_SESSION}' found. Killing it."
-  tmux kill-session -t "${TMUX_SESSION}"
+# ── Step 7/7: Remove static IP for netboot ───────────────────────────
+log_step "Step 7/7: Removing static IP for netboot"
+if ip -4 addr show dev "${IFACE_NAME}" 2>/dev/null | grep -q "${MASTER_STATIC_IP}/"; then
+  sudo ip addr del "${MASTER_STATIC_IP}/24" dev "${IFACE_NAME}"
+  log_ok "Removed ${MASTER_STATIC_IP}/24 from ${IFACE_NAME}"
+else
+  log_ok "Static IP ${MASTER_STATIC_IP} not present on ${IFACE_NAME}, nothing to remove"
 fi
 
-sudo -v
-tmux new-session -d -s "${TMUX_SESSION}" -n services "cd ${REPO_ROOT} && ./scripts/run-harmonia.sh 2>&1 | tee /tmp/harmonia.log"
-tmux split-window -h -t "${TMUX_SESSION}:services" "cd ${REPO_ROOT} && sudo ./scripts/run-pxe-proxy.sh 2>&1 | tee /tmp/pxe-proxy.log"
-tmux select-layout -t "${TMUX_SESSION}:services" even-horizontal
-log_ok "Services started in tmux."
-echo -e "${GREEN}Attach with:${RESET} tmux attach -t ${TMUX_SESSION}"
-echo -e "${GREEN}Logs:${RESET} /tmp/harmonia.log and /tmp/pxe-proxy.log"
+# ── Done ─────────────────────────────────────────────────────────────
+echo ""
+echo -e "${GREEN}========================================${RESET}"
+echo -e "${GREEN}  Preparation complete!${RESET}"
+echo -e "${GREEN}========================================${RESET}"
+echo ""
+echo -e "Start the netboot services in ${YELLOW}two separate terminals${RESET}:"
+echo ""
+echo -e "  ${BLUE}Terminal 1 (binary cache):${RESET}"
+echo -e "    ./scripts/run-harmonia.sh"
+echo ""
+echo -e "  ${BLUE}Terminal 2 (PXE/netboot server):${RESET}"
+echo -e "    sudo ./scripts/run-pxe-proxy.sh"
+echo ""
+echo -e "When all clients are installed, restore the static IP (or reboot pc99):"
+echo -e "    sudo ip addr add ${MASTER_STATIC_IP}/24 dev ${IFACE_NAME}"
+echo ""
