@@ -67,7 +67,7 @@
     idle-delay=uint32 0
 
     [org.gnome.desktop.screensaver]
-    lock-enabled=true
+    lock-enabled=false
     lock-delay=uint32 0
 
     [org.gnome.settings-daemon.plugins.power]

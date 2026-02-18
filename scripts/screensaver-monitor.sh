@@ -10,8 +10,8 @@ set -euo pipefail
 #   On activity          -> kill screensaver
 
 # Idle thresholds (milliseconds)
-IDLE_SCREENSAVER_MS=120000
-IDLE_LOCK_MS=240000
+IDLE_SCREENSAVER_MS=150000  # 2.5 minutes
+IDLE_LOCK_MS=160000         # ~2.5 min + 10 seconds
 
 SCREENSAVER_CLASS="org.meucci.screensaver"
 POLL_INTERVAL=2
@@ -46,7 +46,6 @@ while true; do
 
   if [[ "$IDLE_MS" -ge "$IDLE_LOCK_MS" ]] && [[ "$LOCK_SENT" == "false" ]]; then
     kill_screensaver
-    sleep 0.5
     lock_screen
     LOCK_SENT=true
   elif [[ "$IDLE_MS" -ge "$IDLE_SCREENSAVER_MS" ]] && [[ "$SCREENSAVER_ACTIVE" == "false" ]]; then

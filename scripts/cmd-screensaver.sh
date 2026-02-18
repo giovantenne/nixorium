@@ -22,12 +22,10 @@ trap 'stty "$STTY_STATE" 2>/dev/null || true; tput cnorm 2>/dev/null || true' EX
 # Non-blocking reads
 stty -echo -icanon time 0 min 0
 
-# Force pure black background on entire terminal (OSC 11)
-printf '\033]11;rgb:00/00/00\007'
-printf '\033[40m'
+# Clear screen
 clear
 
-# Available effects (excluding problematic ones)
+# Available effects
 EFFECTS=(
   beams binarypath blackhole bouncyballs bubbles burn colorshift
   crumble decrypt errorcorrect expand fireworks highlight laseretch
@@ -45,7 +43,6 @@ while true; do
     --canvas-height 0 \
     --anchor-canvas c \
     --anchor-text c \
-    --existing-color-handling ignore \
     "$EFFECT" 2>/dev/null &
   TTE_PID=$!
 
@@ -57,7 +54,5 @@ while true; do
   done
 
   sleep 1
-  printf '\033]11;rgb:00/00/00\007'
-  printf '\033[40m'
   clear
 done

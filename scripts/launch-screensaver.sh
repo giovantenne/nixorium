@@ -19,9 +19,6 @@ exec ghostty \
   --background=#000000 \
   --foreground=#f38d70 \
   --cursor-color=#000000 \
-  --background-opacity=1 \
-  --background-opacity-cells=true \
-  --window-padding-color=background \
   --mouse-hide-while-typing=true \
   --window-padding-x=0 \
   --window-padding-y=0 \
