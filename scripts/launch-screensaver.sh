@@ -12,6 +12,7 @@ if pgrep -f "$SCREENSAVER_CLASS" >/dev/null 2>&1; then
 fi
 
 # Launch Ghostty fullscreen with screensaver
+# Override palette color 0 (black) to pure black to avoid grey lines in TTE effects
 exec ghostty \
   --class="$SCREENSAVER_CLASS" \
   --fullscreen=true \
@@ -19,6 +20,8 @@ exec ghostty \
   --background=#000000 \
   --foreground=#f38d70 \
   --cursor-color=#000000 \
+  --palette=0=#000000 \
+  --palette=8=#000000 \
   --mouse-hide-while-typing=true \
   --window-padding-x=0 \
   --window-padding-y=0 \
