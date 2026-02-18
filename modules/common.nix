@@ -187,6 +187,14 @@
 
   programs.neovim.enable = true;
 
+  programs.git = {
+    enable = true;
+    config = {
+      credential.helper = "";
+      core.askPass = "";
+    };
+  };
+
   # Shell tooling and prompt.
   programs.starship.enable = true;
   # Starship prompt (Ristretto palette: warm oranges, soft pinks, muted tones)
@@ -229,6 +237,7 @@
       deleted = "";
     };
   };
+  programs.bash.completion.enable = true;
   programs.bash.shellAliases = {
     ls = "eza --icons --group-directories-first";
     lsa = "eza --icons -a --group-directories-first";
@@ -239,6 +248,8 @@
   programs.bash.interactiveShellInit = ''
     source ${pkgs.fzf}/share/fzf/key-bindings.bash
     source ${pkgs.fzf}/share/fzf/completion.bash
+    source ${pkgs.bash-completion}/share/bash-completion/bash_completion
+    source ${pkgs.git}/share/bash-completion/completions/git
   '';
   programs.zoxide.enable = true;
   programs.zoxide.enableBashIntegration = true;
@@ -266,6 +277,7 @@
     wget
     curl
     bat
+    bash-completion
     docker-compose
     dnsmasq
     eza
@@ -330,7 +342,11 @@
   environment.sessionVariables = {
     EDITOR = "gnome-text-editor";
     VISUAL = "gnome-text-editor";
+    GIT_ASKPASS = "";
+    SSH_ASKPASS_REQUIRE = "never";
   };
+
+  environment.variables.SSH_ASKPASS = lib.mkForce "";
 
   system.stateVersion = "25.11";
 
