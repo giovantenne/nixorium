@@ -25,24 +25,6 @@ if [[ -z "${MASTER_IP}" || "${MASTER_IP}" == "MASTER_DHCP_IP" ]]; then
   exit 1
 fi
 
-PROXY_CIDR=$(
-  ip -4 route show dev "${IFACE}" |
-    awk '$1 ~ /^[0-9]/ && $1 ~ /\// && $0 ~ /scope link/ { print $1; exit }'
-)
-
-if [[ -z "${PROXY_CIDR}" ]]; then
-  echo "Error: could not detect IPv4 subnet for interface ${IFACE}." >&2
-  exit 1
-fi
-
-PROXY_SUBNET=${PROXY_CIDR%/*}
-PROXY_PREFIX=${PROXY_CIDR#*/}
-PROXY_NETMASK=$(python3 - <<EOF
-import ipaddress
-print(ipaddress.IPv4Network("0.0.0.0/${PROXY_PREFIX}").netmask)
-EOF
-)
-
 if [[ ! -f result-kernel/bzImage ]]; then
   echo "Error: missing result-kernel/bzImage. Build netboot artifacts first." >&2
   exit 1
@@ -70,7 +52,8 @@ cp result-kernel/bzImage "${WORK_DIR}/http/bzImage"
 cp result-initrd/initrd "${WORK_DIR}/http/initrd"
 cp assets/ipxe/snponly.efi "${WORK_DIR}/tftp/snponly.efi"
 
-cat > "${WORK_DIR}/http/boot.ipxe" <<EOF
+# iPXE boot script: loads kernel and initrd over HTTP from pc99.
+cat > "${WORK_DIR}/tftp/boot.ipxe" <<EOF
 #!ipxe
 dhcp
 set base-url http://${MASTER_IP}:8080
@@ -79,24 +62,45 @@ initrd \${base-url}/initrd
 boot
 EOF
 
+# Replicate the DRBL/Clonezilla ProxyDHCP dnsmasq configuration.
+# In proxy mode, dnsmasq uses PXE Boot Server Discovery (port 4011) to tell
+# clients which file to load via TFTP.  The pxe-service directive handles
+# architecture-based routing automatically:
+#   - UEFI firmware (arch 00007/00009) -> snponly.efi  (iPXE)
+#   - iPXE re-does DHCP and identifies itself via user-class "iPXE"
+#     so dnsmasq gives it boot.ipxe instead via dhcp-boot tag matching.
+#
+# Critical: dhcp-boot with tags works alongside pxe-service in dnsmasq
+# because iPXE does a *standard DHCP request* (not PXE Boot Server Discovery),
+# so it receives the dhcp-boot filename. Native UEFI firmware uses the
+# pxe-service path instead.
 cat > "${WORK_DIR}/dnsmasq.conf" <<EOF
 port=0
 log-dhcp
 bind-interfaces
 interface=${IFACE}
+dhcp-no-override
 
 enable-tftp
 tftp-root=${WORK_DIR}/tftp
 
-dhcp-range=${PROXY_SUBNET},proxy,${PROXY_NETMASK}
+# ProxyDHCP: use the server's own IP (DRBL-style, not subnet).
+dhcp-range=${MASTER_IP},proxy
 
-dhcp-match=set:efi64,option:client-arch,6
-dhcp-match=set:efi64,option:client-arch,7
-dhcp-match=set:efi64,option:client-arch,9
+# Tag iPXE clients by their user-class header.
 dhcp-userclass=set:ipxe,iPXE
 
-dhcp-boot=tag:!ipxe,tag:efi64,snponly.efi,,${MASTER_IP}
-dhcp-boot=tag:ipxe,http://${MASTER_IP}:8080/boot.ipxe,,${MASTER_IP}
+# Stage 1 - UEFI firmware PXE boot: serve snponly.efi (iPXE) via TFTP.
+# These pxe-service lines respond to PXE Boot Server Discovery from native
+# UEFI firmware.  The 3-arg form (no server IP) means "this server".
+pxe-service=BC_EFI, "Boot iPXE UEFI BC", snponly.efi
+pxe-service=X86-64_EFI, "Boot iPXE UEFI x64", snponly.efi
+pxe-prompt="Network boot", 1
+
+# Stage 2 - iPXE chainload: serve boot.ipxe via TFTP.
+# iPXE issues a standard DHCP request (not PXE discovery), so dhcp-boot
+# applies here.  boot.ipxe then fetches kernel + initrd over HTTP.
+dhcp-boot=tag:ipxe,boot.ipxe
 EOF
 
 if ss -ltnp 2>/dev/null | awk '$4 ~ /:8080$/ { found=1 } END { exit found ? 0 : 1 }'; then

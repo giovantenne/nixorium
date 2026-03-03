@@ -113,7 +113,7 @@ log_ok "Netboot artifacts ready"
 # ── Step 5/7: iPXE bootstrap binary ─────────────────────────────────
 log_step "Step 5/7: Ensuring iPXE bootstrap binary (assets/ipxe/snponly.efi)"
 nix build nixpkgs#ipxe --out-link result-ipxe-bin
-install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
+install -D -m 0644 result-ipxe-bin/snponly.efi assets/ipxe/snponly.efi
 log_ok "snponly.efi installed"
 
 # ── Step 6/7: Pre-build all client closures ──────────────────────────

@@ -117,7 +117,7 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --
 Install the iPXE UEFI bootstrap binary:
 ```sh
 nix build nixpkgs#ipxe --out-link result-ipxe-bin
-install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
+install -D -m 0644 result-ipxe-bin/snponly.efi assets/ipxe/snponly.efi
 ```
 
 Pre-build all client closures so installs work offline via the local cache:
