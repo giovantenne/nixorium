@@ -62,6 +62,10 @@ initrd \${base-url}/initrd
 boot
 EOF
 
+# Some iPXE builds look for autoexec.ipxe when no boot filename is provided.
+# Keep an identical fallback script to avoid PXE boot loops.
+cp "${WORK_DIR}/tftp/boot.ipxe" "${WORK_DIR}/tftp/autoexec.ipxe"
+
 # Replicate the DRBL/Clonezilla ProxyDHCP dnsmasq configuration.
 # In proxy mode, dnsmasq uses PXE Boot Server Discovery (port 4011) to tell
 # clients which file to load via TFTP.  The pxe-service directive handles

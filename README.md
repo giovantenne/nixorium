@@ -94,7 +94,7 @@ The script performs these steps:
 2. Validates `flake.nix` settings (errors out if `masterDhcpIp` is not set)
 3. Rebuilds pc99 (`nixos-rebuild switch`)
 4. Builds netboot artifacts (kernel, initrd, iPXE script)
-5. Installs the iPXE bootstrap binary (`snponly.efi`)
+5. Installs the iPXE bootstrap binary (`snp.efi` from nixpkgs, saved as `assets/ipxe/snponly.efi`)
 6. Pre-builds all client closures (for offline install via local cache)
 7. Removes the static IP from the network interface (needed during netboot)
 
@@ -117,7 +117,7 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --
 Install the iPXE UEFI bootstrap binary:
 ```sh
 nix build nixpkgs#ipxe --out-link result-ipxe-bin
-install -D -m 0644 result-ipxe-bin/snponly.efi assets/ipxe/snponly.efi
+install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
 ```
 
 Pre-build all client closures so installs work offline via the local cache:
