@@ -85,7 +85,7 @@ in
     exec-arg='--'
 
     [org.gnome.settings-daemon.plugins.media-keys]
-    custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/']
+    custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/']
 
     [org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/]
     name='Ghostty'
@@ -96,6 +96,11 @@ in
     name='Chromium'
     command='/run/current-system/sw/bin/chromium'
     binding='<Super><Shift>Return'
+
+    [org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/]
+    name='Code'
+    command='/run/current-system/sw/bin/code'
+    binding='<Primary><Shift>c'
 
     [org.gnome.desktop.wm.keybindings]
     maximize=['<Super>Up']
