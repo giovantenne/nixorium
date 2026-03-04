@@ -1,4 +1,7 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, hostName, labSettings, ... }:
+let
+  isMaster = hostName == labSettings.masterHostName;
+in
 {
   # Enable flakes and nix-command
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -81,6 +84,19 @@
     exec='ghostty'
     exec-arg='--'
 
+    [org.gnome.settings-daemon.plugins.media-keys]
+    custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/']
+
+    [org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/]
+    name='Ghostty'
+    command='/run/current-system/sw/bin/ghostty'
+    binding='<Super>Return'
+
+    [org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/]
+    name='Chromium'
+    command='/run/current-system/sw/bin/chromium'
+    binding='<Super><Shift>Return'
+
     [org.gnome.desktop.wm.keybindings]
     maximize=['<Super>Up']
     unmaximize=['<Super>Down']
@@ -95,7 +111,10 @@
     [org.gnome.nautilus.icon-view]
     default-zoom-level='small'
   '';
-  services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.nautilus ];
+  services.desktopManager.gnome.extraGSettingsOverridePackages = [
+    pkgs.nautilus
+    pkgs.gnome-settings-daemon
+  ];
 
   # Disable GNOME initial setup and welcome
   services.gnome.gnome-initial-setup.enable = false;
@@ -106,6 +125,18 @@
     HandleLidSwitchExternalPower = "ignore";
     HandleLidSwitchDocked = "ignore";
   };
+
+  # Ensure pc99 never enters sleep/suspend/hibernate.
+  systemd.sleep.extraConfig = lib.mkIf isMaster ''
+    AllowSuspend=no
+    AllowHibernation=no
+    AllowHybridSleep=no
+    AllowSuspendThenHibernate=no
+  '';
+  systemd.targets.sleep.enable = lib.mkIf isMaster false;
+  systemd.targets.suspend.enable = lib.mkIf isMaster false;
+  systemd.targets.hibernate.enable = lib.mkIf isMaster false;
+  systemd.targets.hybrid-sleep.enable = lib.mkIf isMaster false;
 
   # VirtualBox guest additions (harmless on bare metal: the kernel module
   # simply fails to load and the service does not start).
@@ -371,7 +402,7 @@
       Type = "oneshot";
       ExecStart = "${pkgs.bash}/bin/bash /etc/lab/gnome-user-setup.sh";
     };
-    path = [ pkgs.glib pkgs.gsettings-desktop-schemas ];
+    path = [ pkgs.glib pkgs.gsettings-desktop-schemas pkgs.python3 ];
   };
 
   services.openssh = {

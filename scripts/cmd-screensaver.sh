@@ -16,14 +16,22 @@ tput civis 2>/dev/null || true
 
 STTY_STATE="$(stty -g)"
 
+# Draw in the terminal alternate screen to avoid scrollback/cursor drift.
+tput smcup 2>/dev/null || true
+
 # Restore terminal state on exit
-trap 'stty "$STTY_STATE" 2>/dev/null || true; tput cnorm 2>/dev/null || true' EXIT
+trap 'stty "$STTY_STATE" 2>/dev/null || true; tput cnorm 2>/dev/null || true; tput rmcup 2>/dev/null || true' EXIT
 
 # Non-blocking reads
 stty -echo -icanon time 0 min 0
 
+reset_canvas() {
+  # Home + full clear (+ scrollback clear when supported).
+  printf '\033[H\033[2J\033[3J'
+}
+
 # Clear screen
-clear
+reset_canvas
 
 # Available effects
 EFFECTS=(
@@ -36,6 +44,9 @@ EFFECTS=(
 
 while true; do
   EFFECT="${EFFECTS[$((RANDOM % ${#EFFECTS[@]}))]}"
+
+  # Ensure each effect starts from a stable full-screen origin.
+  reset_canvas
 
   tte -i "$SCREENSAVER_TEXT" \
     --frame-rate 120 \
@@ -53,6 +64,8 @@ while true; do
     fi
   done
 
+  wait "$TTE_PID" 2>/dev/null || true
+
   sleep 1
-  clear
+  reset_canvas
 done
