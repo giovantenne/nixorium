@@ -38,9 +38,9 @@ git clone https://github.com/giovantenne/nixos-lab.git
 cd ~/nixos-lab
 ```
 
-### Step 2 — Copy secret files
+### Step 2 — Copy or generate secret files
 
-Copy these three files into the repo folder `~/nixos-lab/` (all are in `.gitignore`):
+Place these three files in the repo folder `~/nixos-lab/` (all are in `.gitignore`):
 
 | File | Description |
 |---|---|
@@ -48,7 +48,29 @@ Copy these three files into the repo folder `~/nixos-lab/` (all are in `.gitigno
 | `id_ed25519` | Admin SSH private key |
 | `veyon-private-key.pem` | Veyon Master private key |
 
-Then install them all at once:
+If you already have the files from a previous deployment, copy them into `~/nixos-lab/`.
+
+If you need to generate them from scratch, run:
+```sh
+# Binary cache signing key for Harmonia
+nix key generate-secret --key-name lab-cache-key > secret-key
+nix key convert-secret-to-public < secret-key > public-key
+
+# Admin SSH key used by Colmena / SSH access
+ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@pc99'
+
+# Veyon RSA keypair
+openssl genrsa -out veyon-private-key.pem 4096
+openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
+```
+
+After generating new keys, update the repo configuration before continuing:
+
+- Replace `cachePublicKey` in `flake.nix` with the content of `public-key`.
+- Replace the hardcoded `ssh-ed25519 ...` public key in `modules/users.nix` with the content of `id_ed25519.pub` for both `root` and `admin`.
+- Keep `veyon-public-key.pem` in the repo so Nix deploys the matching public key to all PCs.
+
+Then install the local copies needed on `pc99`:
 ```sh
 cd ~/nixos-lab && \
   install -m 600 -D id_ed25519 ~/.ssh/id_ed25519 && \
@@ -79,28 +101,9 @@ vim flake.nix
 | `pcCount` | Number of student PCs | `30` |
 | `ifaceName` | Network interface name (from `ip -4 addr`) | `"enp0s3"` |
 
-> **Important**: this step is required before both Option A and Option B below.
+> **Important**: finish this step before preparing `pc99`.
 
 ### Step 4 — Prepare the controller (pc99)
-
-#### Option A — Automatic (recommended)
-
-```sh
-sudo ./scripts/prepare-pc99.sh
-```
-
-The script performs these steps:
-1. Checks prerequisites
-2. Validates `flake.nix` settings (errors out if `masterDhcpIp` is not set)
-3. Rebuilds pc99 (`nixos-rebuild switch`)
-4. Builds netboot artifacts (kernel, initrd, iPXE script)
-5. Installs the iPXE bootstrap binary (`snp.efi` from nixpkgs, saved as `assets/ipxe/snponly.efi`)
-6. Pre-builds all client closures (for offline install via local cache)
-7. Removes the static IP from the network interface (needed during netboot)
-
-When done, the script prints the commands to start the netboot services.
-
-#### Option B — Manual (step-by-step)
 
 Rebuild pc99 to apply the new `flake.nix` settings:
 ```sh
@@ -252,21 +255,6 @@ cp /var/lib/home-snapshots/snapshot-1/file.txt /home/informatica/
 Veyon is packaged locally (not in nixpkgs) and deployed on all PCs. The
 `veyon-service` systemd unit runs on every machine, accepting connections on
 port **11100**.
-
-Authentication uses RSA key-file mode:
-
-| Key | Location | Managed by |
-|---|---|---|
-| **Public key** (`veyon-public-key.pem`) | Committed in the repo, deployed to all PCs | Nix |
-| **Private key** (`veyon-private-key.pem`) | In `.gitignore`, installed in [Step 2](#step-2--copy-secret-files) | Manual |
-
-#### Generating keys
-
-Keys are generated once with openssl:
-```sh
-openssl genrsa -out veyon-private-key.pem 4096
-openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
-```
 
 #### Configuration
 
