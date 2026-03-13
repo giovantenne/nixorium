@@ -22,7 +22,7 @@
         if builtins.pathExists adminSshKeyFile then
           builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile adminSshKeyFile)
         else
-          throw "Missing ./id_ed25519.pub. Generate it with: ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'";
+          throw "Missing ./id_ed25519.pub. Generate it with: ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'\nIf you already have id_ed25519, regenerate the public key with: ssh-keygen -y -f id_ed25519 > id_ed25519.pub";
 
       # ── Import lab configuration ─────────────────────────────────
       # Edit lab-config.nix to customize for your environment.

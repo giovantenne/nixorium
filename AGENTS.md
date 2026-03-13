@@ -15,6 +15,8 @@ flake.lock                 # Pinned inputs (nixpkgs nixos-25.11, disko)
 lab-config.nix             # Lab configuration (edit for your environment)
 disko-uefi.nix             # Declarative disk partitioning (UEFI boot, parameterized student user)
 setup.sh                   # Installer script for PXE-booted client PCs
+public-key                 # Harmonia public key (generated locally, safe to commit)
+id_ed25519.pub             # Admin SSH public key (generated locally, safe to commit)
 veyon-public-key.pem       # Veyon RSA public key (deployed to all PCs)
 pkgs/
   veyon.nix                # Veyon package derivation (not in nixpkgs)
@@ -185,6 +187,7 @@ set -euo pipefail
 
 - **Never commit** `secret-key` or `id_ed25519` (both in `.gitignore`)
 - **Never commit** `veyon-private-key.pem` (in `.gitignore`); deploy manually to `/etc/veyon/keys/private/teacher/key` with mode `0640` and group `veyon-master`
+- `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` are public and may be committed
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management

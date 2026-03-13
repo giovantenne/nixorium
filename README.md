@@ -93,15 +93,28 @@ cd nixos-lab
 
 ### 3. Generate passwords, SSH keys, and Veyon keys
 
-The lab uses three cryptographic key pairs. All private keys are in `.gitignore` and must **never** be committed.
+The lab uses three cryptographic key pairs. Private keys must **never** be committed. Public key files are part of the declarative lab state and should be committed in your lab repo or fork.
 
 | Key pair | Private file | Public file / config | Purpose |
 |---|---|---|---|
-| **Binary cache** | `secret-key` | `cachePublicKey` in `flake.nix` | Harmonia signs Nix store paths; clients verify signatures |
-| **SSH** | `id_ed25519` | `id_ed25519.pub` | Admin SSH access + Colmena deploys (connects as `root`) |
+| **Binary cache** | `secret-key` | `public-key` (committed) | Harmonia signs Nix store paths; clients verify signatures |
+| **SSH** | `id_ed25519` | `id_ed25519.pub` (committed) | Admin SSH access + Colmena deploys (connects as `root`) |
 | **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
 
-If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`. Otherwise, generate everything from scratch:
+If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/` and regenerate the public files before rebuilding:
+
+```sh
+# Binary cache public key from the existing private key
+nix key convert-secret-to-public < secret-key > public-key
+
+# SSH public key from the existing private key
+ssh-keygen -y -f id_ed25519 > id_ed25519.pub
+
+# Veyon public key from the existing private key
+openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
+```
+
+Otherwise, generate everything from scratch:
 
 ```sh
 # Binary cache signing key for Harmonia
@@ -169,11 +182,14 @@ consoleKeyMap = "it2";
 
 > **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
 
-### 5. Copy secret files into position
+### 5. Copy keys into position
 
 ```sh
 # SSH private key -- used by Colmena to connect as root to all PCs
 install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
+
+# SSH public key -- useful for normal SSH tooling; keep a copy in the repo root too
+install -m 644 -D id_ed25519.pub ~/.ssh/id_ed25519.pub
 
 # Veyon private key -- only needed on the controller (where Veyon Master runs)
 # Only users in the veyon-master group (admin + teacher) can read it
@@ -183,7 +199,9 @@ sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/priva
 
 > `secret-key` just needs to be in the repo root (already there after step 3). `run-harmonia.sh` checks for it at startup and exits with an error if missing.
 
-> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists, that `id_ed25519.pub` is present in the repo root, and that the systems were rebuilt after generating it. If the binary cache is ignored (clients build from source), verify that `public-key` was regenerated from the current `secret-key` and included in the rebuild. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
+> `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` should stay in the repo root because `flake.nix` and the Veyon module read them from there. Commit those public files in your lab repo or fork; only the private key files stay untracked.
+
+> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists, that `id_ed25519.pub` is present in the repo root, and that the systems were rebuilt after generating it. If `id_ed25519.pub` is missing but you still have `id_ed25519`, regenerate it with `ssh-keygen -y -f id_ed25519 > id_ed25519.pub`. If the binary cache is ignored (clients build from source), verify that `public-key` was regenerated from the current `secret-key` with `nix key convert-secret-to-public < secret-key > public-key` and included in the rebuild. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
 
 ### 6. Rebuild the controller
 
@@ -297,7 +315,7 @@ All lab-specific settings are defined in `lab-config.nix`. No other file needs e
 | `teacherPassword` | Teacher password (SHA-512 hash) | -- |
 | `studentPassword` | Student password (SHA-512 hash) | -- |
 | `adminPassword` | Admin password (SHA-512 hash) | -- |
-| `id_ed25519.pub` | SSH public key for root and admin | Generated from `id_ed25519` |
+| `id_ed25519.pub` | SSH public key for root and admin | Generated from `id_ed25519`, safe to commit |
 | `homepageUrl` | Chromium browser homepage | `"https://github.com/giovantenne/nixos-lab"` |
 | `studentGitName` | Git author name for student template | `"student"` |
 | `studentGitEmail` | Git author email for student template | `"student@example.com"` |
@@ -384,6 +402,8 @@ flake.lock                 # Pinned inputs (nixpkgs, disko)
 lab-config.nix             # Lab configuration (edit for your environment)
 disko-uefi.nix             # Declarative disk partitioning (UEFI + Btrfs)
 setup.sh                   # Client PC installer (runs on PXE-booted machines)
+public-key                 # Harmonia public key (generated locally, safe to commit)
+id_ed25519.pub             # Admin SSH public key (generated locally, safe to commit)
 veyon-public-key.pem       # Veyon RSA public key (deployed to all PCs)
 pkgs/
   veyon.nix                # Veyon package derivation
@@ -416,6 +436,7 @@ assets/
 ## Security
 
 - **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all in `.gitignore`)
+- `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` are public and should be committed in your lab repo or fork
 - Passwords are SHA-512 hashed; never store plaintext
 - SSH password authentication is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
