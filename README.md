@@ -104,9 +104,6 @@ The lab uses three cryptographic key pairs. All private keys are in `.gitignore`
 If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`. Otherwise, generate everything from scratch:
 
 ```sh
-# Hashed passwords (run once per user, paste each hash into lab-config.nix)
-mkpasswd -m sha-512
-
 # Binary cache signing key for Harmonia
 nix key generate-secret --key-name lab-cache-key > secret-key
 nix key convert-secret-to-public < secret-key > public-key
@@ -161,6 +158,13 @@ defaultLocale = "en_US.UTF-8";
 extraLocale = "it_IT.UTF-8";
 keyboardLayout = "it";
 consoleKeyMap = "it2";
+```
+
+Generate the password hashes after editing the file structure, then paste them into the three password fields above:
+
+```sh
+# Hashed passwords (run once per user, paste each hash into lab-config.nix)
+mkpasswd -m sha-512
 ```
 
 Also update key files in the repo:
