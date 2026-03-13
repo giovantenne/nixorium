@@ -11,18 +11,32 @@
 
   outputs = { self, nixpkgs, disko }:
     let
-      # ====== EDIT THESE ======
-      # DHCP IP of the master (used by clients during netboot install)
-      masterDhcpIp = "MASTER_DHCP_IP";
-      # Static IP network base (each PC gets networkBase.N)
-      networkBase = "10.22.9";
-      pcCount = 30;
-      # Shared interface name on lab PCs
-      ifaceName = "enp0s3";
-      # =======================
+      # ── Import lab configuration ─────────────────────────────────
+      # Edit lab-config.nix to customize for your environment.
+      config = import ./lab-config.nix;
 
-      # Fixed controller host number (do not edit)
-      masterHostNumber = 99;
+      inherit (config) masterDhcpIp;
+      inherit (config) networkBase;
+      inherit (config) pcCount;
+      inherit (config) masterHostNumber;
+      inherit (config) ifaceName;
+      inherit (config) teacherUser;
+      inherit (config) studentUser;
+      inherit (config) teacherPassword;
+      inherit (config) studentPassword;
+      inherit (config) adminPassword;
+      inherit (config) adminSshKey;
+      inherit (config) homepageUrl;
+      inherit (config) studentGitName;
+      inherit (config) studentGitEmail;
+      inherit (config) adminGitName;
+      inherit (config) adminGitEmail;
+      inherit (config) veyonLocationName;
+      inherit (config) timeZone;
+      inherit (config) defaultLocale;
+      inherit (config) extraLocale;
+      inherit (config) keyboardLayout;
+      inherit (config) consoleKeyMap;
 
       masterHostName = "pc${toString masterHostNumber}";
       masterIp = "${networkBase}.${toString masterHostNumber}";
@@ -57,9 +71,27 @@
         inherit masterIp;
         inherit masterDhcpIp;
         inherit masterHostName;
+        inherit masterHostNumber;
         inherit networkBase;
         inherit pcCount;
         inherit ifaceName;
+        inherit teacherUser;
+        inherit studentUser;
+        inherit teacherPassword;
+        inherit studentPassword;
+        inherit adminPassword;
+        inherit adminSshKey;
+        inherit homepageUrl;
+        inherit studentGitName;
+        inherit studentGitEmail;
+        inherit adminGitName;
+        inherit adminGitEmail;
+        inherit veyonLocationName;
+        inherit timeZone;
+        inherit defaultLocale;
+        inherit extraLocale;
+        inherit keyboardLayout;
+        inherit consoleKeyMap;
         cachePublicKey = "lab-cache-key:jJsA9nDLNlyzhBOj5rfSKcEL2IwNspxrbNCyqmvdUvI=";
         cachePort = 5000;
       };
@@ -102,6 +134,8 @@
           };
         };
     in
+    assert masterHostNumber > pcCount
+      || throw "masterHostNumber (${toString masterHostNumber}) must be greater than pcCount (${toString pcCount})";
     {
       nixosConfigurations = builtins.listToAttrs (map mkHost pcNumbers) // {
         ${masterHostName} = nixpkgs.lib.nixosSystem {
@@ -121,7 +155,7 @@
             ./modules/cache.nix
             ({ pkgs, lib, ... }: {
               # During netboot the master is only reachable on its DHCP address
-              nix.settings.substituters = lib.mkForce [ "http://${masterDhcpIp}:5000" ];
+              nix.settings.substituters = lib.mkForce [ "http://${masterDhcpIp}:${toString labSettings.cachePort}" ];
               networking.useDHCP = lib.mkForce true;
               services.openssh.enable = true;
               environment.systemPackages = [ disko.packages.${system}.default ];
@@ -149,7 +183,7 @@
             buildOnTarget = false;
           };
         };
-        # pc99 (master) deploys to itself locally
+        # Controller deploys to itself locally
         ${masterHostName} = {
           _module.args = {
             inherit labSettings;

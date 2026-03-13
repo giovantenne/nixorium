@@ -1,44 +1,150 @@
-# NixOS Lab Deployment (Zero-Internet Workflow)
+# NixOS Lab
 
-This repository manages a 31-PC NixOS lab with network installation (Netboot),
-no internet on clients, and a master PC (`pc99`) as the local controller.
+A reproducible NixOS deployment system for multi-PC environments (classrooms, training rooms, public labs, libraries) with **no internet access on client machines**.
+
+One controller PC manages the entire lab: it builds all configurations locally, serves them over LAN, and deploys updates to every workstation declaratively. The whole lab can be reinstalled from scratch in under 20 minutes.
+
+## Why this exists
+
+Managing a multi-PC lab is painful. Machines drift over time, reinstalling by hand is slow and error-prone, and keeping many systems consistent is a full-time job. Traditional tools like Ansible help, but they can't guarantee that two machines built a week apart end up identical.
+
+NixOS solves this with **declarative, reproducible configurations** -- but most NixOS workflows assume internet access. In many schools, offices, and public labs, client PCs either have no internet at all or only get access after a user logs into an institutional network.
+
+This project bridges that gap with a **local-first workflow**:
+
+- A single controller PC acts as the build server, binary cache, and PXE boot server
+- Client PCs are installed and updated entirely over the LAN
+- One `flake.nix` file is the single source of truth for the entire lab
+- Everything is parameterizable -- user names, passwords, network settings, locale -- so you can fork this repo and adapt it to your environment in minutes
+
+## Features
+
+- **Zero-internet client installation** -- PXE/netboot + local binary cache (Harmonia), no USB drives needed per client
+- **Single source of truth** -- one `flake.nix` generates all host configurations programmatically
+- **Multi-machine orchestration** -- deploy updates to all PCs at once with Colmena
+- **Student home directory reset** -- homes are restored to a clean template on every boot, with the last 5 sessions saved as Btrfs snapshots for recovery
+- **Classroom management** -- Veyon is pre-configured with all lab PCs mapped, ready to use
+- **Fully parameterizable** -- user names, PC count, network layout, passwords, locale, homepage, and more are all configurable from a single settings block
+- **Dual networking** -- DHCP for institutional network integration + static IPs for the internal lab network
+- **UEFI + Btrfs** -- modern boot with declarative disk partitioning (Disko) and snapshot support
+- **GNOME desktop** -- pre-configured with dark theme, development tools, and terminal customization
 
 ## Architecture
 
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      Controller (pcNN)                           │
+│                                                                  │
+│  Nix Flake ──► Build all configs ──► Harmonia (binary cache)     │
+│                                      PXE/Netboot server          │
+│                                      Colmena orchestration       │
+└──────────────────────┬───────────────────────────────────────────┘
+                       │ LAN (static IPs)
+        ┌──────────────┼──────────────┐
+        │              │              │
+   ┌────▼────┐   ┌────▼────┐   ┌────▼────┐
+   │  pc01   │   │  pc02   │   │  pcNN   │
+   │ Student │   │ Student │   │ Student │
+   │Workstat.│   │Workstat.│   │Workstat.│
+   └─────────┘   └─────────┘   └─────────┘
+```
+
 | Component | Description |
 |---|---|
-| **Controller** (`pc99`) | PXE/Netboot server, local binary cache, Colmena orchestration |
-| **Nodes** (`pc01`–`pc30`) | 30 student workstations, Btrfs filesystem |
-| **Networking** | Install and updates over LAN only, no internet on clients |
-| **Boot mode** | UEFI only |
+| **Controller** | PXE/Netboot server, local binary cache, Colmena orchestration |
+| **Client PCs** | Student workstations with Btrfs snapshots and home reset |
+| **Networking** | Installation and updates over LAN only, no internet required on clients |
+| **Boot mode** | UEFI only, declarative partitioning with Disko |
 
----
+## Quick start
 
-## Setup
+### 1. Fork and configure
 
-### Step 1 — Bootstrap pc99 from USB
+Fork this repository, then edit `lab-config.nix` with your lab's settings:
+
+```nix
+# ── Network ────────────────────────────────────────────────────
+masterDhcpIp = "MASTER_DHCP_IP";   # Set after first boot (ip -4 addr)
+networkBase = "10.0.0";             # First 3 octets of static lab subnet
+pcCount = 20;                       # Number of student PCs
+masterHostNumber = 99;              # Controller PC number
+ifaceName = "enp0s3";               # Network interface name
+
+# ── User accounts ─────────────────────────────────────────────
+teacherUser = "teacher";            # Teacher account name
+studentUser = "student";            # Student account name
+
+# ── Passwords (SHA-512 hashed) ────────────────────────────────
+# Generate with: mkpasswd -m sha-512
+teacherPassword = "...";
+studentPassword = "...";
+adminPassword = "...";
+
+# ── SSH ────────────────────────────────────────────────────────
+adminSshKey = "ssh-ed25519 AAAA... admin@controller";
+
+# ── School / organization ──────────────────────────────────────
+homepageUrl = "https://example.com";
+studentGitName = "student";
+studentGitEmail = "student@example.com";
+adminGitName = "admin";
+adminGitEmail = "admin@example.com";
+veyonLocationName = "Lab";
+
+# ── Locale / timezone ──────────────────────────────────────────
+timeZone = "Europe/Rome";
+defaultLocale = "en_US.UTF-8";
+extraLocale = "it_IT.UTF-8";
+keyboardLayout = "it";
+consoleKeyMap = "it2";
+```
+
+### 2. Generate passwords and SSH keys
+
+```sh
+# Generate hashed passwords
+mkpasswd -m sha-512
+
+# Generate SSH keypair
+ssh-keygen -t ed25519 -C "admin@controller"
+```
+
+### 3. Generate Veyon keys
+
+```sh
+openssl genrsa -out veyon-private-key.pem 4096
+openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
+```
+
+Commit `veyon-public-key.pem` to the repo. Keep `veyon-private-key.pem` private (it's in `.gitignore`).
+
+### 4. Bootstrap the controller from USB
 
 > **Requires**: temporary internet access on this first boot. UEFI boot must be enabled.
 
-From the NixOS live USB, partition and install:
+From the NixOS live USB:
 ```sh
-curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/scripts/install-pc99.sh | bash
-```
-If one disk is detected, the script selects it automatically; if multiple disks
-are detected, it asks you to choose one.
+# If using the default repo:
+curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/scripts/install-controller.sh | bash
 
-After the installation finishes, reboot:
-```sh
-reboot
+# If using your own fork:
+curl -fsSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/scripts/install-controller.sh | \
+  FLAKE_REF="github:YOUR_USER/YOUR_REPO" \
+  DISKO_URL="https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/disko-uefi.nix" \
+  MASTER_HOST_NUMBER=99 \
+  bash
 ```
 
-After the first reboot, log in as `admin` and clone the repo:
+If one disk is detected, the script selects it automatically; if multiple disks are detected, it asks you to choose one.
+
+After the installation finishes, reboot and log in as `admin`.
+
+### 5. Clone and copy secrets
+
 ```sh
-git clone https://github.com/giovantenne/nixos-lab.git
+git clone https://github.com/YOUR_USER/YOUR_REPO.git
 cd ~/nixos-lab
 ```
-
-### Step 2 — Copy or generate secret files
 
 Place these three files in the repo folder `~/nixos-lab/` (all are in `.gitignore`):
 
@@ -57,7 +163,7 @@ nix key generate-secret --key-name lab-cache-key > secret-key
 nix key convert-secret-to-public < secret-key > public-key
 
 # Admin SSH key used by Colmena / SSH access
-ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@pc99'
+ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'
 
 # Veyon RSA keypair
 openssl genrsa -out veyon-private-key.pem 4096
@@ -67,112 +173,90 @@ openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
 After generating new keys, update the repo configuration before continuing:
 
 - Replace `cachePublicKey` in `flake.nix` with the content of `public-key`.
-- Replace the hardcoded `ssh-ed25519 ...` public key in `modules/users.nix` with the content of `id_ed25519.pub` for both `root` and `admin`.
+- Replace `adminSshKey` in `lab-config.nix` with the content of `id_ed25519.pub`.
 - Keep `veyon-public-key.pem` in the repo so Nix deploys the matching public key to all PCs.
 
-Then install the local copies needed on `pc99`:
+Then install the local copies needed on the controller:
 ```sh
-cd ~/nixos-lab && \
-  install -m 600 -D id_ed25519 ~/.ssh/id_ed25519 && \
-  sudo install -d -m 0750 -g veyon-master /etc/veyon/keys/private/teacher && \
-  sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/private/teacher/key
+install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
+sudo install -d -m 0750 -g veyon-master /etc/veyon/keys/private/teacher
+sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/private/teacher/key
 ```
 
 > `secret-key` just needs to be in the repo root (already there after the copy).
-> Only users in the `veyon-master` group (`admin`, `docente`) can read the Veyon
-> private key and use Veyon Master.
+> Only users in the `veyon-master` group (`admin` and the teacher user) can read the Veyon private key.
 
-### Step 3 — Configure flake.nix
+### 6. Set the DHCP address
 
-Find the DHCP address and interface name of pc99:
+Find the controller's DHCP address and interface name:
 ```sh
 ip -4 addr
 ```
 
-Edit the settings at the top of `flake.nix`:
+Edit `masterDhcpIp` and `ifaceName` in `lab-config.nix` if not already set.
+
+### 7. Prepare the controller
+
 ```sh
-vim flake.nix
-```
+# Rebuild the controller
+sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
 
-| Variable | Description | Example |
-|---|---|---|
-| `masterDhcpIp` | DHCP address of pc99 (from `ip -4 addr`) | `"192.168.1.100"` |
-| `networkBase` | First 3 octets of the static lab subnet | `"10.22.9"` |
-| `pcCount` | Number of student PCs | `30` |
-| `ifaceName` | Network interface name (from `ip -4 addr`) | `"enp0s3"` |
-
-> **Important**: finish this step before preparing `pc99`.
-
-### Step 4 — Prepare the controller (pc99)
-
-Rebuild pc99 to apply the new `flake.nix` settings:
-```sh
-sudo nixos-rebuild switch --flake .#pc99 --no-write-lock-file
-```
-
-Build the netboot artifacts:
-```sh
+# Build netboot artifacts
 nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
-```
 
-Install the iPXE UEFI bootstrap binary:
-```sh
+# Install iPXE bootstrap binary
 nix build nixpkgs#ipxe --out-link result-ipxe-bin
 install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
-```
 
-Pre-build all client closures so installs work offline via the local cache:
-```sh
-nix build .#nixosConfigurations.pc{01..30}.config.system.build.toplevel
-```
+# Pre-build all client closures
+PC_COUNT=$(awk '/pcCount =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
+TARGETS=()
+for i in $(seq 1 "$PC_COUNT"); do
+  TARGETS+=(".#nixosConfigurations.pc$(printf "%02d" "$i").config.system.build.toplevel")
+done
+nix build "${TARGETS[@]}"
 
-Remove the static IP so pc99 uses only its DHCP address during netboot
-(the static IP returns automatically after a reboot):
-```sh
-STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' flake.nix).$(awk '/masterHostNumber =/ { gsub(/;/, "", $3); print $3; exit }' flake.nix)
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' flake.nix)
+# Remove static IP for netboot (returns after reboot)
+STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' lab-config.nix).$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
+IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
 sudo ip addr del "${STATIC_IP}/24" dev "${IFACE}"
 ```
 
-### Step 5 — Start netboot services
+### 8. Start netboot services
 
-Open **two separate terminals** and run:
+Open **two separate terminals**:
 
-**Terminal 1** — Binary cache:
+**Terminal 1** -- Binary cache:
 ```sh
 ./scripts/run-harmonia.sh
 ```
 
-**Terminal 2** — ProxyDHCP + TFTP + HTTP netboot server:
+**Terminal 2** -- ProxyDHCP + TFTP + HTTP netboot server:
 ```sh
 sudo ./scripts/run-pxe-proxy.sh
 ```
 
-> **Note**: both processes run in the foreground. Keep the terminals open
-> during the entire client installation process.
+> Both processes run in the foreground. Keep the terminals open during client installation.
 
-### Step 6 — Install client PCs
+### 9. Install client PCs
 
-On each client PC, enable **UEFI network boot** in the BIOS/firmware settings.
-The PC will PXE-boot into a NixOS ramdisk environment.
+On each client PC, enable **UEFI network boot** in the BIOS/firmware settings. The PC will PXE-boot into a NixOS ramdisk environment.
 
-On the booted client, run the installer:
+On the booted client:
 ```sh
 cd /installer/repo
 ./setup.sh XX
 ```
 Where `XX` is the PC number (e.g., `./setup.sh 5` for `pc05`).
 
-> `setup.sh` auto-selects the disk if only one is present; if multiple disks
-> are detected, it asks for a choice and requires a final confirmation before
-> wiping it.
+> `setup.sh` auto-selects the disk if only one is present; if multiple disks are detected, it asks for a choice.
 
-When all clients are installed, restore the static IP on pc99 (or just reboot it):
+When all clients are installed, restore the static IP on the controller (or just reboot it):
 ```sh
-STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' flake.nix).$(awk '/masterHostNumber =/ { gsub(/;/, "", $3); print $3; exit }' flake.nix)
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' flake.nix)
+STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' lab-config.nix).$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
+IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
 sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 ```
 
@@ -182,9 +266,7 @@ sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 
 ### Deploy updates (Colmena)
 
-The master (`pc99`) pushes updates to all lab PCs via SSH.
-
-Start the binary cache first (required for client builds):
+Start the binary cache first:
 ```sh
 ./scripts/run-harmonia.sh
 ```
@@ -201,53 +283,83 @@ nix run nixpkgs#colmena -- apply --impure --on pc05
 
 ### Manual rebuild
 
-To manually rebuild a single PC from the latest GitHub config:
+Rebuild a single PC from the latest config:
 ```sh
-sudo nixos-rebuild switch --flake github:giovantenne/nixos-lab#pc99 --no-write-lock-file --refresh
+sudo nixos-rebuild switch --flake github:YOUR_USER/YOUR_REPO#pc05 --no-write-lock-file --refresh
 ```
-Replace `pc99` with the appropriate hostname (e.g., `pc01`, `pc15`).
 
 ---
 
-## Reference
+## Configuration reference
+
+### Settings overview
+
+All lab-specific settings are defined in `lab-config.nix`. No other file needs editing for basic customization.
+
+| Setting | Description | Default |
+|---|---|---|
+| `masterDhcpIp` | DHCP address of the controller | `"MASTER_DHCP_IP"` |
+| `networkBase` | First 3 octets of the static lab subnet | `"10.0.0"` |
+| `pcCount` | Number of student PCs | `20` |
+| `masterHostNumber` | Controller PC number (must be > `pcCount`) | `99` |
+| `ifaceName` | Network interface name (shared across all PCs) | `"enp0s3"` |
+| `teacherUser` | Teacher account name | `"teacher"` |
+| `studentUser` | Student account name (autologin, home reset) | `"student"` |
+| `teacherPassword` | Teacher password (SHA-512 hash) | -- |
+| `studentPassword` | Student password (SHA-512 hash) | -- |
+| `adminPassword` | Admin password (SHA-512 hash) | -- |
+| `adminSshKey` | SSH public key for root and admin | -- |
+| `homepageUrl` | Chromium browser homepage | `"https://example.com"` |
+| `studentGitName` | Git author name for student template | `"student"` |
+| `studentGitEmail` | Git author email for student template | `"student@example.com"` |
+| `adminGitName` | Git author name for admin template | `"admin"` |
+| `adminGitEmail` | Git author email for admin template | `"admin@example.com"` |
+| `veyonLocationName` | Veyon classroom location name | `"Lab"` |
+| `timeZone` | System timezone | `"Europe/Rome"` |
+| `defaultLocale` | Default system locale | `"en_US.UTF-8"` |
+| `extraLocale` | Locale for LC_* settings | `"it_IT.UTF-8"` |
+| `keyboardLayout` | X11 keyboard layout | `"it"` |
+| `consoleKeyMap` | Console keymap | `"it2"` |
+
+### User accounts
+
+| User | Role | Details |
+|---|---|---|
+| `admin` | System administrator | SSH access, sudo, Veyon Master access |
+| Teacher (configurable) | Instructor | Veyon Master access, persistent home, snapshot bookmark |
+| Student (configurable) | Student | Autologin on client PCs, home reset at every boot |
+| `root` | System | Password disabled, SSH key access only |
 
 ### Disk layout (Disko)
 
-Declarative disk config is in `disko-uefi.nix`. All machines must boot in **UEFI mode**.
+All machines must boot in **UEFI mode**. Disk partitioning is declarative via `disko-uefi.nix`.
 
 | Partition | Filesystem | Mount point |
 |---|---|---|
 | EFI System Partition | FAT32 | `/boot` |
-| Root partition (`nixos`) | Btrfs | — |
+| Root partition | Btrfs | -- |
 
 Btrfs subvolumes:
 
 | Subvolume | Mount point |
 |---|---|
 | `@root` | `/` |
-| `@home-informatica` | `/home/informatica` |
+| `@home-<studentUser>` | `/home/<studentUser>` |
 | `@snapshots` | `/var/lib/home-snapshots` |
-
-GRUB is enabled in UEFI mode with a 5-second timeout and `os-prober` enabled.
-Windows installations on other disks are detected when GRUB is regenerated
-(`nixos-install` / `nixos-rebuild switch`).
 
 ### Home reset and snapshots
 
-The `informatica` home directory resets to a clean template on every boot:
+The student home directory resets to a clean template on every boot:
 
-- **Template**: generated at activation time with git config, VS Code settings,
-  and XDG directories.
-- **Snapshots**: the last 5 versions are saved in `/var/lib/home-snapshots/`
-  (accessible by `admin`, `docente`, and `root`).
+- **Template**: generated at activation time with git config, VS Code settings and extensions, and XDG directories
+- **Snapshots**: the last 5 sessions are saved in `/var/lib/home-snapshots/` (accessible by `admin`, the teacher user, and `root`)
 
-The `docente` user has a **Snapshot Studenti** bookmark in the Nautilus (Files)
-sidebar pointing to the snapshots directory.
+The teacher user has a **Snapshot Studenti** bookmark in the Nautilus sidebar.
 
 To recover student work from a previous session:
 ```sh
 ls /var/lib/home-snapshots/snapshot-1/
-cp /var/lib/home-snapshots/snapshot-1/file.txt /home/informatica/
+cp /var/lib/home-snapshots/snapshot-1/file.txt /home/<studentUser>/
 ```
 
 ### Veyon (classroom management)
@@ -258,6 +370,69 @@ port **11100**.
 
 #### Configuration
 
-A base configuration with all 30 lab PCs pre-mapped is deployed to
-`/etc/xdg/Veyon Solutions/Veyon.conf`. Admin or docente can customize the
-layout via `veyon-configurator`.
+- **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all in `.gitignore`)
+- Passwords are SHA-512 hashed; never store plaintext
+- SSH password authentication is disabled; key-based only
+- `users.mutableUsers = false` enforces declarative user management
+- The Veyon private key is readable only by the `veyon-master` group
+
+### Customizing packages and desktop
+
+The default desktop is GNOME (Wayland) with a curated set of development tools. To customize:
+
+- **System packages**: edit the `environment.systemPackages` list in `modules/common.nix`
+- **GNOME settings**: edit the `extraGSettingsOverrides` in `modules/common.nix`
+- **Screensaver**: replace `assets/meucci.txt` with your own ASCII art
+- **Wallpapers**: replace images in `assets/backgrounds/`
+- **VS Code extensions**: edit the `vscodeExtensions` list in `modules/home-reset.nix`
+
+---
+
+## Project structure
+
+```
+flake.nix                  # Entry point: host generation, Colmena config
+flake.lock                 # Pinned inputs (nixpkgs, disko)
+lab-config.nix             # Lab configuration (edit for your environment)
+disko-uefi.nix             # Declarative disk partitioning (UEFI + Btrfs)
+setup.sh                   # Client PC installer (runs on PXE-booted machines)
+veyon-public-key.pem       # Veyon RSA public key (deployed to all PCs)
+pkgs/
+  veyon.nix                # Veyon package derivation
+  gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
+modules/
+  common.nix               # GNOME desktop, packages, shells, locale, services
+  hardware.nix             # Generic hardware detection
+  networking.nix           # Hostname + static IP per host
+  users.nix                # User accounts and autologin
+  cache.nix                # Binary cache client configuration
+  filesystems.nix          # Btrfs support
+  home-reset.nix           # Student home templating + boot-time reset
+  veyon.nix                # Veyon service, keys, and classroom config
+scripts/
+  install-controller.sh    # Controller bootstrap from live USB
+  run-harmonia.sh          # Binary cache server
+  run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server
+  cmd-screensaver.sh       # TTE screensaver animation loop
+  launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
+  screensaver-monitor.sh   # GNOME idle watcher for screensaver
+  create-home-template.sh  # Home directory template builder
+  home-reset.sh            # Boot-time snapshot rotation + home reset
+assets/
+  backgrounds/             # Wallpapers (randomly selected at home reset)
+  meucci.txt               # ASCII art for screensaver
+  mimeapps.list            # Default applications
+  vscode-settings.json     # VS Code defaults
+```
+
+## Security
+
+- **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all in `.gitignore`)
+- Passwords are SHA-512 hashed; never store plaintext
+- SSH password authentication is disabled; key-based only
+- `users.mutableUsers = false` enforces declarative user management
+- The Veyon private key is readable only by the `veyon-master` group
+
+## License
+
+This project is open source. Feel free to fork, adapt, and use it for your own lab environment.

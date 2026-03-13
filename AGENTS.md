@@ -1,44 +1,48 @@
 # AGENTS.md
 
-This repository manages a 31-PC NixOS school computer lab using Nix Flakes,
-Disko, and Colmena. The master controller (`pc99`, IP `10.22.9.99`) deploys to
-30 student workstations over a LAN-only network (no internet on clients).
+This repository manages a multi-PC NixOS lab using Nix Flakes,
+Disko, and Colmena. A controller PC deploys to student workstations
+over a LAN-only network (no internet on clients).
+
+All lab-specific settings (user names, PC count, network layout, passwords,
+locale, etc.) are parameterized in `lab-config.nix` and imported by `flake.nix`.
 
 ## Project Structure
 
 ```
-flake.nix                  # Entry point: generates pc01-pc30 + pc99 configs + netboot + Colmena
+flake.nix                  # Entry point: imports lab-config.nix, host generation + netboot + Colmena
 flake.lock                 # Pinned inputs (nixpkgs nixos-25.11, disko)
-disko-uefi.nix             # Declarative disk partitioning (UEFI boot)
+lab-config.nix             # Lab configuration (edit for your environment)
+disko-uefi.nix             # Declarative disk partitioning (UEFI boot, parameterized student user)
 setup.sh                   # Installer script for PXE-booted client PCs
 public-key                 # Binary cache public key (for reference)
 veyon-public-key.pem       # Veyon RSA public key (deployed to all PCs)
 pkgs/
   veyon.nix                # Veyon package derivation (not in nixpkgs)
+  gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
 modules/
-  common.nix               # Shared system config (GNOME, packages, shells, services)
+  common.nix               # Shared system config (GNOME, packages, shells, locale, services)
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
-  users.nix                # User accounts (admin + docente + informatica student, veyon-master group)
-  cache.nix                # Binary cache client (points to pc99's Harmonia)
+  users.nix                # User accounts (admin + teacher + student, veyon-master group)
+  cache.nix                # Binary cache client (points to controller's Harmonia)
   filesystems.nix          # Btrfs subvolume mount declarations
   home-reset.nix           # Student home directory templating + boot-time reset
   veyon.nix                # Veyon service, public key, firewall, base config
 scripts/
-  install-pc99.sh          # Live USB bootstrap installer for pc99 with disk selection
+  install-controller.sh    # Live USB bootstrap installer for controller with disk selection
   run-harmonia.sh          # Launches Harmonia binary cache server
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server (external DHCP compatible)
   create-home-template.sh  # Builds clean home directory template
   home-reset.sh            # Boot-time snapshot rotation + home reset
-  gnome-user-setup.sh      # GNOME favorites and welcome setup
+  cmd-screensaver.sh       # TTE screensaver animation loop
+  launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
+  screensaver-monitor.sh   # GNOME idle watcher for screensaver
 assets/
   backgrounds/             # Ristretto wallpapers (random at each home-reset)
-    1-ristretto.jpg
-    2-ristretto.jpg
-    3-ristretto.jpg
-  ipxe/
-    README.md              # Notes about required iPXE bootstrap binaries
+  meucci.txt               # ASCII art for screensaver
   mimeapps.list            # Default browser = Chromium
+  vscode-settings.json     # VS Code defaults
 ```
 
 ## Build / Deploy Commands
@@ -51,10 +55,10 @@ nix eval .#nixosConfigurations.pc01.config.system.build.toplevel --no-write-lock
 nix build .#nixosConfigurations.pc01.config.system.build.toplevel
 
 # Build all client closures
-nix build .#nixosConfigurations.pc{01..30}.config.system.build.toplevel
+nix build .#nixosConfigurations.pc{01..20}.config.system.build.toplevel
 
-# Rebuild and activate on the local machine (pc99)
-sudo nixos-rebuild switch --flake .#pc99 --no-write-lock-file
+# Rebuild and activate on the local machine (controller)
+sudo nixos-rebuild switch --flake .#pcNN --no-write-lock-file
 
 # Deploy to all lab PCs via Colmena
 colmena apply --on @lab
@@ -73,17 +77,19 @@ To validate changes, build the affected host configuration (`nix build`).
 
 ## Architecture Notes
 
-- Hosts pc01-pc30 are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost` in `flake.nix`, with pc99 defined separately as the controller.
+- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost` in `flake.nix`, with the controller defined separately.
 - Hostname + static IP are centralized in `flake.nix` (derived from `networkBase` + host number) and applied in `modules/networking.nix`. Each PC gets both a DHCP address and a static address on the same interface.
 - Custom settings flow from `flake.nix` via `specialArgs` (`labSettings`, `hostName`, `hostIp`) to modules that need them.
+- `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - No custom NixOS options are declared (`options = { ... }`). This repo only sets existing nixpkgs options.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
 - Netboot uses `dnsmasq` in ProxyDHCP mode (`scripts/run-pxe-proxy.sh`) so institutional DHCP remains authoritative for leases.
 - `labOverlay` in `flake.nix` provides custom packages (e.g. `pkgs.veyon` via `callPackage ./pkgs/veyon.nix {}`). Applied via `nixpkgs.overlays` in each host's module list and in `colmena.meta.nixpkgs`.
-- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` on all PCs, deploys the public key, generates a `Veyon.conf` with all 30 client PCs pre-mapped, and opens port 11100. The private key is not managed by Nix (see Security).
-- The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and `docente` are members (configured in `modules/users.nix`).
+- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` on all PCs, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. The private key is not managed by Nix (see Security).
+- The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
+- The `gnome-user-setup.sh` script is generated inline in `modules/common.nix` (not a standalone file) to use parameterized user names from `labSettings`.
 
 ## Nix Code Style
 
@@ -187,3 +193,6 @@ set -euo pipefail
 
 Hostname + static IP are generated in `flake.nix`. The shared interface name
 is configured via `labSettings.ifaceName` and applied in `modules/networking.nix`.
+
+All user-configurable parameters live in `lab-config.nix` (committed to the repo).
+Shell scripts that need settings parse `lab-config.nix` directly with `awk`.

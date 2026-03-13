@@ -1,21 +1,21 @@
-{ pkgs, ... }:
+{ pkgs, labSettings, ... }:
 
 let
   # Git configuration
-  gitConfigInformatica = {
-    name = "studente";
-    email = "studente@itismeucci.com";
+  gitConfigStudent = {
+    name = labSettings.studentGitName;
+    email = labSettings.studentGitEmail;
   };
 
   gitConfigAdmin = {
-    name = "admin";
-    email = "admin@itismeucci.com";
+    name = labSettings.adminGitName;
+    email = labSettings.adminGitEmail;
   };
 
-  templateDirInformatica = "/var/lib/home-template/informatica";
+  templateDirStudent = "/var/lib/home-template/${labSettings.studentUser}";
   templateDirAdmin = "/var/lib/home-template/admin";
   snapshotsDir = "/var/lib/home-snapshots";
-  homeDirInformatica = "/home/informatica";
+  homeDirStudent = "/home/${labSettings.studentUser}";
   homeDirAdmin = "/home/admin";
   # VSCode extensions to pre-install in the template
   vscodeExtensions = [
@@ -60,21 +60,21 @@ in
   # Create templates at system activation (rebuild time)
   system.activationScripts.createHomeTemplates = {
     text = ''
-      # Create informatica template
-      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirInformatica}" "${gitConfigInformatica.name}" "${gitConfigInformatica.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${assetsDir}"
-      mkdir -p "${templateDirInformatica}/.vscode/extensions"
+      # Create student template
+      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${assetsDir}"
+      mkdir -p "${templateDirStudent}/.vscode/extensions"
       ${builtins.concatStringsSep "\n      " (map (ext:
-        ''cp -a "${ext.pkg}/share/vscode/extensions/${ext.dir}" "${templateDirInformatica}/.vscode/extensions/"''
+        ''cp -a "${ext.pkg}/share/vscode/extensions/${ext.dir}" "${templateDirStudent}/.vscode/extensions/"''
       ) vscodeExtensions)}
       # Fix Nix store read-only permissions so extensions can write temp files
-      chmod -R u+w "${templateDirInformatica}/.vscode/extensions"
+      chmod -R u+w "${templateDirStudent}/.vscode/extensions"
       # Remove LiveServer announcement to suppress the "NEW" toast notification
       ${pkgs.jq}/bin/jq 'del(.announcement)' \
-        "${templateDirInformatica}/.vscode/extensions/ritwickdey.liveserver/package.json" \
-        > "${templateDirInformatica}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp"
-      mv "${templateDirInformatica}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp" \
-        "${templateDirInformatica}/.vscode/extensions/ritwickdey.liveserver/package.json"
-      chown -R informatica:users "${templateDirInformatica}"
+        "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json" \
+        > "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp"
+      mv "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp" \
+        "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json"
+      chown -R ${labSettings.studentUser}:users "${templateDirStudent}"
 
       # Create admin template
       ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${assetsDir}"
@@ -90,15 +90,15 @@ in
     deps = [ "users" ];
   };
 
-  # Systemd service to reset informatica home at boot
+  # Systemd service to reset student home at boot
   systemd.services.home-reset = {
-    description = "Reset informatica home directory from template";
+    description = "Reset ${labSettings.studentUser} home directory from template";
     wantedBy = [ "multi-user.target" ];
     before = [ "display-manager.service" ];
     after = [ "local-fs.target" ];
     unitConfig = {
       RequiresMountsFor = [
-        "/home/informatica"
+        "/home/${labSettings.studentUser}"
         "/var/lib/home-template"
         "/var/lib/home-snapshots"
       ];
@@ -106,7 +106,7 @@ in
     path = [ pkgs.btrfs-progs pkgs.dconf pkgs.findutils pkgs.coreutils ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${pkgs.bash}/bin/bash ${homeResetScript} ${snapshotsDir} ${homeDirInformatica} ${templateDirInformatica} informatica:users";
+      ExecStart = "${pkgs.bash}/bin/bash ${homeResetScript} ${snapshotsDir} ${homeDirStudent} ${templateDirStudent} ${labSettings.studentUser}:users";
       RemainAfterExit = true;
     };
   };
@@ -117,17 +117,17 @@ in
     "d /var/lib/home-template 0755 root root -"
   ];
 
-  # Add "Snapshot Studenti" bookmark in Nautilus sidebar for docente
-  system.activationScripts.docenteSnapshotBookmark = {
+  # Add "Snapshot Studenti" bookmark in Nautilus sidebar for teacher
+  system.activationScripts.teacherSnapshotBookmark = {
     text = ''
-      BOOKMARK_DIR="/home/docente/.config/gtk-3.0"
+      BOOKMARK_DIR="/home/${labSettings.teacherUser}/.config/gtk-3.0"
       BOOKMARK_FILE="$BOOKMARK_DIR/bookmarks"
       ENTRY="file:///var/lib/home-snapshots Snapshot Studenti"
       mkdir -p "$BOOKMARK_DIR"
       if ! grep -q "home-snapshots" "$BOOKMARK_FILE" 2>/dev/null; then
         echo "$ENTRY" >> "$BOOKMARK_FILE"
       fi
-      chown -R docente:users "$BOOKMARK_DIR"
+      chown -R ${labSettings.teacherUser}:users "$BOOKMARK_DIR"
     '';
     deps = [ "users" ];
   };

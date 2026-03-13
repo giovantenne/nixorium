@@ -20,20 +20,20 @@ in
   networking.networkmanager.enable = true;
   networking.firewall.enable = false;
 
-  time.timeZone = "Europe/Rome";
+  time.timeZone = labSettings.timeZone;
 
-  i18n.defaultLocale = "en_US.UTF-8";
+  i18n.defaultLocale = labSettings.defaultLocale;
 
   i18n.extraLocaleSettings = {
-    LC_ADDRESS = "it_IT.UTF-8";
-    LC_IDENTIFICATION = "it_IT.UTF-8";
-    LC_MEASUREMENT = "it_IT.UTF-8";
-    LC_MONETARY = "it_IT.UTF-8";
-    LC_NAME = "it_IT.UTF-8";
-    LC_NUMERIC = "it_IT.UTF-8";
-    LC_PAPER = "it_IT.UTF-8";
-    LC_TELEPHONE = "it_IT.UTF-8";
-    LC_TIME = "it_IT.UTF-8";
+    LC_ADDRESS = labSettings.extraLocale;
+    LC_IDENTIFICATION = labSettings.extraLocale;
+    LC_MEASUREMENT = labSettings.extraLocale;
+    LC_MONETARY = labSettings.extraLocale;
+    LC_NAME = labSettings.extraLocale;
+    LC_NUMERIC = labSettings.extraLocale;
+    LC_PAPER = labSettings.extraLocale;
+    LC_TELEPHONE = labSettings.extraLocale;
+    LC_TIME = labSettings.extraLocale;
   };
 
   services.xserver.enable = true;
@@ -111,7 +111,7 @@ in
     toggle-tiled-right=['<Super>Right']
 
     [org.gnome.desktop.input-sources]
-    sources=[('xkb', 'it')]
+    sources=[('xkb', '${labSettings.keyboardLayout}')]
 
     [org.gnome.nautilus.icon-view]
     default-zoom-level='small'
@@ -131,7 +131,7 @@ in
     HandleLidSwitchDocked = "ignore";
   };
 
-  # Ensure pc99 never enters sleep/suspend/hibernate.
+  # Ensure the controller never enters sleep/suspend/hibernate.
   systemd.sleep.extraConfig = lib.mkIf isMaster ''
     AllowSuspend=no
     AllowHibernation=no
@@ -148,8 +148,8 @@ in
   virtualisation.virtualbox.guest.enable = lib.mkDefault true;
 
   # Keyboard layout
-  services.xserver.xkb.layout = "it";
-  console.keyMap = "it2";
+  services.xserver.xkb.layout = labSettings.keyboardLayout;
+  console.keyMap = labSettings.consoleKeyMap;
 
   services.printing.enable = true;
 
@@ -221,10 +221,10 @@ in
 
   environment.etc."chromium/policies/managed/homepage.json".text = ''
     {
-      "HomepageLocation": "https://www.itismeucci.edu.it",
+      "HomepageLocation": "${labSettings.homepageUrl}",
       "HomepageIsNewTabPage": false,
       "RestoreOnStartup": 4,
-      "RestoreOnStartupURLs": ["https://www.itismeucci.edu.it"]
+      "RestoreOnStartupURLs": ["${labSettings.homepageUrl}"]
     }
   '';
 
@@ -298,7 +298,54 @@ in
   programs.zoxide.enableBashIntegration = true;
 
   environment.etc."lab/gnome-user-setup.sh" = {
-    source = ../scripts/gnome-user-setup.sh;
+    text = ''
+      #!/usr/bin/env bash
+      # Set GNOME favorites, theme, and dismiss welcome dialog for lab users
+      set -euo pipefail
+
+      # Only run for lab users
+      case "''${USER:-}" in
+        ${labSettings.studentUser}|admin|${labSettings.teacherUser}) ;;
+        *) exit 0 ;;
+      esac
+
+      # Wait for GNOME shell to be ready
+      sleep 2
+
+      # Dock and shell settings
+      if [ "''${USER:-}" = "${labSettings.studentUser}" ]; then
+        gsettings set org.gnome.shell favorite-apps \
+          "['com.mitchellh.ghostty.desktop', 'chromium-browser.desktop', 'code.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop']"
+      else
+        current_favorites=$(gsettings get org.gnome.shell favorite-apps)
+        updated_favorites=$(python3 - "$current_favorites" << 'PY'
+      import ast
+      import sys
+
+      raw = sys.argv[1].strip()
+      if raw.startswith("@as "):
+          raw = raw[4:]
+
+      favorites = ast.literal_eval(raw)
+      if "io.veyon.desktop" not in favorites:
+          if "code.desktop" in favorites:
+              favorites.insert(favorites.index("code.desktop") + 1, "io.veyon.desktop")
+          else:
+              favorites.append("io.veyon.desktop")
+      print(repr(favorites))
+      PY
+        ) || updated_favorites=""
+        if [[ -n "$updated_favorites" ]]; then
+          gsettings set org.gnome.shell favorite-apps "$updated_favorites"
+        fi
+      fi
+
+      if gsettings list-schemas | grep -qx "org.gnome.shell.extensions.dash-to-dock"; then
+        gsettings set org.gnome.shell.extensions.dash-to-dock show-trash false
+      fi
+
+      gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
+    '';
     mode = "0755";
   };
 
@@ -319,7 +366,7 @@ in
   environment.etc."lab/backgrounds/3-ristretto.jpg".source = ../assets/backgrounds/3-ristretto.jpg;
 
   programs.ssh.extraConfig = ''
-    Host localhost 127.0.0.1 10.22.9.* pc*
+    Host localhost 127.0.0.1 ${labSettings.networkBase}.* pc*
       StrictHostKeyChecking no
       UserKnownHostsFile /dev/null
   '';
@@ -387,7 +434,7 @@ in
   # Screensaver: watch for GNOME idle (screensaver ActiveChanged signal)
   # and launch the TTE screensaver in a fullscreen Ghostty window.
   systemd.user.services.lab-screensaver = {
-    description = "ITIS Meucci TTE screensaver";
+    description = "Lab TTE screensaver";
     wantedBy = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ];
     serviceConfig = {
@@ -407,7 +454,7 @@ in
       Type = "oneshot";
       ExecStart = "${pkgs.bash}/bin/bash /etc/lab/gnome-user-setup.sh";
     };
-    path = [ pkgs.glib pkgs.gsettings-desktop-schemas pkgs.python3 ];
+    path = [ pkgs.glib pkgs.gsettings-desktop-schemas pkgs.python3 pkgs.gnugrep ];
   };
 
   services.openssh = {

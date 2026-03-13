@@ -43,14 +43,14 @@ let
     in
     "{${builtins.substring 0 8 hash}-${builtins.substring 8 4 hash}-${builtins.substring 12 4 hash}-${builtins.substring 16 4 hash}-${builtins.substring 20 12 hash}}";
 
-  locationUid = uuidFromString "laboratorio";
+  locationUid = uuidFromString (builtins.replaceStrings [" "] ["-"] (lib.toLower labSettings.veyonLocationName));
 
   hostNumbers = builtins.genList (n: n + 1) labSettings.pcCount;
 
   networkObjects = {
     a = [
       {
-        Name = "Laboratorio";
+        Name = labSettings.veyonLocationName;
         Type = 2;
         Uid = locationUid;
       }

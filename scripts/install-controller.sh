@@ -2,14 +2,15 @@
 set -euo pipefail
 
 if [[ $# -gt 1 ]]; then
-  echo "Usage: ./install-pc99.sh [disk]" >&2
-  echo "Example: ./install-pc99.sh /dev/sdb" >&2
+  echo "Usage: ./install-controller.sh [disk]" >&2
+  echo "Example: ./install-controller.sh /dev/sdb" >&2
   exit 1
 fi
 
 INSTALL_DISK="${1:-}"
 FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixos-lab}"
 DISKO_URL="${DISKO_URL:-https://raw.githubusercontent.com/giovantenne/nixos-lab/master/disko-uefi.nix}"
+MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
 AVAILABLE_DISKS=()
 
 prompt_input() {
@@ -120,7 +121,7 @@ sed -E "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" "$TEMP_DISKO_INPU
 echo "Partitioning disk..."
 sudo nix --extra-experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko "$TEMP_DISKO_FILE"
 
-echo "Installing NixOS for pc99..."
-sudo nixos-install --flake "${FLAKE_REF}#pc99" --no-write-lock-file --no-root-passwd
+echo "Installing NixOS for the controller..."
+sudo nixos-install --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" --no-write-lock-file --no-root-passwd
 
 echo "Installation complete. Reboot with: reboot"

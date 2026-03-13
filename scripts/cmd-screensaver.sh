@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run the ITIS Meucci screensaver using random TTE effects.
+# Run the lab screensaver using random TTE effects.
 # This script is meant to be launched inside a fullscreen terminal.
 
 SCREENSAVER_TEXT="/etc/lab/screensaver.txt"

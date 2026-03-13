@@ -13,7 +13,7 @@ set -euo pipefail
 IDLE_SCREENSAVER_MS=150000
 IDLE_LOCK_MS=600000
 
-SCREENSAVER_CLASS="org.meucci.screensaver"
+SCREENSAVER_CLASS="org.nixos-lab.screensaver"
 POLL_INTERVAL=2
 
 SCREENSAVER_ACTIVE=false

@@ -10,13 +10,20 @@ fi
 PC_NUMBER="$1"
 INSTALL_DISK="${2:-}"
 
+# Read pcCount from lab-config.nix
+PC_COUNT=$(awk '/pcCount =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
+if [[ -z "$PC_COUNT" ]]; then
+  echo "Error: pcCount not found in lab-config.nix." >&2
+  exit 1
+fi
+
 if ! [[ "$PC_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "Error: PC number must be numeric." >&2
   exit 1
 fi
 
-if [[ "$PC_NUMBER" -lt 1 || "$PC_NUMBER" -gt 30 ]]; then
-  echo "Error: PC number must be between 1 and 30." >&2
+if [[ "$PC_NUMBER" -lt 1 || "$PC_NUMBER" -gt "$PC_COUNT" ]]; then
+  echo "Error: PC number must be between 1 and ${PC_COUNT}." >&2
   exit 1
 fi
 
@@ -114,16 +121,21 @@ if [[ "$CONFIRMATION" != "YES" ]]; then
   exit 1
 fi
 
-# Extract settings from flake.nix
-MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' flake.nix)
+# Extract settings from lab-config.nix and flake.nix
+MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' lab-config.nix)
 CACHE_KEY=$(awk -F'"' '/cachePublicKey =/ { print $2; exit }' flake.nix)
+CACHE_PORT=$(awk '/cachePort =/ { gsub(/[^0-9]/, ""); print; exit }' flake.nix)
 
 if [[ -z "$MASTER_IP" || "$MASTER_IP" == "MASTER_DHCP_IP" ]]; then
-  echo "Error: masterDhcpIp not configured in flake.nix" >&2
+  echo "Error: masterDhcpIp not configured in lab-config.nix" >&2
   exit 1
 fi
 
-echo "Using binary cache at ${MASTER_IP}:5000"
+if [[ -z "$CACHE_PORT" ]]; then
+  CACHE_PORT=5000
+fi
+
+echo "Using binary cache at ${MASTER_IP}:${CACHE_PORT}"
 
 # Detect UEFI
 if [ -d /sys/firmware/efi ]; then
@@ -142,7 +154,7 @@ sudo disko --mode disko "$TEMP_DISKO_FILE"
 
 echo "Installing NixOS for ${PC_NAME}..."
 sudo nixos-install --flake ".#${PC_NAME}" \
-  --option substituters "http://${MASTER_IP}:5000" \
+  --option substituters "http://${MASTER_IP}:${CACHE_PORT}" \
   --option trusted-public-keys "${CACHE_KEY}" \
   --no-channel-copy \
   --no-root-passwd

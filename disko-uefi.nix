@@ -1,4 +1,4 @@
-{ ... }:
+{ labSettings, ... }:
 {
   disko.devices = {
     disk.main = {
@@ -27,8 +27,8 @@
                   mountpoint = "/";
                   mountOptions = [ "compress=zstd" "noatime" ];
                 };
-                "@home-informatica" = {
-                  mountpoint = "/home/informatica";
+                "@home-${labSettings.studentUser}" = {
+                  mountpoint = "/home/${labSettings.studentUser}";
                   mountOptions = [ "compress=zstd" "noatime" ];
                 };
                 "@snapshots" = {

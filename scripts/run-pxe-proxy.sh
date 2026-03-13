@@ -11,17 +11,17 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' flake.nix)
-MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' flake.nix)
+IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
+MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' lab-config.nix)
 CMDLINE=$(grep '^kernel ' result-ipxe/netboot.ipxe | sed 's/^kernel [^ ]* //')
 
 if [[ -z "${IFACE}" ]]; then
-  echo "Error: ifaceName not found in flake.nix." >&2
+  echo "Error: ifaceName not found in lab-config.nix." >&2
   exit 1
 fi
 
 if [[ -z "${MASTER_IP}" || "${MASTER_IP}" == "MASTER_DHCP_IP" ]]; then
-  echo "Error: masterDhcpIp not configured in flake.nix." >&2
+  echo "Error: masterDhcpIp not configured in lab-config.nix." >&2
   exit 1
 fi
 
@@ -52,7 +52,7 @@ cp result-kernel/bzImage "${WORK_DIR}/http/bzImage"
 cp result-initrd/initrd "${WORK_DIR}/http/initrd"
 cp assets/ipxe/snponly.efi "${WORK_DIR}/tftp/snponly.efi"
 
-# iPXE boot script: loads kernel and initrd over HTTP from pc99.
+# iPXE boot script: loads kernel and initrd over HTTP from the controller.
 cat > "${WORK_DIR}/tftp/boot.ipxe" <<EOF
 #!ipxe
 dhcp
