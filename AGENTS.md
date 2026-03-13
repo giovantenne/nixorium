@@ -12,12 +12,10 @@ locale, etc.) are parameterized in `lab-config.nix` and imported by `flake.nix`.
 ```
 flake.nix                  # Entry point: imports lab-config.nix, host generation + netboot + Colmena
 flake.lock                 # Pinned inputs (nixpkgs nixos-25.11, disko)
+LICENSE                    # MIT license
 lab-config.nix             # Lab configuration (edit for your environment)
 disko-uefi.nix             # Declarative disk partitioning (UEFI boot, parameterized student user)
 setup.sh                   # Installer script for PXE-booted client PCs
-public-key                 # Harmonia public key (generated locally, safe to commit)
-id_ed25519.pub             # Admin SSH public key (generated locally, safe to commit)
-veyon-public-key.pem       # Veyon RSA public key (generated locally, safe to commit)
 pkgs/
   veyon.nix                # Veyon package derivation (not in nixpkgs)
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
@@ -45,6 +43,11 @@ assets/
   mimeapps.list            # Default browser = Chromium
   vscode-settings.json     # VS Code defaults
 ```
+
+Generated locally during setup and committed in the lab repo:
+- `public-key`
+- `id_ed25519.pub`
+- `veyon-public-key.pem`
 
 ## Build / Deploy Commands
 

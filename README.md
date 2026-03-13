@@ -1,10 +1,15 @@
 # NixOS Lab
 
+[![NixOS](https://img.shields.io/badge/NixOS-25.11-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
+[![Flakes](https://img.shields.io/badge/Nix-Flakes-4E9A06?logo=nixos&logoColor=white)](https://nixos.wiki/wiki/Flakes)
+[![Deploy](https://img.shields.io/badge/Deploy-Colmena-2E3440)](https://github.com/zhaofengli/colmena)
+[![License: MIT](https://img.shields.io/badge/License-MIT-2EA44F.svg)](./LICENSE)
+
 A reproducible NixOS deployment system for multi-PC environments (classrooms, training rooms, public labs, libraries) with **no internet access on client machines**.
 
 One controller PC manages the entire lab: it builds all configurations locally, serves them over LAN, and deploys updates to every workstation declaratively. The whole lab can be reinstalled from scratch in under 20 minutes.
 
-## Why this exists
+## 🧭 Why this exists
 
 Managing a multi-PC lab is painful. Machines drift over time, reinstalling by hand is slow and error-prone, and keeping many systems consistent is a full-time job. Traditional tools like Ansible help, but they can't guarantee that two machines built a week apart end up identical.
 
@@ -17,7 +22,7 @@ This project bridges that gap with a **local-first workflow**:
 - One `flake.nix` file is the single source of truth for the entire lab
 - Everything is parameterizable -- user names, passwords, network settings, locale -- so you can fork this repo and adapt it to your environment in minutes
 
-## Features
+## ✨ Features
 
 - **Zero-internet client installation** -- PXE/netboot + local binary cache (Harmonia), no USB drives needed per client
 - **Single source of truth** -- one `flake.nix` generates all host configurations programmatically
@@ -30,7 +35,7 @@ This project bridges that gap with a **local-first workflow**:
 - **GNOME desktop** -- pre-configured with dark theme, development tools, and terminal customization
 - **Controller as teacher workstation** -- the controller is intended for instructor use and shows a user chooser at login (no autologin)
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -57,7 +62,7 @@ This project bridges that gap with a **local-first workflow**:
 | **Networking** | Installation and updates over LAN only, no internet required on clients |
 | **Boot mode** | UEFI only, declarative partitioning with Disko |
 
-## Quick start
+## 🚀 Quick start
 
 > **Optional: fork first.** If you want to push your `lab-config.nix` to a remote repository (for backup or future reinstalls), fork this repo on GitHub before starting. The main flow below works with a plain `git clone` of the original repo -- forking is not required.
 
@@ -264,7 +269,7 @@ sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 
 ---
 
-## Maintenance
+## 🔧 Maintenance
 
 ### Deploy updates (Colmena)
 
@@ -292,7 +297,7 @@ sudo nixos-rebuild switch --flake .#pc05 --no-write-lock-file
 
 ---
 
-## Configuration reference
+## ⚙️ Configuration reference
 
 ### Settings overview
 
@@ -389,17 +394,15 @@ The default desktop is GNOME (Wayland) with a curated set of development tools. 
 
 ---
 
-## Project structure
+## 📁 Project structure
 
 ```
 flake.nix                  # Entry point: host generation, Colmena config
 flake.lock                 # Pinned inputs (nixpkgs, disko)
+LICENSE                    # MIT license
 lab-config.nix             # Lab configuration (edit for your environment)
 disko-uefi.nix             # Declarative disk partitioning (UEFI + Btrfs)
 setup.sh                   # Client PC installer (runs on PXE-booted machines)
-public-key                 # Harmonia public key (generated locally, safe to commit)
-id_ed25519.pub             # Admin SSH public key (generated locally, safe to commit)
-veyon-public-key.pem       # Veyon RSA public key (generated locally, safe to commit)
 pkgs/
   veyon.nix                # Veyon package derivation
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
@@ -428,7 +431,13 @@ assets/
   vscode-settings.json     # VS Code defaults
 ```
 
-## Security
+Generated locally during setup and committed in your lab repo:
+
+- `public-key`
+- `id_ed25519.pub`
+- `veyon-public-key.pem`
+
+## 🔒 Security
 
 - **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all in `.gitignore`)
 - `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` are public and should be committed in your lab repo or fork
@@ -437,6 +446,6 @@ assets/
 - `users.mutableUsers = false` enforces declarative user management
 - The Veyon private key is readable only by the `veyon-master` group
 
-## License
+## 📄 License
 
-This project is open source. Feel free to fork, adapt, and use it for your own lab environment.
+Released under the [MIT License](./LICENSE).
