@@ -110,11 +110,9 @@ in
   environment.systemPackages = [ pkgs.veyon ];
 
   # Deploy the public key (world-readable) from the repo
-  environment.etc = lib.mkIf hasVeyonPublicKey {
-    "veyon/keys/public/teacher/key" = {
-      source = veyonPublicKeyFile;
-      mode = "0644";
-    };
+  environment.etc."veyon/keys/public/teacher/key" = lib.mkIf hasVeyonPublicKey {
+    source = veyonPublicKeyFile;
+    mode = "0644";
   };
 
   # Deploy Veyon configuration
