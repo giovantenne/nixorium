@@ -17,7 +17,7 @@ disko-uefi.nix             # Declarative disk partitioning (UEFI boot, parameter
 setup.sh                   # Installer script for PXE-booted client PCs
 public-key                 # Harmonia public key (generated locally, safe to commit)
 id_ed25519.pub             # Admin SSH public key (generated locally, safe to commit)
-veyon-public-key.pem       # Veyon RSA public key (deployed to all PCs)
+veyon-public-key.pem       # Veyon RSA public key (generated locally, safe to commit)
 pkgs/
   veyon.nix                # Veyon package derivation (not in nixpkgs)
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)

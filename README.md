@@ -146,13 +146,13 @@ consoleKeyMap = "it2";
 
 ### 4. Generate and install keys
 
-The lab uses three cryptographic key pairs. Private keys must **never** be committed. Public key files are part of the declarative lab state and should be committed in your lab repo or fork.
+The lab uses three cryptographic key pairs. Private keys must **never** be committed. Public key files are generated locally during setup, then committed in your lab repo or fork because they are part of the declarative state.
 
 | Key pair | Private file | Public file / config | Purpose |
 |---|---|---|---|
-| **Binary cache** | `secret-key` | `public-key` (committed) | Harmonia signs Nix store paths; clients verify signatures |
-| **SSH** | `id_ed25519` | `id_ed25519.pub` (committed) | Admin SSH access + Colmena deploys (connects as `root`) |
-| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
+| **Binary cache** | `secret-key` | `public-key` (generated locally, committed) | Harmonia signs Nix store paths; clients verify signatures |
+| **SSH** | `id_ed25519` | `id_ed25519.pub` (generated locally, committed) | Admin SSH access + Colmena deploys (connects as `root`) |
+| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (generated locally, committed) | Veyon Master authenticates to student PCs |
 
 Generate everything from scratch:
 
@@ -399,7 +399,7 @@ disko-uefi.nix             # Declarative disk partitioning (UEFI + Btrfs)
 setup.sh                   # Client PC installer (runs on PXE-booted machines)
 public-key                 # Harmonia public key (generated locally, safe to commit)
 id_ed25519.pub             # Admin SSH public key (generated locally, safe to commit)
-veyon-public-key.pem       # Veyon RSA public key (deployed to all PCs)
+veyon-public-key.pem       # Veyon RSA public key (generated locally, safe to commit)
 pkgs/
   veyon.nix                # Veyon package derivation
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
