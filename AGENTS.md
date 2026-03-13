@@ -15,7 +15,6 @@ flake.lock                 # Pinned inputs (nixpkgs nixos-25.11, disko)
 lab-config.nix             # Lab configuration (edit for your environment)
 disko-uefi.nix             # Declarative disk partitioning (UEFI boot, parameterized student user)
 setup.sh                   # Installer script for PXE-booted client PCs
-public-key                 # Binary cache public key (for reference)
 veyon-public-key.pem       # Veyon RSA public key (deployed to all PCs)
 pkgs/
   veyon.nix                # Veyon package derivation (not in nixpkgs)

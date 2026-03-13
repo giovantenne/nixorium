@@ -143,7 +143,7 @@ The lab uses three cryptographic key pairs. All private keys are in `.gitignore`
 
 | Key pair | Private file | Public file / config | Purpose |
 |---|---|---|---|
-| **Binary cache** | `secret-key` | `public-key` + `cachePublicKey` in `flake.nix` | Harmonia signs Nix store paths; clients verify signatures |
+| **Binary cache** | `secret-key` | `cachePublicKey` in `flake.nix` | Harmonia signs Nix store paths; clients verify signatures |
 | **SSH** | `id_ed25519` | `adminSshKey` in `lab-config.nix` | Admin SSH access + Colmena deploys (connects as `root`) |
 | **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
 
@@ -167,7 +167,7 @@ After generating new keys, update the repo configuration:
 
 - Replace `cachePublicKey` in `flake.nix` with the content of `public-key`.
 - Replace `adminSshKey` in `lab-config.nix` with the content of `id_ed25519.pub`.
-- Commit `veyon-public-key.pem` and `public-key` to the repo.
+- Commit `veyon-public-key.pem` to the repo.
 
 Then install the local copies needed on the controller:
 ```sh
