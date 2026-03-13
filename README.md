@@ -91,45 +91,7 @@ cd nixos-lab
 
 > If you forked the repo, clone your fork instead: `git clone https://github.com/YOUR_USER/nixos-lab.git`
 
-### 3. Generate passwords, SSH keys, and Veyon keys
-
-The lab uses three cryptographic key pairs. Private keys must **never** be committed. Public key files are part of the declarative lab state and should be committed in your lab repo or fork.
-
-| Key pair | Private file | Public file / config | Purpose |
-|---|---|---|---|
-| **Binary cache** | `secret-key` | `public-key` (committed) | Harmonia signs Nix store paths; clients verify signatures |
-| **SSH** | `id_ed25519` | `id_ed25519.pub` (committed) | Admin SSH access + Colmena deploys (connects as `root`) |
-| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
-
-If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/` and regenerate the public files before rebuilding:
-
-```sh
-# Binary cache public key from the existing private key
-nix key convert-secret-to-public < secret-key > public-key
-
-# SSH public key from the existing private key
-ssh-keygen -y -f id_ed25519 > id_ed25519.pub
-
-# Veyon public key from the existing private key
-openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
-```
-
-Otherwise, generate everything from scratch:
-
-```sh
-# Binary cache signing key for Harmonia
-nix key generate-secret --key-name lab-cache-key > secret-key
-nix key convert-secret-to-public < secret-key > public-key
-
-# Admin SSH key used by Colmena / SSH access
-ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'
-
-# Veyon RSA keypair
-openssl genrsa -out veyon-private-key.pem 4096
-openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
-```
-
-### 4. Edit `lab-config.nix`
+### 3. Edit `lab-config.nix`
 
 Now you have all the values you need. Find your DHCP address and interface name:
 ```sh
@@ -182,9 +144,30 @@ consoleKeyMap = "it2";
 
 > **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
 
-### 5. Copy keys into position
+### 4. Generate and install keys
+
+The lab uses three cryptographic key pairs. Private keys must **never** be committed. Public key files are part of the declarative lab state and should be committed in your lab repo or fork.
+
+| Key pair | Private file | Public file / config | Purpose |
+|---|---|---|---|
+| **Binary cache** | `secret-key` | `public-key` (committed) | Harmonia signs Nix store paths; clients verify signatures |
+| **SSH** | `id_ed25519` | `id_ed25519.pub` (committed) | Admin SSH access + Colmena deploys (connects as `root`) |
+| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
+
+Generate everything from scratch:
 
 ```sh
+# Binary cache signing key for Harmonia
+nix key generate-secret --key-name lab-cache-key > secret-key
+nix key convert-secret-to-public < secret-key > public-key
+
+# Admin SSH key used by Colmena / SSH access
+ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'
+
+# Veyon RSA keypair
+openssl genrsa -out veyon-private-key.pem 4096
+openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
+
 # SSH private key -- used by Colmena to connect as root to all PCs
 install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
 
@@ -195,15 +178,27 @@ install -m 644 -D id_ed25519.pub ~/.ssh/id_ed25519.pub
 # Only users in the veyon-master group (admin + teacher) can read it
 sudo install -d -m 0750 -g veyon-master /etc/veyon/keys/private/teacher
 sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/private/teacher/key
+
+# Flakes ignore untracked files in a Git worktree, so add the public files
+git add public-key id_ed25519.pub veyon-public-key.pem
 ```
 
-> `secret-key` just needs to be in the repo root (already there after step 3). `run-harmonia.sh` checks for it at startup and exits with an error if missing.
+> `secret-key` just needs to stay in the repo root. `run-harmonia.sh` checks for it at startup and exits with an error if missing.
 
-> `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` should stay in the repo root because `flake.nix` and the Veyon module read them from there. Commit those public files in your lab repo or fork; only the private key files stay untracked.
+> `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` should stay in the repo root because `flake.nix` and the Veyon module read them from there.
 
-> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists, that `id_ed25519.pub` is present in the repo root, and that the systems were rebuilt after generating it. If `id_ed25519.pub` is missing but you still have `id_ed25519`, regenerate it with `ssh-keygen -y -f id_ed25519 > id_ed25519.pub`. If the binary cache is ignored (clients build from source), verify that `public-key` was regenerated from the current `secret-key` with `nix key convert-secret-to-public < secret-key > public-key` and included in the rebuild. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
+> If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`, regenerate the public files, then `git add` them before rebuilding:
+>
+> ```sh
+> nix key convert-secret-to-public < secret-key > public-key
+> ssh-keygen -y -f id_ed25519 > id_ed25519.pub
+> openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
+> git add public-key id_ed25519.pub veyon-public-key.pem
+> ```
 
-### 6. Rebuild the controller
+> **Troubleshooting**: if Colmena deploys fail with `Permission denied (publickey)`, verify that `~/.ssh/id_ed25519` exists, that `id_ed25519.pub` is tracked by Git, and that the systems were rebuilt after updating the key. If needed, regenerate it with `ssh-keygen -y -f id_ed25519 > id_ed25519.pub` and run `git add id_ed25519.pub`.
+
+### 5. Rebuild the controller
 
 ```sh
 # Rebuild the controller with your real config
@@ -232,7 +227,7 @@ IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
 sudo ip addr del "${STATIC_IP}/24" dev "${IFACE}"
 ```
 
-### 7. Start netboot services
+### 6. Start netboot services
 
 Open **two separate terminals**:
 
@@ -248,7 +243,7 @@ sudo ./scripts/run-pxe-proxy.sh
 
 > Both processes run in the foreground. Keep the terminals open during client installation.
 
-### 8. Install client PCs
+### 7. Install client PCs
 
 On each client PC, enable **UEFI network boot** in the BIOS/firmware settings. The PC will PXE-boot into a NixOS ramdisk environment.
 
