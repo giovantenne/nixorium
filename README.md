@@ -123,6 +123,13 @@ Now you have all the values you need. Find your DHCP address and interface name:
 ip -4 addr
 ```
 
+Generate the password hashes before filling the three password fields below. The default password for all users is `nixos`:
+
+```sh
+# Hashed passwords (run once per user, paste each hash into lab-config.nix)
+mkpasswd -m sha-512
+```
+
 Edit `lab-config.nix` with your lab's settings:
 
 ```nix
@@ -159,17 +166,6 @@ extraLocale = "it_IT.UTF-8";
 keyboardLayout = "it";
 consoleKeyMap = "it2";
 ```
-
-Generate the password hashes after editing the file structure, then paste them into the three password fields above:
-
-```sh
-# Hashed passwords (run once per user, paste each hash into lab-config.nix)
-mkpasswd -m sha-512
-```
-
-Also update key files in the repo:
-- Commit `public-key` so future builds and installs use the same cache signing key.
-- Commit `veyon-public-key.pem` if you regenerated it.
 
 > **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
 
