@@ -11,9 +11,11 @@ in
   # Disable root password login
   users.users.root = {
     hashedPassword = "!";
-    openssh.authorizedKeys.keys = [
-      labSettings.adminSshKey
-    ];
+    openssh.authorizedKeys.keys =
+      if labSettings.adminSshKey == null then
+        []
+      else
+        [ labSettings.adminSshKey ];
   };
 
   users.users.${labSettings.teacherUser} = {
@@ -35,9 +37,11 @@ in
     description = "admin";
     extraGroups = [ "networkmanager" "wheel" "docker" "veyon-master" ];
     hashedPassword = labSettings.adminPassword;
-    openssh.authorizedKeys.keys = [
-      labSettings.adminSshKey
-    ];
+    openssh.authorizedKeys.keys =
+      if labSettings.adminSshKey == null then
+        []
+      else
+        [ labSettings.adminSshKey ];
   };
 
   services.displayManager.autoLogin = {

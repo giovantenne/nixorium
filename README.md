@@ -77,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/script
 
 If one disk is detected, the script selects it automatically; if multiple disks are detected, it asks you to choose one.
 
-This installs the controller with default placeholder settings from `lab-config.nix`. The real configuration is applied in step 5.
+This installs the controller with default placeholder settings from `lab-config.nix`. SSH, binary cache, and Veyon public keys are added later, after step 4.
 
 > **Using your own fork?** Only one env var is needed -- `DISKO_URL` is derived automatically:
 > ```sh
@@ -95,6 +95,8 @@ cd nixos-lab
 ```
 
 > If you forked the repo, clone your fork instead: `git clone https://github.com/YOUR_USER/nixos-lab.git`
+
+> **Note**: the bootstrap install intentionally works without `public-key`, `id_ed25519.pub`, or `veyon-public-key.pem`. Generate and commit those in step 4, then rebuild the controller in step 5.
 
 ### 3. Edit `lab-config.nix`
 

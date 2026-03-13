@@ -21,11 +21,7 @@ let
   publicKeyBaseDir = "/etc/veyon/keys/public";
   privateKeyBaseDir = "/etc/veyon/keys/private";
   veyonPublicKeyFile = ../veyon-public-key.pem;
-  veyonPublicKey =
-    if builtins.pathExists veyonPublicKeyFile then
-      veyonPublicKeyFile
-    else
-      throw "Missing ./veyon-public-key.pem. Generate it with: openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem\nIf veyon-public-key.pem already exists locally, make sure it is tracked by Git: git add veyon-public-key.pem";
+  hasVeyonPublicKey = builtins.pathExists veyonPublicKeyFile;
 
   # VNC password used between veyon-service and gnome-remote-desktop.
   # Both sides must agree on this value.  Since this is LAN-only
@@ -114,9 +110,11 @@ in
   environment.systemPackages = [ pkgs.veyon ];
 
   # Deploy the public key (world-readable) from the repo
-  environment.etc."veyon/keys/public/teacher/key" = {
-    source = veyonPublicKey;
-    mode = "0644";
+  environment.etc = lib.mkIf hasVeyonPublicKey {
+    "veyon/keys/public/teacher/key" = {
+      source = veyonPublicKeyFile;
+      mode = "0644";
+    };
   };
 
   # Deploy Veyon configuration
