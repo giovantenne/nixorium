@@ -117,12 +117,12 @@ in
     "d /var/lib/home-template 0755 root root -"
   ];
 
-  # Add "Snapshot Studenti" bookmark in Nautilus sidebar for teacher
+  # Add "Snapshots" bookmark in Nautilus sidebar for teacher
   system.activationScripts.teacherSnapshotBookmark = {
     text = ''
       BOOKMARK_DIR="/home/${labSettings.teacherUser}/.config/gtk-3.0"
       BOOKMARK_FILE="$BOOKMARK_DIR/bookmarks"
-      ENTRY="file:///var/lib/home-snapshots Snapshot Studenti"
+      ENTRY="file:///var/lib/home-snapshots Snapshots"
       mkdir -p "$BOOKMARK_DIR"
       if ! grep -q "home-snapshots" "$BOOKMARK_FILE" 2>/dev/null; then
         echo "$ENTRY" >> "$BOOKMARK_FILE"

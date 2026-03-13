@@ -9,7 +9,13 @@ fi
 
 INSTALL_DISK="${1:-}"
 FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixos-lab}"
-DISKO_URL="${DISKO_URL:-https://raw.githubusercontent.com/giovantenne/nixos-lab/master/disko-uefi.nix}"
+# Derive DISKO_URL from FLAKE_REF if not explicitly set.
+# Extracts owner/repo from "github:owner/repo" (strips ?ref=... if present).
+if [[ -z "${DISKO_URL:-}" ]]; then
+  OWNER_REPO="${FLAKE_REF#github:}"
+  OWNER_REPO="${OWNER_REPO%%\?*}"
+  DISKO_URL="https://raw.githubusercontent.com/${OWNER_REPO}/master/disko-uefi.nix"
+fi
 MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
 STUDENT_USER="${STUDENT_USER:-student}"
 AVAILABLE_DISKS=()

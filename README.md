@@ -58,32 +58,98 @@ This project bridges that gap with a **local-first workflow**:
 
 ## Quick start
 
-### 1. Fork and configure
+> **Optional: fork first.** If you want to push your `lab-config.nix` to a remote repository (for backup or future reinstalls), fork this repo on GitHub before starting. The main flow below works with a plain `git clone` of the original repo -- forking is not required.
 
-Fork this repository, then edit `lab-config.nix` with your lab's settings:
+### 1. Bootstrap the controller from USB
+
+> **Requires**: a NixOS live USB with temporary internet access. UEFI boot must be enabled.
+
+Boot the controller PC from the NixOS live USB, then run:
+```sh
+curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/scripts/install-controller.sh | bash
+```
+
+If one disk is detected, the script selects it automatically; if multiple disks are detected, it asks you to choose one.
+
+This installs the controller with default placeholder settings from `lab-config.nix`. The real configuration is applied in step 5.
+
+> **Using your own fork?** Only one env var is needed -- `DISKO_URL` is derived automatically:
+> ```sh
+> curl -fsSL https://raw.githubusercontent.com/YOUR_USER/nixos-lab/master/scripts/install-controller.sh | \
+>   FLAKE_REF="github:YOUR_USER/nixos-lab" bash
+> ```
+
+### 2. Reboot and clone the repo
+
+Reboot and log in as `admin` (default password from placeholder config).
+
+```sh
+git clone https://github.com/giovantenne/nixos-lab.git
+cd nixos-lab
+```
+
+> If you forked the repo, clone your fork instead: `git clone https://github.com/YOUR_USER/nixos-lab.git`
+
+### 3. Generate passwords, SSH keys, and Veyon keys
+
+The lab uses three cryptographic key pairs. All private keys are in `.gitignore` and must **never** be committed.
+
+| Key pair | Private file | Public file / config | Purpose |
+|---|---|---|---|
+| **Binary cache** | `secret-key` | `cachePublicKey` in `flake.nix` | Harmonia signs Nix store paths; clients verify signatures |
+| **SSH** | `id_ed25519` | `adminSshKey` in `lab-config.nix` | Admin SSH access + Colmena deploys (connects as `root`) |
+| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
+
+If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`. Otherwise, generate everything from scratch:
+
+```sh
+# Hashed passwords (run once per user, paste each hash into lab-config.nix)
+mkpasswd -m sha-512
+
+# Binary cache signing key for Harmonia
+nix key generate-secret --key-name lab-cache-key > secret-key
+nix key convert-secret-to-public < secret-key > public-key
+
+# Admin SSH key used by Colmena / SSH access
+ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'
+
+# Veyon RSA keypair
+openssl genrsa -out veyon-private-key.pem 4096
+openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
+```
+
+### 4. Edit `lab-config.nix`
+
+Now you have all the values you need. Find your DHCP address and interface name:
+```sh
+ip -4 addr
+```
+
+Edit `lab-config.nix` with your lab's settings:
 
 ```nix
 # ── Network ────────────────────────────────────────────────────
-masterDhcpIp = "MASTER_DHCP_IP";   # DHCP address of controller (ip -4 addr)
+masterDhcpIp = "MASTER_DHCP_IP";   # DHCP address of controller (from ip -4 addr)
 networkBase = "10.0.0";             # First 3 octets of static lab subnet
 pcCount = 20;                       # Number of student PCs
 masterHostNumber = 99;              # Controller PC number
-ifaceName = "enp0s3";               # Network interface name
+ifaceName = "enp0s3";               # Network interface name (from ip -4 addr)
 
 # ── User accounts ─────────────────────────────────────────────
 teacherUser = "teacher";            # Teacher account name
 studentUser = "student";            # Student account name
 
 # ── Passwords (SHA-512 hashed) ────────────────────────────────
-# Generate with: mkpasswd -m sha-512
+# Generated in step 3 with: mkpasswd -m sha-512
 teacherPassword = "...";
 studentPassword = "...";
 adminPassword = "...";
 
 # ── SSH ────────────────────────────────────────────────────────
+# Content of id_ed25519.pub generated in step 3
 adminSshKey = "ssh-ed25519 AAAA... admin@controller";
 
-# ── School / organization ──────────────────────────────────────
+# ── Organization ──────────────────────────────────────────────
 homepageUrl = "https://example.com";
 studentGitName = "student";
 studentGitEmail = "student@example.com";
@@ -99,77 +165,14 @@ keyboardLayout = "it";
 consoleKeyMap = "it2";
 ```
 
-### 2. Generate passwords
-
-```sh
-# Generate hashed passwords (one per user)
-mkpasswd -m sha-512
-```
-
-Paste each hash into the corresponding field in `lab-config.nix` (`adminPassword`, `teacherPassword`, `studentPassword`).
-
-> Keys (SSH, Veyon, binary cache) are generated later in **Step 4**, after the controller is installed.
-
-### 3. Bootstrap the controller from USB
-
-> **Requires**: temporary internet access on this first boot. UEFI boot must be enabled.
-
-From the NixOS live USB:
-```sh
-# If using the default repo:
-curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/scripts/install-controller.sh | bash
-
-# If using your own fork:
-curl -fsSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/scripts/install-controller.sh | \
-  FLAKE_REF="github:YOUR_USER/YOUR_REPO" \
-  DISKO_URL="https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/disko-uefi.nix" \
-  MASTER_HOST_NUMBER=99 \
-  STUDENT_USER=student \
-  bash
-```
-
-If one disk is detected, the script selects it automatically; if multiple disks are detected, it asks you to choose one.
-
-After the installation finishes, reboot and log in as `admin`.
-
-### 4. Generate keys and copy secrets
-
-```sh
-git clone https://github.com/YOUR_USER/YOUR_REPO.git
-cd ~/nixos-lab
-```
-
-The lab uses three cryptographic key pairs. All private keys are in `.gitignore` and must **never** be committed.
-
-| Key pair | Private file | Public file / config | Purpose |
-|---|---|---|---|
-| **Binary cache** | `secret-key` | `cachePublicKey` in `flake.nix` | Harmonia signs Nix store paths; clients verify signatures |
-| **SSH** | `id_ed25519` | `adminSshKey` in `lab-config.nix` | Admin SSH access + Colmena deploys (connects as `root`) |
-| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
-
-If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`.
-
-If you need to generate them from scratch, run:
-```sh
-# Binary cache signing key for Harmonia
-nix key generate-secret --key-name lab-cache-key > secret-key
-nix key convert-secret-to-public < secret-key > public-key
-
-# Admin SSH key used by Colmena / SSH access
-ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'
-
-# Veyon RSA keypair
-openssl genrsa -out veyon-private-key.pem 4096
-openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
-```
-
-After generating new keys, update the repo configuration:
-
+Also update key references in the repo:
 - Replace `cachePublicKey` in `flake.nix` with the content of `public-key`.
-- Replace `adminSshKey` in `lab-config.nix` with the content of `id_ed25519.pub`.
-- Commit `veyon-public-key.pem` to the repo.
+- Commit `veyon-public-key.pem` if you regenerated it.
 
-Then install the local copies needed on the controller:
+> **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
+
+### 5. Copy secret files into position
+
 ```sh
 # SSH private key -- used by Colmena to connect as root to all PCs
 install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
@@ -180,25 +183,14 @@ sudo install -d -m 0750 -g veyon-master /etc/veyon/keys/private/teacher
 sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/private/teacher/key
 ```
 
-> `secret-key` just needs to be in the repo root (already there after the copy). `run-harmonia.sh` checks for it at startup and exits with an error if missing.
+> `secret-key` just needs to be in the repo root (already there after step 3). `run-harmonia.sh` checks for it at startup and exits with an error if missing.
 
 > **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists and that `adminSshKey` in `lab-config.nix` matches. If the binary cache is ignored (clients build from source), verify that `cachePublicKey` in `flake.nix` matches the `secret-key`. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
 
-### 5. Set the DHCP address
-
-Find the controller's DHCP address (assigned by the institutional DHCP server) and interface name:
-```sh
-ip -4 addr
-```
-
-Edit `masterDhcpIp` and `ifaceName` in `lab-config.nix` if not already set.
-
-> **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
-
-### 6. Prepare the controller
+### 6. Rebuild the controller
 
 ```sh
-# Rebuild the controller
+# Rebuild the controller with your real config
 sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
 
 # Build netboot artifacts
@@ -285,7 +277,7 @@ nix run nixpkgs#colmena -- apply --impure --on pc05
 
 Rebuild a single PC from the latest config:
 ```sh
-sudo nixos-rebuild switch --flake github:YOUR_USER/YOUR_REPO#pc05 --no-write-lock-file --refresh
+sudo nixos-rebuild switch --flake .#pc05 --no-write-lock-file
 ```
 
 ---
@@ -354,7 +346,7 @@ The student home directory resets to a clean template on every boot:
 - **Template**: generated at activation time with git config, VS Code settings and extensions, and XDG directories
 - **Snapshots**: the last 5 sessions are saved in `/var/lib/home-snapshots/` (accessible by `admin`, the teacher user, and `root`)
 
-The teacher user has a **Snapshot Studenti** bookmark in the Nautilus sidebar.
+The teacher user has a **Snapshots** bookmark in the Nautilus sidebar.
 
 To recover student work from a previous session:
 ```sh
