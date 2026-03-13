@@ -82,7 +82,7 @@ This installs the controller with default placeholder settings from `lab-config.
 
 ### 2. Reboot and clone the repo
 
-Reboot and log in as `admin` (default password from placeholder config).
+Reboot and log in as `admin` (default password: `nixos`).
 
 ```sh
 git clone https://github.com/giovantenne/nixos-lab.git
@@ -141,7 +141,7 @@ teacherUser = "teacher";            # Teacher account name
 studentUser = "student";            # Student account name
 
 # ── Passwords (SHA-512 hashed) ────────────────────────────────
-# Generated in step 3 with: mkpasswd -m sha-512
+# Default is "nixos" for all accounts. Generate your own with: mkpasswd -m sha-512
 teacherPassword = "...";
 studentPassword = "...";
 adminPassword = "...";

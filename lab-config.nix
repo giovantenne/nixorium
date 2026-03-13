@@ -45,9 +45,10 @@
 
   # ── Passwords (SHA-512 hashed) ────────────────────────────────
   # Generate with: mkpasswd -m sha-512
-  teacherPassword = "$6$CHANGE_ME_teacher";
-  studentPassword = "$6$CHANGE_ME_student";
-  adminPassword = "$6$CHANGE_ME_admin";
+  # Default password for all accounts is "nixos" -- change after first boot.
+  teacherPassword = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
+  studentPassword = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
+  adminPassword = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
 
   # ── SSH ────────────────────────────────────────────────────────
   # Public key for root and admin SSH access
