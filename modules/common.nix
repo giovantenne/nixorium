@@ -377,6 +377,7 @@ in
   environment.systemPackages = with pkgs; [
     wget
     curl
+    openssl
     bat
     bash-completion
     docker-compose
