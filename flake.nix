@@ -161,8 +161,8 @@
               environment.systemPackages = [ disko.packages.${system}.default ];
               system.stateVersion = "25.11";
               system.activationScripts.copyFlakeToRamdisk.text = ''
-                install -d -m 0755 /installer/repo
-                cp -a ${self}/. /installer/repo/
+                install -d -m 0755 /installer
+                cp -a ${self}/. /installer/
               '';
             })
           ];

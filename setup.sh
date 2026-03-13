@@ -9,17 +9,21 @@ fi
 
 PC_NUMBER="$1"
 INSTALL_DISK="${2:-}"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LAB_CONFIG_FILE="${SCRIPT_DIR}/lab-config.nix"
+FLAKE_FILE="${SCRIPT_DIR}/flake.nix"
+DISKO_FILE="${SCRIPT_DIR}/disko-uefi.nix"
 
 # Read settings from lab-config.nix
-PC_COUNT=$(awk '/pcCount =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
+PC_COUNT=$(awk '/pcCount =/ { gsub(/[^0-9]/, ""); print; exit }' "$LAB_CONFIG_FILE")
 if [[ -z "$PC_COUNT" ]]; then
-  echo "Error: pcCount not found in lab-config.nix." >&2
+  echo "Error: pcCount not found in ${LAB_CONFIG_FILE}." >&2
   exit 1
 fi
 
-STUDENT_USER=$(awk -F'"' '/studentUser =/ { print $2; exit }' lab-config.nix)
+STUDENT_USER=$(awk -F'"' '/studentUser =/ { print $2; exit }' "$LAB_CONFIG_FILE")
 if [[ -z "$STUDENT_USER" ]]; then
-  echo "Error: studentUser not found in lab-config.nix." >&2
+  echo "Error: studentUser not found in ${LAB_CONFIG_FILE}." >&2
   exit 1
 fi
 
@@ -128,12 +132,12 @@ if [[ "$CONFIRMATION" != "YES" ]]; then
 fi
 
 # Extract settings from lab-config.nix and flake.nix
-MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' lab-config.nix)
-CACHE_KEY=$(awk -F'"' '/cachePublicKey =/ { print $2; exit }' flake.nix)
-CACHE_PORT=$(awk '/cachePort =/ { gsub(/[^0-9]/, ""); print; exit }' flake.nix)
+MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' "$LAB_CONFIG_FILE")
+CACHE_KEY=$(awk -F'"' '/cachePublicKey =/ { print $2; exit }' "$FLAKE_FILE")
+CACHE_PORT=$(awk '/cachePort =/ { gsub(/[^0-9]/, ""); print; exit }' "$FLAKE_FILE")
 
 if [[ -z "$MASTER_IP" || "$MASTER_IP" == "MASTER_DHCP_IP" ]]; then
-  echo "Error: masterDhcpIp not configured in lab-config.nix" >&2
+  echo "Error: masterDhcpIp not configured in ${LAB_CONFIG_FILE}" >&2
   exit 1
 fi
 
@@ -160,13 +164,13 @@ sed -E \
   -e "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" \
   -e 's/\{ labSettings, \.\.\. \}:/{ ... }:/' \
   -e "s/\\$\\{labSettings\\.studentUser\\}/${STUDENT_USER}/g" \
-  ./disko-uefi.nix > "$TEMP_DISKO_FILE"
+  "$DISKO_FILE" > "$TEMP_DISKO_FILE"
 
 echo "Partitioning disk..."
 sudo disko --mode disko "$TEMP_DISKO_FILE"
 
 echo "Installing NixOS for ${PC_NAME}..."
-sudo nixos-install --flake ".#${PC_NAME}" \
+sudo nixos-install --flake "${SCRIPT_DIR}#${PC_NAME}" \
   --option substituters "http://${MASTER_IP}:${CACHE_PORT}" \
   --option trusted-public-keys "${CACHE_KEY}" \
   --no-channel-copy \

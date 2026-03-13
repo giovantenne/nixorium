@@ -239,10 +239,9 @@ On each client PC, enable **UEFI network boot** in the BIOS/firmware settings. T
 
 On the booted client:
 ```sh
-cd /installer/repo
-./setup.sh XX
+/installer/setup.sh XX
 ```
-Where `XX` is the PC number (e.g., `./setup.sh 5` for `pc05`).
+Where `XX` is the PC number (e.g., `/installer/setup.sh 5` for `pc05`).
 
 > `setup.sh` auto-selects the disk if only one is present; if multiple disks are detected, it asks for a choice.
 
