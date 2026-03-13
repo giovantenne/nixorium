@@ -11,6 +11,7 @@ INSTALL_DISK="${1:-}"
 FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixos-lab}"
 DISKO_URL="${DISKO_URL:-https://raw.githubusercontent.com/giovantenne/nixos-lab/master/disko-uefi.nix}"
 MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
+STUDENT_USER="${STUDENT_USER:-student}"
 AVAILABLE_DISKS=()
 
 prompt_input() {
@@ -116,7 +117,14 @@ trap 'rm -f "$TEMP_DISKO_INPUT" "$TEMP_DISKO_FILE"' EXIT
 
 echo "Downloading disko config..."
 curl -fsSL "$DISKO_URL" -o "$TEMP_DISKO_INPUT"
-sed -E "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" "$TEMP_DISKO_INPUT" > "$TEMP_DISKO_FILE"
+# Replace disk device and resolve labSettings.studentUser for standalone disko use.
+# disko-uefi.nix is a NixOS module that normally receives labSettings via specialArgs,
+# but disko CLI evaluates it standalone without that context.
+sed -E \
+  -e "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" \
+  -e 's/\{ labSettings, \.\.\. \}:/{ ... }:/' \
+  -e "s/\\$\\{labSettings\\.studentUser\\}/${STUDENT_USER}/g" \
+  "$TEMP_DISKO_INPUT" > "$TEMP_DISKO_FILE"
 
 echo "Partitioning disk..."
 sudo nix --extra-experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko "$TEMP_DISKO_FILE"

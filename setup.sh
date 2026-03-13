@@ -10,10 +10,16 @@ fi
 PC_NUMBER="$1"
 INSTALL_DISK="${2:-}"
 
-# Read pcCount from lab-config.nix
+# Read settings from lab-config.nix
 PC_COUNT=$(awk '/pcCount =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
 if [[ -z "$PC_COUNT" ]]; then
   echo "Error: pcCount not found in lab-config.nix." >&2
+  exit 1
+fi
+
+STUDENT_USER=$(awk -F'"' '/studentUser =/ { print $2; exit }' lab-config.nix)
+if [[ -z "$STUDENT_USER" ]]; then
+  echo "Error: studentUser not found in lab-config.nix." >&2
   exit 1
 fi
 
@@ -147,7 +153,14 @@ fi
 
 TEMP_DISKO_FILE=$(mktemp)
 trap 'rm -f "$TEMP_DISKO_FILE"' EXIT
-sed -E "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" ./disko-uefi.nix > "$TEMP_DISKO_FILE"
+# Replace disk device and resolve labSettings.studentUser for standalone disko use.
+# disko-uefi.nix is a NixOS module that normally receives labSettings via specialArgs,
+# but disko CLI evaluates it standalone without that context.
+sed -E \
+  -e "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" \
+  -e 's/\{ labSettings, \.\.\. \}:/{ ... }:/' \
+  -e "s/\\$\\{labSettings\\.studentUser\\}/${STUDENT_USER}/g" \
+  ./disko-uefi.nix > "$TEMP_DISKO_FILE"
 
 echo "Partitioning disk..."
 sudo disko --mode disko "$TEMP_DISKO_FILE"

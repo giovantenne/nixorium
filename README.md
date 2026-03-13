@@ -64,7 +64,7 @@ Fork this repository, then edit `lab-config.nix` with your lab's settings:
 
 ```nix
 # ── Network ────────────────────────────────────────────────────
-masterDhcpIp = "MASTER_DHCP_IP";   # Set after first boot (ip -4 addr)
+masterDhcpIp = "MASTER_DHCP_IP";   # DHCP address of controller (ip -4 addr)
 networkBase = "10.0.0";             # First 3 octets of static lab subnet
 pcCount = 20;                       # Number of student PCs
 masterHostNumber = 99;              # Controller PC number
@@ -99,26 +99,18 @@ keyboardLayout = "it";
 consoleKeyMap = "it2";
 ```
 
-### 2. Generate passwords and SSH keys
+### 2. Generate passwords
 
 ```sh
-# Generate hashed passwords
+# Generate hashed passwords (one per user)
 mkpasswd -m sha-512
-
-# Generate SSH keypair
-ssh-keygen -t ed25519 -C "admin@controller"
 ```
 
-### 3. Generate Veyon keys
+Paste each hash into the corresponding field in `lab-config.nix` (`adminPassword`, `teacherPassword`, `studentPassword`).
 
-```sh
-openssl genrsa -out veyon-private-key.pem 4096
-openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
-```
+> Keys (SSH, Veyon, binary cache) are generated later in **Step 4**, after the controller is installed.
 
-Commit `veyon-public-key.pem` to the repo. Keep `veyon-private-key.pem` private (it's in `.gitignore`).
-
-### 4. Bootstrap the controller from USB
+### 3. Bootstrap the controller from USB
 
 > **Requires**: temporary internet access on this first boot. UEFI boot must be enabled.
 
@@ -132,6 +124,7 @@ curl -fsSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/scripts/
   FLAKE_REF="github:YOUR_USER/YOUR_REPO" \
   DISKO_URL="https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/disko-uefi.nix" \
   MASTER_HOST_NUMBER=99 \
+  STUDENT_USER=student \
   bash
 ```
 
@@ -139,22 +132,22 @@ If one disk is detected, the script selects it automatically; if multiple disks 
 
 After the installation finishes, reboot and log in as `admin`.
 
-### 5. Clone and copy secrets
+### 4. Generate keys and copy secrets
 
 ```sh
 git clone https://github.com/YOUR_USER/YOUR_REPO.git
 cd ~/nixos-lab
 ```
 
-Place these three files in the repo folder `~/nixos-lab/` (all are in `.gitignore`):
+The lab uses three cryptographic key pairs. All private keys are in `.gitignore` and must **never** be committed.
 
-| File | Description |
-|---|---|
-| `secret-key` | Binary cache signing key (Harmonia) |
-| `id_ed25519` | Admin SSH private key |
-| `veyon-private-key.pem` | Veyon Master private key |
+| Key pair | Private file | Public file / config | Purpose |
+|---|---|---|---|
+| **Binary cache** | `secret-key` | `public-key` + `cachePublicKey` in `flake.nix` | Harmonia signs Nix store paths; clients verify signatures |
+| **SSH** | `id_ed25519` | `adminSshKey` in `lab-config.nix` | Admin SSH access + Colmena deploys (connects as `root`) |
+| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
 
-If you already have the files from a previous deployment, copy them into `~/nixos-lab/`.
+If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`.
 
 If you need to generate them from scratch, run:
 ```sh
@@ -170,32 +163,39 @@ openssl genrsa -out veyon-private-key.pem 4096
 openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
 ```
 
-After generating new keys, update the repo configuration before continuing:
+After generating new keys, update the repo configuration:
 
 - Replace `cachePublicKey` in `flake.nix` with the content of `public-key`.
 - Replace `adminSshKey` in `lab-config.nix` with the content of `id_ed25519.pub`.
-- Keep `veyon-public-key.pem` in the repo so Nix deploys the matching public key to all PCs.
+- Commit `veyon-public-key.pem` and `public-key` to the repo.
 
 Then install the local copies needed on the controller:
 ```sh
+# SSH private key -- used by Colmena to connect as root to all PCs
 install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
+
+# Veyon private key -- only needed on the controller (where Veyon Master runs)
+# Only users in the veyon-master group (admin + teacher) can read it
 sudo install -d -m 0750 -g veyon-master /etc/veyon/keys/private/teacher
 sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/private/teacher/key
 ```
 
-> `secret-key` just needs to be in the repo root (already there after the copy).
-> Only users in the `veyon-master` group (`admin` and the teacher user) can read the Veyon private key.
+> `secret-key` just needs to be in the repo root (already there after the copy). `run-harmonia.sh` checks for it at startup and exits with an error if missing.
 
-### 6. Set the DHCP address
+> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists and that `adminSshKey` in `lab-config.nix` matches. If the binary cache is ignored (clients build from source), verify that `cachePublicKey` in `flake.nix` matches the `secret-key`. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
 
-Find the controller's DHCP address and interface name:
+### 5. Set the DHCP address
+
+Find the controller's DHCP address (assigned by the institutional DHCP server) and interface name:
 ```sh
 ip -4 addr
 ```
 
 Edit `masterDhcpIp` and `ifaceName` in `lab-config.nix` if not already set.
 
-### 7. Prepare the controller
+> **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
+
+### 6. Prepare the controller
 
 ```sh
 # Rebuild the controller
@@ -224,7 +224,7 @@ IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
 sudo ip addr del "${STATIC_IP}/24" dev "${IFACE}"
 ```
 
-### 8. Start netboot services
+### 7. Start netboot services
 
 Open **two separate terminals**:
 
@@ -240,7 +240,7 @@ sudo ./scripts/run-pxe-proxy.sh
 
 > Both processes run in the foreground. Keep the terminals open during client installation.
 
-### 9. Install client PCs
+### 8. Install client PCs
 
 On each client PC, enable **UEFI network boot** in the BIOS/firmware settings. The PC will PXE-boot into a NixOS ramdisk environment.
 
@@ -298,7 +298,7 @@ All lab-specific settings are defined in `lab-config.nix`. No other file needs e
 
 | Setting | Description | Default |
 |---|---|---|
-| `masterDhcpIp` | DHCP address of the controller | `"MASTER_DHCP_IP"` |
+| `masterDhcpIp` | Institutional DHCP address of the controller (used for PXE/netboot only; can change on lease renewal) | `"MASTER_DHCP_IP"` |
 | `networkBase` | First 3 octets of the static lab subnet | `"10.0.0"` |
 | `pcCount` | Number of student PCs | `20` |
 | `masterHostNumber` | Controller PC number (must be > `pcCount`) | `99` |
@@ -370,11 +370,10 @@ port **11100**.
 
 #### Configuration
 
-- **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all in `.gitignore`)
-- Passwords are SHA-512 hashed; never store plaintext
-- SSH password authentication is disabled; key-based only
-- `users.mutableUsers = false` enforces declarative user management
-- The Veyon private key is readable only by the `veyon-master` group
+- All PCs have `veyon-service` running and the public key deployed via Nix
+- `Veyon.conf` is generated with all lab PCs pre-mapped (location name from `veyonLocationName` in `lab-config.nix`)
+- The Veyon private key is only needed on the controller -- student PCs only have the public key
+- Users in the `veyon-master` group (`admin` and the teacher user) can access Veyon Master
 
 ### Customizing packages and desktop
 

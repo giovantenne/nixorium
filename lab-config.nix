@@ -6,9 +6,27 @@
 # Generate SSH key with: ssh-keygen -t ed25519 -C "admin@controller"
 {
   # ── Network ────────────────────────────────────────────────────
-  # DHCP IP of the controller (used by clients during PXE/netboot install).
+  # IP address dynamically assigned to the controller by the institutional
+  # DHCP server.  This address can change whenever the DHCP lease expires
+  # or is renewed, so verify it before each PXE/netboot session.
+  #
+  # It is used in two places:
+  #   1. Netboot ramdisk -- baked into the netboot image so PXE-booted
+  #      clients can reach the binary cache (Harmonia) on the controller.
+  #   2. PXE proxy server (run-pxe-proxy.sh) -- the iPXE boot script
+  #      fetches kernel and initrd over HTTP from this address.
+  #
+  # After all clients are installed, day-to-day Colmena deploys use the
+  # static IP (networkBase.masterHostNumber) instead, so a DHCP address
+  # change does NOT affect ongoing updates -- only new PXE installs.
+  #
+  # If the DHCP address changes after netboot artifacts have been built,
+  # rebuild them before booting new clients:
+  #   nix build .#nixosConfigurations.netboot.config.system.build.kernel  --out-link result-kernel
+  #   nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
+  #   nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
+  #
   # Find it with: ip -4 addr show dev <ifaceName>
-  # This is only needed during initial client installation via netboot.
   masterDhcpIp = "MASTER_DHCP_IP";
   # Static IP network base (each PC gets networkBase.N)
   networkBase = "10.0.0";
