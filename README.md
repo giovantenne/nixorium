@@ -28,6 +28,7 @@ This project bridges that gap with a **local-first workflow**:
 - **Dual networking** -- DHCP for institutional network integration + static IPs for the internal lab network
 - **UEFI + Btrfs** -- modern boot with declarative disk partitioning (Disko) and snapshot support
 - **GNOME desktop** -- pre-configured with dark theme, development tools, and terminal customization
+- **Controller as teacher workstation** -- the controller is intended for instructor use and shows a user chooser at login (no autologin)
 
 ## Architecture
 
