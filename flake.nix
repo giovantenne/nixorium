@@ -11,6 +11,13 @@
 
   outputs = { self, nixpkgs, disko }:
     let
+      cachePublicKeyFile = ./public-key;
+      cachePublicKey =
+        if builtins.pathExists cachePublicKeyFile then
+          builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile cachePublicKeyFile)
+        else
+          throw "Missing ./public-key. Generate it with: nix key convert-secret-to-public < secret-key > public-key";
+
       # ── Import lab configuration ─────────────────────────────────
       # Edit lab-config.nix to customize for your environment.
       config = import ./lab-config.nix;
@@ -92,7 +99,7 @@
         inherit extraLocale;
         inherit keyboardLayout;
         inherit consoleKeyMap;
-        cachePublicKey = "lab-cache-key:jJsA9nDLNlyzhBOj5rfSKcEL2IwNspxrbNCyqmvdUvI=";
+        inherit cachePublicKey;
         cachePort = 5000;
       };
       mkHost = n:

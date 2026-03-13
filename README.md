@@ -166,8 +166,8 @@ keyboardLayout = "it";
 consoleKeyMap = "it2";
 ```
 
-Also update key references in the repo:
-- Replace `cachePublicKey` in `flake.nix` with the content of `public-key`.
+Also update key files in the repo:
+- Commit `public-key` so future builds and installs use the same cache signing key.
 - Commit `veyon-public-key.pem` if you regenerated it.
 
 > **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
@@ -186,7 +186,7 @@ sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/priva
 
 > `secret-key` just needs to be in the repo root (already there after step 3). `run-harmonia.sh` checks for it at startup and exits with an error if missing.
 
-> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists and that `adminSshKey` in `lab-config.nix` matches. If the binary cache is ignored (clients build from source), verify that `cachePublicKey` in `flake.nix` matches the `secret-key`. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
+> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists and that `adminSshKey` in `lab-config.nix` matches. If the binary cache is ignored (clients build from source), verify that `public-key` was regenerated from the current `secret-key`, committed, and included in the rebuild. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
 
 ### 6. Rebuild the controller
 
