@@ -17,6 +17,12 @@
           builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile cachePublicKeyFile)
         else
           throw "Missing ./public-key. Generate it with: nix key convert-secret-to-public < secret-key > public-key";
+      adminSshKeyFile = ./id_ed25519.pub;
+      adminSshKey =
+        if builtins.pathExists adminSshKeyFile then
+          builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile adminSshKeyFile)
+        else
+          throw "Missing ./id_ed25519.pub. Generate it with: ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'";
 
       # ── Import lab configuration ─────────────────────────────────
       # Edit lab-config.nix to customize for your environment.
@@ -32,7 +38,6 @@
       inherit (config) teacherPassword;
       inherit (config) studentPassword;
       inherit (config) adminPassword;
-      inherit (config) adminSshKey;
       inherit (config) homepageUrl;
       inherit (config) studentGitName;
       inherit (config) studentGitEmail;

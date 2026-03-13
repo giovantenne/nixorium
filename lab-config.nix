@@ -3,7 +3,7 @@
 # This file is imported by flake.nix and contains all site-specific settings.
 #
 # Generate hashed passwords with: mkpasswd -m sha-512
-# Generate SSH key with: ssh-keygen -t ed25519 -C "admin@controller"
+# Generate SSH key with: ssh-keygen -t ed25519 -f id_ed25519 -N '' -C "admin@controller"
 {
   # ── Network ────────────────────────────────────────────────────
   # IP address dynamically assigned to the controller by the institutional
@@ -49,10 +49,6 @@
   teacherPassword = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
   studentPassword = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
   adminPassword = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
-
-  # ── SSH ────────────────────────────────────────────────────────
-  # Public key for root and admin SSH access
-  adminSshKey = "ssh-ed25519 AAAA... admin@controller";
 
   # ── School / organization ──────────────────────────────────────
   # Chromium homepage URL

@@ -98,7 +98,7 @@ The lab uses three cryptographic key pairs. All private keys are in `.gitignore`
 | Key pair | Private file | Public file / config | Purpose |
 |---|---|---|---|
 | **Binary cache** | `secret-key` | `cachePublicKey` in `flake.nix` | Harmonia signs Nix store paths; clients verify signatures |
-| **SSH** | `id_ed25519` | `adminSshKey` in `lab-config.nix` | Admin SSH access + Colmena deploys (connects as `root`) |
+| **SSH** | `id_ed25519` | `id_ed25519.pub` | Admin SSH access + Colmena deploys (connects as `root`) |
 | **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (committed) | Veyon Master authenticates to student PCs |
 
 If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`. Otherwise, generate everything from scratch:
@@ -147,9 +147,6 @@ studentPassword = "...";
 adminPassword = "...";
 
 # ── SSH ────────────────────────────────────────────────────────
-# Content of id_ed25519.pub generated in step 3
-adminSshKey = "ssh-ed25519 AAAA... admin@controller";
-
 # ── Organization ──────────────────────────────────────────────
 homepageUrl = "https://github.com/giovantenne/nixos-lab";
 studentGitName = "student";
@@ -186,7 +183,7 @@ sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/priva
 
 > `secret-key` just needs to be in the repo root (already there after step 3). `run-harmonia.sh` checks for it at startup and exits with an error if missing.
 
-> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists and that `adminSshKey` in `lab-config.nix` matches. If the binary cache is ignored (clients build from source), verify that `public-key` was regenerated from the current `secret-key`, committed, and included in the rebuild. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
+> **Troubleshooting**: if Colmena deploys fail with "Permission denied (publickey)", verify that `~/.ssh/id_ed25519` exists, that `id_ed25519.pub` is present in the repo root, and that the systems were rebuilt after generating it. If the binary cache is ignored (clients build from source), verify that `public-key` was regenerated from the current `secret-key` and included in the rebuild. If Veyon Master cannot connect to student screens, verify the private key is at `/etc/veyon/keys/private/teacher/key` and matches `veyon-public-key.pem`.
 
 ### 6. Rebuild the controller
 
@@ -300,7 +297,7 @@ All lab-specific settings are defined in `lab-config.nix`. No other file needs e
 | `teacherPassword` | Teacher password (SHA-512 hash) | -- |
 | `studentPassword` | Student password (SHA-512 hash) | -- |
 | `adminPassword` | Admin password (SHA-512 hash) | -- |
-| `adminSshKey` | SSH public key for root and admin | -- |
+| `id_ed25519.pub` | SSH public key for root and admin | Generated from `id_ed25519` |
 | `homepageUrl` | Chromium browser homepage | `"https://github.com/giovantenne/nixos-lab"` |
 | `studentGitName` | Git author name for student template | `"student"` |
 | `studentGitEmail` | Git author email for student template | `"student@example.com"` |
