@@ -196,6 +196,8 @@ git add public-key id_ed25519.pub veyon-public-key.pem
 
 > `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` should stay in the repo root because `flake.nix` and the Veyon module read them from there.
 
+> `public-key` and `setup.sh` are copied into `/installer` when you build the netboot artifacts. If you change either one, rebuild the netboot artifacts before booting clients again.
+
 > If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`, regenerate the public files, then `git add` them before rebuilding:
 >
 > ```sh
