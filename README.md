@@ -151,7 +151,7 @@ adminPassword = "...";
 adminSshKey = "ssh-ed25519 AAAA... admin@controller";
 
 # ── Organization ──────────────────────────────────────────────
-homepageUrl = "https://example.com";
+homepageUrl = "https://github.com/giovantenne/nixos-lab";
 studentGitName = "student";
 studentGitEmail = "student@example.com";
 adminGitName = "admin";
@@ -302,7 +302,7 @@ All lab-specific settings are defined in `lab-config.nix`. No other file needs e
 | `studentPassword` | Student password (SHA-512 hash) | -- |
 | `adminPassword` | Admin password (SHA-512 hash) | -- |
 | `adminSshKey` | SSH public key for root and admin | -- |
-| `homepageUrl` | Chromium browser homepage | `"https://example.com"` |
+| `homepageUrl` | Chromium browser homepage | `"https://github.com/giovantenne/nixos-lab"` |
 | `studentGitName` | Git author name for student template | `"student"` |
 | `studentGitEmail` | Git author email for student template | `"student@example.com"` |
 | `adminGitName` | Git author name for admin template | `"admin"` |
@@ -374,7 +374,7 @@ The default desktop is GNOME (Wayland) with a curated set of development tools. 
 
 - **System packages**: edit the `environment.systemPackages` list in `modules/common.nix`
 - **GNOME settings**: edit the `extraGSettingsOverrides` in `modules/common.nix`
-- **Screensaver**: replace `assets/meucci.txt` with your own ASCII art
+- **Screensaver**: replace `assets/logo.txt` with your own ASCII art
 - **Wallpapers**: replace images in `assets/backgrounds/`
 - **VS Code extensions**: edit the `vscodeExtensions` list in `modules/home-reset.nix`
 
@@ -412,7 +412,7 @@ scripts/
   home-reset.sh            # Boot-time snapshot rotation + home reset
 assets/
   backgrounds/             # Wallpapers (randomly selected at home reset)
-  meucci.txt               # ASCII art for screensaver
+  logo.txt                 # ASCII art for screensaver
   mimeapps.list            # Default applications
   vscode-settings.json     # VS Code defaults
 ```

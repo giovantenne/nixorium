@@ -350,7 +350,7 @@ in
   };
 
   # Screensaver scripts and ASCII art logo
-  environment.etc."lab/screensaver.txt".source = ../assets/meucci.txt;
+  environment.etc."lab/screensaver.txt".source = ../assets/logo.txt;
   environment.etc."lab/cmd-screensaver.sh" = {
     source = ../scripts/cmd-screensaver.sh;
     mode = "0755";

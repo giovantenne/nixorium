@@ -39,7 +39,7 @@ scripts/
   screensaver-monitor.sh   # GNOME idle watcher for screensaver
 assets/
   backgrounds/             # Ristretto wallpapers (random at each home-reset)
-  meucci.txt               # ASCII art for screensaver
+  logo.txt                 # ASCII art for screensaver
   mimeapps.list            # Default browser = Chromium
   vscode-settings.json     # VS Code defaults
 ```
