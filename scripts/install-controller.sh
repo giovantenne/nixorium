@@ -20,6 +20,11 @@ MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
 STUDENT_USER="${STUDENT_USER:-student}"
 AVAILABLE_DISKS=()
 
+# Force the bootstrap install to use the official NixOS cache only.
+# This avoids inheriting substituters from a preconfigured live/netboot
+# environment, which may point at an unavailable or unsigned local cache.
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo='
+
 prompt_input() {
   local PROMPT_TEXT="$1"
   local TARGET_VAR="$2"

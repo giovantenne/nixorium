@@ -79,6 +79,8 @@ If one disk is detected, the script selects it automatically; if multiple disks 
 
 This installs the controller with default placeholder settings from `lab-config.nix`. SSH, binary cache, and Veyon public keys are added later, after step 4.
 
+The bootstrap script forces `cache.nixos.org` during installation, so it does not depend on any LAN cache or substituter already configured in the live environment.
+
 > **Using your own fork?** Only one env var is needed -- `DISKO_URL` is derived automatically:
 > ```sh
 > curl -fsSL https://raw.githubusercontent.com/YOUR_USER/nixos-lab/master/scripts/install-controller.sh | \
