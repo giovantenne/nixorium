@@ -15,6 +15,8 @@
 { pkgs, lib, labSettings, ... }:
 
 let
+  veyonLocationName = "Lab";
+
   # Veyon authentication key base directories.
   # Veyon resolves keys as: BaseDir/<role>/key
   # e.g. /etc/veyon/keys/public  +  teacher/key
@@ -45,14 +47,14 @@ let
     in
     "{${builtins.substring 0 8 hash}-${builtins.substring 8 4 hash}-${builtins.substring 12 4 hash}-${builtins.substring 16 4 hash}-${builtins.substring 20 12 hash}}";
 
-  locationUid = uuidFromString (builtins.replaceStrings [" "] ["-"] (lib.toLower labSettings.veyonLocationName));
+  locationUid = uuidFromString (builtins.replaceStrings [" "] ["-"] (lib.toLower veyonLocationName));
 
   hostNumbers = builtins.genList (n: n + 1) labSettings.pcCount;
 
   networkObjects = {
     a = [
       {
-        Name = labSettings.veyonLocationName;
+        Name = veyonLocationName;
         Type = 2;
         Uid = locationUid;
       }

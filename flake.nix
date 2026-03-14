@@ -45,7 +45,6 @@
       inherit (config) studentGitEmail;
       inherit (config) adminGitName;
       inherit (config) adminGitEmail;
-      inherit (config) veyonLocationName;
       inherit (config) timeZone;
       inherit (config) defaultLocale;
       inherit (config) extraLocale;
@@ -106,7 +105,6 @@
         inherit studentGitEmail;
         inherit adminGitName;
         inherit adminGitEmail;
-        inherit veyonLocationName;
         inherit timeZone;
         inherit defaultLocale;
         inherit extraLocale;

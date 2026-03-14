@@ -59,8 +59,6 @@
   # Git identity for admin home template
   adminGitName = "admin";
   adminGitEmail = "admin@example.com";
-  # Veyon classroom location name
-  veyonLocationName = "Lab";
 
   # ── Locale / timezone ──────────────────────────────────────────
   timeZone = "Europe/Rome";

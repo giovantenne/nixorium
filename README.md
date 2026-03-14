@@ -113,10 +113,10 @@ Generate the password hashes before filling the three password fields below. The
 mkpasswd -m sha-512
 ```
 
-Edit `lab-config.nix` with the values required for the first rebuild. Everything else can stay at the defaults for now and is documented later in the Configuration reference section:
+Edit `lab-config.nix` with your lab's settings:
 
 ```nix
-# Required fields for first deploy
+# ── Network ────────────────────────────────────────────────────
 masterDhcpIp = "MASTER_DHCP_IP";   # DHCP address of controller (from ip -4 addr)
 networkBase = "10.0.0";             # First 3 octets of static lab subnet
 pcCount = 20;                       # Number of student PCs
@@ -132,9 +132,19 @@ studentUser = "student";            # Student account name
 teacherPassword = "...";
 studentPassword = "...";
 adminPassword = "...";
+
+# ── School / organization ─────────────────────────────────────
+homepageUrl = "https://github.com/giovantenne/nixos-lab";
+
+# ── Locale / timezone ─────────────────────────────────────────
+timeZone = "Europe/Rome";
+defaultLocale = "en_US.UTF-8";
+extraLocale = "it_IT.UTF-8";
+keyboardLayout = "it";
+consoleKeyMap = "it2";
 ```
 
-Common optional settings such as homepage, git identity, locale, keyboard layout, and Veyon location can be changed later.
+You can leave the git identity fields at their defaults for now.
 
 > **Note**: `masterDhcpIp` is used only during PXE/netboot client installation. The generated iPXE script, the netboot ramdisk, and the PXE helper services all point to that DHCP address, so if the DHCP lease changes before a netboot session you must update `lab-config.nix` and rebuild the netboot artifacts. Regular Colmena deploys use the controller's static lab IP instead.
 
@@ -279,34 +289,6 @@ For client PCs, prefer Colmena from the controller. Only run `sudo nixos-rebuild
 
 ## ⚙️ Configuration reference
 
-### Settings overview
-
-All lab-specific settings are defined in `lab-config.nix`. The quick start only requires the network, user, and password fields; everything below can stay at the defaults unless you want to customize it.
-
-| Setting | Description | Default |
-|---|---|---|
-| `masterDhcpIp` | Institutional DHCP address of the controller (used for PXE/netboot only; can change on lease renewal) | `"MASTER_DHCP_IP"` |
-| `networkBase` | First 3 octets of the static lab subnet | `"10.0.0"` |
-| `pcCount` | Number of student PCs | `20` |
-| `masterHostNumber` | Controller PC number (must be > `pcCount`) | `99` |
-| `ifaceName` | Network interface name (shared across all PCs) | `"enp0s3"` |
-| `teacherUser` | Teacher account name | `"teacher"` |
-| `studentUser` | Student account name (autologin, home reset) | `"student"` |
-| `teacherPassword` | Teacher password (SHA-512 hash) | -- |
-| `studentPassword` | Student password (SHA-512 hash) | -- |
-| `adminPassword` | Admin password (SHA-512 hash) | -- |
-| `homepageUrl` | Chromium browser homepage | `"https://github.com/giovantenne/nixos-lab"` |
-| `studentGitName` | Git author name for student template | `"student"` |
-| `studentGitEmail` | Git author email for student template | `"student@example.com"` |
-| `adminGitName` | Git author name for admin template | `"admin"` |
-| `adminGitEmail` | Git author email for admin template | `"admin@example.com"` |
-| `veyonLocationName` | Veyon classroom location name | `"Lab"` |
-| `timeZone` | System timezone | `"Europe/Rome"` |
-| `defaultLocale` | Default system locale | `"en_US.UTF-8"` |
-| `extraLocale` | Locale for LC_* settings | `"it_IT.UTF-8"` |
-| `keyboardLayout` | X11 keyboard layout | `"it"` |
-| `consoleKeyMap` | Console keymap | `"it2"` |
-
 ### User accounts
 
 | User | Role | Details |
@@ -357,7 +339,7 @@ port **11100**.
 #### Configuration
 
 - All PCs have `veyon-service` running and the public key deployed via Nix
-- `Veyon.conf` is generated with all lab PCs pre-mapped (location name from `veyonLocationName` in `lab-config.nix`)
+- `Veyon.conf` is generated with all lab PCs pre-mapped under the hardcoded location name `Lab`
 - The Veyon private key is only needed on the controller -- student PCs only have the public key
 - Users in the `veyon-master` group (`admin` and the teacher user) can access Veyon Master
 
