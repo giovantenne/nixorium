@@ -32,6 +32,7 @@ scripts/
   install-controller.sh    # Live USB bootstrap installer for controller with disk selection
   run-harmonia.sh          # Launches Harmonia binary cache server
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server (external DHCP compatible)
+  lib/lab-meta.sh          # Shared helper: loads labMeta from the flake for shell scripts
   create-home-template.sh  # Builds clean home directory template
   home-reset.sh            # Boot-time snapshot rotation + home reset
   cmd-screensaver.sh       # TTE screensaver animation loop
@@ -86,6 +87,7 @@ To validate changes, build the affected host configuration (`nix build`).
 - The controller has two relevant IPs: `masterIp` (static, `networkBase.masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, `masterDhcpIp` in `lab-config.nix` must be updated and netboot artifacts rebuilt before the next PXE session.
 - Custom settings flow from `flake.nix` via `specialArgs` (`labSettings`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
+- `labMeta` is a public flake output containing the small set of non-sensitive operational values that shell scripts need (controller IPs, iface name, client count, ports, usernames). Scripts must consume this output instead of parsing Nix source files textually.
 - No custom NixOS options are declared (`options = { ... }`). This repo only sets existing nixpkgs options.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
@@ -201,4 +203,4 @@ Hostname + static IP are generated in `flake.nix`. The shared interface name
 is configured via `labSettings.ifaceName` and applied in `modules/networking.nix`.
 
 All user-configurable parameters live in `lab-config.nix` (committed to the repo).
-Shell scripts that need settings parse `lab-config.nix` directly with `awk`.
+Shell scripts must load operational settings from `labMeta` via `scripts/lib/lab-meta.sh`.

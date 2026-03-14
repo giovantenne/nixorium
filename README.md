@@ -363,7 +363,7 @@ The default desktop is GNOME (Wayland) with a curated set of development tools. 
 ## 📁 Project structure
 
 ```
-flake.nix                  # Entry point: host generation, Colmena config
+flake.nix                  # Entry point: host generation, Colmena config, labMeta export
 flake.lock                 # Pinned inputs (nixpkgs, disko)
 LICENSE                    # MIT license
 lab-config.nix             # Lab configuration (edit for your environment)
@@ -385,6 +385,7 @@ scripts/
   install-controller.sh    # Controller bootstrap from live USB
   run-harmonia.sh          # Binary cache server
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server
+  lib/lab-meta.sh          # Shared helper: loads labMeta from the flake
   cmd-screensaver.sh       # TTE screensaver animation loop
   launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
   screensaver-monitor.sh   # GNOME idle watcher for screensaver

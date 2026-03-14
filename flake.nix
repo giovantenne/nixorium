@@ -53,6 +53,8 @@
 
       masterHostName = "pc${toString masterHostNumber}";
       masterIp = "${networkBase}.${toString masterHostNumber}";
+      cachePort = 5000;
+      pxeHttpPort = 8080;
 
       system = "x86_64-linux";
       pcNumbers = builtins.genList (n: n + 1) pcCount;
@@ -111,7 +113,29 @@
         inherit keyboardLayout;
         inherit consoleKeyMap;
         inherit cachePublicKey;
-        cachePort = 5000;
+        inherit cachePort;
+      };
+      labMeta = {
+        schemaVersion = 1;
+        controller = {
+          name = masterHostName;
+          number = masterHostNumber;
+          staticIp = masterIp;
+          dhcpIp = masterDhcpIp;
+        };
+        clients = {
+          count = pcCount;
+        };
+        network = {
+          base = networkBase;
+          inherit ifaceName;
+          inherit cachePort;
+          inherit pxeHttpPort;
+        };
+        users = {
+          student = studentUser;
+          teacher = teacherUser;
+        };
       };
       mkHost = n:
         let
@@ -176,7 +200,10 @@
               nix.settings.substituters = lib.mkForce [ "http://${masterDhcpIp}:${toString labSettings.cachePort}" ];
               networking.useDHCP = lib.mkForce true;
               services.openssh.enable = true;
-              environment.systemPackages = [ disko.packages.${system}.default ];
+              environment.systemPackages = [
+                disko.packages.${system}.default
+                pkgs.jq
+              ];
               system.stateVersion = "25.11";
               system.activationScripts.copyFlakeToRamdisk.text = ''
                 install -d -m 0755 /installer
@@ -186,6 +213,8 @@
           ];
         };
       };
+
+      inherit labMeta;
 
       colmena = {
         meta = {

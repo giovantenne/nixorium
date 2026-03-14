@@ -11,33 +11,52 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
-MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' lab-config.nix)
-CMDLINE=$(grep '^kernel ' result-ipxe/netboot.ipxe | sed 's/^kernel [^ ]* //')
+# Resolve the repository root explicitly so the script does not depend on cwd.
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
+
+# shellcheck source=/home/admin/nixos-lab/scripts/lib/lab-meta.sh
+source "${SCRIPT_DIR}/lib/lab-meta.sh"
+load_lab_meta "${REPO_ROOT}"
+
+IFACE="${LAB_IFACE_NAME}"
+MASTER_IP="${LAB_CONTROLLER_DHCP_IP}"
+HTTP_PORT="${LAB_PXE_HTTP_PORT}"
 
 if [[ -z "${IFACE}" ]]; then
-  echo "Error: ifaceName not found in lab-config.nix." >&2
+  echo "Error: interface name missing from labMeta." >&2
   exit 1
 fi
 
-if [[ -z "${MASTER_IP}" || "${MASTER_IP}" == "MASTER_DHCP_IP" ]]; then
-  echo "Error: masterDhcpIp not configured in lab-config.nix." >&2
+if [[ -z "${MASTER_IP}" ]]; then
+  echo "Error: controller DHCP IP missing from labMeta." >&2
   exit 1
 fi
 
-if [[ ! -f result-kernel/bzImage ]]; then
+if [[ ! -f "${REPO_ROOT}/result-kernel/bzImage" ]]; then
   echo "Error: missing result-kernel/bzImage. Build netboot artifacts first." >&2
   exit 1
 fi
 
-if [[ ! -f result-initrd/initrd ]]; then
+if [[ ! -f "${REPO_ROOT}/result-initrd/initrd" ]]; then
   echo "Error: missing result-initrd/initrd. Build netboot artifacts first." >&2
   exit 1
 fi
 
-if [[ ! -f assets/ipxe/snponly.efi ]]; then
+if [[ ! -f "${REPO_ROOT}/result-ipxe/netboot.ipxe" ]]; then
+  echo "Error: missing result-ipxe/netboot.ipxe. Build netboot artifacts first." >&2
+  exit 1
+fi
+
+if [[ ! -f "${REPO_ROOT}/assets/ipxe/snponly.efi" ]]; then
   echo "Error: missing assets/ipxe/snponly.efi." >&2
   echo "Copy it from your iPXE package/build into assets/ipxe/." >&2
+  exit 1
+fi
+
+CMDLINE=$(grep '^kernel ' "${REPO_ROOT}/result-ipxe/netboot.ipxe" | sed 's/^kernel [^ ]* //')
+if [[ -z "${CMDLINE}" ]]; then
+  echo "Error: could not extract kernel cmdline from result-ipxe/netboot.ipxe." >&2
   exit 1
 fi
 
@@ -48,15 +67,15 @@ chmod 0755 "${WORK_DIR}"
 install -d -m 0755 "${WORK_DIR}/http"
 install -d -m 0755 "${WORK_DIR}/tftp"
 
-cp result-kernel/bzImage "${WORK_DIR}/http/bzImage"
-cp result-initrd/initrd "${WORK_DIR}/http/initrd"
-cp assets/ipxe/snponly.efi "${WORK_DIR}/tftp/snponly.efi"
+cp "${REPO_ROOT}/result-kernel/bzImage" "${WORK_DIR}/http/bzImage"
+cp "${REPO_ROOT}/result-initrd/initrd" "${WORK_DIR}/http/initrd"
+cp "${REPO_ROOT}/assets/ipxe/snponly.efi" "${WORK_DIR}/tftp/snponly.efi"
 
 # iPXE boot script: loads kernel and initrd over HTTP from the controller.
 cat > "${WORK_DIR}/tftp/boot.ipxe" <<EOF
 #!ipxe
 dhcp
-set base-url http://${MASTER_IP}:8080
+set base-url http://${MASTER_IP}:${HTTP_PORT}
 kernel \${base-url}/bzImage ${CMDLINE}
 initrd \${base-url}/initrd
 boot
@@ -107,16 +126,16 @@ pxe-prompt="Network boot", 1
 dhcp-boot=tag:ipxe,boot.ipxe
 EOF
 
-if ss -ltnp 2>/dev/null | awk '$4 ~ /:8080$/ { found=1 } END { exit found ? 0 : 1 }'; then
-  echo "Error: port 8080 already in use. Stop the existing server and retry." >&2
+if ss -ltnp 2>/dev/null | awk -v port=":${HTTP_PORT}$" '$4 ~ port { found=1 } END { exit found ? 0 : 1 }'; then
+  echo "Error: port ${HTTP_PORT} already in use. Stop the existing server and retry." >&2
   exit 1
 fi
 
-echo "Starting HTTP server on ${MASTER_IP}:8080"
-python3 -m http.server 8080 --directory "${WORK_DIR}/http" --bind 0.0.0.0 &
+echo "Starting HTTP server on ${MASTER_IP}:${HTTP_PORT}"
+python3 -m http.server "${HTTP_PORT}" --directory "${WORK_DIR}/http" --bind 0.0.0.0 &
 HTTP_PID=$!
 if ! kill -0 "${HTTP_PID}" >/dev/null 2>&1; then
-  echo "Error: HTTP server failed to start on port 8080." >&2
+  echo "Error: HTTP server failed to start on port ${HTTP_PORT}." >&2
   exit 1
 fi
 

@@ -9,24 +9,16 @@ fi
 
 PC_NUMBER="$1"
 INSTALL_DISK="${2:-}"
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-LAB_CONFIG_FILE="${SCRIPT_DIR}/lab-config.nix"
-FLAKE_FILE="${SCRIPT_DIR}/flake.nix"
-DISKO_FILE="${SCRIPT_DIR}/disko-uefi.nix"
-PUBLIC_KEY_FILE="${SCRIPT_DIR}/public-key"
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+DISKO_FILE="${REPO_ROOT}/disko-uefi.nix"
+PUBLIC_KEY_FILE="${REPO_ROOT}/public-key"
 
-# Read settings from lab-config.nix
-PC_COUNT=$(awk '/pcCount =/ { gsub(/[^0-9]/, ""); print; exit }' "$LAB_CONFIG_FILE")
-if [[ -z "$PC_COUNT" ]]; then
-  echo "Error: pcCount not found in ${LAB_CONFIG_FILE}." >&2
-  exit 1
-fi
+# shellcheck source=/home/admin/nixos-lab/scripts/lib/lab-meta.sh
+source "${REPO_ROOT}/scripts/lib/lab-meta.sh"
+load_lab_meta "${REPO_ROOT}"
 
-STUDENT_USER=$(awk -F'"' '/studentUser =/ { print $2; exit }' "$LAB_CONFIG_FILE")
-if [[ -z "$STUDENT_USER" ]]; then
-  echo "Error: studentUser not found in ${LAB_CONFIG_FILE}." >&2
-  exit 1
-fi
+PC_COUNT="${LAB_CLIENT_COUNT}"
+STUDENT_USER="${LAB_STUDENT_USER}"
 
 if ! [[ "$PC_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "Error: PC number must be numeric." >&2
@@ -132,17 +124,17 @@ if [[ "$CONFIRMATION" != "YES" ]]; then
   exit 1
 fi
 
-# Extract settings from lab-config.nix and the generated public key file
-MASTER_IP=$(awk -F'"' '/masterDhcpIp =/ { print $2; exit }' "$LAB_CONFIG_FILE")
-CACHE_PORT=$(awk '/cachePort =/ { gsub(/[^0-9]/, ""); print; exit }' "$FLAKE_FILE")
+# Extract settings from lab metadata and the generated public key file
+MASTER_IP="${LAB_CONTROLLER_DHCP_IP}"
+CACHE_PORT="${LAB_CACHE_PORT}"
 CACHE_KEY=""
 
 if [[ -f "$PUBLIC_KEY_FILE" ]]; then
   CACHE_KEY=$(tr -d '\n' < "$PUBLIC_KEY_FILE")
 fi
 
-if [[ -z "$MASTER_IP" || "$MASTER_IP" == "MASTER_DHCP_IP" ]]; then
-  echo "Error: masterDhcpIp not configured in ${LAB_CONFIG_FILE}" >&2
+if [[ -z "$MASTER_IP" ]]; then
+  echo "Error: controller DHCP IP missing from labMeta." >&2
   exit 1
 fi
 
@@ -183,7 +175,7 @@ echo "Partitioning disk..."
 sudo disko --mode disko "$TEMP_DISKO_FILE"
 
 echo "Installing NixOS for ${PC_NAME}..."
-sudo nixos-install --flake "${SCRIPT_DIR}#${PC_NAME}" \
+sudo nixos-install --flake "${REPO_ROOT}#${PC_NAME}" \
   --option substituters "http://${MASTER_IP}:${CACHE_PORT}" \
   --option trusted-public-keys "${CACHE_KEY}" \
   --no-channel-copy \

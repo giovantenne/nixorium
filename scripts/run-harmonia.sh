@@ -3,8 +3,12 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 SECRET_KEY="${REPO_ROOT}/secret-key"
-CACHE_PORT=$(awk '/cachePort =/ { gsub(/[^0-9]/, ""); print; exit }' "${REPO_ROOT}/flake.nix")
-CACHE_PORT="${CACHE_PORT:-5000}"
+
+# shellcheck source=/home/admin/nixos-lab/scripts/lib/lab-meta.sh
+source "${REPO_ROOT}/scripts/lib/lab-meta.sh"
+load_lab_meta "${REPO_ROOT}"
+
+CACHE_PORT="${LAB_CACHE_PORT}"
 
 if [ ! -f "${SECRET_KEY}" ]; then
   echo "Missing ${SECRET_KEY}. Copy the secret-key into the repo root." >&2
