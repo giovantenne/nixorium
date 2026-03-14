@@ -81,7 +81,7 @@ This installs the controller with default placeholder settings from `lab-config.
 
 The bootstrap script forces `cache.nixos.org` during installation, so it does not depend on any LAN cache or substituter already configured in the live environment.
 
-> **Using your own fork?** Only one env var is needed -- `DISKO_URL` is derived automatically:
+> **Using your own fork?** Only one env var is needed:
 > ```sh
 > curl -fsSL https://raw.githubusercontent.com/YOUR_USER/nixos-lab/master/scripts/install-controller.sh | \
 >   FLAKE_REF="github:YOUR_USER/nixos-lab" bash
@@ -98,7 +98,6 @@ cd nixos-lab
 
 > If you forked the repo, clone your fork instead: `git clone https://github.com/YOUR_USER/nixos-lab.git`
 
-> **Note**: the bootstrap install intentionally works without `public-key`, `id_ed25519.pub`, or `veyon-public-key.pem`. Generate and commit those in step 4, then rebuild the controller in step 5.
 
 ### 3. Edit `lab-config.nix`
 
@@ -114,10 +113,10 @@ Generate the password hashes before filling the three password fields below. The
 mkpasswd -m sha-512
 ```
 
-Edit `lab-config.nix` with your lab's settings:
+Edit `lab-config.nix` with the values required for the first rebuild. Everything else can stay at the defaults for now and is documented later in the Configuration reference section:
 
 ```nix
-# ── Network ────────────────────────────────────────────────────
+# Required fields for first deploy
 masterDhcpIp = "MASTER_DHCP_IP";   # DHCP address of controller (from ip -4 addr)
 networkBase = "10.0.0";             # First 3 octets of static lab subnet
 pcCount = 20;                       # Number of student PCs
@@ -133,29 +132,15 @@ studentUser = "student";            # Student account name
 teacherPassword = "...";
 studentPassword = "...";
 adminPassword = "...";
-
-# ── SSH ────────────────────────────────────────────────────────
-# ── Organization ──────────────────────────────────────────────
-homepageUrl = "https://github.com/giovantenne/nixos-lab";
-studentGitName = "student";
-studentGitEmail = "student@example.com";
-adminGitName = "admin";
-adminGitEmail = "admin@example.com";
-veyonLocationName = "Lab";
-
-# ── Locale / timezone ──────────────────────────────────────────
-timeZone = "Europe/Rome";
-defaultLocale = "en_US.UTF-8";
-extraLocale = "it_IT.UTF-8";
-keyboardLayout = "it";
-consoleKeyMap = "it2";
 ```
 
-> **Note**: `masterDhcpIp` is the address dynamically assigned by the institutional DHCP server. It can change when the DHCP lease expires. It is only used during PXE/netboot client installation -- after that, Colmena deploys use the static IP (`networkBase.masterHostNumber`). If the DHCP address changes before a netboot session, update `lab-config.nix` and rebuild the netboot artifacts.
+Common optional settings such as homepage, git identity, locale, keyboard layout, and Veyon location can be changed later.
+
+> **Note**: `masterDhcpIp` is used only during PXE/netboot client installation. The generated iPXE script, the netboot ramdisk, and the PXE helper services all point to that DHCP address, so if the DHCP lease changes before a netboot session you must update `lab-config.nix` and rebuild the netboot artifacts. Regular Colmena deploys use the controller's static lab IP instead.
 
 ### 4. Generate and install keys
 
-The lab uses three cryptographic key pairs. Private keys must **never** be committed. Public key files are generated locally during setup, then committed in your lab repo or fork because they are part of the declarative state.
+Generate the three required key pairs. Keep the private files local to the controller, and add the public files to Git in the last command below so Nix can read them from the repo.
 
 | Key pair | Private file | Public file / config | Purpose |
 |---|---|---|---|
@@ -192,24 +177,9 @@ sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/priva
 git add public-key id_ed25519.pub veyon-public-key.pem
 ```
 
-> `secret-key` just needs to stay in the repo root. `run-harmonia.sh` checks for it at startup and exits with an error if missing.
-
-> `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` should stay in the repo root because `flake.nix` and the Veyon module read them from there.
-
-> `public-key` and `setup.sh` are copied into `/installer` when you build the netboot artifacts. If you change either one, rebuild the netboot artifacts before booting clients again.
-
-> If you already have the private keys from a previous deployment, copy them into `~/nixos-lab/`, regenerate the public files, then `git add` them before rebuilding:
->
-> ```sh
-> nix key convert-secret-to-public < secret-key > public-key
-> ssh-keygen -y -f id_ed25519 > id_ed25519.pub
-> openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
-> git add public-key id_ed25519.pub veyon-public-key.pem
-> ```
-
-> **Troubleshooting**: if Colmena deploys fail with `Permission denied (publickey)`, verify that `~/.ssh/id_ed25519` exists, that `id_ed25519.pub` is tracked by Git, and that the systems were rebuilt after updating the key. If needed, regenerate it with `ssh-keygen -y -f id_ed25519 > id_ed25519.pub` and run `git add id_ed25519.pub`.
-
 ### 5. Rebuild the controller
+
+Before starting PXE, temporarily remove the controller's static lab IP from the shared interface. The generated netboot artifacts refer to `masterDhcpIp`, so this keeps PXE, HTTP, and binary-cache traffic on that single DHCP address during installation. The change is temporary and a reboot restores the static IP automatically.
 
 ```sh
 # Rebuild the controller with your real config
@@ -232,7 +202,7 @@ for i in $(seq 1 "$PC_COUNT"); do
 done
 nix build "${TARGETS[@]}"
 
-# Remove static IP for netboot (returns after reboot)
+# Temporarily remove the lab static IP so netboot uses masterDhcpIp only
 STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' lab-config.nix).$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
 IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
 sudo ip addr del "${STATIC_IP}/24" dev "${IFACE}"
@@ -266,7 +236,7 @@ Where `XX` is the PC number (e.g., `/installer/setup.sh 5` for `pc05`).
 
 > `setup.sh` auto-selects the disk if only one is present; if multiple disks are detected, it asks for a choice.
 
-When all clients are installed, restore the static IP on the controller (or just reboot it):
+When all clients are installed, restore the controller's static lab IP so Colmena can reach the lab subnet again (or just reboot it):
 ```sh
 STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' lab-config.nix).$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
 IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
@@ -296,10 +266,14 @@ nix run nixpkgs#colmena -- apply --impure --on pc05
 
 ### Manual rebuild
 
-Rebuild a single PC from the latest config:
+Use `nixos-rebuild` only on the machine you are rebuilding.
+
+Rebuild the controller locally:
 ```sh
-sudo nixos-rebuild switch --flake .#pc05 --no-write-lock-file
+sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
 ```
+
+For client PCs, prefer Colmena from the controller. Only run `sudo nixos-rebuild switch --flake /path/to/nixos-lab#pc05 --no-write-lock-file` after logging into `pc05` itself (or after cloning the repo there).
 
 ---
 
@@ -307,7 +281,7 @@ sudo nixos-rebuild switch --flake .#pc05 --no-write-lock-file
 
 ### Settings overview
 
-All lab-specific settings are defined in `lab-config.nix`. No other file needs editing for basic customization.
+All lab-specific settings are defined in `lab-config.nix`. The quick start only requires the network, user, and password fields; everything below can stay at the defaults unless you want to customize it.
 
 | Setting | Description | Default |
 |---|---|---|
@@ -321,7 +295,6 @@ All lab-specific settings are defined in `lab-config.nix`. No other file needs e
 | `teacherPassword` | Teacher password (SHA-512 hash) | -- |
 | `studentPassword` | Student password (SHA-512 hash) | -- |
 | `adminPassword` | Admin password (SHA-512 hash) | -- |
-| `id_ed25519.pub` | SSH public key for root and admin | Generated from `id_ed25519`, safe to commit |
 | `homepageUrl` | Chromium browser homepage | `"https://github.com/giovantenne/nixos-lab"` |
 | `studentGitName` | Git author name for student template | `"student"` |
 | `studentGitEmail` | Git author email for student template | `"student@example.com"` |
@@ -437,16 +410,12 @@ assets/
   vscode-settings.json     # VS Code defaults
 ```
 
-Generated locally during setup and committed in your lab repo:
-
-- `public-key`
-- `id_ed25519.pub`
-- `veyon-public-key.pem`
+Public key artifacts generated during setup live in the repo root; see step 4.
 
 ## 🔒 Security
 
-- **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all in `.gitignore`)
-- `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` are public and should be committed in your lab repo or fork
+- **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all are in `.gitignore`)
+- Commit only the public counterparts used by the Nix configuration: `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem`
 - Passwords are SHA-512 hashed; never store plaintext
 - SSH password authentication is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
