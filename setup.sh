@@ -10,7 +10,7 @@ fi
 PC_NUMBER="$1"
 INSTALL_DISK="${2:-}"
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-DISKO_FILE="${REPO_ROOT}/disko-uefi.nix"
+DISKO_LAYOUT_FILE="${REPO_ROOT}/lib/disko-layout.nix"
 PUBLIC_KEY_FILE="${REPO_ROOT}/public-key"
 
 # shellcheck source=/home/admin/nixos-lab/scripts/lib/lab-meta.sh
@@ -138,6 +138,11 @@ if [[ -z "$MASTER_IP" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$DISKO_LAYOUT_FILE" ]]; then
+  echo "Error: Disko layout file missing at ${DISKO_LAYOUT_FILE}." >&2
+  exit 1
+fi
+
 if [[ -z "$CACHE_KEY" ]]; then
   echo "Error: public-key missing in ${PUBLIC_KEY_FILE}." >&2
   echo "Generate it on the controller with: nix key convert-secret-to-public < secret-key > public-key" >&2
@@ -162,14 +167,18 @@ fi
 
 TEMP_DISKO_FILE=$(mktemp)
 trap 'rm -f "$TEMP_DISKO_FILE"' EXIT
-# Replace disk device and resolve labSettings.studentUser for standalone disko use.
-# disko-uefi.nix is a NixOS module that normally receives labSettings via specialArgs,
-# but disko CLI evaluates it standalone without that context.
-sed -E \
-  -e "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" \
-  -e 's/\{ labSettings, \.\.\. \}:/{ ... }:/' \
-  -e "s/\\$\\{labSettings\\.studentUser\\}/${STUDENT_USER}/g" \
-  "$DISKO_FILE" > "$TEMP_DISKO_FILE"
+
+# Generate a standalone Disko config with concrete arguments for the selected
+# disk and student user. This keeps the installer independent from the text
+# shape of the NixOS module wrapper.
+cat > "$TEMP_DISKO_FILE" <<EOF
+{
+  disko.devices = import ${DISKO_LAYOUT_FILE} {
+    device = "${INSTALL_DISK}";
+    studentUser = "${STUDENT_USER}";
+  };
+}
+EOF
 
 echo "Partitioning disk..."
 sudo disko --mode disko "$TEMP_DISKO_FILE"

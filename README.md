@@ -305,7 +305,7 @@ For client PCs, prefer Colmena from the controller. Only run `sudo nixos-rebuild
 
 ### Disk layout (Disko)
 
-All machines must boot in **UEFI mode**. Disk partitioning is declarative via `disko-uefi.nix`.
+All machines must boot in **UEFI mode**. Disk partitioning is declarative via `disko-uefi.nix`, which wraps the shared pure layout in `lib/disko-layout.nix`.
 
 | Partition | Filesystem | Mount point |
 |---|---|---|
@@ -367,7 +367,9 @@ flake.nix                  # Entry point: host generation, Colmena config, labMe
 flake.lock                 # Pinned inputs (nixpkgs, disko)
 LICENSE                    # MIT license
 lab-config.nix             # Lab configuration (edit for your environment)
-disko-uefi.nix             # Declarative disk partitioning (UEFI + Btrfs)
+disko-uefi.nix             # NixOS wrapper for the shared Disko layout
+lib/
+  disko-layout.nix         # Shared Disko layout function (device + student user)
 setup.sh                   # Client PC installer (runs on PXE-booted machines)
 pkgs/
   veyon.nix                # Veyon package derivation

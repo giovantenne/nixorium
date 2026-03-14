@@ -14,7 +14,9 @@ flake.nix                  # Entry point: imports lab-config.nix, host generatio
 flake.lock                 # Pinned inputs (nixpkgs nixos-25.11, disko)
 LICENSE                    # MIT license
 lab-config.nix             # Lab configuration (edit for your environment)
-disko-uefi.nix             # Declarative disk partitioning (UEFI boot, parameterized student user)
+disko-uefi.nix             # NixOS wrapper for the shared Disko layout
+lib/
+  disko-layout.nix         # Shared Disko layout function (device + student user)
 setup.sh                   # Installer script for PXE-booted client PCs
 pkgs/
   veyon.nix                # Veyon package derivation (not in nixpkgs)

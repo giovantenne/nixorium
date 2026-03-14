@@ -9,12 +9,12 @@ fi
 
 INSTALL_DISK="${1:-}"
 FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixos-lab}"
-# Derive DISKO_URL from FLAKE_REF if not explicitly set.
+# Derive DISKO_LAYOUT_URL from FLAKE_REF if not explicitly set.
 # Extracts owner/repo from "github:owner/repo" (strips ?ref=... if present).
-if [[ -z "${DISKO_URL:-}" ]]; then
+if [[ -z "${DISKO_LAYOUT_URL:-}" ]]; then
   OWNER_REPO="${FLAKE_REF#github:}"
   OWNER_REPO="${OWNER_REPO%%\?*}"
-  DISKO_URL="https://raw.githubusercontent.com/${OWNER_REPO}/master/disko-uefi.nix"
+  DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${OWNER_REPO}/master/lib/disko-layout.nix"
 fi
 MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
 STUDENT_USER="${STUDENT_USER:-student}"
@@ -122,20 +122,23 @@ if [[ "$CONFIRMATION" != "YES" ]]; then
   exit 1
 fi
 
-TEMP_DISKO_INPUT=$(mktemp)
+TEMP_DISKO_LAYOUT=$(mktemp)
 TEMP_DISKO_FILE=$(mktemp)
-trap 'rm -f "$TEMP_DISKO_INPUT" "$TEMP_DISKO_FILE"' EXIT
+trap 'rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"' EXIT
 
-echo "Downloading disko config..."
-curl -fsSL "$DISKO_URL" -o "$TEMP_DISKO_INPUT"
-# Replace disk device and resolve labSettings.studentUser for standalone disko use.
-# disko-uefi.nix is a NixOS module that normally receives labSettings via specialArgs,
-# but disko CLI evaluates it standalone without that context.
-sed -E \
-  -e "s#device = \"[^\"]+\";#device = \"${INSTALL_DISK}\";#" \
-  -e 's/\{ labSettings, \.\.\. \}:/{ ... }:/' \
-  -e "s/\\$\\{labSettings\\.studentUser\\}/${STUDENT_USER}/g" \
-  "$TEMP_DISKO_INPUT" > "$TEMP_DISKO_FILE"
+echo "Downloading Disko layout..."
+curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
+
+# Generate a standalone Disko config with concrete arguments for the selected
+# disk and student user. This avoids patching the text of the NixOS module.
+cat > "$TEMP_DISKO_FILE" <<EOF
+{
+  disko.devices = import ${TEMP_DISKO_LAYOUT} {
+    device = "${INSTALL_DISK}";
+    studentUser = "${STUDENT_USER}";
+  };
+}
+EOF
 
 echo "Partitioning disk..."
 sudo nix --extra-experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko "$TEMP_DISKO_FILE"
