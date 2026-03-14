@@ -259,7 +259,12 @@ sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 
 ### Deploy updates (Colmena)
 
-Start the binary cache first:
+First apply the latest configuration on the controller itself:
+```sh
+sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
+```
+
+Then start the binary cache:
 ```sh
 ./scripts/run-harmonia.sh
 ```
