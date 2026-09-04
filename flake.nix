@@ -11,6 +11,7 @@
 
   outputs = { self, nixpkgs, disko }:
     let
+      version = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ./VERSION);
       cachePublicKeyFile = ./public-key;
       cachePublicKey =
         if builtins.pathExists cachePublicKeyFile then
@@ -117,6 +118,7 @@
       };
       labMeta = {
         schemaVersion = 1;
+        inherit version;
         controller = {
           name = masterHostName;
           number = masterHostNumber;

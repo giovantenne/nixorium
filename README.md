@@ -1,11 +1,14 @@
 # NixOS Lab
 
+[![Release](https://img.shields.io/github/v/release/giovantenne/nixos-lab?display_name=tag&sort=semver)](https://github.com/giovantenne/nixos-lab/releases/latest)
 [![NixOS](https://img.shields.io/badge/NixOS-25.11-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
 [![Flakes](https://img.shields.io/badge/Nix-Flakes-4E9A06?logo=nixos&logoColor=white)](https://nixos.wiki/wiki/Flakes)
 [![Deploy](https://img.shields.io/badge/Deploy-Colmena-2E3440)](https://github.com/zhaofengli/colmena)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2EA44F.svg)](./LICENSE)
 
 A reproducible NixOS deployment system for multi-PC environments (classrooms, training rooms, public labs, libraries) with **no internet access on client machines**.
+
+The current stable release is **v1.0.0**. Production installations should use a tagged release from the [GitHub Releases page](https://github.com/giovantenne/nixos-lab/releases) instead of tracking `master` directly.
 
 One controller PC manages the entire lab: it builds all configurations locally, serves them over LAN, and deploys updates to every workstation declaratively. The whole lab can be reinstalled from scratch in under 20 minutes.
 
@@ -70,9 +73,13 @@ This project bridges that gap with a **local-first workflow**:
 
 > **Requires**: a NixOS live USB with temporary internet access. UEFI boot must be enabled.
 
-Boot the controller PC from the NixOS live USB, then run:
+Boot the controller PC from the NixOS live USB, then run the installer from the stable release:
 ```sh
-curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/scripts/install-controller.sh | bash
+RELEASE="v1.0.0"
+curl -fsSL "https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/scripts/install-controller.sh" | \
+  FLAKE_REF="github:giovantenne/nixos-lab/${RELEASE}" \
+  DISKO_LAYOUT_URL="https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/lib/disko-layout.nix" \
+  bash
 ```
 
 If one disk is detected, the script selects it automatically; if multiple disks are detected, it asks you to choose one.
@@ -81,22 +88,26 @@ This installs the controller with default placeholder settings from `lab-config.
 
 The bootstrap script forces `cache.nixos.org` during installation, so it does not depend on any LAN cache or substituter already configured in the live environment.
 
-> **Using your own fork?** Only one env var is needed:
+> **Using your own fork?** Use the same release tag in the script URL, flake reference, and Disko layout URL:
 > ```sh
-> curl -fsSL https://raw.githubusercontent.com/YOUR_USER/nixos-lab/master/scripts/install-controller.sh | \
->   FLAKE_REF="github:YOUR_USER/nixos-lab" bash
+> RELEASE="v1.0.0"
+> curl -fsSL "https://raw.githubusercontent.com/YOUR_USER/nixos-lab/${RELEASE}/scripts/install-controller.sh" | \
+>   FLAKE_REF="github:YOUR_USER/nixos-lab/${RELEASE}" \
+>   DISKO_LAYOUT_URL="https://raw.githubusercontent.com/YOUR_USER/nixos-lab/${RELEASE}/lib/disko-layout.nix" \
+>   bash
 > ```
 
 ### 2. Reboot and clone the repo
 
-Reboot and log in as `admin` (default password: `nixos`).
+Reboot and log in as `admin` (default password: `nixos`). Clone the same release used for installation, then create a local deployment branch for your lab configuration.
 
 ```sh
-git clone https://github.com/giovantenne/nixos-lab.git
+git clone --branch v1.0.0 https://github.com/giovantenne/nixos-lab.git
 cd nixos-lab
+git switch -c lab-config
 ```
 
-> If you forked the repo, clone your fork instead: `git clone https://github.com/YOUR_USER/nixos-lab.git`
+> If you forked the repo, clone your fork instead and base the deployment branch on the corresponding release tag.
 
 
 ### 3. Edit `lab-config.nix`
@@ -257,6 +268,32 @@ sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 
 ## 🔧 Maintenance
 
+### Releases and versioning
+
+NixOS Lab follows [Semantic Versioning](https://semver.org/). `VERSION` is the canonical project version and every release must have a matching dated entry in `CHANGELOG.md`.
+
+GitHub Releases are generated automatically when a tag named `v<version>` is pushed. The workflow validates that the tag, `VERSION`, and `CHANGELOG.md` agree, then publishes the matching changelog section as the release notes. Releases contain GitHub's source archives; Nix build outputs remain reproducible from `flake.lock` and are distributed to clients through Harmonia.
+
+To prepare a release:
+
+1. Update `VERSION` according to SemVer.
+2. Move the relevant entries from `Unreleased` to a dated section in `CHANGELOG.md`.
+3. Update the stable release number in this README when appropriate.
+4. Build an affected host configuration and commit the release metadata.
+5. Push `master`, then publish the tag:
+
+```sh
+./scripts/release.sh 1.1.0
+```
+
+The script refuses to release from a dirty tree, from a branch other than `master`, or when local `HEAD` differs from `origin/master`.
+
+The project version is also exposed without building a system closure:
+
+```sh
+nix eval .#labMeta.version --raw
+```
+
 ### Deploy updates (Colmena)
 
 First apply the latest configuration on the controller itself:
@@ -363,8 +400,11 @@ The default desktop is GNOME (Wayland) with a curated set of development tools. 
 ## 📁 Project structure
 
 ```
+.github/workflows/release.yml # Validates tags and publishes GitHub Releases
 flake.nix                  # Entry point: host generation, Colmena config, labMeta export
 flake.lock                 # Pinned inputs (nixpkgs, disko)
+VERSION                    # Canonical Semantic Version
+CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
 lab-config.nix             # Lab configuration (edit for your environment)
 disko-uefi.nix             # NixOS wrapper for the shared Disko layout
@@ -384,6 +424,7 @@ modules/
   home-reset.nix           # Student home templating + boot-time reset
   veyon.nix                # Veyon service, keys, and classroom config
 scripts/
+  release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Controller bootstrap from live USB
   run-harmonia.sh          # Binary cache server
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server
