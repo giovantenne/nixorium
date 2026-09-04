@@ -66,4 +66,10 @@
   extraLocale = "it_IT.UTF-8";
   keyboardLayout = "it";
   consoleKeyMap = "it2";
+
+  # ── Veyon Wayland pilot ───────────────────────────────────
+  # Veyon 4.11 includes a native PipeWire/XDG portal backend. GNOME still
+  # requires interactive screen-sharing consent, so enable it on pilot PCs
+  # only. All other hosts keep the unattended GNOME Remote Desktop fallback.
+  veyonNativeHosts = [];
 }

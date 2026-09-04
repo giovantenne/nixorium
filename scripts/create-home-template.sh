@@ -47,6 +47,7 @@ HOME="$TEMPLATE_DIR" "$XDG_USER_DIRS_BIN" --force
 # Create config directories
 mkdir -p "$TEMPLATE_DIR/.config"
 mkdir -p "$TEMPLATE_DIR/.local/share"
+mkdir -p "$TEMPLATE_DIR/.local/npm"
 
 # Copy mimeapps.list
 cp "$ASSETS_DIR/mimeapps.list" "$TEMPLATE_DIR/.config/mimeapps.list"

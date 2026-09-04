@@ -132,12 +132,12 @@ in
   };
 
   # Ensure the controller never enters sleep/suspend/hibernate.
-  systemd.sleep.extraConfig = lib.mkIf isMaster ''
-    AllowSuspend=no
-    AllowHibernation=no
-    AllowHybridSleep=no
-    AllowSuspendThenHibernate=no
-  '';
+  systemd.sleep.settings.Sleep = lib.mkIf isMaster {
+    AllowSuspend = "no";
+    AllowHibernation = "no";
+    AllowHybridSleep = "no";
+    AllowSuspendThenHibernate = "no";
+  };
   systemd.targets.sleep.enable = lib.mkIf isMaster false;
   systemd.targets.suspend.enable = lib.mkIf isMaster false;
   systemd.targets.hibernate.enable = lib.mkIf isMaster false;
@@ -177,9 +177,6 @@ in
     sansSerif = [ "Liberation Sans" ];
     serif = [ "Liberation Serif" ];
   };
-
-  # Docker.
-  virtualisation.docker.enable = true;
 
   # User directories.
   systemd.user.services.xdg-user-dirs = {
@@ -407,9 +404,9 @@ in
     lua-language-server
     jdk21
     maven
-    nodejs_20
+    nodejs
     opencode
-    php83
+    php
     ripgrep
     try
     xdg-user-dirs

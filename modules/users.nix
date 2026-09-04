@@ -21,22 +21,25 @@ in
   users.users.${labSettings.teacherUser} = {
     isNormalUser = true;
     description = labSettings.teacherUser;
-    extraGroups = [ "networkmanager" "docker" "veyon-master" ];
+    extraGroups = [ "networkmanager" "veyon-master" ];
     hashedPassword = labSettings.teacherPassword;
+    autoSubUidGidRange = true;
   };
 
   users.users.${labSettings.studentUser} = {
     isNormalUser = true;
     description = labSettings.studentUser;
-    extraGroups = [ "networkmanager" "docker" "render" "video" ];
+    extraGroups = [ "networkmanager" "render" "video" ];
     hashedPassword = labSettings.studentPassword;
+    autoSubUidGidRange = true;
   };
 
   users.users.admin = {
     isNormalUser = true;
     description = "admin";
-    extraGroups = [ "networkmanager" "wheel" "docker" "veyon-master" ];
+    extraGroups = [ "networkmanager" "wheel" "veyon-master" ];
     hashedPassword = labSettings.adminPassword;
+    autoSubUidGidRange = true;
     openssh.authorizedKeys.keys =
       if labSettings.adminSshKey == null then
         []

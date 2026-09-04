@@ -1,10 +1,9 @@
 # Veyon classroom management: service, keys and base configuration.
 #
-# GNOME runs on Wayland (GNOME 49 dropped X11 session support).
-# Veyon's built-in x11vnc cannot capture a Wayland compositor, so we use
-# the "External VNC Server" plugin that delegates screen capture to
-# gnome-remote-desktop (grd).  grd uses PipeWire + the Wayland screen-cast
-# API, then exposes the framebuffer over VNC on port 5900.
+# Veyon 4.11 provides a native PipeWire/XDG portal backend for Wayland.
+# GNOME still requires interactive screen-sharing consent, which prevents
+# fully unattended use. Hosts not explicitly selected for the native pilot
+# therefore delegate capture to gnome-remote-desktop on port 5900.
 #
 # gnome-remote-desktop is patched in our overlay to allow multiple
 # concurrent VNC connections (upstream limits it to one).
@@ -12,7 +11,7 @@
 # - Public key deployed to all PCs for key-file authentication
 # - Private key must be placed manually where needed (not managed by Nix)
 # - Classroom/PC layout is configured via Veyon Configurator or veyon-cli
-{ pkgs, lib, labSettings, ... }:
+{ pkgs, lib, hostName, labSettings, ... }:
 
 let
   veyonLocationName = "Lab";
@@ -24,6 +23,12 @@ let
   privateKeyBaseDir = "/etc/veyon/keys/private";
   veyonPublicKeyFile = ../veyon-public-key.pem;
   hasVeyonPublicKey = builtins.pathExists veyonPublicKeyFile;
+  useNativeWayland = builtins.elem hostName labSettings.veyonNativeHosts;
+  vncServerPluginUid =
+    if useNativeWayland then
+      "{3b8e5c1a-9f72-4d3e-b6a0-2c7f1e8d4b95}"
+    else
+      "{67dfc1c1-8f37-4539-a298-16e74e34fd8b}";
 
   # VNC password used between veyon-service and gnome-remote-desktop.
   # Both sides must agree on this value.  Since this is LAN-only
@@ -73,8 +78,7 @@ let
     printf '%s' ${lib.escapeShellArg networkObjectsJson} | ${pkgs.coreutils}/bin/base64 -w0 > $out
   '');
 
-  # Veyon configuration (deployed as /etc/xdg/Veyon Solutions/Veyon.conf)
-  # Uses the External VNC Server plugin pointing to grd on port 5900.
+  # Veyon configuration (deployed as /etc/xdg/Veyon Solutions/Veyon.conf).
   veyonConf = ''
     [Authentication]
     Method=1
@@ -100,11 +104,13 @@ let
     ComputerMonitoringUpdateInterval=1000
 
     [VncServer]
-    Plugin={67dfc1c1-8f37-4539-a298-16e74e34fd8b}
+    Plugin=${vncServerPluginUid}
 
-    [ExternalVncServer]
-    ServerPort=5900
-    Password=${vncPasswordEncrypted}
+    ${lib.optionalString (!useNativeWayland) ''
+      [ExternalVncServer]
+      ServerPort=5900
+      Password=${vncPasswordEncrypted}
+    ''}
   '';
 in
 {
@@ -123,24 +129,29 @@ in
     mode = "0644";
   };
 
-  # Veyon service: runs per user session.
-  # On Wayland, veyon-service connects to grd's VNC (port 5900) rather
-  # than capturing the screen directly.
+  # The user session supplies the Wayland, PipeWire and portal environment.
   systemd.user.services.veyon-server = {
     description = "Veyon Service";
     wantedBy = [ "graphical-session.target" ];
-    after = [ "graphical-session.target" "gnome-remote-desktop.service" ];
+    after = [ "graphical-session.target" ]
+      ++ lib.optional (!useNativeWayland) "gnome-remote-desktop.service";
+    environment.PATH = lib.mkForce "/run/wrappers/bin:${lib.makeBinPath [
+      pkgs.veyon
+      pkgs.coreutils
+      pkgs.findutils
+      pkgs.gnugrep
+      pkgs.gnused
+      pkgs.systemd
+    ]}";
     serviceConfig = {
       ExecStart = "${pkgs.veyon}/bin/veyon-service";
       Restart = "on-failure";
       RestartSec = 5;
     };
-    path = [ pkgs.veyon ];
   };
 
-  # gnome-remote-desktop VNC configuration via dconf.
-  # Enable VNC backend, set password authentication, mirror the primary screen.
-  services.desktopManager.gnome.extraGSettingsOverrides = ''
+  # Fallback VNC configuration for hosts outside the native Wayland pilot.
+  services.desktopManager.gnome.extraGSettingsOverrides = lib.mkIf (!useNativeWayland) ''
     [org.gnome.desktop.remote-desktop.vnc]
     enable=true
     view-only=true
@@ -155,12 +166,13 @@ in
   '';
 
   # Ensure the remote-desktop schemas are visible to gsettings.
-  services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-remote-desktop ];
+  services.desktopManager.gnome.extraGSettingsOverridePackages =
+    lib.optionals (!useNativeWayland) [ pkgs.gnome-remote-desktop ];
 
   # gnome-remote-desktop user service: set the VNC password via environment
   # variable (GNOME Keyring is disabled in common.nix), and ensure it's enabled
   # at session start.
-  systemd.user.services.gnome-remote-desktop = {
+  systemd.user.services.gnome-remote-desktop = lib.mkIf (!useNativeWayland) {
     wantedBy = [ "gnome-session.target" ];
     serviceConfig.Environment = [
       "GNOME_REMOTE_DESKTOP_TEST_VNC_PASSWORD=${vncPassword}"
@@ -170,8 +182,25 @@ in
   # Group for Veyon Master access (private key ownership)
   users.groups.veyon-master = {};
 
+  # Nix store permissions cannot carry setuid bits. Veyon uses these narrowly
+  # scoped helpers for PAM authentication and Wayland input locking.
+  security.wrappers.veyon-auth-helper = {
+    source = "${pkgs.veyon}/bin/veyon-auth-helper";
+    owner = "root";
+    group = "root";
+    setuid = true;
+  };
+
+  security.wrappers.veyon-input-helper = {
+    source = "${pkgs.veyon}/bin/veyon-input-helper";
+    owner = "root";
+    group = "root";
+    setuid = true;
+  };
+
   # Open the Veyon and VNC ports.
   # The firewall is disabled in common.nix but we declare the ports
   # explicitly for documentation / defense-in-depth.
-  networking.firewall.allowedTCPPorts = [ 11100 5900 ];
+  networking.firewall.allowedTCPPorts = [ 11100 ]
+    ++ lib.optional (!useNativeWayland) 5900;
 }
