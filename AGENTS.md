@@ -10,8 +10,11 @@ locale, etc.) are parameterized in `lab-config.nix` and imported by `flake.nix`.
 ## Project Structure
 
 ```
+.github/workflows/release.yml # Validates tags and publishes GitHub Releases
 flake.nix                  # Entry point: imports lab-config.nix, host generation + netboot + Colmena
 flake.lock                 # Pinned inputs (nixpkgs nixos-25.11, disko)
+VERSION                    # Canonical Semantic Version
+CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
 lab-config.nix             # Lab configuration (edit for your environment)
 disko-uefi.nix             # NixOS wrapper for the shared Disko layout
@@ -31,6 +34,7 @@ modules/
   home-reset.nix           # Student home directory templating + boot-time reset
   veyon.nix                # Veyon service, public key, firewall, base config
 scripts/
+  release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Live USB bootstrap installer for controller with disk selection
   run-harmonia.sh          # Launches Harmonia binary cache server
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server (external DHCP compatible)
@@ -81,6 +85,14 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --
 
 There are **no tests, linters, or formatters** configured in this repository.
 To validate changes, build the affected host configuration (`nix build`).
+
+## Releases
+
+Releases follow Semantic Versioning. `VERSION`, the release tag (`v<version>`),
+and the dated `CHANGELOG.md` section must agree. After the release commit has
+been pushed to `master`, run `./scripts/release.sh <version>` to create and push
+the annotated tag. The GitHub Actions release workflow publishes the GitHub
+Release from the matching changelog section.
 
 ## Architecture Notes
 
