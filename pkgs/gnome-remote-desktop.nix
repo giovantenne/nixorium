@@ -26,53 +26,23 @@ prev.gnome-remote-desktop.overrideAttrs (oldAttrs: {
   ];
 
   postPatch = (oldAttrs.postPatch or "") + ''
-    # Replace the single-session guard with code that stops existing sessions
-    # before accepting the new connection.
-    #
-    # Original code pattern (upstream):
-    #   if (vnc_server->sessions)
-    #     {
-    #       /* TODO: ... */
-    #       g_message ("Refusing new VNC connection: ...");
-    #       return TRUE;
-    #     }
-    #
-    # Replacement: stop all existing sessions, clean them up, then continue
-    # to accept the new connection normally.
-    sed -i '/if (vnc_server->sessions)/{
-      # Read the next lines that form the if-block body
-      :loop
-      N
-      /return TRUE;/!b loop
-      # Now we have the full if-block; also grab the closing brace
-      N
-      # Replace the entire block
-      c\  /* Veyon reconnect patch: stop existing sessions before accepting new */\
-      while (vnc_server->sessions)\
-        {\
-          GrdSession *existing = vnc_server->sessions->data;\
-          g_debug ("Stopping existing VNC session for reconnect");\
-          grd_session_stop (existing);\
-        }
-    }' src/grd-vnc-server.c
+    # GNOME 50 moved its single-client policy into GrdThrottler. Let a second
+    # connection reach the callback, then replace the existing VNC session.
+    substituteInPlace src/grd-vnc-server.c \
+      --replace-fail \
+        '  g_debug ("Creating new VNC session");' \
+        '  while (vnc_server->sessions)
+    {
+      GrdSession *existing = vnc_server->sessions->data;
 
-    # Verify the patch was applied: the refuse message should be gone
-    if grep -q "Refusing new VNC connection" src/grd-vnc-server.c; then
-      echo "ERROR: Failed to patch out VNC single-session limit"
-      echo "=== Relevant section of grd-vnc-server.c ==="
-      grep -n -A5 -B5 "vnc_server->sessions" src/grd-vnc-server.c
-      exit 1
-    fi
+      g_debug ("Stopping existing VNC session for reconnect");
+      grd_session_stop (existing);
+    }
 
-    # Verify grd_session_stop was injected
-    if ! grep -q "Stopping existing VNC session for reconnect" src/grd-vnc-server.c; then
-      echo "ERROR: Reconnect patch not found in grd-vnc-server.c"
-      exit 1
-    fi
-
-    # Ensure grd-session.h is included (for grd_session_stop prototype)
-    if ! grep -q '#include "grd-session.h"' src/grd-vnc-server.c; then
-      sed -i '/#include "grd-vnc-server.h"/a #include "grd-session.h"' src/grd-vnc-server.c
-    fi
+  grd_vnc_server_cleanup_stopped_sessions (vnc_server);
+  g_debug ("Creating new VNC session");' \
+      --replace-fail \
+        'grd_throttler_limits_set_max_global_connections (limits, 1);' \
+        'grd_throttler_limits_set_max_global_connections (limits, 2);'
   '';
 })

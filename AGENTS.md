@@ -2,7 +2,8 @@
 
 This repository manages a multi-PC NixOS lab using Nix Flakes,
 Disko, and Colmena. A controller PC deploys to student workstations
-over a LAN-only network (no internet on clients).
+over a LAN-only deployment network. Clients do not need internet for
+installation or system updates, but may have internet during user sessions.
 
 All lab-specific settings (user names, PC count, network layout, passwords,
 locale, etc.) are parameterized in `lab-config.nix` and imported by `flake.nix`.
@@ -12,7 +13,7 @@ locale, etc.) are parameterized in `lab-config.nix` and imported by `flake.nix`.
 ```
 .github/workflows/release.yml # Validates tags and publishes GitHub Releases
 flake.nix                  # Entry point: imports lab-config.nix, host generation + netboot + Colmena
-flake.lock                 # Pinned inputs (nixpkgs nixos-25.11, disko)
+flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
@@ -22,7 +23,6 @@ lib/
   disko-layout.nix         # Shared Disko layout function (device + student user)
 setup.sh                   # Installer script for PXE-booted client PCs
 pkgs/
-  veyon.nix                # Veyon package derivation (not in nixpkgs)
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
 modules/
   common.nix               # Shared system config (GNOME, packages, shells, locale, services)
@@ -32,6 +32,8 @@ modules/
   cache.nix                # Binary cache client (points to controller's Harmonia)
   filesystems.nix          # Btrfs subvolume mount declarations
   home-reset.nix           # Student home directory templating + boot-time reset
+  docker.nix               # Per-user rootless Docker daemon
+  development.nix          # Writable npm global prefix and PATH
   veyon.nix                # Veyon service, public key, firewall, base config
 scripts/
   release.sh               # Validates, tags, and publishes a release
@@ -107,8 +109,10 @@ Release from the matching changelog section.
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
 - Netboot uses `dnsmasq` in ProxyDHCP mode (`scripts/run-pxe-proxy.sh`) so institutional DHCP remains authoritative for leases.
-- `labOverlay` in `flake.nix` provides custom packages (e.g. `pkgs.veyon` via `callPackage ./pkgs/veyon.nix {}`). Applied via `nixpkgs.overlays` in each host's module list and in `colmena.meta.nixpkgs`.
-- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` on all PCs, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. The private key is not managed by Nix (see Security).
+- `labOverlay` composes Veyon's official overlay with local PipeWire packaging fixes and the GNOME Remote Desktop fallback patch. It is applied in each host's module list and in `colmena.meta.nixpkgs`.
+- Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
+- Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
+- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. `labSettings.veyonNativeHosts` selects the Veyon 4.11 native PipeWire backend per host; other hosts use the GNOME Remote Desktop fallback on port 5900. The private key is not managed by Nix (see Security).
 - The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
 - The `gnome-user-setup.sh` script is generated inline in `modules/common.nix` (not a standalone file) to use parameterized user names from `labSettings`.
 

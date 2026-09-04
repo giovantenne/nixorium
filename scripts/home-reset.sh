@@ -31,6 +31,20 @@ echo "Starting home reset..."
 # Ensure snapshots directory exists
 mkdir -p "$SNAPSHOTS_DIR"
 
+# Runtime caches and installed tools are reproducible/replaceable and can be
+# very large. Exclude them from the recoverable work snapshots.
+EPHEMERAL_PATHS=(
+  ".local/share/docker"
+  ".local/npm"
+  ".npm"
+)
+
+for EPHEMERAL_PATH in "${EPHEMERAL_PATHS[@]}"; do
+  if [ -e "$HOME_DIR/$EPHEMERAL_PATH" ]; then
+    rm -rf "$HOME_DIR/$EPHEMERAL_PATH"
+  fi
+done
+
 # Check if home has any content (not first boot)
 if [ -n "$(find "$HOME_DIR" -maxdepth 1 -mindepth 1 -print -quit 2>/dev/null)" ]; then
   echo "Rotating snapshots..."

@@ -1,14 +1,18 @@
 # NixOS Lab
 
 [![Release](https://img.shields.io/github/v/release/giovantenne/nixos-lab?display_name=tag&sort=semver)](https://github.com/giovantenne/nixos-lab/releases/latest)
-[![NixOS](https://img.shields.io/badge/NixOS-25.11-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
+[![NixOS](https://img.shields.io/badge/NixOS-26.05-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
 [![Flakes](https://img.shields.io/badge/Nix-Flakes-4E9A06?logo=nixos&logoColor=white)](https://nixos.wiki/wiki/Flakes)
 [![Deploy](https://img.shields.io/badge/Deploy-Colmena-2E3440)](https://github.com/zhaofengli/colmena)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2EA44F.svg)](./LICENSE)
 
-A reproducible NixOS deployment system for multi-PC environments (classrooms, training rooms, public labs, libraries) with **no internet access on client machines**.
+A reproducible NixOS deployment system for multi-PC environments (classrooms, training rooms, public labs, libraries). Installation and system updates work over the LAN without client internet access; normal user sessions may still use the internet.
 
-The current stable release is **v1.0.0**. Production installations should use a tagged release from the [GitHub Releases page](https://github.com/giovantenne/nixos-lab/releases) instead of tracking `master` directly.
+The current stable release is **v1.0.0**. The NixOS 26.05, rootless Docker,
+and Veyon 4.11 work is available for hardware testing as
+**v2.0.0-beta.1**. Production installations should use a tagged release from
+the [GitHub Releases page](https://github.com/giovantenne/nixos-lab/releases)
+instead of tracking `master` directly.
 
 One controller PC manages the entire lab: it builds all configurations locally, serves them over LAN, and deploys updates to every workstation declaratively. The whole lab can be reinstalled from scratch in under 20 minutes.
 
@@ -32,6 +36,8 @@ This project bridges that gap with a **local-first workflow**:
 - **Multi-machine orchestration** -- deploy updates to all PCs at once with Colmena
 - **Student home directory reset** -- homes are restored to a clean template on every boot, with the last 5 sessions saved as Btrfs snapshots for recovery
 - **Classroom management** -- Veyon is pre-configured with all lab PCs mapped, ready to use
+- **Rootless containers** -- every normal user gets an isolated Docker daemon without root-equivalent `docker` group access
+- **User-managed npm tools** -- global npm packages install under `~/.local/npm` without `sudo` or writes to the Nix store
 - **Fully parameterizable** -- user names, PC count, network layout, passwords, locale, homepage, and more are all configurable from a single settings block
 - **Dual networking** -- DHCP for institutional network integration + static IPs for the internal lab network
 - **UEFI + Btrfs** -- modern boot with declarative disk partitioning (Disko) and snapshot support
@@ -62,7 +68,7 @@ This project bridges that gap with a **local-first workflow**:
 |---|---|
 | **Controller** | PXE/Netboot server, local binary cache, Colmena orchestration |
 | **Client PCs** | Student workstations with Btrfs snapshots and home reset |
-| **Networking** | Installation and updates over LAN only, no internet required on clients |
+| **Networking** | Installation and system updates over LAN; user internet access is optional |
 | **Boot mode** | UEFI only, declarative partitioning with Disko |
 
 ## 🚀 Quick start
@@ -73,9 +79,10 @@ This project bridges that gap with a **local-first workflow**:
 
 > **Requires**: a NixOS live USB with temporary internet access. UEFI boot must be enabled.
 
-Boot the controller PC from the NixOS live USB, then run the installer from the stable release:
+Boot the controller PC from the NixOS live USB, then run the installer from
+the current beta. Use `v1.0.0` instead if you need the previous stable release:
 ```sh
-RELEASE="v1.0.0"
+RELEASE="v2.0.0-beta.1"
 curl -fsSL "https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/scripts/install-controller.sh" | \
   FLAKE_REF="github:giovantenne/nixos-lab/${RELEASE}" \
   DISKO_LAYOUT_URL="https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/lib/disko-layout.nix" \
@@ -90,7 +97,7 @@ The bootstrap script forces `cache.nixos.org` during installation, so it does no
 
 > **Using your own fork?** Use the same release tag in the script URL, flake reference, and Disko layout URL:
 > ```sh
-> RELEASE="v1.0.0"
+> RELEASE="v2.0.0-beta.1"
 > curl -fsSL "https://raw.githubusercontent.com/YOUR_USER/nixos-lab/${RELEASE}/scripts/install-controller.sh" | \
 >   FLAKE_REF="github:YOUR_USER/nixos-lab/${RELEASE}" \
 >   DISKO_LAYOUT_URL="https://raw.githubusercontent.com/YOUR_USER/nixos-lab/${RELEASE}/lib/disko-layout.nix" \
@@ -102,7 +109,7 @@ The bootstrap script forces `cache.nixos.org` during installation, so it does no
 Reboot and log in as `admin` (default password: `nixos`). Clone the same release used for installation, then create a local deployment branch for your lab configuration.
 
 ```sh
-git clone --branch v1.0.0 https://github.com/giovantenne/nixos-lab.git
+git clone --branch v2.0.0-beta.1 https://github.com/giovantenne/nixos-lab.git
 cd nixos-lab
 git switch -c lab-config
 ```
@@ -153,6 +160,10 @@ defaultLocale = "en_US.UTF-8";
 extraLocale = "it_IT.UTF-8";
 keyboardLayout = "it";
 consoleKeyMap = "it2";
+
+# Leave empty for unattended GNOME operation. Add pilot host names to test
+# Veyon 4.11's native Wayland backend, for example [ "pc01" ].
+veyonNativeHosts = [];
 ```
 
 You can leave the git identity fields at their defaults for now.
@@ -366,17 +377,59 @@ The student home directory resets to a clean template on every boot:
 
 The teacher user has a **Snapshots** bookmark in the Nautilus sidebar.
 
+Docker images, npm's download cache, and user-installed global npm packages
+are intentionally excluded from snapshots. They are runtime artifacts and are
+removed together with the rest of the student home at the next boot.
+
 To recover student work from a previous session:
 ```sh
 ls /var/lib/home-snapshots/snapshot-1/
 cp /var/lib/home-snapshots/snapshot-1/file.txt /home/<studentUser>/
 ```
 
+### Rootless Docker
+
+Docker runs as a per-user systemd service. No account belongs to the `docker`
+group, which would otherwise provide root-equivalent access to the machine.
+The login environment points Docker and Compose to the current user's socket.
+
+```sh
+docker run --rm hello-world
+docker-compose up
+```
+
+Rootless containers cannot bind ports below 1024 without additional host
+configuration. For student projects, publish services on ports such as 3000,
+8080, or 8000. Images and containers are isolated between users; student data
+under `~/.local/share/docker` is ephemeral because the student home resets.
+
+### Global npm packages
+
+Node.js comes from the current NixOS stable package set. Global npm installs
+use the writable per-user prefix `~/.local/npm`, already present in `PATH`.
+Never use `sudo npm install -g`.
+
+```sh
+# Install or upgrade command-line tools directly from the public npm registry
+npm install -g @openai/codex@latest
+npm install -g @anthropic-ai/claude-code@latest
+
+# Inspect and update all user-installed global packages
+npm outdated -g
+npm update -g
+```
+
+The clients need internet access only while downloading npm packages. These
+installs are intentionally session-local for the reset student account; source
+files saved in the home snapshots remain recoverable.
+
 ### Veyon (classroom management)
 
-Veyon is packaged locally (not in nixpkgs) and deployed on all PCs. The
-`veyon-service` systemd unit runs on every machine, accepting connections on
-port **11100**.
+Veyon 4.11.0 is pinned from its official flake because it is still absent from
+nixpkgs. The lab overlay adds the missing PipeWire build dependency and NixOS
+setuid wrappers for Veyon's authentication and Wayland input helpers. The
+`veyon-service` user unit runs on every graphical session and accepts Veyon
+connections on port **11100**.
 
 #### Configuration
 
@@ -384,6 +437,12 @@ port **11100**.
 - `Veyon.conf` is generated with all lab PCs pre-mapped under the hardcoded location name `Lab`
 - The Veyon private key is only needed on the controller -- student PCs only have the public key
 - Users in the `veyon-master` group (`admin` and the teacher user) can access Veyon Master
+- The default backend remains the unattended GNOME Remote Desktop VNC bridge on port 5900
+- Hosts listed in `veyonNativeHosts` use Veyon's native PipeWire/XDG portal backend and close port 5900
+
+GNOME does not currently support unattended portal pre-authorization for this
+backend, so a native pilot host will display a screen-sharing consent dialog.
+Keep `veyonNativeHosts = [];` for production until this is resolved upstream.
 
 ### Customizing packages and desktop
 
@@ -402,7 +461,7 @@ The default desktop is GNOME (Wayland) with a curated set of development tools. 
 ```
 .github/workflows/release.yml # Validates tags and publishes GitHub Releases
 flake.nix                  # Entry point: host generation, Colmena config, labMeta export
-flake.lock                 # Pinned inputs (nixpkgs, disko)
+flake.lock                 # Pinned inputs (nixpkgs, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
@@ -412,7 +471,6 @@ lib/
   disko-layout.nix         # Shared Disko layout function (device + student user)
 setup.sh                   # Client PC installer (runs on PXE-booted machines)
 pkgs/
-  veyon.nix                # Veyon package derivation
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
 modules/
   common.nix               # GNOME desktop, packages, shells, locale, services
@@ -422,6 +480,8 @@ modules/
   cache.nix                # Binary cache client configuration
   filesystems.nix          # Btrfs support
   home-reset.nix           # Student home templating + boot-time reset
+  docker.nix               # Per-user rootless Docker daemon
+  development.nix          # Writable npm global prefix and PATH
   veyon.nix                # Veyon service, keys, and classroom config
 scripts/
   release.sh               # Validates, tags, and publishes a release
@@ -450,6 +510,7 @@ Public key artifacts generated during setup live in the repo root; see step 4.
 - Passwords are SHA-512 hashed; never store plaintext
 - SSH password authentication is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
+- Docker is rootless and no normal user belongs to the root-equivalent `docker` group
 - The Veyon private key is readable only by the `veyon-master` group
 
 ## 📄 License

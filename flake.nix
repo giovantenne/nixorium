@@ -2,14 +2,18 @@
   description = "NixOS system configuration";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    veyon = {
+      url = "git+https://github.com/veyon/veyon.git?ref=refs/tags/v4.11.0&submodules=1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, disko }:
+  outputs = { self, nixpkgs, disko, veyon }:
     let
       version = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ./VERSION);
       cachePublicKeyFile = ./public-key;
@@ -51,6 +55,7 @@
       inherit (config) extraLocale;
       inherit (config) keyboardLayout;
       inherit (config) consoleKeyMap;
+      inherit (config) veyonNativeHosts;
 
       masterHostName = "pc${toString masterHostNumber}";
       masterIp = "${networkBase}.${toString masterHostNumber}";
@@ -62,12 +67,32 @@
       clientNumbers = pcNumbers;
       padNumber = n: if n < 10 then "0${toString n}" else toString n;
 
-      # Overlay: packages not available in nixpkgs or needing patches
-      labOverlay = final: prev: {
-        veyon = final.callPackage ./pkgs/veyon.nix {};
-        # gnome-remote-desktop with VNC enabled + multi-session patch
-        gnome-remote-desktop = import ./pkgs/gnome-remote-desktop.nix { inherit prev; };
+      # Use Veyon's upstream package and add the missing native Wayland dependency.
+      veyonWaylandOverlay = final: prev: {
+        veyon = prev.veyon.overrideAttrs (oldAttrs: {
+          buildInputs = (oldAttrs.buildInputs or []) ++ [ final.pipewire ];
+          postPatch = (oldAttrs.postPatch or "") + ''
+            substituteInPlace plugins/platform/linux/input-helper/CMakeLists.txt \
+              --replace-fail 'OWNER_READ OWNER_WRITE OWNER_EXECUTE SETUID' \
+                             'OWNER_READ OWNER_WRITE OWNER_EXECUTE'
+          '';
+          postInstall = (oldAttrs.postInstall or "") + ''
+            if [ ! -f "$out/lib/veyon/pipewire-vnc-server.so" ]; then
+              echo "ERROR: Veyon PipeWire VNC plugin was not built" >&2
+              exit 1
+            fi
+          '';
+        });
       };
+
+      # Keep the GNOME VNC fallback until its portal supports unattended access.
+      labOverlay = nixpkgs.lib.composeManyExtensions [
+        veyon.overlays.default
+        veyonWaylandOverlay
+        (final: prev: {
+          gnome-remote-desktop = import ./pkgs/gnome-remote-desktop.nix { inherit prev; };
+        })
+      ];
 
       hostModules = [
         { nixpkgs.overlays = [ labOverlay ]; }
@@ -86,6 +111,8 @@
         ./modules/cache.nix
         ./modules/filesystems.nix
         ./modules/home-reset.nix
+        ./modules/docker.nix
+        ./modules/development.nix
         ./modules/veyon.nix
       ];
 
@@ -113,6 +140,7 @@
         inherit extraLocale;
         inherit keyboardLayout;
         inherit consoleKeyMap;
+        inherit veyonNativeHosts;
         inherit cachePublicKey;
         inherit cachePort;
       };
@@ -201,6 +229,7 @@
               # During netboot the master is only reachable on its DHCP address
               nix.settings.substituters = lib.mkForce [ "http://${masterDhcpIp}:${toString labSettings.cachePort}" ];
               networking.useDHCP = lib.mkForce true;
+              boot.zfs.forceImportRoot = false;
               services.openssh.enable = true;
               environment.systemPackages = [
                 disko.packages.${system}.default
