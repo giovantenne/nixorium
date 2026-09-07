@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Rewrote the deployment upgrade guide with an explicit release example,
+  current Nix Flake commands, complete validation, and the Git merge workflow.
+
 ## [2.0.0-beta.2] - 2026-09-07
 
 ### Added
