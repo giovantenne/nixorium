@@ -83,36 +83,41 @@ upstream release through its `flake.lock`.
 
 > **Requires**: a NixOS live USB with temporary internet access. UEFI boot must be enabled.
 
-Boot the controller PC from the NixOS live USB, then run the installer from
-the current beta. Use `v1.0.0` instead if you need the previous stable release:
+Boot the controller PC from the official NixOS live USB, connect it to the
+internet, and run one command:
+
 ```sh
-RELEASE="v2.0.0-beta.2"
-curl -fsSL "https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/scripts/install-controller.sh" | \
-  FLAKE_REF="github:giovantenne/nixos-lab/${RELEASE}" \
-  DISKO_LAYOUT_URL="https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/lib/disko-layout.nix" \
-  bash
+curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/install.sh | bash
 ```
 
-If one disk is detected, the script selects it automatically; if multiple disks are detected, it asks you to choose one.
+The Raw GitHub entrypoint selects a tagged release and enables the required Nix
+Flake features for its own commands. To select a different compatible release
+or disk explicitly:
 
-This installs the controller with default placeholder settings from `lab-config.nix`. SSH, binary cache, and Veyon public keys are added later, after step 4.
+```sh
+curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/install.sh | \
+  bash -s -- --release v2.0.0-beta.2 --disk /dev/sda
+```
+
+If one disk is detected, the installer selects it automatically; if multiple
+disks are detected, it asks you to choose one.
+
+Before partitioning, the bootstrap generates and commits a private deployment
+from the template in the selected release. It installs the controller from
+that deployment using the default placeholder settings in `lab-config.nix`.
+SSH, binary cache, and Veyon public keys are added later, after step 4.
 
 The bootstrap script forces `cache.nixos.org` during installation, so it does not depend on any LAN cache or substituter already configured in the live environment.
 
-### 2. Create the private deployment repository
+### 2. Review and publish the private deployment repository
 
-Reboot and log in as `admin` (default password: `nixos`). Generate a deployment
-repository from the template included in the same tagged release:
+Reboot and log in as `admin` (default password: `nixos`). The installer has
+already created and initialized the deployment repository:
 
 ```sh
-mkdir nixos-lab-deployment
-cd nixos-lab-deployment
-RELEASE="v2.0.0-beta.2"
-nix flake init -t "github:giovantenne/nixos-lab/${RELEASE}#site"
-
-git init
-git add .
-git commit -m "chore: initialize lab deployment"
+cd ~/nixos-lab-deployment
+git status
+git log --oneline -1
 ```
 
 Create an empty **private** repository in your school organization, add it as
@@ -552,6 +557,7 @@ packages those source trees into the offline PXE installer.
 
 ```
 .github/workflows/release.yml # Validates tags and publishes GitHub Releases
+install.sh                  # Raw GitHub entrypoint for controller bootstrap
 flake.nix                  # Entry point: host generation, Colmena config, labMeta export
 flake.lock                 # Pinned inputs (nixpkgs, Disko, Veyon)
 VERSION                    # Canonical Semantic Version

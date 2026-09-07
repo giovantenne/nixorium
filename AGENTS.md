@@ -19,6 +19,7 @@ repository generated from `templates/site`.
 
 ```
 .github/workflows/release.yml # Validates tags and publishes GitHub Releases
+install.sh                  # Raw GitHub entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
 flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
 VERSION                    # Canonical Semantic Version

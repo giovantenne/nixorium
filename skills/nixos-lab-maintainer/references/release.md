@@ -9,15 +9,16 @@ The upstream follows Semantic Versioning. Prereleases use identifiers such as
 2. Choose the version from compatibility impact and the user's requested
    release channel.
 3. Update `VERSION`.
-4. Move the curated Unreleased notes into a dated changelog section and update
+4. Update `DEFAULT_RELEASE` in the root `install.sh` to `v<version>`.
+5. Move the curated Unreleased notes into a dated changelog section and update
    comparison links.
-5. Run the full validation matrix, including a freshly generated deployment
+6. Run the full validation matrix, including a freshly generated deployment
    and offline derivation equivalence.
-6. Commit the release metadata and push `master`.
-7. Run `./scripts/release.sh <version>`. It verifies metadata, creates an
+7. Commit the release metadata and push `master`.
+8. Run `./scripts/release.sh <version>`. It verifies metadata, creates an
    annotated tag, and pushes it. GitHub Actions publishes the release and marks
    hyphenated versions as prereleases.
-8. Verify the workflow and GitHub release instead of assuming tag push implies
+9. Verify the workflow and GitHub release instead of assuming tag push implies
    publication success.
 
 Do not create or move a release tag manually around failures unless the user
