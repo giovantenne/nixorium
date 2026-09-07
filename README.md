@@ -312,18 +312,6 @@ Open `flake.nix` and replace the current tag in this line:
 inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.4";
 ```
 
-When upgrading a deployment created before the Nixorium rebrand, rename the
-input and its output argument in the same file:
-
-```nix
-inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.4";
-
-outputs = { self, nixorium }:
-  nixorium.lib.mkLab {
-    # Keep the existing deployment arguments here.
-  };
-```
-
 Then update only the `nixorium` lock entry and inspect the result:
 
 ```sh
