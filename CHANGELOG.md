@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A Raw GitHub `install.sh` entrypoint that selects a tagged release, prepares
+  the private deployment Git repository, and installs the controller from it.
+
 ### Changed
 
 - Rewrote the deployment upgrade guide with an explicit release example,

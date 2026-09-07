@@ -24,6 +24,12 @@ if [[ "${FILE_VERSION}" != "${VERSION}" ]]; then
   exit 1
 fi
 
+INSTALLER_RELEASE="$(sed -n 's/^DEFAULT_RELEASE="\(v[^\"]*\)"$/\1/p' install.sh)"
+if [[ "${INSTALLER_RELEASE}" != "${TAG}" ]]; then
+  echo "Error: install.sh defaults to '${INSTALLER_RELEASE}', expected '${TAG}'." >&2
+  exit 1
+fi
+
 if ! grep -Eq "^## \\[${VERSION//./\\.}\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" CHANGELOG.md; then
   echo "Error: CHANGELOG.md has no dated section for ${VERSION}." >&2
   exit 1
