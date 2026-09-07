@@ -480,6 +480,14 @@ Keep every site-specific change in the private deployment repository:
 Changes that are useful to every deployment belong in this upstream. Changes
 that identify or specialize one school belong in its private repository.
 
+### Agent skill
+
+The repository includes the `nixos-lab-maintainer` Agent Skill for maintenance,
+customization, validation, cross-repository updates and releases. It is exposed
+through repository-local discovery paths for Codex, OpenCode, Claude Code and
+Pi; new deployment repositories created from the `site` template include the
+same skill automatically.
+
 ### Deployment Flake API
 
 `lib.mkLab` accepts the following extension points:
@@ -550,6 +558,7 @@ assets/
   mimeapps.list            # Default applications
   vscode-settings.json     # VS Code defaults
 templates/site/            # Scaffold for a private deployment repository
+skills/nixos-lab-maintainer/ # Cross-agent maintenance and release workflow
 ```
 
 The root configuration keeps the historical standalone deployment working.

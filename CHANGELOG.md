@@ -13,6 +13,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Extension points for shared, controller, client, host-specific and netboot modules.
 - Configurable logo, backgrounds, MIME defaults, VS Code settings and public key paths.
 - A standalone netboot installer bundle containing the effective downstream configuration.
+- A portable `nixos-lab-maintainer` Agent Skill, preinstalled by the site template for Codex, OpenCode, Claude Code and Pi.
 
 ### Changed
 
