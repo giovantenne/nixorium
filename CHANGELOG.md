@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Documented the complete per-host customization workflow in both READMEs and
+  in the Nixorium maintainer skill.
+
 ## [2.0.0-beta.3] - 2026-09-08
 
 ### Added
