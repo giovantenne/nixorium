@@ -1,8 +1,16 @@
-{ pkgs, lib, hostName, labSettings, ... }:
+{ pkgs, lib, hostName, labSettings, labAssets, ... }:
 let
   isMaster = hostName == labSettings.masterHostName;
+  backgroundFiles = builtins.listToAttrs (map (background: {
+    name = "lab/backgrounds/${builtins.baseNameOf (builtins.unsafeDiscardStringContext (toString background))}";
+    value.source = background;
+  }) labAssets.backgrounds);
 in
 {
+  imports = [
+    { environment.etc = backgroundFiles; }
+  ];
+
   # Enable flakes and nix-command
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
@@ -186,10 +194,6 @@ in
   console.keyMap = labSettings.consoleKeyMap;
 
   services.printing.enable = true;
-
-  # Install Samsung SPL drivers only on the master workstation where the
-  # local USB printer is expected to be configured.
-  services.printing.drivers = lib.optionals isMaster [ pkgs.splix ];
 
   # Sound (PipeWire)
   security.rtkit.enable = true;
@@ -385,7 +389,7 @@ in
   };
 
   # Screensaver scripts and ASCII art logo
-  environment.etc."lab/screensaver.txt".source = ../assets/logo.txt;
+  environment.etc."lab/screensaver.txt".source = labAssets.logo;
   environment.etc."lab/cmd-screensaver.sh" = {
     source = ../scripts/cmd-screensaver.sh;
     mode = "0755";
@@ -394,11 +398,6 @@ in
     source = ../scripts/launch-screensaver.sh;
     mode = "0755";
   };
-
-  # Ristretto wallpapers for random selection at home-reset
-  environment.etc."lab/backgrounds/1-ristretto.jpg".source = ../assets/backgrounds/1-ristretto.jpg;
-  environment.etc."lab/backgrounds/2-ristretto.jpg".source = ../assets/backgrounds/2-ristretto.jpg;
-  environment.etc."lab/backgrounds/3-ristretto.jpg".source = ../assets/backgrounds/3-ristretto.jpg;
 
   programs.ssh.extraConfig = ''
     Host localhost 127.0.0.1 ${labSettings.networkBase}.* pc*

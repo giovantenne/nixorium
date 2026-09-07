@@ -21,8 +21,8 @@ let
   # e.g. /etc/veyon/keys/public  +  teacher/key
   publicKeyBaseDir = "/etc/veyon/keys/public";
   privateKeyBaseDir = "/etc/veyon/keys/private";
-  veyonPublicKeyFile = ../veyon-public-key.pem;
-  hasVeyonPublicKey = builtins.pathExists veyonPublicKeyFile;
+  veyonPublicKeyFile = labSettings.veyonPublicKeyFile;
+  hasVeyonPublicKey = veyonPublicKeyFile != null && builtins.pathExists veyonPublicKeyFile;
   useNativeWayland = builtins.elem hostName labSettings.veyonNativeHosts;
   vncServerPluginUid =
     if useNativeWayland then
