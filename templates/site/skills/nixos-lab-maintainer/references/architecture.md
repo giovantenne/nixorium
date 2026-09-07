@@ -1,0 +1,57 @@
+# Architecture and ownership
+
+## Repository roles
+
+The public `nixos-lab` repository is a versioned framework. Its root Flake
+exports `lib.mkLab`, a `site` template, standalone example configurations,
+Colmena outputs, netboot outputs, helper apps, and an installer bundle.
+
+A private deployment repository is a consumer. It owns:
+
+- `lab-config.nix` and real site values
+- public cache, SSH, and Veyon keys
+- branding and desktop assets
+- shared, controller, client, netboot, and per-host modules
+- its `flake.lock`, which is the selected upstream revision
+
+Private keys stay outside Git even when the deployment repository is private.
+
+## `mkLab` extension points
+
+- `deploymentSelf`: downstream Flake `self`; required for offline packaging
+- `labConfig`: typed site attribute set
+- `publicKeys`: `cache`, `ssh`, and `veyon` file paths
+- `assets`: `logo`, `backgrounds`, `mimeApps`, and `vscodeSettings`
+- `sharedModules`: modules for every installed host
+- `controllerModules`: controller-only modules
+- `clientModules`: client-only modules
+- `hostModules`: attribute set keyed by generated host name
+- `netbootModules`: modules for the PXE environment
+
+Reject unknown nested key and asset names. Extension modules must be filesystem
+paths or path strings located under the deployment or upstream source tree.
+
+## Offline invariant
+
+PXE clients have no internet during installation. `installerBundle` therefore
+contains a standalone Flake with the effective typed configuration, input
+sources, public cache key, downstream modules, and assets.
+
+Preserve path types as well as path values when serializing the bundle. Nix can
+produce different derivations when the same store file is represented once as
+a path and once as a string.
+
+For an unchanged lock and configuration, evaluating a client through the
+deployment and through the offline installer bundle must return the same
+`system.build.toplevel.drvPath`.
+
+## Deciding where a request belongs
+
+Move a change upstream when it is reusable, configurable, safe as a default,
+and useful to unrelated labs. Keep it downstream when it identifies one site,
+depends on local hardware or network layout, changes branding, or expresses a
+local operational policy.
+
+If a downstream need exposes a missing extension point, add the smallest
+generic extension upstream and consume it from the deployment. Do not add the
+site value itself to the upstream.

@@ -1,5 +1,10 @@
 # AGENTS.md
 
+For maintenance, customization, offline-installer, cross-repository, and
+release work, use the repository skill at
+`skills/nixos-lab-maintainer/SKILL.md`. Discovery links for Codex, OpenCode,
+Claude Code, and Pi are versioned with the repository.
+
 This repository manages a multi-PC NixOS lab using Nix Flakes,
 Disko, and Colmena. A controller PC deploys to student workstations
 over a LAN-only deployment network. Clients do not need internet for
@@ -56,6 +61,7 @@ assets/
   mimeapps.list            # Default browser = Chromium
   vscode-settings.json     # VS Code defaults
 templates/site/            # Private deployment repository template
+skills/nixos-lab-maintainer/ # Cross-agent maintenance and release workflow
 ```
 
 Generated locally during setup and committed in the private deployment repo:
