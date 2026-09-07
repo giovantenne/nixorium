@@ -27,7 +27,7 @@ This project bridges that gap with a **local-first workflow**:
 - A single controller PC acts as the build server, binary cache, and PXE boot server
 - Client PCs are installed and updated entirely over the LAN
 - One `flake.nix` file is the single source of truth for the entire lab
-- Everything is parameterizable -- user names, passwords, network settings, locale -- so you can fork this repo and adapt it to your environment in minutes
+- Site configuration lives in a small private deployment Flake, while this repository remains a reusable versioned upstream
 
 ## ✨ Features
 
@@ -73,7 +73,11 @@ This project bridges that gap with a **local-first workflow**:
 
 ## 🚀 Quick start
 
-> **Optional: fork first.** If you want to push your `lab-config.nix` to a remote repository (for backup or future reinstalls), fork this repo on GitHub before starting. The main flow below works with a plain `git clone` of the original repo -- forking is not required.
+Each installation uses two repositories: this public upstream and a small
+private deployment repository generated from the `site` template. Do not fork
+this repository just to configure a lab. The private repository owns the real
+password hashes, public keys, assets and local NixOS modules, and pins an
+upstream release through its `flake.lock`.
 
 ### 1. Bootstrap the controller from USB
 
@@ -95,27 +99,26 @@ This installs the controller with default placeholder settings from `lab-config.
 
 The bootstrap script forces `cache.nixos.org` during installation, so it does not depend on any LAN cache or substituter already configured in the live environment.
 
-> **Using your own fork?** Use the same release tag in the script URL, flake reference, and Disko layout URL:
-> ```sh
-> RELEASE="v2.0.0-beta.1"
-> curl -fsSL "https://raw.githubusercontent.com/YOUR_USER/nixos-lab/${RELEASE}/scripts/install-controller.sh" | \
->   FLAKE_REF="github:YOUR_USER/nixos-lab/${RELEASE}" \
->   DISKO_LAYOUT_URL="https://raw.githubusercontent.com/YOUR_USER/nixos-lab/${RELEASE}/lib/disko-layout.nix" \
->   bash
-> ```
+### 2. Create the private deployment repository
 
-### 2. Reboot and clone the repo
-
-Reboot and log in as `admin` (default password: `nixos`). Clone the same release used for installation, then create a local deployment branch for your lab configuration.
+Reboot and log in as `admin` (default password: `nixos`). Generate a deployment
+repository from the upstream template. Until this API is included in a tagged
+release, use `master` for testing; production deployments must select the tag
+that contains the template.
 
 ```sh
-git clone --branch v2.0.0-beta.1 https://github.com/giovantenne/nixos-lab.git
-cd nixos-lab
-git switch -c lab-config
+mkdir nixos-lab-deployment
+cd nixos-lab-deployment
+nix flake init -t github:giovantenne/nixos-lab/master#site
+
+git init
+git add .
+git commit -m "chore: initialize lab deployment"
 ```
 
-> If you forked the repo, clone your fork instead and base the deployment branch on the corresponding release tag.
-
+Create an empty **private** repository in your school organization, add it as
+`origin`, and push this initial commit. Public forks are unsuitable because the
+deployment contains password hashes and internal network details.
 
 ### 3. Edit `lab-config.nix`
 
@@ -176,29 +179,30 @@ Generate the three required key pairs. Keep the private files local to the contr
 
 | Key pair | Private file | Public file / config | Purpose |
 |---|---|---|---|
-| **Binary cache** | `secret-key` | `public-key` (generated locally, committed) | Harmonia signs Nix store paths; clients verify signatures |
-| **SSH** | `id_ed25519` | `id_ed25519.pub` (generated locally, committed) | Admin SSH access + Colmena deploys (connects as `root`) |
-| **Veyon** | `veyon-private-key.pem` | `veyon-public-key.pem` (generated locally, committed) | Veyon Master authenticates to student PCs |
+| **Binary cache** | `secret-key` | `keys/cache-public-key` | Harmonia signs Nix store paths; clients verify signatures |
+| **SSH** | `admin-ssh` | `keys/admin-ssh.pub` | Admin SSH access + Colmena deploys (connects as `root`) |
+| **Veyon** | `veyon-private-key.pem` | `keys/veyon-public-key.pem` | Veyon Master authenticates to student PCs |
 
 Generate everything from scratch:
 
 ```sh
 # Binary cache signing key for Harmonia
 nix key generate-secret --key-name lab-cache-key > secret-key
-nix key convert-secret-to-public < secret-key > public-key
+nix key convert-secret-to-public < secret-key > keys/cache-public-key
 
 # Admin SSH key used by Colmena / SSH access
-ssh-keygen -t ed25519 -f id_ed25519 -N '' -C 'admin@controller'
+ssh-keygen -t ed25519 -f admin-ssh -N '' -C 'admin@controller'
 
 # Veyon RSA keypair
 openssl genrsa -out veyon-private-key.pem 4096
-openssl rsa -in veyon-private-key.pem -pubout -out veyon-public-key.pem
+openssl rsa -in veyon-private-key.pem -pubout -out keys/veyon-public-key.pem
 
 # SSH private key -- used by Colmena to connect as root to all PCs
-install -m 600 -D id_ed25519 ~/.ssh/id_ed25519
+install -m 600 -D admin-ssh ~/.ssh/id_ed25519
 
-# SSH public key -- useful for normal SSH tooling; keep a copy in the repo root too
-install -m 644 -D id_ed25519.pub ~/.ssh/id_ed25519.pub
+# SSH public key -- commit it in the deployment and install it for SSH tooling
+install -m 644 -D admin-ssh.pub keys/admin-ssh.pub
+install -m 644 -D admin-ssh.pub ~/.ssh/id_ed25519.pub
 
 # Veyon private key -- only needed on the controller (where Veyon Master runs)
 # Only users in the veyon-master group (admin + teacher) can read it
@@ -206,7 +210,8 @@ sudo install -d -m 0750 -g veyon-master /etc/veyon/keys/private/teacher
 sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/private/teacher/key
 
 # Flakes ignore untracked files in a Git worktree, so add the public files
-git add public-key id_ed25519.pub veyon-public-key.pem
+git add keys/cache-public-key keys/admin-ssh.pub keys/veyon-public-key.pem
+git commit -m "chore: add lab public keys"
 ```
 
 ### 5. Rebuild the controller
@@ -246,12 +251,12 @@ Open **two separate terminals**:
 
 **Terminal 1** -- Binary cache:
 ```sh
-./scripts/run-harmonia.sh
+nix run .#run-harmonia
 ```
 
 **Terminal 2** -- ProxyDHCP + TFTP + HTTP netboot server:
 ```sh
-sudo ./scripts/run-pxe-proxy.sh
+sudo nix run .#run-pxe-proxy
 ```
 
 > Both processes run in the foreground. Keep the terminals open during client installation.
@@ -278,6 +283,22 @@ sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 ---
 
 ## 🔧 Maintenance
+
+### Update a lab deployment
+
+Lab administrators update the pinned input in their private repository; they do
+not merge this upstream into their configuration:
+
+```sh
+git switch -c upgrade/nixos-lab-vNEXT
+# Change inputs.nixos-lab.url in flake.nix to the new release tag.
+nix flake lock --update-input nixos-lab
+nix build .#nixosConfigurations.pc01.config.system.build.toplevel
+nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk
+```
+
+Commit the changed `flake.nix` and `flake.lock` only after validating a client,
+the controller and the netboot output.
 
 ### Releases and versioning
 
@@ -314,7 +335,7 @@ sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/,
 
 Then start the binary cache:
 ```sh
-./scripts/run-harmonia.sh
+nix run .#run-harmonia
 ```
 
 Deploy to all lab PCs:
@@ -446,13 +467,40 @@ Keep `veyonNativeHosts = [];` for production until this is resolved upstream.
 
 ### Customizing packages and desktop
 
-The default desktop is GNOME (Wayland) with a curated set of development tools. To customize:
+The default desktop is GNOME (Wayland) with a curated set of development tools.
+Keep every site-specific change in the private deployment repository:
 
-- **System packages**: edit the `environment.systemPackages` list in `modules/common.nix`
-- **GNOME settings**: edit the `extraGSettingsOverrides` in `modules/common.nix`
-- **Screensaver**: replace `assets/logo.txt` with your own ASCII art
-- **Wallpapers**: replace images in `assets/backgrounds/`
-- **VS Code extensions**: edit the `vscodeExtensions` list in `modules/home-reset.nix`
+- **All machines**: add settings and packages to `modules/shared.nix`
+- **Controller only**: use `modules/controller.nix` for printers and local services
+- **Clients only**: use `modules/clients.nix`
+- **Single machine**: add a module through `hostModules.pcNN` in `flake.nix`
+- **Screensaver**: replace `assets/logo.txt`
+- **Wallpapers and desktop files**: pass replacement paths through the `assets` argument in `flake.nix`
+
+Changes that are useful to every deployment belong in this upstream. Changes
+that identify or specialize one school belong in its private repository.
+
+### Deployment Flake API
+
+`lib.mkLab` accepts the following extension points:
+
+| Argument | Purpose |
+|---|---|
+| `deploymentSelf` | The downstream Flake `self`, used to package its files for offline installation |
+| `labConfig` | Required typed site settings imported from `lab-config.nix` |
+| `publicKeys` | Cache, SSH and Veyon public-key paths |
+| `assets` | Logo, wallpaper list, MIME defaults and VS Code settings |
+| `sharedModules` | NixOS modules applied to every host |
+| `controllerModules` | Modules applied only to the controller |
+| `clientModules` | Modules applied only to client PCs |
+| `hostModules` | Attribute set of modules keyed by host name |
+| `netbootModules` | Additional modules applied to the PXE system |
+
+The site template demonstrates every commonly needed argument. Configuration
+fields are type-checked, and unknown fields fail evaluation instead of being
+silently ignored. Files referenced by `publicKeys`, `assets` and module lists
+must live in the deployment repository (or in this upstream), because `mkLab`
+packages those source trees into the offline PXE installer.
 
 ---
 
@@ -465,10 +513,12 @@ flake.lock                 # Pinned inputs (nixpkgs, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
-lab-config.nix             # Lab configuration (edit for your environment)
+lab-config.nix             # Standalone example configuration for this upstream
 disko-uefi.nix             # NixOS wrapper for the shared Disko layout
 lib/
   disko-layout.nix         # Shared Disko layout function (device + student user)
+  eval-lab-config.nix      # Typed schema and validation for site configuration
+  mk-lab.nix               # Reusable host/netboot/Colmena output constructor
 setup.sh                   # Client PC installer (runs on PXE-booted machines)
 pkgs/
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
@@ -499,14 +549,18 @@ assets/
   logo.txt                 # ASCII art for screensaver
   mimeapps.list            # Default applications
   vscode-settings.json     # VS Code defaults
+templates/site/            # Scaffold for a private deployment repository
 ```
 
-Public key artifacts generated during setup live in the repo root; see step 4.
+The root configuration keeps the historical standalone deployment working.
+New installations should use `templates/site` and keep generated public keys in
+the private deployment repository.
 
 ## 🔒 Security
 
-- **Never commit** `secret-key`, `id_ed25519`, or `veyon-private-key.pem` (all are in `.gitignore`)
-- Commit only the public counterparts used by the Nix configuration: `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem`
+- **Never commit** `secret-key`, `admin-ssh`, or `veyon-private-key.pem`
+- Commit only their public counterparts under `keys/`
+- Keep the deployment repository private because password hashes and network topology are still sensitive operational data
 - Passwords are SHA-512 hashed; never store plaintext
 - SSH password authentication is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management

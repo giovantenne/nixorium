@@ -145,9 +145,8 @@ fi
 
 if [[ -z "$CACHE_KEY" ]]; then
   echo "Error: public-key missing in ${PUBLIC_KEY_FILE}." >&2
-  echo "Generate it on the controller with: nix key convert-secret-to-public < secret-key > public-key" >&2
-  echo "Then run: git add public-key" >&2
-  echo "Then rebuild the netboot artifacts before booting clients again." >&2
+  echo "Configure publicKeys.cache in the deployment Flake, commit the public key," >&2
+  echo "and rebuild the netboot artifacts before booting clients again." >&2
   exit 1
 fi
 

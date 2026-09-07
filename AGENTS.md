@@ -5,22 +5,26 @@ Disko, and Colmena. A controller PC deploys to student workstations
 over a LAN-only deployment network. Clients do not need internet for
 installation or system updates, but may have internet during user sessions.
 
-All lab-specific settings (user names, PC count, network layout, passwords,
-locale, etc.) are parameterized in `lab-config.nix` and imported by `flake.nix`.
+The repository exports `lib.mkLab` for private per-lab deployment Flakes. The
+root `lab-config.nix` keeps the standalone example compatible, while real lab
+settings, public keys, assets and local modules belong in a private deployment
+repository generated from `templates/site`.
 
 ## Project Structure
 
 ```
 .github/workflows/release.yml # Validates tags and publishes GitHub Releases
-flake.nix                  # Entry point: imports lab-config.nix, host generation + netboot + Colmena
+flake.nix                  # Public Flake API plus backward-compatible example deployment
 flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
-lab-config.nix             # Lab configuration (edit for your environment)
+lab-config.nix             # Standalone example configuration for this upstream
 disko-uefi.nix             # NixOS wrapper for the shared Disko layout
 lib/
   disko-layout.nix         # Shared Disko layout function (device + student user)
+  eval-lab-config.nix      # Typed schema and validation for lab-config.nix
+  mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 pkgs/
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
@@ -51,12 +55,13 @@ assets/
   logo.txt                 # ASCII art for screensaver
   mimeapps.list            # Default browser = Chromium
   vscode-settings.json     # VS Code defaults
+templates/site/            # Private deployment repository template
 ```
 
-Generated locally during setup and committed in the lab repo:
-- `public-key`
-- `id_ed25519.pub`
-- `veyon-public-key.pem`
+Generated locally during setup and committed in the private deployment repo:
+- `keys/cache-public-key`
+- `keys/admin-ssh.pub`
+- `keys/veyon-public-key.pem`
 
 ## Build / Deploy Commands
 
@@ -98,17 +103,19 @@ Release from the matching changelog section.
 
 ## Architecture Notes
 
-- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost` in `flake.nix`, with the controller defined separately.
-- Hostname + static IP are centralized in `flake.nix` (derived from `networkBase` + host number) and applied in `modules/networking.nix`. Each PC gets both a DHCP address and a static address on the same interface.
+- `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
+- Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
+- Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
+- Hostname + static IP are centralized in `lib/mk-lab.nix` (derived from `networkBase` + host number) and applied in `modules/networking.nix`. Each PC gets both a DHCP address and a static address on the same interface.
 - The controller has two relevant IPs: `masterIp` (static, `networkBase.masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, `masterDhcpIp` in `lab-config.nix` must be updated and netboot artifacts rebuilt before the next PXE session.
-- Custom settings flow from `flake.nix` via `specialArgs` (`labSettings`, `hostName`, `hostIp`) to modules that need them.
+- Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that shell scripts need (controller IPs, iface name, client count, ports, usernames). Scripts must consume this output instead of parsing Nix source files textually.
-- No custom NixOS options are declared (`options = { ... }`). This repo only sets existing nixpkgs options.
+- `lib/eval-lab-config.nix` uses a private `lib.evalModules` schema to type-check site data. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
-- Netboot uses `dnsmasq` in ProxyDHCP mode (`scripts/run-pxe-proxy.sh`) so institutional DHCP remains authoritative for leases.
+- Netboot uses `dnsmasq` in ProxyDHCP mode (`scripts/run-pxe-proxy.sh`) so institutional DHCP remains authoritative for leases. `mkLab` builds a standalone installer source containing the effective downstream configuration and only local Flake inputs for offline evaluation.
 - `labOverlay` composes Veyon's official overlay with local PipeWire packaging fixes and the GNOME Remote Desktop fallback patch. It is applied in each host's module list and in `colmena.meta.nixpkgs`.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
@@ -208,17 +215,18 @@ set -euo pipefail
 
 ## Security
 
-- **Never commit** `secret-key` or `id_ed25519` (both in `.gitignore`)
+- **Never commit** `secret-key` or `admin-ssh` (both in the deployment `.gitignore`)
 - **Never commit** `veyon-private-key.pem` (in `.gitignore`); deploy manually to `/etc/veyon/keys/private/teacher/key` with mode `0640` and group `veyon-master`
-- `public-key`, `id_ed25519.pub`, and `veyon-public-key.pem` are public and may be committed
+- `keys/cache-public-key`, `keys/admin-ssh.pub`, and `keys/veyon-public-key.pem` are public and may be committed
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
 
 ## Host Configuration
 
-Hostname + static IP are generated in `flake.nix`. The shared interface name
+Hostname + static IP are generated in `lib/mk-lab.nix`. The shared interface name
 is configured via `labSettings.ifaceName` and applied in `modules/networking.nix`.
 
-All user-configurable parameters live in `lab-config.nix` (committed to the repo).
+All user-configurable parameters live in the deployment `lab-config.nix`.
+Additional behavior belongs in downstream extension modules, never in copies of upstream modules.
 Shell scripts must load operational settings from `labMeta` via `scripts/lib/lab-meta.sh`.

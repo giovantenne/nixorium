@@ -1,4 +1,4 @@
-{ pkgs, labSettings, ... }:
+{ pkgs, labSettings, labAssets, ... }:
 
 let
   # Git configuration
@@ -53,15 +53,13 @@ let
   # External scripts
   createTemplateScript = ../scripts/create-home-template.sh;
   homeResetScript = ../scripts/home-reset.sh;
-  assetsDir = ../assets;
-
 in
 {
   # Create templates at system activation (rebuild time)
   system.activationScripts.createHomeTemplates = {
     text = ''
       # Create student template
-      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${assetsDir}"
+      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${labAssets.mimeApps}" "${labAssets.vscodeSettings}"
       mkdir -p "${templateDirStudent}/.vscode/extensions"
       ${builtins.concatStringsSep "\n      " (map (ext:
         ''cp -a "${ext.pkg}/share/vscode/extensions/${ext.dir}" "${templateDirStudent}/.vscode/extensions/"''
@@ -77,7 +75,7 @@ in
       chown -R ${labSettings.studentUser}:users "${templateDirStudent}"
 
       # Create admin template
-      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${assetsDir}"
+      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${labAssets.mimeApps}" "${labAssets.vscodeSettings}"
       chown -R admin:users "${templateDirAdmin}"
 
       # Setup admin home (once, not reset at boot)

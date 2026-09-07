@@ -13,7 +13,11 @@ fi
 
 # Resolve the repository root explicitly so the script does not depend on cwd.
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
+if [[ -n "${LAB_REPO_ROOT:-}" ]]; then
+  REPO_ROOT="${LAB_REPO_ROOT}"
+else
+  REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
+fi
 
 # shellcheck source=/home/admin/nixos-lab/scripts/lib/lab-meta.sh
 source "${SCRIPT_DIR}/lib/lab-meta.sh"
