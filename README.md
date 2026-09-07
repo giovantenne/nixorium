@@ -10,7 +10,7 @@ A reproducible NixOS deployment system for multi-PC environments (classrooms, tr
 
 The current stable release is **v1.0.0**. The NixOS 26.05, rootless Docker,
 and Veyon 4.11 work is available for hardware testing as
-**v2.0.0-beta.1**. Production installations should use a tagged release from
+**v2.0.0-beta.2**. Production installations should use a tagged release from
 the [GitHub Releases page](https://github.com/giovantenne/nixos-lab/releases)
 instead of tracking `master` directly.
 
@@ -86,7 +86,7 @@ upstream release through its `flake.lock`.
 Boot the controller PC from the NixOS live USB, then run the installer from
 the current beta. Use `v1.0.0` instead if you need the previous stable release:
 ```sh
-RELEASE="v2.0.0-beta.1"
+RELEASE="v2.0.0-beta.2"
 curl -fsSL "https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/scripts/install-controller.sh" | \
   FLAKE_REF="github:giovantenne/nixos-lab/${RELEASE}" \
   DISKO_LAYOUT_URL="https://raw.githubusercontent.com/giovantenne/nixos-lab/${RELEASE}/lib/disko-layout.nix" \
@@ -102,14 +102,13 @@ The bootstrap script forces `cache.nixos.org` during installation, so it does no
 ### 2. Create the private deployment repository
 
 Reboot and log in as `admin` (default password: `nixos`). Generate a deployment
-repository from the upstream template. Until this API is included in a tagged
-release, use `master` for testing; production deployments must select the tag
-that contains the template.
+repository from the template included in the same tagged release:
 
 ```sh
 mkdir nixos-lab-deployment
 cd nixos-lab-deployment
-nix flake init -t github:giovantenne/nixos-lab/master#site
+RELEASE="v2.0.0-beta.2"
+nix flake init -t "github:giovantenne/nixos-lab/${RELEASE}#site"
 
 git init
 git add .

@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.2] - 2026-09-07
+
 ### Added
 
 - A reusable `lib.mkLab` Flake API with typed lab configuration validation.
@@ -66,6 +68,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixos-lab/compare/v2.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixos-lab/compare/v2.0.0-beta.2...HEAD
+[2.0.0-beta.2]: https://github.com/giovantenne/nixos-lab/compare/v2.0.0-beta.1...v2.0.0-beta.2
 [2.0.0-beta.1]: https://github.com/giovantenne/nixos-lab/compare/v1.0.0...v2.0.0-beta.1
 [1.0.0]: https://github.com/giovantenne/nixos-lab/releases/tag/v1.0.0

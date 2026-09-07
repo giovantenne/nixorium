@@ -1,7 +1,7 @@
 {
   description = "Private NixOS lab deployment";
 
-  inputs.nixos-lab.url = "github:giovantenne/nixos-lab";
+  inputs.nixos-lab.url = "github:giovantenne/nixos-lab/v2.0.0-beta.2";
 
   outputs = { self, nixos-lab }:
     nixos-lab.lib.mkLab {
