@@ -69,7 +69,7 @@ jobs:
           RELEASE_ARGS=(
             "v${VERSION}"
             --verify-tag
-            --title "NixOS Lab v${VERSION}"
+            --title "Nixorium v${VERSION}"
             --notes-file release-notes.md
           )
 

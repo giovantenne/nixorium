@@ -3,8 +3,8 @@
 Use a writable temporary cache when the normal Nix cache is unavailable:
 
 ```sh
-mkdir -p /tmp/nixos-lab-nix-cache
-export XDG_CACHE_HOME=/tmp/nixos-lab-nix-cache
+mkdir -p /tmp/nixorium-nix-cache
+export XDG_CACHE_HOME=/tmp/nixorium-nix-cache
 ```
 
 Do not change `flake.lock` during validation unless updating inputs is part of
@@ -42,7 +42,7 @@ nix build .#installerBundle --no-write-lock-file --no-link
 
 Generate a fresh deployment from the template in a new temporary directory,
 initialize Git so Flake source filtering matches real use, add the generated
-files, and lock its `nixos-lab` input to the upstream under test. Validate one
+files, and lock its `nixorium` input to the upstream under test. Validate one
 client and build its installer bundle.
 
 Evaluate the client derivation once through the generated deployment and once
@@ -58,9 +58,9 @@ Verify that the upstream and template skill directories are identical, then
 check that these repository-local entries resolve to the canonical skill:
 
 ```text
-.agents/skills/nixos-lab-maintainer/SKILL.md
-.claude/skills/nixos-lab-maintainer/SKILL.md
-.pi/skills/nixos-lab-maintainer/SKILL.md
+.agents/skills/nixorium-maintainer/SKILL.md
+.claude/skills/nixorium-maintainer/SKILL.md
+.pi/skills/nixorium-maintainer/SKILL.md
 ```
 
 Generate a fresh site template and repeat the same check there. When the

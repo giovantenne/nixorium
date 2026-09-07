@@ -19,7 +19,7 @@ else
   REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
 fi
 
-# shellcheck source=/home/admin/nixos-lab/scripts/lib/lab-meta.sh
+# shellcheck source=/home/admin/nixorium/scripts/lib/lab-meta.sh
 source "${SCRIPT_DIR}/lib/lab-meta.sh"
 load_lab_meta "${REPO_ROOT}"
 

@@ -1,9 +1,9 @@
-# NixOS lab deployment
+# Nixorium deployment
 
 This private repository contains one lab's configuration. The reusable system
-implementation is pinned as the `nixos-lab` Flake input.
+implementation is pinned as the `nixorium` Flake input.
 
-The repository includes the `nixos-lab-maintainer` Agent Skill and discovery
+The repository includes the `nixorium-maintainer` Agent Skill and discovery
 links for Codex, OpenCode, Claude Code and Pi. Agents can load it automatically
 for lab configuration, validation and upstream-update work.
 
@@ -15,7 +15,7 @@ for lab configuration, validation and upstream-update work.
 3. Replace `assets/logo.txt` and add any local NixOS settings under `modules/`.
 4. Generate the public keys under `keys/` and keep all private keys outside
    Git.
-5. Keep `inputs.nixos-lab.url` pinned to a released tag and record it in the
+5. Keep `inputs.nixorium.url` pinned to a released tag and record it in the
    lock file.
 
 ```sh
@@ -62,29 +62,29 @@ Build the netboot artifacts using the normal `nixosConfigurations.netboot`
 outputs. The generated ramdisk contains a standalone installer bundle with the
 effective configuration, public cache key, local modules and assets.
 
-## Updating nixos-lab
+## Updating nixorium
 
 Run the upgrade from this private deployment repository. In this example the
-new upstream release is `v2.0.0-beta.3`; replace it with the tag you actually
+new upstream release is `v2.0.0-beta.4`; replace it with the tag you actually
 want to install:
 
 ```sh
 git switch master
 git pull --ff-only
-git switch -c upgrade/nixos-lab-v2.0.0-beta.3
+git switch -c upgrade/nixorium-v2.0.0-beta.4
 ```
 
-Open `flake.nix` and change the `inputs.nixos-lab.url` line so that it contains
+Open `flake.nix` and change the `inputs.nixorium.url` line so that it contains
 the new release tag:
 
 ```nix
-inputs.nixos-lab.url = "github:giovantenne/nixos-lab/v2.0.0-beta.3";
+inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.4";
 ```
 
 Update only that input, review the lock-file change and validate every role:
 
 ```sh
-nix flake update nixos-lab
+nix flake update nixorium
 git diff -- flake.nix flake.lock
 
 nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-link
@@ -97,9 +97,9 @@ If every build succeeds, commit and merge the tested upgrade:
 
 ```sh
 git add flake.nix flake.lock
-git commit -m "chore: update nixos-lab to v2.0.0-beta.3"
+git commit -m "chore: update nixorium to v2.0.0-beta.4"
 git switch master
-git merge --ff-only upgrade/nixos-lab-v2.0.0-beta.3
+git merge --ff-only upgrade/nixorium-v2.0.0-beta.4
 git push origin master
 ```
 

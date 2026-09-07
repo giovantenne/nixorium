@@ -8,7 +8,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 INSTALL_DISK="${1:-}"
-FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixos-lab}"
+FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixorium}"
 # Derive DISKO_LAYOUT_URL from FLAKE_REF if not explicitly set.
 # Extracts owner/repo from "github:owner/repo" (strips ?ref=... if present).
 if [[ -z "${DISKO_LAYOUT_URL:-}" ]]; then

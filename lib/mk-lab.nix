@@ -209,9 +209,9 @@ let
     else if lib.hasPrefix deploymentPrefix valueString then
       preservePathType "(site + ${builtins.toJSON (lib.removePrefix (toString deploymentRoot) valueString)})"
     else if lib.hasPrefix upstreamPrefix valueString then
-      preservePathType "(nixos-lab + ${builtins.toJSON (lib.removePrefix (toString upstreamRoot) valueString)})"
+      preservePathType "(nixorium + ${builtins.toJSON (lib.removePrefix (toString upstreamRoot) valueString)})"
     else
-      throw "mkLab files must be located inside the deployment or nixos-lab source tree: ${valueString}";
+      throw "mkLab files must be located inside the deployment or nixorium source tree: ${valueString}";
   renderPathList = values: "[ ${builtins.concatStringsSep " " (map renderPath values)} ]";
   renderHostModules = "{\n${builtins.concatStringsSep "\n" (lib.mapAttrsToList
     (name: modules: "    ${builtins.toJSON name} = ${renderPathList modules};")
@@ -242,7 +242,7 @@ let
     inherit system;
   };
 
-  installerFlake = bootstrapPkgs.writeText "nixos-lab-installer-flake.nix" ''
+  installerFlake = bootstrapPkgs.writeText "nixorium-installer-flake.nix" ''
     {
       inputs = {
         nixpkgs.url = "path:${nixpkgs.outPath}";
@@ -264,7 +264,7 @@ let
           inputs.nixpkgs.follows = "nixpkgs";
           inputs.flake-utils.follows = "flake-utils";
         };
-        nixos-lab = {
+        nixorium = {
           url = "path:${upstreamRoot}";
           inputs.nixpkgs.follows = "nixpkgs";
           inputs.disko.follows = "disko";
@@ -272,8 +272,8 @@ let
         };
       };
 
-      outputs = { self, nixos-lab, site, ... }:
-        nixos-lab.lib.mkLab {
+      outputs = { self, nixorium, site, ... }:
+        nixorium.lib.mkLab {
           deploymentSelf = site;
           labConfig = builtins.fromJSON (builtins.readFile ./lab-config.json);
           publicKeys = {
@@ -301,7 +301,7 @@ let
     }
   '';
 
-  installerBundle = bootstrapPkgs.runCommand "nixos-lab-installer-${masterHostName}" {} ''
+  installerBundle = bootstrapPkgs.runCommand "nixorium-installer-${masterHostName}" {} ''
     install -d -m 0755 "$out/lib" "$out/scripts/lib"
     install -m 0644 ${installerFlake} "$out/flake.nix"
     install -m 0644 ${labConfigJson} "$out/lab-config.json"
@@ -347,7 +347,7 @@ let
     };
 
   runHarmonia = bootstrapPkgs.writeShellApplication {
-    name = "nixos-lab-run-harmonia";
+    name = "nixorium-run-harmonia";
     text = ''
       export LAB_REPO_ROOT="$PWD"
       exec ${upstreamRoot}/scripts/run-harmonia.sh "$@"
@@ -355,7 +355,7 @@ let
   };
 
   runPxeProxy = bootstrapPkgs.writeShellApplication {
-    name = "nixos-lab-run-pxe-proxy";
+    name = "nixorium-run-pxe-proxy";
     text = ''
       export LAB_REPO_ROOT="$PWD"
       exec ${upstreamRoot}/scripts/run-pxe-proxy.sh "$@"
@@ -435,11 +435,11 @@ assert unknownAssetNames == []
   apps.${system} = {
     run-harmonia = {
       type = "app";
-      program = "${runHarmonia}/bin/nixos-lab-run-harmonia";
+      program = "${runHarmonia}/bin/nixorium-run-harmonia";
     };
     run-pxe-proxy = {
       type = "app";
-      program = "${runPxeProxy}/bin/nixos-lab-run-pxe-proxy";
+      program = "${runPxeProxy}/bin/nixorium-run-pxe-proxy";
     };
   };
 

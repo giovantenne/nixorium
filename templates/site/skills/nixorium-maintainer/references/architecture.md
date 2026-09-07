@@ -2,7 +2,7 @@
 
 ## Repository roles
 
-The public `nixos-lab` repository is a versioned framework. Its root Flake
+The public `nixorium` repository is a versioned framework. Its root Flake
 exports `lib.mkLab`, a `site` template, standalone example configurations,
 Colmena outputs, netboot outputs, helper apps, and an installer bundle.
 

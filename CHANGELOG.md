@@ -1,10 +1,12 @@
 # Changelog
 
-All notable changes to NixOS Lab are documented in this file.
+All notable changes to Nixorium are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [2.0.0-beta.3] - 2026-09-08
 
 ### Added
 
@@ -15,6 +17,17 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 - Rewrote the deployment upgrade guide with an explicit release example,
   current Nix Flake commands, complete validation, and the Git merge workflow.
+- Completed the project-wide Nixorium rebrand across repositories, Flake
+  inputs, installer identifiers, command names, desktop identifiers, and the
+  Agent Skill.
+- Adopted `nixorium.org` as the canonical website and installer entrypoint,
+  with Raw GitHub documented as the bootstrap fallback.
+
+### Breaking
+
+- Private deployments must rename their upstream input to `nixorium` and use
+  `github:giovantenne/nixorium/<release>` when moving to this release.
+- Installer environment variables now use the `NIXORIUM_` prefix.
 
 ## [2.0.0-beta.2] - 2026-09-07
 
@@ -25,7 +38,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Extension points for shared, controller, client, host-specific and netboot modules.
 - Configurable logo, backgrounds, MIME defaults, VS Code settings and public key paths.
 - A standalone netboot installer bundle containing the effective downstream configuration.
-- A portable `nixos-lab-maintainer` Agent Skill, preinstalled by the site template for Codex, OpenCode, Claude Code and Pi.
+- A portable repository-maintainer Agent Skill, preinstalled by the site template for Codex, OpenCode, Claude Code and Pi.
 
 ### Changed
 
@@ -78,7 +91,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixos-lab/compare/v2.0.0-beta.2...HEAD
-[2.0.0-beta.2]: https://github.com/giovantenne/nixos-lab/compare/v2.0.0-beta.1...v2.0.0-beta.2
-[2.0.0-beta.1]: https://github.com/giovantenne/nixos-lab/compare/v1.0.0...v2.0.0-beta.1
-[1.0.0]: https://github.com/giovantenne/nixos-lab/releases/tag/v1.0.0
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.3...HEAD
+[2.0.0-beta.3]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.2...v2.0.0-beta.3
+[2.0.0-beta.2]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.1...v2.0.0-beta.2
+[2.0.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v1.0.0...v2.0.0-beta.1
+[1.0.0]: https://github.com/giovantenne/nixorium/releases/tag/v1.0.0

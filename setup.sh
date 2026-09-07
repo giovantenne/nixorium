@@ -13,7 +13,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DISKO_LAYOUT_FILE="${REPO_ROOT}/lib/disko-layout.nix"
 PUBLIC_KEY_FILE="${REPO_ROOT}/public-key"
 
-# shellcheck source=/home/admin/nixos-lab/scripts/lib/lab-meta.sh
+# shellcheck source=/home/admin/nixorium/scripts/lib/lab-meta.sh
 source "${REPO_ROOT}/scripts/lib/lab-meta.sh"
 load_lab_meta "${REPO_ROOT}"
 

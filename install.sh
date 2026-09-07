@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_RELEASE="v2.0.0-beta.2"
-RELEASE="${NIXOS_LAB_RELEASE:-$DEFAULT_RELEASE}"
+DEFAULT_RELEASE="v2.0.0-beta.3"
+RELEASE="${NIXORIUM_RELEASE:-$DEFAULT_RELEASE}"
 INSTALL_DISK=""
-REPOSITORY="giovantenne/nixos-lab"
-TARGET_ROOT="${NIXOS_LAB_TARGET_ROOT:-/mnt}"
+REPOSITORY="giovantenne/nixorium"
+TARGET_ROOT="${NIXORIUM_TARGET_ROOT:-/mnt}"
 ADMIN_USER="admin"
-DEPLOYMENT_NAME="nixos-lab-deployment"
-INSTALLER_REF="${NIXOS_LAB_INSTALLER_REF:-}"
+DEPLOYMENT_NAME="nixorium-deployment"
+INSTALLER_REF="${NIXORIUM_INSTALLER_REF:-}"
 INSTALLER_ARGS=()
 
 # Keep bootstrap downloads independent from any cache configured in the live environment.
@@ -16,7 +16,7 @@ export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = h
 
 usage() {
   echo "Usage: install.sh [--release <tag>] [--disk <device>]" >&2
-  echo "Example: install.sh --release v2.0.0-beta.2 --disk /dev/sda" >&2
+  echo "Example: install.sh --release v2.0.0-beta.3 --disk /dev/sda" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -61,7 +61,7 @@ if [[ -z "$INSTALLER_REF" ]]; then
 fi
 
 if [[ "$TARGET_ROOT" != /* || "$TARGET_ROOT" == "/" ]]; then
-  echo "Error: NIXOS_LAB_TARGET_ROOT must be an absolute mount path other than /." >&2
+  echo "Error: NIXORIUM_TARGET_ROOT must be an absolute mount path other than /." >&2
   exit 1
 fi
 
@@ -91,7 +91,7 @@ else
   )
 fi
 
-echo "Preparing NixOS Lab ${RELEASE}..."
+echo "Preparing Nixorium ${RELEASE}..."
 curl -fsSL "$INSTALLER_URL" -o "$TEMP_INSTALLER"
 
 (
@@ -103,8 +103,8 @@ curl -fsSL "$INSTALLER_URL" -o "$TEMP_INSTALLER"
   nix --extra-experimental-features "nix-command flakes" flake lock
   "${GIT_COMMAND[@]}" add flake.lock
   "${GIT_COMMAND[@]}" \
-    -c user.name="NixOS Lab Installer" \
-    -c user.email="installer@nixos-lab.local" \
+    -c user.name="Nixorium Installer" \
+    -c user.email="installer@nixorium.local" \
     commit -m "chore: initialize lab deployment"
 )
 

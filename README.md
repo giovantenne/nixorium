@@ -1,6 +1,6 @@
-# NixOS Lab
+# Nixorium
 
-[![Release](https://img.shields.io/github/v/release/giovantenne/nixos-lab?display_name=tag&sort=semver)](https://github.com/giovantenne/nixos-lab/releases/latest)
+[![Release](https://img.shields.io/github/v/release/giovantenne/nixorium?display_name=tag&sort=semver)](https://github.com/giovantenne/nixorium/releases/latest)
 [![NixOS](https://img.shields.io/badge/NixOS-26.05-5277C3?logo=nixos&logoColor=white)](https://nixos.org)
 [![Flakes](https://img.shields.io/badge/Nix-Flakes-4E9A06?logo=nixos&logoColor=white)](https://nixos.wiki/wiki/Flakes)
 [![Deploy](https://img.shields.io/badge/Deploy-Colmena-2E3440)](https://github.com/zhaofengli/colmena)
@@ -8,10 +8,12 @@
 
 A reproducible NixOS deployment system for multi-PC environments (classrooms, training rooms, public labs, libraries). Installation and system updates work over the LAN without client internet access; normal user sessions may still use the internet.
 
+Website: [nixorium.org](https://nixorium.org)
+
 The current stable release is **v1.0.0**. The NixOS 26.05, rootless Docker,
 and Veyon 4.11 work is available for hardware testing as
-**v2.0.0-beta.2**. Production installations should use a tagged release from
-the [GitHub Releases page](https://github.com/giovantenne/nixos-lab/releases)
+**v2.0.0-beta.3**. Production installations should use a tagged release from
+the [GitHub Releases page](https://github.com/giovantenne/nixorium/releases)
 instead of tracking `master` directly.
 
 One controller PC manages the entire lab: it builds all configurations locally, serves them over LAN, and deploys updates to every workstation declaratively. The whole lab can be reinstalled from scratch in under 20 minutes.
@@ -87,16 +89,22 @@ Boot the controller PC from the official NixOS live USB, connect it to the
 internet, and run one command:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/install.sh | bash
+curl -fsSL https://nixorium.org/install.sh | bash
 ```
 
-The Raw GitHub entrypoint selects a tagged release and enables the required Nix
-Flake features for its own commands. To select a different compatible release
-or disk explicitly:
+The public entrypoint selects a tagged release and enables the required Nix
+Flake features for its own commands. Until the domain's DNS and hosting are
+active, use the equivalent Raw GitHub URL:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/giovantenne/nixos-lab/master/install.sh | \
-  bash -s -- --release v2.0.0-beta.2 --disk /dev/sda
+curl -fsSL https://raw.githubusercontent.com/giovantenne/nixorium/master/install.sh | bash
+```
+
+To select a different compatible release or disk explicitly:
+
+```sh
+curl -fsSL https://nixorium.org/install.sh | \
+  bash -s -- --release v2.0.0-beta.3 --disk /dev/sda
 ```
 
 If one disk is detected, the installer selects it automatically; if multiple
@@ -115,7 +123,7 @@ Reboot and log in as `admin` (default password: `nixos`). The installer has
 already created and initialized the deployment repository:
 
 ```sh
-cd ~/nixos-lab-deployment
+cd ~/nixorium-deployment
 git status
 git log --oneline -1
 ```
@@ -159,7 +167,7 @@ studentPassword = "...";
 adminPassword = "...";
 
 # ── School / organization ─────────────────────────────────────
-homepageUrl = "https://github.com/giovantenne/nixos-lab";
+homepageUrl = "https://nixorium.org";
 
 # ── Locale / timezone ─────────────────────────────────────────
 timeZone = "Europe/Rome";
@@ -294,26 +302,38 @@ Lab administrators update the pinned input in their private repository; they do
 not merge this upstream into their configuration. Run the following commands
 from the private deployment repository.
 
-In this example the new upstream release is `v2.0.0-beta.3`. Replace it with
+In this example the new upstream release is `v2.0.0-beta.4`. Replace it with
 the tag you actually want to install. The upgrade branch keeps `master`
 unchanged while the new release is tested:
 
 ```sh
 git switch master
 git pull --ff-only
-git switch -c upgrade/nixos-lab-v2.0.0-beta.3
+git switch -c upgrade/nixorium-v2.0.0-beta.4
 ```
 
 Open `flake.nix` and replace the current tag in this line:
 
 ```nix
-inputs.nixos-lab.url = "github:giovantenne/nixos-lab/v2.0.0-beta.3";
+inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.4";
 ```
 
-Then update only the `nixos-lab` lock entry and inspect the result:
+When upgrading a deployment created before the Nixorium rebrand, rename the
+input and its output argument in the same file:
+
+```nix
+inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.4";
+
+outputs = { self, nixorium }:
+  nixorium.lib.mkLab {
+    # Keep the existing deployment arguments here.
+  };
+```
+
+Then update only the `nixorium` lock entry and inspect the result:
 
 ```sh
-nix flake update nixos-lab
+nix flake update nixorium
 git diff -- flake.nix flake.lock
 ```
 
@@ -332,9 +352,9 @@ branch into `master`:
 
 ```sh
 git add flake.nix flake.lock
-git commit -m "chore: update nixos-lab to v2.0.0-beta.3"
+git commit -m "chore: update nixorium to v2.0.0-beta.4"
 git switch master
-git merge --ff-only upgrade/nixos-lab-v2.0.0-beta.3
+git merge --ff-only upgrade/nixorium-v2.0.0-beta.4
 git push origin master
 ```
 
@@ -343,7 +363,7 @@ to the lab PCs separately, after reviewing the upgrade.
 
 ### Releases and versioning
 
-NixOS Lab follows [Semantic Versioning](https://semver.org/). `VERSION` is the canonical project version and every release must have a matching dated entry in `CHANGELOG.md`.
+Nixorium follows [Semantic Versioning](https://semver.org/). `VERSION` is the canonical project version and every release must have a matching dated entry in `CHANGELOG.md`.
 
 GitHub Releases are generated automatically when a tag named `v<version>` is pushed. The workflow validates that the tag, `VERSION`, and `CHANGELOG.md` agree, then publishes the matching changelog section as the release notes. Releases contain GitHub's source archives; Nix build outputs remain reproducible from `flake.lock` and are distributed to clients through Harmonia.
 
@@ -398,7 +418,7 @@ Rebuild the controller locally:
 sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
 ```
 
-For client PCs, prefer Colmena from the controller. Only run `sudo nixos-rebuild switch --flake /path/to/nixos-lab#pc05 --no-write-lock-file` after logging into `pc05` itself (or after cloning the repo there).
+For client PCs, prefer Colmena from the controller. Only run `sudo nixos-rebuild switch --flake /path/to/nixorium-deployment#pc05 --no-write-lock-file` after logging into `pc05` itself (or after cloning the deployment there).
 
 ---
 
@@ -523,7 +543,7 @@ that identify or specialize one school belong in its private repository.
 
 ### Agent skill
 
-The repository includes the `nixos-lab-maintainer` Agent Skill for maintenance,
+The repository includes the `nixorium-maintainer` Agent Skill for maintenance,
 customization, validation, cross-repository updates and releases. It is exposed
 through repository-local discovery paths for Codex, OpenCode, Claude Code and
 Pi; new deployment repositories created from the `site` template include the
@@ -557,7 +577,7 @@ packages those source trees into the offline PXE installer.
 
 ```
 .github/workflows/release.yml # Validates tags and publishes GitHub Releases
-install.sh                  # Raw GitHub entrypoint for controller bootstrap
+install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Entry point: host generation, Colmena config, labMeta export
 flake.lock                 # Pinned inputs (nixpkgs, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
@@ -600,7 +620,7 @@ assets/
   mimeapps.list            # Default applications
   vscode-settings.json     # VS Code defaults
 templates/site/            # Scaffold for a private deployment repository
-skills/nixos-lab-maintainer/ # Cross-agent maintenance and release workflow
+skills/nixorium-maintainer/ # Cross-agent maintenance and release workflow
 ```
 
 The root configuration keeps the historical standalone deployment working.

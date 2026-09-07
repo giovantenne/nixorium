@@ -2,10 +2,10 @@
 
 For maintenance, customization, offline-installer, cross-repository, and
 release work, use the repository skill at
-`skills/nixos-lab-maintainer/SKILL.md`. Discovery links for Codex, OpenCode,
+`skills/nixorium-maintainer/SKILL.md`. Discovery links for Codex, OpenCode,
 Claude Code, and Pi are versioned with the repository.
 
-This repository manages a multi-PC NixOS lab using Nix Flakes,
+Nixorium manages a multi-PC NixOS lab using Nix Flakes,
 Disko, and Colmena. A controller PC deploys to student workstations
 over a LAN-only deployment network. Clients do not need internet for
 installation or system updates, but may have internet during user sessions.
@@ -19,7 +19,7 @@ repository generated from `templates/site`.
 
 ```
 .github/workflows/release.yml # Validates tags and publishes GitHub Releases
-install.sh                  # Raw GitHub entrypoint for controller bootstrap
+install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
 flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
@@ -62,7 +62,7 @@ assets/
   mimeapps.list            # Default browser = Chromium
   vscode-settings.json     # VS Code defaults
 templates/site/            # Private deployment repository template
-skills/nixos-lab-maintainer/ # Cross-agent maintenance and release workflow
+skills/nixorium-maintainer/ # Cross-agent maintenance and release workflow
 ```
 
 Generated locally during setup and committed in the private deployment repo:
