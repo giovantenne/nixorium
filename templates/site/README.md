@@ -64,11 +64,43 @@ effective configuration, public cache key, local modules and assets.
 
 ## Updating nixos-lab
 
-Change the release tag in `flake.nix`, then update only that input and validate
-the controller, one client and the netboot ramdisk before deployment:
+Run the upgrade from this private deployment repository. In this example the
+new upstream release is `v2.0.0-beta.3`; replace it with the tag you actually
+want to install:
 
 ```sh
-nix flake lock --update-input nixos-lab
-nix build .#nixosConfigurations.pc01.config.system.build.toplevel
-nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk
+git switch master
+git pull --ff-only
+git switch -c upgrade/nixos-lab-v2.0.0-beta.3
 ```
+
+Open `flake.nix` and change the `inputs.nixos-lab.url` line so that it contains
+the new release tag:
+
+```nix
+inputs.nixos-lab.url = "github:giovantenne/nixos-lab/v2.0.0-beta.3";
+```
+
+Update only that input, review the lock-file change and validate every role:
+
+```sh
+nix flake update nixos-lab
+git diff -- flake.nix flake.lock
+
+nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-link
+nix build .#nixosConfigurations.pc99.config.system.build.toplevel --no-link
+nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --no-link
+nix build .#installerBundle --no-link
+```
+
+If every build succeeds, commit and merge the tested upgrade:
+
+```sh
+git add flake.nix flake.lock
+git commit -m "chore: update nixos-lab to v2.0.0-beta.3"
+git switch master
+git merge --ff-only upgrade/nixos-lab-v2.0.0-beta.3
+git push origin master
+```
+
+Updating the repository does not deploy the new configuration to the lab PCs.

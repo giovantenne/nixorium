@@ -286,18 +286,55 @@ sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
 ### Update a lab deployment
 
 Lab administrators update the pinned input in their private repository; they do
-not merge this upstream into their configuration:
+not merge this upstream into their configuration. Run the following commands
+from the private deployment repository.
+
+In this example the new upstream release is `v2.0.0-beta.3`. Replace it with
+the tag you actually want to install. The upgrade branch keeps `master`
+unchanged while the new release is tested:
 
 ```sh
-git switch -c upgrade/nixos-lab-vNEXT
-# Change inputs.nixos-lab.url in flake.nix to the new release tag.
-nix flake lock --update-input nixos-lab
-nix build .#nixosConfigurations.pc01.config.system.build.toplevel
-nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk
+git switch master
+git pull --ff-only
+git switch -c upgrade/nixos-lab-v2.0.0-beta.3
 ```
 
-Commit the changed `flake.nix` and `flake.lock` only after validating a client,
-the controller and the netboot output.
+Open `flake.nix` and replace the current tag in this line:
+
+```nix
+inputs.nixos-lab.url = "github:giovantenne/nixos-lab/v2.0.0-beta.3";
+```
+
+Then update only the `nixos-lab` lock entry and inspect the result:
+
+```sh
+nix flake update nixos-lab
+git diff -- flake.nix flake.lock
+```
+
+Before accepting the upgrade, build one client, the controller, the netboot
+ramdisk and the offline installer bundle:
+
+```sh
+nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-link
+nix build .#nixosConfigurations.pc99.config.system.build.toplevel --no-link
+nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --no-link
+nix build .#installerBundle --no-link
+```
+
+If every build succeeds, commit the two changed files and merge the tested
+branch into `master`:
+
+```sh
+git add flake.nix flake.lock
+git commit -m "chore: update nixos-lab to v2.0.0-beta.3"
+git switch master
+git merge --ff-only upgrade/nixos-lab-v2.0.0-beta.3
+git push origin master
+```
+
+These commands update the deployment repository only. Apply the configuration
+to the lab PCs separately, after reviewing the upgrade.
 
 ### Releases and versioning
 
