@@ -15,7 +15,7 @@ for lab configuration, validation and upstream-update work.
 3. Replace `assets/logo.txt` and add any local NixOS settings under `modules/`.
 4. Generate the public keys under `keys/` and keep all private keys outside
    Git.
-5. Pin `inputs.nixos-lab.url` in `flake.nix` to a released tag and update the
+5. Keep `inputs.nixos-lab.url` pinned to a released tag and record it in the
    lock file.
 
 ```sh
