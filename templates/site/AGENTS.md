@@ -1,7 +1,7 @@
 # AGENTS.md
 
-This is a private deployment repository consuming the public `nixos-lab`
-Flake. Use `skills/nixos-lab-maintainer/SKILL.md` for configuration,
+This is a private deployment repository consuming the public `nixorium`
+Flake. Use `skills/nixorium-maintainer/SKILL.md` for configuration,
 customization, validation, upstream-update, and offline-installer work.
 
 - Keep lab identity, network data, password hashes, public keys, branding,

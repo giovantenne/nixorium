@@ -4,7 +4,7 @@ set -euo pipefail
 # Launch the lab screensaver in a fullscreen Ghostty window.
 # Used by the idle service to start the screensaver on inactivity.
 
-SCREENSAVER_CLASS="org.nixos-lab.screensaver"
+SCREENSAVER_CLASS="org.nixorium.screensaver"
 
 # Skip if already running
 if pgrep -f "$SCREENSAVER_CLASS" >/dev/null 2>&1; then

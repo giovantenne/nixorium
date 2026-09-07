@@ -60,7 +60,7 @@ if [[ "${LOCAL_COMMIT}" != "${REMOTE_COMMIT}" ]]; then
   exit 1
 fi
 
-git tag --annotate "${TAG}" --message "NixOS Lab ${TAG}"
+git tag --annotate "${TAG}" --message "Nixorium ${TAG}"
 git push origin "${TAG}"
 
 echo "Published ${TAG}. GitHub Actions will create the GitHub Release."

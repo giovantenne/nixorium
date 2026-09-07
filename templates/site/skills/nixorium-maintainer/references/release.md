@@ -1,7 +1,7 @@
 # Release and downstream update
 
 The upstream follows Semantic Versioning. Prereleases use identifiers such as
-`2.0.0-beta.2` and Git tags use the corresponding `v2.0.0-beta.2` form.
+`2.0.0-beta.3` and Git tags use the corresponding `v2.0.0-beta.3` form.
 
 ## Prepare the upstream release
 
@@ -28,8 +28,8 @@ has explicitly approved the recovery operation.
 
 After the upstream tag exists:
 
-1. Change `inputs.nixos-lab.url` to the released tag.
-2. Update only the `nixos-lab` input in `flake.lock`.
+1. Change `inputs.nixorium.url` to the released tag.
+2. Update only the `nixorium` input in `flake.lock`.
 3. Review the lock diff and release notes.
 4. Evaluate `labMeta`, build the controller, one client, netboot ramdisk, and
    installer bundle.

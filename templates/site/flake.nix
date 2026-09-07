@@ -1,10 +1,10 @@
 {
-  description = "Private NixOS lab deployment";
+  description = "Private Nixorium deployment";
 
-  inputs.nixos-lab.url = "github:giovantenne/nixos-lab/v2.0.0-beta.2";
+  inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.3";
 
-  outputs = { self, nixos-lab }:
-    nixos-lab.lib.mkLab {
+  outputs = { self, nixorium }:
+    nixorium.lib.mkLab {
       deploymentSelf = self;
       labConfig = import ./lab-config.nix;
 

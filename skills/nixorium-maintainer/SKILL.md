@@ -1,10 +1,10 @@
 ---
-name: nixos-lab-maintainer
-description: Maintain or customize the nixos-lab upstream and its private deployment Flakes. Use for lab-config.nix, lib.mkLab, NixOS modules, keys, assets, offline netboot, cross-repository updates, validation, or releases. Do not use for unrelated NixOS projects.
+name: nixorium-maintainer
+description: Maintain or customize the Nixorium upstream and its private deployment Flakes. Use for lab-config.nix, lib.mkLab, NixOS modules, keys, assets, offline netboot, cross-repository updates, validation, or releases. Do not use for unrelated NixOS projects.
 license: MIT
 ---
 
-# NixOS Lab Maintainer
+# Nixorium Maintainer
 
 Keep the reusable public upstream and each private lab deployment independently
 updatable. The user's instructions take precedence over this skill.
@@ -19,7 +19,7 @@ worktree before changing anything.
 
 - Treat a repository containing `lib/mk-lab.nix`, `templates/site/`, and
   `VERSION` as the public upstream.
-- Treat a repository whose Flake consumes `nixos-lab.lib.mkLab` as a private
+- Treat a repository whose Flake consumes `nixorium.lib.mkLab` as a private
   deployment.
 - If both repositories are involved, inspect both worktrees and their pinned
   revisions before deciding where a change belongs.
@@ -50,7 +50,7 @@ netboot, or the deployment template.
 - When the public API changes, update the site template, both READMEs,
   `AGENTS.md`, and `CHANGELOG.md` in the same change.
 - In the upstream, keep the copy of this skill under `templates/site/skills/`
-  identical to the root copy, including references and compatibility links.
+  identical to the root copy, including references and discovery links.
 - Preserve unrelated user changes in dirty worktrees.
 
 ## Validate proportionally

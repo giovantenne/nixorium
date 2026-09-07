@@ -52,7 +52,7 @@
 
   # ── School / organization ──────────────────────────────────────
   # Chromium homepage URL
-  homepageUrl = "https://github.com/giovantenne/nixos-lab";
+  homepageUrl = "https://nixorium.org";
   # Git identity for student home template
   studentGitName = "student";
   studentGitEmail = "student@example.com";

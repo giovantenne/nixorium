@@ -1,5 +1,5 @@
 {
-  description = "NixOS system configuration";
+  description = "Nixorium - reproducible NixOS lab infrastructure";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
@@ -38,7 +38,7 @@
       };
       templates.site = {
         path = ./templates/site;
-        description = "Private deployment repository for a NixOS lab";
+        description = "Private Nixorium deployment repository";
       };
     };
 }
