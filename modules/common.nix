@@ -42,6 +42,40 @@ in
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
 
+  # Make the GDM login screen and teacher session use the same monitor
+  # layout as the admin user on the master workstation.
+  systemd.services.gdm-monitor-config = lib.mkIf isMaster {
+    description = "Copy admin monitor layout to GDM and teacher";
+    wantedBy = [ "display-manager.service" ];
+    before = [ "display-manager.service" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+    };
+    script = ''
+      ADMIN_MONITORS="/home/admin/.config/monitors.xml"
+      GDM_CONFIG_DIR="/var/lib/gdm/seat0/config"
+      GDM_MONITORS="$GDM_CONFIG_DIR/monitors.xml"
+      TEACHER_CONFIG_DIR="/home/${labSettings.teacherUser}/.config"
+      TEACHER_MONITORS="$TEACHER_CONFIG_DIR/monitors.xml"
+
+      if [ ! -f "$ADMIN_MONITORS" ]; then
+        exit 0
+      fi
+
+      install -d -m 0700 "$GDM_CONFIG_DIR"
+      cp "$ADMIN_MONITORS" "$GDM_MONITORS"
+      chmod 0600 "$GDM_MONITORS"
+      chown "$(stat -c '%u:%g' "$GDM_CONFIG_DIR")" "$GDM_MONITORS"
+
+      install -d -o "${labSettings.teacherUser}" -g users -m 0700 "$TEACHER_CONFIG_DIR"
+      cp "$ADMIN_MONITORS" "$TEACHER_MONITORS"
+      chmod 0600 "$TEACHER_MONITORS"
+      chown "${labSettings.teacherUser}:users" "$TEACHER_MONITORS"
+    '';
+    path = [ pkgs.coreutils ];
+  };
+
   # Disable GNOME Keyring (no password prompts for Chromium, VSCode, etc.)
   services.gnome.gnome-keyring.enable = lib.mkForce false;
   services.desktopManager.gnome.extraGSettingsOverrides = ''
@@ -153,6 +187,10 @@ in
 
   services.printing.enable = true;
 
+  # Install Samsung SPL drivers only on the master workstation where the
+  # local USB printer is expected to be configured.
+  services.printing.drivers = lib.optionals isMaster [ pkgs.splix ];
+
   # Sound (PipeWire)
   security.rtkit.enable = true;
   services.pipewire = {
@@ -239,7 +277,7 @@ in
   programs.starship.enable = true;
   # Starship prompt (Ristretto palette: warm oranges, soft pinks, muted tones)
   programs.starship.settings = {
-    add_newline = false;
+    add_newline = true;
     command_timeout = 200;
     format = "$hostname$directory$git_branch$git_status$character";
     character = {
@@ -384,13 +422,19 @@ in
     fzf
     ghostty
     git
+    gh
     chromium
     vscode
     gcc
     tig
     tmux
+    tree-sitter
     imagemagick
     ghostscript
+    hunspell
+    hunspellDicts.it_IT
+    hunspellDicts.en_US
+    libreoffice-qt
     tectonic
     mermaid-cli
     jq
@@ -406,6 +450,7 @@ in
     maven
     nodejs
     opencode
+    pi-coding-agent
     php
     ripgrep
     try

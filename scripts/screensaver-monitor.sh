@@ -10,7 +10,7 @@ set -euo pipefail
 #   On activity          -> kill screensaver
 
 # Idle thresholds (milliseconds)
-IDLE_SCREENSAVER_MS=150000
+IDLE_SCREENSAVER_MS=300000
 IDLE_LOCK_MS=600000
 
 SCREENSAVER_CLASS="org.nixos-lab.screensaver"
