@@ -93,14 +93,8 @@ curl -fsSL https://nixorium.org/install.sh | bash
 ```
 
 The public entrypoint selects a tagged release and enables the required Nix
-Flake features for its own commands. Until the domain's DNS and hosting are
-active, use the equivalent Raw GitHub URL:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/giovantenne/nixorium/master/install.sh | bash
-```
-
-To select a different compatible release or disk explicitly:
+Flake features for its own commands. To select a different compatible release
+or disk explicitly:
 
 ```sh
 curl -fsSL https://nixorium.org/install.sh | \
