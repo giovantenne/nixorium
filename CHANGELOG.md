@@ -11,6 +11,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Documented the complete per-host customization workflow in both READMEs and
   in the Nixorium maintainer skill.
 
+### Added
+
+- An interactive controller-bootstrap release selector that lists published
+  GitHub releases while preserving `--release` and `NIXORIUM_RELEASE` for
+  unattended installations.
+
 ## [2.0.0-beta.3] - 2026-09-08
 
 ### Added
