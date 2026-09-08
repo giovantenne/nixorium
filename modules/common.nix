@@ -235,15 +235,6 @@ in
     font=JetBrainsMono Nerd Font Mono:size=14
     pad=8x4
 
-    # Titlebar in Adwaita-dark style: dark bar with plain glyph buttons
-    # (GNOME/mutter has no server-side decorations, so foot draws its own)
-    [csd]
-    color=ff303030
-    font=Liberation Sans
-    button-color=ffffffff
-    button-minimize-color=ff303030
-    button-maximize-color=ff303030
-    button-close-color=ff303030
     [colors-dark]
     background=2c2525
     foreground=e6d9db
