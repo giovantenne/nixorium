@@ -18,6 +18,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - GNOME favorites migration for admin and teacher: cached
   `com.mitchellh.ghostty.desktop` entries are replaced with `foot.desktop`
   at session start.
+- Foot CSD titlebar styled to match GNOME Adwaita dark (GNOME/mutter has
+  no server-side decorations), aligned with Nautilus and other GTK4 apps.
 - Documented the complete per-host customization workflow in both READMEs and
   in the Nixorium maintainer skill.
 
