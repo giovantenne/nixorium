@@ -13,9 +13,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- An interactive controller-bootstrap release selector that lists published
-  GitHub releases while preserving `--release` and `NIXORIUM_RELEASE` for
-  unattended installations.
+- An interactive controller-bootstrap version selector offering `master`, the
+  latest GitHub prerelease, and published stable releases while preserving
+  `--release` and `NIXORIUM_RELEASE` for unattended installations.
 
 ## [2.0.0-beta.3] - 2026-09-08
 
