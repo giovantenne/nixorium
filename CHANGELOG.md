@@ -12,12 +12,6 @@ The project follows [Semantic Versioning](https://semver.org/).
   theme, JetBrainsMono Nerd Font, GNOME favorites and `Super+Return`
   keybinding, and identical screensaver behavior (fullscreen TTE effects
   with black palette overrides).
-- Foot configuration and screensaver overrides moved to the foot 1.28
-  `[colors-dark]` syntax (`cursor` foreground/background pair, validated
-  against foot 1.28.0).
-- GNOME favorites migration for admin and teacher: cached
-  `com.mitchellh.ghostty.desktop` entries are replaced with `foot.desktop`
-  at session start.
 - Documented the complete per-host customization workflow in both READMEs and
   in the Nixorium maintainer skill.
 
