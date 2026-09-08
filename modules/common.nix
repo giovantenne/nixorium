@@ -235,10 +235,10 @@ in
     font=JetBrainsMono Nerd Font Mono:size=14
     pad=8x4
 
-    [colors]
+    [colors-dark]
     background=2c2525
     foreground=e6d9db
-    cursor-color=c3b7b8
+    cursor=2c2525 c3b7b8
     selection-background=403e41
     selection-foreground=e6d9db
     regular0=72696a
@@ -367,6 +367,8 @@ in
           raw = raw[4:]
 
       favorites = ast.literal_eval(raw)
+      # Migrate the removed Ghostty desktop entry to Foot
+      favorites = ["foot.desktop" if f == "com.mitchellh.ghostty.desktop" else f for f in favorites]
       if "io.veyon.desktop" not in favorites:
           if "code.desktop" in favorites:
               favorites.insert(favorites.index("code.desktop") + 1, "io.veyon.desktop")
