@@ -2,9 +2,10 @@
 set -euo pipefail
 
 DEFAULT_RELEASE="v2.0.0-beta.3"
-RELEASE="${NIXORIUM_RELEASE:-$DEFAULT_RELEASE}"
+RELEASE="${NIXORIUM_RELEASE:-}"
 INSTALL_DISK=""
 REPOSITORY="giovantenne/nixorium"
+RELEASES_API_URL="https://api.github.com/repos/${REPOSITORY}/releases?per_page=100"
 TARGET_ROOT="${NIXORIUM_TARGET_ROOT:-/mnt}"
 ADMIN_USER="admin"
 DEPLOYMENT_NAME="nixorium-deployment"
@@ -17,6 +18,92 @@ export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = h
 usage() {
   echo "Usage: install.sh [--release <tag>] [--disk <device>]" >&2
   echo "Example: install.sh --release v2.0.0-beta.3 --disk /dev/sda" >&2
+}
+
+choose_release() {
+  local API_RESPONSE
+  local CHOICE
+  local CHOICE_NUMBER
+  local INDEX
+  local LABEL
+  local RELEASED_TAG
+  local TAG
+  local TAG_ALREADY_LISTED
+  local -a AVAILABLE_RELEASES=()
+
+  echo "Fetching published Nixorium releases..." >&3
+  if API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
+    while IFS= read -r TAG; do
+      if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+        continue
+      fi
+
+      TAG_ALREADY_LISTED=false
+      for RELEASED_TAG in "${AVAILABLE_RELEASES[@]}"; do
+        if [[ "$RELEASED_TAG" == "$TAG" ]]; then
+          TAG_ALREADY_LISTED=true
+          break
+        fi
+      done
+
+      if [[ "$TAG_ALREADY_LISTED" == "false" ]]; then
+        AVAILABLE_RELEASES+=("$TAG")
+      fi
+    done < <(
+      printf '%s\n' "$API_RESPONSE" |
+        sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\(v[^"]*\)",*$/\1/p'
+    )
+  else
+    echo "Warning: could not retrieve the GitHub release list." >&3
+  fi
+
+  TAG_ALREADY_LISTED=false
+  for TAG in "${AVAILABLE_RELEASES[@]}"; do
+    if [[ "$TAG" == "$DEFAULT_RELEASE" ]]; then
+      TAG_ALREADY_LISTED=true
+      break
+    fi
+  done
+  if [[ "$TAG_ALREADY_LISTED" == "false" ]]; then
+    AVAILABLE_RELEASES=("$DEFAULT_RELEASE" "${AVAILABLE_RELEASES[@]}")
+  fi
+
+  echo >&3
+  echo "Select a tagged Nixorium release:" >&3
+  for INDEX in "${!AVAILABLE_RELEASES[@]}"; do
+    TAG="${AVAILABLE_RELEASES[$INDEX]}"
+    if [[ "$TAG" == *-* ]]; then
+      LABEL="prerelease"
+    else
+      LABEL="stable"
+    fi
+    if [[ "$TAG" == "$DEFAULT_RELEASE" ]]; then
+      LABEL="${LABEL}, default"
+    fi
+    printf '  %d) %s (%s)\n' "$((INDEX + 1))" "$TAG" "$LABEL" >&3
+  done
+
+  while true; do
+    printf 'Release [%s]: ' "$DEFAULT_RELEASE" >&3
+    IFS= read -r CHOICE <&3
+
+    if [[ -z "$CHOICE" ]]; then
+      RELEASE="$DEFAULT_RELEASE"
+      break
+    fi
+    if [[ "$CHOICE" =~ ^[0-9]+$ ]]; then
+      CHOICE_NUMBER=$((10#$CHOICE))
+      if (( CHOICE_NUMBER >= 1 && CHOICE_NUMBER <= ${#AVAILABLE_RELEASES[@]} )); then
+        RELEASE="${AVAILABLE_RELEASES[$((CHOICE_NUMBER - 1))]}"
+        break
+      fi
+    fi
+
+    echo "Invalid selection. Enter a number from 1 to ${#AVAILABLE_RELEASES[@]}, or press Enter for ${DEFAULT_RELEASE}." >&3
+  done
+
+  echo "Selected ${RELEASE}." >&3
+  echo >&3
 }
 
 while [[ $# -gt 0 ]]; do
@@ -50,6 +137,17 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ -z "$RELEASE" ]]; then
+  if { exec 3<>/dev/tty; } 2>/dev/null; then
+    choose_release
+    exec 3>&-
+  else
+    RELEASE="$DEFAULT_RELEASE"
+    echo "No interactive terminal detected; using ${RELEASE}." >&2
+    echo "Pass --release <tag> or set NIXORIUM_RELEASE to choose explicitly." >&2
+  fi
+fi
 
 if [[ ! "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
   echo "Error: '$RELEASE' is not a valid release tag." >&2
