@@ -16,38 +16,38 @@ INSTALLER_ARGS=()
 export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo='
 
 usage() {
-  echo "Usage: install.sh [--release <tag>] [--disk <device>]" >&2
+  echo "Usage: install.sh [--release <tag|master>] [--disk <device>]" >&2
   echo "Example: install.sh --release v2.0.0-beta.3 --disk /dev/sda" >&2
 }
 
 choose_release() {
   local API_RESPONSE
+  local API_SUCCEEDED=false
   local CHOICE
   local CHOICE_NUMBER
+  local DEFAULT_AVAILABLE=false
   local INDEX
   local LABEL
-  local RELEASED_TAG
+  local LATEST_PRERELEASE=""
+  local MENU_DEFAULT="$DEFAULT_RELEASE"
   local TAG
-  local TAG_ALREADY_LISTED
-  local -a AVAILABLE_RELEASES=()
+  local -a AVAILABLE_RELEASES=("master")
+  local -a STABLE_RELEASES=()
 
   echo "Fetching published Nixorium releases..." >&3
   if API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
+    API_SUCCEEDED=true
     while IFS= read -r TAG; do
       if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
         continue
       fi
 
-      TAG_ALREADY_LISTED=false
-      for RELEASED_TAG in "${AVAILABLE_RELEASES[@]}"; do
-        if [[ "$RELEASED_TAG" == "$TAG" ]]; then
-          TAG_ALREADY_LISTED=true
-          break
+      if [[ "$TAG" == *-* ]]; then
+        if [[ -z "$LATEST_PRERELEASE" ]]; then
+          LATEST_PRERELEASE="$TAG"
         fi
-      done
-
-      if [[ "$TAG_ALREADY_LISTED" == "false" ]]; then
-        AVAILABLE_RELEASES+=("$TAG")
+      else
+        STABLE_RELEASES+=("$TAG")
       fi
     done < <(
       printf '%s\n' "$API_RESPONSE" |
@@ -57,38 +57,58 @@ choose_release() {
     echo "Warning: could not retrieve the GitHub release list." >&3
   fi
 
-  TAG_ALREADY_LISTED=false
+  if [[ -n "$LATEST_PRERELEASE" ]]; then
+    AVAILABLE_RELEASES+=("$LATEST_PRERELEASE")
+  fi
+  AVAILABLE_RELEASES+=("${STABLE_RELEASES[@]}")
+
+  if [[ "$API_SUCCEEDED" == "false" && "$DEFAULT_RELEASE" != "master" ]]; then
+    AVAILABLE_RELEASES+=("$DEFAULT_RELEASE")
+  fi
+
+  if [[ "$DEFAULT_RELEASE" == *-* && -n "$LATEST_PRERELEASE" ]]; then
+    MENU_DEFAULT="$LATEST_PRERELEASE"
+  fi
+
   for TAG in "${AVAILABLE_RELEASES[@]}"; do
-    if [[ "$TAG" == "$DEFAULT_RELEASE" ]]; then
-      TAG_ALREADY_LISTED=true
+    if [[ "$TAG" == "$MENU_DEFAULT" ]]; then
+      DEFAULT_AVAILABLE=true
       break
     fi
   done
-  if [[ "$TAG_ALREADY_LISTED" == "false" ]]; then
-    AVAILABLE_RELEASES=("$DEFAULT_RELEASE" "${AVAILABLE_RELEASES[@]}")
+  if [[ "$DEFAULT_AVAILABLE" == "false" ]]; then
+    if [[ -n "$LATEST_PRERELEASE" ]]; then
+      MENU_DEFAULT="$LATEST_PRERELEASE"
+    elif (( ${#STABLE_RELEASES[@]} > 0 )); then
+      MENU_DEFAULT="${STABLE_RELEASES[0]}"
+    else
+      MENU_DEFAULT="master"
+    fi
   fi
 
   echo >&3
-  echo "Select a tagged Nixorium release:" >&3
+  echo "Select a Nixorium version:" >&3
   for INDEX in "${!AVAILABLE_RELEASES[@]}"; do
     TAG="${AVAILABLE_RELEASES[$INDEX]}"
-    if [[ "$TAG" == *-* ]]; then
+    if [[ "$TAG" == "master" ]]; then
+      LABEL="development"
+    elif [[ "$TAG" == *-* ]]; then
       LABEL="prerelease"
     else
       LABEL="stable"
     fi
-    if [[ "$TAG" == "$DEFAULT_RELEASE" ]]; then
+    if [[ "$TAG" == "$MENU_DEFAULT" ]]; then
       LABEL="${LABEL}, default"
     fi
     printf '  %d) %s (%s)\n' "$((INDEX + 1))" "$TAG" "$LABEL" >&3
   done
 
   while true; do
-    printf 'Release [%s]: ' "$DEFAULT_RELEASE" >&3
+    printf 'Version [%s]: ' "$MENU_DEFAULT" >&3
     IFS= read -r CHOICE <&3
 
     if [[ -z "$CHOICE" ]]; then
-      RELEASE="$DEFAULT_RELEASE"
+      RELEASE="$MENU_DEFAULT"
       break
     fi
     if [[ "$CHOICE" =~ ^[0-9]+$ ]]; then
@@ -99,7 +119,7 @@ choose_release() {
       fi
     fi
 
-    echo "Invalid selection. Enter a number from 1 to ${#AVAILABLE_RELEASES[@]}, or press Enter for ${DEFAULT_RELEASE}." >&3
+    echo "Invalid selection. Enter a number from 1 to ${#AVAILABLE_RELEASES[@]}, or press Enter for ${MENU_DEFAULT}." >&3
   done
 
   echo "Selected ${RELEASE}." >&3
@@ -149,8 +169,8 @@ if [[ -z "$RELEASE" ]]; then
   fi
 fi
 
-if [[ ! "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-  echo "Error: '$RELEASE' is not a valid release tag." >&2
+if [[ "$RELEASE" != "master" && ! "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "Error: '$RELEASE' is neither 'master' nor a valid release tag." >&2
   exit 1
 fi
 

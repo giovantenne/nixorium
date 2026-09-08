@@ -92,12 +92,14 @@ internet, and run one command:
 curl -fsSL https://nixorium.org/install.sh | bash
 ```
 
-The public entrypoint lists the published GitHub releases and asks which tagged
-version to install. Press Enter to accept the displayed default. When no
-interactive terminal is available, the default is selected automatically.
+The public entrypoint offers the current `master`, the latest published
+prerelease, and every published stable release. Press Enter to accept the
+displayed default. When no interactive terminal is available, the built-in
+default release is selected automatically.
 The script also enables the required Nix Flake features for its own commands.
 
-For automation, or to select a compatible release and disk explicitly:
+For automation, or to select a compatible release, `master`, and disk
+explicitly:
 
 ```sh
 curl -fsSL https://nixorium.org/install.sh | \
