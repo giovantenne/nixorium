@@ -8,10 +8,6 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Replaced Ghostty with Foot as the lab terminal: same Ristretto color
-  theme, JetBrainsMono Nerd Font, GNOME favorites and `Super+Return`
-  keybinding, and identical screensaver behavior (fullscreen TTE effects
-  with black palette overrides).
 - Documented the complete per-host customization workflow in both READMEs and
   in the Nixorium maintainer skill.
 

@@ -102,7 +102,7 @@ in
 
     [org.gnome.shell]
     enabled-extensions=['ding@rastersoft.com', 'dash-to-dock@micxgx.gmail.com']
-    favorite-apps=['foot.desktop', 'chromium-browser.desktop', 'code.desktop', 'io.veyon.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop']
+    favorite-apps=['com.mitchellh.ghostty.desktop', 'chromium-browser.desktop', 'code.desktop', 'io.veyon.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop']
     welcome-dialog-last-shown-version='9999'
 
     [org.gnome.shell.extensions.dash-to-dock]
@@ -123,15 +123,15 @@ in
     idle-dim=false
 
     [org.gnome.desktop.default-applications.terminal]
-    exec='foot'
+    exec='ghostty'
     exec-arg='--'
 
     [org.gnome.settings-daemon.plugins.media-keys]
     custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/']
 
     [org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/]
-    name='Terminal'
-    command='/run/current-system/sw/bin/foot'
+    name='Ghostty'
+    command='/run/current-system/sw/bin/ghostty'
     binding='<Super>Return'
 
     [org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/]
@@ -230,33 +230,32 @@ in
     wantedBy = [ "default.target" ];
   };
 
-  # Foot defaults for all users (Ristretto color theme).
-  environment.etc."xdg/foot/foot.ini".text = ''
-    font=JetBrainsMono Nerd Font Mono:size=14
-    pad=8x4
-
-    [colors]
-    background=2c2525
-    foreground=e6d9db
-    cursor-color=c3b7b8
-    selection-background=403e41
-    selection-foreground=e6d9db
-    regular0=72696a
-    regular1=fd6883
-    regular2=adda78
-    regular3=f9cc6c
-    regular4=f38d70
-    regular5=a8a9eb
-    regular6=85dacc
-    regular7=e6d9db
-    bright0=948a8b
-    bright1=ff8297
-    bright2=c8e292
-    bright3=fcd675
-    bright4=f8a788
-    bright5=bebffd
-    bright6=9bf1e1
-    bright7=f1e5e7
+  # Ghostty defaults for all users (Ristretto color theme).
+  environment.etc."xdg/ghostty/config".text = ''
+    font-size = 14
+    background = #2c2525
+    foreground = #e6d9db
+    cursor-color = #c3b7b8
+    selection-background = #403e41
+    selection-foreground = #e6d9db
+    palette = 0=#72696a
+    palette = 1=#fd6883
+    palette = 2=#adda78
+    palette = 3=#f9cc6c
+    palette = 4=#f38d70
+    palette = 5=#a8a9eb
+    palette = 6=#85dacc
+    palette = 7=#e6d9db
+    palette = 8=#948a8b
+    palette = 9=#ff8297
+    palette = 10=#c8e292
+    palette = 11=#fcd675
+    palette = 12=#f8a788
+    palette = 13=#bebffd
+    palette = 14=#9bf1e1
+    palette = 15=#f1e5e7
+    window-padding-x = 8
+    window-padding-y = 4
   '';
 
   environment.etc."chromium/policies/managed/homepage.json".text = ''
@@ -355,7 +354,7 @@ in
       # Dock and shell settings
       if [ "''${USER:-}" = "${labSettings.studentUser}" ]; then
         gsettings set org.gnome.shell favorite-apps \
-          "['foot.desktop', 'chromium-browser.desktop', 'code.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop']"
+          "['com.mitchellh.ghostty.desktop', 'chromium-browser.desktop', 'code.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.TextEditor.desktop']"
       else
         current_favorites=$(gsettings get org.gnome.shell favorite-apps)
         updated_favorites=$(python3 - "$current_favorites" << 'PY'
@@ -406,7 +405,7 @@ in
       UserKnownHostsFile /dev/null
   '';
 
-  # Exclude GNOME Console (we use Foot)
+  # Exclude GNOME Console (we use Ghostty)
   environment.gnome.excludePackages = [ pkgs.gnome-console ];
 
   environment.systemPackages = with pkgs; [
@@ -420,7 +419,7 @@ in
     eza
     fd
     fzf
-    foot
+    ghostty
     git
     gh
     chromium
@@ -475,7 +474,7 @@ in
   };
 
   # Screensaver: watch for GNOME idle (screensaver ActiveChanged signal)
-  # and launch the TTE screensaver in a fullscreen Foot window.
+  # and launch the TTE screensaver in a fullscreen Ghostty window.
   systemd.user.services.lab-screensaver = {
     description = "Lab TTE screensaver";
     wantedBy = [ "graphical-session.target" ];
@@ -486,7 +485,7 @@ in
       Restart = "on-failure";
       RestartSec = 5;
     };
-    path = [ pkgs.bash pkgs.glib pkgs.gnugrep pkgs.procps pkgs.foot pkgs.python3Packages.terminaltexteffects pkgs.ncurses pkgs.systemd ];
+    path = [ pkgs.bash pkgs.glib pkgs.gnugrep pkgs.procps pkgs.ghostty pkgs.python3Packages.terminaltexteffects pkgs.ncurses pkgs.systemd ];
   };
 
   systemd.user.services.lab-gnome-setup = {
