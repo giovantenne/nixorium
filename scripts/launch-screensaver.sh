@@ -18,10 +18,10 @@ exec foot \
   --app-id="$SCREENSAVER_CLASS" \
   --fullscreen \
   --font='JetBrainsMono Nerd Font Mono:size=18' \
-  -o colors.background=000000 \
-  -o colors.foreground=f38d70 \
-  -o colors.cursor-color=000000 \
-  -o colors.regular0=000000 \
-  -o colors.bright0=000000 \
-  -o mouse-hide-while-typing=yes \
+  -o colors-dark.background=000000 \
+  -o colors-dark.foreground=f38d70 \
+  -o 'colors-dark.cursor=000000 000000' \
+  -o colors-dark.regular0=000000 \
+  -o colors-dark.bright0=000000 \
+  -o mouse.hide-when-typing=yes \
   -e /etc/lab/cmd-screensaver.sh
