@@ -625,7 +625,7 @@ scripts/
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server
   lib/lab-meta.sh          # Shared helper: loads labMeta from the flake
   cmd-screensaver.sh       # TTE screensaver animation loop
-  launch-screensaver.sh    # Fullscreen Foot screensaver launcher
+  launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
   screensaver-monitor.sh   # GNOME idle watcher for screensaver
   create-home-template.sh  # Home directory template builder
   home-reset.sh            # Boot-time snapshot rotation + home reset

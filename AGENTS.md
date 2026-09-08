@@ -54,7 +54,7 @@ scripts/
   create-home-template.sh  # Builds clean home directory template
   home-reset.sh            # Boot-time snapshot rotation + home reset
   cmd-screensaver.sh       # TTE screensaver animation loop
-  launch-screensaver.sh    # Fullscreen Foot screensaver launcher
+  launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
   screensaver-monitor.sh   # GNOME idle watcher for screensaver
 assets/
   backgrounds/             # Ristretto wallpapers (random at each home-reset)
