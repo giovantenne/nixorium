@@ -108,11 +108,12 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --
 ```
 
 `nix flake check` runs the configuration-schema tests. GitHub CI runs
-`scripts/validate.sh --ci`, which performs syntax, Flake, and fresh-template
-evaluations without building system closures. The default `scripts/validate.sh`
-remains the required local full matrix: it builds representative hosts,
-netboot, Disko, and installer bundles and verifies offline equivalence. There
-is no automatic formatter; follow the styles below and run `git diff --check`.
+`scripts/validate.sh --ci`, which performs syntax, schema, representative-role,
+and fresh-template evaluations without visiting every generated client or
+building system closures. The default `scripts/validate.sh` remains the
+required local full matrix: it builds representative hosts, netboot, Disko,
+and installer bundles and verifies offline equivalence. There is no automatic
+formatter; follow the styles below and run `git diff --check`.
 
 ## Releases
 

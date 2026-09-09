@@ -19,11 +19,14 @@ GitHub Actions must use the evaluation-only mode:
 ./scripts/validate.sh --ci
 ```
 
-This mode checks syntax and skill distribution, evaluates every Flake output,
-generates and evaluates a fresh deployment, and evaluates its installer bundle
-without building system closures. Keep the full matrix off GitHub-hosted
-runners; it is a local prerequisite for changes that affect builds and for
-release preparation.
+This mode checks syntax and skill distribution, evaluates the schema tests and
+one representative client plus the controller, netboot, apps, packages,
+Colmena metadata, and deployment status. It also generates and evaluates a
+fresh deployment and its installer bundle without building system closures.
+It intentionally skips the other generated clients because they share the
+same module graph and their address generation is covered by `mk-lab` tests.
+Keep the full matrix off GitHub-hosted runners; it is a local prerequisite for
+changes that affect builds and for release preparation.
 
 Run narrower evaluations while iterating, but run the complete script after
 API, template, module, installer, asset-plumbing, or netboot changes. A
