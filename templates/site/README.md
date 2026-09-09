@@ -15,13 +15,14 @@ for lab configuration, validation and upstream-update work.
 3. Replace `assets/logo.txt` and add any local NixOS settings under `modules/`.
 4. Generate the public keys under `keys/` and keep all private keys outside
    Git.
-5. Keep `inputs.nixorium.url` pinned to a released tag and record it in the
-   lock file.
+5. Before production deployment, replace the template's `master` input with a
+   released tag and record it in the lock file.
 
 ```sh
 git add .
 nix flake lock
 nix eval .#labMeta --json
+nix eval .#deploymentStatus --json
 nix build .#nixosConfigurations.pc01.config.system.build.toplevel
 ```
 
@@ -116,7 +117,8 @@ nix flake update nixorium
 git diff -- flake.nix flake.lock
 
 nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-link
-nix build .#nixosConfigurations.pc99.config.system.build.toplevel --no-link
+CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
+nix build ".#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-link
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --no-link
 nix build .#installerBundle --no-link
 ```

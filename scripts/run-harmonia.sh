@@ -12,6 +12,7 @@ SECRET_KEY="${REPO_ROOT}/secret-key"
 # shellcheck source=/home/admin/nixorium/scripts/lib/lab-meta.sh
 source "${SCRIPT_DIR}/lib/lab-meta.sh"
 load_lab_meta "${REPO_ROOT}"
+require_deployment_ready "${REPO_ROOT}"
 
 CACHE_PORT="${LAB_CACHE_PORT}"
 

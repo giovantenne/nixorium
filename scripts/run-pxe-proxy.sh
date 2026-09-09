@@ -22,6 +22,7 @@ fi
 # shellcheck source=/home/admin/nixorium/scripts/lib/lab-meta.sh
 source "${SCRIPT_DIR}/lib/lab-meta.sh"
 load_lab_meta "${REPO_ROOT}"
+require_deployment_ready "${REPO_ROOT}"
 
 IFACE="${LAB_IFACE_NAME}"
 MASTER_IP="${LAB_CONTROLLER_DHCP_IP}"

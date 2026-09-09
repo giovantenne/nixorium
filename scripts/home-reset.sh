@@ -10,6 +10,14 @@ SNAPSHOTS_DIR="$1"
 HOME_DIR="$2"
 TEMPLATE_DIR="$3"
 OWNER="$4"
+KEYFILE_DIR=""
+
+cleanup() {
+  if [[ -n "$KEYFILE_DIR" ]]; then
+    rm -rf "$KEYFILE_DIR"
+  fi
+}
+trap cleanup EXIT
 
 # Validate template exists before doing anything destructive
 if [ ! -d "$TEMPLATE_DIR" ]; then
@@ -23,7 +31,7 @@ if [[ "$HOME_DIR" != /home/* ]]; then
   exit 1
 fi
 
-# If something goes wrong between delete and copy, log a critical error
+# If something goes wrong between delete and copy, log a critical error.
 trap 'echo "CRITICAL: home-reset failed, home may be incomplete" >&2' ERR
 
 echo "Starting home reset..."
@@ -51,7 +59,11 @@ if [ -n "$(find "$HOME_DIR" -maxdepth 1 -mindepth 1 -print -quit 2>/dev/null)" ]
 
   # Remove oldest snapshot (5)
   if [ -d "$SNAPSHOTS_DIR/snapshot-5" ]; then
-    btrfs subvolume delete "$SNAPSHOTS_DIR/snapshot-5" 2>/dev/null || rm -rf "$SNAPSHOTS_DIR/snapshot-5"
+    if btrfs subvolume show "$SNAPSHOTS_DIR/snapshot-5" >/dev/null 2>&1; then
+      btrfs subvolume delete "$SNAPSHOTS_DIR/snapshot-5"
+    else
+      rm -rf "$SNAPSHOTS_DIR/snapshot-5"
+    fi
   fi
 
   # Rotate snapshots: 4->5, 3->4, 2->3, 1->2
@@ -64,8 +76,7 @@ if [ -n "$(find "$HOME_DIR" -maxdepth 1 -mindepth 1 -print -quit 2>/dev/null)" ]
 
   # Create new snapshot of current home
   echo "Creating snapshot of current home..."
-  btrfs subvolume snapshot "$HOME_DIR" "$SNAPSHOTS_DIR/snapshot-1" 2>/dev/null || \
-    cp -a "$HOME_DIR" "$SNAPSHOTS_DIR/snapshot-1"
+  btrfs subvolume snapshot "$HOME_DIR" "$SNAPSHOTS_DIR/snapshot-1"
 
   # Make snapshot accessible to admin/teacher (veyon-master group)
   chgrp veyon-master "$SNAPSHOTS_DIR/snapshot-1"
@@ -73,9 +84,18 @@ if [ -n "$(find "$HOME_DIR" -maxdepth 1 -mindepth 1 -print -quit 2>/dev/null)" ]
   chmod -R g+rX "$SNAPSHOTS_DIR/snapshot-1"
 fi
 
-# Clear home directory content (keep the subvolume mount)
+# Clear home directory content while keeping the mounted subvolume itself.
 echo "Clearing home directory..."
-find "$HOME_DIR" -mindepth 1 -delete 2>/dev/null || true
+if ! find "$HOME_DIR" -xdev -mindepth 1 -delete; then
+  echo "Error: could not completely clear '$HOME_DIR'." >&2
+  echo "Nested mounts or Btrfs subvolumes must be removed before login can continue." >&2
+  exit 1
+fi
+
+if [ -n "$(find "$HOME_DIR" -xdev -mindepth 1 -print -quit)" ]; then
+  echo "Error: '$HOME_DIR' is not empty after cleanup; refusing to restore over stale data." >&2
+  exit 1
+fi
 
 # Copy template to home
 echo "Copying template to home..."
@@ -105,6 +125,7 @@ default-zoom-level='small'
 EOF
     dconf compile "$DCONF_DIR/user" "$KEYFILE_DIR"
     rm -rf "$KEYFILE_DIR"
+    KEYFILE_DIR=""
     echo "Wallpaper set to $(basename "$PICK")"
   fi
 fi

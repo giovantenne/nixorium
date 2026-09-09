@@ -1,69 +1,46 @@
 ---
 name: nixorium-maintainer
-description: Maintain or customize the Nixorium upstream and its private deployment Flakes. Use for lab-config.nix, lib.mkLab, NixOS modules, keys, assets, offline netboot, cross-repository updates, validation, or releases. Do not use for unrelated NixOS projects.
+description: Configure, validate, install, update, and operate a private Nixorium laboratory deployment. Use for a deployment Flake that consumes nixorium.lib.mkLab, including lab settings, public keys, assets, local modules, netboot, builds, and Colmena deploys. Do not use for developing or releasing the public Nixorium upstream.
 license: MIT
 ---
 
-# Nixorium Maintainer
+# Nixorium Lab Maintainer
 
-Keep the reusable public upstream and each private lab deployment independently
-updatable. The user's instructions take precedence over this skill.
+Maintain one laboratory through its private deployment Flake while keeping the
+public Nixorium implementation replaceable through a pinned input.
 
-The workflow requires Git and Nix with flakes. Release operations additionally
-require GitHub CLI.
-
-## Start by identifying the repository
+## Identify the deployment
 
 Read the repository `AGENTS.md` completely when it exists, then inspect the
-worktree before changing anything.
+worktree and `flake.lock` before changing anything.
 
-- Treat a repository containing `lib/mk-lab.nix`, `templates/site/`, and
-  `VERSION` as the public upstream.
-- Treat a repository whose Flake consumes `nixorium.lib.mkLab` as a private
-  deployment.
-- If both repositories are involved, inspect both worktrees and their pinned
-  revisions before deciding where a change belongs.
+Use this skill only when the repository consumes `nixorium.lib.mkLab`. When
+the task changes the public API, built-in modules, installer implementation,
+template, CI, or an upstream release, stop and move the work to the public
+upstream repository, whose `nixorium-developer` skill covers that scope.
 
-Read [references/architecture.md](references/architecture.md) before changing
-configuration boundaries, Flake outputs, extension points, assets, keys,
-netboot, or the deployment template.
+## Preserve ownership
 
-## Preserve the boundary
+The deployment owns site identities, network data, password hashes, public
+keys, branding, printers, site packages, and host-specific policy. Add local
+behavior through the existing module extension points; do not copy or edit
+upstream modules and do not merge upstream Git history.
 
-- Put reusable behavior and safe generic defaults in the upstream.
-- Put identities, network data, password hashes, keys, branding, printers,
-  site packages, and host-specific policy in the private deployment.
-- Do not recommend a fork for normal customization. The deployment must pin an
-  upstream release through its Flake input and lock file.
-- Preserve the standalone upstream outputs unless an explicitly approved
-  breaking release removes them.
-- Keep every downstream file referenced by `mkLab` inside the deployment or
-  upstream source tree so the offline installer can package it.
-- Never commit private SSH, Harmonia, or Veyon keys.
+Keep referenced modules, assets, and public keys within the deployment source
+tree so the offline installer can package them. Never commit Harmonia, SSH, or
+Veyon private keys.
 
-## Make changes coherently
+Read [references/configuration.md](references/configuration.md) when changing
+lab settings, keys, assets, or modules. Read
+[references/operations.md](references/operations.md) before netboot,
+installation, deployment, or an upstream-version update.
 
-- Extend existing `mkLab` arguments instead of making downstream users replace
-  upstream modules wholesale.
-- Validate configuration through `lib/eval-lab-config.nix`; reject unknown
-  fields rather than silently ignoring them.
-- When the public API changes, update the site template, both READMEs,
-  `AGENTS.md`, and `CHANGELOG.md` in the same change.
-- In the upstream, keep the copy of this skill under `templates/site/skills/`
-  identical to the root copy, including references and discovery links.
-- Preserve unrelated user changes in dirty worktrees.
+## Work safely
 
-## Validate proportionally
+Preserve unrelated changes. Validate the smallest affected host set plus the
+deployment readiness status. For netboot, asset, or module-plumbing changes,
+also validate the installer bundle and offline equivalence.
 
-Read [references/validation.md](references/validation.md) and run the checks for
-the affected surface. API, template, asset plumbing, or installer changes
-require the fresh-template and offline-equivalence checks, not only an upstream
-host build.
-
-## Release carefully
-
-Read [references/release.md](references/release.md) before changing `VERSION`,
-tagging, publishing a GitHub release, or updating a deployment to a new tag.
-Commits, pushes, tags, GitHub repository changes, releases, deployment, and
-installation are external state changes: perform them only when the user has
-authorized that scope.
+Builds and evaluations are local checks. Installation, Colmena apply, commits,
+pushes, and updates to live services or repositories require explicit user
+authorization.

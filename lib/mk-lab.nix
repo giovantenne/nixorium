@@ -48,6 +48,7 @@ let
 
   inherit (config) masterDhcpIp;
   inherit (config) networkBase;
+  inherit (config) networkPrefixLength;
   inherit (config) pcCount;
   inherit (config) masterHostNumber;
   inherit (config) ifaceName;
@@ -68,14 +69,29 @@ let
   inherit (config) consoleKeyMap;
   inherit (config) veyonNativeHosts;
 
-  masterHostName = "pc${toString masterHostNumber}";
-  masterIp = "${networkBase}.${toString masterHostNumber}";
+  networkOctets = map lib.toInt (lib.splitString "." networkBase);
+  networkAddress =
+    builtins.elemAt networkOctets 0 * 16777216
+      + builtins.elemAt networkOctets 1 * 65536
+      + builtins.elemAt networkOctets 2 * 256
+      + builtins.elemAt networkOctets 3;
+  ipv4FromInt = address:
+    builtins.concatStringsSep "." (map toString [
+      (builtins.div address 16777216)
+      (lib.mod (builtins.div address 65536) 256)
+      (lib.mod (builtins.div address 256) 256)
+      (lib.mod address 256)
+    ]);
+  mkHostIp = number: ipv4FromInt (networkAddress + number);
+  padNumber = n: if n < 10 then "0${toString n}" else toString n;
+  masterHostName = "pc${padNumber masterHostNumber}";
+  masterIp = mkHostIp masterHostNumber;
   cachePort = 5000;
   pxeHttpPort = 8080;
   system = "x86_64-linux";
   pcNumbers = builtins.genList (n: n + 1) pcCount;
   clientNumbers = pcNumbers;
-  padNumber = n: if n < 10 then "0${toString n}" else toString n;
+  clientIps = map mkHostIp clientNumbers;
 
   veyonWaylandOverlay = final: prev: {
     veyon = prev.veyon.overrideAttrs (oldAttrs: {
@@ -108,6 +124,8 @@ let
     inherit masterHostName;
     inherit masterHostNumber;
     inherit networkBase;
+    inherit networkPrefixLength;
+    inherit clientIps;
     inherit pcCount;
     inherit ifaceName;
     inherit teacherUser;
@@ -172,7 +190,7 @@ let
   };
 
   labMeta = {
-    schemaVersion = 1;
+    schemaVersion = 2;
     inherit version;
     controller = {
       name = masterHostName;
@@ -183,6 +201,7 @@ let
     clients.count = pcCount;
     network = {
       base = networkBase;
+      prefixLength = networkPrefixLength;
       inherit ifaceName;
       inherit cachePort;
       inherit pxeHttpPort;
@@ -225,6 +244,18 @@ let
   isModulePath = module: builtins.isPath module || builtins.isString module;
   unknownPublicKeyNames = builtins.attrNames (builtins.removeAttrs publicKeys [ "cache" "ssh" "veyon" ]);
   unknownAssetNames = builtins.attrNames (builtins.removeAttrs assets [ "logo" "backgrounds" "mimeApps" "vscodeSettings" ]);
+  validHostNames = map (n: "pc${padNumber n}") pcNumbers ++ [ masterHostName ];
+  unknownHostModuleNames = builtins.attrNames (builtins.removeAttrs hostModules validHostNames);
+  unknownVeyonNativeHosts = builtins.filter (name: !builtins.elem name validHostNames) veyonNativeHosts;
+  defaultPasswordHash = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
+  deploymentIssues =
+    lib.optional (masterDhcpIp == "MASTER_DHCP_IP") "masterDhcpIp still uses the template placeholder"
+    ++ lib.optional (cachePublicKeyFile == null) "cache public key is missing"
+    ++ lib.optional (adminSshKeyFile == null) "admin SSH public key is missing"
+    ++ lib.optional (veyonPublicKeyFile == null) "Veyon public key is missing"
+    ++ lib.optional (teacherPassword == defaultPasswordHash) "teacherPassword still uses the public default"
+    ++ lib.optional (studentPassword == defaultPasswordHash) "studentPassword still uses the public default"
+    ++ lib.optional (adminPassword == defaultPasswordHash) "adminPassword still uses the public default";
   sourceNixosVersionMetadata =
     if nixpkgs ? rev && nixpkgs ? lastModifiedDate then
       {
@@ -318,7 +349,7 @@ let
   mkHost = n:
     let
       name = "pc${padNumber n}";
-      hostIp = "${networkBase}.${toString n}";
+      hostIp = mkHostIp n;
     in
     {
       inherit name;
@@ -332,7 +363,7 @@ let
   mkColmenaHost = n:
     let
       name = "pc${padNumber n}";
-      hostIp = "${networkBase}.${toString n}";
+      hostIp = mkHostIp n;
     in
     {
       inherit name;
@@ -361,6 +392,13 @@ let
       exec ${upstreamRoot}/scripts/run-pxe-proxy.sh "$@"
     '';
   };
+
+  runDisko = bootstrapPkgs.writeShellApplication {
+    name = "nixorium-disko";
+    text = ''
+      exec ${disko.packages.${system}.default}/bin/disko "$@"
+    '';
+  };
 in
 assert builtins.all isModulePath extensionModules
   || throw "mkLab extension modules must be file paths so they can be included in the offline installer";
@@ -368,6 +406,10 @@ assert unknownPublicKeyNames == []
   || throw "Unknown publicKeys entries: ${builtins.concatStringsSep ", " unknownPublicKeyNames}";
 assert unknownAssetNames == []
   || throw "Unknown assets entries: ${builtins.concatStringsSep ", " unknownAssetNames}";
+assert unknownHostModuleNames == []
+  || throw "hostModules contains unknown hosts: ${builtins.concatStringsSep ", " unknownHostModuleNames}";
+assert unknownVeyonNativeHosts == []
+  || throw "veyonNativeHosts contains unknown hosts: ${builtins.concatStringsSep ", " unknownVeyonNativeHosts}";
 {
   nixosConfigurations = builtins.listToAttrs (map mkHost pcNumbers) // {
     ${masterHostName} = nixpkgs.lib.nixosSystem {
@@ -407,6 +449,11 @@ assert unknownAssetNames == []
 
   inherit labMeta;
 
+  deploymentStatus = {
+    ready = deploymentIssues == [];
+    issues = deploymentIssues;
+  };
+
   colmena = {
     meta = {
       nixpkgs = import nixpkgs {
@@ -421,6 +468,7 @@ assert unknownAssetNames == []
     defaults.deployment = {
       targetUser = "root";
       buildOnTarget = false;
+      sshOptions = [ "-o" "StrictHostKeyChecking=accept-new" ];
     };
     ${masterHostName} = {
       _module.args = specialArgsForHost masterHostName masterIp;
@@ -436,12 +484,22 @@ assert unknownAssetNames == []
     run-harmonia = {
       type = "app";
       program = "${runHarmonia}/bin/nixorium-run-harmonia";
+      meta.description = "Run the laboratory Harmonia binary cache";
     };
     run-pxe-proxy = {
       type = "app";
       program = "${runPxeProxy}/bin/nixorium-run-pxe-proxy";
+      meta.description = "Run the laboratory ProxyDHCP, TFTP, and HTTP services";
+    };
+    disko = {
+      type = "app";
+      program = "${runDisko}/bin/nixorium-disko";
+      meta.description = "Run the Disko revision pinned by this deployment";
     };
   };
 
-  packages.${system}.installerBundle = installerBundle;
+  packages.${system} = {
+    inherit installerBundle;
+    disko = runDisko;
+  };
 }

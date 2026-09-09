@@ -45,6 +45,7 @@ load_lab_meta() {
     LAB_CONTROLLER_DHCP_IP \
     LAB_CLIENT_COUNT \
     LAB_NETWORK_BASE \
+    LAB_NETWORK_PREFIX_LENGTH \
     LAB_IFACE_NAME \
     LAB_CACHE_PORT \
     LAB_PXE_HTTP_PORT \
@@ -59,6 +60,7 @@ load_lab_meta() {
         .controller.dhcpIp,
         (.clients.count | tostring),
         .network.base,
+        (.network.prefixLength | tostring),
         .network.ifaceName,
         (.network.cachePort | tostring),
         (.network.pxeHttpPort | tostring),
@@ -67,7 +69,7 @@ load_lab_meta() {
       ] | @tsv
     ')"
 
-  if [[ "${LAB_META_SCHEMA_VERSION}" != "1" ]]; then
+  if [[ "${LAB_META_SCHEMA_VERSION}" != "2" ]]; then
     echo "Error: unsupported labMeta schema version '${LAB_META_SCHEMA_VERSION}'." >&2
     return 1
   fi
@@ -79,9 +81,35 @@ load_lab_meta() {
   export LAB_CONTROLLER_DHCP_IP
   export LAB_CLIENT_COUNT
   export LAB_NETWORK_BASE
+  export LAB_NETWORK_PREFIX_LENGTH
   export LAB_IFACE_NAME
   export LAB_CACHE_PORT
   export LAB_PXE_HTTP_PORT
   export LAB_STUDENT_USER
   export LAB_TEACHER_USER
+}
+
+require_deployment_ready() {
+  if [[ $# -ne 1 ]]; then
+    echo "Usage: require_deployment_ready <repo-root>" >&2
+    return 1
+  fi
+
+  local REPO_ROOT="$1"
+  local DEPLOYMENT_STATUS_JSON
+
+  DEPLOYMENT_STATUS_JSON=$(
+    nix --extra-experimental-features "nix-command flakes" \
+      eval "${REPO_ROOT}#deploymentStatus" \
+      --json \
+      --no-write-lock-file
+  )
+
+  if [[ "$(printf '%s' "$DEPLOYMENT_STATUS_JSON" | jq -r '.ready')" == "true" ]]; then
+    return 0
+  fi
+
+  echo "Error: the deployment is not ready:" >&2
+  printf '%s' "$DEPLOYMENT_STATUS_JSON" | jq -r '.issues[] | "  - " + .' >&2
+  return 1
 }

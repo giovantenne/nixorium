@@ -1,6 +1,30 @@
 { lib }:
 rawConfig:
 let
+  ipv4Octets = value:
+    let
+      matched = builtins.match "([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)" value;
+    in
+    if matched == null then null else map lib.toInt matched;
+  isIpv4 = value:
+    let
+      octets = ipv4Octets value;
+    in
+    octets != null && builtins.all (octet: octet >= 0 && octet <= 255) octets;
+  ipv4ToInt = value:
+    let
+      octets = ipv4Octets value;
+    in
+    builtins.elemAt octets 0 * 16777216
+      + builtins.elemAt octets 1 * 65536
+      + builtins.elemAt octets 2 * 256
+      + builtins.elemAt octets 3;
+  pow2 = exponent:
+    if exponent == 0 then 1 else 2 * pow2 (exponent - 1);
+  isUserName = value:
+    builtins.match "[a-z_][a-z0-9_-]{0,30}" value != null;
+  isPasswordHash = value:
+    builtins.match "\\$6\\$[^$]+\\$[^$]+" value != null;
   evaluated = lib.evalModules {
     modules = [
       {
@@ -11,7 +35,11 @@ let
           };
           networkBase = lib.mkOption {
             type = lib.types.str;
-            description = "First three octets of the static lab network";
+            description = "IPv4 network address of the static lab network";
+          };
+          networkPrefixLength = lib.mkOption {
+            type = lib.types.ints.between 1 30;
+            description = "CIDR prefix length of the static lab network";
           };
           pcCount = lib.mkOption {
             type = lib.types.ints.between 1 253;
@@ -98,13 +126,36 @@ let
     ];
   };
   config = evaluated.config.lab;
+  networkSize = pow2 (32 - config.networkPrefixLength);
 in
 assert config.masterHostNumber > config.pcCount
   || throw "masterHostNumber (${toString config.masterHostNumber}) must be greater than pcCount (${toString config.pcCount})";
-assert config.masterDhcpIp != ""
-  || throw "masterDhcpIp must not be empty";
-assert config.networkBase != ""
-  || throw "networkBase must not be empty";
-assert config.ifaceName != ""
-  || throw "ifaceName must not be empty";
+assert config.masterDhcpIp == "MASTER_DHCP_IP" || isIpv4 config.masterDhcpIp
+  || throw "masterDhcpIp must be an IPv4 address or the template placeholder MASTER_DHCP_IP";
+assert isIpv4 config.networkBase
+  || throw "networkBase must be an IPv4 network address such as 10.0.0.0";
+assert lib.mod (ipv4ToInt config.networkBase) networkSize == 0
+  || throw "networkBase (${config.networkBase}) is not aligned to /${toString config.networkPrefixLength}";
+assert config.masterHostNumber < networkSize - 1
+  || throw "masterHostNumber (${toString config.masterHostNumber}) does not fit in ${config.networkBase}/${toString config.networkPrefixLength}";
+assert builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" config.ifaceName != null
+  || throw "ifaceName must be a valid Linux interface name of at most 15 characters";
+assert isUserName config.teacherUser
+  || throw "teacherUser must be a valid Unix user name";
+assert isUserName config.studentUser
+  || throw "studentUser must be a valid Unix user name";
+assert config.teacherUser != config.studentUser
+  || throw "teacherUser and studentUser must be different";
+assert !builtins.elem config.teacherUser [ "root" "admin" ]
+  || throw "teacherUser must not be root or admin";
+assert !builtins.elem config.studentUser [ "root" "admin" ]
+  || throw "studentUser must not be root or admin";
+assert isPasswordHash config.teacherPassword
+  || throw "teacherPassword must be a SHA-512 crypt hash beginning with $6$";
+assert isPasswordHash config.studentPassword
+  || throw "studentPassword must be a SHA-512 crypt hash beginning with $6$";
+assert isPasswordHash config.adminPassword
+  || throw "adminPassword must be a SHA-512 crypt hash beginning with $6$";
+assert builtins.match "https?://.+" config.homepageUrl != null
+  || throw "homepageUrl must use http:// or https://";
 config

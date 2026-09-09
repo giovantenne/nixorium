@@ -92,6 +92,7 @@ in
   systemd.services.home-reset = {
     description = "Reset ${labSettings.studentUser} home directory from template";
     wantedBy = [ "multi-user.target" ];
+    requiredBy = [ "display-manager.service" ];
     before = [ "display-manager.service" ];
     after = [ "local-fs.target" ];
     unitConfig = {

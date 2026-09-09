@@ -216,6 +216,13 @@ curl -fsSL "$INSTALLER_URL" -o "$TEMP_INSTALLER"
   cd "$TEMP_DEPLOYMENT"
   nix --extra-experimental-features "nix-command flakes" \
     flake init -t "${UPSTREAM_REF}#site"
+  sed -i \
+    's|inputs\.nixorium\.url = "github:giovantenne/nixorium/[^"]*";|inputs.nixorium.url = "'"${UPSTREAM_REF}"'";|' \
+    flake.nix
+  if ! grep -Fxq "  inputs.nixorium.url = \"${UPSTREAM_REF}\";" flake.nix; then
+    echo "Error: could not pin the generated deployment to ${UPSTREAM_REF}." >&2
+    exit 1
+  fi
   "${GIT_COMMAND[@]}" init -b master
   "${GIT_COMMAND[@]}" add .
   nix --extra-experimental-features "nix-command flakes" flake lock

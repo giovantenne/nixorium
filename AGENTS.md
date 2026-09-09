@@ -1,9 +1,10 @@
 # AGENTS.md
 
-For maintenance, customization, offline-installer, cross-repository, and
-release work, use the repository skill at
-`skills/nixorium-maintainer/SKILL.md`. Discovery links for Codex, OpenCode,
-Claude Code, and Pi are versioned with the repository.
+For public API, built-in module, installer, CI, template, and release work, use
+`skills/nixorium-developer/SKILL.md`. The separate
+`skills/nixorium-maintainer/SKILL.md` is dedicated to operating private lab
+deployments and is the only skill copied into the site template. Discovery
+links for Codex, OpenCode, Claude Code, and Pi are versioned with the repository.
 
 Nixorium manages a multi-PC NixOS lab using Nix Flakes,
 Disko, and Colmena. A controller PC deploys to student workstations
@@ -18,7 +19,8 @@ repository generated from `templates/site`.
 ## Project Structure
 
 ```
-.github/workflows/release.yml # Validates tags and publishes GitHub Releases
+.github/workflows/validate.yml # Builds representative roles and checks offline equivalence
+.github/workflows/release.yml # Revalidates tags and publishes GitHub Releases
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
 flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
@@ -35,7 +37,13 @@ setup.sh                   # Installer script for PXE-booted client PCs
 pkgs/
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
 modules/
-  common.nix               # Shared system config (GNOME, packages, shells, locale, services)
+  common.nix               # Composition point and shared system defaults
+  desktop.nix              # GNOME, locale, fonts and desktop policy
+  packages.nix             # Shared package set
+  power.nix                # Idle and controller sleep policy
+  screensaver.nix          # Screensaver files and user service
+  shell.nix                # Shell, prompt, Git and editor tooling
+  ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
   users.nix                # User accounts (admin + teacher + student, veyon-master group)
@@ -56,13 +64,15 @@ scripts/
   cmd-screensaver.sh       # TTE screensaver animation loop
   launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
   screensaver-monitor.sh   # GNOME idle watcher for screensaver
+  validate.sh              # Full upstream validation matrix
 assets/
   backgrounds/             # Ristretto wallpapers (random at each home-reset)
   logo.txt                 # ASCII art for screensaver
   mimeapps.list            # Default browser = Chromium
   vscode-settings.json     # VS Code defaults
 templates/site/            # Private deployment repository template
-skills/nixorium-maintainer/ # Cross-agent maintenance and release workflow
+skills/nixorium-developer/ # Public upstream development and release workflow
+skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 ```
 
 Generated locally during setup and committed in the private deployment repo:
@@ -97,8 +107,10 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
 ```
 
-There are **no tests, linters, or formatters** configured in this repository.
-To validate changes, build the affected host configuration (`nix build`).
+`nix flake check` runs the configuration-schema tests. The `Validate` workflow
+and `scripts/validate.sh` build representative hosts and netboot, generate a
+fresh deployment, and verify offline installer equivalence. There is no
+automatic formatter; follow the styles below and run `git diff --check`.
 
 ## Releases
 
@@ -113,11 +125,11 @@ Release from the matching changelog section.
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
 - Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
-- Hostname + static IP are centralized in `lib/mk-lab.nix` (derived from `networkBase` + host number) and applied in `modules/networking.nix`. Each PC gets both a DHCP address and a static address on the same interface.
-- The controller has two relevant IPs: `masterIp` (static, `networkBase.masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, `masterDhcpIp` in `lab-config.nix` must be updated and netboot artifacts rebuilt before the next PXE session.
+- Hostname + static IP are centralized in `lib/mk-lab.nix`. `networkBase` is a full IPv4 network address and `networkPrefixLength` its CIDR prefix; host numbers are validated offsets. Each PC gets both a DHCP address and a static address on the same interface.
+- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, `masterDhcpIp` in `lab-config.nix` must be updated and netboot artifacts rebuilt before the next PXE session.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
-- `labMeta` is a public flake output containing the small set of non-sensitive operational values that shell scripts need (controller IPs, iface name, client count, ports, usernames). Scripts must consume this output instead of parsing Nix source files textually.
+- `labMeta` is a public flake output containing the small set of non-sensitive operational values that shell scripts need (controller IPs, network prefix, iface name, client count, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-config.nix` uses a private `lib.evalModules` schema to type-check site data. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
@@ -128,7 +140,8 @@ Release from the matching changelog section.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
 - Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. `labSettings.veyonNativeHosts` selects the Veyon 4.11 native PipeWire backend per host; other hosts use the GNOME Remote Desktop fallback on port 5900. The private key is not managed by Nix (see Security).
 - The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
-- The `gnome-user-setup.sh` script is generated inline in `modules/common.nix` (not a standalone file) to use parameterized user names from `labSettings`.
+- `modules/common.nix` is only the composition point for focused desktop, package, power, screensaver, shell, and SSH modules.
+- The `gnome-user-setup.sh` script is generated inline in `modules/desktop.nix` to use parameterized user names from `labSettings`.
 
 ## Nix Code Style
 
@@ -231,8 +244,9 @@ set -euo pipefail
 
 ## Host Configuration
 
-Hostname + static IP are generated in `lib/mk-lab.nix`. The shared interface name
-is configured via `labSettings.ifaceName` and applied in `modules/networking.nix`.
+Hostname + static IP are generated in `lib/mk-lab.nix` from the IPv4 network,
+CIDR prefix, and host offset. The shared interface name is configured via
+`labSettings.ifaceName` and applied in `modules/networking.nix`.
 
 All user-configurable parameters live in the deployment `lab-config.nix`.
 Additional behavior belongs in downstream extension modules, never in copies of upstream modules.

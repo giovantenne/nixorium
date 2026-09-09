@@ -13,5 +13,6 @@ customization, validation, upstream-update, and offline-installer work.
 - Keep referenced modules, keys, and assets inside this source tree so they
   are included in the offline installer.
 - Never commit `secret-key`, `admin-ssh`, or `veyon-private-key.pem`.
-- Validate at least `labMeta`, the affected host roles, and the netboot ramdisk
-  before deployment. Deployment requires explicit authorization.
+- Require `deploymentStatus.ready` before installation or deployment. Validate
+  `labMeta`, the affected host roles, and the netboot ramdisk first. Deployment
+  requires explicit authorization.
