@@ -31,7 +31,8 @@ test -e .claude/skills/nixorium-developer/SKILL.md
 test -e .pi/skills/nixorium-developer/SKILL.md
 
 if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
-  nix flake check "path:${REPO_ROOT}" --no-build --no-write-lock-file
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.config-schema.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
 else
   nix flake check "path:${REPO_ROOT}" --no-write-lock-file
 fi
@@ -40,7 +41,17 @@ nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file >/dev/null
 
 CONTROLLER_NAME=$(nix eval "path:${REPO_ROOT}#labMeta.controller.name" --raw --no-write-lock-file)
 
-if [[ "${VALIDATION_MODE}" == "full" ]]; then
+if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+  nix eval "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.disko.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.installerBundle.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-harmonia.program" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-pxe-proxy.program" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#colmena.pc01.deployment.targetHost" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#deploymentStatus" --json --no-write-lock-file >/dev/null
+else
   nix build "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel" --no-write-lock-file --no-link
   nix build "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-write-lock-file --no-link
   nix build "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" --no-write-lock-file --no-link
