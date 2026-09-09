@@ -15,8 +15,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate hosts and offline installer
+    name: Evaluate source and deployment template
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -26,5 +27,5 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run validation matrix
-        run: ./scripts/validate.sh
+      - name: Run evaluation checks
+        run: ./scripts/validate.sh --ci

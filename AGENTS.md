@@ -19,8 +19,8 @@ repository generated from `templates/site`.
 ## Project Structure
 
 ```
-.github/workflows/validate.yml # Builds representative roles and checks offline equivalence
-.github/workflows/release.yml # Revalidates tags and publishes GitHub Releases
+.github/workflows/validate.yml # Evaluation-only CI for source and deployment template
+.github/workflows/release.yml # Revalidates release metadata and publishes GitHub Releases
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
 flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
@@ -107,10 +107,12 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
 ```
 
-`nix flake check` runs the configuration-schema tests. The `Validate` workflow
-and `scripts/validate.sh` build representative hosts and netboot, generate a
-fresh deployment, and verify offline installer equivalence. There is no
-automatic formatter; follow the styles below and run `git diff --check`.
+`nix flake check` runs the configuration-schema tests. GitHub CI runs
+`scripts/validate.sh --ci`, which performs syntax, Flake, and fresh-template
+evaluations without building system closures. The default `scripts/validate.sh`
+remains the required local full matrix: it builds representative hosts,
+netboot, Disko, and installer bundles and verifies offline equivalence. There
+is no automatic formatter; follow the styles below and run `git diff --check`.
 
 ## Releases
 

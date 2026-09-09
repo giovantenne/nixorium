@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -gt 0 ]]; then
-  echo "Usage: ./scripts/validate.sh" >&2
+if [[ $# -gt 1 ]] || [[ $# -eq 1 && "$1" != "--ci" ]]; then
+  echo "Usage: ./scripts/validate.sh [--ci]" >&2
   exit 1
 fi
 
+VALIDATION_MODE="${1:-full}"
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEMP_DIR=$(mktemp -d)
 SITE_DIR="${TEMP_DIR}/site"
@@ -28,16 +29,24 @@ diff -qr skills/nixorium-maintainer templates/site/skills/nixorium-maintainer
 test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md
 test -e .pi/skills/nixorium-developer/SKILL.md
-nix flake check "path:${REPO_ROOT}" --no-write-lock-file
+
+if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+  nix flake check "path:${REPO_ROOT}" --no-build --no-write-lock-file
+else
+  nix flake check "path:${REPO_ROOT}" --no-write-lock-file
+fi
+
 nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file >/dev/null
 
 CONTROLLER_NAME=$(nix eval "path:${REPO_ROOT}#labMeta.controller.name" --raw --no-write-lock-file)
 
-nix build "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel" --no-write-lock-file --no-link
-nix build "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-write-lock-file --no-link
-nix build "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" --no-write-lock-file --no-link
-nix build "path:${REPO_ROOT}#disko" --no-write-lock-file --no-link
-nix build "path:${REPO_ROOT}#installerBundle" --no-write-lock-file --no-link
+if [[ "${VALIDATION_MODE}" == "full" ]]; then
+  nix build "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel" --no-write-lock-file --no-link
+  nix build "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-write-lock-file --no-link
+  nix build "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" --no-write-lock-file --no-link
+  nix build "path:${REPO_ROOT}#disko" --no-write-lock-file --no-link
+  nix build "path:${REPO_ROOT}#installerBundle" --no-write-lock-file --no-link
+fi
 
 (
   cd "$SITE_DIR"
@@ -63,6 +72,14 @@ DIRECT_CLIENT_DRV=$(
     --raw \
     --no-write-lock-file
 )
+
+if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+  nix eval "path:${SITE_DIR}#installerBundle.drvPath" \
+    --raw \
+    --no-write-lock-file >/dev/null
+  echo "CI evaluation completed successfully."
+  exit 0
+fi
 
 nix build "path:${SITE_DIR}#installerBundle" \
   --no-write-lock-file \

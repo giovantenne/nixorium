@@ -20,8 +20,10 @@ Before release:
 7. Run `./scripts/release.sh <version>` only with explicit authorization.
 8. Verify the GitHub workflow and published release.
 
-The release workflow repeats the full validation matrix and rejects a tag when
-`VERSION`, `DEFAULT_RELEASE`, or the changelog section does not match.
+The release workflow repeats evaluation-only checks and rejects a tag when
+`VERSION`, `DEFAULT_RELEASE`, or the changelog section does not match. It does
+not repeat system builds: the full local validation in step 5 is the release
+build gate.
 Use only the annotated tag created by `scripts/release.sh`; never create, move,
 replace, or push tags as an implicit part of implementation work. If publishing
 fails after the tag is pushed, inspect the tag and workflow before retrying.

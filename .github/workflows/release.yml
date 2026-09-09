@@ -25,8 +25,8 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate release source
-        run: ./scripts/validate.sh
+      - name: Evaluate release source
+        run: ./scripts/validate.sh --ci
 
       - name: Validate release metadata
         shell: bash

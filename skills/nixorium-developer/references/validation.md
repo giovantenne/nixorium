@@ -13,6 +13,18 @@ It checks shell syntax and Git whitespace, runs Flake checks, builds a client,
 the controller, netboot ramdisk, and installer bundle, generates a fresh site
 deployment, and verifies offline derivation equivalence.
 
+GitHub Actions must use the evaluation-only mode:
+
+```sh
+./scripts/validate.sh --ci
+```
+
+This mode checks syntax and skill distribution, evaluates every Flake output,
+generates and evaluates a fresh deployment, and evaluates its installer bundle
+without building system closures. Keep the full matrix off GitHub-hosted
+runners; it is a local prerequisite for changes that affect builds and for
+release preparation.
+
 Run narrower evaluations while iterating, but run the complete script after
 API, template, module, installer, asset-plumbing, or netboot changes. A
 successful evaluation does not prove that source patches compile, so affected
