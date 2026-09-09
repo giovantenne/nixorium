@@ -25,8 +25,9 @@ Colmena metadata, and deployment status. It also generates and evaluates a
 fresh deployment and its installer bundle without building system closures.
 It intentionally skips the other generated clients because they share the
 same module graph and their address generation is covered by `mk-lab` tests.
-Keep the full matrix off GitHub-hosted runners; it is a local prerequisite for
-changes that affect builds and for release preparation.
+The CI mode disables import-from-derivation so evaluation cannot trigger hidden
+builds. Keep the full matrix off GitHub-hosted runners; it is a local
+prerequisite for changes that affect builds and for release preparation.
 
 Run narrower evaluations while iterating, but run the complete script after
 API, template, module, installer, asset-plumbing, or netboot changes. A

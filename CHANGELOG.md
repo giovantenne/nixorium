@@ -21,6 +21,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   separate upstream-only `nixorium-developer` skill.
 - Made the development-branch site template consume `master`; release
   preparation replaces it with the matching immutable tag.
+- Moved Veyon network-object encoding from module evaluation into the
+  `Veyon.conf` build and made CI reject import-from-derivation.
 
 ### Added
 

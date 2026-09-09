@@ -44,3 +44,8 @@ Keep the small `common.nix` module as the composition point. Desktop policy,
 packages, power behavior, screensaver, shell configuration, and SSH policy
 belong in separate modules. Site-specific removal or policy should use
 downstream overrides or the smallest new generic extension point.
+
+Keep module evaluation free of import-from-derivation. In particular,
+`Veyon.conf` must encode its generated network objects inside its build-time
+derivation and be installed through `environment.etc.<name>.source`; never read
+that derivation with `builtins.readFile` during evaluation.

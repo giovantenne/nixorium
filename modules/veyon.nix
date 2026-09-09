@@ -73,13 +73,16 @@ let
   };
 
   networkObjectsJson = builtins.toJSON networkObjects;
+  networkObjectsJsonFile = pkgs.writeText "veyon-network-objects.json" networkObjectsJson;
 
-  networkObjectsBase64 = builtins.readFile (pkgs.runCommand "veyon-network-objects" {} ''
-    printf '%s' ${lib.escapeShellArg networkObjectsJson} | ${pkgs.coreutils}/bin/base64 -w0 > $out
-  '');
+  # Generate the encoded network objects during the system build, not while
+  # evaluating the NixOS module.
+  veyonConfFile = pkgs.runCommand "Veyon.conf" {
+    NETWORK_OBJECTS_JSON_FILE = networkObjectsJsonFile;
+  } ''
+    NETWORK_OBJECTS_BASE64="$(${pkgs.coreutils}/bin/base64 -w0 < "$NETWORK_OBJECTS_JSON_FILE")"
 
-  # Veyon configuration (deployed as /etc/xdg/Veyon Solutions/Veyon.conf).
-  veyonConf = ''
+    ${pkgs.coreutils}/bin/cat > "$out" <<EOF
     [Authentication]
     Method=1
 
@@ -88,7 +91,7 @@ let
     PrivateKeyBaseDir=${privateKeyBaseDir}
 
     [BuiltinDirectory]
-    NetworkObjects="@@JsonValue(${networkObjectsBase64})"
+    NetworkObjects="@@JsonValue($NETWORK_OBJECTS_BASE64)"
 
     [Network]
     PrimaryServicePort=11100
@@ -111,6 +114,7 @@ let
       ServerPort=5900
       Password=${vncPasswordEncrypted}
     ''}
+    EOF
   '';
 in
 {
@@ -125,7 +129,7 @@ in
 
   # Deploy Veyon configuration
   environment.etc."xdg/Veyon Solutions/Veyon.conf" = {
-    text = veyonConf;
+    source = veyonConfFile;
     mode = "0644";
   };
 
