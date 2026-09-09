@@ -30,6 +30,12 @@ if [[ "${INSTALLER_RELEASE}" != "${TAG}" ]]; then
   exit 1
 fi
 
+TEMPLATE_RELEASE="$(sed -n 's/^  inputs\.nixorium\.url = "github:giovantenne\/nixorium\/\([^"]*\)";$/\1/p' templates/site/flake.nix)"
+if [[ "${TEMPLATE_RELEASE}" != "${TAG}" ]]; then
+  echo "Error: the site template pins '${TEMPLATE_RELEASE}', expected '${TAG}'." >&2
+  exit 1
+fi
+
 if ! grep -Eq "^## \\[${VERSION//./\\.}\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" CHANGELOG.md; then
   echo "Error: CHANGELOG.md has no dated section for ${VERSION}." >&2
   exit 1

@@ -18,7 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate release source
+        run: ./scripts/validate.sh
 
       - name: Validate release metadata
         shell: bash
@@ -35,6 +43,18 @@ jobs:
 
           if [[ "${TAG}" != "v${VERSION}" ]]; then
             echo "Tag ${TAG} does not match VERSION (${VERSION})." >&2
+            exit 1
+          fi
+
+          INSTALLER_RELEASE="$(sed -n 's/^DEFAULT_RELEASE="\(v[^\"]*\)"$/\1/p' install.sh)"
+          if [[ "${INSTALLER_RELEASE}" != "${TAG}" ]]; then
+            echo "install.sh defaults to ${INSTALLER_RELEASE}, expected ${TAG}." >&2
+            exit 1
+          fi
+
+          TEMPLATE_RELEASE="$(sed -n 's/^  inputs\.nixorium\.url = "github:giovantenne\/nixorium\/\([^"]*\)";$/\1/p' templates/site/flake.nix)"
+          if [[ "${TEMPLATE_RELEASE}" != "${TAG}" ]]; then
+            echo "Site template pins ${TEMPLATE_RELEASE}, expected ${TAG}." >&2
             exit 1
           fi
 

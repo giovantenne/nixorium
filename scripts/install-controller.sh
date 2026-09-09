@@ -140,8 +140,9 @@ cat > "$TEMP_DISKO_FILE" <<EOF
 }
 EOF
 
-echo "Partitioning disk..."
-sudo nix --extra-experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko "$TEMP_DISKO_FILE"
+echo "Partitioning disk with the Disko revision pinned by the deployment..."
+sudo nix --extra-experimental-features "nix-command flakes" \
+  run "${FLAKE_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE"
 
 echo "Installing NixOS for the controller..."
 sudo nixos-install --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" --no-write-lock-file --no-root-passwd

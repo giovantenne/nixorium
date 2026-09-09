@@ -1,7 +1,7 @@
 {
   description = "Private Nixorium deployment";
 
-  inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.3";
+  inputs.nixorium.url = "github:giovantenne/nixorium/master";
 
   outputs = { self, nixorium }:
     nixorium.lib.mkLab {

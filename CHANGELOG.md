@@ -10,12 +10,42 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 - Documented the complete per-host customization workflow in both READMEs and
   in the Nixorium maintainer skill.
+- Made `networkBase` a full IPv4 network address and added a configurable CIDR
+  prefix, with static addresses calculated from validated host offsets.
+- Split the former monolithic `common.nix` into focused desktop, package,
+  power, screensaver, shell, and SSH modules.
+- Made student-home reset fail closed when snapshots or cleanup are incomplete,
+  and made display-manager startup require a successful reset.
+- Replaced README parsing of Nix source with stable `labMeta` evaluations.
+- Dedicated `nixorium-maintainer` to private laboratory operations and added a
+  separate upstream-only `nixorium-developer` skill.
+- Made the development-branch site template consume `master`; release
+  preparation replaces it with the matching immutable tag.
 
 ### Added
 
 - An interactive controller-bootstrap version selector offering `master`, the
   latest GitHub prerelease, and published stable releases while preserving
   `--release` and `NIXORIUM_RELEASE` for unattended installations.
+- Semantic validation for IPv4 networks, CIDR capacity, interfaces, users,
+  password hashes, URLs, per-host modules, and Veyon pilot hosts.
+- A `deploymentStatus` output for placeholders, missing public keys, and public
+  default password hashes.
+- Configuration-schema tests and continuous validation of representative
+  hosts, netboot, fresh templates, and offline installer equivalence.
+
+### Security
+
+- The controller bootstrap now runs the Disko revision pinned by the generated
+  deployment instead of fetching a mutable upstream revision.
+- SSH now records keys on first connection and rejects later key changes;
+  Colmena uses the same `accept-new` policy.
+
+### Breaking
+
+- Deployment configurations must change `networkBase` from three octets such
+  as `10.0.0` to a full network address such as `10.0.0.0` and add
+  `networkPrefixLength`. The configuration and `labMeta` schema version is 2.
 
 ## [2.0.0-beta.3] - 2026-09-08
 

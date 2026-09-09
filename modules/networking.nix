@@ -7,7 +7,7 @@
       ipv4.addresses = [
         {
           address = hostIp;
-          prefixLength = 24;
+          prefixLength = labSettings.networkPrefixLength;
         }
       ];
     };

@@ -1,6 +1,7 @@
 {
   masterDhcpIp = "MASTER_DHCP_IP";
-  networkBase = "10.0.0";
+  networkBase = "10.0.0.0";
+  networkPrefixLength = 24;
   pcCount = 20;
   masterHostNumber = 99;
   ifaceName = "enp0s3";

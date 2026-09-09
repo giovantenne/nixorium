@@ -17,7 +17,7 @@
   #      fetches kernel and initrd over HTTP from this address.
   #
   # After all clients are installed, day-to-day Colmena deploys use the
-  # static IP (networkBase.masterHostNumber) instead, so a DHCP address
+  # static IP derived from networkBase + masterHostNumber instead, so a DHCP address
   # change does NOT affect ongoing updates -- only new PXE installs.
   #
   # If the DHCP address changes after netboot artifacts have been built,
@@ -28,11 +28,13 @@
   #
   # Find it with: ip -4 addr show dev <ifaceName>
   masterDhcpIp = "MASTER_DHCP_IP";
-  # Static IP network base (each PC gets networkBase.N)
-  networkBase = "10.0.0";
+  # Static IPv4 network address and prefix. Host numbers are added to this
+  # address, so pc01 gets 10.0.0.1 and the default controller gets 10.0.0.99.
+  networkBase = "10.0.0.0";
+  networkPrefixLength = 24;
   # Number of student PCs
   pcCount = 20;
-  # Controller host number (gets networkBase.N as its static IP)
+  # Controller host number within the configured static network
   masterHostNumber = 99;
   # Shared network interface name on lab PCs
   ifaceName = "enp0s3";

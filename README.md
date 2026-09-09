@@ -150,7 +150,8 @@ Edit `lab-config.nix` with your lab's settings:
 ```nix
 # ── Network ────────────────────────────────────────────────────
 masterDhcpIp = "MASTER_DHCP_IP";   # DHCP address of controller (from ip -4 addr)
-networkBase = "10.0.0";             # First 3 octets of static lab subnet
+networkBase = "10.0.0.0";           # Static IPv4 network address
+networkPrefixLength = 24;            # CIDR prefix for the static network
 pcCount = 20;                       # Number of student PCs
 masterHostNumber = 99;              # Controller PC number
 ifaceName = "enp0s3";               # Network interface name (from ip -4 addr)
@@ -231,7 +232,8 @@ Before starting PXE, temporarily remove the controller's static lab IP from the 
 
 ```sh
 # Rebuild the controller with your real config
-sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
+CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
+sudo nixos-rebuild switch --flake ".#${CONTROLLER_NAME}" --no-write-lock-file
 
 # Build netboot artifacts
 nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
@@ -243,7 +245,7 @@ nix build nixpkgs#ipxe --out-link result-ipxe-bin
 install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
 
 # Pre-build all client closures
-PC_COUNT=$(awk '/pcCount =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
+PC_COUNT=$(nix eval .#labMeta.clients.count --json --no-write-lock-file)
 TARGETS=()
 for i in $(seq 1 "$PC_COUNT"); do
   TARGETS+=(".#nixosConfigurations.pc$(printf "%02d" "$i").config.system.build.toplevel")
@@ -251,9 +253,10 @@ done
 nix build "${TARGETS[@]}"
 
 # Temporarily remove the lab static IP so netboot uses masterDhcpIp only
-STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' lab-config.nix).$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
-sudo ip addr del "${STATIC_IP}/24" dev "${IFACE}"
+STATIC_IP=$(nix eval .#labMeta.controller.staticIp --raw --no-write-lock-file)
+PREFIX_LENGTH=$(nix eval .#labMeta.network.prefixLength --json --no-write-lock-file)
+IFACE=$(nix eval .#labMeta.network.ifaceName --raw --no-write-lock-file)
+sudo ip addr del "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
 ```
 
 ### 6. Start netboot services
@@ -286,9 +289,10 @@ Where `XX` is the PC number (e.g., `/installer/setup.sh 5` for `pc05`).
 
 When all clients are installed, restore the controller's static lab IP so Colmena can reach the lab subnet again (or just reboot it):
 ```sh
-STATIC_IP=$(awk -F'"' '/networkBase =/ { print $2; exit }' lab-config.nix).$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print; exit }' lab-config.nix)
-IFACE=$(awk -F'"' '/ifaceName =/ { print $2; exit }' lab-config.nix)
-sudo ip addr add "${STATIC_IP}/24" dev "${IFACE}"
+STATIC_IP=$(nix eval .#labMeta.controller.staticIp --raw --no-write-lock-file)
+PREFIX_LENGTH=$(nix eval .#labMeta.network.prefixLength --json --no-write-lock-file)
+IFACE=$(nix eval .#labMeta.network.ifaceName --raw --no-write-lock-file)
+sudo ip addr add "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
 ```
 
 ---
@@ -329,7 +333,8 @@ ramdisk and the offline installer bundle:
 
 ```sh
 nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-link
-nix build .#nixosConfigurations.pc99.config.system.build.toplevel --no-link
+CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
+nix build ".#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-link
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --no-link
 nix build .#installerBundle --no-link
 ```
@@ -358,8 +363,9 @@ To prepare a release:
 
 1. Update `VERSION` according to SemVer.
 2. Move the relevant entries from `Unreleased` to a dated section in `CHANGELOG.md`.
-3. Update the stable release number in this README when appropriate.
-4. Build an affected host configuration and commit the release metadata.
+3. Update `DEFAULT_RELEASE` in `install.sh`, the tag in
+   `templates/site/flake.nix`, and release examples when appropriate.
+4. Run `./scripts/validate.sh` and commit the release metadata.
 5. Push `master`, then publish the tag:
 
 ```sh
@@ -378,7 +384,8 @@ nix eval .#labMeta.version --raw
 
 First apply the latest configuration on the controller itself:
 ```sh
-sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
+CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
+sudo nixos-rebuild switch --flake ".#${CONTROLLER_NAME}" --no-write-lock-file
 ```
 
 Then start the binary cache:
@@ -402,7 +409,8 @@ Use `nixos-rebuild` only on the machine you are rebuilding.
 
 Rebuild the controller locally:
 ```sh
-sudo nixos-rebuild switch --flake .#$(awk '/masterHostNumber =/ { gsub(/[^0-9]/, ""); print "pc" $0; exit }' lab-config.nix) --no-write-lock-file
+CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
+sudo nixos-rebuild switch --flake ".#${CONTROLLER_NAME}" --no-write-lock-file
 ```
 
 For client PCs, prefer Colmena from the controller. Only run `sudo nixos-rebuild switch --flake /path/to/nixorium-deployment#pc05 --no-write-lock-file` after logging into `pc05` itself (or after cloning the deployment there).
@@ -556,13 +564,12 @@ colmena apply --on pc05
 Changes that are useful to every deployment belong in this upstream. Changes
 that identify or specialize one school belong in its private repository.
 
-### Agent skill
+### Agent skills
 
-The repository includes the `nixorium-maintainer` Agent Skill for maintenance,
-customization, validation, cross-repository updates and releases. It is exposed
-through repository-local discovery paths for Codex, OpenCode, Claude Code and
-Pi; new deployment repositories created from the `site` template include the
-same skill automatically.
+The upstream includes two separate Agent Skills. `nixorium-developer` covers
+the public API, built-in modules, installer, CI and releases.
+`nixorium-maintainer` covers configuration and operation of one private lab.
+Only the lab-maintenance skill is copied into new deployment repositories.
 
 ### Deployment Flake API
 
@@ -581,8 +588,10 @@ same skill automatically.
 | `netbootModules` | Additional modules applied to the PXE system |
 
 The site template demonstrates every commonly needed argument. Configuration
-fields are type-checked, and unknown fields fail evaluation instead of being
-silently ignored. Files referenced by `publicKeys`, `assets` and module lists
+fields are validated, and unknown settings, host names and asset names fail
+evaluation instead of being silently ignored. `deploymentStatus` reports
+remaining placeholders, missing public keys and unchanged default passwords.
+Files referenced by `publicKeys`, `assets` and module lists
 must live in the deployment repository (or in this upstream), because `mkLab`
 packages those source trees into the offline PXE installer.
 
@@ -591,7 +600,8 @@ packages those source trees into the offline PXE installer.
 ## 📁 Project structure
 
 ```
-.github/workflows/release.yml # Validates tags and publishes GitHub Releases
+.github/workflows/validate.yml # Builds hosts and verifies the offline bundle
+.github/workflows/release.yml # Revalidates tags and publishes GitHub Releases
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Entry point: host generation, Colmena config, labMeta export
 flake.lock                 # Pinned inputs (nixpkgs, Disko, Veyon)
@@ -608,7 +618,13 @@ setup.sh                   # Client PC installer (runs on PXE-booted machines)
 pkgs/
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
 modules/
-  common.nix               # GNOME desktop, packages, shells, locale, services
+  common.nix               # Composition and shared system defaults
+  desktop.nix              # GNOME, locale, fonts and desktop policy
+  packages.nix             # Shared package set
+  power.nix                # Idle and controller sleep policy
+  screensaver.nix          # Screensaver files and user service
+  shell.nix                # Shell, prompt, Git and editor tooling
+  ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection
   networking.nix           # Hostname + static IP per host
   users.nix                # User accounts and autologin
@@ -629,13 +645,15 @@ scripts/
   screensaver-monitor.sh   # GNOME idle watcher for screensaver
   create-home-template.sh  # Home directory template builder
   home-reset.sh            # Boot-time snapshot rotation + home reset
+  validate.sh              # Full upstream validation matrix
 assets/
   backgrounds/             # Wallpapers (randomly selected at home reset)
   logo.txt                 # ASCII art for screensaver
   mimeapps.list            # Default applications
   vscode-settings.json     # VS Code defaults
 templates/site/            # Scaffold for a private deployment repository
-skills/nixorium-maintainer/ # Cross-agent maintenance and release workflow
+skills/nixorium-developer/ # Public upstream development and release workflow
+skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 ```
 
 The root configuration keeps the historical standalone deployment working.
@@ -649,6 +667,7 @@ the private deployment repository.
 - Keep the deployment repository private because password hashes and network topology are still sensitive operational data
 - Passwords are SHA-512 hashed; never store plaintext
 - SSH password authentication is disabled; key-based only
+- SSH host keys are recorded on first connection and checked thereafter
 - `users.mutableUsers = false` enforces declarative user management
 - Docker is rootless and no normal user belongs to the root-equivalent `docker` group
 - The Veyon private key is readable only by the `veyon-master` group

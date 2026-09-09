@@ -15,6 +15,10 @@
 
   outputs = { self, nixpkgs, disko, veyon }:
     let
+      system = "x86_64-linux";
+      pkgs = import nixpkgs {
+        inherit system;
+      };
       mkLab = import ./lib/mk-lab.nix {
         upstreamSelf = self;
         inherit nixpkgs;
@@ -30,11 +34,27 @@
           veyon = ./veyon-public-key.pem;
         };
       };
+      configSchemaTest = import ./tests/eval-lab-config.nix {
+        inherit (nixpkgs) lib;
+      };
+      mkLabTest = import ./tests/mk-lab.nix {
+        inherit mkLab;
+        deploymentSelf = self;
+        labConfig = import ./lab-config.nix;
+      };
     in
     defaultLab // {
       lib = {
         inherit mkLab;
-        configSchemaVersion = 1;
+        configSchemaVersion = 2;
+      };
+      checks.${system} = {
+        config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
+          touch "$out"
+        '';
+        mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
+          touch "$out"
+        '';
       };
       templates.site = {
         path = ./templates/site;

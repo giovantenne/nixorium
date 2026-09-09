@@ -64,7 +64,7 @@ let
         Uid = locationUid;
       }
     ] ++ map (n: {
-      HostAddress = "${labSettings.networkBase}.${toString n}";
+      HostAddress = builtins.elemAt labSettings.clientIps (n - 1);
       Name = "pc${padNumber n}";
       ParentUid = locationUid;
       Type = 3;
