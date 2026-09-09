@@ -52,17 +52,19 @@ authorization; if rewriting an authorized private branch, use
 
 ## GitHub CI
 
-`.github/workflows/validate.yml` runs for pull requests and pushes to `master`.
-After pushing or merging, verify that the intended commit is reachable from
-the remote target branch and monitor its GitHub Actions run to completion. A
-green local validation does not replace the required remote result. If CI
-fails, inspect the failing job and logs, fix forward in a new commit, validate,
-and push again; do not rewrite `master` to hide the failed commit.
+`.github/workflows/validate.yml` runs evaluation-only checks for pull requests
+and pushes to `master`; GitHub-hosted runners must not run the full system-build
+matrix. After pushing or merging, verify that the intended commit is reachable
+from the remote target branch and monitor its GitHub Actions run to completion.
+The remote evaluation does not replace required local builds. If CI fails,
+inspect the failing job and logs, fix forward in a new commit, validate, and
+push again; do not rewrite `master` to hide the failed commit.
 
-`.github/workflows/release.yml` is separate and runs only for release tags. Its
-success is part of release verification, not ordinary integration validation.
-Report checks that cannot be observed or are still running. Deleting a branch
-is a separate cleanup action, not an implicit part of the merge.
+`.github/workflows/release.yml` is separate and runs only evaluation checks and
+release metadata validation for release tags. Its success is part of release
+verification, not ordinary integration validation. Report checks that cannot
+be observed or are still running. Deleting a branch is a separate cleanup
+action, not an implicit part of the merge.
 
 Commits, pushes, rebases of published work, merges, force-pushes, and branch
 deletion require authorization appropriate to their external or destructive

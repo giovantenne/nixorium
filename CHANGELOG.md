@@ -31,8 +31,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   password hashes, URLs, per-host modules, and Veyon pilot hosts.
 - A `deploymentStatus` output for placeholders, missing public keys, and public
   default password hashes.
-- Configuration-schema tests and continuous validation of representative
-  hosts, netboot, fresh templates, and offline installer equivalence.
+- Configuration-schema tests, lightweight GitHub evaluation of the upstream
+  and fresh templates, and a separate local matrix for representative hosts,
+  netboot, and offline installer equivalence.
 
 ### Security
 

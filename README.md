@@ -600,8 +600,8 @@ packages those source trees into the offline PXE installer.
 ## 📁 Project structure
 
 ```
-.github/workflows/validate.yml # Builds hosts and verifies the offline bundle
-.github/workflows/release.yml # Revalidates tags and publishes GitHub Releases
+.github/workflows/validate.yml # Evaluation-only CI for source and deployment template
+.github/workflows/release.yml # Revalidates release metadata and publishes GitHub Releases
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Entry point: host generation, Colmena config, labMeta export
 flake.lock                 # Pinned inputs (nixpkgs, Disko, Veyon)
