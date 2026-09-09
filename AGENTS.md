@@ -142,6 +142,7 @@ Release from the matching changelog section.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
 - Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. `labSettings.veyonNativeHosts` selects the Veyon 4.11 native PipeWire backend per host; other hosts use the GNOME Remote Desktop fallback on port 5900. The private key is not managed by Nix (see Security).
+- `Veyon.conf` is a build-time derivation: evaluation must never read a derivation output to encode its network objects. GitHub CI disables import-from-derivation to enforce this boundary.
 - The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
 - `modules/common.nix` is only the composition point for focused desktop, package, power, screensaver, shell, and SSH modules.
 - The `gnome-user-setup.sh` script is generated inline in `modules/desktop.nix` to use parameterized user names from `labSettings`.

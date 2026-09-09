@@ -21,6 +21,10 @@ mkdir -p "$CACHE_DIR" "$SITE_DIR"
 export XDG_CACHE_HOME="$CACHE_DIR"
 export NIX_CONFIG="${NIX_CONFIG:-}"$'\nexperimental-features = nix-command flakes'
 
+if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+  export NIX_CONFIG="${NIX_CONFIG}"$'\nallow-import-from-derivation = false'
+fi
+
 cd "$REPO_ROOT"
 
 git diff --check
