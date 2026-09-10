@@ -10,7 +10,8 @@ import (
 )
 
 type fakeSetupSource struct {
-	data []byte
+	data  []byte
+	dirty bool
 }
 
 func (f fakeSetupSource) ReadSettings(string) ([]byte, error) {
@@ -23,6 +24,10 @@ func (fakeSetupSource) LabMeta(context.Context, string) (domain.LabMeta, error) 
 
 func (fakeSetupSource) DeploymentStatus(context.Context, string) (domain.DeploymentStatus, error) {
 	return domain.DeploymentStatus{Ready: false, Issues: []string{"keys missing"}}, nil
+}
+
+func (f fakeSetupSource) GitState(context.Context, string) (domain.GitState, error) {
+	return domain.GitState{Available: true, Dirty: f.dirty, Changes: 1}, nil
 }
 
 func (fakeSetupSource) ArtifactState(_ string, name, path string) domain.ArtifactState {
@@ -74,6 +79,19 @@ func TestSetupStatusAdvancesToReviewAfterConfiguredInputs(t *testing.T) {
 	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
 	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
 	report := NewSetupManager(fakeSetupSource{data: data}).Status(context.Background(), "/repo")
+	if report.CurrentStage != domain.SetupStageApply {
+		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageApply, report)
+	}
+}
+
+func TestSetupStatusStopsAtGitReviewWhenWorktreeIsDirty(t *testing.T) {
+	data, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
+	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	report := NewSetupManager(fakeSetupSource{data: data, dirty: true}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageReview {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageReview, report)
 	}

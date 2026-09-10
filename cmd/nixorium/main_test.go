@@ -72,8 +72,15 @@ func TestParseArgumentsAcceptsSetupStatus(t *testing.T) {
 	if options.command != "setup" || options.subcommand != "status" || !options.json {
 		t.Fatalf("unexpected options: %+v", options)
 	}
-	if _, err := parseArguments([]string{"setup"}); err == nil {
-		t.Fatal("setup without status was accepted")
+	bare, err := parseArguments([]string{"setup"})
+	if err != nil || bare.subcommand != "configure" || !bare.guided {
+		t.Fatalf("bare setup = %+v, %v", bare, err)
+	}
+}
+
+func TestParseArgumentsRejectsJSONInteractiveSetup(t *testing.T) {
+	if _, err := parseArguments([]string{"setup", "configure", "--json"}); err == nil {
+		t.Fatal("interactive setup accepted --json")
 	}
 }
 

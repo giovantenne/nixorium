@@ -45,9 +45,10 @@ type DeploymentStatus struct {
 }
 
 type GitState struct {
-	Available bool `json:"available"`
-	Dirty     bool `json:"dirty"`
-	Changes   int  `json:"changes"`
+	Available bool     `json:"available"`
+	Dirty     bool     `json:"dirty"`
+	Changes   int      `json:"changes"`
+	Paths     []string `json:"paths,omitempty"`
 }
 
 type ServiceState struct {

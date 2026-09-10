@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -21,12 +22,16 @@ type PasswordHasher interface {
 }
 
 func CollectPasswordHash(ctx context.Context, reader SecretReader, hasher PasswordHasher) (string, error) {
-	password, err := reader.ReadSecret("Password: ")
+	return CollectNamedPasswordHash(ctx, reader, hasher, "Password")
+}
+
+func CollectNamedPasswordHash(ctx context.Context, reader SecretReader, hasher PasswordHasher, label string) (string, error) {
+	password, err := reader.ReadSecret(label + ": ")
 	if err != nil {
 		return "", fmt.Errorf("read password: %w", err)
 	}
 	defer wipe(password)
-	confirmation, err := reader.ReadSecret("Confirm password: ")
+	confirmation, err := reader.ReadSecret("Confirm " + strings.ToLower(label) + ": ")
 	if err != nil {
 		return "", fmt.Errorf("read password confirmation: %w", err)
 	}

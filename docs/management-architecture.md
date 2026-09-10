@@ -253,12 +253,18 @@ key correspondence, system generations, service state, and artifact metadata.
 On restart, setup re-runs safe inspections and selects the earliest unmet
 stage. Going backward changes draft values without undoing applied operations.
 
-The first implementation slices expose read-only reconciliation through
-`nixorium setup status` and explicit key reconciliation through `nixorium setup
-keys`. Status derives stage state from the managed settings, required commands,
-password-hash readiness, verified key correspondence and private modes, Nix
-evaluation, artifacts, and `deploymentStatus`; it never advances a stage by
-writing a global completion flag.
+The implemented setup slices expose read-only reconciliation through
+`nixorium setup status`, guided configuration through `nixorium setup`, and
+explicit key reconciliation through `nixorium setup keys`. The wizard proposes
+detected network values, retains entries across backward navigation, collects
+default credentials without echo, and uses the same candidate-plan/apply
+backend as automation. After acceptance, bare `setup` continues into
+idempotent key reconciliation; `setup configure` limits the run to settings.
+Status derives stage state from the managed settings,
+required commands, password-hash readiness, verified key correspondence and
+private modes, clean Git review state, Nix evaluation, artifacts, and
+`deploymentStatus`; it never advances a stage by writing a global completion
+flag.
 
 Key creation uses create-new semantics. Existing keys are verified and reused;
 they are never overwritten. Regeneration is a separately named recovery action

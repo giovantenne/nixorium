@@ -22,5 +22,8 @@ customization, validation, upstream-update, and offline-installer work.
   requires explicit authorization.
 - Use `nixorium setup status` to re-inspect the earliest incomplete first-run
   stage; do not invent or toggle a global configured flag.
+- Use `nixorium setup` for guided first-run settings, password collection, and
+  key reconciliation; inspect its redacted review before accepting the atomic
+  settings write.
 - Use `nixorium setup keys` to create missing pairs and verify existing ones;
   it must never overwrite public-only or mismatched key material.

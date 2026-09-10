@@ -125,3 +125,8 @@ type KeyReconcileReport struct {
 	Repository    string             `json:"repository"`
 	Keys          []KeyMaterialState `json:"keys"`
 }
+
+type NetworkDefaults struct {
+	InterfaceName string
+	DHCPAddress   string
+}

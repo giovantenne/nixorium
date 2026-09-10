@@ -11,6 +11,7 @@ import (
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
+	"github.com/giovantenne/nixorium/internal/domain"
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
 
@@ -23,6 +24,7 @@ type options struct {
 	json       bool
 	full       bool
 	help       bool
+	guided     bool
 }
 
 func main() {
@@ -138,7 +140,9 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		}
 	case "setup":
 		manager := app.NewSetupManager(adapters.Local{})
-		if options.subcommand == "keys" {
+		if options.subcommand == "configure" {
+			return runSetupConfigure(ctx, repository, stdout, stderr, options.guided)
+		} else if options.subcommand == "keys" {
 			report, reconcileErr := manager.ReconcileKeys(ctx, repository)
 			if options.json {
 				err = presentation.JSON(stdout, report)
@@ -225,6 +229,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("keys must follow setup")
 			}
 			result.subcommand = "keys"
+		case "configure":
+			if result.command != "setup" || result.subcommand != "" {
+				return options{}, errors.New("configure must follow setup")
+			}
+			result.subcommand = "configure"
 		default:
 			return options{}, fmt.Errorf("unknown argument %q", arguments[index])
 		}
@@ -247,8 +256,15 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("config apply requires --expect from config plan")
 	}
-	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" {
-		return options{}, errors.New("setup requires the status or keys subcommand")
+	if result.command == "setup" && result.subcommand == "" {
+		result.subcommand = "configure"
+		result.guided = true
+	}
+	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" && result.subcommand != "configure" {
+		return options{}, errors.New("setup requires the configure, status, or keys subcommand")
+	}
+	if result.command == "setup" && result.subcommand == "configure" && result.json {
+		return options{}, errors.New("--json is not valid with interactive setup configure")
 	}
 	return result, nil
 }
@@ -314,9 +330,105 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup status|setup keys] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys] [options]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
+}
+
+func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io.Writer, reconcileKeys bool) int {
+	local := adapters.Local{}
+	data, err := local.ReadSettings(repository)
+	if err != nil {
+		fmt.Fprintln(stderr, "Error:", err)
+		return 1
+	}
+	settings, issues := domain.DecodeLabSettings(data)
+	if len(issues) > 0 {
+		fmt.Fprintf(stderr, "Error: current settings are invalid: %s: %s\n", issues[0].Field, issues[0].Message)
+		return 1
+	}
+	if settings.Lab.MasterDHCPIP == domain.MasterDHCPPlaceholder {
+		detected := local.DetectNetworkDefaults()
+		if detected.DHCPAddress != "" {
+			settings.Lab.MasterDHCPIP = detected.DHCPAddress
+		}
+		if detected.InterfaceName != "" {
+			settings.Lab.InterfaceName = detected.InterfaceName
+		}
+	}
+
+	candidate, accepted, err := presentation.RunSettingsWizard(settings)
+	if err != nil {
+		fmt.Fprintln(stderr, "Error: configuration wizard:", err)
+		return 1
+	}
+	if !accepted {
+		fmt.Fprintln(stdout, "Configuration cancelled; no files changed.")
+		return 0
+	}
+
+	secretReader := presentation.TerminalSecretReader{Input: os.Stdin, Output: stdout}
+	credentials := []struct {
+		label string
+		value *string
+	}{
+		{label: "Administrator password", value: &candidate.Lab.AdminPassword},
+		{label: "Teacher password", value: &candidate.Lab.TeacherPassword},
+		{label: "Student password", value: &candidate.Lab.StudentPassword},
+	}
+	for _, credential := range credentials {
+		if *credential.value != domain.DefaultPasswordHash {
+			continue
+		}
+		hash, hashErr := app.CollectNamedPasswordHash(ctx, secretReader, local, credential.label)
+		if hashErr != nil {
+			fmt.Fprintf(stderr, "Error: %s: %v\n", credential.label, hashErr)
+			return 1
+		}
+		*credential.value = hash
+	}
+
+	candidateData, err := domain.MarshalLabSettings(candidate)
+	if err != nil {
+		fmt.Fprintln(stderr, "Error: prepare candidate:", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "Validating the complete candidate through Nix...")
+	settingsManager := app.NewSettingsManager(local)
+	plan := settingsManager.Plan(ctx, repository, candidateData)
+	if plan.HasErrors() {
+		presentation.ConfigPlanText(stderr, plan)
+		return 1
+	}
+	gitState, err := local.GitState(ctx, repository)
+	if err != nil {
+		fmt.Fprintln(stderr, "Error: inspect Git worktree:", err)
+		return 1
+	}
+	approved, err := presentation.RunConfigReview(plan, gitState)
+	if err != nil {
+		fmt.Fprintln(stderr, "Error: configuration review:", err)
+		return 1
+	}
+	if !approved {
+		fmt.Fprintln(stdout, "Configuration cancelled; no files changed.")
+		return 0
+	}
+	report := settingsManager.Apply(ctx, repository, candidateData, plan.BaseFingerprint)
+	presentation.ConfigApplyText(stdout, report)
+	if report.HasErrors() {
+		return 1
+	}
+	if reconcileKeys {
+		keyReport, keyErr := app.NewSetupManager(local).ReconcileKeys(ctx, repository)
+		presentation.KeyReconcileText(stdout, keyReport)
+		if keyErr != nil {
+			fmt.Fprintln(stderr, "Error:", keyErr)
+			return 1
+		}
+		fmt.Fprintln(stdout, "Review and commit lab-settings.json and the public files under keys/ before applying the controller.")
+	}
+	return 0
 }

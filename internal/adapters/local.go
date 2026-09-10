@@ -41,10 +41,17 @@ func (Local) GitState(ctx context.Context, repository string) (domain.GitState, 
 	}
 	trimmed := strings.TrimSpace(output)
 	changes := 0
+	paths := []string{}
 	if trimmed != "" {
-		changes = len(strings.Split(trimmed, "\n"))
+		lines := strings.Split(trimmed, "\n")
+		changes = len(lines)
+		for _, line := range lines {
+			if len(line) >= 4 {
+				paths = append(paths, line[3:])
+			}
+		}
 	}
-	return domain.GitState{Available: true, Dirty: changes > 0, Changes: changes}, nil
+	return domain.GitState{Available: true, Dirty: changes > 0, Changes: changes, Paths: paths}, nil
 }
 
 func (Local) ServiceState(ctx context.Context, name string) domain.ServiceState {

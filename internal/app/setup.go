@@ -12,6 +12,7 @@ type SetupSource interface {
 	ReadSettings(repository string) ([]byte, error)
 	LabMeta(ctx context.Context, repository string) (domain.LabMeta, error)
 	DeploymentStatus(ctx context.Context, repository string) (domain.DeploymentStatus, error)
+	GitState(ctx context.Context, repository string) (domain.GitState, error)
 	ArtifactState(repository, name, relativePath string) domain.ArtifactState
 	CommandAvailable(name string) bool
 	KeyMaterial(ctx context.Context, repository string) []domain.KeyMaterialState
@@ -47,9 +48,16 @@ func (m SetupManager) ReconcileKeys(ctx context.Context, repository string) (dom
 
 func (m SetupManager) Status(ctx context.Context, repository string) domain.SetupReport {
 	facts := domain.SetupFacts{
-		Review:  domain.SetupObservation{Detail: "configuration review is not available yet"},
 		Apply:   domain.SetupObservation{Detail: "controller apply is not available yet"},
 		Install: domain.SetupObservation{Detail: "guided client installation is not available yet"},
+	}
+	if gitState, err := m.source.GitState(ctx, repository); err != nil {
+		facts.Review.Detail = fmt.Sprintf("Git review state is unavailable: %v", err)
+	} else if gitState.Dirty {
+		facts.Review.Detail = fmt.Sprintf("review and accept %d Git worktree change(s)", gitState.Changes)
+	} else {
+		facts.Review.Complete = true
+		facts.Review.Detail = "deployment worktree is clean; reviewed changes are recorded"
 	}
 
 	missingCommands := []string{}
