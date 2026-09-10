@@ -289,6 +289,7 @@ status and diagnostics. Run these commands from the private deployment root:
 nix run .#nixorium
 nix run .#nixorium -- status
 nix run .#nixorium -- status --json
+nix run .#nixorium -- setup status
 nix run .#nixorium -- config validate
 nix run .#nixorium -- doctor
 ```
@@ -302,6 +303,13 @@ correspondence and cache health, netboot artifacts, PXE port conflicts, client
 SSH reachability, managed-service availability, disk space, and required local
 commands including Colmena. `nixorium doctor --full` additionally performs a
 real controller build. The default remains quick and read-only.
+
+`setup status` reconciles observed state on every run and selects the earliest
+incomplete first-run stage. It currently reports environment, network,
+identity/locale, default credentials, key-file presence and private modes,
+candidate validation, artifacts, and deployment readiness. Review, controller
+apply, and guided installation remain explicit future stages; no global
+`configured` flag is trusted.
 
 The `nixorium` executable is installed on the generated controller system. It
 uses `NIXORIUM_REPO` when set, otherwise the current deployment root or the

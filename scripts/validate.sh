@@ -91,6 +91,8 @@ fi
 
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   config validate --repo "$SITE_DIR" --json >/dev/null
+nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
+  setup status --repo "$SITE_DIR" --json >/dev/null
 
 nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
   --raw \

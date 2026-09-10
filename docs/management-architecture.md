@@ -243,6 +243,12 @@ key correspondence, system generations, service state, and artifact metadata.
 On restart, setup re-runs safe inspections and selects the earliest unmet
 stage. Going backward changes draft values without undoing applied operations.
 
+The first implementation slice exposes this reconciliation read-only through
+`nixorium setup status`. It derives stage state from the managed settings,
+required commands, password-hash readiness, key-file presence and private
+modes, Nix evaluation, artifacts, and `deploymentStatus`; it never advances a
+stage by writing a global completion flag.
+
 Key creation uses create-new semantics. Existing keys are verified and reused;
 they are never overwritten. Regeneration is a separately named recovery action
 that describes affected clients and requires confirmation. Controller rebuild

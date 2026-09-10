@@ -106,6 +106,13 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		if report.HasErrors() {
 			return 1
 		}
+	case "setup":
+		report := app.NewSetupManager(adapters.Local{}).Status(ctx, repository)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.SetupText(stdout, report)
+		}
 	default:
 		fmt.Fprintf(stderr, "Error: unknown command %q\n", options.command)
 		usage(stderr)
@@ -134,7 +141,16 @@ func parseArguments(arguments []string) (options, error) {
 			result.full = true
 		case "-h", "--help", "help":
 			result.help = true
-		case "status", "doctor", "config":
+		case "status":
+			if result.command == "setup" && result.subcommand == "" {
+				result.subcommand = "status"
+				continue
+			}
+			if result.command != "" {
+				return options{}, errors.New("only one command may be selected")
+			}
+			result.command = arguments[index]
+		case "doctor", "config", "setup":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -153,6 +169,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "config" && result.subcommand != "validate" {
 		return options{}, errors.New("config requires the validate subcommand")
+	}
+	if result.command == "setup" && result.subcommand != "status" {
+		return options{}, errors.New("setup requires the status subcommand")
 	}
 	return result, nil
 }
@@ -193,7 +212,7 @@ func isDeploymentRoot(path string) bool {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate] [--repo <path>] [--json] [--full]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|setup status] [--repo <path>] [--json] [--full]")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
 }
