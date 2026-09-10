@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -10,6 +11,99 @@ import (
 type SettingsSource interface {
 	ReadSettings(repository string) ([]byte, error)
 	LabMeta(ctx context.Context, repository string) (domain.LabMeta, error)
+	ValidateCandidate(ctx context.Context, repository string, settings domain.LabSettingsFile) error
+	WriteSettingsIfUnchanged(repository string, expected []byte, settings domain.LabSettingsFile) error
+}
+
+func (m SettingsManager) Plan(ctx context.Context, repository string, candidateData []byte) domain.ConfigPlanReport {
+	report, _, _ := m.planCandidate(ctx, repository, candidateData)
+	return report
+}
+
+func (m SettingsManager) Apply(ctx context.Context, repository string, candidateData []byte, expectedFingerprint string) domain.ConfigApplyReport {
+	plan, baseData, candidate := m.planCandidate(ctx, repository, candidateData)
+	report := domain.ConfigApplyReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "config-apply",
+		State:         plan.State,
+		Repository:    repository,
+		File:          "lab-settings.json",
+		Changes:       plan.Changes,
+		Issues:        plan.Issues,
+	}
+	if plan.HasErrors() {
+		report.State = "invalid"
+		return report
+	}
+	if expectedFingerprint == "" || expectedFingerprint != plan.BaseFingerprint {
+		report.State = "conflict"
+		report.Issues = append(report.Issues, domain.ValidationIssue{
+			Field:   "$fingerprint",
+			Message: "the managed settings changed after review; create a new plan",
+		})
+		return report
+	}
+	if len(plan.Changes) == 0 {
+		report.State = "unchanged"
+		return report
+	}
+	if err := m.source.WriteSettingsIfUnchanged(repository, baseData, candidate); err != nil {
+		if errors.Is(err, domain.ErrSettingsConflict) {
+			report.State = "conflict"
+			report.Issues = append(report.Issues, domain.ValidationIssue{
+				Field:   "$fingerprint",
+				Message: "the managed settings changed while applying; create a new plan",
+			})
+			return report
+		}
+		report.State = "invalid"
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$write", Message: err.Error()})
+		return report
+	}
+	report.State = "applied"
+	return report
+}
+
+func (m SettingsManager) planCandidate(ctx context.Context, repository string, candidateData []byte) (domain.ConfigPlanReport, []byte, domain.LabSettingsFile) {
+	report := domain.ConfigPlanReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "config-plan",
+		State:         "invalid",
+		Repository:    repository,
+		File:          "lab-settings.json",
+		Changes:       []domain.SettingChange{},
+		Issues:        []domain.ValidationIssue{},
+	}
+	baseData, err := m.source.ReadSettings(repository)
+	if err != nil {
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$", Message: err.Error()})
+		return report, nil, domain.LabSettingsFile{}
+	}
+	base, baseIssues := domain.DecodeLabSettings(baseData)
+	if len(baseIssues) > 0 {
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$base", Message: "managed settings are invalid; repair them before applying a candidate"})
+		return report, baseData, domain.LabSettingsFile{}
+	}
+	report.BaseFingerprint = domain.SettingsFingerprint(baseData)
+	candidate, candidateIssues := domain.DecodeLabSettings(candidateData)
+	report.Issues = append(report.Issues, candidateIssues...)
+	if len(candidateIssues) > 0 {
+		return report, baseData, candidate
+	}
+	if err := m.source.ValidateCandidate(ctx, repository, candidate); err != nil {
+		report.Issues = append(report.Issues, domain.ValidationIssue{
+			Field:   "$nix",
+			Message: fmt.Sprintf("Nix evaluation rejected the candidate: %v", err),
+		})
+		return report, baseData, candidate
+	}
+	report.Changes = domain.DiffLabSettings(base, candidate)
+	if len(report.Changes) == 0 {
+		report.State = "unchanged"
+	} else {
+		report.State = "valid"
+	}
+	return report, baseData, candidate
 }
 
 type SettingsManager struct {

@@ -110,6 +110,9 @@ nix run .#nixorium -- setup status
 # Create missing key pairs and verify all existing correspondence
 nix run .#nixorium -- setup keys
 
+# Validate and review a complete settings candidate without writing it
+nix run .#nixorium -- config plan --file candidate.json
+
 # Rebuild and activate on the local machine (controller)
 sudo nixos-rebuild switch --flake .#pcNN --no-write-lock-file
 
@@ -150,6 +153,7 @@ Release from the matching changelog section.
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, update `masterDhcpIp` in the deployment's `lab-settings.json` (or a legacy deployment's `lab-config.nix`) and rebuild netboot artifacts before the next PXE session.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
+- Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).

@@ -162,6 +162,24 @@ configuration:
 nix run .#nixorium -- config validate
 ```
 
+The machine-facing review/apply API accepts a complete candidate settings file.
+It validates the candidate through both the management schema and the actual
+deployment Flake before showing a semantic diff. Password hashes are reported
+only as `configured -> updated`.
+
+```sh
+nix run .#nixorium -- config plan --file candidate.json --json
+nix run .#nixorium -- config apply --file candidate.json \
+  --expect 'sha256:fingerprint-from-plan'
+git diff -- lab-settings.json
+```
+
+`config apply` succeeds only with the exact base fingerprint returned by the
+reviewed plan. It locks the deployment, compares the source again immediately
+before its atomic write, preserves unrelated files, and reports a conflict if
+the managed file changed. Candidate files must contain hashes, never plaintext
+passwords; the guided setup will create those hashes internally.
+
 You can leave the git identity fields at their defaults for now.
 
 > **Note**: `masterDhcpIp` is used only during PXE/netboot client installation. The generated iPXE script, the netboot ramdisk, and the PXE helper services all point to that DHCP address, so if the DHCP lease changes before a netboot session you must update `lab-settings.json` and rebuild the netboot artifacts. Regular Colmena deploys use the controller's static lab IP instead.
@@ -292,6 +310,7 @@ nix run .#nixorium -- status --json
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
 nix run .#nixorium -- config validate
+nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
 ```
 

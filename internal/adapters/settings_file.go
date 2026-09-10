@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -23,18 +24,36 @@ func (Local) ReadSettings(repository string) ([]byte, error) {
 }
 
 func (Local) WriteSettings(repository string, settings domain.LabSettingsFile) error {
+	return writeSettings(repository, nil, settings)
+}
+
+func (Local) WriteSettingsIfUnchanged(repository string, expected []byte, settings domain.LabSettingsFile) error {
+	return writeSettings(repository, expected, settings)
+}
+
+func writeSettings(repository string, expected []byte, settings domain.LabSettingsFile) error {
 	data, err := domain.MarshalLabSettings(settings)
 	if err != nil {
 		return err
 	}
-	rootInfo, err := os.Lstat(repository)
+	rootDescriptor, err := syscall.Open(repository, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
-		return fmt.Errorf("inspect deployment root: %w", err)
+		return fmt.Errorf("open deployment root: %w", err)
 	}
-	if rootInfo.Mode()&os.ModeSymlink != 0 || !rootInfo.IsDir() {
-		return errors.New("deployment root must be a directory and not a symlink")
+	root := os.NewFile(uintptr(rootDescriptor), repository)
+	defer root.Close()
+	if err := syscall.Flock(rootDescriptor, syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("lock deployment root: %w", err)
 	}
+	defer syscall.Flock(rootDescriptor, syscall.LOCK_UN)
+
 	target := filepath.Join(repository, settingsFileName)
+	if expected != nil {
+		current, _, readErr := readRegularFileNoFollowLimit(target, 1024*1024)
+		if readErr != nil || !bytes.Equal(current, expected) {
+			return domain.ErrSettingsConflict
+		}
+	}
 	if targetInfo, statErr := os.Lstat(target); statErr == nil {
 		if targetInfo.Mode()&os.ModeSymlink != 0 || !targetInfo.Mode().IsRegular() {
 			return errors.New("lab-settings.json must be a regular file and not a symlink")
@@ -69,16 +88,17 @@ func (Local) WriteSettings(repository string, settings domain.LabSettingsFile) e
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close settings draft: %w", err)
 	}
+	if expected != nil {
+		current, _, readErr := readRegularFileNoFollowLimit(target, 1024*1024)
+		if readErr != nil || !bytes.Equal(current, expected) {
+			return domain.ErrSettingsConflict
+		}
+	}
 	if err := os.Rename(temporaryPath, target); err != nil {
 		return fmt.Errorf("replace lab-settings.json: %w", err)
 	}
 	keepTemporary = false
-	directory, err := os.Open(repository)
-	if err != nil {
-		return fmt.Errorf("open deployment root for sync: %w", err)
-	}
-	defer directory.Close()
-	if err := directory.Sync(); err != nil {
+	if err := root.Sync(); err != nil {
 		return fmt.Errorf("sync deployment root: %w", err)
 	}
 	return nil

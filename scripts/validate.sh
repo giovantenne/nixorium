@@ -91,6 +91,10 @@ fi
 
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   config validate --repo "$SITE_DIR" --json >/dev/null
+cp "$SITE_DIR/lab-settings.json" "$TEMP_DIR/candidate.json"
+nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
+  config plan --repo "$SITE_DIR" --file "$TEMP_DIR/candidate.json" | \
+  grep -q 'Configuration plan: UNCHANGED'
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   setup status --repo "$SITE_DIR" --json >/dev/null
 

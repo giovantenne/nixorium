@@ -46,6 +46,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Idempotent `nixorium setup keys` reconciliation for Harmonia, SSH, and Veyon
   pairs, with create-new writes, private-mode enforcement, cryptographic
   correspondence checks, retry safety, and overwrite refusal.
+- A non-secret `config plan` and fingerprint-bound `config apply` protocol
+  that validates candidates through the deployment Flake, rejects concurrent
+  edits, and atomically updates only `lab-settings.json`.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.

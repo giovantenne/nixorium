@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,5 +90,40 @@ func TestWriteSettingsRejectsSymlinkTarget(t *testing.T) {
 	}
 	if string(content) != "untouched" {
 		t.Fatalf("symlink target changed: %q", content)
+	}
+}
+
+func TestWriteSettingsIfUnchangedRejectsStaleContent(t *testing.T) {
+	directory := t.TempDir()
+	local := Local{}
+	settings := adapterSettings()
+	if err := local.WriteSettings(directory, settings); err != nil {
+		t.Fatal(err)
+	}
+	original, err := local.ReadSettings(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.Lab.HomepageURL = "https://changed.example.org"
+	if err := local.WriteSettingsIfUnchanged(directory, []byte("stale"), settings); !errors.Is(err, domain.ErrSettingsConflict) {
+		t.Fatalf("stale write error = %v", err)
+	}
+	current, err := local.ReadSettings(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(current) != string(original) {
+		t.Fatal("stale write changed settings")
+	}
+	if err := local.WriteSettingsIfUnchanged(directory, original, settings); err != nil {
+		t.Fatal(err)
+	}
+	current, err = local.ReadSettings(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, issues := domain.DecodeLabSettings(current)
+	if len(issues) != 0 || decoded.Lab.HomepageURL != settings.Lab.HomepageURL {
+		t.Fatalf("written settings = %+v, issues = %+v", decoded, issues)
 	}
 }
