@@ -4,9 +4,13 @@
   inputs.nixorium.url = "github:giovantenne/nixorium/master";
 
   outputs = { self, nixorium }:
+    let
+      labConfig = nixorium.lib.evalLabSettings
+        (builtins.fromJSON (builtins.readFile ./lab-settings.json));
+    in
     nixorium.lib.mkLab {
       deploymentSelf = self;
-      labConfig = import ./lab-config.nix;
+      inherit labConfig;
 
       publicKeys = {
         cache = ./keys/cache-public-key;

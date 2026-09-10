@@ -6,6 +6,7 @@ For every configuration change:
 
 ```sh
 git diff --check
+nix run .#nixorium -- config validate
 nix eval .#labMeta --json --no-write-lock-file
 nix eval .#deploymentStatus --json --no-write-lock-file
 ```

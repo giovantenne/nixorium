@@ -37,28 +37,48 @@
       configSchemaTest = import ./tests/eval-lab-config.nix {
         inherit (nixpkgs) lib;
       };
+      settingsSchemaTest = import ./tests/eval-lab-settings.nix {
+        inherit (nixpkgs) lib;
+      };
       mkLabTest = import ./tests/mk-lab.nix {
         inherit mkLab;
         deploymentSelf = self;
         labConfig = import ./lab-config.nix;
       };
+      managementVmTest = pkgs.testers.runNixOSTest (import ./tests/management-vm.nix {
+        nixoriumPackage = defaultLab.packages.${system}.nixorium;
+      });
     in
     defaultLab // {
       lib = {
         inherit mkLab;
         configSchemaVersion = 2;
+        settingsSchemaVersion = 1;
+        evalLabSettings = import ./lib/eval-lab-settings.nix {
+          inherit (nixpkgs) lib;
+        };
       };
       checks.${system} = {
         config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
           touch "$out"
         '';
+        settings-schema = assert settingsSchemaTest; pkgs.runCommand "nixorium-settings-schema-test" {} ''
+          touch "$out"
+        '';
         mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
           touch "$out"
         '';
+        management-vm = managementVmTest;
       };
       templates.site = {
         path = ./templates/site;
         description = "Private Nixorium deployment repository";
+      };
+      apps.${system} = defaultLab.apps.${system} // {
+        default = defaultLab.apps.${system}.nixorium;
+      };
+      packages.${system} = defaultLab.packages.${system} // {
+        default = defaultLab.packages.${system}.nixorium;
       };
     };
 }

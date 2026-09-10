@@ -1,0 +1,79 @@
+package domain
+
+import (
+	"bytes"
+	"testing"
+)
+
+func validSettings() LabSettingsFile {
+	return LabSettingsFile{
+		SchemaVersion: SettingsSchemaVersion,
+		Lab: LabSettings{
+			MasterDHCPIP:     "192.0.2.10",
+			NetworkBase:      "10.0.0.0",
+			NetworkPrefix:    24,
+			PCCount:          20,
+			MasterHostNumber: 99,
+			InterfaceName:    "enp0s3",
+			TeacherUser:      "teacher",
+			StudentUser:      "student",
+			TeacherPassword:  "$6$salt$teacher",
+			StudentPassword:  "$6$salt$student",
+			AdminPassword:    "$6$salt$admin",
+			HomepageURL:      "https://example.org",
+			StudentGitName:   "Student",
+			StudentGitEmail:  "student@example.org",
+			AdminGitName:     "Admin",
+			AdminGitEmail:    "admin@example.org",
+			TimeZone:         "Europe/Rome",
+			DefaultLocale:    "en_US.UTF-8",
+			ExtraLocale:      "it_IT.UTF-8",
+			KeyboardLayout:   "it",
+			ConsoleKeyMap:    "it2",
+			VeyonNativeHosts: []string{"pc01"},
+		},
+	}
+}
+
+func TestLabSettingsValidation(t *testing.T) {
+	settings := validSettings()
+	if issues := settings.Validate(); len(issues) != 0 {
+		t.Fatalf("valid settings returned issues: %#v", issues)
+	}
+
+	settings.Lab.NetworkBase = "10.0.0.1"
+	settings.Lab.StudentUser = settings.Lab.TeacherUser
+	settings.Lab.VeyonNativeHosts = []string{"pc98"}
+	issues := settings.Validate()
+	if len(issues) != 3 {
+		t.Fatalf("got %d issues, want 3: %#v", len(issues), issues)
+	}
+}
+
+func TestDecodeRejectsUnknownAndTrailingValues(t *testing.T) {
+	data, err := MarshalLabSettings(validSettings())
+	if err != nil {
+		t.Fatal(err)
+	}
+	unknown := bytes.Replace(data, []byte(`"schemaVersion": 1`), []byte(`"schemaVersion": 1, "unknown": true`), 1)
+	if _, issues := DecodeLabSettings(unknown); len(issues) != 1 {
+		t.Fatalf("unknown field issues = %#v", issues)
+	}
+	if _, issues := DecodeLabSettings(append(data, []byte("{}")...)); len(issues) != 1 {
+		t.Fatalf("trailing value issues = %#v", issues)
+	}
+}
+
+func TestMarshalIsDeterministicAndEndsWithNewline(t *testing.T) {
+	first, err := MarshalLabSettings(validSettings())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := MarshalLabSettings(validSettings())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first, second) || len(first) == 0 || first[len(first)-1] != '\n' {
+		t.Fatalf("non-deterministic or unterminated output:\n%s", first)
+	}
+}

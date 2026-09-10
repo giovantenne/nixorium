@@ -1,0 +1,441 @@
+# Nixorium management architecture
+
+Status: accepted design for incremental implementation
+
+This document defines the target management architecture and the boundaries
+that implementation must preserve. It describes the intended end state; items
+not yet implemented are tracked in the external project status rather than
+being implied complete here.
+
+## Current state
+
+Nixorium already has a sound declarative core:
+
+- `lib.mkLab` turns a typed site configuration into NixOS hosts, Colmena
+  metadata, netboot outputs, helper applications, and an offline installer.
+- `labMeta` is a versioned, non-secret operational interface. Shell helpers
+  consume it through Nix evaluation instead of parsing Nix source.
+- `deploymentStatus` reports configuration blockers without making the
+  standalone public example unevaluable.
+- a private deployment owns identities, network values, password hashes,
+  public keys, assets, and site modules while the public repository owns
+  reusable behavior;
+- the installer bundle preserves the deployment's locked inputs and produces
+  the same client derivation without client internet access.
+
+The missing layer is lifecycle management. The administrator currently edits
+Nix, generates three key pairs, invokes builds, runs Harmonia and PXE in two
+terminals, temporarily changes an address with `ip`, chooses a client identity
+by numeric argument, and invokes Colmena directly. Runtime service state,
+repository state, and generated artifacts have no unified structured status.
+Failures during those manual sequences are understandable only to an operator
+who knows the underlying tools.
+
+Important constraints in the current implementation are:
+
+- the controller DHCP address is embedded in the netboot closure and generated
+  iPXE script, so a lease change requires targeted artifact rebuilding;
+- Harmonia and PXE are foreground Flake apps, not controller services;
+- PXE temporarily removes the controller static address without persistent
+  operation state or automatic same-boot recovery;
+- the client installer is destructive and confirms the disk, but host
+  selection is a numeric command-line argument and duplicate assignment is not
+  coordinated;
+- the controller bootstrap installs an evaluable placeholder deployment, but
+  there is no first-run application after reboot;
+- the controller firewall is currently disabled by a shared module, so new
+  management services must not assume a firewall already limits exposure.
+
+## Architectural goals and invariants
+
+The management system has three layers:
+
+```text
+terminal UI and human-readable CLI rendering
+                    |
+typed application/domain operations
+                    |
+Nix, Git, systemd, networking, Colmena, and filesystem adapters
+```
+
+The TUI never owns operational logic and never scrapes the human-readable CLI.
+CLI commands and the TUI call the same Go application services. Domain results
+are typed values that may be rendered as terminal text or stable versioned
+JSON. Long-running operations emit structured progress events.
+
+The following invariants apply to every milestone:
+
+1. The private Git deployment remains the declarative source of truth.
+2. Runtime observations come from the operating system, not only marker files.
+3. Public code never absorbs site identities, keys, network values, or policy.
+4. Client installation and normal deployment require no client internet.
+5. Destructive and disruptive actions require an explicit preview and
+   confirmation; read-only commands do not require root.
+6. Commands are executed with argument arrays, never by interpolating input
+   into a shell program.
+7. Operations are idempotent or report precisely why a repeated invocation is
+   unsafe. Interrupted operations are reconciled from actual state.
+8. Plaintext passwords and private keys never enter Git, Nix expressions,
+   store paths, logs, process arguments, or world-readable temporary files.
+
+## Management application
+
+The application is a Go executable named `nixorium`. Go provides a small
+deployable binary, explicit process execution, straightforward unit testing,
+and good Nix packaging. Bubble Tea is used only in the presentation package.
+The domain and adapter packages have no Bubble Tea dependency.
+
+The initial package layout is:
+
+```text
+cmd/nixorium/           command parsing and renderer selection
+internal/domain/        statuses, findings, plans, state transitions
+internal/app/           use cases and orchestration interfaces
+internal/adapters/      exec, filesystem, Git, Nix, systemd, network adapters
+internal/presentation/  text, JSON, and Bubble Tea renderers
+modules/management.nix  executable, services, policy, and first-run discovery
+```
+
+The first increment installs the executable only on the controller. Repository
+discovery prefers an explicit `--repo`, then `NIXORIUM_REPO`, the current
+directory when it contains `flake.nix`, and finally
+`~/nixorium-deployment`.
+
+Adapters receive validated values such as a deployment root, host selector, or
+service name. They construct fixed executable/argument arrays and return
+captured structured results. Domain tests use fakes; integration tests exercise
+the real adapters in isolated repositories or NixOS VMs.
+
+Every non-interactive command supports `--json`. JSON responses have a top
+level schema version, operation, status, findings or data, and optional next
+actions. Exit status is zero for a successfully completed operation, including
+a status report containing warnings; it is nonzero for invalid invocation,
+failed operation, or a doctor report containing errors. Exact exit semantics
+are documented with each command before stabilization.
+
+## Command model
+
+The compact command surface is:
+
+```text
+nixorium                    open the TUI
+nixorium setup              resume first-run setup
+nixorium status             summarize controller and deployment state
+nixorium doctor             run actionable diagnostics
+nixorium config             review or change managed settings
+nixorium hosts              inspect configured machines
+nixorium deploy             build and deploy selected machines
+nixorium pxe                prepare, start, inspect, stop, or recover PXE mode
+nixorium services           inspect relevant controller services
+nixorium update             prepare a reviewable upstream release update
+```
+
+Advanced output names and raw tool commands remain documented and usable. The
+management layer wraps rather than replaces Nix and Colmena.
+
+`status` is deliberately cheap and read-only. It reports configuration
+readiness, Git state, controller identity, configured clients, Harmonia/PXE
+unit state, PXE recovery need, and artifact presence. Network probes and builds
+are opt-in or belong to `doctor`, so opening the dashboard is predictable.
+
+`doctor` returns ordered findings with `OK`, `WARNING`, or `ERROR`, a stable
+finding identifier, evidence safe to display, and a remediation. Expensive
+checks are grouped behind `doctor --full`; its first such check performs a real
+controller build. Automatic remediation is a
+separate confirmed operation, not a side effect of diagnosis.
+
+## TUI information architecture
+
+The default screen prioritizes tasks rather than implementation names:
+
+```text
+Nixorium
+
+Laboratory
+  Configuration        ready / action required
+  Controller services  healthy / degraded
+  Computers            reachable / configured
+  Installation mode    stopped / preparing / active / recovery required
+  Deployment            current / changes pending / unknown
+
+Actions
+  Finish laboratory setup
+  Install computers over network
+  View computers
+  Deploy configuration
+  Diagnose a problem
+  Change settings
+  Update Nixorium
+  Advanced services and logs
+```
+
+Each action has a review screen before mutation. Long operations show the
+current stage, elapsed time, recent events, and a route to detailed logs.
+Failures state what failed, what was left intact, whether retry is safe, and
+the next action. ASCII text conveys critical state; color and Unicode are
+enhancements only. The layout targets ordinary 80-column terminals and SSH.
+
+## Configuration ownership and editing
+
+New deployments will opt into a deterministic `lab-settings.json` file:
+
+```json
+{
+  "schemaVersion": 1,
+  "lab": {
+    "masterDhcpIp": "192.0.2.10",
+    "networkBase": "10.0.0.0",
+    "networkPrefixLength": 24
+  }
+}
+```
+
+The complete `lab` object contains the same typed fields currently accepted by
+`lib.mkLab`. Nix reads it with `builtins.fromJSON`; the existing Nix module
+schema remains the final authority and rejects unknown values. A small
+management schema validates input before writing and is kept in conformance
+with Nix evaluation tests. Deterministic pretty-printed JSON provides stable
+Git diffs and is the only file the management application edits.
+
+The application writes a sibling temporary file with mode `0600`, fsyncs it,
+and atomically renames it after verifying the deployment root and rejecting
+symlinks. It then evaluates the candidate through the deployment Flake before
+offering acceptance. The operator sees the non-secret effective configuration
+and Git diff. Existing unrelated changes are preserved and highlighted.
+
+Plaintext passwords are read without terminal echo, sent to a local hashing
+process over standard input, retained in memory only as long as needed, and
+cleared where practical. Only salted SHA-512 password hashes enter the private
+configuration. Private Harmonia, SSH, and Veyon keys stay outside the Git
+worktree in root- or user-owned locations. Their public counterparts remain in
+the deployment and may be committed.
+
+Existing deployments that import `lab-config.nix` continue to work unchanged.
+The management application treats arbitrary Nix configuration as read-only and
+offers an explicit migration that evaluates current `labMeta` plus the typed
+configuration export, writes `lab-settings.json`, and shows the required small
+Flake diff. It never rewrites arbitrary Nix. Migration is accepted only after
+old and new `labMeta`, `deploymentStatus`, and representative derivations are
+equivalent.
+
+## First-run state machine
+
+Setup is a resumable reconciliation, not a linear script or a single
+`configured` flag. Its stages are:
+
+```text
+inspect environment
+  -> collect network settings
+  -> collect lab identity and locale
+  -> collect and hash credentials
+  -> reconcile key material
+  -> validate candidate configuration
+  -> review and accept Git changes
+  -> apply controller configuration
+  -> prepare installation artifacts
+  -> verify readiness
+  -> offer first client installation
+```
+
+The private deployment records only non-secret intent and completed review
+decisions. Runtime completion is inferred from configuration, public/private
+key correspondence, system generations, service state, and artifact metadata.
+On restart, setup re-runs safe inspections and selects the earliest unmet
+stage. Going backward changes draft values without undoing applied operations.
+
+Key creation uses create-new semantics. Existing keys are verified and reused;
+they are never overwritten. Regeneration is a separately named recovery action
+that describes affected clients and requires confirmation. Controller rebuild
+and artifact preparation are restartable because output paths are content
+addressed; their logs are recorded by systemd or the operation event stream.
+
+First-run discoverability is provided by a controller-only desktop entry and a
+GNOME autostart notification/launcher conditioned on incomplete readiness. It
+runs as the logged-in administrator and does not use shell profile hooks or
+automatic root execution. The exact desktop mechanism is verified in a NixOS
+VM before it becomes the default.
+
+## Privilege model
+
+The TUI and most of the CLI run as the administrator account. They may read
+public Flake outputs, inspect Git, edit the administrator-owned deployment,
+build in the Nix store, probe hosts, and invoke Colmena as that account.
+
+Root operations are exposed as fixed controller services/actions:
+
+- install or verify private key material at fixed destinations;
+- apply the controller NixOS configuration;
+- start, stop, and recover PXE networking and services;
+- inspect narrowly selected system units and journals.
+
+Systemd owns the long-running processes and root-only state. Polkit grants the
+administrator group access only to named Nixorium actions. There is no generic
+root command executor and no user-provided executable path or shell fragment.
+The deployment path used by privileged actions is configured declaratively on
+the controller and validated as a local, administrator-owned Git worktree.
+
+The administrator is already a wheel user, but the narrow interface still
+reduces accidental misuse and makes every disruptive operation auditable.
+Deployment to clients continues through SSH/Colmena with the existing keys and
+host-key policy. A future enrollment API, if justified, is separate from this
+local privilege interface and must have its own authentication design.
+
+## Managed services
+
+The controller module defines:
+
+- `nixorium-harmonia.service`, a normal system service with its signing key in
+  a non-store path, restart policy, journald logs, readiness check, and binding
+  restricted to configured lab addresses where Harmonia permits it;
+- `nixorium-pxe.service`, an on-demand service for ProxyDHCP/TFTP/HTTP whose
+  runtime directory and generated configuration are owned by systemd;
+- `nixorium-pxe-network.service`, a root oneshot that applies and reverts the
+  temporary address transition idempotently;
+- preparation/apply jobs as transient or oneshot units so their logs survive a
+  TUI exit.
+
+PXE ordering requires the cache, prepared artifacts, and network transition
+before starting the proxy. Stopping PXE stops network services first and then
+restores normal addressing. Firewall openings are scoped to the installation
+interface and active service wherever the NixOS firewall model supports it.
+The management application never keeps infrastructure alive by remaining open.
+
+## PXE lifecycle and recovery
+
+The lifecycle is:
+
+```text
+stopped -> inspecting -> preparing -> ready -> starting -> active
+   ^                                               |
+   +--------- stopping <- active/degraded <--------+
+                    |
+                 recovering
+```
+
+Preparation is non-disruptive. It verifies deployment readiness, interface and
+DHCP address, detects a changed lease, updates the managed setting only after a
+review, builds necessary client closures and netboot artifacts, obtains the
+locked iPXE binary, and verifies cache reachability. Content-addressed build
+results are recorded by store path and configuration revision, not merely by
+the existence of `result-*` symlinks.
+
+Starting creates a root-owned session record under `/var/lib/nixorium/pxe/`
+containing a schema version, original observed addresses, desired transition,
+artifact store paths, and timestamps. The network unit then reconciles the
+actual interface, followed by PXE service startup. A session is `active` only
+when both actual unit/network state and health checks agree.
+
+Stopping is idempotent. It stops listeners, restores the declarative static
+address if absent, verifies the resulting interface, and archives a concise
+operation result. Ctrl-C closes only the interactive view unless the operator
+explicitly chooses to stop installation mode. On controller reboot, normal
+declarative networking returns; a boot-time recovery unit detects an unfinished
+session, verifies reality, performs any missing cleanup, and marks it recovered.
+On the next invocation, stale records are never trusted over actual addresses,
+listeners, processes, and systemd unit state.
+
+The first implementation need not add a controller/client protocol. Passive
+information from dnsmasq journald and neighbor state may be displayed as
+untrusted observations. Reliable host reservation or duplicate-assignment
+prevention requires an authenticated enrollment protocol and is deferred until
+its threat model and hardware behavior are proven.
+
+## Client enrollment
+
+The client-side application reads the configured host list from a versioned
+installer metadata output, shows firmware, CPU, memory, NIC/MAC, disks, and the
+exact target disk, and lets the operator choose a host identity. It requires an
+unmistakable final confirmation containing both hostname and disk before Disko
+runs. An unattended mode is disabled by default and requires an explicit
+deployment policy plus invocation token.
+
+Without a trusted controller protocol, the installer can warn about observed
+reachability or duplicate choices but cannot claim a reservation. A later
+protocol must bind to the installation network, authenticate the controller,
+prevent unauthenticated clients from reserving arbitrary identities
+indefinitely, and retain a manual recovery path.
+
+## Git workflow and operation records
+
+Configuration changes are prepared in the existing working tree. The
+application refuses to conflate its generated patch with overlapping existing
+edits, shows the diff, and can discard only its own staged draft before
+acceptance. A commit is optional and requires explicit confirmation; push is
+never implicit and no remote is required.
+
+System operations log structured key/value events to journald with an operation
+identifier. A small root-owned state directory contains only active/recovery
+state that journald cannot provide. It is not an alternative configuration
+database. Logs redact credential input, private paths where useful, key
+contents, environment secrets, and command output known to contain secrets.
+
+## Testing strategy
+
+Testing is layered:
+
+- unit tests cover validation, command plans, status aggregation, state
+  transitions, migration, redaction, host selection, and cleanup decisions;
+- adapter tests use temporary Git repositories and fake executables with
+  recorded argument arrays and controlled output;
+- Nix evaluation tests cover package/module exports, strict configuration,
+  public metadata schemas, template generation, and unchanged legacy inputs;
+- NixOS VM tests cover first-run discovery, systemd ordering, Harmonia health,
+  PXE start/stop/recovery, permission boundaries, and CLI status;
+- offline equivalence continues comparing the direct and bundled client
+  derivations;
+- a QEMU PXE scenario is added when deterministic ProxyDHCP behavior can be
+  isolated;
+- physical validation separately covers firmware varieties, NICs, disk wipe,
+  DHCP coexistence, power loss, and multi-client deployment.
+
+Every implementation increment runs the smallest relevant tests plus the
+repository validation matrix required by `skills/nixorium-developer`.
+Evaluation alone is not evidence that affected packages or host roles build.
+
+## Incremental delivery
+
+1. Package the Go command with typed read-only `status` and `doctor`, JSON
+   output, adapters, tests, and legacy deployment compatibility.
+2. Add structured settings, migration, setup state reconciliation, secure
+   credential hashing and idempotent key handling.
+3. Add controller services, PXE preparation, transactional networking, and
+   recovery tests.
+4. Replace numeric client setup with guided enrollment and explicit destructive
+   review; decide whether an authenticated controller protocol is justified.
+5. Add host inventory, deployment, service/log, and Git review workflows.
+6. Add guided upstream update and richer recovery.
+7. Complete administrator documentation, VM/PXE automation, migration testing,
+   and physical-lab validation.
+
+Each step preserves the public `mkLab` outputs and manual workflows until a
+documented compatibility decision says otherwise.
+
+## Risks and open questions
+
+- DHCP leases embedded in netboot artifacts can make a prepared session stale;
+  preparation must compare observed and configured addresses every time.
+- Address changes can interrupt controller connectivity; systemd cleanup and
+  reboot reconciliation need VM and hardware testing before the workflow is
+  called safe.
+- The disabled shared firewall broadens current exposure. Management services
+  must bind narrowly, and the underlying firewall policy should be corrected
+  in a compatible milestone.
+- Git cannot safely include private keys or plaintext credentials; key and
+  password flows need adversarial tests for files, process arguments, logs,
+  and Nix store references.
+- Go module vendoring and Nix packaging must remain reproducible and must not
+  add network use to installed management commands.
+- Hardware diversity may invalidate assumptions about interface ownership,
+  UEFI PXE, disk naming, and `snponly.efi`; physical validation remains distinct
+  from VM validation.
+- Reliable duplicate enrollment is unresolved without a controller protocol.
+  The first client UX must describe the actual guarantee rather than simulate
+  coordination.
+
+The following decisions are recorded separately:
+
+- [ADR-0001: terminal-first management](adr/0001-terminal-first-management.md)
+- [ADR-0002: Go and Bubble Tea](adr/0002-go-bubble-tea.md)
+- [ADR-0003: structured deployment settings](adr/0003-structured-deployment-settings.md)
+- [ADR-0004: narrow privileged actions](adr/0004-narrow-privileged-actions.md)
+- [ADR-0005: systemd-owned runtime services](adr/0005-systemd-owned-runtime-services.md)
