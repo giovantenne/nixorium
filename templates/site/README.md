@@ -90,6 +90,7 @@ nix run .#nixorium -- status
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
+nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
@@ -119,6 +120,10 @@ first incomplete first-run stage so interrupted setup can resume predictably.
 `setup keys` creates only missing Harmonia, SSH, and Veyon pairs, restricts
 private modes, verifies correspondence, and refuses to overwrite existing key
 material. It is safe to retry after interruption.
+`setup install-secrets` asks the fixed, sandboxed controller systemd action to
+install only already-verified material. Its source is the declarative
+`services.nixorium.deploymentPath`; existing different destinations are never
+replaced.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.

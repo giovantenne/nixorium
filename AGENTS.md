@@ -113,6 +113,9 @@ nix run .#nixorium -- setup
 # Create missing key pairs and verify all existing correspondence
 nix run .#nixorium -- setup keys
 
+# Install verified private material through the fixed privileged unit
+nix run .#nixorium -- setup install-secrets
+
 # Validate and review a complete settings candidate without writing it
 nix run .#nixorium -- config plan --file candidate.json
 
@@ -268,6 +271,7 @@ set -euo pipefail
 - **Never commit** `veyon-private-key.pem` (in `.gitignore`); deploy manually to `/etc/veyon/keys/private/teacher/key` with mode `0640` and group `veyon-master`
 - `keys/cache-public-key`, `keys/admin-ssh.pub`, and `keys/veyon-public-key.pem` are public and may be committed
 - `nixorium setup keys` uses create-new semantics and refuses public-only or mismatched pairs; never bypass that refusal by overwriting an existing key
+- `nixorium setup install-secrets` may start only `nixorium-install-secrets.service`; its deployment path is declarative and destinations are fixed
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management

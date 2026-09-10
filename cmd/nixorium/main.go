@@ -25,6 +25,7 @@ type options struct {
 	full       bool
 	help       bool
 	guided     bool
+	verifyOnly bool
 }
 
 func main() {
@@ -142,8 +143,24 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		manager := app.NewSetupManager(adapters.Local{})
 		if options.subcommand == "configure" {
 			return runSetupConfigure(ctx, repository, stdout, stderr, options.guided)
+		} else if options.subcommand == "install-secrets" {
+			report := app.NewSystemActions(adapters.Local{}).InstallSecrets(ctx)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.ActionText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
 		} else if options.subcommand == "keys" {
-			report, reconcileErr := manager.ReconcileKeys(ctx, repository)
+			report := domain.KeyReconcileReport{}
+			var reconcileErr error
+			if options.verifyOnly {
+				report = manager.VerifyKeys(ctx, repository)
+			} else {
+				report, reconcileErr = manager.ReconcileKeys(ctx, repository)
+			}
 			if options.json {
 				err = presentation.JSON(stdout, report)
 			} else {
@@ -151,6 +168,9 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 			if err == nil && reconcileErr != nil {
 				err = reconcileErr
+			}
+			if report.State != "ready" && err == nil {
+				return 1
 			}
 		} else {
 			report := manager.Status(ctx, repository)
@@ -198,6 +218,8 @@ func parseArguments(arguments []string) (options, error) {
 			result.json = true
 		case "--full":
 			result.full = true
+		case "--verify-only":
+			result.verifyOnly = true
 		case "-h", "--help", "help":
 			result.help = true
 		case "status":
@@ -234,12 +256,20 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("configure must follow setup")
 			}
 			result.subcommand = "configure"
+		case "install-secrets":
+			if result.command != "setup" || result.subcommand != "" {
+				return options{}, errors.New("install-secrets must follow setup")
+			}
+			result.subcommand = "install-secrets"
 		default:
 			return options{}, fmt.Errorf("unknown argument %q", arguments[index])
 		}
 	}
 	if result.full && result.command != "doctor" {
 		return options{}, errors.New("--full is only valid with doctor")
+	}
+	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
+		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -260,8 +290,8 @@ func parseArguments(arguments []string) (options, error) {
 		result.subcommand = "configure"
 		result.guided = true
 	}
-	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" && result.subcommand != "configure" {
-		return options{}, errors.New("setup requires the configure, status, or keys subcommand")
+	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" && result.subcommand != "configure" && result.subcommand != "install-secrets" {
+		return options{}, errors.New("setup requires configure, status, keys, or install-secrets")
 	}
 	if result.command == "setup" && result.subcommand == "configure" && result.json {
 		return options{}, errors.New("--json is not valid with interactive setup configure")
@@ -330,9 +360,10 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets] [options]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
+	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
 }
@@ -426,6 +457,12 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 		presentation.KeyReconcileText(stdout, keyReport)
 		if keyErr != nil {
 			fmt.Fprintln(stderr, "Error:", keyErr)
+			return 1
+		}
+		actionReport := app.NewSystemActions(local).InstallSecrets(ctx)
+		presentation.ActionText(stdout, actionReport)
+		if actionReport.HasErrors() {
+			fmt.Fprintln(stderr, "The settings and repository keys are intact; retry with `nixorium setup install-secrets` on the controller.")
 			return 1
 		}
 		fmt.Fprintln(stdout, "Review and commit lab-settings.json and the public files under keys/ before applying the controller.")

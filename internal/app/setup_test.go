@@ -60,6 +60,13 @@ func TestReconcileKeysReportsVerifiedState(t *testing.T) {
 	}
 }
 
+func TestVerifyKeysIsReadOnlyAndReportsVerifiedState(t *testing.T) {
+	report := NewSetupManager(fakeSetupSource{}).VerifyKeys(context.Background(), "/repo")
+	if report.Operation != "setup-keys-verify" || report.State != "ready" || len(report.Keys) != 3 {
+		t.Fatalf("report = %+v", report)
+	}
+}
+
 func TestSetupStatusSelectsNetworkForFreshTemplate(t *testing.T) {
 	data, err := os.ReadFile("../../templates/site/lab-settings.json")
 	if err != nil {

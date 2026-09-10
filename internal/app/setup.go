@@ -29,10 +29,18 @@ func NewSetupManager(source SetupSource) SetupManager {
 
 func (m SetupManager) ReconcileKeys(ctx context.Context, repository string) (domain.KeyReconcileReport, error) {
 	reconcileErr := m.source.ReconcileKeyMaterial(ctx, repository)
+	return m.keyReport(ctx, repository, "setup-keys"), reconcileErr
+}
+
+func (m SetupManager) VerifyKeys(ctx context.Context, repository string) domain.KeyReconcileReport {
+	return m.keyReport(ctx, repository, "setup-keys-verify")
+}
+
+func (m SetupManager) keyReport(ctx context.Context, repository, operation string) domain.KeyReconcileReport {
 	states := m.source.KeyMaterial(ctx, repository)
 	report := domain.KeyReconcileReport{
 		SchemaVersion: domain.SchemaVersion,
-		Operation:     "setup-keys",
+		Operation:     operation,
 		State:         "ready",
 		Repository:    repository,
 		Keys:          states,
@@ -43,7 +51,7 @@ func (m SetupManager) ReconcileKeys(ctx context.Context, repository string) (dom
 			break
 		}
 	}
-	return report, reconcileErr
+	return report
 }
 
 func (m SetupManager) Status(ctx context.Context, repository string) domain.SetupReport {

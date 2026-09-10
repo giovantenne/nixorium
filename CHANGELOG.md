@@ -52,6 +52,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - A guided `nixorium setup` terminal form with detected network defaults,
   backward navigation, no-echo password hashing, redacted final review,
   explicit acceptance, and Git-aware classification of existing changes.
+- A fixed-path, systemd-sandboxed `setup install-secrets` action with
+  unit-specific wheel polkit authorization, key-pair re-verification,
+  least-privilege destinations, idempotent reuse, and mismatch refusal.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.
