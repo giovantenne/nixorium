@@ -137,30 +137,24 @@ Create an empty **private** repository in your school organization, add it as
 `origin`, and push this initial commit. Public forks are unsuitable because the
 deployment contains password hashes and internal network details.
 
-### 3. Edit and validate `lab-settings.json`
+### 3. Configure the laboratory
 
-Now you have all the values you need. Find your DHCP address and interface name:
-```sh
-ip -4 addr
-```
-
-Generate the password hashes before filling the three password fields below. The default password for all users is `nixos`:
+Launch the guided first-run configuration from the deployment root:
 
 ```sh
-# Hashed passwords (run once per user, paste each hash into lab-settings.json)
-mkpasswd -m sha-512
+nix run .#nixorium -- setup
 ```
 
-Edit the existing deterministic JSON file without changing its
-`schemaVersion`. Set the controller DHCP address and interface, static network
-and prefix, client count and controller host number, account names, three
-password hashes, homepage, Git identities, locale, keyboard, and optional
-`veyonNativeHosts`. Then validate both the management schema and the final Nix
-configuration:
-
-```sh
-nix run .#nixorium -- config validate
-```
+The terminal wizard proposes the detected active interface and current IPv4
+address on a fresh deployment, walks through network, account, locale,
+homepage, Git, and Veyon settings, and supports backward navigation. Enter the
+three normal passwords when prompted; input is not echoed and only salted
+hashes reach `lab-settings.json`. The final screen shows a non-secret semantic
+diff, separates setup-generated public-key changes from other worktree edits,
+and writes only after explicit acceptance and complete Nix validation. Once
+accepted, the full `setup` command also creates or verifies the three required
+key pairs and tells you which public files to review and commit. Use `setup
+configure` when only the settings stage should run.
 
 The machine-facing review/apply API accepts a complete candidate settings file.
 It validates the candidate through both the management schema and the actual
@@ -194,7 +188,8 @@ Generate the three required key pairs. Keep the private files local to the contr
 | **SSH** | `admin-ssh` | `keys/admin-ssh.pub` | Admin SSH access + Colmena deploys (connects as `root`) |
 | **Veyon** | `veyon-private-key.pem` | `keys/veyon-public-key.pem` | Veyon Master authenticates to student PCs |
 
-Create or reconcile all three pairs through the management command:
+Bare `setup` already performs this stage. It can also be run or retried
+independently:
 
 ```sh
 nix run .#nixorium -- setup keys
@@ -298,15 +293,15 @@ sudo ip addr add "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
 
 ## 🔧 Maintenance
 
-### Read-only management preview
+### Management commands
 
-The first management increment provides a read-only dashboard plus structured
-status and diagnostics. Run these commands from the private deployment root:
+Run these commands from the private deployment root:
 
 ```sh
 nix run .#nixorium
 nix run .#nixorium -- status
 nix run .#nixorium -- status --json
+nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
 nix run .#nixorium -- config validate
@@ -314,8 +309,9 @@ nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
 ```
 
-The dashboard and commands evaluate `labMeta` and `deploymentStatus`; they do
-not perform privileged operations. `config validate` reads the machine-owned
+The dashboard and inspection commands evaluate `labMeta` and
+`deploymentStatus`; setup configuration and key generation are explicit,
+unprivileged mutations of the private deployment. `config validate` reads the machine-owned
 settings without changing them, rejects unknown or invalid values, and then
 evaluates the deployment through Nix as the final authority. The current `doctor`
 checks readiness, Git state, subnet/interface/address ownership, Harmonia key
@@ -327,10 +323,12 @@ real controller build. The default remains quick and read-only.
 `setup status` reconciles observed state on every run and selects the earliest
 incomplete first-run stage. It currently reports environment, network,
 identity/locale, default credentials, key correspondence and private modes,
-candidate validation, artifacts, and deployment readiness. Review, controller
+candidate validation, artifacts, and deployment readiness. Git review is
+complete only when the deployment worktree is clean. Controller
 apply, and guided installation remain explicit future stages; no global
-`configured` flag is trusted. `setup keys` is the explicit, unprivileged
-create-new operation for the Harmonia, SSH, and Veyon pairs.
+`configured` flag is trusted. Bare `setup` continues from accepted settings to
+key reconciliation; `setup keys` exposes that same explicit, unprivileged
+create-new operation independently.
 
 The `nixorium` executable is installed on the generated controller system. It
 uses `NIXORIUM_REPO` when set, otherwise the current deployment root or the

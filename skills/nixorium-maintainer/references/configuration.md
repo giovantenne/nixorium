@@ -25,6 +25,18 @@ application. Validate it through both schema layers after any edit:
 nix run .#nixorium -- config validate
 ```
 
+For first-run configuration, prefer the interactive wizard:
+
+```sh
+nix run .#nixorium -- setup
+```
+
+It proposes detected network values, retains prior entries when navigating
+back, accepts normal passwords without echo, hashes them locally, validates the
+complete candidate through Nix, and presents a redacted review before writing.
+Bare `setup` then reconciles the three key pairs; `setup configure` runs only
+the settings stage.
+
 For a machine-generated complete candidate, use the review/apply protocol:
 
 ```sh

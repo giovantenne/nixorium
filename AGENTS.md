@@ -107,6 +107,9 @@ nix build .#nixorium
 # Inspect the deterministic first-run setup stage without mutating state
 nix run .#nixorium -- setup status
 
+# Run guided configuration, key reconciliation, and final review
+nix run .#nixorium -- setup
+
 # Create missing key pairs and verify all existing correspondence
 nix run .#nixorium -- setup keys
 

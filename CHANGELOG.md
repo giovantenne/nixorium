@@ -49,6 +49,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - A non-secret `config plan` and fingerprint-bound `config apply` protocol
   that validates candidates through the deployment Flake, rejects concurrent
   edits, and atomically updates only `lab-settings.json`.
+- A guided `nixorium setup` terminal form with detected network defaults,
+  backward navigation, no-echo password hashing, redacted final review,
+  explicit acceptance, and Git-aware classification of existing changes.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.

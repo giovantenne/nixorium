@@ -41,7 +41,7 @@ func TestGitStateCountsChangedPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !state.Dirty || state.Changes != 2 {
+	if !state.Dirty || state.Changes != 2 || len(state.Paths) != 2 {
 		t.Fatalf("state = %+v, want two changes", state)
 	}
 }
