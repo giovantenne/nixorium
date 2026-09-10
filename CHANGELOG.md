@@ -40,6 +40,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - A deterministic, read-only `nixorium setup status` reconciler that reports
   every first-run stage and selects the earliest incomplete one from observed
   settings, credentials, key files, artifacts, and deployment readiness.
+- A secure password-collection backend with terminal-only no-echo input,
+  confirmation, default/length checks, best-effort memory wiping, and
+  stdin-only salted SHA-512 hashing through the packaged `mkpasswd` tool.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.
