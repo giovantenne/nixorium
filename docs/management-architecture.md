@@ -210,6 +210,12 @@ configuration. Private Harmonia, SSH, and Veyon keys stay outside the Git
 worktree in root- or user-owned locations. Their public counterparts remain in
 the deployment and may be committed.
 
+The credential backend implements this boundary with terminal-only confirmed
+input, explicit rejection of short/default values, best-effort slice wiping,
+and `mkpasswd -m sha-512 --stdin`. It remains an application service until the
+candidate-review workflow can apply the resulting hash without an unreviewed
+configuration write.
+
 Existing deployments that import `lab-config.nix` continue to work unchanged.
 The management application treats arbitrary Nix configuration as read-only and
 offers an explicit migration that evaluates current `labMeta` plus the typed

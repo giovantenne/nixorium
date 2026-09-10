@@ -192,3 +192,7 @@ func MarshalLabSettings(settings LabSettingsFile) ([]byte, error) {
 	}
 	return append(data, '\n'), nil
 }
+
+func IsPasswordHash(value string) bool {
+	return passwordHashPattern.MatchString(value)
+}
