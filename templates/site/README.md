@@ -85,6 +85,7 @@ Run commands from the repository root:
 
 ```sh
 nix run .#nixorium -- status
+nix run .#nixorium -- setup status
 nix run .#nixorium -- config validate
 nix run .#nixorium -- doctor
 nix run .#nixorium -- doctor --full
@@ -96,6 +97,8 @@ Running `nix run .#nixorium` without a subcommand opens the current read-only
 terminal dashboard. Add `--json` to `status` or `doctor` for structured output.
 `config validate` checks the strict management schema and then evaluates the
 deployment through Nix, which remains the final configuration authority.
+`setup status` is also read-only: it re-inspects the deployment and reports the
+first incomplete first-run stage so interrupted setup can resume predictably.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.

@@ -66,6 +66,21 @@ func ConfigValidationText(writer io.Writer, report domain.ConfigValidationReport
 	}
 }
 
+func SetupText(writer io.Writer, report domain.SetupReport) {
+	fmt.Fprintf(writer, "First-run setup: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:      %s\n", report.Repository)
+	if report.CurrentStage != "" {
+		fmt.Fprintf(writer, "Current stage:   %s\n", report.CurrentStage)
+	}
+	for _, stage := range report.Stages {
+		fmt.Fprintf(writer, "  %-8s %-28s", strings.ToUpper(string(stage.State)), stage.Title)
+		if stage.Detail != "" {
+			fmt.Fprintf(writer, " %s", stage.Detail)
+		}
+		fmt.Fprintln(writer)
+	}
+}
+
 func readyText(ready bool) string {
 	if ready {
 		return "ready"

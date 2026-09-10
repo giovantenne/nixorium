@@ -18,3 +18,5 @@ customization, validation, upstream-update, and offline-installer work.
 - Require `deploymentStatus.ready` before installation or deployment. Validate
   `labMeta`, the affected host roles, and the netboot ramdisk first. Deployment
   requires explicit authorization.
+- Use `nixorium setup status` to re-inspect the earliest incomplete first-run
+  stage; do not invent or toggle a global configured flag.

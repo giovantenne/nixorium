@@ -53,6 +53,7 @@
         };
       }
     '';
+    environment.etc."nixorium-test/lab-settings.json".source = ../templates/site/lab-settings.json;
   };
 
   testScript = ''
@@ -63,10 +64,12 @@
     controller.succeed("nixorium --help | grep -F 'doctor --full'")
     controller.succeed("mkdir -p /tmp/deployment")
     controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
+    controller.succeed("cp /etc/nixorium-test/lab-settings.json /tmp/deployment/lab-settings.json")
     controller.succeed("git -C /tmp/deployment init -q")
     controller.succeed("git -C /tmp/deployment add flake.nix")
     controller.succeed("git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm initial")
     controller.succeed("nixorium status --repo /tmp/deployment --json | jq -e '.operation == \"status\" and .state == \"ready\" and .lab.clients.hosts[0].name == \"pc01\"'")
+    controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"action-required\" and .currentStage == \"collect-network\"'")
     controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\")'")
   '';
 }

@@ -37,6 +37,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments
   remain compatible.
+- A deterministic, read-only `nixorium setup status` reconciler that reports
+  every first-run stage and selects the earliest incomplete one from observed
+  settings, credentials, key files, artifacts, and deployment readiness.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.

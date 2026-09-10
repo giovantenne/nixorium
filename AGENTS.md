@@ -104,6 +104,9 @@ nix build .#nixosConfigurations.pc{01..20}.config.system.build.toplevel
 nix develop --command go test ./...
 nix build .#nixorium
 
+# Inspect the deterministic first-run setup stage without mutating state
+nix run .#nixorium -- setup status
+
 # Rebuild and activate on the local machine (controller)
 sudo nixos-rebuild switch --flake .#pcNN --no-write-lock-file
 

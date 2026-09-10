@@ -11,7 +11,11 @@ import (
 	"strings"
 )
 
-const SettingsSchemaVersion = 1
+const (
+	SettingsSchemaVersion = 1
+	MasterDHCPPlaceholder = "MASTER_DHCP_IP"
+	DefaultPasswordHash   = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0"
+)
 
 var (
 	interfaceNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$`)
@@ -90,7 +94,7 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	}
 
 	lab := s.Lab
-	if lab.MasterDHCPIP != "MASTER_DHCP_IP" {
+	if lab.MasterDHCPIP != MasterDHCPPlaceholder {
 		if address, err := netip.ParseAddr(lab.MasterDHCPIP); err != nil || !address.Is4() {
 			add("lab.masterDhcpIp", "must be an IPv4 address or MASTER_DHCP_IP")
 		}
