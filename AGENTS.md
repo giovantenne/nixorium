@@ -12,9 +12,10 @@ over a LAN-only deployment network. Clients do not need internet for
 installation or system updates, but may have internet during user sessions.
 
 The repository exports `lib.mkLab` for private per-lab deployment Flakes. The
-root `lab-config.nix` keeps the standalone example compatible, while real lab
-settings, public keys, assets and local modules belong in a private deployment
-repository generated from `templates/site`.
+root `lab-config.nix` keeps the standalone example compatible, while new
+private deployments store managed site values in `lab-settings.json`. Public
+keys, assets and local modules also belong in the private repository generated
+from `templates/site`.
 
 ## Project Structure
 
@@ -32,10 +33,14 @@ disko-uefi.nix             # NixOS wrapper for the shared Disko layout
 lib/
   disko-layout.nix         # Shared Disko layout function (device + student user)
   eval-lab-config.nix      # Typed schema and validation for lab-config.nix
+  eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 pkgs/
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
+  nixorium.nix             # Go management command package
+cmd/nixorium/              # Management CLI entrypoint
+internal/                  # Domain, application, adapter, and presentation layers
 modules/
   common.nix               # Composition point and shared system defaults
   desktop.nix              # GNOME, locale, fonts and desktop policy
@@ -46,6 +51,7 @@ modules/
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
+  management.nix           # Controller-only management command installation
   users.nix                # User accounts (admin + teacher + student, veyon-master group)
   cache.nix                # Binary cache client (points to controller's Harmonia)
   filesystems.nix          # Btrfs subvolume mount declarations
@@ -73,6 +79,8 @@ assets/
 templates/site/            # Private deployment repository template
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
+docs/management-architecture.md # Accepted management-system target design
+docs/adr/                   # Product architecture decision records
 ```
 
 Generated locally during setup and committed in the private deployment repo:
@@ -91,6 +99,10 @@ nix build .#nixosConfigurations.pc01.config.system.build.toplevel
 
 # Build all client closures
 nix build .#nixosConfigurations.pc{01..20}.config.system.build.toplevel
+
+# Run management application tests and build the package
+nix develop --command go test ./...
+nix build .#nixorium
 
 # Rebuild and activate on the local machine (controller)
 sudo nixos-rebuild switch --flake .#pcNN --no-write-lock-file
@@ -129,11 +141,11 @@ Release from the matching changelog section.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
 - Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
 - Hostname + static IP are centralized in `lib/mk-lab.nix`. `networkBase` is a full IPv4 network address and `networkPrefixLength` its CIDR prefix; host numbers are validated offsets. Each PC gets both a DHCP address and a static address on the same interface.
-- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, `masterDhcpIp` in `lab-config.nix` must be updated and netboot artifacts rebuilt before the next PXE session.
+- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, update `masterDhcpIp` in the deployment's `lab-settings.json` (or a legacy deployment's `lab-config.nix`) and rebuild netboot artifacts before the next PXE session.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
-- `labMeta` is a public flake output containing the small set of non-sensitive operational values that shell scripts need (controller IPs, network prefix, iface name, client count, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
-- `lib/eval-lab-config.nix` uses a private `lib.evalModules` schema to type-check site data. No custom NixOS options are added to host configurations.
+- `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
+- `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
@@ -252,6 +264,8 @@ Hostname + static IP are generated in `lib/mk-lab.nix` from the IPv4 network,
 CIDR prefix, and host offset. The shared interface name is configured via
 `labSettings.ifaceName` and applied in `modules/networking.nix`.
 
-All user-configurable parameters live in the deployment `lab-config.nix`.
+All machine-managed parameters live in a new deployment's
+`lab-settings.json`; legacy `lab-config.nix` deployments remain supported and
+read-only until explicitly migrated.
 Additional behavior belongs in downstream extension modules, never in copies of upstream modules.
 Shell scripts must load operational settings from `labMeta` via `scripts/lib/lab-meta.sh`.

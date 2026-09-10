@@ -36,7 +36,9 @@ test -e .pi/skills/nixorium-developer/SKILL.md
 
 if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.config-schema.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.management-vm.drvPath" --raw --no-write-lock-file >/dev/null
 else
   nix flake check "path:${REPO_ROOT}" --no-write-lock-file
 fi
@@ -53,6 +55,8 @@ if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#packages.x86_64-linux.installerBundle.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-harmonia.program" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-pxe-proxy.program" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#apps.x86_64-linux.nixorium.program" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.nixorium.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#colmena.pc01.deployment.targetHost" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#deploymentStatus" --json --no-write-lock-file >/dev/null
 else
@@ -61,6 +65,7 @@ else
   nix build "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" --no-write-lock-file --no-link
   nix build "path:${REPO_ROOT}#disko" --no-write-lock-file --no-link
   nix build "path:${REPO_ROOT}#installerBundle" --no-write-lock-file --no-link
+  nix build "path:${REPO_ROOT}#nixorium" --no-write-lock-file --no-link
 fi
 
 (
@@ -75,12 +80,21 @@ fi
   test -e .claude/skills/nixorium-maintainer/SKILL.md
   test -e .pi/skills/nixorium-maintainer/SKILL.md
   test ! -e skills/nixorium-developer
+  test -e lab-settings.json
+  test ! -e lab-config.nix
 )
 
 if [[ "$(nix eval "path:${SITE_DIR}#deploymentStatus.ready" --json --no-write-lock-file)" != "false" ]]; then
   echo "Error: a fresh template unexpectedly reports that it is deployment-ready." >&2
   exit 1
 fi
+
+nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
+  config validate --repo "$SITE_DIR" --json >/dev/null
+
+nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
+  --raw \
+  --no-write-lock-file >/dev/null
 
 DIRECT_CLIENT_DRV=$(
   nix eval "path:${SITE_DIR}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" \

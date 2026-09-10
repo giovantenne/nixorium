@@ -170,6 +170,7 @@ let
     (upstreamRoot + "/modules/docker.nix")
     (upstreamRoot + "/modules/development.nix")
     (upstreamRoot + "/modules/veyon.nix")
+    (upstreamRoot + "/modules/management.nix")
   ] ++ lib.optional (nixosVersionMetadata != null) ({ lib, ... }: {
     system.nixos.versionSuffix = lib.mkForce nixosVersionMetadata.versionSuffix;
     system.nixos.revision = lib.mkForce nixosVersionMetadata.revision;
@@ -185,6 +186,7 @@ let
   specialArgsForHost = name: hostIp: {
     inherit labSettings;
     inherit labAssets;
+    inherit nixoriumPackage;
     inherit hostIp;
     hostName = name;
   };
@@ -198,7 +200,13 @@ let
       staticIp = masterIp;
       dhcpIp = masterDhcpIp;
     };
-    clients.count = pcCount;
+    clients = {
+      count = pcCount;
+      hosts = map (n: {
+        name = "pc${padNumber n}";
+        ip = mkHostIp n;
+      }) clientNumbers;
+    };
     network = {
       base = networkBase;
       prefixLength = networkPrefixLength;
@@ -272,6 +280,7 @@ let
   bootstrapPkgs = import nixpkgs {
     inherit system;
   };
+  nixoriumPackage = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {};
 
   installerFlake = bootstrapPkgs.writeText "nixorium-installer-flake.nix" ''
     {
@@ -481,6 +490,11 @@ assert unknownVeyonNativeHosts == []
   } // builtins.listToAttrs (map mkColmenaHost clientNumbers);
 
   apps.${system} = {
+    nixorium = {
+      type = "app";
+      program = "${nixoriumPackage}/bin/nixorium";
+      meta.description = "Manage the Nixorium laboratory";
+    };
     run-harmonia = {
       type = "app";
       program = "${runHarmonia}/bin/nixorium-run-harmonia";
@@ -501,5 +515,6 @@ assert unknownVeyonNativeHosts == []
   packages.${system} = {
     inherit installerBundle;
     disko = runDisko;
+    nixorium = nixoriumPackage;
   };
 }

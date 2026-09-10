@@ -48,6 +48,12 @@ This project bridges that gap with a **local-first workflow**:
 
 ## 🏗️ Architecture
 
+The accepted design for the management CLI/TUI, configuration boundary,
+privilege separation, and recoverable PXE lifecycle is documented in
+[the management architecture proposal](docs/management-architecture.md).
+It is a target design; the external implementation status tracks which parts
+have actually been delivered and validated.
+
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                      Controller (pcNN)                           │
@@ -111,7 +117,7 @@ disks are detected, it asks you to choose one.
 
 Before partitioning, the bootstrap generates and commits a private deployment
 from the template in the selected release. It installs the controller from
-that deployment using the default placeholder settings in `lab-config.nix`.
+that deployment using the default placeholder settings in `lab-settings.json`.
 SSH, binary cache, and Veyon public keys are added later, after step 4.
 
 The bootstrap script forces `cache.nixos.org` during installation, so it does not depend on any LAN cache or substituter already configured in the live environment.
@@ -131,7 +137,7 @@ Create an empty **private** repository in your school organization, add it as
 `origin`, and push this initial commit. Public forks are unsuitable because the
 deployment contains password hashes and internal network details.
 
-### 3. Edit `lab-config.nix`
+### 3. Edit and validate `lab-settings.json`
 
 Now you have all the values you need. Find your DHCP address and interface name:
 ```sh
@@ -141,49 +147,24 @@ ip -4 addr
 Generate the password hashes before filling the three password fields below. The default password for all users is `nixos`:
 
 ```sh
-# Hashed passwords (run once per user, paste each hash into lab-config.nix)
+# Hashed passwords (run once per user, paste each hash into lab-settings.json)
 mkpasswd -m sha-512
 ```
 
-Edit `lab-config.nix` with your lab's settings:
+Edit the existing deterministic JSON file without changing its
+`schemaVersion`. Set the controller DHCP address and interface, static network
+and prefix, client count and controller host number, account names, three
+password hashes, homepage, Git identities, locale, keyboard, and optional
+`veyonNativeHosts`. Then validate both the management schema and the final Nix
+configuration:
 
-```nix
-# ── Network ────────────────────────────────────────────────────
-masterDhcpIp = "MASTER_DHCP_IP";   # DHCP address of controller (from ip -4 addr)
-networkBase = "10.0.0.0";           # Static IPv4 network address
-networkPrefixLength = 24;            # CIDR prefix for the static network
-pcCount = 20;                       # Number of student PCs
-masterHostNumber = 99;              # Controller PC number
-ifaceName = "enp0s3";               # Network interface name (from ip -4 addr)
-
-# ── User accounts ─────────────────────────────────────────────
-teacherUser = "teacher";            # Teacher account name
-studentUser = "student";            # Student account name
-
-# ── Passwords (SHA-512 hashed) ────────────────────────────────
-# Default is "nixos" for all accounts. Generate your own with: mkpasswd -m sha-512
-teacherPassword = "...";
-studentPassword = "...";
-adminPassword = "...";
-
-# ── School / organization ─────────────────────────────────────
-homepageUrl = "https://nixorium.org";
-
-# ── Locale / timezone ─────────────────────────────────────────
-timeZone = "Europe/Rome";
-defaultLocale = "en_US.UTF-8";
-extraLocale = "it_IT.UTF-8";
-keyboardLayout = "it";
-consoleKeyMap = "it2";
-
-# Leave empty for unattended GNOME operation. Add pilot host names to test
-# Veyon 4.11's native Wayland backend, for example [ "pc01" ].
-veyonNativeHosts = [];
+```sh
+nix run .#nixorium -- config validate
 ```
 
 You can leave the git identity fields at their defaults for now.
 
-> **Note**: `masterDhcpIp` is used only during PXE/netboot client installation. The generated iPXE script, the netboot ramdisk, and the PXE helper services all point to that DHCP address, so if the DHCP lease changes before a netboot session you must update `lab-config.nix` and rebuild the netboot artifacts. Regular Colmena deploys use the controller's static lab IP instead.
+> **Note**: `masterDhcpIp` is used only during PXE/netboot client installation. The generated iPXE script, the netboot ramdisk, and the PXE helper services all point to that DHCP address, so if the DHCP lease changes before a netboot session you must update `lab-settings.json` and rebuild the netboot artifacts. Regular Colmena deploys use the controller's static lab IP instead.
 
 ### 4. Generate and install keys
 
@@ -298,6 +279,40 @@ sudo ip addr add "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
 ---
 
 ## 🔧 Maintenance
+
+### Read-only management preview
+
+The first management increment provides a read-only dashboard plus structured
+status and diagnostics. Run these commands from the private deployment root:
+
+```sh
+nix run .#nixorium
+nix run .#nixorium -- status
+nix run .#nixorium -- status --json
+nix run .#nixorium -- config validate
+nix run .#nixorium -- doctor
+```
+
+The dashboard and commands evaluate `labMeta` and `deploymentStatus`; they do
+not perform privileged operations. `config validate` reads the machine-owned
+settings without changing them, rejects unknown or invalid values, and then
+evaluates the deployment through Nix as the final authority. The current `doctor`
+checks readiness, Git state, subnet/interface/address ownership, Harmonia key
+correspondence and cache health, netboot artifacts, PXE port conflicts, client
+SSH reachability, managed-service availability, disk space, and required local
+commands including Colmena. `nixorium doctor --full` additionally performs a
+real controller build. The default remains quick and read-only.
+
+The `nixorium` executable is installed on the generated controller system. It
+uses `NIXORIUM_REPO` when set, otherwise the current deployment root or the
+installer's default `~/nixorium-deployment` location. `--repo <path>` always
+selects an explicit deployment.
+
+`labMeta.clients.hosts` provides the generated hostname/IP inventory used by
+diagnostics without parsing Nix source. The controller configuration installs
+both `nixorium` and the Colmena version pinned by nixpkgs, so routine
+diagnostics and later deployment workflows do not need an ad-hoc online
+`nix run nixpkgs#colmena` lookup.
 
 ### Update a lab deployment
 
@@ -578,7 +593,7 @@ Only the lab-maintenance skill is copied into new deployment repositories.
 | Argument | Purpose |
 |---|---|
 | `deploymentSelf` | The downstream Flake `self`, used to package its files for offline installation |
-| `labConfig` | Required typed site settings imported from `lab-config.nix` |
+| `labConfig` | Required typed site settings, loaded from `lab-settings.json` in new managed deployments or provided directly by legacy deployments |
 | `publicKeys` | Cache, SSH and Veyon public-key paths |
 | `assets` | Logo, wallpaper list, MIME defaults and VS Code settings |
 | `sharedModules` | NixOS modules applied to every host |
@@ -613,6 +628,7 @@ disko-uefi.nix             # NixOS wrapper for the shared Disko layout
 lib/
   disko-layout.nix         # Shared Disko layout function (device + student user)
   eval-lab-config.nix      # Typed schema and validation for site configuration
+  eval-lab-settings.nix    # Versioned JSON envelope validation
   mk-lab.nix               # Reusable host/netboot/Colmena output constructor
 setup.sh                   # Client PC installer (runs on PXE-booted machines)
 pkgs/
@@ -654,6 +670,7 @@ assets/
 templates/site/            # Scaffold for a private deployment repository
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
+docs/                       # Product architecture and architecture decisions
 ```
 
 The root configuration keeps the historical standalone deployment working.

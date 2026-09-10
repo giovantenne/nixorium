@@ -6,6 +6,8 @@ customization, validation, upstream-update, and offline-installer work.
 
 - Keep lab identity, network data, password hashes, public keys, branding,
   printers, and local policy in this repository.
+- Edit managed site values only in `lab-settings.json`; keep its deterministic
+  format and run `nixorium config validate` before accepting changes.
 - Do not edit or vendor the upstream implementation. Add local NixOS modules
   or request the smallest reusable `lib.mkLab` extension point upstream.
 - Pin released upstream versions in `flake.nix` and `flake.lock`; never merge

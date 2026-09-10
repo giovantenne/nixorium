@@ -4,7 +4,8 @@
 
 The deployment passes these values to `nixorium.lib.mkLab`:
 
-- `labConfig`: typed site settings
+- `labConfig`: typed site settings loaded from the machine-owned
+  `lab-settings.json`
 - `publicKeys`: cache, SSH, and Veyon public-key paths
 - `assets`: logo, backgrounds, MIME defaults, and VS Code settings
 - `sharedModules`: every installed host
@@ -16,6 +17,17 @@ The deployment passes these values to `nixorium.lib.mkLab`:
 Unknown settings, asset names, public-key names, host names, and Veyon pilot
 hosts are rejected. Keep every referenced file inside the deployment
 repository.
+
+`lab-settings.json` is deterministic, versioned JSON owned by the management
+application. Validate it through both schema layers after any edit:
+
+```sh
+nix run .#nixorium -- config validate
+```
+
+Do not make the application rewrite arbitrary Nix. Existing deployments that
+still import `lab-config.nix` remain supported but read-only until an explicit
+equivalence-checked migration is available.
 
 ## Network settings
 
