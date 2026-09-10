@@ -43,6 +43,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - A secure password-collection backend with terminal-only no-echo input,
   confirmation, default/length checks, best-effort memory wiping, and
   stdin-only salted SHA-512 hashing through the packaged `mkpasswd` tool.
+- Idempotent `nixorium setup keys` reconciliation for Harmonia, SSH, and Veyon
+  pairs, with create-new writes, private-mode enforcement, cryptographic
+  correspondence checks, retry safety, and overwrite refusal.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.

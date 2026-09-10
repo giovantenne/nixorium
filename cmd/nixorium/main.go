@@ -107,11 +107,24 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			return 1
 		}
 	case "setup":
-		report := app.NewSetupManager(adapters.Local{}).Status(ctx, repository)
-		if options.json {
-			err = presentation.JSON(stdout, report)
+		manager := app.NewSetupManager(adapters.Local{})
+		if options.subcommand == "keys" {
+			report, reconcileErr := manager.ReconcileKeys(ctx, repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.KeyReconcileText(stdout, report)
+			}
+			if err == nil && reconcileErr != nil {
+				err = reconcileErr
+			}
 		} else {
-			presentation.SetupText(stdout, report)
+			report := manager.Status(ctx, repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.SetupText(stdout, report)
+			}
 		}
 	default:
 		fmt.Fprintf(stderr, "Error: unknown command %q\n", options.command)
@@ -160,6 +173,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("validate must follow config")
 			}
 			result.subcommand = "validate"
+		case "keys":
+			if result.command != "setup" || result.subcommand != "" {
+				return options{}, errors.New("keys must follow setup")
+			}
+			result.subcommand = "keys"
 		default:
 			return options{}, fmt.Errorf("unknown argument %q", arguments[index])
 		}
@@ -170,8 +188,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && result.subcommand != "validate" {
 		return options{}, errors.New("config requires the validate subcommand")
 	}
-	if result.command == "setup" && result.subcommand != "status" {
-		return options{}, errors.New("setup requires the status subcommand")
+	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" {
+		return options{}, errors.New("setup requires the status or keys subcommand")
 	}
 	return result, nil
 }
@@ -212,7 +230,7 @@ func isDeploymentRoot(path string) bool {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|setup status] [--repo <path>] [--json] [--full]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|setup status|setup keys] [--repo <path>] [--json] [--full]")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
 }

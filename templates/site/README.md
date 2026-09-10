@@ -13,8 +13,9 @@ for lab configuration, validation and upstream-update work.
    template. Flakes only include files tracked by Git.
 2. Replace every placeholder and password hash in `lab-settings.json`.
 3. Replace `assets/logo.txt` and add any local NixOS settings under `modules/`.
-4. Generate the public keys under `keys/` and keep all private keys outside
-   Git.
+4. Run `nix run .#nixorium -- setup keys` to create and verify the key pairs.
+   Keep the private files outside Git and commit their public counterparts
+   under `keys/`.
 5. Before production deployment, replace the template's `master` input with a
    released tag and record it in the lock file.
 
@@ -86,6 +87,7 @@ Run commands from the repository root:
 ```sh
 nix run .#nixorium -- status
 nix run .#nixorium -- setup status
+nix run .#nixorium -- setup keys
 nix run .#nixorium -- config validate
 nix run .#nixorium -- doctor
 nix run .#nixorium -- doctor --full
@@ -99,11 +101,14 @@ terminal dashboard. Add `--json` to `status` or `doctor` for structured output.
 deployment through Nix, which remains the final configuration authority.
 `setup status` is also read-only: it re-inspects the deployment and reports the
 first incomplete first-run stage so interrupted setup can resume predictably.
+`setup keys` creates only missing Harmonia, SSH, and Veyon pairs, restricts
+private modes, verifies correspondence, and refuses to overwrite existing key
+material. It is safe to retry after interruption.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.
-Configuration, key generation, service control, and deployment remain manual
-until their management milestones are implemented.
+Configuration collection, private-key installation, service control, and
+deployment remain manual until their management milestones are implemented.
 
 Build the netboot artifacts using the normal `nixosConfigurations.netboot`
 outputs. The generated ramdisk contains a standalone installer bundle with the

@@ -109,9 +109,19 @@ type KeyMaterialState struct {
 	PublicPresent  bool   `json:"publicPresent"`
 	PrivateMode    uint32 `json:"privateMode,omitempty"`
 	Safe           bool   `json:"safe"`
+	Verified       bool   `json:"verified"`
+	Matches        bool   `json:"matches"`
 	Problem        string `json:"problem,omitempty"`
 }
 
 func (k KeyMaterialState) Ready() bool {
-	return k.PrivatePresent && k.PublicPresent && k.Safe && k.Problem == ""
+	return k.PrivatePresent && k.PublicPresent && k.Safe && k.Verified && k.Matches && k.Problem == ""
+}
+
+type KeyReconcileReport struct {
+	SchemaVersion int                `json:"schemaVersion"`
+	Operation     string             `json:"operation"`
+	State         string             `json:"state"`
+	Repository    string             `json:"repository"`
+	Keys          []KeyMaterialState `json:"keys"`
 }

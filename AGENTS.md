@@ -107,6 +107,9 @@ nix build .#nixorium
 # Inspect the deterministic first-run setup stage without mutating state
 nix run .#nixorium -- setup status
 
+# Create missing key pairs and verify all existing correspondence
+nix run .#nixorium -- setup keys
+
 # Rebuild and activate on the local machine (controller)
 sudo nixos-rebuild switch --flake .#pcNN --no-write-lock-file
 
@@ -257,6 +260,7 @@ set -euo pipefail
 - **Never commit** `secret-key` or `admin-ssh` (both in the deployment `.gitignore`)
 - **Never commit** `veyon-private-key.pem` (in `.gitignore`); deploy manually to `/etc/veyon/keys/private/teacher/key` with mode `0640` and group `veyon-master`
 - `keys/cache-public-key`, `keys/admin-ssh.pub`, and `keys/veyon-public-key.pem` are public and may be committed
+- `nixorium setup keys` uses create-new semantics and refuses public-only or mismatched pairs; never bypass that refusal by overwriting an existing key
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
