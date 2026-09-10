@@ -27,3 +27,5 @@ customization, validation, upstream-update, and offline-installer work.
   settings write.
 - Use `nixorium setup keys` to create missing pairs and verify existing ones;
   it must never overwrite public-only or mismatched key material.
+- Install private material only with `nixorium setup install-secrets`; never
+  weaken its fixed deployment path, destinations, or mismatch refusal.

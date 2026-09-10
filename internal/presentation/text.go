@@ -126,6 +126,14 @@ func KeyReconcileText(writer io.Writer, report domain.KeyReconcileReport) {
 	}
 }
 
+func ActionText(writer io.Writer, report domain.ActionReport) {
+	fmt.Fprintf(writer, "%s: %s\n", report.Operation, strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Unit: %s\n", report.Unit)
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail: %s\n", report.Message)
+	}
+}
+
 func readyText(ready bool) string {
 	if ready {
 		return "ready"

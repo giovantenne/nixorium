@@ -106,3 +106,13 @@ nix run .#nixorium -- setup keys
 The operation creates only missing material, restricts private modes, verifies
 public/private correspondence, and refuses to overwrite public-only or
 mismatched pairs. Commit only the resulting files under `keys/`.
+
+Install verified controller-side copies through the narrow privileged action:
+
+```sh
+nix run .#nixorium -- setup install-secrets
+```
+
+The source is the fixed `services.nixorium.deploymentPath` (default
+`/home/admin/nixorium-deployment`). The systemd service rejects symlink
+sources/destinations and refuses to replace different existing material.

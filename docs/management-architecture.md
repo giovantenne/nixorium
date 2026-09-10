@@ -303,6 +303,15 @@ Deployment to clients continues through SSH/Colmena with the existing keys and
 host-key policy. A future enrollment API, if justified, is separate from this
 local privilege interface and must have its own authentication design.
 
+The first implemented privileged action is
+`nixorium-install-secrets.service`, reached only through `nixorium setup
+install-secrets` (or bare guided setup). It reads the declaratively fixed,
+administrator-owned deployment, re-verifies all three pairs, and copies them
+only to fixed SSH, Veyon, and Harmonia destinations. Its polkit rule permits
+wheel members to start that exact unit only. The systemd sandbox makes the
+deployment read-only and exposes write access only to the three pre-created
+destination directories; differing existing keys and symlinks are fatal.
+
 ## Managed services
 
 The controller module defines:

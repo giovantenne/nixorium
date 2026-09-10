@@ -84,6 +84,13 @@ func TestParseArgumentsRejectsJSONInteractiveSetup(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsInstallSecrets(t *testing.T) {
+	options, err := parseArguments([]string{"setup", "install-secrets", "--json"})
+	if err != nil || options.subcommand != "install-secrets" || !options.json {
+		t.Fatalf("options = %+v, error = %v", options, err)
+	}
+}
+
 func TestParseArgumentsAcceptsSetupKeys(t *testing.T) {
 	options, err := parseArguments([]string{"setup", "keys", "--json"})
 	if err != nil {
@@ -94,6 +101,16 @@ func TestParseArgumentsAcceptsSetupKeys(t *testing.T) {
 	}
 	if _, err := parseArguments([]string{"keys", "setup"}); err == nil {
 		t.Fatal("keys before setup was accepted")
+	}
+}
+
+func TestParseArgumentsAcceptsReadOnlyKeyVerification(t *testing.T) {
+	options, err := parseArguments([]string{"setup", "keys", "--verify-only", "--json"})
+	if err != nil || !options.verifyOnly {
+		t.Fatalf("options = %+v, error = %v", options, err)
+	}
+	if _, err := parseArguments([]string{"status", "--verify-only"}); err == nil {
+		t.Fatal("status accepted --verify-only")
 	}
 }
 

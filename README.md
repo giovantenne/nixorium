@@ -200,24 +200,27 @@ The command creates only missing pairs, restricts private files to mode
 never replaces an existing key. A public key without its private counterpart,
 or a mismatched pair, stops reconciliation for explicit recovery.
 
-Install the controller-side copies and commit only the public material:
+Bare `setup` also requests the narrow privileged install action. It can be
+retried independently without running the wizard:
+
+```sh
+nix run .#nixorium -- setup install-secrets
+```
+
+The systemd action reads only the controller's declaratively configured
+`services.nixorium.deploymentPath` (default:
+`/home/admin/nixorium-deployment`). It re-verifies every pair, installs the SSH
+key for `admin`, the Veyon private key for `veyon-master`, and the Harmonia key
+under `/var/lib/nixorium/keys`. Existing identical destinations are reused;
+symlinks, unsafe sources, and different destination contents fail closed.
+
+Commit only the public material and reviewed settings:
 
 ```sh
 
-# SSH private key -- used by Colmena to connect as root to all PCs
-install -m 600 -D admin-ssh ~/.ssh/id_ed25519
-
-# SSH public key -- commit it in the deployment and install it for SSH tooling
-install -m 644 -D keys/admin-ssh.pub ~/.ssh/id_ed25519.pub
-
-# Veyon private key -- only needed on the controller (where Veyon Master runs)
-# Only users in the veyon-master group (admin + teacher) can read it
-sudo install -d -m 0750 -g veyon-master /etc/veyon/keys/private/teacher
-sudo install -m 0640 -g veyon-master veyon-private-key.pem /etc/veyon/keys/private/teacher/key
-
 # Flakes ignore untracked files in a Git worktree, so add the public files
-git add keys/cache-public-key keys/admin-ssh.pub keys/veyon-public-key.pem
-git commit -m "chore: add lab public keys"
+git add lab-settings.json keys/cache-public-key keys/admin-ssh.pub keys/veyon-public-key.pem
+git commit -m "chore: configure lab and add public keys"
 ```
 
 ### 5. Rebuild the controller
@@ -304,6 +307,7 @@ nix run .#nixorium -- status --json
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
+nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
@@ -328,7 +332,9 @@ complete only when the deployment worktree is clean. Controller
 apply, and guided installation remain explicit future stages; no global
 `configured` flag is trusted. Bare `setup` continues from accepted settings to
 key reconciliation; `setup keys` exposes that same explicit, unprivileged
-create-new operation independently.
+create-new operation independently. `setup install-secrets` starts the fixed,
+sandboxed systemd action authorized for wheel administrators by a unit-specific
+polkit rule; it never accepts a destination or command argument.
 
 The `nixorium` executable is installed on the generated controller system. It
 uses `NIXORIUM_REPO` when set, otherwise the current deployment root or the
