@@ -176,26 +176,26 @@ Generate the three required key pairs. Keep the private files local to the contr
 | **SSH** | `admin-ssh` | `keys/admin-ssh.pub` | Admin SSH access + Colmena deploys (connects as `root`) |
 | **Veyon** | `veyon-private-key.pem` | `keys/veyon-public-key.pem` | Veyon Master authenticates to student PCs |
 
-Generate everything from scratch:
+Create or reconcile all three pairs through the management command:
 
 ```sh
-# Binary cache signing key for Harmonia
-nix key generate-secret --key-name lab-cache-key > secret-key
-nix key convert-secret-to-public < secret-key > keys/cache-public-key
+nix run .#nixorium -- setup keys
+```
 
-# Admin SSH key used by Colmena / SSH access
-ssh-keygen -t ed25519 -f admin-ssh -N '' -C 'admin@controller'
+The command creates only missing pairs, restricts private files to mode
+`0600`, verifies every public/private correspondence, and is safe to retry. It
+never replaces an existing key. A public key without its private counterpart,
+or a mismatched pair, stops reconciliation for explicit recovery.
 
-# Veyon RSA keypair
-openssl genrsa -out veyon-private-key.pem 4096
-openssl rsa -in veyon-private-key.pem -pubout -out keys/veyon-public-key.pem
+Install the controller-side copies and commit only the public material:
+
+```sh
 
 # SSH private key -- used by Colmena to connect as root to all PCs
 install -m 600 -D admin-ssh ~/.ssh/id_ed25519
 
 # SSH public key -- commit it in the deployment and install it for SSH tooling
-install -m 644 -D admin-ssh.pub keys/admin-ssh.pub
-install -m 644 -D admin-ssh.pub ~/.ssh/id_ed25519.pub
+install -m 644 -D keys/admin-ssh.pub ~/.ssh/id_ed25519.pub
 
 # Veyon private key -- only needed on the controller (where Veyon Master runs)
 # Only users in the veyon-master group (admin + teacher) can read it
@@ -290,6 +290,7 @@ nix run .#nixorium
 nix run .#nixorium -- status
 nix run .#nixorium -- status --json
 nix run .#nixorium -- setup status
+nix run .#nixorium -- setup keys
 nix run .#nixorium -- config validate
 nix run .#nixorium -- doctor
 ```
@@ -306,10 +307,11 @@ real controller build. The default remains quick and read-only.
 
 `setup status` reconciles observed state on every run and selects the earliest
 incomplete first-run stage. It currently reports environment, network,
-identity/locale, default credentials, key-file presence and private modes,
+identity/locale, default credentials, key correspondence and private modes,
 candidate validation, artifacts, and deployment readiness. Review, controller
 apply, and guided installation remain explicit future stages; no global
-`configured` flag is trusted.
+`configured` flag is trusted. `setup keys` is the explicit, unprivileged
+create-new operation for the Harmonia, SSH, and Veyon pairs.
 
 The `nixorium` executable is installed on the generated controller system. It
 uses `NIXORIUM_REPO` when set, otherwise the current deployment root or the

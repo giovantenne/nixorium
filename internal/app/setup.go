@@ -14,7 +14,8 @@ type SetupSource interface {
 	DeploymentStatus(ctx context.Context, repository string) (domain.DeploymentStatus, error)
 	ArtifactState(repository, name, relativePath string) domain.ArtifactState
 	CommandAvailable(name string) bool
-	KeyMaterial(repository string) []domain.KeyMaterialState
+	KeyMaterial(ctx context.Context, repository string) []domain.KeyMaterialState
+	ReconcileKeyMaterial(ctx context.Context, repository string) error
 }
 
 type SetupManager struct {
@@ -23,6 +24,25 @@ type SetupManager struct {
 
 func NewSetupManager(source SetupSource) SetupManager {
 	return SetupManager{source: source}
+}
+
+func (m SetupManager) ReconcileKeys(ctx context.Context, repository string) (domain.KeyReconcileReport, error) {
+	reconcileErr := m.source.ReconcileKeyMaterial(ctx, repository)
+	states := m.source.KeyMaterial(ctx, repository)
+	report := domain.KeyReconcileReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "setup-keys",
+		State:         "ready",
+		Repository:    repository,
+		Keys:          states,
+	}
+	for _, state := range states {
+		if !state.Ready() {
+			report.State = "action-required"
+			break
+		}
+	}
+	return report, reconcileErr
 }
 
 func (m SetupManager) Status(ctx context.Context, repository string) domain.SetupReport {
@@ -82,7 +102,7 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 		facts.Credentials.Detail = "one or more account hashes are missing, invalid, or still use the public default"
 	}
 
-	keyStates := m.source.KeyMaterial(repository)
+	keyStates := m.source.KeyMaterial(ctx, repository)
 	keyProblems := []string{}
 	for _, state := range keyStates {
 		if !state.Ready() {
@@ -95,7 +115,7 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 	}
 	facts.Keys.Complete = len(keyStates) == 3 && len(keyProblems) == 0
 	if facts.Keys.Complete {
-		facts.Keys.Detail = "cache, SSH, and Veyon key files are present with private modes"
+		facts.Keys.Detail = "cache, SSH, and Veyon pairs have safe private modes and verified correspondence"
 	} else {
 		facts.Keys.Detail = "incomplete key pairs: " + strings.Join(keyProblems, ", ")
 	}

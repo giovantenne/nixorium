@@ -81,6 +81,21 @@ func SetupText(writer io.Writer, report domain.SetupReport) {
 	}
 }
 
+func KeyReconcileText(writer io.Writer, report domain.KeyReconcileReport) {
+	fmt.Fprintf(writer, "Key reconciliation: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:         %s\n", report.Repository)
+	for _, key := range report.Keys {
+		state := "ready"
+		if !key.Ready() {
+			state = key.Problem
+			if state == "" {
+				state = "action required"
+			}
+		}
+		fmt.Fprintf(writer, "  %-8s %s\n", key.Name, state)
+	}
+}
+
 func readyText(ready bool) string {
 	if ready {
 		return "ready"

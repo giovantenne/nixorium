@@ -1,4 +1,4 @@
-{ buildGoModule, lib, makeWrapper, whois }:
+{ buildGoModule, lib, makeWrapper, openssh, openssl, whois }:
 
 buildGoModule {
   pname = "nixorium";
@@ -12,7 +12,7 @@ buildGoModule {
 
   postFixup = ''
     wrapProgram "$out/bin/nixorium" \
-      --prefix PATH : ${lib.makeBinPath [ whois ]}
+      --prefix PATH : ${lib.makeBinPath [ openssh openssl whois ]}
   '';
 
   ldflags = [ "-s" "-w" ];

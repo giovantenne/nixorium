@@ -71,3 +71,13 @@ Private files stay outside Git:
 - `veyon-private-key.pem`
 
 Only their public counterparts belong under `keys/`.
+
+Create or reconcile all three pairs with:
+
+```sh
+nix run .#nixorium -- setup keys
+```
+
+The operation creates only missing material, restricts private modes, verifies
+public/private correspondence, and refuses to overwrite public-only or
+mismatched pairs. Commit only the resulting files under `keys/`.

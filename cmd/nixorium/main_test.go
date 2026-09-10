@@ -61,6 +61,19 @@ func TestParseArgumentsAcceptsSetupStatus(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsSetupKeys(t *testing.T) {
+	options, err := parseArguments([]string{"setup", "keys", "--json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.command != "setup" || options.subcommand != "keys" || !options.json {
+		t.Fatalf("unexpected options: %+v", options)
+	}
+	if _, err := parseArguments([]string{"keys", "setup"}); err == nil {
+		t.Fatal("keys before setup was accepted")
+	}
+}
+
 func TestResolveRepositoryUsesConfiguredRoot(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.WriteFile(filepath.Join(directory, "flake.nix"), []byte("{}"), 0600); err != nil {

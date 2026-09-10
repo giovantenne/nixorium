@@ -33,11 +33,25 @@ func (fakeSetupSource) CommandAvailable(string) bool {
 	return true
 }
 
-func (fakeSetupSource) KeyMaterial(string) []domain.KeyMaterialState {
+func (fakeSetupSource) KeyMaterial(context.Context, string) []domain.KeyMaterialState {
 	return []domain.KeyMaterialState{
-		{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true},
-		{Name: "ssh", PrivatePresent: true, PublicPresent: true, Safe: true},
-		{Name: "veyon", PrivatePresent: true, PublicPresent: true, Safe: true},
+		{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
+		{Name: "ssh", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
+		{Name: "veyon", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
+	}
+}
+
+func (fakeSetupSource) ReconcileKeyMaterial(context.Context, string) error {
+	return nil
+}
+
+func TestReconcileKeysReportsVerifiedState(t *testing.T) {
+	report, err := NewSetupManager(fakeSetupSource{}).ReconcileKeys(context.Background(), "/repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Operation != "setup-keys" || report.State != "ready" || len(report.Keys) != 3 {
+		t.Fatalf("report = %+v", report)
 	}
 }
 
