@@ -25,6 +25,19 @@ application. Validate it through both schema layers after any edit:
 nix run .#nixorium -- config validate
 ```
 
+For a machine-generated complete candidate, use the review/apply protocol:
+
+```sh
+nix run .#nixorium -- config plan --file candidate.json --json
+nix run .#nixorium -- config apply --file candidate.json \
+  --expect 'sha256:fingerprint-from-plan'
+```
+
+The plan evaluates the candidate through the deployment Flake and redacts
+password hashes. Apply changes only `lab-settings.json`, uses an atomic write,
+and rejects stale fingerprints or concurrent edits. Never place plaintext
+passwords in a candidate file.
+
 Do not make the application rewrite arbitrary Nix. Existing deployments that
 still import `lab-config.nix` remain supported but read-only until an explicit
 equivalence-checked migration is available.

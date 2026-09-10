@@ -48,6 +48,22 @@ func TestParseArgumentsAcceptsConfigValidate(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsReviewedConfigApply(t *testing.T) {
+	options, err := parseArguments([]string{"config", "apply", "--file", "/tmp/candidate.json", "--expect", "sha256:value", "--json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.subcommand != "apply" || options.file != "/tmp/candidate.json" || options.expect != "sha256:value" || !options.json {
+		t.Fatalf("unexpected options: %+v", options)
+	}
+	if _, err := parseArguments([]string{"config", "apply", "--file", "/tmp/candidate.json"}); err == nil {
+		t.Fatal("apply without reviewed fingerprint was accepted")
+	}
+	if _, err := parseArguments([]string{"config", "plan"}); err == nil {
+		t.Fatal("plan without candidate file was accepted")
+	}
+}
+
 func TestParseArgumentsAcceptsSetupStatus(t *testing.T) {
 	options, err := parseArguments([]string{"setup", "--json", "status"})
 	if err != nil {
@@ -93,5 +109,20 @@ func TestResolveRepositoryUsesConfiguredRoot(t *testing.T) {
 func TestResolveRepositoryRejectsMissingFlake(t *testing.T) {
 	if _, err := resolveRepository(t.TempDir()); err == nil {
 		t.Fatal("repository without flake.nix was accepted")
+	}
+}
+
+func TestReadCandidateSettingsRejectsSymlink(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target.json")
+	if err := os.WriteFile(target, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(directory, "candidate.json")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readCandidateSettings(link); err == nil {
+		t.Fatal("candidate symlink was accepted")
 	}
 }

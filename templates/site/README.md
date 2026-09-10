@@ -89,6 +89,7 @@ nix run .#nixorium -- status
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
 nix run .#nixorium -- config validate
+nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
 nix run .#nixorium -- doctor --full
 nix run .#run-harmonia
@@ -99,6 +100,12 @@ Running `nix run .#nixorium` without a subcommand opens the current read-only
 terminal dashboard. Add `--json` to `status` or `doctor` for structured output.
 `config validate` checks the strict management schema and then evaluates the
 deployment through Nix, which remains the final configuration authority.
+For automation, `config plan --file candidate.json` evaluates a complete
+candidate through the deployment Flake and shows a non-secret semantic diff.
+Apply that exact review with `config apply --file candidate.json --expect
+sha256:...`, using the base fingerprint emitted by the plan. Apply locks and
+rechecks `lab-settings.json`, reports concurrent edits as conflicts, and writes
+only that managed file atomically.
 `setup status` is also read-only: it re-inspects the deployment and reports the
 first incomplete first-run stage so interrupted setup can resume predictably.
 `setup keys` creates only missing Harmonia, SSH, and Veyon pairs, restricts

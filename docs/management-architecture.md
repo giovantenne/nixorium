@@ -197,11 +197,15 @@ management schema validates input before writing and is kept in conformance
 with Nix evaluation tests. Deterministic pretty-printed JSON provides stable
 Git diffs and is the only file the management application edits.
 
-The application writes a sibling temporary file with mode `0600`, fsyncs it,
-and atomically renames it after verifying the deployment root and rejecting
-symlinks. It then evaluates the candidate through the deployment Flake before
-offering acceptance. The operator sees the non-secret effective configuration
-and Git diff. Existing unrelated changes are preserved and highlighted.
+The application first evaluates a complete candidate through the deployment
+Flake's candidate hook, including controller configuration instantiation. It
+then shows an ordered semantic diff whose password values are always redacted.
+Acceptance carries the reviewed SHA-256 fingerprint of the source settings.
+The writer locks the deployment directory, compares the source at the start
+and immediately before commit, writes a sibling mode-`0600` temporary file,
+fsyncs it, and atomically renames it after rejecting symlinks. Existing
+unrelated changes are preserved; stale or concurrent managed-file edits become
+explicit conflicts.
 
 Plaintext passwords are read without terminal echo, sent to a local hashing
 process over standard input, retained in memory only as long as needed, and

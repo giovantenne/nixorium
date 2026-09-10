@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
@@ -17,6 +18,8 @@ type options struct {
 	command    string
 	subcommand string
 	repository string
+	file       string
+	expect     string
 	json       bool
 	full       bool
 	help       bool
@@ -93,18 +96,45 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			return 1
 		}
 	case "config":
-		report := app.NewSettingsManager(adapters.Local{}).Validate(ctx, repository)
-		if options.json {
-			err = presentation.JSON(stdout, report)
-		} else {
-			presentation.ConfigValidationText(stdout, report)
-		}
-		if err != nil {
-			fmt.Fprintln(stderr, "Error:", err)
-			return 1
-		}
-		if report.HasErrors() {
-			return 1
+		manager := app.NewSettingsManager(adapters.Local{})
+		switch options.subcommand {
+		case "validate":
+			report := manager.Validate(ctx, repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.ConfigValidationText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		case "plan", "apply":
+			candidate, readErr := readCandidateSettings(options.file)
+			if readErr != nil {
+				fmt.Fprintln(stderr, "Error: read candidate settings:", readErr)
+				return 1
+			}
+			if options.subcommand == "plan" {
+				report := manager.Plan(ctx, repository, candidate)
+				if options.json {
+					err = presentation.JSON(stdout, report)
+				} else {
+					presentation.ConfigPlanText(stdout, report)
+				}
+				if report.HasErrors() {
+					return 1
+				}
+			} else {
+				report := manager.Apply(ctx, repository, candidate, options.expect)
+				if options.json {
+					err = presentation.JSON(stdout, report)
+				} else {
+					presentation.ConfigApplyText(stdout, report)
+				}
+				if report.HasErrors() {
+					return 1
+				}
+			}
 		}
 	case "setup":
 		manager := app.NewSetupManager(adapters.Local{})
@@ -148,6 +178,18 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--repo requires a path")
 			}
 			result.repository = arguments[index]
+		case "--file":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--file requires a path")
+			}
+			result.file = arguments[index]
+		case "--expect":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--expect requires a fingerprint")
+			}
+			result.expect = arguments[index]
 		case "--json":
 			result.json = true
 		case "--full":
@@ -173,6 +215,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("validate must follow config")
 			}
 			result.subcommand = "validate"
+		case "plan", "apply":
+			if result.command != "config" || result.subcommand != "" {
+				return options{}, fmt.Errorf("%s must follow config", arguments[index])
+			}
+			result.subcommand = arguments[index]
 		case "keys":
 			if result.command != "setup" || result.subcommand != "" {
 				return options{}, errors.New("keys must follow setup")
@@ -185,8 +232,20 @@ func parseArguments(arguments []string) (options, error) {
 	if result.full && result.command != "doctor" {
 		return options{}, errors.New("--full is only valid with doctor")
 	}
-	if result.command == "config" && result.subcommand != "validate" {
-		return options{}, errors.New("config requires the validate subcommand")
+	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
+	}
+	if result.file != "" && (result.command != "config" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--file is only valid with config plan or config apply")
+	}
+	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
+		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
+	}
+	if result.expect != "" && (result.command != "config" || result.subcommand != "apply") {
+		return options{}, errors.New("--expect is only valid with config apply")
+	}
+	if result.command == "config" && result.subcommand == "apply" && result.expect == "" {
+		return options{}, errors.New("config apply requires --expect from config plan")
 	}
 	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" {
 		return options{}, errors.New("setup requires the status or keys subcommand")
@@ -229,8 +288,35 @@ func isDeploymentRoot(path string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
+func readCandidateSettings(path string) ([]byte, error) {
+	const maximumBytes = int64(1024 * 1024)
+	fileDescriptor, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	file := os.NewFile(uintptr(fileDescriptor), path)
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("candidate must be a regular file and not a symlink")
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maximumBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maximumBytes {
+		return nil, errors.New("candidate settings file is unexpectedly large")
+	}
+	return data, nil
+}
+
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|setup status|setup keys] [--repo <path>] [--json] [--full]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup status|setup keys] [options]")
+	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
+	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
 }

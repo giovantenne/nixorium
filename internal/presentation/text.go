@@ -66,6 +66,36 @@ func ConfigValidationText(writer io.Writer, report domain.ConfigValidationReport
 	}
 }
 
+func ConfigPlanText(writer io.Writer, report domain.ConfigPlanReport) {
+	fmt.Fprintf(writer, "Configuration plan: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:         %s\n", report.Repository)
+	if report.BaseFingerprint != "" {
+		fmt.Fprintf(writer, "Base fingerprint:   %s\n", report.BaseFingerprint)
+	}
+	configChangesText(writer, report.Changes, report.Issues)
+}
+
+func ConfigApplyText(writer io.Writer, report domain.ConfigApplyReport) {
+	fmt.Fprintf(writer, "Configuration apply: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:          %s\n", report.Repository)
+	configChangesText(writer, report.Changes, report.Issues)
+}
+
+func configChangesText(writer io.Writer, changes []domain.SettingChange, issues []domain.ValidationIssue) {
+	if len(changes) > 0 {
+		fmt.Fprintln(writer, "Changes:")
+		for _, change := range changes {
+			fmt.Fprintf(writer, "  - %s: %v -> %v\n", change.Field, change.Before, change.After)
+		}
+	}
+	if len(issues) > 0 {
+		fmt.Fprintln(writer, "Issues:")
+		for _, issue := range issues {
+			fmt.Fprintf(writer, "  - %s: %s\n", issue.Field, issue.Message)
+		}
+	}
+}
+
 func SetupText(writer io.Writer, report domain.SetupReport) {
 	fmt.Fprintf(writer, "First-run setup: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Repository:      %s\n", report.Repository)
