@@ -52,8 +52,15 @@ assert subnetLab.labMeta.clients.hosts == [
 assert subnetLab.colmena.pc01.deployment.targetHost == "10.23.4.129";
 assert subnetLab.apps.x86_64-linux.nixorium.type == "app";
 assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";
-  assert hasNixorium subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
+assert hasNixorium subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert !(hasNixorium subnetLab.nixosConfigurations.pc01.config.environment.systemPackages);
+assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.enable;
+assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.signKeyPaths == [
+  "/var/lib/nixorium/keys/harmonia-secret-key"
+];
+assert builtins.elem "nixorium-harmonia.service"
+  subnetLab.nixosConfigurations.pc99.config.systemd.services.harmonia.aliases;
+assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 true

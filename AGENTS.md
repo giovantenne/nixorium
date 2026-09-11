@@ -53,7 +53,7 @@ modules/
   networking.nix           # Hostname + static IP with shared iface name
   management.nix           # Controller-only management command installation
   users.nix                # User accounts (admin + teacher + student, veyon-master group)
-  cache.nix                # Binary cache client (points to controller's Harmonia)
+  cache.nix                # Controller Harmonia service + client cache trust
   filesystems.nix          # Btrfs subvolume mount declarations
   home-reset.nix           # Student home directory templating + boot-time reset
   docker.nix               # Per-user rootless Docker daemon
@@ -62,7 +62,7 @@ modules/
 scripts/
   release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Live USB bootstrap installer for controller with disk selection
-  run-harmonia.sh          # Launches Harmonia binary cache server
+  run-harmonia.sh          # Advanced standalone Harmonia compatibility helper
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server (external DHCP compatible)
   lib/lab-meta.sh          # Shared helper: loads labMeta from the flake for shell scripts
   create-home-template.sh  # Builds clean home directory template

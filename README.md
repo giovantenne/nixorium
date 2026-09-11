@@ -244,6 +244,16 @@ safe to retry after a failed build or activation; inspect durable output with
 `journalctl -u nixorium-apply-controller.service`. Non-interactive automation
 must opt in explicitly with `--yes`.
 
+The applied controller configuration owns Harmonia as a persistent systemd
+service. It loads the installed signing key through systemd credentials, never
+from the Git/Nix source, and restarts after process failures. Inspect it with:
+
+```sh
+systemctl status nixorium-harmonia.service
+journalctl -u harmonia.service
+nix run .#nixorium -- doctor
+```
+
 Before starting PXE, temporarily remove the controller's static lab IP from the shared interface. The generated netboot artifacts refer to `masterDhcpIp`, so this keeps PXE, HTTP, and binary-cache traffic on that single DHCP address during installation. The change is temporary and a reboot restores the static IP automatically.
 
 ```sh
@@ -273,19 +283,15 @@ sudo ip addr del "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
 
 ### 6. Start netboot services
 
-Open **two separate terminals**:
+Harmonia is already running under systemd after `setup apply`. Start the
+still-manual ProxyDHCP + TFTP + HTTP netboot server in a terminal:
 
-**Terminal 1** -- Binary cache:
-```sh
-nix run .#run-harmonia
-```
-
-**Terminal 2** -- ProxyDHCP + TFTP + HTTP netboot server:
 ```sh
 sudo nix run .#run-pxe-proxy
 ```
 
-> Both processes run in the foreground. Keep the terminals open during client installation.
+> The PXE proxy still runs in the foreground. Keep that terminal open during
+> client installation until the managed PXE lifecycle is implemented.
 
 ### 7. Install client PCs
 
@@ -453,13 +459,13 @@ nix eval .#labMeta.version --raw
 
 First apply the latest configuration on the controller itself:
 ```sh
-CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
-sudo nixos-rebuild switch --flake ".#${CONTROLLER_NAME}" --no-write-lock-file
+nix run .#nixorium -- setup apply
 ```
 
-Then start the binary cache:
+Then verify the managed binary cache:
 ```sh
-nix run .#run-harmonia
+systemctl is-active nixorium-harmonia.service
+nix run .#nixorium -- doctor
 ```
 
 Deploy to all lab PCs:
@@ -698,7 +704,7 @@ modules/
   hardware.nix             # Generic hardware detection
   networking.nix           # Hostname + static IP per host
   users.nix                # User accounts and autologin
-  cache.nix                # Binary cache client configuration
+  cache.nix                # Controller Harmonia service + client cache trust
   filesystems.nix          # Btrfs support
   home-reset.nix           # Student home templating + boot-time reset
   docker.nix               # Per-user rootless Docker daemon
@@ -707,7 +713,7 @@ modules/
 scripts/
   release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Controller bootstrap from live USB
-  run-harmonia.sh          # Binary cache server
+  run-harmonia.sh          # Advanced standalone Harmonia compatibility helper
   run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server
   lib/lab-meta.sh          # Shared helper: loads labMeta from the flake
   cmd-screensaver.sh       # TTE screensaver animation loop

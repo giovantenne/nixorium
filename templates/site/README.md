@@ -96,7 +96,6 @@ nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
 nix run .#nixorium -- doctor --full
-nix run .#run-harmonia
 sudo nix run .#run-pxe-proxy
 ```
 
@@ -133,11 +132,16 @@ closure runs as root. Use `journalctl -u nixorium-apply-controller.service`
 for durable failure details and retry the same command after correction.
 Private deployments are evaluated through the Git Flake fetcher so ignored
 private keys do not enter the Nix source/store.
+The applied controller runs Harmonia as `nixorium-harmonia.service`; systemd
+loads `/var/lib/nixorium/keys/harmonia-secret-key` as an isolated credential
+and restarts the cache after process failures. Check readiness with
+`systemctl status nixorium-harmonia.service` and `nixorium doctor`; detailed
+service logs use the canonical `journalctl -u harmonia.service` unit name.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.
 PXE service control and client deployment remain manual until their management
-milestones are implemented.
+milestones are implemented; the cache no longer needs a foreground terminal.
 
 Build the netboot artifacts using the normal `nixosConfigurations.netboot`
 outputs. The generated ramdisk contains a standalone installer bundle with the

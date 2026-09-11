@@ -58,6 +58,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 - A confirmed `setup apply` workflow with clean-Git/readiness/key preflights,
   a fixed systemd/polkit action, unprivileged controller build, exact-closure
   activation, durable journald failures, and observed active-generation state.
+- A declarative controller-only Harmonia lifecycle with systemd credential
+  loading from the non-store installed key, restart/watchdog behavior, a
+  stable `nixorium-harmonia.service` alias, health diagnostics, and VM-tested
+  missing-key recovery.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.
