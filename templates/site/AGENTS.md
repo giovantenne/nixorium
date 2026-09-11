@@ -29,3 +29,6 @@ customization, validation, upstream-update, and offline-installer work.
   it must never overwrite public-only or mismatched key material.
 - Install private material only with `nixorium setup install-secrets`; never
   weaken its fixed deployment path, destinations, or mismatch refusal.
+- Apply a committed controller configuration with `nixorium setup apply`; it
+  must keep the fixed local target, exact confirmation, clean-worktree gate,
+  and Git-fetcher boundary that excludes ignored private files from the store.

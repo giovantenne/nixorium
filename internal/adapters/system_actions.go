@@ -7,7 +7,8 @@ import (
 
 func (Local) StartSystemUnit(ctx context.Context, unit string) error {
 	allowed := map[string]bool{
-		"nixorium-install-secrets.service": true,
+		"nixorium-install-secrets.service":  true,
+		"nixorium-apply-controller.service": true,
 	}
 	if !allowed[unit] {
 		return fmt.Errorf("system unit %q is not an allowed Nixorium action", unit)

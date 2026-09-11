@@ -11,6 +11,7 @@ import (
 func TestValidateCandidateUsesPrivateTemporaryFileAndCleansIt(t *testing.T) {
 	directory := t.TempDir()
 	marker := filepath.Join(directory, "marker")
+	writeExecutable(t, filepath.Join(directory, "git"), "#!/bin/sh\nexit 0\n")
 	writeExecutable(t, filepath.Join(directory, "nix"), `#!/bin/sh
 test -n "$NIXORIUM_CANDIDATE_FILE"
 test "$(stat -c '%a' "$NIXORIUM_CANDIDATE_FILE")" = 600
@@ -35,6 +36,7 @@ printf 'true\n'
 
 func TestValidateCandidateRedactsNixOutput(t *testing.T) {
 	directory := t.TempDir()
+	writeExecutable(t, filepath.Join(directory, "git"), "#!/bin/sh\nexit 0\n")
 	writeExecutable(t, filepath.Join(directory, "nix"), "#!/bin/sh\nprintf '$6$secret$hash' >&2\nexit 7\n")
 	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
 	err := (Local{}).ValidateCandidate(context.Background(), "/deployment", adapterSettings())

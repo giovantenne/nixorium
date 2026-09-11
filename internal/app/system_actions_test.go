@@ -27,3 +27,11 @@ func TestInstallSecretsStartsOnlyFixedUnit(t *testing.T) {
 		t.Fatalf("failure report = %+v", report)
 	}
 }
+
+func TestApplyControllerStartsOnlyFixedUnit(t *testing.T) {
+	source := &fakeSystemActionSource{}
+	report := NewSystemActions(source).ApplyController(context.Background())
+	if report.HasErrors() || source.unit != ApplyControllerUnit || report.Operation != "setup-apply-controller" {
+		t.Fatalf("report = %+v, unit = %q", report, source.unit)
+	}
+}

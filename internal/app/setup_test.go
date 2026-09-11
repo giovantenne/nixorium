@@ -30,6 +30,10 @@ func (f fakeSetupSource) GitState(context.Context, string) (domain.GitState, err
 	return domain.GitState{Available: true, Dirty: f.dirty, Changes: 1}, nil
 }
 
+func (fakeSetupSource) ControllerApplied(context.Context, string) (bool, string) {
+	return false, "reviewed controller configuration is not active"
+}
+
 func (fakeSetupSource) ArtifactState(_ string, name, path string) domain.ArtifactState {
 	return domain.ArtifactState{Name: name, Path: path, Present: false}
 }

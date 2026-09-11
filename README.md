@@ -214,6 +214,10 @@ key for `admin`, the Veyon private key for `veyon-master`, and the Harmonia key
 under `/var/lib/nixorium/keys`. Existing identical destinations are reused;
 symlinks, unsafe sources, and different destination contents fail closed.
 
+Nixorium evaluates private deployments through the local Git Flake fetcher.
+Only version-controlled public configuration enters the Nix source/store;
+ignored private key files remain outside it.
+
 Commit only the public material and reviewed settings:
 
 ```sh
@@ -225,13 +229,24 @@ git commit -m "chore: configure lab and add public keys"
 
 ### 5. Rebuild the controller
 
+Apply the committed configuration through the reviewed management action:
+
+```sh
+nix run .#nixorium -- setup apply
+```
+
+The command requires a clean Git worktree, valid/readiness-complete settings,
+verified source keys, and matching installed secrets. It identifies this
+controller from `labMeta`, shows the expected networking/service impact, and
+requires typing `APPLY`. The fixed systemd action builds as the unprivileged
+`admin` user and activates exactly that resulting NixOS closure as root. It is
+safe to retry after a failed build or activation; inspect durable output with
+`journalctl -u nixorium-apply-controller.service`. Non-interactive automation
+must opt in explicitly with `--yes`.
+
 Before starting PXE, temporarily remove the controller's static lab IP from the shared interface. The generated netboot artifacts refer to `masterDhcpIp`, so this keeps PXE, HTTP, and binary-cache traffic on that single DHCP address during installation. The change is temporary and a reboot restores the static IP automatically.
 
 ```sh
-# Rebuild the controller with your real config
-CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
-sudo nixos-rebuild switch --flake ".#${CONTROLLER_NAME}" --no-write-lock-file
-
 # Build netboot artifacts
 nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
@@ -308,6 +323,7 @@ nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
 nix run .#nixorium -- setup install-secrets
+nix run .#nixorium -- setup apply
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
@@ -328,13 +344,18 @@ real controller build. The default remains quick and read-only.
 incomplete first-run stage. It currently reports environment, network,
 identity/locale, default credentials, key correspondence and private modes,
 candidate validation, artifacts, and deployment readiness. Git review is
-complete only when the deployment worktree is clean. Controller
-apply, and guided installation remain explicit future stages; no global
-`configured` flag is trusted. Bare `setup` continues from accepted settings to
+complete only when the deployment worktree is clean. Controller apply is a
+fixed, confirmed systemd action; guided installation remains an explicit
+future stage, and no global `configured` flag is trusted. Bare `setup`
+continues from accepted settings to
 key reconciliation; `setup keys` exposes that same explicit, unprivileged
 create-new operation independently. `setup install-secrets` starts the fixed,
 sandboxed systemd action authorized for wheel administrators by a unit-specific
 polkit rule; it never accepts a destination or command argument.
+`setup apply` similarly accepts no executable or machine target, requires all
+earlier observed setup stages, and starts only
+`nixorium-apply-controller.service`. Status marks the stage complete only when
+`/run/current-system` matches the evaluated controller generation.
 
 The `nixorium` executable is installed on the generated controller system. It
 uses `NIXORIUM_REPO` when set, otherwise the current deployment root or the

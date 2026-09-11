@@ -17,6 +17,12 @@ polkit policy. Privileged code accepts validated typed parameters and fixed
 deployment/service locations, invokes programs with argument arrays, and never
 offers a generic shell or arbitrary command endpoint.
 
+Controller apply is split further: Git evaluation and the Nix build run as the
+administrator who owns the private deployment. The root action activates only
+the exact returned NixOS store closure. Local deployments use the Git Flake
+fetcher, not `path:`, so ignored private keys are excluded from copied Nix
+sources and never become build inputs.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

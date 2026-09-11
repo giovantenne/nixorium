@@ -53,6 +53,73 @@ let
       install_checked "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key 0600 root root
     '';
   };
+  applyController = pkgs.writeShellApplication {
+    name = "nixorium-apply-controller";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.diffutils
+      pkgs.git
+      pkgs.nix
+      pkgs.util-linux
+      nixoriumPackage
+    ];
+    text = ''
+      REPOSITORY=${lib.escapeShellArg cfg.deploymentPath}
+
+      fail() {
+        echo "Error: $*" >&2
+        exit 1
+      }
+
+      [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
+        || fail "configured deployment path is not a real directory"
+      [[ -f "$REPOSITORY/flake.nix" && -d "$REPOSITORY/.git" ]] \
+        || fail "configured deployment path is not a Git Flake"
+      [[ "$(stat -c '%U' "$REPOSITORY")" == admin ]] \
+        || fail "deployment repository must be owned by admin"
+      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
+        || fail "deployment worktree must be clean before controller apply"
+      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
+          secret-key admin-ssh veyon-private-key.pem)" ]] \
+        || fail "private key files must not be tracked by Git"
+
+      # Use the Git fetcher so ignored private keys are never copied into the
+      # immutable Nix source tree or store during evaluation and builds.
+      FLAKE_URL="git+file://$REPOSITORY"
+      install -d -m 0700 -o admin -g users /var/cache/nixorium/admin
+      export XDG_CACHE_HOME=/var/cache/nixorium/admin
+      export NIX_CONFIG="experimental-features = nix-command flakes"
+
+      as_admin() {
+        runuser -u admin -- "$@"
+      }
+
+      as_admin nixorium config validate --repo "$REPOSITORY" --json \
+        || fail "deployment configuration validation failed"
+      as_admin nixorium setup keys --verify-only --repo "$REPOSITORY" --json \
+        || fail "deployment key correspondence verification failed"
+      [[ "$(as_admin nix eval "$FLAKE_URL#deploymentStatus.ready" --json --no-write-lock-file)" == true ]] \
+        || fail "deploymentStatus.ready must be true before controller apply"
+
+      cmp -s "$REPOSITORY/admin-ssh" /home/admin/.ssh/id_ed25519 \
+        || fail "installed admin SSH key is absent or differs"
+      cmp -s "$REPOSITORY/veyon-private-key.pem" /etc/veyon/keys/private/teacher/key \
+        || fail "installed Veyon private key is absent or differs"
+      cmp -s "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key \
+        || fail "installed Harmonia signing key is absent or differs"
+
+      CONTROLLER_NAME="$(as_admin nix eval "$FLAKE_URL#labMeta.controller.name" --raw --no-write-lock-file)"
+      [[ "$CONTROLLER_NAME" =~ ^pc[0-9]+$ ]] \
+        || fail "evaluated controller name is invalid"
+
+      SYSTEM_PATH="$(as_admin nix build "$FLAKE_URL#nixosConfigurations.$CONTROLLER_NAME.config.system.build.toplevel" \
+        --no-write-lock-file --no-link --print-out-paths)"
+      [[ "$SYSTEM_PATH" == /nix/store/* && "$SYSTEM_PATH" != *[[:space:]]* \
+          && -x "$SYSTEM_PATH/bin/switch-to-configuration" ]] \
+        || fail "controller build did not return one valid NixOS system closure"
+      exec "$SYSTEM_PATH/bin/switch-to-configuration" switch
+    '';
+  };
 in
 {
   options.services.nixorium.deploymentPath = lib.mkOption {
@@ -70,8 +137,10 @@ in
     security.polkit.enable = true;
     security.polkit.extraConfig = ''
       polkit.addRule(function(action, subject) {
+        var unit = action.lookup("unit");
         if (action.id == "org.freedesktop.systemd1.manage-units" &&
-            action.lookup("unit") == "nixorium-install-secrets.service" &&
+            (unit == "nixorium-install-secrets.service" ||
+             unit == "nixorium-apply-controller.service") &&
             action.lookup("verb") == "start" &&
             subject.isInGroup("wheel")) {
           return polkit.Result.YES;
@@ -107,6 +176,28 @@ in
         ];
         NoNewPrivileges = true;
         CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
+      };
+    };
+
+    systemd.services.nixorium-apply-controller = {
+      description = "Build and activate the reviewed Nixorium controller configuration";
+      after = [ "nixorium-install-secrets.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${applyController}/bin/nixorium-apply-controller";
+        User = "root";
+        Group = "root";
+        UMask = "0077";
+        CacheDirectory = "nixorium";
+        Environment = "XDG_CACHE_HOME=/var/cache/nixorium";
+        PrivateTmp = true;
+        ProtectHome = "read-only";
+        ReadOnlyPaths = [ cfg.deploymentPath ];
+        ReadWritePaths = [ "-/var/cache/nixorium" ];
+        Nice = 10;
+        IOSchedulingClass = "best-effort";
+        NoNewPrivileges = true;
+        TimeoutStartSec = "2h";
       };
     };
   };
