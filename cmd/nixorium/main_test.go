@@ -64,6 +64,16 @@ func TestParseArgumentsAcceptsReviewedConfigApply(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsDistinguishesSetupApply(t *testing.T) {
+	options, err := parseArguments([]string{"setup", "apply", "--yes", "--json"})
+	if err != nil || options.subcommand != "apply" || !options.yes {
+		t.Fatalf("options = %+v, error = %v", options, err)
+	}
+	if _, err := parseArguments([]string{"setup", "status", "--yes"}); err == nil {
+		t.Fatal("setup status accepted --yes")
+	}
+}
+
 func TestParseArgumentsAcceptsSetupStatus(t *testing.T) {
 	options, err := parseArguments([]string{"setup", "--json", "status"})
 	if err != nil {

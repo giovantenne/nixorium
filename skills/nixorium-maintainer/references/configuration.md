@@ -116,3 +116,16 @@ nix run .#nixorium -- setup install-secrets
 The source is the fixed `services.nixorium.deploymentPath` (default
 `/home/admin/nixorium-deployment`). The systemd service rejects symlink
 sources/destinations and refuses to replace different existing material.
+
+Commit the reviewed settings and public keys, then apply this controller with:
+
+```sh
+nix run .#nixorium -- setup apply
+```
+
+The worktree must be clean. Confirm by typing the exact `APPLY` token after
+reviewing the networking/service warning. The fixed service builds the Git
+view of the deployment as `admin`, which excludes the three ignored private
+files from the Nix store, then activates only that exact closure as root.
+Inspect failures with `journalctl -u nixorium-apply-controller.service` and
+retry after correcting the reported preflight, build, or activation error.

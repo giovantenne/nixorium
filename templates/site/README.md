@@ -91,6 +91,7 @@ nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
 nix run .#nixorium -- setup install-secrets
+nix run .#nixorium -- setup apply
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
@@ -124,11 +125,19 @@ material. It is safe to retry after interruption.
 install only already-verified material. Its source is the declarative
 `services.nixorium.deploymentPath`; existing different destinations are never
 replaced.
+After committing the reviewed settings and public keys, `setup apply` checks a
+clean/readiness-complete deployment, verifies that installed secrets match,
+and asks for the exact `APPLY` confirmation before building and activating
+this controller. The build runs as `admin`; only activation of the resulting
+closure runs as root. Use `journalctl -u nixorium-apply-controller.service`
+for durable failure details and retry the same command after correction.
+Private deployments are evaluated through the Git Flake fetcher so ignored
+private keys do not enter the Nix source/store.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.
-Private-key installation, service control, and deployment remain manual until
-their management milestones are implemented.
+PXE service control and client deployment remain manual until their management
+milestones are implemented.
 
 Build the netboot artifacts using the normal `nixosConfigurations.netboot`
 outputs. The generated ramdisk contains a standalone installer bundle with the

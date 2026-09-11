@@ -17,6 +17,13 @@ in deployment.nixoriumValidateCandidate candidate
 `
 
 func (Local) ValidateCandidate(ctx context.Context, repository string, settings domain.LabSettingsFile) error {
+	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
+		return err
+	}
+	flake, err := deploymentFlakeReference(repository)
+	if err != nil {
+		return err
+	}
 	data, err := domain.MarshalLabSettings(settings)
 	if err != nil {
 		return err
@@ -45,7 +52,7 @@ func (Local) ValidateCandidate(ctx context.Context, repository string, settings 
 
 	command := exec.CommandContext(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--expr", candidateValidationExpression)
 	command.Env = append(os.Environ(),
-		"NIXORIUM_DEPLOYMENT_FLAKE=path:"+repository,
+		"NIXORIUM_DEPLOYMENT_FLAKE="+flake,
 		"NIXORIUM_CANDIDATE_FILE="+path,
 	)
 	if _, err := command.Output(); err != nil {

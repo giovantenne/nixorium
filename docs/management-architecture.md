@@ -312,6 +312,22 @@ wheel members to start that exact unit only. The systemd sandbox makes the
 deployment read-only and exposes write access only to the three pre-created
 destination directories; differing existing keys and symlinks are fatal.
 
+The second privileged action is `nixorium-apply-controller.service`, reached
+through `nixorium setup apply`. The CLI first requires every pre-apply setup
+stage to be observably complete and obtains exact interactive confirmation (or
+an explicit automation-only `--yes`). The service accepts no path, target, or
+command parameters: it uses only the declarative deployment path and the
+controller identity evaluated from `labMeta`.
+
+The service rejects dirty Git worktrees, invalid or unready configurations,
+key mismatches, and installed-secret drift. Evaluation and the build run as
+the administrator through a `git+file` Flake URL, deliberately excluding
+ignored private keys from the Nix source/store. Root receives only the single
+resulting store closure and executes its `switch-to-configuration switch`.
+Systemd/journald retain preflight, build, and activation output across TUI or
+terminal exits. Setup completion is reconciled by comparing the evaluated
+controller to `/run/current-system`, not by setting a flag.
+
 ## Managed services
 
 The controller module defines:

@@ -13,6 +13,7 @@ type SetupSource interface {
 	LabMeta(ctx context.Context, repository string) (domain.LabMeta, error)
 	DeploymentStatus(ctx context.Context, repository string) (domain.DeploymentStatus, error)
 	GitState(ctx context.Context, repository string) (domain.GitState, error)
+	ControllerApplied(ctx context.Context, repository string) (bool, string)
 	ArtifactState(repository, name, relativePath string) domain.ArtifactState
 	CommandAvailable(name string) bool
 	KeyMaterial(ctx context.Context, repository string) []domain.KeyMaterialState
@@ -56,7 +57,6 @@ func (m SetupManager) keyReport(ctx context.Context, repository, operation strin
 
 func (m SetupManager) Status(ctx context.Context, repository string) domain.SetupReport {
 	facts := domain.SetupFacts{
-		Apply:   domain.SetupObservation{Detail: "controller apply is not available yet"},
 		Install: domain.SetupObservation{Detail: "guided client installation is not available yet"},
 	}
 	if gitState, err := m.source.GitState(ctx, repository); err != nil {
@@ -146,6 +146,11 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 		}
 	} else {
 		facts.Validation.Detail = firstIssue(issues, "settings validation failed")
+	}
+	if facts.Validation.Complete {
+		facts.Apply.Complete, facts.Apply.Detail = m.source.ControllerApplied(ctx, repository)
+	} else {
+		facts.Apply.Detail = "controller apply requires a valid candidate configuration"
 	}
 
 	artifacts := []domain.ArtifactState{

@@ -116,6 +116,9 @@ nix run .#nixorium -- setup keys
 # Install verified private material through the fixed privileged unit
 nix run .#nixorium -- setup install-secrets
 
+# Apply the committed controller configuration through the fixed unit
+nix run .#nixorium -- setup apply
+
 # Validate and review a complete settings candidate without writing it
 nix run .#nixorium -- config plan --file candidate.json
 
@@ -272,6 +275,9 @@ set -euo pipefail
 - `keys/cache-public-key`, `keys/admin-ssh.pub`, and `keys/veyon-public-key.pem` are public and may be committed
 - `nixorium setup keys` uses create-new semantics and refuses public-only or mismatched pairs; never bypass that refusal by overwriting an existing key
 - `nixorium setup install-secrets` may start only `nixorium-install-secrets.service`; its deployment path is declarative and destinations are fixed
+- `nixorium setup apply` requires a clean reviewed Git deployment and may start
+  only `nixorium-apply-controller.service`; never add arbitrary target/path
+  parameters or evaluate ignored private files through a `path:` Flake URL
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management

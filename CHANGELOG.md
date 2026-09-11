@@ -55,6 +55,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - A fixed-path, systemd-sandboxed `setup install-secrets` action with
   unit-specific wheel polkit authorization, key-pair re-verification,
   least-privilege destinations, idempotent reuse, and mismatch refusal.
+- A confirmed `setup apply` workflow with clean-Git/readiness/key preflights,
+  a fixed systemd/polkit action, unprivileged controller build, exact-closure
+  activation, durable journald failures, and observed active-generation state.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.
@@ -71,6 +74,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- Private deployments are evaluated with the local Git Flake fetcher, keeping
+  ignored Harmonia, SSH, and Veyon private keys out of Nix source/store copies.
 - The controller bootstrap now runs the Disko revision pinned by the generated
   deployment instead of fetching a mutable upstream revision.
 - SSH now records keys on first connection and rejects later key changes;

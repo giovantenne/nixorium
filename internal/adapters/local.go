@@ -257,14 +257,28 @@ func (Local) SSHReachability(ctx context.Context, hosts []domain.HostMeta, timeo
 }
 
 func (Local) ControllerBuild(ctx context.Context, repository, controllerName string) error {
-	reference := "path:" + repository + "#nixosConfigurations." + controllerName + ".config.system.build.toplevel"
-	_, err := run(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "build", reference, "--no-write-lock-file", "--no-link")
+	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
+		return err
+	}
+	flake, err := deploymentFlakeReference(repository)
+	if err != nil {
+		return err
+	}
+	reference := flake + "#nixosConfigurations." + controllerName + ".config.system.build.toplevel"
+	_, err = run(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "build", reference, "--no-write-lock-file", "--no-link")
 	return err
 }
 
 func nixJSON(ctx context.Context, repository, attribute string, destination any) error {
-	reference := "path:" + repository + "#" + attribute
-	output, err := run(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", reference, "--json", "--no-write-lock-file")
+	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
+		return err
+	}
+	flake, err := deploymentFlakeReference(repository)
+	if err != nil {
+		return err
+	}
+	reference := flake + "#" + attribute
+	output, err := runOutput(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", reference, "--json", "--no-write-lock-file")
 	if err != nil {
 		return err
 	}
@@ -285,6 +299,22 @@ func run(ctx context.Context, name string, arguments ...string) (string, error) 
 		return string(output), fmt.Errorf("%s: %s", name, message)
 	}
 	return string(output), nil
+}
+
+func runOutput(ctx context.Context, name string, arguments ...string) (string, error) {
+	command := exec.CommandContext(ctx, name, arguments...)
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	command.Stdout = stdout
+	command.Stderr = stderr
+	if err := command.Run(); err != nil {
+		message := strings.TrimSpace(stderr.String())
+		if message == "" {
+			message = err.Error()
+		}
+		return stdout.String(), fmt.Errorf("%s: %s", name, message)
+	}
+	return stdout.String(), nil
 }
 
 func runWithInput(ctx context.Context, input []byte, name string, arguments ...string) (string, error) {
