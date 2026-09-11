@@ -7,7 +7,7 @@ that implementation must preserve. It describes the intended end state; items
 not yet implemented are tracked in the external project status rather than
 being implied complete here.
 
-## Current state
+## Baseline and implementation state
 
 Nixorium already has a sound declarative core:
 
@@ -23,19 +23,20 @@ Nixorium already has a sound declarative core:
 - the installer bundle preserves the deployment's locked inputs and produces
   the same client derivation without client internet access.
 
-The missing layer is lifecycle management. The administrator currently edits
-Nix, generates three key pairs, invokes builds, runs Harmonia and PXE in two
-terminals, temporarily changes an address with `ip`, chooses a client identity
-by numeric argument, and invokes Colmena directly. Runtime service state,
-repository state, and generated artifacts have no unified structured status.
-Failures during those manual sequences are understandable only to an operator
-who knows the underlying tools.
+At the start of this design, the administrator edited Nix, generated three key
+pairs, invoked builds, ran Harmonia and PXE in two terminals, temporarily
+changed an address with `ip`, chose a client identity by numeric argument, and
+invoked Colmena directly. The management command, structured settings,
+first-run reconciliation, secure key handling, reviewed controller apply, and
+managed Harmonia service are now implemented. Managed PXE, client enrollment,
+deployment, updates, and recovery remain incremental work tracked externally.
 
 Important constraints in the current implementation are:
 
 - the controller DHCP address is embedded in the netboot closure and generated
   iPXE script, so a lease change requires targeted artifact rebuilding;
-- Harmonia and PXE are foreground Flake apps, not controller services;
+- PXE remains a foreground Flake app; Harmonia is now controller-only and
+  systemd-owned, while the old helper remains an advanced compatibility app;
 - PXE temporarily removes the controller static address without persistent
   operation state or automatic same-boot recovery;
 - the client installer is destructive and confirms the disk, but host
@@ -330,11 +331,14 @@ controller to `/run/current-system`, not by setting a flag.
 
 ## Managed services
 
-The controller module defines:
+The controller architecture defines:
 
-- `nixorium-harmonia.service`, a normal system service with its signing key in
-  a non-store path, restart policy, journald logs, readiness check, and binding
-  restricted to configured lab addresses where Harmonia permits it;
+- `nixorium-harmonia.service` (implemented as an alias of the native
+  `harmonia.service`), a persistent service with the installed non-store key
+  delivered through `LoadCredential`, socket activation, restart/watchdog
+  behavior, journald logs, and status/HTTP readiness checks. Harmonia accepts
+  one bind address, so interface-scoped exposure is completed with the
+  controller firewall policy later in this milestone;
 - `nixorium-pxe.service`, an on-demand service for ProxyDHCP/TFTP/HTTP whose
   runtime directory and generated configuration are owned by systemd;
 - `nixorium-pxe-network.service`, a root oneshot that applies and reverts the
@@ -455,8 +459,9 @@ Evaluation alone is not evidence that affected packages or host roles build.
 7. Complete administrator documentation, VM/PXE automation, migration testing,
    and physical-lab validation.
 
-Each step preserves the public `mkLab` outputs and manual workflows until a
-documented compatibility decision says otherwise.
+Each step preserves the public `mkLab` outputs. Advanced compatibility helpers
+may remain exported after the normal documented workflow moves to managed
+operations.
 
 ## Risks and open questions
 

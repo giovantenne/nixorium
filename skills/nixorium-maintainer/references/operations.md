@@ -42,6 +42,21 @@ Host keys are accepted on first connection and verified on later connections.
 Investigate changed-key failures instead of deleting `known_hosts` entries
 blindly.
 
+## Binary cache
+
+After `nixorium setup apply`, the controller owns Harmonia through systemd; do
+not launch a second foreground cache. Check both unit and HTTP readiness with:
+
+```sh
+systemctl status nixorium-harmonia.service
+nixorium doctor
+```
+
+The stable product alias is used for status and service control. Query detailed
+logs with `journalctl -u harmonia.service`, the canonical nixpkgs unit name.
+The signing key is loaded from `/var/lib/nixorium/keys/harmonia-secret-key` as
+an isolated systemd credential and must never be copied into Git or the store.
+
 ## Updating the upstream input
 
 Create a temporary upgrade branch, change `inputs.nixorium.url` to the chosen

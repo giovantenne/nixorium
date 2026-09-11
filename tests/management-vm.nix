@@ -33,15 +33,24 @@
     '';
   in
   {
-    imports = [ ../modules/management.nix ];
+    imports = [
+      ../modules/cache.nix
+      ../modules/management.nix
+    ];
 
     _module.args = {
       hostName = "pc99";
-      labSettings.masterHostName = "pc99";
+      labSettings = {
+        masterHostName = "pc99";
+        masterIp = "127.0.0.1";
+        cachePort = 5000;
+        cachePublicKey = null;
+      };
       inherit nixoriumPackage;
     };
 
-    environment.systemPackages = [ pkgs.git pkgs.jq ];
+    networking.hostName = "pc99";
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq ];
     users.groups.veyon-master = {};
     users.users.admin = {
       isNormalUser = true;
@@ -104,6 +113,9 @@
     controller.wait_for_unit("sshd.service")
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
+    controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
+    controller.wait_until_fails("systemctl is-active --quiet nixorium-harmonia.service")
+    controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'Failed to set up credentials'")
     controller.succeed("nixorium --help | grep -F 'setup keys'")
     controller.succeed("mkdir -p /tmp/deployment")
     controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
@@ -133,6 +145,10 @@
     controller.succeed("cmp /home/admin/nixorium-deployment/secret-key /var/lib/nixorium/keys/harmonia-secret-key")
     controller.succeed("test $(stat -c '%a' /home/admin/.ssh/id_ed25519 /var/lib/nixorium/keys/harmonia-secret-key | sort -u) = 600")
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")
+    controller.succeed("systemctl reset-failed harmonia.service harmonia.socket; systemctl restart harmonia.socket nixorium-harmonia.service")
+    controller.wait_for_unit("nixorium-harmonia.service")
+    controller.wait_until_succeeds("curl --fail --silent http://127.0.0.1:5000/nix-cache-info | grep -F 'StoreDir: /nix/store'")
+    controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'listening on inherited fd'")
     controller.succeed("su - admin -c 'systemctl start nixorium-install-secrets.service'")
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'")
@@ -147,8 +163,8 @@
     controller.succeed("touch /home/admin/nixorium-deployment/dirty")
     controller.fail("su - admin -c 'systemctl start nixorium-apply-controller.service'")
     controller.succeed("journalctl -u nixorium-apply-controller.service --no-pager | grep -F 'deployment worktree must be clean before controller apply'")
-    controller.succeed("nixorium status --repo /tmp/deployment --json | jq -e '.operation == \"status\" and .state == \"ready\" and .lab.clients.hosts[0].name == \"pc01\"'")
+    controller.succeed("nixorium status --repo /tmp/deployment --json | jq -e '.operation == \"status\" and .state == \"ready\" and .lab.clients.hosts[0].name == \"pc01\" and any(.services[]; .name == \"nixorium-harmonia.service\" and .loaded and .active)'")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"action-required\" and .currentStage == \"prepare-artifacts\"'")
-    controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\")'")
+    controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\")'")
   '';
 }

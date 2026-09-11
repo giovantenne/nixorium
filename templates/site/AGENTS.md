@@ -32,3 +32,6 @@ customization, validation, upstream-update, and offline-installer work.
 - Apply a committed controller configuration with `nixorium setup apply`; it
   must keep the fixed local target, exact confirmation, clean-worktree gate,
   and Git-fetcher boundary that excludes ignored private files from the store.
+- Treat `nixorium-harmonia.service` as the controller-owned cache lifecycle;
+  verify it with `nixorium doctor` and use the canonical `harmonia.service`
+  name when querying its journal. Do not run a second foreground cache.

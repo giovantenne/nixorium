@@ -111,8 +111,11 @@ func TestStatusReportsReadinessAndDirtyTree(t *testing.T) {
 	if report.State != "action-required" {
 		t.Fatalf("state = %q, want action-required", report.State)
 	}
-	if len(report.Warnings) != 1 {
-		t.Fatalf("warnings = %v, want dirty-tree warning", report.Warnings)
+	if len(report.Warnings) != 2 {
+		t.Fatalf("warnings = %v, want dirty-tree and inactive-cache warnings", report.Warnings)
+	}
+	if report.Warnings[1] != "nixorium-harmonia.service is inactive" {
+		t.Fatalf("warnings = %v, want inactive-cache warning", report.Warnings)
 	}
 }
 

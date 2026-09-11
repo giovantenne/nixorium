@@ -94,6 +94,8 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 	for _, service := range report.Services {
 		if !service.Loaded {
 			report.Warnings = append(report.Warnings, service.Name+" is not installed")
+		} else if service.Name == "nixorium-harmonia.service" && !service.Active {
+			report.Warnings = append(report.Warnings, service.Name+" is inactive")
 		}
 	}
 	return report, nil
