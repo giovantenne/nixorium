@@ -41,13 +41,17 @@
     imports = [
       ../modules/cache.nix
       ../modules/management.nix
+      ../modules/pxe.nix
     ];
 
     _module.args = {
       hostName = "pc99";
       labSettings = {
         masterHostName = "pc99";
-        masterIp = "127.0.0.1";
+        masterIp = "10.0.0.99";
+        masterDhcpIp = "192.0.2.10";
+        networkPrefixLength = 8;
+        ifaceName = "lab0";
         cachePort = 5000;
         cachePublicKey = null;
       };
@@ -60,6 +64,22 @@
     users.users.admin = {
       isNormalUser = true;
       extraGroups = [ "wheel" "veyon-master" ];
+    };
+    systemd.services.nixorium-test-network = {
+      description = "Create the persistent dummy network used by the Nixorium VM test";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "network-online.target" "nixorium-pxe-recover.service" ];
+      path = [ pkgs.iproute2 ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        ip link show dev lab0 >/dev/null 2>&1 || ip link add lab0 type dummy
+        ip addr replace 192.0.2.10/24 dev lab0
+        ip addr replace 10.0.0.99/8 dev lab0
+        ip link set lab0 up
+      '';
     };
     services.openssh.enable = true;
     environment.etc."nixorium-test/flake.nix".text = ''
@@ -124,6 +144,7 @@
   testScript = ''
     start_all()
     controller.wait_for_unit("sshd.service")
+    controller.wait_for_unit("nixorium-test-network.service")
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
@@ -152,7 +173,7 @@
     controller.succeed("mkdir -p /home/admin/nixorium-deployment")
     controller.succeed("cp -a /tmp/deployment/. /home/admin/nixorium-deployment/")
     controller.succeed("chown -R admin:users /home/admin/nixorium-deployment")
-    controller.succeed("ip link add lab0 type dummy; ip addr add 192.0.2.10/24 dev lab0; ip link set lab0 up")
+    controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '192.0.2.10/24'; ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'")
     controller.succeed("su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json > /tmp/pxe-prepare-failed.json' || test $? = 1")
     controller.succeed("jq -e '.operation == \"pxe-prepare\" and .state == \"failed\" and .unit == \"nixorium-prepare-pxe.service\"' /tmp/pxe-prepare-failed.json")
     controller.succeed("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'Harmonia cache service is not active'")
@@ -177,6 +198,24 @@
     controller.succeed("jq -e '.state == \"failed\"' /tmp/pxe-address-failed.json")
     controller.succeed("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'configured DHCP address 192.0.2.10 is not assigned to lab0 (observed non-static addresses: 192.0.2.11)'")
     controller.succeed("ip addr del 192.0.2.11/24 dev lab0; ip addr add 192.0.2.10/24 dev lab0")
+    controller.succeed("systemctl show nixorium-pxe-network.service nixorium-pxe-recover.service -p LoadState --value | grep -vFx not-found")
+    controller.succeed("ip addr add 198.51.100.7/24 dev lab0")
+    controller.succeed("systemctl start nixorium-pxe-network.service")
+    controller.succeed("systemctl is-active --quiet nixorium-pxe-network.service")
+    controller.fail("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'")
+    controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '192.0.2.10/24'; ip -4 -o addr show dev lab0 scope global | grep -F '198.51.100.7/24'")
+    controller.succeed("jq -e '.schemaVersion == 1 and .state == \"network-active\" and .interface == \"lab0\" and .dhcpAddress == \"192.0.2.10\" and .staticAddress == \"10.0.0.99\" and .prefixLength == 8 and .removedStatic and (.originalAddresses | index(\"10.0.0.99/8\") != null) and .artifacts.kernel.relativePath == \"bzImage\"' /var/lib/nixorium/pxe/session.json")
+    controller.succeed("test $(stat -c '%U:%G:%a' /var/lib/nixorium/pxe/session.json) = root:root:600")
+    controller.succeed("systemctl start nixorium-pxe-network.service; systemctl stop nixorium-pxe-network.service")
+    controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'; ip -4 -o addr show dev lab0 scope global | grep -F '198.51.100.7/24'")
+    controller.succeed("test ! -e /var/lib/nixorium/pxe/session.json; jq -e '.state == \"stopped\" and .stopReason == \"normal-stop\"' /var/lib/nixorium/pxe/last-session.json")
+    controller.succeed("ln -s /etc/passwd /var/lib/nixorium/pxe/session.json; ! systemctl start nixorium-pxe-recover.service; test -L /var/lib/nixorium/pxe/session.json; rm /var/lib/nixorium/pxe/session.json; systemctl reset-failed nixorium-pxe-recover.service")
+    controller.succeed("ip addr del 10.0.0.99/8 dev lab0; ! systemctl start nixorium-pxe-network.service")
+    controller.succeed("test ! -e /var/lib/nixorium/pxe/session.json; journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'refusing an untracked transition'")
+    controller.succeed("ip addr add 10.0.0.99/8 dev lab0; systemctl reset-failed nixorium-pxe-network.service")
+    controller.succeed("systemctl start nixorium-pxe-network.service; systemctl start nixorium-pxe-recover.service")
+    controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'; test ! -e /var/lib/nixorium/pxe/session.json; jq -e '.state == \"recovered\" and .stopReason == \"boot-or-explicit-recovery\"' /var/lib/nixorium/pxe/last-session.json")
+    controller.succeed("systemctl stop nixorium-pxe-network.service")
     controller.succeed("su - admin -c 'systemctl start nixorium-install-secrets.service'")
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'")
@@ -194,5 +233,9 @@
     controller.succeed("nixorium status --repo /tmp/deployment --json | jq -e '.operation == \"status\" and .state == \"ready\" and .lab.clients.hosts[0].name == \"pc01\" and .pxePreparation.ready and all(.artifacts[]; .present) and any(.services[]; .name == \"nixorium-harmonia.service\" and .loaded and .active)'")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"action-required\" and .currentStage == \"offer-client-installation\"'")
     controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"PXE-PREPARATION\" and .level == \"OK\") and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\")'")
+    controller.succeed("systemctl start nixorium-pxe-network.service; test -e /var/lib/nixorium/pxe/session.json")
+    controller.crash()
+    controller.wait_for_unit("multi-user.target")
+    controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'; test ! -e /var/lib/nixorium/pxe/session.json; jq -e '.state == \"recovered\" and .stopReason == \"boot-or-explicit-recovery\"' /var/lib/nixorium/pxe/last-session.json")
   '';
 }

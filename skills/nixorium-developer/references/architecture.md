@@ -49,3 +49,10 @@ Keep module evaluation free of import-from-derivation. In particular,
 `Veyon.conf` must encode its generated network objects inside its build-time
 derivation and be installed through `environment.etc.<name>.source`; never read
 that derivation with `builtins.readFile` during evaluation.
+
+Keep controller orchestration in `management.nix` and privileged PXE address
+state in the focused `pxe.nix` module. The network unit must write its
+root-owned session before mutation, remove and restore only the exact recorded
+static CIDR, preserve unrelated interface addresses, and retain only
+`CAP_NET_ADMIN`. Git inspection stays in the unprivileged application and
+preparation layers rather than expanding the network unit's filesystem access.
