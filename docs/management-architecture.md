@@ -29,20 +29,22 @@ changed an address with `ip`, chose a client identity by numeric argument, and
 invoked Colmena directly. The management command, structured settings,
 first-run reconciliation, secure key handling, reviewed controller apply, and
 managed Harmonia service are now implemented. PXE preparation is systemd-owned
-and records immutable artifacts/client closures. Managed PXE networking and
-listeners, client enrollment, deployment, updates, and recovery remain
-incremental work tracked externally.
+and records immutable artifacts/client closures. Transactional PXE networking
+and systemd-owned listeners are also implemented; public lifecycle commands,
+client enrollment, deployment, updates, and richer recovery remain incremental
+work tracked externally.
 
 Important constraints in the current implementation are:
 
 - the controller DHCP address is embedded in the netboot closure and generated
   iPXE script, so a lease change requires targeted artifact rebuilding;
-- PXE listeners remain a foreground Flake app; preparation is a fixed
-  administrator-owned systemd action and Harmonia is controller-only and
-  systemd-owned, while the old helper remains an advanced compatibility app;
+- PXE listeners are owned by a controller-only systemd service; preparation is
+  a fixed administrator-owned systemd action and Harmonia is controller-only
+  and systemd-owned, while the old foreground helper remains an advanced
+  compatibility app;
 - the internal PXE network transition now has persistent session state and
-  boot/explicit recovery, but the normal workflow does not invoke it until the
-  managed listener and confirmed start/stop orchestration are complete;
+  boot/explicit recovery and is ordered before the listener; the public
+  workflow still needs confirmed start/stop/recover orchestration;
 - the client installer is destructive and confirms the disk, but host
   selection is a numeric command-line argument and duplicate assignment is not
   coordinated;
@@ -344,7 +346,10 @@ The controller architecture defines:
   one bind address, so interface-scoped exposure is completed with the
   controller firewall policy later in this milestone;
 - `nixorium-pxe.service`, an on-demand service for ProxyDHCP/TFTP/HTTP whose
-  runtime directory and generated configuration are owned by systemd;
+  runtime directory and generated configuration are owned by systemd. It
+  validates the prepared revision and active network session before binding,
+  reports readiness only after an HTTP health probe, and runs HTTP and dnsmasq
+  under separate unprivileged identities after the narrow bind setup;
 - `nixorium-pxe-network.service`, a root oneshot that applies and reverts the
   temporary address transition idempotently;
 - preparation/apply jobs as transient or oneshot units so their logs survive a
@@ -370,8 +375,9 @@ writes a root-owned mode-0600 session containing the original observed
 addresses and prepared artifacts, then removes only that static CIDR. Stop and
 `nixorium-pxe-recover.service` restore only the recorded address, preserve
 unrelated addresses, verify live state, and archive the result. Malformed or
-unowned session records fail closed. Public start/stop orchestration remains
-pending until the listener service can be ordered around this boundary.
+unowned session records fail closed. The listener is now ordered after both
+this boundary and Harmonia. Public confirmed start/stop/recover orchestration
+remains pending.
 
 PXE ordering requires the cache, prepared artifacts, and network transition
 before starting the proxy. Stopping PXE stops network services first and then

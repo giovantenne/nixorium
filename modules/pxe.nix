@@ -233,9 +233,200 @@ let
       esac
     '';
   };
+  listenerAction = pkgs.writeShellApplication {
+    name = "nixorium-pxe-listener";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.dnsmasq
+      pkgs.gawk
+      pkgs.gnugrep
+      pkgs.iproute2
+      pkgs.jq
+      pkgs.python3
+      pkgs.systemd
+      pkgs.util-linux
+    ];
+    text = ''
+      PREPARATION_FILE=${lib.escapeShellArg preparationFile}
+      SESSION_FILE=${lib.escapeShellArg sessionFile}
+      IFACE=${lib.escapeShellArg labSettings.ifaceName}
+      DHCP_IP=${lib.escapeShellArg labSettings.masterDhcpIp}
+      STATIC_IP=${lib.escapeShellArg labSettings.masterIp}
+      STATIC_CIDR=${lib.escapeShellArg "${labSettings.masterIp}/${toString labSettings.networkPrefixLength}"}
+      HTTP_PORT=${lib.escapeShellArg (toString labSettings.pxeHttpPort)}
+      DNSMASQ_USER=nixorium-pxe-dnsmasq
+      DNSMASQ_GROUP=nixorium-pxe-dnsmasq
+
+      fail() {
+        echo "Error: $*" >&2
+        exit 1
+      }
+
+      [[ -f "$PREPARATION_FILE" && ! -L "$PREPARATION_FILE" ]] \
+        || fail "managed PXE preparation is missing or not a regular file"
+      [[ "$(stat -c '%U:%G:%a' "$PREPARATION_FILE")" == admin:users:644 ]] \
+        || fail "managed PXE preparation has unsafe ownership or permissions"
+      [[ "$(stat -c '%s' "$PREPARATION_FILE")" -le 1048576 ]] \
+        || fail "managed PXE preparation exceeds the size limit"
+      [[ -f "$SESSION_FILE" && ! -L "$SESSION_FILE" ]] \
+        || fail "active PXE network session is missing or not a regular file"
+      [[ "$(stat -c '%U:%G:%a' "$SESSION_FILE")" == root:root:600 ]] \
+        || fail "active PXE network session has unsafe ownership or permissions"
+      [[ "$(stat -c '%s' "$SESSION_FILE")" -le 1048576 ]] \
+        || fail "active PXE network session exceeds the size limit"
+
+      PREPARATION_REVISION="$(jq -er '.revision' "$PREPARATION_FILE")"
+      [[ "$PREPARATION_REVISION" =~ ^[0-9a-f]{40}$ ]] \
+        || fail "deployment revision is invalid"
+      jq -e \
+        --arg revision "$PREPARATION_REVISION" \
+        --arg iface "$IFACE" \
+        --arg dhcpIp "$DHCP_IP" \
+        '.schemaVersion == 1 and .revision == $revision and
+         .controller.dhcpIp == $dhcpIp and .network.ifaceName == $iface and
+         .artifacts.kernel.relativePath == "bzImage" and
+         .artifacts.initrd.relativePath == "initrd" and
+         .artifacts.ipxeScript.relativePath == "netboot.ipxe" and
+         .artifacts.firmware.relativePath == "snponly.efi"' \
+        "$PREPARATION_FILE" >/dev/null \
+        || fail "managed PXE preparation is invalid"
+      jq -e \
+        --arg revision "$PREPARATION_REVISION" \
+        --arg iface "$IFACE" \
+        --arg dhcpIp "$DHCP_IP" \
+        --arg staticAddress "$STATIC_IP" \
+        --argjson prefixLength ${lib.escapeShellArg (toString labSettings.networkPrefixLength)} \
+        '.schemaVersion == 1 and .state == "network-active" and
+         .preparationRevision == $revision and .interface == $iface and
+         .dhcpAddress == $dhcpIp and .staticAddress == $staticAddress and
+         .prefixLength == $prefixLength and .removedStatic == true' \
+        "$SESSION_FILE" >/dev/null \
+        || fail "PXE network session does not match the prepared revision"
+      ip -4 -o addr show dev "$IFACE" scope global \
+        | awk '{ split($4, value, "/"); print value[1] }' \
+        | grep -Fxq "$DHCP_IP" \
+        || fail "configured DHCP address $DHCP_IP is not assigned to $IFACE"
+      ! ip -4 -o addr show dev "$IFACE" scope global \
+        | awk '{ print $4 }' \
+        | grep -Fxq "$STATIC_CIDR" \
+        || fail "static address $STATIC_CIDR is still assigned during PXE mode"
+
+      KERNEL_ROOT="$(jq -er '.artifacts.kernel.storePath' "$PREPARATION_FILE")"
+      INITRD_ROOT="$(jq -er '.artifacts.initrd.storePath' "$PREPARATION_FILE")"
+      IPXE_ROOT="$(jq -er '.artifacts.ipxeScript.storePath' "$PREPARATION_FILE")"
+      FIRMWARE_ROOT="$(jq -er '.artifacts.firmware.storePath' "$PREPARATION_FILE")"
+      for store_path in "$KERNEL_ROOT" "$INITRD_ROOT" "$IPXE_ROOT" "$FIRMWARE_ROOT"; do
+        [[ "$store_path" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ ]] \
+          || fail "managed PXE preparation contains an invalid store path"
+      done
+      KERNEL_FILE="$KERNEL_ROOT/bzImage"
+      INITRD_FILE="$INITRD_ROOT/initrd"
+      IPXE_FILE="$IPXE_ROOT/netboot.ipxe"
+      FIRMWARE_FILE="$FIRMWARE_ROOT/snponly.efi"
+      for artifact in "$KERNEL_FILE" "$INITRD_FILE" "$IPXE_FILE" "$FIRMWARE_FILE"; do
+        [[ -f "$artifact" ]] || fail "prepared PXE artifact is unavailable: $artifact"
+      done
+
+      install -d -m 0755 "$RUNTIME_DIRECTORY/http" "$RUNTIME_DIRECTORY/tftp"
+      ln -s "$KERNEL_FILE" "$RUNTIME_DIRECTORY/http/bzImage"
+      ln -s "$INITRD_FILE" "$RUNTIME_DIRECTORY/http/initrd"
+      ln -s "$FIRMWARE_FILE" "$RUNTIME_DIRECTORY/tftp/snponly.efi"
+      CMDLINE="$(grep -m1 '^kernel ' "$IPXE_FILE" | sed 's/^kernel [^ ]* //')"
+      [[ -n "$CMDLINE" ]] || fail "could not extract the prepared kernel command line"
+
+      cat >"$RUNTIME_DIRECTORY/tftp/boot.ipxe" <<EOF
+      #!ipxe
+      dhcp
+      set base-url http://$DHCP_IP:$HTTP_PORT
+      kernel \''${base-url}/bzImage $CMDLINE
+      initrd \''${base-url}/initrd
+      boot
+      EOF
+      cp "$RUNTIME_DIRECTORY/tftp/boot.ipxe" "$RUNTIME_DIRECTORY/tftp/autoexec.ipxe"
+
+      cat >"$RUNTIME_DIRECTORY/dnsmasq.conf" <<EOF
+      port=0
+      log-dhcp
+      log-facility=-
+      bind-interfaces
+      interface=$IFACE
+      dhcp-no-override
+      dhcp-leasefile=/dev/null
+      pid-file=
+      enable-tftp
+      tftp-root=$RUNTIME_DIRECTORY/tftp
+      dhcp-range=$DHCP_IP,proxy
+      dhcp-userclass=set:ipxe,iPXE
+      pxe-service=BC_EFI,"Boot iPXE UEFI BC",snponly.efi
+      pxe-service=X86-64_EFI,"Boot iPXE UEFI x64",snponly.efi
+      pxe-prompt="Network boot",1
+      dhcp-boot=tag:ipxe,boot.ipxe
+      EOF
+      dnsmasq --test --conf-file="$RUNTIME_DIRECTORY/dnsmasq.conf" >/dev/null \
+        || fail "generated dnsmasq configuration is invalid"
+
+      [[ -z "$(ss -H -ltn "sport = :$HTTP_PORT")" ]] \
+        || fail "PXE HTTP port $HTTP_PORT is already in use"
+      for port in 67 69 4011; do
+        [[ -z "$(ss -H -lun "sport = :$port")" ]] \
+          || fail "PXE UDP port $port is already in use"
+      done
+
+      setpriv --reuid=nobody --regid=nogroup --clear-groups -- \
+        python3 -m http.server "$HTTP_PORT" --directory "$RUNTIME_DIRECTORY/http" --bind "$DHCP_IP" &
+      HTTP_PID=$!
+      dnsmasq --keep-in-foreground \
+        --user="$DNSMASQ_USER" --group="$DNSMASQ_GROUP" \
+        --conf-file="$RUNTIME_DIRECTORY/dnsmasq.conf" &
+      DNSMASQ_PID=$!
+
+      stop_children() {
+        trap - TERM INT
+        kill "$HTTP_PID" "$DNSMASQ_PID" >/dev/null 2>&1 || true
+        wait "$HTTP_PID" "$DNSMASQ_PID" >/dev/null 2>&1 || true
+      }
+      # Invoked through the TERM/INT trap below.
+      # shellcheck disable=SC2329
+      terminate() {
+        stop_children
+        exit 0
+      }
+      trap terminate TERM INT
+
+      READY=false
+      for _ in $(seq 1 50); do
+        kill -0 "$HTTP_PID" "$DNSMASQ_PID" >/dev/null 2>&1 \
+          || { stop_children; fail "a PXE listener exited during startup"; }
+        if curl --fail --silent --max-time 1 "http://$DHCP_IP:$HTTP_PORT/bzImage" >/dev/null; then
+          READY=true
+          break
+        fi
+        sleep 0.1
+      done
+      [[ "$READY" == true ]] \
+        || { stop_children; fail "PXE HTTP readiness check failed"; }
+      echo "PXE ProxyDHCP, TFTP, and HTTP listeners active on $IFACE ($DHCP_IP)"
+      systemd-notify --ready --status="PXE listeners active on $IFACE ($DHCP_IP)"
+
+      set +e
+      wait -n "$HTTP_PID" "$DNSMASQ_PID"
+      CHILD_STATUS=$?
+      set -e
+      stop_children
+      echo "Error: a PXE listener exited unexpectedly with status $CHILD_STATUS" >&2
+      exit 1
+    '';
+  };
 in
 {
   config = lib.mkIf isController {
+    users.groups.nixorium-pxe-dnsmasq = { };
+    users.users.nixorium-pxe-dnsmasq = {
+      isSystemUser = true;
+      group = "nixorium-pxe-dnsmasq";
+    };
+
     systemd.services.nixorium-pxe-network = {
       description = "Apply and restore the Nixorium PXE address transition";
       wants = [ "network-online.target" ];
@@ -283,6 +474,42 @@ in
         NoNewPrivileges = true;
         CapabilityBoundingSet = [ "CAP_NET_ADMIN" ];
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
+      };
+    };
+
+    systemd.services.nixorium-pxe = {
+      description = "Serve Nixorium ProxyDHCP, TFTP, and HTTP installation endpoints";
+      requires = [ "harmonia.service" "nixorium-pxe-network.service" ];
+      after = [ "harmonia.service" "nixorium-pxe-network.service" ];
+      serviceConfig = {
+        Type = "notify";
+        NotifyAccess = "all";
+        ExecStart = "${listenerAction}/bin/nixorium-pxe-listener";
+        ExecStopPost = "${pkgs.systemd}/bin/systemctl --no-block stop nixorium-pxe-network.service";
+        User = "root";
+        Group = "root";
+        UMask = "0022";
+        RuntimeDirectory = "nixorium/pxe-runtime";
+        RuntimeDirectoryMode = "0755";
+        PrivateTmp = true;
+        PrivateDevices = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        NoNewPrivileges = true;
+        LockPersonality = true;
+        CapabilityBoundingSet = [
+          "CAP_KILL"
+          "CAP_NET_ADMIN"
+          "CAP_NET_BIND_SERVICE"
+          "CAP_NET_RAW"
+          "CAP_SETGID"
+          "CAP_SETUID"
+        ];
+        AmbientCapabilities = [ "CAP_SETGID" "CAP_SETUID" ];
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
+        Restart = "no";
+        TimeoutStopSec = "30s";
+        KillMode = "mixed";
       };
     };
   };

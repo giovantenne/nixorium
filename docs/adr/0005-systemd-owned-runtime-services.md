@@ -4,10 +4,10 @@ Status: accepted
 
 ## Context
 
-Harmonia and PXE currently run in foreground terminals. PXE also has a
-temporary networking transition that can be left unclear after interruption.
-The TUI must be able to exit while infrastructure remains observable and
-recoverable.
+At the time of this decision, Harmonia and PXE ran in foreground terminals.
+PXE also had a temporary networking transition that could be left unclear
+after interruption. The TUI must be able to exit while infrastructure remains
+observable and recoverable.
 
 ## Decision
 
@@ -34,10 +34,14 @@ key, recovery after verified installation, real cache metadata, service state,
 and durable canonical-unit logs. PXE preparation now runs as `admin` inside a
 fixed oneshot unit, verifies the live DHCP address and cache health, and
 atomically records canonical build outputs for the exact Git revision. The
-existing proxy consumes that record defensively. PXE listener ownership and
-confirmed start/stop orchestration remain pending. The internal
+existing compatibility proxy consumes that record defensively. The internal
 `nixorium-pxe-network.service` now writes a root-owned session before removing
 the exact configured static CIDR; stop and the boot-enabled recovery unit
 restore only that recorded address and archive the reconciled outcome. The
 unit retains only `CAP_NET_ADMIN` and validates the live interface over stored
-state before every mutation.
+state before every mutation. `nixorium-pxe.service` now owns the ProxyDHCP,
+TFTP, and HTTP listeners, validates both records and live address state before
+binding, and reports readiness only after the HTTP endpoint responds. Its
+ephemeral runtime files are systemd-owned; HTTP runs as `nobody` and dnsmasq
+drops to a dedicated system identity. Confirmed public start/stop/recover
+orchestration remains pending.

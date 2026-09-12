@@ -172,7 +172,7 @@ Release from the matching changelog section.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
-- Netboot uses `dnsmasq` in ProxyDHCP mode (`scripts/run-pxe-proxy.sh`) so institutional DHCP remains authoritative for leases. `mkLab` builds a standalone installer source containing the effective downstream configuration and only local Flake inputs for offline evaluation.
+- Netboot uses the systemd-owned `nixorium-pxe.service` with `dnsmasq` in ProxyDHCP mode so institutional DHCP remains authoritative for leases. `scripts/run-pxe-proxy.sh` remains an advanced foreground compatibility helper. `mkLab` builds a standalone installer source containing the effective downstream configuration and only local Flake inputs for offline evaluation.
 - `labOverlay` composes Veyon's official overlay with local PipeWire packaging fixes and the GNOME Remote Desktop fallback patch. It is applied in each host's module list and in `colmena.meta.nixpkgs`.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
@@ -288,6 +288,9 @@ set -euo pipefail
 - `nixorium-pxe-network.service` is an internal root boundary with only
   `CAP_NET_ADMIN`; preserve its root-owned session-before-mutation ordering,
   exact static-address restoration, and boot-time recovery semantics
+- `nixorium-pxe.service` must validate the prepared revision, root-owned active
+  session, live DHCP address, and absent static CIDR before binding; preserve
+  its systemd readiness protocol and unprivileged listener identities
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
