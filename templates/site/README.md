@@ -160,9 +160,14 @@ committing a changed `masterDhcpIp`.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.
-PXE start/stop networking and client deployment remain manual until their
-management milestones are implemented; artifact preparation and the cache no
-longer need foreground terminals or mutable build links.
+PXE preparation, start, stop, and recovery no longer need foreground terminals,
+direct systemd commands, manual network repair, or mutable build links. Guided
+client enrollment remains a later management milestone.
+
+The NixOS firewall is enabled on every installed host. SSH, mDNS, Veyon, and
+the optional VNC fallback are admitted only on `ifaceName`; Harmonia and PXE
+ports are admitted there only on the controller. Add any site-specific service
+rules in the private extension modules rather than changing upstream modules.
 
 The generated ramdisk contains a standalone installer bundle with the effective
 configuration, public cache key, local modules and assets.

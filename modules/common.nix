@@ -2,6 +2,7 @@
 {
   imports = [
     ./desktop.nix
+    ./firewall.nix
     ./packages.nix
     ./power.nix
     ./screensaver.nix
@@ -21,9 +22,6 @@
   boot.loader.efi.efiSysMountPoint = "/boot";
 
   networking.networkmanager.enable = true;
-
-  # Kept intentionally until the Veyon/VNC network policy is redesigned.
-  networking.firewall.enable = false;
 
   # Downstream hardware modules may disable this default on bare metal.
   virtualisation.virtualbox.guest.enable = lib.mkDefault true;

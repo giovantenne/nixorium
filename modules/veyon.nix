@@ -201,10 +201,4 @@ in
     group = "root";
     setuid = true;
   };
-
-  # Open the Veyon and VNC ports.
-  # The firewall is disabled in common.nix but we declare the ports
-  # explicitly for documentation / defense-in-depth.
-  networking.firewall.allowedTCPPorts = [ 11100 ]
-    ++ lib.optional (!useNativeWayland) 5900;
 }

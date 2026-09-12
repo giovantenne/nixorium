@@ -40,6 +40,7 @@
   {
     imports = [
       ../modules/cache.nix
+      ../modules/firewall.nix
       ../modules/management.nix
       ../modules/pxe.nix
     ];
@@ -55,6 +56,7 @@
         cachePort = 5000;
         pxeHttpPort = 8080;
         cachePublicKey = null;
+        veyonNativeHosts = [];
       };
       inherit nixoriumPackage;
     };
@@ -146,6 +148,8 @@
     start_all()
     controller.wait_for_unit("sshd.service")
     controller.wait_for_unit("nixorium-test-network.service")
+    controller.succeed("systemctl is-active --quiet firewall.service")
+    controller.succeed("iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 5000'; iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 8080'; iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 67'")
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")

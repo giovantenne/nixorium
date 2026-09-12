@@ -43,6 +43,7 @@ cmd/nixorium/              # Management CLI entrypoint
 internal/                  # Domain, application, adapter, and presentation layers
 modules/
   common.nix               # Composition point and shared system defaults
+  firewall.nix             # Interface-scoped SSH, Veyon, cache, and PXE policy
   desktop.nix              # GNOME, locale, fonts and desktop policy
   packages.nix             # Shared package set
   power.nix                # Idle and controller sleep policy
@@ -182,6 +183,9 @@ Release from the matching changelog section.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
 - Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. `labSettings.veyonNativeHosts` selects the Veyon 4.11 native PipeWire backend per host; other hosts use the GNOME Remote Desktop fallback on port 5900. The private key is not managed by Nix (see Security).
+- `modules/firewall.nix` enables the firewall everywhere, disables implicit
+  all-interface SSH/Avahi openings, scopes SSH/mDNS/Veyon/optional VNC to the
+  configured interface, and adds Harmonia/PXE ports only on the controller.
 - `Veyon.conf` is a build-time derivation: evaluation must never read a derivation output to encode its network objects. GitHub CI disables import-from-derivation to enforce this boundary.
 - The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
 - `modules/common.nix` is only the composition point for focused desktop, package, power, screensaver, shell, and SSH modules.
@@ -299,6 +303,8 @@ set -euo pipefail
 - public PXE lifecycle control must retain the exact verb/unit allowlist,
   require readiness before confirmed start, deny direct network-unit start,
   and synchronously stop listener/network units after a failed start
+- keep product firewall openings interface- and role-scoped; do not restore
+  global `allowed*Ports` or module `openFirewall` shortcuts
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
