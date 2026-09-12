@@ -76,6 +76,9 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 	if preparation.Ready {
 		artifacts = preparation.Artifacts
 	}
+	listener := i.source.ServiceState(ctx, PXEListenerUnit)
+	network := i.source.ServiceState(ctx, PXENetworkUnit)
+	pxeState := ObservePXELifecycle(listener, network, preparation)
 	report := domain.StatusReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "status",
@@ -86,9 +89,11 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 		Deployment:    deployment,
 		Git:           gitState,
 		Services: []domain.ServiceState{
-			i.source.ServiceState(ctx, "nixorium-harmonia.service"),
-			i.source.ServiceState(ctx, "nixorium-pxe.service"),
+			i.source.ServiceState(ctx, HarmoniaUnit),
+			listener,
+			network,
 		},
+		PXE:            pxeState,
 		PXEPreparation: preparation,
 		Artifacts:      artifacts,
 	}
@@ -100,6 +105,9 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 	}
 	if preparation.Present && !preparation.Ready {
 		report.Warnings = append(report.Warnings, "managed PXE preparation is stale or invalid: "+preparation.Detail)
+	}
+	if pxeState.Mode == "degraded" || pxeState.Mode == "recovery-required" {
+		report.Warnings = append(report.Warnings, "PXE lifecycle requires recovery: "+pxeState.Detail)
 	}
 	for _, service := range report.Services {
 		if !service.Loaded {
@@ -170,11 +178,23 @@ func (i *Inspector) Doctor(ctx context.Context, repository string, options Docto
 	for _, service := range status.Services {
 		if !service.Loaded {
 			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is not installed", Remediation: "Install the managed-service controller module when it becomes available."})
+		} else if service.Name == PXEListenerUnit || service.Name == PXENetworkUnit {
+			continue
 		} else if !service.Active {
 			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is inactive", Evidence: service.State})
 		} else {
 			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelOK, Summary: service.Name + " is active"})
 		}
+	}
+	switch status.PXE.Mode {
+	case "active":
+		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelOK, Summary: "PXE installation mode is active", Evidence: status.PXE.Detail})
+	case "ready", "stopped":
+		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelOK, Summary: "PXE installation mode is " + status.PXE.Mode, Evidence: status.PXE.Detail})
+	case "degraded", "recovery-required":
+		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelError, Summary: "PXE lifecycle requires recovery", Evidence: status.PXE.Detail, Remediation: "Run `nixorium pxe recover` before starting installation mode again."})
+	default:
+		add(domain.Finding{ID: "PXE-LIFECYCLE", Level: domain.LevelWarning, Summary: "PXE lifecycle is unavailable", Evidence: status.PXE.Detail})
 	}
 
 	i.addCacheKeyFinding(ctx, status.Repository, add)

@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/x/term"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func IsInteractive(input *os.File) bool {
@@ -26,4 +28,19 @@ func ConfirmControllerApply(input io.Reader, output io.Writer, controller string
 		return false, err
 	}
 	return strings.TrimSpace(value) == "APPLY", nil
+}
+
+func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecycleReport) (bool, error) {
+	fmt.Fprintln(output, "PXE installation mode review")
+	fmt.Fprintf(output, "Interface: %s\n", report.Interface)
+	fmt.Fprintf(output, "Temporary change: remove %s while installation mode is active\n", report.StaticCIDR)
+	fmt.Fprintf(output, "Service address: %s (institutional DHCP remains authoritative)\n", report.DHCPAddress)
+	fmt.Fprintln(output, "Services: ProxyDHCP, TFTP, HTTP, and the local binary cache")
+	fmt.Fprintln(output, "Recovery: `nixorium pxe stop` restores normal addressing; reboot recovery is enabled")
+	fmt.Fprint(output, "Type START PXE to continue: ")
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == "START PXE", nil
 }

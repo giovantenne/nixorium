@@ -30,9 +30,10 @@ invoked Colmena directly. The management command, structured settings,
 first-run reconciliation, secure key handling, reviewed controller apply, and
 managed Harmonia service are now implemented. PXE preparation is systemd-owned
 and records immutable artifacts/client closures. Transactional PXE networking
-and systemd-owned listeners are also implemented; public lifecycle commands,
-client enrollment, deployment, updates, and richer recovery remain incremental
-work tracked externally.
+and systemd-owned listeners are also implemented. The public lifecycle now
+performs confirmed start, idempotent stop, explicit recovery, and typed state
+reconciliation; its TUI entry point, client enrollment, deployment, updates,
+and richer recovery remain incremental work tracked externally.
 
 Important constraints in the current implementation are:
 
@@ -43,8 +44,9 @@ Important constraints in the current implementation are:
   and systemd-owned, while the old foreground helper remains an advanced
   compatibility app;
 - the internal PXE network transition now has persistent session state and
-  boot/explicit recovery and is ordered before the listener; the public
-  workflow still needs confirmed start/stop/recover orchestration;
+  boot/explicit recovery and is ordered before the listener; the public CLI
+  owns confirmed start/stop/recover orchestration while the dashboard action
+  remains to be connected;
 - the client installer is destructive and confirms the disk, but host
   selection is a numeric command-line argument and duplicate assignment is not
   coordinated;
@@ -375,9 +377,12 @@ writes a root-owned mode-0600 session containing the original observed
 addresses and prepared artifacts, then removes only that static CIDR. Stop and
 `nixorium-pxe-recover.service` restore only the recorded address, preserve
 unrelated addresses, verify live state, and archive the result. Malformed or
-unowned session records fail closed. The listener is now ordered after both
-this boundary and Harmonia. Public confirmed start/stop/recover orchestration
-remains pending.
+unowned session records fail closed. The listener is ordered after both this
+boundary and Harmonia. Public start repeats the unprivileged preflight after
+confirmation, starts only the listener unit, and verifies both service and
+address state. A failure triggers synchronous listener/network cleanup. Public
+stop and recover use only fixed unit/action pairs and verify the restored
+static address before success.
 
 PXE ordering requires the cache, prepared artifacts, and network transition
 before starting the proxy. Stopping PXE stops network services first and then

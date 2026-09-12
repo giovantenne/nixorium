@@ -93,11 +93,13 @@ nix run .#nixorium -- setup keys
 nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- setup apply
 nix run .#nixorium -- pxe prepare
+nix run .#nixorium -- pxe start
+nix run .#nixorium -- pxe stop
+nix run .#nixorium -- pxe recover
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
 nix run .#nixorium -- doctor --full
-sudo nix run .#run-pxe-proxy
 ```
 
 Running `nix run .#nixorium` without a subcommand opens the current read-only
@@ -118,6 +120,13 @@ rechecks `lab-settings.json`, reports concurrent edits as conflicts, and writes
 only that managed file atomically.
 `setup status` is also read-only: it re-inspects the deployment and reports the
 first incomplete first-run stage so interrupted setup can resume predictably.
+`pxe start` validates the committed preparation, live DHCP address, cache, and
+managed services before requiring the exact `START PXE` confirmation. `pxe
+stop` restores normal controller addressing, while `pxe recover` reconciles an
+interrupted session explicitly; all three operations are idempotent. Use
+`--yes` with `pxe start` only for intentional automation. The
+`run-pxe-proxy` Flake app remains an advanced foreground diagnostic helper and
+does not own the managed network transition.
 `setup keys` creates only missing Harmonia, SSH, and Veyon pairs, restricts
 private modes, verifies correspondence, and refuses to overwrite existing key
 material. It is safe to retry after interruption.

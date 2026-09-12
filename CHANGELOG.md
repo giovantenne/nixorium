@@ -75,6 +75,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   prepared revision, active network session, and live addresses before serving
   ProxyDHCP, TFTP, and HTTP; publishes readiness only after a health check; and
   drops network children to separate unprivileged identities.
+- Confirmed `nixorium pxe start`, idempotent `pxe stop`, and explicit `pxe
+  recover` operations with exact polkit controls, typed lifecycle status,
+  repeated readiness checks, and synchronous rollback after startup failure.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.

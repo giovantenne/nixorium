@@ -44,6 +44,13 @@ dnsmasq drops to the dedicated `nixorium-pxe-dnsmasq` system user. Both consume
 only fixed runtime paths derived from strictly validated preparation and
 root-owned session records.
 
+The public PXE lifecycle uses an exact verb/unit allowlist. Administrators may
+start or stop `nixorium-pxe.service`, stop the internal network unit, and start
+the fixed recovery unit; direct public start of the network unit is denied.
+The application performs readiness and Git checks unprivileged, starts the
+listener whose systemd dependencies enter installation mode, and synchronously
+stops both units if startup or post-start verification fails.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

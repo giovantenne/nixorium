@@ -21,8 +21,9 @@ events and detailed logs.
 
 Services gain dependencies, restart behavior, persistent logs, and clean
 start/stop semantics. Network cleanup can run on normal stop and boot-time
-recovery. Abrupt interruption and power-loss paths still require VM and
-physical hardware validation before PXE lifecycle work is complete.
+recovery. Abrupt interruption and power-loss paths are covered in the NixOS
+VM; physical hardware validation remains required before claiming hardware
+coverage.
 
 ## Implementation status
 
@@ -43,5 +44,8 @@ state before every mutation. `nixorium-pxe.service` now owns the ProxyDHCP,
 TFTP, and HTTP listeners, validates both records and live address state before
 binding, and reports readiness only after the HTTP endpoint responds. Its
 ephemeral runtime files are systemd-owned; HTTP runs as `nobody` and dnsmasq
-drops to a dedicated system identity. Confirmed public start/stop/recover
-orchestration remains pending.
+drops to a dedicated system identity. The public lifecycle repeats readiness
+checks around exact confirmation, exposes typed active/degraded/recovery state,
+and controls only fixed start/stop/recover unit pairs through polkit. VM tests
+prove idempotent start/stop, synchronous rollback after listener failure,
+explicit recovery, and boot recovery after a controller crash.
