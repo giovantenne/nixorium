@@ -62,3 +62,6 @@ signal, and drop HTTP and dnsmasq to separate unprivileged identities.
 Public lifecycle operations must keep readiness checks in the unprivileged
 application, expose typed reconciled state, use exact systemd verb/unit pairs,
 deny direct network-unit start, and synchronously roll back a failed start.
+Keep firewall policy in the focused built-in module: no implicit global
+OpenSSH/Avahi openings, common desktop services only on the configured
+interface, and Harmonia/PXE ports only for the controller role.

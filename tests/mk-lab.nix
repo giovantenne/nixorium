@@ -10,6 +10,11 @@ let
       networkPrefixLength = 25;
     };
   });
+  nativeVeyonLab = mkLab (baseArgs // {
+    labConfig = labConfig // {
+      veyonNativeHosts = [ "pc01" ];
+    };
+  });
   rejectsUnknownHost = !(builtins.tryEval (builtins.deepSeq
     (mkLab (baseArgs // {
       hostModules.pc00 = [ ../modules/common.nix ];
@@ -24,6 +29,12 @@ let
     true)).success;
   hasNixorium = packages:
     builtins.any (package: (package.pname or "") == "nixorium") packages;
+  controllerFirewall = subnetLab.nixosConfigurations.pc99.config.networking.firewall;
+  clientFirewall = subnetLab.nixosConfigurations.pc01.config.networking.firewall;
+  controllerTCP = controllerFirewall.interfaces.enp0s3.allowedTCPPorts;
+  controllerUDP = controllerFirewall.interfaces.enp0s3.allowedUDPPorts;
+  clientTCP = clientFirewall.interfaces.enp0s3.allowedTCPPorts;
+  nativeClientTCP = nativeVeyonLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
 in
 assert subnetLab.labMeta.controller.staticIp == "10.23.4.227";
 assert subnetLab.labMeta.network.prefixLength == 25;
@@ -78,10 +89,26 @@ assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe"
 ];
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe".serviceConfig.AmbientCapabilities == [ "CAP_SETGID" "CAP_SETUID" ];
 assert subnetLab.nixosConfigurations.pc99.config.users.users.nixorium-pxe-dnsmasq.isSystemUser;
+assert controllerFirewall.enable;
+assert controllerFirewall.allowedTCPPorts == [];
+assert controllerFirewall.allowedUDPPorts == [];
+assert builtins.all (port: builtins.elem port controllerTCP) [ 22 11100 5900 5000 8080 ];
+assert builtins.length controllerTCP == 5;
+assert builtins.all (port: builtins.elem port controllerUDP) [ 67 69 4011 5353 ];
+assert builtins.length controllerUDP == 4;
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-prepare-pxe");
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-pxe-network");
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-pxe");
+assert clientFirewall.enable;
+assert clientFirewall.allowedTCPPorts == [];
+assert clientFirewall.allowedUDPPorts == [];
+assert builtins.all (port: builtins.elem port clientTCP) [ 22 11100 5900 ];
+assert builtins.length clientTCP == 3;
+assert clientFirewall.interfaces.enp0s3.allowedUDPPorts == [ 5353 ];
+assert builtins.all (port: builtins.elem port nativeClientTCP) [ 22 11100 ];
+assert !(builtins.elem 5900 nativeClientTCP);
+assert builtins.length nativeClientTCP == 2;
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 true

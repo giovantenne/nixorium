@@ -704,6 +704,7 @@ pkgs/
 modules/
   common.nix               # Composition and shared system defaults
   desktop.nix              # GNOME, locale, fonts and desktop policy
+  firewall.nix             # Interface-scoped role-specific service policy
   packages.nix             # Shared package set
   power.nix                # Idle and controller sleep policy
   screensaver.nix          # Screensaver files and user service
@@ -758,6 +759,8 @@ the private deployment repository.
 - `users.mutableUsers = false` enforces declarative user management
 - Docker is rootless and no normal user belongs to the root-equivalent `docker` group
 - The Veyon private key is readable only by the `veyon-master` group
+- The firewall exposes SSH, mDNS, Veyon and optional VNC only on `ifaceName`;
+  Harmonia and PXE ports are additionally controller-only
 
 ## 📄 License
 

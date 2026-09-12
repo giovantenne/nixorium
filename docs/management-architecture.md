@@ -52,8 +52,8 @@ Important constraints in the current implementation are:
   coordinated;
 - the controller bootstrap installs an evaluable placeholder deployment, but
   there is no first-run application after reboot;
-- the controller firewall is currently disabled by a shared module, so new
-  management services must not assume a firewall already limits exposure.
+- the firewall admits product ports only on the configured laboratory
+  interface, with controller-only rules for Harmonia and PXE;
 
 ## Architectural goals and invariants
 
@@ -345,8 +345,8 @@ The controller architecture defines:
   `harmonia.service`), a persistent service with the installed non-store key
   delivered through `LoadCredential`, socket activation, restart/watchdog
   behavior, journald logs, and status/HTTP readiness checks. Harmonia accepts
-  one bind address, so interface-scoped exposure is completed with the
-  controller firewall policy later in this milestone;
+  one bind address, while the firewall limits its port to the configured
+  laboratory interface on the controller;
 - `nixorium-pxe.service`, an on-demand service for ProxyDHCP/TFTP/HTTP whose
   runtime directory and generated configuration are owned by systemd. It
   validates the prepared revision and active network session before binding,
@@ -386,9 +386,10 @@ static address before success.
 
 PXE ordering requires the cache, prepared artifacts, and network transition
 before starting the proxy. Stopping PXE stops network services first and then
-restores normal addressing. Firewall openings are scoped to the installation
-interface and active service wherever the NixOS firewall model supports it.
-The management application never keeps infrastructure alive by remaining open.
+restores normal addressing. Firewall openings are scoped to the configured
+interface and by host role. The NixOS firewall policy is static, but stopped
+on-demand PXE services leave no listening endpoint. The management application
+never keeps infrastructure alive by remaining open.
 
 ## PXE lifecycle and recovery
 
@@ -508,9 +509,10 @@ operations.
 - Address changes can interrupt controller connectivity; systemd cleanup and
   reboot reconciliation need VM and hardware testing before the workflow is
   called safe.
-- The disabled shared firewall broadens current exposure. Management services
-  must bind narrowly, and the underlying firewall policy should be corrected
-  in a compatible milestone.
+- A single configured interface can carry both laboratory and institutional
+  traffic. Public defaults scope services to that interface but cannot safely
+  guess a narrower institutional DHCP source range; physical deployments must
+  review whether downstream source-specific overrides are appropriate.
 - Git cannot safely include private keys or plaintext credentials; key and
   password flows need adversarial tests for files, process arguments, logs,
   and Nix store references.
@@ -530,3 +532,4 @@ The following decisions are recorded separately:
 - [ADR-0003: structured deployment settings](adr/0003-structured-deployment-settings.md)
 - [ADR-0004: narrow privileged actions](adr/0004-narrow-privileged-actions.md)
 - [ADR-0005: systemd-owned runtime services](adr/0005-systemd-owned-runtime-services.md)
+- [ADR-0006: interface-scoped laboratory firewall](adr/0006-interface-scoped-firewall.md)

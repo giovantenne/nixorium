@@ -94,6 +94,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- Enabled the NixOS firewall on every installed host with role-specific ports
+  limited to the configured interface, including controller-only Harmonia/PXE
+  rules and no implicit global OpenSSH or Avahi openings.
 - Private deployments are evaluated with the local Git Flake fetcher, keeping
   ignored Harmonia, SSH, and Veyon private keys out of Nix source/store copies.
 - The controller bootstrap now runs the Disko revision pinned by the generated
