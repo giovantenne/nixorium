@@ -26,6 +26,7 @@ type Source interface {
 	GitState(context.Context, string) (domain.GitState, error)
 	ServiceState(context.Context, string) domain.ServiceState
 	ArtifactState(string, string, string) domain.ArtifactState
+	PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState
 	InterfaceAddresses(string) ([]string, error)
 	AddressOwners(string) ([]string, error)
 	FreeBytes(string) (uint64, error)
@@ -65,6 +66,16 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 		return domain.StatusReport{}, fmt.Errorf("inspect Git worktree: %w", err)
 	}
 
+	preparation := i.source.PXEPreparation(ctx, root, meta)
+	artifacts := []domain.ArtifactState{
+		i.source.ArtifactState(root, "kernel", "result-kernel/bzImage"),
+		i.source.ArtifactState(root, "initrd", "result-initrd/initrd"),
+		i.source.ArtifactState(root, "iPXE script", "result-ipxe/netboot.ipxe"),
+		i.source.ArtifactState(root, "iPXE firmware", "assets/ipxe/snponly.efi"),
+	}
+	if preparation.Ready {
+		artifacts = preparation.Artifacts
+	}
 	report := domain.StatusReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "status",
@@ -78,18 +89,17 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 			i.source.ServiceState(ctx, "nixorium-harmonia.service"),
 			i.source.ServiceState(ctx, "nixorium-pxe.service"),
 		},
-		Artifacts: []domain.ArtifactState{
-			i.source.ArtifactState(root, "kernel", "result-kernel/bzImage"),
-			i.source.ArtifactState(root, "initrd", "result-initrd/initrd"),
-			i.source.ArtifactState(root, "iPXE script", "result-ipxe/netboot.ipxe"),
-			i.source.ArtifactState(root, "iPXE firmware", "assets/ipxe/snponly.efi"),
-		},
+		PXEPreparation: preparation,
+		Artifacts:      artifacts,
 	}
 	if !deployment.Ready {
 		report.State = "action-required"
 	}
 	if gitState.Dirty {
 		report.Warnings = append(report.Warnings, "deployment repository has uncommitted changes")
+	}
+	if preparation.Present && !preparation.Ready {
+		report.Warnings = append(report.Warnings, "managed PXE preparation is stale or invalid: "+preparation.Detail)
 	}
 	for _, service := range report.Services {
 		if !service.Loaded {
@@ -138,6 +148,13 @@ func (i *Inspector) Doctor(ctx context.Context, repository string, options Docto
 	}
 
 	i.addNetworkFindings(status, add)
+	if status.PXEPreparation.Ready {
+		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelOK, Summary: "Managed PXE artifacts and client closures are current", Evidence: status.PXEPreparation.Detail})
+	} else if status.PXEPreparation.Present {
+		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Managed PXE preparation is stale or invalid", Evidence: status.PXEPreparation.Detail, Remediation: "Review the reported mismatch and run `nixorium pxe prepare` again."})
+	} else {
+		add(domain.Finding{ID: "PXE-PREPARATION", Level: domain.LevelWarning, Summary: "Managed PXE preparation has not run", Remediation: "Run `nixorium pxe prepare` before starting installation mode."})
+	}
 	for _, artifact := range status.Artifacts {
 		level := domain.LevelOK
 		remediation := ""

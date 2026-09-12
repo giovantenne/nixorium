@@ -31,4 +31,8 @@ the stable `nixorium-harmonia.service` alias. The source signing key remains
 root-only at `/var/lib/nixorium/keys/harmonia-secret-key`; systemd delivers an
 isolated runtime credential to Harmonia. A NixOS VM proves failure without the
 key, recovery after verified installation, real cache metadata, service state,
-and durable canonical-unit logs. PXE ownership and recovery remain pending.
+and durable canonical-unit logs. PXE preparation now runs as `admin` inside a
+fixed oneshot unit, verifies the live DHCP address and cache health, and
+atomically records canonical build outputs for the exact Git revision. The
+existing proxy consumes that record defensively. PXE listener ownership,
+transactional networking, and recovery remain pending.

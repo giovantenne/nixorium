@@ -408,6 +408,9 @@ let
       exec ${disko.packages.${system}.default}/bin/disko "$@"
     '';
   };
+  pxeFirmware = bootstrapPkgs.runCommand "nixorium-ipxe-firmware" {} ''
+    install -D -m 0644 ${bootstrapPkgs.ipxe}/snp.efi "$out/snponly.efi"
+  '';
 in
 assert builtins.all isModulePath extensionModules
   || throw "mkLab extension modules must be file paths so they can be included in the offline installer";
@@ -513,7 +516,7 @@ assert unknownVeyonNativeHosts == []
   };
 
   packages.${system} = {
-    inherit installerBundle;
+    inherit installerBundle pxeFirmware;
     disko = runDisko;
     nixorium = nixoriumPackage;
   };

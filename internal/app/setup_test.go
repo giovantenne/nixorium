@@ -38,6 +38,10 @@ func (fakeSetupSource) ArtifactState(_ string, name, path string) domain.Artifac
 	return domain.ArtifactState{Name: name, Path: path, Present: false}
 }
 
+func (fakeSetupSource) PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState {
+	return domain.PXEPreparationState{}
+}
+
 func (fakeSetupSource) CommandAvailable(string) bool {
 	return true
 }

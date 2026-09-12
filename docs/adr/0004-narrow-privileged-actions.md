@@ -23,6 +23,13 @@ the exact returned NixOS store closure. Local deployments use the Git Flake
 fetcher, not `path:`, so ignored private keys are excluded from copied Nix
 sources and never become build inputs.
 
+PXE preparation needs authorization to start a fixed long-running unit but no
+root capability. That unit runs entirely as `admin`, reads the deployment
+read-only, builds content-addressed outputs, and can write only its Nix cache
+and preparation state directories. Later privileged PXE consumers must treat
+the administrator-owned manifest as untrusted structured input and accept
+only canonical `/nix/store/<hash>-<name>` roots and fixed artifact names.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

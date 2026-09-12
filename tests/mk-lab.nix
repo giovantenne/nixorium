@@ -52,6 +52,7 @@ assert subnetLab.labMeta.clients.hosts == [
 assert subnetLab.colmena.pc01.deployment.targetHost == "10.23.4.129";
 assert subnetLab.apps.x86_64-linux.nixorium.type == "app";
 assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";
+assert subnetLab.packages.x86_64-linux.pxeFirmware.name == "nixorium-ipxe-firmware";
 assert hasNixorium subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert !(hasNixorium subnetLab.nixosConfigurations.pc01.config.environment.systemPackages);
 assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.enable;
@@ -60,7 +61,11 @@ assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.signKey
 ];
 assert builtins.elem "nixorium-harmonia.service"
   subnetLab.nixosConfigurations.pc99.config.systemd.services.harmonia.aliases;
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-prepare-pxe";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prepare-pxe".serviceConfig.User == "admin";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prepare-pxe".serviceConfig.CapabilityBoundingSet == "";
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-prepare-pxe");
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 true

@@ -35,3 +35,15 @@ func TestApplyControllerStartsOnlyFixedUnit(t *testing.T) {
 		t.Fatalf("report = %+v, unit = %q", report, source.unit)
 	}
 }
+
+func TestPreparePXEStartsOnlyFixedUnit(t *testing.T) {
+	source := &fakeSystemActionSource{}
+	report := NewSystemActions(source).PreparePXE(context.Background())
+	if report.HasErrors() || source.unit != PreparePXEUnit || report.Operation != "pxe-prepare" {
+		t.Fatalf("report = %+v, unit = %q", report, source.unit)
+	}
+	source.err = errors.New("not ready")
+	if report := NewSystemActions(source).PreparePXE(context.Background()); !report.HasErrors() {
+		t.Fatalf("failure report = %+v", report)
+	}
+}

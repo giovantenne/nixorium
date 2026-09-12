@@ -35,3 +35,7 @@ customization, validation, upstream-update, and offline-installer work.
 - Treat `nixorium-harmonia.service` as the controller-owned cache lifecycle;
   verify it with `nixorium doctor` and use the canonical `harmonia.service`
   name when querying its journal. Do not run a second foreground cache.
+- Prepare installation artifacts only with `nixorium pxe prepare`; keep its
+  clean-Git, live-DHCP, healthy-cache, and immutable-manifest checks intact.
+  Diagnose failures through `nixorium doctor` and
+  `journalctl -u nixorium-prepare-pxe.service`.

@@ -21,9 +21,9 @@ nix build ".#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel
 ```
 
 For netboot, assets, or extension-module plumbing, also build the netboot
-ramdisk and `installerBundle`. Evaluate one client through both the deployment
-and the real installer-bundle store path with `--offline`; the two
-`system.build.toplevel.drvPath` values must match.
+ramdisk, `pxeFirmware`, and `installerBundle`. Evaluate one client through both
+the deployment and the real installer-bundle store path with `--offline`; the
+two `system.build.toplevel.drvPath` values must match.
 
 ## Installation and deployment
 
@@ -56,6 +56,29 @@ The stable product alias is used for status and service control. Query detailed
 logs with `journalctl -u harmonia.service`, the canonical nixpkgs unit name.
 The signing key is loaded from `/var/lib/nixorium/keys/harmonia-secret-key` as
 an isolated systemd credential and must never be copied into Git or the store.
+
+## PXE preparation
+
+Before changing controller addresses or starting the PXE proxy, prepare the
+session inputs from a clean, committed deployment:
+
+```sh
+nixorium pxe prepare
+nixorium status
+nixorium doctor
+```
+
+The fixed `nixorium-prepare-pxe.service` runs the build as `admin`, verifies
+that `masterDhcpIp` is currently assigned to the configured interface, checks
+Harmonia over that address, and builds every client closure plus the kernel,
+initrd, iPXE script, and pinned firmware. It retains their closures with
+managed Nix garbage-collector roots and atomically records the immutable store
+paths for the exact Git revision at
+`/var/lib/nixorium/prepared/prepared.json`; no `result-*` links are part of the
+normal workflow. The operation is non-disruptive and retry-safe. If the lease
+changed, update and commit the setting, apply the controller, then prepare
+again. Use `journalctl -u nixorium-prepare-pxe.service` for durable build and
+preflight failures.
 
 ## Updating the upstream input
 

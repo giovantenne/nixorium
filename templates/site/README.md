@@ -92,6 +92,7 @@ nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
 nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- setup apply
+nix run .#nixorium -- pxe prepare
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
@@ -137,15 +138,25 @@ loads `/var/lib/nixorium/keys/harmonia-secret-key` as an isolated credential
 and restarts the cache after process failures. Check readiness with
 `systemctl status nixorium-harmonia.service` and `nixorium doctor`; detailed
 service logs use the canonical `journalctl -u harmonia.service` unit name.
+Run `nixorium pxe prepare` before an installation session. The fixed
+systemd-owned action requires a clean and ready deployment, confirms that the
+configured DHCP address is currently assigned, checks Harmonia, and builds the
+netboot artifacts, pinned iPXE firmware, and all configured client closures.
+It retains immutable store paths with managed Nix garbage-collector roots and
+records them at the current Git revision in
+`/var/lib/nixorium/prepared/prepared.json`; preparation is non-disruptive and
+safe to retry. Inspect failures with
+`journalctl -u nixorium-prepare-pxe.service` and rerun it after updating and
+committing a changed `masterDhcpIp`.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.
-PXE service control and client deployment remain manual until their management
-milestones are implemented; the cache no longer needs a foreground terminal.
+PXE start/stop networking and client deployment remain manual until their
+management milestones are implemented; artifact preparation and the cache no
+longer need foreground terminals or mutable build links.
 
-Build the netboot artifacts using the normal `nixosConfigurations.netboot`
-outputs. The generated ramdisk contains a standalone installer bundle with the
-effective configuration, public cache key, local modules and assets.
+The generated ramdisk contains a standalone installer bundle with the effective
+configuration, public cache key, local modules and assets.
 
 ## Updating nixorium
 
@@ -176,6 +187,7 @@ nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-link
 CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
 nix build ".#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-link
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --no-link
+nix build .#pxeFirmware --no-link
 nix build .#installerBundle --no-link
 ```
 

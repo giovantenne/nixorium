@@ -119,6 +119,9 @@ nix run .#nixorium -- setup install-secrets
 # Apply the committed controller configuration through the fixed unit
 nix run .#nixorium -- setup apply
 
+# Prepare immutable netboot artifacts and every configured client closure
+nix run .#nixorium -- pxe prepare
+
 # Validate and review a complete settings candidate without writing it
 nix run .#nixorium -- config plan --file candidate.json
 
@@ -131,7 +134,7 @@ colmena apply --on @lab
 # Deploy to a single PC
 colmena apply --on pc05
 
-# Build netboot artifacts
+# Advanced compatibility: build mutable netboot result links manually
 nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
@@ -159,7 +162,7 @@ Release from the matching changelog section.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
 - Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
 - Hostname + static IP are centralized in `lib/mk-lab.nix`. `networkBase` is a full IPv4 network address and `networkPrefixLength` its CIDR prefix; host numbers are validated offsets. Each PC gets both a DHCP address and a static address on the same interface.
-- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. If the DHCP lease changes, update `masterDhcpIp` in the deployment's `lab-settings.json` (or a legacy deployment's `lab-config.nix`) and rebuild netboot artifacts before the next PXE session.
+- The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (dynamic, assigned by the institutional DHCP server) used only during PXE/netboot client installation. `nixorium pxe prepare` verifies the live lease before building and records immutable store paths for the exact deployment Git revision.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
@@ -278,6 +281,9 @@ set -euo pipefail
 - `nixorium setup apply` requires a clean reviewed Git deployment and may start
   only `nixorium-apply-controller.service`; never add arbitrary target/path
   parameters or evaluate ignored private files through a `path:` Flake URL
+- `nixorium pxe prepare` may start only the fixed administrator-owned
+  `nixorium-prepare-pxe.service`; keep its clean-Git, live-DHCP, healthy-cache,
+  canonical-store-path, and managed-GC-root checks intact
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management

@@ -27,6 +27,7 @@ require_deployment_ready "${REPO_ROOT}"
 IFACE="${LAB_IFACE_NAME}"
 MASTER_IP="${LAB_CONTROLLER_DHCP_IP}"
 HTTP_PORT="${LAB_PXE_HTTP_PORT}"
+PREPARATION_FILE="/var/lib/nixorium/prepared/prepared.json"
 
 if [[ -z "${IFACE}" ]]; then
   echo "Error: interface name missing from labMeta." >&2
@@ -38,28 +39,55 @@ if [[ -z "${MASTER_IP}" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${REPO_ROOT}/result-kernel/bzImage" ]]; then
-  echo "Error: missing result-kernel/bzImage. Build netboot artifacts first." >&2
-  exit 1
+if [[ -e "${PREPARATION_FILE}" ]]; then
+  [[ -f "${PREPARATION_FILE}" && ! -L "${PREPARATION_FILE}" ]] \
+    || { echo "Error: managed PXE preparation is not a regular file." >&2; exit 1; }
+  [[ "$(stat -c '%U:%G:%a' "${PREPARATION_FILE}")" == admin:users:644 ]] \
+    || { echo "Error: managed PXE preparation has unsafe ownership or permissions." >&2; exit 1; }
+  CURRENT_REVISION=$(git -c safe.directory="${REPO_ROOT}" -C "${REPO_ROOT}" rev-parse HEAD)
+  jq -e \
+    --arg revision "${CURRENT_REVISION}" \
+    --arg iface "${IFACE}" \
+    --arg dhcpIp "${MASTER_IP}" \
+    --argjson cachePort "${LAB_CACHE_PORT}" \
+    --argjson pxeHttpPort "${HTTP_PORT}" \
+    --argjson clientCount "${LAB_CLIENT_COUNT}" \
+    '.schemaVersion == 1 and .revision == $revision and
+     .controller.dhcpIp == $dhcpIp and .network.ifaceName == $iface and
+     .network.cachePort == $cachePort and .network.pxeHttpPort == $pxeHttpPort and
+     (.clients | length) == $clientCount and
+     .artifacts.kernel.relativePath == "bzImage" and
+     .artifacts.initrd.relativePath == "initrd" and
+     .artifacts.ipxeScript.relativePath == "netboot.ipxe" and
+     .artifacts.firmware.relativePath == "snponly.efi"' \
+    "${PREPARATION_FILE}" >/dev/null \
+    || { echo "Error: managed PXE preparation is stale or invalid; run nixorium pxe prepare." >&2; exit 1; }
+  KERNEL_ROOT=$(jq -er '.artifacts.kernel.storePath' "${PREPARATION_FILE}")
+  INITRD_ROOT=$(jq -er '.artifacts.initrd.storePath' "${PREPARATION_FILE}")
+  IPXE_SCRIPT_ROOT=$(jq -er '.artifacts.ipxeScript.storePath' "${PREPARATION_FILE}")
+  FIRMWARE_ROOT=$(jq -er '.artifacts.firmware.storePath' "${PREPARATION_FILE}")
+  for store_path in "${KERNEL_ROOT}" "${INITRD_ROOT}" "${IPXE_SCRIPT_ROOT}" "${FIRMWARE_ROOT}"; do
+    [[ "${store_path}" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ ]] \
+      || { echo "Error: managed PXE preparation contains an invalid store path." >&2; exit 1; }
+  done
+  KERNEL_FILE="${KERNEL_ROOT}/bzImage"
+  INITRD_FILE="${INITRD_ROOT}/initrd"
+  IPXE_SCRIPT_FILE="${IPXE_SCRIPT_ROOT}/netboot.ipxe"
+  FIRMWARE_FILE="${FIRMWARE_ROOT}/snponly.efi"
+else
+  # Advanced compatibility path for deployments prepared with result symlinks.
+  KERNEL_FILE="${REPO_ROOT}/result-kernel/bzImage"
+  INITRD_FILE="${REPO_ROOT}/result-initrd/initrd"
+  IPXE_SCRIPT_FILE="${REPO_ROOT}/result-ipxe/netboot.ipxe"
+  FIRMWARE_FILE="${REPO_ROOT}/assets/ipxe/snponly.efi"
 fi
 
-if [[ ! -f "${REPO_ROOT}/result-initrd/initrd" ]]; then
-  echo "Error: missing result-initrd/initrd. Build netboot artifacts first." >&2
-  exit 1
-fi
+for artifact in "${KERNEL_FILE}" "${INITRD_FILE}" "${IPXE_SCRIPT_FILE}" "${FIRMWARE_FILE}"; do
+  [[ -f "${artifact}" ]] \
+    || { echo "Error: missing prepared PXE artifact ${artifact}." >&2; exit 1; }
+done
 
-if [[ ! -f "${REPO_ROOT}/result-ipxe/netboot.ipxe" ]]; then
-  echo "Error: missing result-ipxe/netboot.ipxe. Build netboot artifacts first." >&2
-  exit 1
-fi
-
-if [[ ! -f "${REPO_ROOT}/assets/ipxe/snponly.efi" ]]; then
-  echo "Error: missing assets/ipxe/snponly.efi." >&2
-  echo "Copy it from your iPXE package/build into assets/ipxe/." >&2
-  exit 1
-fi
-
-CMDLINE=$(grep '^kernel ' "${REPO_ROOT}/result-ipxe/netboot.ipxe" | sed 's/^kernel [^ ]* //')
+CMDLINE=$(grep '^kernel ' "${IPXE_SCRIPT_FILE}" | sed 's/^kernel [^ ]* //')
 if [[ -z "${CMDLINE}" ]]; then
   echo "Error: could not extract kernel cmdline from result-ipxe/netboot.ipxe." >&2
   exit 1
@@ -72,9 +100,9 @@ chmod 0755 "${WORK_DIR}"
 install -d -m 0755 "${WORK_DIR}/http"
 install -d -m 0755 "${WORK_DIR}/tftp"
 
-cp "${REPO_ROOT}/result-kernel/bzImage" "${WORK_DIR}/http/bzImage"
-cp "${REPO_ROOT}/result-initrd/initrd" "${WORK_DIR}/http/initrd"
-cp "${REPO_ROOT}/assets/ipxe/snponly.efi" "${WORK_DIR}/tftp/snponly.efi"
+cp "${KERNEL_FILE}" "${WORK_DIR}/http/bzImage"
+cp "${INITRD_FILE}" "${WORK_DIR}/http/initrd"
+cp "${FIRMWARE_FILE}" "${WORK_DIR}/tftp/snponly.efi"
 
 # iPXE boot script: loads kernel and initrd over HTTP from the controller.
 cat > "${WORK_DIR}/tftp/boot.ipxe" <<EOF
