@@ -171,6 +171,7 @@ let
     (upstreamRoot + "/modules/development.nix")
     (upstreamRoot + "/modules/veyon.nix")
     (upstreamRoot + "/modules/management.nix")
+    (upstreamRoot + "/modules/pxe.nix")
   ] ++ lib.optional (nixosVersionMetadata != null) ({ lib, ... }: {
     system.nixos.versionSuffix = lib.mkForce nixosVersionMetadata.versionSuffix;
     system.nixos.revision = lib.mkForce nixosVersionMetadata.revision;

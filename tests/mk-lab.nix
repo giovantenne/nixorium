@@ -64,8 +64,12 @@ assert builtins.elem "nixorium-harmonia.service"
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-prepare-pxe";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prepare-pxe".serviceConfig.User == "admin";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prepare-pxe".serviceConfig.CapabilityBoundingSet == "";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-network";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe-network".serviceConfig.CapabilityBoundingSet == [ "CAP_NET_ADMIN" ];
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-recover";
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-prepare-pxe");
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-pxe-network");
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 true

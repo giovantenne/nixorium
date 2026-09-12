@@ -30,6 +30,13 @@ and preparation state directories. Later privileged PXE consumers must treat
 the administrator-owned manifest as untrusted structured input and accept
 only canonical `/nix/store/<hash>-<name>` roots and fixed artifact names.
 
+The address transition is a separate root unit bounded to `CAP_NET_ADMIN`.
+It accepts only the compiled start/stop/recover verb, writes a root-owned
+session record before mutation, removes only the exact configured static CIDR,
+and restores only an address proven present in that record. Git inspection
+stays outside this unit so access to the administrator's private home does not
+require adding filesystem-bypass capabilities.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

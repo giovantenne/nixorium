@@ -713,6 +713,8 @@ modules/
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection
   networking.nix           # Hostname + static IP per host
+  management.nix           # Controller management CLI and fixed actions
+  pxe.nix                  # Transactional PXE address state and boot recovery
   users.nix                # User accounts and autologin
   cache.nix                # Controller Harmonia service + client cache trust
   filesystems.nix          # Btrfs support

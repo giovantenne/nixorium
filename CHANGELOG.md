@@ -67,6 +67,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   pinned firmware and all-client builds; managed GC retention; and an atomic,
   revision-bound manifest of strictly validated immutable Nix store outputs
   used by status and PXE.
+- An internal, controller-only PXE network unit with a root-owned
+  session-before-mutation record, narrowly bounded `CAP_NET_ADMIN`, exact
+  static-address rollback, failure-safe stop behavior, and boot/explicit
+  recovery that reconciles recorded state against the live interface.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.

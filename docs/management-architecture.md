@@ -40,8 +40,9 @@ Important constraints in the current implementation are:
 - PXE listeners remain a foreground Flake app; preparation is a fixed
   administrator-owned systemd action and Harmonia is controller-only and
   systemd-owned, while the old helper remains an advanced compatibility app;
-- PXE temporarily removes the controller static address without persistent
-  operation state or automatic same-boot recovery;
+- the internal PXE network transition now has persistent session state and
+  boot/explicit recovery, but the normal workflow does not invoke it until the
+  managed listener and confirmed start/stop orchestration are complete;
 - the client installer is destructive and confirms the disk, but host
   selection is a numeric command-line argument and duplicate assignment is not
   coordinated;
@@ -360,6 +361,17 @@ removed only after the new manifest has been durably published.
 Status/setup reconciliation validates it against current Git, `labMeta`, store
 availability, and client ordering. Privileged consumers revalidate the
 administrator-owned record rather than treating it as authority.
+
+The internal network unit is also implemented. Before removing the exact
+declarative static CIDR, it requires a strictly valid prepared revision whose
+network values match the active configuration, the configured live DHCP
+address, and the expected static address. It durably
+writes a root-owned mode-0600 session containing the original observed
+addresses and prepared artifacts, then removes only that static CIDR. Stop and
+`nixorium-pxe-recover.service` restore only the recorded address, preserve
+unrelated addresses, verify live state, and archive the result. Malformed or
+unowned session records fail closed. Public start/stop orchestration remains
+pending until the listener service can be ordered around this boundary.
 
 PXE ordering requires the cache, prepared artifacts, and network transition
 before starting the proxy. Stopping PXE stops network services first and then

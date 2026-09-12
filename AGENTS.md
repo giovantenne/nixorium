@@ -52,6 +52,7 @@ modules/
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
   management.nix           # Controller-only management command installation
+  pxe.nix                  # Transactional PXE address state and boot recovery
   users.nix                # User accounts (admin + teacher + student, veyon-master group)
   cache.nix                # Controller Harmonia service + client cache trust
   filesystems.nix          # Btrfs subvolume mount declarations
@@ -284,6 +285,9 @@ set -euo pipefail
 - `nixorium pxe prepare` may start only the fixed administrator-owned
   `nixorium-prepare-pxe.service`; keep its clean-Git, live-DHCP, healthy-cache,
   canonical-store-path, and managed-GC-root checks intact
+- `nixorium-pxe-network.service` is an internal root boundary with only
+  `CAP_NET_ADMIN`; preserve its root-owned session-before-mutation ordering,
+  exact static-address restoration, and boot-time recovery semantics
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
