@@ -53,13 +53,14 @@
         networkPrefixLength = 8;
         ifaceName = "lab0";
         cachePort = 5000;
+        pxeHttpPort = 8080;
         cachePublicKey = null;
       };
       inherit nixoriumPackage;
     };
 
     networking.hostName = "pc99";
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 ];
     users.groups.veyon-master = {};
     users.users.admin = {
       isNormalUser = true;
@@ -196,9 +197,23 @@
     controller.succeed("before=$(jq -c 'del(.preparedAt)' /var/lib/nixorium/prepared/prepared.json); su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json' >/dev/null; after=$(jq -c 'del(.preparedAt)' /var/lib/nixorium/prepared/prepared.json); test \"$before\" = \"$after\"; test ! -e /var/lib/nixorium/prepared/roots/0000000000000000000000000000000000000000")
     controller.succeed("before=$(sha256sum /var/lib/nixorium/prepared/prepared.json); ip addr del 192.0.2.10/24 dev lab0; ip addr add 192.0.2.11/24 dev lab0; su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json > /tmp/pxe-address-failed.json' || test $? = 1; after=$(sha256sum /var/lib/nixorium/prepared/prepared.json); test \"$before\" = \"$after\"")
     controller.succeed("jq -e '.state == \"failed\"' /tmp/pxe-address-failed.json")
-    controller.succeed("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'configured DHCP address 192.0.2.10 is not assigned to lab0 (observed non-static addresses: 192.0.2.11)'")
+    controller.succeed("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'configured DHCP address 192.0.2.10 is not assigned to lab0' | grep -F '192.0.2.11'")
     controller.succeed("ip addr del 192.0.2.11/24 dev lab0; ip addr add 192.0.2.10/24 dev lab0")
-    controller.succeed("systemctl show nixorium-pxe-network.service nixorium-pxe-recover.service -p LoadState --value | grep -vFx not-found")
+    controller.succeed("systemctl show nixorium-pxe.service nixorium-pxe-network.service nixorium-pxe-recover.service -p LoadState --value | grep -vFx not-found")
+    controller.succeed("systemctl start nixorium-pxe.service")
+    controller.succeed("systemctl is-active --quiet nixorium-pxe.service; systemctl is-active --quiet nixorium-pxe-network.service")
+    controller.wait_until_succeeds("curl --fail --silent http://192.0.2.10:8080/bzImage >/dev/null; curl --fail --silent http://192.0.2.10:8080/initrd >/dev/null")
+    controller.succeed("grep -F 'kernel ''${base-url}/bzImage init=/nix/store/test-init' /run/nixorium/pxe-runtime/tftp/boot.ipxe")
+    controller.succeed("ss -H -lun 'sport = :67' | grep -F ':67'; ss -H -lun 'sport = :69' | grep -F ':69'; ss -H -ltn 'sport = :8080' | grep -F ':8080'")
+    controller.succeed("pgrep -u nobody -f 'python3 -m http.server 8080'; pid=$(pgrep -o -x dnsmasq); test $(awk '/^Uid:/ {print $3}' /proc/$pid/status) = $(id -u nixorium-pxe-dnsmasq)")
+    controller.fail("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'")
+    controller.succeed("systemctl stop nixorium-pxe.service; systemctl stop nixorium-pxe-network.service")
+    controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'; test ! -e /var/lib/nixorium/pxe/session.json")
+    controller.succeed("systemd-run --unit=nixorium-test-pxe-conflict --property=Type=simple python3 -m http.server 8080 --bind 192.0.2.10")
+    controller.succeed("! systemctl start nixorium-pxe.service")
+    controller.succeed("systemctl stop nixorium-pxe-network.service; ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'; test ! -e /var/lib/nixorium/pxe/session.json")
+    controller.succeed("journalctl -u nixorium-pxe.service --no-pager | grep -F 'PXE HTTP port 8080 is already in use'")
+    controller.succeed("systemctl stop nixorium-test-pxe-conflict.service; systemctl reset-failed nixorium-pxe.service nixorium-pxe-network.service")
     controller.succeed("ip addr add 198.51.100.7/24 dev lab0")
     controller.succeed("systemctl start nixorium-pxe-network.service")
     controller.succeed("systemctl is-active --quiet nixorium-pxe-network.service")

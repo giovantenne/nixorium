@@ -147,6 +147,7 @@ let
     inherit veyonNativeHosts;
     inherit cachePublicKey;
     inherit cachePort;
+    inherit pxeHttpPort;
     inherit veyonPublicKeyFile;
   };
 

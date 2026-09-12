@@ -67,9 +67,21 @@ assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prep
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-network";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe-network".serviceConfig.CapabilityBoundingSet == [ "CAP_NET_ADMIN" ];
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-recover";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe".serviceConfig.CapabilityBoundingSet == [
+  "CAP_KILL"
+  "CAP_NET_ADMIN"
+  "CAP_NET_BIND_SERVICE"
+  "CAP_NET_RAW"
+  "CAP_SETGID"
+  "CAP_SETUID"
+];
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe".serviceConfig.AmbientCapabilities == [ "CAP_SETGID" "CAP_SETUID" ];
+assert subnetLab.nixosConfigurations.pc99.config.users.users.nixorium-pxe-dnsmasq.isSystemUser;
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-prepare-pxe");
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-pxe-network");
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-pxe");
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 true

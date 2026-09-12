@@ -37,6 +37,13 @@ and restores only an address proven present in that record. Git inspection
 stays outside this unit so access to the administrator's private home does not
 require adding filesystem-bypass capabilities.
 
+The listener is a separate systemd-owned boundary. Its supervisor retains
+only the capabilities needed to bind the DHCP/TFTP ports, configure dnsmasq,
+and drop child identities. The HTTP child immediately runs as `nobody`, while
+dnsmasq drops to the dedicated `nixorium-pxe-dnsmasq` system user. Both consume
+only fixed runtime paths derived from strictly validated preparation and
+root-owned session records.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

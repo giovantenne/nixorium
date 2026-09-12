@@ -272,31 +272,28 @@ atomically in
 proxy reject a stale or invalid record. If the DHCP lease changed, update and
 commit `masterDhcpIp`, apply the controller, and run preparation again.
 
-Before starting PXE, temporarily remove the controller's static lab IP from
-the shared interface. This keeps PXE, HTTP, and binary-cache traffic on the
-verified DHCP address during installation. The change is temporary and a
-reboot restores the static IP automatically.
-
-```sh
-# Temporarily remove the lab static IP so netboot uses masterDhcpIp only
-STATIC_IP=$(nix eval .#labMeta.controller.staticIp --raw --no-write-lock-file)
-PREFIX_LENGTH=$(nix eval .#labMeta.network.prefixLength --json --no-write-lock-file)
-IFACE=$(nix eval .#labMeta.network.ifaceName --raw --no-write-lock-file)
-sudo ip addr del "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
-```
-
 ### 6. Start netboot services
 
-Harmonia is already running under systemd after `setup apply`. Start the
-still-manual ProxyDHCP + TFTP + HTTP netboot server in a terminal. It consumes
-the current managed preparation record instead of mutable build links:
+Harmonia is already running under systemd after `setup apply`. Until the
+public lifecycle command lands, start the managed ProxyDHCP + TFTP + HTTP
+service directly. Its dependency applies the transactional address transition
+and it consumes the current preparation record instead of mutable build links:
 
 ```sh
-sudo nix run .#run-pxe-proxy
+sudo systemctl start nixorium-pxe.service
+systemctl status nixorium-pxe.service
 ```
 
-> The PXE proxy still runs in the foreground. Keep that terminal open during
-> client installation until the managed PXE lifecycle is implemented.
+When installation is finished, stop the listeners and synchronously restore
+normal addressing:
+
+```sh
+sudo systemctl stop nixorium-pxe.service
+sudo systemctl stop nixorium-pxe-network.service
+```
+
+The compatibility `run-pxe-proxy` Flake app remains available for advanced
+foreground diagnostics, but it does not own the transactional network change.
 
 ### 7. Install client PCs
 

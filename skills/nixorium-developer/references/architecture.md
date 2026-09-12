@@ -56,3 +56,6 @@ root-owned session before mutation, remove and restore only the exact recorded
 static CIDR, preserve unrelated interface addresses, and retain only
 `CAP_NET_ADMIN`. Git inspection stays in the unprivileged application and
 preparation layers rather than expanding the network unit's filesystem access.
+The systemd-owned listener must reject mismatched preparation/session state,
+bind only after the transactional network unit, use an explicit readiness
+signal, and drop HTTP and dnsmasq to separate unprivileged identities.

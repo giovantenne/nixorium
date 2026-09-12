@@ -71,6 +71,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   session-before-mutation record, narrowly bounded `CAP_NET_ADMIN`, exact
   static-address rollback, failure-safe stop behavior, and boot/explicit
   recovery that reconciles recorded state against the live interface.
+- A systemd-owned, controller-only PXE listener that strictly reconciles the
+  prepared revision, active network session, and live addresses before serving
+  ProxyDHCP, TFTP, and HTTP; publishes readiness only after a health check; and
+  drops network children to separate unprivileged identities.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.
