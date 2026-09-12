@@ -22,6 +22,7 @@ func StatusText(writer io.Writer, report domain.StatusReport) {
 	fmt.Fprintf(writer, "Clients:        %d configured\n", report.Meta.Clients.Count)
 	fmt.Fprintf(writer, "Network:        %s/%d on %s\n", report.Meta.Network.Base, report.Meta.Network.PrefixLength, report.Meta.Network.Interface)
 	fmt.Fprintf(writer, "Git worktree:   %s\n", cleanText(report.Git.Dirty, report.Git.Changes))
+	fmt.Fprintf(writer, "PXE mode:       %s\n", report.PXE.Mode)
 	fmt.Fprintln(writer, "Services:")
 	for _, service := range report.Services {
 		fmt.Fprintf(writer, "  %-28s %s\n", service.Name, service.State)
@@ -129,6 +130,20 @@ func KeyReconcileText(writer io.Writer, report domain.KeyReconcileReport) {
 func ActionText(writer io.Writer, report domain.ActionReport) {
 	fmt.Fprintf(writer, "%s: %s\n", report.Operation, strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Unit: %s\n", report.Unit)
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail: %s\n", report.Message)
+	}
+}
+
+func PXELifecycleText(writer io.Writer, report domain.PXELifecycleReport) {
+	fmt.Fprintf(writer, "%s: %s\n", report.Operation, strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Mode: %s\n", report.Mode)
+	if report.Interface != "" {
+		fmt.Fprintf(writer, "Network: %s via %s (normal address %s)\n", report.Interface, report.DHCPAddress, report.StaticCIDR)
+	}
+	for _, service := range report.Services {
+		fmt.Fprintf(writer, "  %-30s %s\n", service.Name, service.State)
+	}
 	if report.Message != "" {
 		fmt.Fprintf(writer, "Detail: %s\n", report.Message)
 	}

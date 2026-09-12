@@ -86,6 +86,7 @@ type StatusReport struct {
 	Deployment     DeploymentStatus    `json:"deployment"`
 	Git            GitState            `json:"git"`
 	Services       []ServiceState      `json:"services"`
+	PXE            PXELifecycleState   `json:"pxe"`
 	PXEPreparation PXEPreparationState `json:"pxePreparation"`
 	Artifacts      []ArtifactState     `json:"artifacts"`
 	Warnings       []string            `json:"warnings,omitempty"`

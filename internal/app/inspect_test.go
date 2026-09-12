@@ -23,6 +23,7 @@ type fakeSource struct {
 	buildErr    error
 	built       bool
 	preparation domain.PXEPreparationState
+	services    map[string]domain.ServiceState
 }
 
 func readyFake() *fakeSource {
@@ -68,6 +69,9 @@ func (f *fakeSource) GitState(context.Context, string) (domain.GitState, error) 
 }
 
 func (f *fakeSource) ServiceState(_ context.Context, name string) domain.ServiceState {
+	if service, found := f.services[name]; found {
+		return service
+	}
 	return domain.ServiceState{Name: name, Loaded: true, State: "inactive"}
 }
 
@@ -192,6 +196,25 @@ func TestDoctorReportsStaleManagedPXEPreparation(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertFinding(t, report.Findings, "PXE-PREPARATION", domain.LevelWarning)
+}
+
+func TestStatusAndDoctorReportPXERecoveryState(t *testing.T) {
+	source := readyFake()
+	source.services = map[string]domain.ServiceState{
+		PXENetworkUnit: {Name: PXENetworkUnit, Loaded: true, Active: true, State: "active"},
+	}
+	status, err := NewInspector(source).Status(context.Background(), ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.PXE.Mode != "recovery-required" {
+		t.Fatalf("PXE mode = %q, want recovery-required", status.PXE.Mode)
+	}
+	doctor, err := NewInspector(source).Doctor(context.Background(), ".", DoctorOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertFinding(t, doctor.Findings, "PXE-LIFECYCLE", domain.LevelError)
 }
 
 func assertFinding(t *testing.T, findings []domain.Finding, id string, level domain.Level) {

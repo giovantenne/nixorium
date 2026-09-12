@@ -59,3 +59,6 @@ preparation layers rather than expanding the network unit's filesystem access.
 The systemd-owned listener must reject mismatched preparation/session state,
 bind only after the transactional network unit, use an explicit readiness
 signal, and drop HTTP and dnsmasq to separate unprivileged identities.
+Public lifecycle operations must keep readiness checks in the unprivileged
+application, expose typed reconciled state, use exact systemd verb/unit pairs,
+deny direct network-unit start, and synchronously roll back a failed start.

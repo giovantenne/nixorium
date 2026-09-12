@@ -274,23 +274,29 @@ commit `masterDhcpIp`, apply the controller, and run preparation again.
 
 ### 6. Start netboot services
 
-Harmonia is already running under systemd after `setup apply`. Until the
-public lifecycle command lands, start the managed ProxyDHCP + TFTP + HTTP
-service directly. Its dependency applies the transactional address transition
-and it consumes the current preparation record instead of mutable build links:
+Harmonia is already running under systemd after `setup apply`. Start the
+managed ProxyDHCP + TFTP + HTTP installation mode through Nixorium:
 
 ```sh
-sudo systemctl start nixorium-pxe.service
-systemctl status nixorium-pxe.service
+nix run .#nixorium -- pxe start
+nix run .#nixorium -- status
 ```
 
-When installation is finished, stop the listeners and synchronously restore
-normal addressing:
+The command performs its readiness checks before showing the exact interface
+and address transition, then requires the confirmation `START PXE`. For
+explicit automation, `--yes` skips only that confirmation. When installation
+is finished, one command stops the listeners and synchronously restores normal
+addressing:
 
 ```sh
-sudo systemctl stop nixorium-pxe.service
-sudo systemctl stop nixorium-pxe-network.service
+nix run .#nixorium -- pxe stop
 ```
+
+`pxe start` and `pxe stop` are safe to retry. A failed start rolls back the
+network transition before returning. After an interrupted session, reboot
+recovery runs automatically; `nix run .#nixorium -- pxe recover` performs the
+same explicit reconciliation on demand. Detailed service failures remain in
+journald.
 
 The compatibility `run-pxe-proxy` Flake app remains available for advanced
 foreground diagnostics, but it does not own the transactional network change.
@@ -307,13 +313,8 @@ Where `XX` is the PC number (e.g., `/installer/setup.sh 5` for `pc05`).
 
 > `setup.sh` auto-selects the disk if only one is present; if multiple disks are detected, it asks for a choice.
 
-When all clients are installed, restore the controller's static lab IP so Colmena can reach the lab subnet again (or just reboot it):
-```sh
-STATIC_IP=$(nix eval .#labMeta.controller.staticIp --raw --no-write-lock-file)
-PREFIX_LENGTH=$(nix eval .#labMeta.network.prefixLength --json --no-write-lock-file)
-IFACE=$(nix eval .#labMeta.network.ifaceName --raw --no-write-lock-file)
-sudo ip addr add "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
-```
+When all clients are installed, run `nix run .#nixorium -- pxe stop` so normal
+controller addressing is restored before deploying with Colmena.
 
 ---
 

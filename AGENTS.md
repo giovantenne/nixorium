@@ -123,6 +123,11 @@ nix run .#nixorium -- setup apply
 # Prepare immutable netboot artifacts and every configured client closure
 nix run .#nixorium -- pxe prepare
 
+# Enter, leave, or explicitly recover managed PXE installation mode
+nix run .#nixorium -- pxe start
+nix run .#nixorium -- pxe stop
+nix run .#nixorium -- pxe recover
+
 # Validate and review a complete settings candidate without writing it
 nix run .#nixorium -- config plan --file candidate.json
 
@@ -291,6 +296,9 @@ set -euo pipefail
 - `nixorium-pxe.service` must validate the prepared revision, root-owned active
   session, live DHCP address, and absent static CIDR before binding; preserve
   its systemd readiness protocol and unprivileged listener identities
+- public PXE lifecycle control must retain the exact verb/unit allowlist,
+  require readiness before confirmed start, deny direct network-unit start,
+  and synchronously stop listener/network units after a failed start
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management

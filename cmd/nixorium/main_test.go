@@ -114,6 +114,43 @@ func TestParseArgumentsAcceptsPXEPrepare(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsPXELifecycle(t *testing.T) {
+	for _, subcommand := range []string{"start", "stop", "recover"} {
+		arguments := []string{"pxe", subcommand, "--json"}
+		if subcommand == "start" {
+			arguments = append(arguments, "--yes")
+		}
+		options, err := parseArguments(arguments)
+		if err != nil || options.command != "pxe" || options.subcommand != subcommand || !options.json {
+			t.Fatalf("%s options = %+v, error = %v", subcommand, options, err)
+		}
+	}
+	if _, err := parseArguments([]string{"pxe", "stop", "--yes"}); err == nil {
+		t.Fatal("pxe stop accepted --yes")
+	}
+	if _, err := parseArguments([]string{"start", "pxe"}); err == nil {
+		t.Fatal("start before pxe was accepted")
+	}
+}
+
+func TestOnlyPXECleanupCanRunWithoutRepository(t *testing.T) {
+	tests := []struct {
+		options  options
+		required bool
+	}{
+		{options: options{command: "status"}, required: true},
+		{options: options{command: "pxe", subcommand: "prepare"}, required: true},
+		{options: options{command: "pxe", subcommand: "start"}, required: true},
+		{options: options{command: "pxe", subcommand: "stop"}, required: false},
+		{options: options{command: "pxe", subcommand: "recover"}, required: false},
+	}
+	for _, test := range tests {
+		if actual := commandRequiresRepository(test.options); actual != test.required {
+			t.Errorf("commandRequiresRepository(%+v) = %v, want %v", test.options, actual, test.required)
+		}
+	}
+}
+
 func TestParseArgumentsAcceptsSetupKeys(t *testing.T) {
 	options, err := parseArguments([]string{"setup", "keys", "--json"})
 	if err != nil {

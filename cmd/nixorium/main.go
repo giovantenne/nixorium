@@ -44,9 +44,12 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		usage(stdout)
 		return 0
 	}
-	repository, err := resolveRepository(options.repository)
-	if err != nil {
-		fmt.Fprintln(stderr, "Error:", err)
+	repository := options.repository
+	resolvedRepository, resolveErr := resolveRepository(options.repository)
+	if resolveErr == nil {
+		repository = resolvedRepository
+	} else if commandRequiresRepository(options) {
+		fmt.Fprintln(stderr, "Error:", resolveErr)
 		return 1
 	}
 
@@ -184,14 +187,35 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 		}
 	case "pxe":
-		report := app.NewSystemActions(adapters.Local{}).PreparePXE(ctx)
-		if options.json {
-			err = presentation.JSON(stdout, report)
-		} else {
-			presentation.ActionText(stdout, report)
-		}
-		if report.HasErrors() {
-			return 1
+		switch options.subcommand {
+		case "prepare":
+			report := app.NewSystemActions(adapters.Local{}).PreparePXE(ctx)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.ActionText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		case "start":
+			return runPXEStart(ctx, repository, stdout, stderr, options.yes, options.json)
+		case "stop", "recover":
+			manager := app.NewPXELifecycle(adapters.Local{})
+			report := domain.PXELifecycleReport{}
+			if options.subcommand == "stop" {
+				report = manager.Stop(ctx, repository)
+			} else {
+				report = manager.Recover(ctx, repository)
+			}
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.PXELifecycleText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
 		}
 	default:
 		fmt.Fprintf(stderr, "Error: unknown command %q\n", options.command)
@@ -203,6 +227,10 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		return 1
 	}
 	return 0
+}
+
+func commandRequiresRepository(options options) bool {
+	return options.command != "pxe" || (options.subcommand != "stop" && options.subcommand != "recover")
 }
 
 func parseArguments(arguments []string) (options, error) {
@@ -290,6 +318,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("prepare must follow pxe")
 			}
 			result.subcommand = "prepare"
+		case "start", "stop", "recover":
+			if result.command != "pxe" || result.subcommand != "" {
+				return options{}, fmt.Errorf("%s must follow pxe", arguments[index])
+			}
+			result.subcommand = arguments[index]
 		default:
 			return options{}, fmt.Errorf("unknown argument %q", arguments[index])
 		}
@@ -300,8 +333,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && (result.command != "setup" || result.subcommand != "apply") {
-		return options{}, errors.New("--yes is only valid with setup apply")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start")) {
+		return options{}, errors.New("--yes is only valid with setup apply or pxe start")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -325,8 +358,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" && result.subcommand != "configure" && result.subcommand != "install-secrets" && result.subcommand != "apply" {
 		return options{}, errors.New("setup requires configure, status, keys, install-secrets, or apply")
 	}
-	if result.command == "pxe" && result.subcommand != "prepare" {
-		return options{}, errors.New("pxe requires the prepare subcommand")
+	if result.command == "pxe" && result.subcommand != "prepare" && result.subcommand != "start" && result.subcommand != "stop" && result.subcommand != "recover" {
+		return options{}, errors.New("pxe requires prepare, start, stop, or recover")
 	}
 	if result.command == "setup" && result.subcommand == "configure" && result.json {
 		return options{}, errors.New("--json is not valid with interactive setup configure")
@@ -395,12 +428,55 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
+}
+
+func runPXEStart(ctx context.Context, repository string, stdout, stderr io.Writer, assumeYes, jsonOutput bool) int {
+	manager := app.NewPXELifecycle(adapters.Local{})
+	plan := manager.PlanStart(ctx, repository)
+	if plan.HasErrors() {
+		if jsonOutput {
+			if err := presentation.JSON(stdout, plan); err != nil {
+				fmt.Fprintln(stderr, "Error:", err)
+			}
+		} else {
+			presentation.PXELifecycleText(stderr, plan)
+		}
+		return 1
+	}
+	if !assumeYes && plan.Mode != "active" {
+		if !presentation.IsInteractive(os.Stdin) {
+			fmt.Fprintln(stderr, "Error: pxe start requires an interactive terminal or explicit --yes")
+			return 2
+		}
+		approved, err := presentation.ConfirmPXEStart(os.Stdin, stdout, plan)
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: read confirmation:", err)
+			return 1
+		}
+		if !approved {
+			fmt.Fprintln(stdout, "PXE start cancelled; networking was not changed.")
+			return 0
+		}
+	}
+	report := manager.Start(ctx, repository)
+	if jsonOutput {
+		if err := presentation.JSON(stdout, report); err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+	} else {
+		presentation.PXELifecycleText(stdout, report)
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
 }
 
 func runSetupApply(ctx context.Context, repository string, stdout, stderr io.Writer, assumeYes, jsonOutput bool) int {

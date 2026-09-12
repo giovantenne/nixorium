@@ -319,11 +319,16 @@ in
     security.polkit.extraConfig = ''
       polkit.addRule(function(action, subject) {
         var unit = action.lookup("unit");
+        var verb = action.lookup("verb");
         if (action.id == "org.freedesktop.systemd1.manage-units" &&
-            (unit == "nixorium-install-secrets.service" ||
-             unit == "nixorium-apply-controller.service" ||
-             unit == "nixorium-prepare-pxe.service") &&
-            action.lookup("verb") == "start" &&
+            ((verb == "start" &&
+              (unit == "nixorium-install-secrets.service" ||
+               unit == "nixorium-apply-controller.service" ||
+               unit == "nixorium-prepare-pxe.service" ||
+               unit == "nixorium-pxe-recover.service")) ||
+             (unit == "nixorium-pxe.service" &&
+              (verb == "start" || verb == "stop")) ||
+             (unit == "nixorium-pxe-network.service" && verb == "stop")) &&
             subject.isInGroup("wheel")) {
           return polkit.Result.YES;
         }
