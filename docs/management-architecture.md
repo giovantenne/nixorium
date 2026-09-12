@@ -28,14 +28,17 @@ pairs, invoked builds, ran Harmonia and PXE in two terminals, temporarily
 changed an address with `ip`, chose a client identity by numeric argument, and
 invoked Colmena directly. The management command, structured settings,
 first-run reconciliation, secure key handling, reviewed controller apply, and
-managed Harmonia service are now implemented. Managed PXE, client enrollment,
-deployment, updates, and recovery remain incremental work tracked externally.
+managed Harmonia service are now implemented. PXE preparation is systemd-owned
+and records immutable artifacts/client closures. Managed PXE networking and
+listeners, client enrollment, deployment, updates, and recovery remain
+incremental work tracked externally.
 
 Important constraints in the current implementation are:
 
 - the controller DHCP address is embedded in the netboot closure and generated
   iPXE script, so a lease change requires targeted artifact rebuilding;
-- PXE remains a foreground Flake app; Harmonia is now controller-only and
+- PXE listeners remain a foreground Flake app; preparation is a fixed
+  administrator-owned systemd action and Harmonia is controller-only and
   systemd-owned, while the old helper remains an advanced compatibility app;
 - PXE temporarily removes the controller static address without persistent
   operation state or automatic same-boot recovery;
@@ -346,6 +349,18 @@ The controller architecture defines:
 - preparation/apply jobs as transient or oneshot units so their logs survive a
   TUI exit.
 
+The preparation job is implemented as `nixorium-prepare-pxe.service`. It runs
+without root capabilities as the deployment owner, requires a clean and ready
+Git source plus the configured live DHCP address and healthy Harmonia service,
+builds all netboot outputs and client closures, and atomically records schema
+version 1 under `/var/lib/nixorium/prepared/prepared.json`. The record binds
+fixed artifact names and canonical store roots to the full deployment revision.
+Revision-scoped indirect GC roots retain those closures; older roots are
+removed only after the new manifest has been durably published.
+Status/setup reconciliation validates it against current Git, `labMeta`, store
+availability, and client ordering. Privileged consumers revalidate the
+administrator-owned record rather than treating it as authority.
+
 PXE ordering requires the cache, prepared artifacts, and network transition
 before starting the proxy. Stopping PXE stops network services first and then
 restores normal addressing. Firewall openings are scoped to the installation
@@ -364,12 +379,12 @@ stopped -> inspecting -> preparing -> ready -> starting -> active
                  recovering
 ```
 
-Preparation is non-disruptive. It verifies deployment readiness, interface and
-DHCP address, detects a changed lease, updates the managed setting only after a
-review, builds necessary client closures and netboot artifacts, obtains the
-locked iPXE binary, and verifies cache reachability. Content-addressed build
-results are recorded by store path and configuration revision, not merely by
-the existence of `result-*` symlinks.
+Preparation is non-disruptive. The implemented action verifies deployment
+readiness, interface and DHCP address, refuses a changed lease until the
+managed setting is reviewed and committed, builds necessary client closures
+and netboot artifacts, obtains the locked iPXE binary, and verifies cache
+reachability. Content-addressed build results are recorded by store path and
+configuration revision, not merely by the existence of `result-*` symlinks.
 
 Starting creates a root-owned session record under `/var/lib/nixorium/pxe/`
 containing a schema version, original observed addresses, desired transition,

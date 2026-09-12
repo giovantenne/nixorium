@@ -53,6 +53,7 @@ if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#packages.x86_64-linux.disko.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#packages.x86_64-linux.installerBundle.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.pxeFirmware.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-harmonia.program" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-pxe-proxy.program" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#apps.x86_64-linux.nixorium.program" --raw --no-write-lock-file >/dev/null
@@ -65,6 +66,7 @@ else
   nix build "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" --no-write-lock-file --no-link
   nix build "path:${REPO_ROOT}#disko" --no-write-lock-file --no-link
   nix build "path:${REPO_ROOT}#installerBundle" --no-write-lock-file --no-link
+  nix build "path:${REPO_ROOT}#pxeFirmware" --no-write-lock-file --no-link
   nix build "path:${REPO_ROOT}#nixorium" --no-write-lock-file --no-link
 fi
 
@@ -99,6 +101,9 @@ nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   setup status --repo "$SITE_DIR" --json >/dev/null
 
 nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
+  --raw \
+  --no-write-lock-file >/dev/null
+nix eval "path:${SITE_DIR}#packages.x86_64-linux.pxeFirmware.drvPath" \
   --raw \
   --no-write-lock-file >/dev/null
 

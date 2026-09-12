@@ -254,26 +254,30 @@ journalctl -u harmonia.service
 nix run .#nixorium -- doctor
 ```
 
-Before starting PXE, temporarily remove the controller's static lab IP from the shared interface. The generated netboot artifacts refer to `masterDhcpIp`, so this keeps PXE, HTTP, and binary-cache traffic on that single DHCP address during installation. The change is temporary and a reboot restores the static IP automatically.
+Prepare every netboot artifact and client closure through the managed action:
 
 ```sh
-# Build netboot artifacts
-nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
-nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
-nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
+nix run .#nixorium -- pxe prepare
+journalctl -u nixorium-prepare-pxe.service
+```
 
-# Install iPXE bootstrap binary
-nix build nixpkgs#ipxe --out-link result-ipxe-bin
-install -D -m 0644 result-ipxe-bin/snp.efi assets/ipxe/snponly.efi
+Preparation is non-disruptive and safe to retry. It requires a clean,
+deployment-ready Git revision, the configured DHCP address on the configured
+interface, and a healthy Harmonia endpoint. It builds the kernel, initrd,
+generated iPXE script, pinned iPXE firmware, and every configured client
+closure without creating `result-*` links. The immutable store paths and Git
+revision are retained with managed garbage-collector roots and recorded
+atomically in
+`/var/lib/nixorium/prepared/prepared.json`; `status`, `doctor`, and the PXE
+proxy reject a stale or invalid record. If the DHCP lease changed, update and
+commit `masterDhcpIp`, apply the controller, and run preparation again.
 
-# Pre-build all client closures
-PC_COUNT=$(nix eval .#labMeta.clients.count --json --no-write-lock-file)
-TARGETS=()
-for i in $(seq 1 "$PC_COUNT"); do
-  TARGETS+=(".#nixosConfigurations.pc$(printf "%02d" "$i").config.system.build.toplevel")
-done
-nix build "${TARGETS[@]}"
+Before starting PXE, temporarily remove the controller's static lab IP from
+the shared interface. This keeps PXE, HTTP, and binary-cache traffic on the
+verified DHCP address during installation. The change is temporary and a
+reboot restores the static IP automatically.
 
+```sh
 # Temporarily remove the lab static IP so netboot uses masterDhcpIp only
 STATIC_IP=$(nix eval .#labMeta.controller.staticIp --raw --no-write-lock-file)
 PREFIX_LENGTH=$(nix eval .#labMeta.network.prefixLength --json --no-write-lock-file)
@@ -284,7 +288,8 @@ sudo ip addr del "${STATIC_IP}/${PREFIX_LENGTH}" dev "${IFACE}"
 ### 6. Start netboot services
 
 Harmonia is already running under systemd after `setup apply`. Start the
-still-manual ProxyDHCP + TFTP + HTTP netboot server in a terminal:
+still-manual ProxyDHCP + TFTP + HTTP netboot server in a terminal. It consumes
+the current managed preparation record instead of mutable build links:
 
 ```sh
 sudo nix run .#run-pxe-proxy
@@ -330,6 +335,7 @@ nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
 nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- setup apply
+nix run .#nixorium -- pxe prepare
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
@@ -362,6 +368,9 @@ polkit rule; it never accepts a destination or command argument.
 earlier observed setup stages, and starts only
 `nixorium-apply-controller.service`. Status marks the stage complete only when
 `/run/current-system` matches the evaluated controller generation.
+`pxe prepare` starts only the fixed, administrator-owned preparation unit. It
+does not alter networking; its current manifest is exposed in `status --json`
+as `pxePreparation` and checked by `doctor`.
 
 The `nixorium` executable is installed on the generated controller system. It
 uses `NIXORIUM_REPO` when set, otherwise the current deployment root or the
@@ -411,6 +420,7 @@ nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-link
 CONTROLLER_NAME=$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)
 nix build ".#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-link
 nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --no-link
+nix build .#pxeFirmware --no-link
 nix build .#installerBundle --no-link
 ```
 

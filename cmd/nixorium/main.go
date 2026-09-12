@@ -183,6 +183,16 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				presentation.SetupText(stdout, report)
 			}
 		}
+	case "pxe":
+		report := app.NewSystemActions(adapters.Local{}).PreparePXE(ctx)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.ActionText(stdout, report)
+		}
+		if report.HasErrors() {
+			return 1
+		}
 	default:
 		fmt.Fprintf(stderr, "Error: unknown command %q\n", options.command)
 		usage(stderr)
@@ -236,7 +246,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "config", "setup":
+		case "doctor", "config", "setup", "pxe":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -275,6 +285,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("apply must follow config or setup")
 			}
 			result.subcommand = "apply"
+		case "prepare":
+			if result.command != "pxe" || result.subcommand != "" {
+				return options{}, errors.New("prepare must follow pxe")
+			}
+			result.subcommand = "prepare"
 		default:
 			return options{}, fmt.Errorf("unknown argument %q", arguments[index])
 		}
@@ -309,6 +324,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "setup" && result.subcommand != "status" && result.subcommand != "keys" && result.subcommand != "configure" && result.subcommand != "install-secrets" && result.subcommand != "apply" {
 		return options{}, errors.New("setup requires configure, status, keys, install-secrets, or apply")
+	}
+	if result.command == "pxe" && result.subcommand != "prepare" {
+		return options{}, errors.New("pxe requires the prepare subcommand")
 	}
 	if result.command == "setup" && result.subcommand == "configure" && result.json {
 		return options{}, errors.New("--json is not valid with interactive setup configure")
@@ -377,7 +395,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare] [options]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")

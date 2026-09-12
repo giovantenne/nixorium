@@ -8,6 +8,7 @@ import (
 
 const InstallSecretsUnit = "nixorium-install-secrets.service"
 const ApplyControllerUnit = "nixorium-apply-controller.service"
+const PreparePXEUnit = "nixorium-prepare-pxe.service"
 
 type SystemActionSource interface {
 	StartSystemUnit(ctx context.Context, unit string) error
@@ -45,6 +46,21 @@ func (a SystemActions) ApplyController(ctx context.Context) domain.ActionReport 
 		Message:       "reviewed controller configuration built and activated",
 	}
 	if err := a.source.StartSystemUnit(ctx, ApplyControllerUnit); err != nil {
+		report.State = "failed"
+		report.Message = err.Error()
+	}
+	return report
+}
+
+func (a SystemActions) PreparePXE(ctx context.Context) domain.ActionReport {
+	report := domain.ActionReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "pxe-prepare",
+		State:         "completed",
+		Unit:          PreparePXEUnit,
+		Message:       "PXE artifacts and client closures prepared",
+	}
+	if err := a.source.StartSystemUnit(ctx, PreparePXEUnit); err != nil {
 		report.State = "failed"
 		report.Message = err.Error()
 	}

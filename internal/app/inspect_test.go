@@ -10,18 +10,19 @@ import (
 )
 
 type fakeSource struct {
-	meta       domain.LabMeta
-	deployment domain.DeploymentStatus
-	git        domain.GitState
-	addresses  []string
-	owners     []string
-	free       uint64
-	key        domain.CacheKeyState
-	cacheErr   error
-	ports      []domain.PortUse
-	reachable  map[string]bool
-	buildErr   error
-	built      bool
+	meta        domain.LabMeta
+	deployment  domain.DeploymentStatus
+	git         domain.GitState
+	addresses   []string
+	owners      []string
+	free        uint64
+	key         domain.CacheKeyState
+	cacheErr    error
+	ports       []domain.PortUse
+	reachable   map[string]bool
+	buildErr    error
+	built       bool
+	preparation domain.PXEPreparationState
 }
 
 func readyFake() *fakeSource {
@@ -72,6 +73,10 @@ func (f *fakeSource) ServiceState(_ context.Context, name string) domain.Service
 
 func (f *fakeSource) ArtifactState(_, name, path string) domain.ArtifactState {
 	return domain.ArtifactState{Name: name, Path: path, Present: true}
+}
+
+func (f *fakeSource) PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState {
+	return f.preparation
 }
 
 func (f *fakeSource) InterfaceAddresses(string) ([]string, error) {
@@ -173,6 +178,20 @@ func TestDoctorReportsPXEPortConflictAndOfflineHost(t *testing.T) {
 	}
 	assertFinding(t, report.Findings, "PXE-PORTS", domain.LevelError)
 	assertFinding(t, report.Findings, "CLIENT-SSH", domain.LevelWarning)
+}
+
+func TestDoctorReportsStaleManagedPXEPreparation(t *testing.T) {
+	source := readyFake()
+	source.preparation = domain.PXEPreparationState{
+		Present: true,
+		Detail:  "prepared revision differs from deployment revision",
+	}
+
+	report, err := NewInspector(source).Doctor(context.Background(), ".", DoctorOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertFinding(t, report.Findings, "PXE-PREPARATION", domain.LevelWarning)
 }
 
 func assertFinding(t *testing.T, findings []domain.Finding, id string, level domain.Level) {

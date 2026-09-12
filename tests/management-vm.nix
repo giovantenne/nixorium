@@ -30,6 +30,11 @@
       ${pkgs.coreutils}/bin/touch /run/nixorium-controller-applied
       SCRIPT
       chmod +x "$out/bin/switch-to-configuration"
+      touch "$out/bzImage" "$out/initrd" "$out/snponly.efi"
+      cat > "$out/netboot.ipxe" <<'IPXE'
+      #!ipxe
+      kernel bzImage init=/nix/store/test-init
+      IPXE
     '';
   in
   {
@@ -70,8 +75,8 @@
             controller = {
               name = "pc99";
               number = 99;
-              staticIp = "127.0.0.1";
-              dhcpIp = "127.0.0.1";
+              staticIp = "10.0.0.99";
+              dhcpIp = "192.0.2.10";
             };
             clients = {
               count = 1;
@@ -85,7 +90,7 @@
             network = {
               base = "127.0.0.0";
               prefixLength = 8;
-              ifaceName = "lo";
+              ifaceName = "lab0";
               cachePort = 5000;
               pxeHttpPort = 8080;
             };
@@ -98,8 +103,16 @@
             ready = true;
             issues = [];
           };
-          nixosConfigurations.pc99.config.system.build.toplevel =
-            fakeSystem.outPath;
+          nixosConfigurations = {
+            pc99.config.system.build.toplevel = fakeSystem.outPath;
+            pc01.config.system.build.toplevel = fakeSystem.outPath;
+            netboot.config.system.build = {
+              kernel = fakeSystem.outPath;
+              netbootRamdisk = fakeSystem.outPath;
+              netbootIpxeScript = fakeSystem.outPath;
+            };
+          };
+          packages.x86_64-linux.pxeFirmware = fakeSystem.outPath;
           nixoriumValidateCandidate = candidate: builtins.deepSeq candidate true;
         };
       }
@@ -121,7 +134,7 @@
     controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
     controller.succeed("cp /etc/nixorium-test/lab-settings.json /tmp/deployment/lab-settings.json")
     controller.succeed("cp /etc/nixorium-test/.gitignore /tmp/deployment/.gitignore")
-    controller.succeed("jq --arg password '$6$vm$not-the-public-default' '.lab.masterDhcpIp = \"127.0.0.1\" | .lab.teacherPassword = $password | .lab.studentPassword = $password | .lab.adminPassword = $password' /tmp/deployment/lab-settings.json > /tmp/lab-settings.json && mv /tmp/lab-settings.json /tmp/deployment/lab-settings.json")
+    controller.succeed("jq --arg password '$6$vm$not-the-public-default' '.lab.masterDhcpIp = \"192.0.2.10\" | .lab.ifaceName = \"lab0\" | .lab.teacherPassword = $password | .lab.studentPassword = $password | .lab.adminPassword = $password' /tmp/deployment/lab-settings.json > /tmp/lab-settings.json && mv /tmp/lab-settings.json /tmp/deployment/lab-settings.json")
     controller.succeed("git -C /tmp/deployment init -q")
     controller.succeed("git -C /tmp/deployment add flake.nix lab-settings.json .gitignore")
     controller.succeed("git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm initial")
@@ -139,6 +152,10 @@
     controller.succeed("mkdir -p /home/admin/nixorium-deployment")
     controller.succeed("cp -a /tmp/deployment/. /home/admin/nixorium-deployment/")
     controller.succeed("chown -R admin:users /home/admin/nixorium-deployment")
+    controller.succeed("ip link add lab0 type dummy; ip addr add 192.0.2.10/24 dev lab0; ip link set lab0 up")
+    controller.succeed("su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json > /tmp/pxe-prepare-failed.json' || test $? = 1")
+    controller.succeed("jq -e '.operation == \"pxe-prepare\" and .state == \"failed\" and .unit == \"nixorium-prepare-pxe.service\"' /tmp/pxe-prepare-failed.json")
+    controller.succeed("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'Harmonia cache service is not active'")
     controller.succeed("su - admin -c 'cd ~/nixorium-deployment && nixorium setup install-secrets --json' | jq -e '.operation == \"setup-install-secrets\" and .state == \"completed\"'")
     controller.succeed("cmp /home/admin/nixorium-deployment/admin-ssh /home/admin/.ssh/id_ed25519")
     controller.succeed("cmp /home/admin/nixorium-deployment/veyon-private-key.pem /etc/veyon/keys/private/teacher/key")
@@ -147,14 +164,25 @@
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")
     controller.succeed("systemctl reset-failed harmonia.service harmonia.socket; systemctl restart harmonia.socket nixorium-harmonia.service")
     controller.wait_for_unit("nixorium-harmonia.service")
-    controller.wait_until_succeeds("curl --fail --silent http://127.0.0.1:5000/nix-cache-info | grep -F 'StoreDir: /nix/store'")
+    controller.wait_until_succeeds("curl --fail --silent http://192.0.2.10:5000/nix-cache-info | grep -F 'StoreDir: /nix/store'")
     controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'listening on inherited fd'")
+    controller.succeed("su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json' | jq -e '.operation == \"pxe-prepare\" and .state == \"completed\"'")
+    controller.succeed("jq -e '.schemaVersion == 1 and .revision != \"\" and .controller.dhcpIp == \"192.0.2.10\" and .network.ifaceName == \"lab0\" and .artifacts.kernel.relativePath == \"bzImage\" and .artifacts.firmware.relativePath == \"snponly.efi\" and (.clients | length) == 1 and .clients[0].name == \"pc01\" and (.clients[0].storePath | startswith(\"/nix/store/\"))' /var/lib/nixorium/prepared/prepared.json")
+    controller.succeed("test $(stat -c '%U:%G:%a' /var/lib/nixorium/prepared/prepared.json) = admin:users:644")
+    controller.succeed("revision=$(jq -r .revision /var/lib/nixorium/prepared/prepared.json); test $(find /var/lib/nixorium/prepared/roots/$revision -maxdepth 1 -type l | wc -l) = 5; nix-store --gc --print-roots | grep -F /var/lib/nixorium/prepared/roots/$revision/kernel")
+    controller.succeed("test ! -e /home/admin/nixorium-deployment/result-kernel; test ! -e /home/admin/nixorium-deployment/result-initrd; test ! -e /home/admin/nixorium-deployment/result-ipxe")
+    controller.succeed("mkdir /var/lib/nixorium/prepared/roots/0000000000000000000000000000000000000000; chown admin:users /var/lib/nixorium/prepared/roots/0000000000000000000000000000000000000000")
+    controller.succeed("before=$(jq -c 'del(.preparedAt)' /var/lib/nixorium/prepared/prepared.json); su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json' >/dev/null; after=$(jq -c 'del(.preparedAt)' /var/lib/nixorium/prepared/prepared.json); test \"$before\" = \"$after\"; test ! -e /var/lib/nixorium/prepared/roots/0000000000000000000000000000000000000000")
+    controller.succeed("before=$(sha256sum /var/lib/nixorium/prepared/prepared.json); ip addr del 192.0.2.10/24 dev lab0; ip addr add 192.0.2.11/24 dev lab0; su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json > /tmp/pxe-address-failed.json' || test $? = 1; after=$(sha256sum /var/lib/nixorium/prepared/prepared.json); test \"$before\" = \"$after\"")
+    controller.succeed("jq -e '.state == \"failed\"' /tmp/pxe-address-failed.json")
+    controller.succeed("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'configured DHCP address 192.0.2.10 is not assigned to lab0 (observed non-static addresses: 192.0.2.11)'")
+    controller.succeed("ip addr del 192.0.2.11/24 dev lab0; ip addr add 192.0.2.10/24 dev lab0")
     controller.succeed("su - admin -c 'systemctl start nixorium-install-secrets.service'")
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json' | jq -e '.operation == \"setup-apply-controller\" and .state == \"completed\"'")
     controller.succeed("test -e /run/nixorium-controller-applied")
-    controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"prepare-artifacts\" and (.stages[] | select(.id == \"apply-controller\").state) == \"complete\"'")
+    controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"offer-client-installation\" and (.stages[] | select(.id == \"prepare-artifacts\").state) == \"complete\"'")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json' | jq -e '.state == \"completed\"'")
     controller.succeed("printf different > /home/admin/.ssh/id_ed25519; ! systemctl start nixorium-install-secrets.service")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json > /tmp/apply.json' || test $? = 1")
@@ -163,8 +191,8 @@
     controller.succeed("touch /home/admin/nixorium-deployment/dirty")
     controller.fail("su - admin -c 'systemctl start nixorium-apply-controller.service'")
     controller.succeed("journalctl -u nixorium-apply-controller.service --no-pager | grep -F 'deployment worktree must be clean before controller apply'")
-    controller.succeed("nixorium status --repo /tmp/deployment --json | jq -e '.operation == \"status\" and .state == \"ready\" and .lab.clients.hosts[0].name == \"pc01\" and any(.services[]; .name == \"nixorium-harmonia.service\" and .loaded and .active)'")
-    controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"action-required\" and .currentStage == \"prepare-artifacts\"'")
-    controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\")'")
+    controller.succeed("nixorium status --repo /tmp/deployment --json | jq -e '.operation == \"status\" and .state == \"ready\" and .lab.clients.hosts[0].name == \"pc01\" and .pxePreparation.ready and all(.artifacts[]; .present) and any(.services[]; .name == \"nixorium-harmonia.service\" and .loaded and .active)'")
+    controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"action-required\" and .currentStage == \"offer-client-installation\"'")
+    controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"PXE-PREPARATION\" and .level == \"OK\") and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\")'")
   '';
 }

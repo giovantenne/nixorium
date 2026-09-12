@@ -101,6 +101,19 @@ func TestParseArgumentsAcceptsInstallSecrets(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsPXEPrepare(t *testing.T) {
+	options, err := parseArguments([]string{"pxe", "prepare", "--json"})
+	if err != nil || options.command != "pxe" || options.subcommand != "prepare" || !options.json {
+		t.Fatalf("options = %+v, error = %v", options, err)
+	}
+	if _, err := parseArguments([]string{"pxe"}); err == nil {
+		t.Fatal("bare pxe command was accepted")
+	}
+	if _, err := parseArguments([]string{"prepare", "pxe"}); err == nil {
+		t.Fatal("prepare before pxe was accepted")
+	}
+}
+
 func TestParseArgumentsAcceptsSetupKeys(t *testing.T) {
 	options, err := parseArguments([]string{"setup", "keys", "--json"})
 	if err != nil {

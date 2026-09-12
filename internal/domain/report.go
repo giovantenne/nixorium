@@ -77,17 +77,18 @@ type PortUse struct {
 }
 
 type StatusReport struct {
-	SchemaVersion int              `json:"schemaVersion"`
-	Operation     string           `json:"operation"`
-	GeneratedAt   time.Time        `json:"generatedAt"`
-	State         string           `json:"state"`
-	Repository    string           `json:"repository"`
-	Meta          LabMeta          `json:"lab"`
-	Deployment    DeploymentStatus `json:"deployment"`
-	Git           GitState         `json:"git"`
-	Services      []ServiceState   `json:"services"`
-	Artifacts     []ArtifactState  `json:"artifacts"`
-	Warnings      []string         `json:"warnings,omitempty"`
+	SchemaVersion  int                 `json:"schemaVersion"`
+	Operation      string              `json:"operation"`
+	GeneratedAt    time.Time           `json:"generatedAt"`
+	State          string              `json:"state"`
+	Repository     string              `json:"repository"`
+	Meta           LabMeta             `json:"lab"`
+	Deployment     DeploymentStatus    `json:"deployment"`
+	Git            GitState            `json:"git"`
+	Services       []ServiceState      `json:"services"`
+	PXEPreparation PXEPreparationState `json:"pxePreparation"`
+	Artifacts      []ArtifactState     `json:"artifacts"`
+	Warnings       []string            `json:"warnings,omitempty"`
 }
 
 type Finding struct {

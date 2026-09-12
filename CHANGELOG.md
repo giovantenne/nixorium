@@ -62,6 +62,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   loading from the non-store installed key, restart/watchdog behavior, a
   stable `nixorium-harmonia.service` alias, health diagnostics, and VM-tested
   missing-key recovery.
+- A non-disruptive `nixorium pxe prepare` workflow with clean-Git, live-DHCP,
+  and Harmonia readiness gates; a capability-free administrator systemd job;
+  pinned firmware and all-client builds; managed GC retention; and an atomic,
+  revision-bound manifest of strictly validated immutable Nix store outputs
+  used by status and PXE.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, and systemd-owned runtime services.
