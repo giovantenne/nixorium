@@ -21,3 +21,10 @@ Go provides straightforward cross-package tests and Nix packaging. Module
 dependencies must be pinned and vendored or otherwise built reproducibly by
 Nix. Bubble Tea adds terminal behavior that needs integration testing, but it
 does not become an operational dependency of the backend.
+
+The first operational TUI screen implements this boundary with injected typed
+callbacks for PXE preparation and lifecycle operations. Unit tests drive its
+state machine, including Bubble Tea's distinct space-key event, and the NixOS
+management VM drives the packaged application through a real PTY. Command
+execution and privilege decisions remain in the shared application and adapter
+layers.

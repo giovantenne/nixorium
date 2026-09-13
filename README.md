@@ -334,14 +334,21 @@ nix run .#nixorium -- setup keys
 nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- setup apply
 nix run .#nixorium -- pxe prepare
+nix run .#nixorium -- pxe start
+nix run .#nixorium -- pxe stop
+nix run .#nixorium -- pxe recover
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- doctor
 ```
 
 The dashboard and inspection commands evaluate `labMeta` and
-`deploymentStatus`; setup configuration and key generation are explicit,
-unprivileged mutations of the private deployment. `config validate` reads the machine-owned
+`deploymentStatus`. From the dashboard, **Install computers over network**
+uses the same typed application operations as the CLI to prepare artifacts and
+to review, start, stop, or recover PXE mode. Starting requires the exact
+`START PXE` confirmation; quitting the view does not stop systemd-owned
+services. Setup configuration and key generation are explicit, unprivileged
+mutations of the private deployment. `config validate` reads the machine-owned
 settings without changing them, rejects unknown or invalid values, and then
 evaluates the deployment through Nix as the final authority. The current `doctor`
 checks readiness, Git state, subnet/interface/address ownership, Harmonia key

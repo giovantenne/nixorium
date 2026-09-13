@@ -102,8 +102,12 @@ nix run .#nixorium -- doctor
 nix run .#nixorium -- doctor --full
 ```
 
-Running `nix run .#nixorium` without a subcommand opens the current read-only
-terminal dashboard. Add `--json` to `status` or `doctor` for structured output.
+Running `nix run .#nixorium` without a subcommand opens the task-oriented
+terminal dashboard. Its **Install computers over network** screen prepares
+artifacts and reviews, starts, stops, or recovers PXE mode through the same
+typed operations as the CLI. Starting requires the exact `START PXE`
+confirmation; quitting the view does not stop systemd-owned services. Add
+`--json` to `status` or `doctor` for structured output.
 Bare `setup` (or `setup configure`) opens the first-run terminal wizard. It
 proposes detected network values, supports backward navigation, collects
 passwords without echo, validates the complete candidate through Nix, shows a

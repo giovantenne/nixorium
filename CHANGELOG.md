@@ -26,9 +26,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- A packaged `nixorium` Go command with a read-only terminal dashboard,
+- A packaged `nixorium` Go command with a task-oriented terminal dashboard,
   human/JSON `status`, actionable `doctor` diagnostics, shared typed domain
-  operations, and unit tests.
+  operations, and unit tests. Its first operational screen prepares, reviews,
+  starts, stops, and recovers managed PXE installation mode.
 - Structured client hostname/IP inventory in `labMeta`, comprehensive
   read-only diagnostics for networking, Harmonia, PXE ports, SSH, Colmena and
   disk capacity, an explicit full controller-build check, and a NixOS VM test

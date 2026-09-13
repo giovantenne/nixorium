@@ -32,8 +32,9 @@ managed Harmonia service are now implemented. PXE preparation is systemd-owned
 and records immutable artifacts/client closures. Transactional PXE networking
 and systemd-owned listeners are also implemented. The public lifecycle now
 performs confirmed start, idempotent stop, explicit recovery, and typed state
-reconciliation; its TUI entry point, client enrollment, deployment, updates,
-and richer recovery remain incremental work tracked externally.
+reconciliation through both CLI and the first task-oriented TUI screen. Client
+enrollment, deployment, updates, and richer recovery remain incremental work
+tracked externally.
 
 Important constraints in the current implementation are:
 
@@ -44,9 +45,8 @@ Important constraints in the current implementation are:
   and systemd-owned, while the old foreground helper remains an advanced
   compatibility app;
 - the internal PXE network transition now has persistent session state and
-  boot/explicit recovery and is ordered before the listener; the public CLI
-  owns confirmed start/stop/recover orchestration while the dashboard action
-  remains to be connected;
+  boot/explicit recovery and is ordered before the listener; CLI and TUI call
+  the same confirmed start/stop/recover application operations;
 - the client installer is destructive and confirms the disk, but host
   selection is a numeric command-line argument and duplicate assignment is not
   coordinated;
@@ -183,6 +183,14 @@ current stage, elapsed time, recent events, and a route to detailed logs.
 Failures state what failed, what was left intact, whether retry is safe, and
 the next action. ASCII text conveys critical state; color and Unicode are
 enhancements only. The layout targets ordinary 80-column terminals and SSH.
+
+The implemented installation-mode screen is the first operational slice of
+this structure. Presentation callbacks invoke typed PXE preparation and
+lifecycle services; the TUI itself contains no command execution, systemd
+policy, network mutation, or CLI-output parsing. It renders reconciled state,
+shows the exact address transition before start, requires `START PXE`, refreshes
+status after every operation, and leaves long-lived services under systemd
+when the view exits.
 
 ## Configuration ownership and editing
 
@@ -471,7 +479,8 @@ Testing is layered:
 - Nix evaluation tests cover package/module exports, strict configuration,
   public metadata schemas, template generation, and unchanged legacy inputs;
 - NixOS VM tests cover first-run discovery, systemd ordering, Harmonia health,
-  PXE start/stop/recovery, permission boundaries, and CLI status;
+  PXE start/stop/recovery, permission boundaries, CLI status, and a real PTY
+  traversal of the TUI's reviewed PXE start flow;
 - offline equivalence continues comparing the direct and bundled client
   derivations;
 - a QEMU PXE scenario is added when deterministic ProxyDHCP behavior can be
