@@ -433,26 +433,31 @@ session, verifies reality, performs any missing cleanup, and marks it recovered.
 On the next invocation, stale records are never trusted over actual addresses,
 listeners, processes, and systemd unit state.
 
-The first implementation need not add a controller/client protocol. Passive
+The first implementation does not add a controller/client protocol. Passive
 information from dnsmasq journald and neighbor state may be displayed as
 untrusted observations. Reliable host reservation or duplicate-assignment
 prevention requires an authenticated enrollment protocol and is deferred until
-its threat model and hardware behavior are proven.
+authenticated client identity can be established without embedding a reusable
+secret in the public netboot closure.
 
 ## Client enrollment
 
-The client-side application reads the configured host list from a versioned
-installer metadata output, shows firmware, CPU, memory, NIC/MAC, disks, and the
-exact target disk, and lets the operator choose a host identity. It requires an
-unmistakable final confirmation containing both hostname and disk before Disko
-runs. An unattended mode is disabled by default and requires an explicit
-deployment policy plus invocation token.
+The client-side application reads the configured host list from the versioned
+`labMeta` document embedded in the immutable installer bundle, shows firmware,
+system, CPU, memory, NIC/MAC, disks, and the exact target disk, and lets the
+operator choose a host identity. It requires an unmistakable final
+confirmation containing both hostname and the canonical disk path before Disko
+runs, revalidates that target immediately before mutation, reports explicit
+progress and outcome, and treats reboot as a separate confirmed action. An
+unattended mode is disabled by default and requires an explicit deployment
+policy plus invocation token.
 
-Without a trusted controller protocol, the installer can warn about observed
-reachability or duplicate choices but cannot claim a reservation. A later
-protocol must bind to the installation network, authenticate the controller,
-prevent unauthenticated clients from reserving arbitrary identities
-indefinitely, and retain a manual recovery path.
+Without a trusted controller protocol, the installer probes the chosen static
+address where routing permits and refuses a responding identity, but it cannot
+claim that a silent address is reserved or free. A later protocol must bind to
+the installation network, authenticate the controller, prevent unauthenticated
+clients from reserving arbitrary identities indefinitely, and retain a manual
+recovery path.
 
 ## Git workflow and operation records
 

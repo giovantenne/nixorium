@@ -66,6 +66,12 @@ Wire TUI screens to those application operations through typed callbacks from
 the command composition root. Presentation code may manage navigation, review,
 confirmation input, and rendering, but must not execute commands, select
 privileged units, or duplicate lifecycle decisions.
+Keep client enrollment local and guided until a genuine authenticated identity
+exists for netboot clients. Limit selection to the immutable versioned
+installer inventory, label reachability probes as best-effort rather than a
+reservation, require the exact hostname and canonical disk in destructive
+confirmation, and do not enable unattended installation without explicit
+private policy and a documented invocation-token lifecycle.
 Keep firewall policy in the focused built-in module: no implicit global
 OpenSSH/Avahi openings, common desktop services only on the configured
 interface, and Harmonia/PXE ports only for the controller role.

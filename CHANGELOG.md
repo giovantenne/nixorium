@@ -81,7 +81,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   repeated readiness checks, and synchronous rollback after startup failure.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
-  narrow privilege boundary, and systemd-owned runtime services.
+  narrow privilege boundary, systemd-owned runtime services, interface-scoped
+  firewall, and local guided client-enrollment trust model.
 - An interactive controller-bootstrap version selector offering `master`, the
   latest GitHub prerelease, and published stable releases while preserving
   `--release` and `NIXORIUM_RELEASE` for unattended installations.
