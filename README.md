@@ -344,6 +344,9 @@ nix run .#nixorium
 nix run .#nixorium -- status
 nix run .#nixorium -- status --json
 nix run .#nixorium -- hosts
+nix run .#nixorium -- deploy plan --on pc05
+nix run .#nixorium -- deploy plan --on pc01,pc02
+nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -365,6 +368,12 @@ that refuses SSH, an unreachable host, and an unknown probe result. The same
 typed inventory is available through `nixorium hosts` and `--json`; probes run
 with bounded concurrency only when this view/command or `doctor` is requested,
 so the initial dashboard and `status` remain predictable and probe-free.
+Before using Colmena, `deploy plan --on ...` expands one, several, or all
+configured clients into a reviewable revision-bound target list. Planning is
+read-only and fails closed when the deployment is not ready, the Git worktree
+is dirty, HEAD cannot be resolved, or a selector is empty, duplicate, or
+unknown. It always states that selected configurations must build before
+deployment. This increment does not execute the plan yet.
 From the dashboard, **Install computers over network**
 uses the same typed application operations as the CLI to prepare artifacts and
 to review, start, stop, or recover PXE mode. Starting requires the exact
@@ -493,6 +502,16 @@ nix eval .#labMeta.version --raw
 ```
 
 ### Deploy updates (Colmena)
+
+Review the exact committed target set first:
+
+```sh
+nix run .#nixorium -- deploy plan --on @lab
+```
+
+Plan output does not authorize or execute a deployment yet. Until the reviewed
+apply workflow is implemented, the following raw Colmena commands are advanced
+manual operation.
 
 First apply the latest configuration on the controller itself:
 ```sh

@@ -21,6 +21,7 @@ type options struct {
 	repository string
 	file       string
 	expect     string
+	on         string
 	json       bool
 	full       bool
 	help       bool
@@ -119,6 +120,16 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			err = presentation.JSON(stdout, report)
 		} else {
 			presentation.HostsText(stdout, report)
+		}
+	case "deploy":
+		report := app.NewDeploymentManager(local).Plan(ctx, repository, options.on)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.DeploymentPlanText(stdout, report)
+		}
+		if report.HasErrors() {
+			return 1
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -291,6 +302,12 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--expect requires a fingerprint")
 			}
 			result.expect = arguments[index]
+		case "--on":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--on requires a client or @lab")
+			}
+			result.on = arguments[index]
 		case "--json":
 			result.json = true
 		case "--full":
@@ -310,7 +327,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "config", "setup", "pxe":
+		case "doctor", "hosts", "deploy", "config", "setup", "pxe":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -321,8 +338,8 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "validate"
 		case "plan":
-			if result.command != "config" || result.subcommand != "" {
-				return options{}, errors.New("plan must follow config")
+			if (result.command != "config" && result.command != "deploy") || result.subcommand != "" {
+				return options{}, errors.New("plan must follow config or deploy")
 			}
 			result.subcommand = "plan"
 		case "keys":
@@ -383,6 +400,15 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.expect != "" && (result.command != "config" || result.subcommand != "apply") {
 		return options{}, errors.New("--expect is only valid with config apply")
+	}
+	if result.on != "" && (result.command != "deploy" || result.subcommand != "plan") {
+		return options{}, errors.New("--on is only valid with deploy plan")
+	}
+	if result.command == "deploy" && result.subcommand != "plan" {
+		return options{}, errors.New("deploy requires the plan subcommand")
+	}
+	if result.command == "deploy" && result.on == "" {
+		return options{}, errors.New("deploy plan requires --on")
 	}
 	if result.command == "config" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("config apply requires --expect from config plan")
@@ -464,7 +490,8 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")

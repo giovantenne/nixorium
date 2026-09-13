@@ -88,6 +88,8 @@ Run commands from the repository root:
 ```sh
 nix run .#nixorium -- status
 nix run .#nixorium -- hosts
+nix run .#nixorium -- deploy plan --on pc01
+nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -113,6 +115,10 @@ artifacts and reviews, starts, stops, or recovers PXE mode through the same
 typed operations as the CLI. Starting requires the exact `START PXE`
 confirmation; quitting the view does not stop systemd-owned services. Add
 `--json` to `status` or `doctor` for structured output.
+Use `deploy plan --on pc01`, a comma-separated client list, or `@lab` to review
+the exact clean Git revision and canonical Colmena target set. Planning is
+read-only, requires deployment readiness, and rejects dirty Git or unknown and
+duplicate clients; it does not execute Colmena yet.
 Bare `setup` (or `setup configure`) opens the first-run terminal wizard. It
 proposes detected network values, supports backward navigation, collects
 passwords without echo, validates the complete candidate through Nix, shows a

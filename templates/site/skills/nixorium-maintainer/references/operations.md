@@ -34,6 +34,16 @@ because builds succeeded.
 Use Colmena only after authorization:
 
 ```sh
+nixorium deploy plan --on pc05
+nixorium deploy plan --on @lab
+```
+
+Planning requires a ready deployment and clean Git worktree, records HEAD, and
+rejects unknown or duplicate clients. It does not execute Colmena. Until the
+reviewed apply workflow is available, the raw commands below remain advanced
+manual operations:
+
+```sh
 colmena apply --on pc05
 colmena apply --on @lab
 ```
