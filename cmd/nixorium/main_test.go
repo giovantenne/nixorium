@@ -16,6 +16,13 @@ func TestParseArgumentsAllowsFlagsBeforeOrAfterCommand(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsHosts(t *testing.T) {
+	options, err := parseArguments([]string{"hosts", "--json"})
+	if err != nil || options.command != "hosts" || !options.json {
+		t.Fatalf("hosts options = %+v, error = %v", options, err)
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

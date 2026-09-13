@@ -34,6 +34,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   read-only diagnostics for networking, Harmonia, PXE ports, SSH, Colmena and
   disk capacity, an explicit full controller-build check, and a NixOS VM test
   of the installed controller command.
+- Explicit `nixorium hosts` text/JSON inventory and a dashboard Computers
+  screen with bounded SSH probes and distinct reachable, unreachable, refused,
+  and unknown observations, while the default status path remains probe-free.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments

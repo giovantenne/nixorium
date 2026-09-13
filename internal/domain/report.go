@@ -39,6 +39,46 @@ type HostMeta struct {
 	IP   string `json:"ip"`
 }
 
+type Reachability string
+
+const (
+	ReachabilityReachable   Reachability = "reachable"
+	ReachabilityUnreachable Reachability = "unreachable"
+	ReachabilityUnknown     Reachability = "unknown"
+)
+
+type SSHAvailability string
+
+const (
+	SSHAvailable   SSHAvailability = "available"
+	SSHUnavailable SSHAvailability = "unavailable"
+	SSHUnknown     SSHAvailability = "unknown"
+)
+
+type SSHProbe struct {
+	Reachability Reachability    `json:"reachability"`
+	SSH          SSHAvailability `json:"ssh"`
+	Detail       string          `json:"detail,omitempty"`
+}
+
+type HostStatus struct {
+	Name         string          `json:"name"`
+	IP           string          `json:"ip"`
+	Role         string          `json:"role"`
+	Reachability Reachability    `json:"reachability"`
+	SSH          SSHAvailability `json:"ssh"`
+	Detail       string          `json:"detail,omitempty"`
+}
+
+type HostsReport struct {
+	SchemaVersion int          `json:"schemaVersion"`
+	Operation     string       `json:"operation"`
+	GeneratedAt   time.Time    `json:"generatedAt"`
+	State         string       `json:"state"`
+	Repository    string       `json:"repository"`
+	Hosts         []HostStatus `json:"hosts"`
+}
+
 type DeploymentStatus struct {
 	Ready  bool     `json:"ready"`
 	Issues []string `json:"issues"`

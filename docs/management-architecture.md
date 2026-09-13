@@ -149,6 +149,13 @@ readiness, Git state, controller identity, configured clients, Harmonia/PXE
 unit state, PXE recovery need, and artifact presence. Network probes and builds
 are opt-in or belong to `doctor`, so opening the dashboard is predictable.
 
+`hosts` is the explicit observed client-inventory operation. The application
+layer preserves configured ordering and emits typed reachability and SSH
+availability rather than a boolean that conflates connection refusal, timeout,
+and probe failure. The local adapter limits concurrent TCP/22 probes to eight.
+Both the CLI/JSON frontend and the TUI **Computers** screen consume the same
+report; `doctor` uses the same classification for its aggregate SSH finding.
+
 `doctor` returns ordered findings with `OK`, `WARNING`, or `ERROR`, a stable
 finding identifier, evidence safe to display, and a remediation. Expensive
 checks are grouped behind `doctor --full`; its first such check performs a real
@@ -186,13 +193,13 @@ Failures state what failed, what was left intact, whether retry is safe, and
 the next action. ASCII text conveys critical state; color and Unicode are
 enhancements only. The layout targets ordinary 80-column terminals and SSH.
 
-The implemented installation-mode screen is the first operational slice of
-this structure. Presentation callbacks invoke typed PXE preparation and
-lifecycle services; the TUI itself contains no command execution, systemd
-policy, network mutation, or CLI-output parsing. It renders reconciled state,
-shows the exact address transition before start, requires `START PXE`, refreshes
-status after every operation, and leaves long-lived services under systemd
-when the view exits.
+The implemented installation-mode and computer-inventory screens are the first
+operational slices of this structure. Presentation callbacks invoke typed PXE
+lifecycle and host-inspection services; the TUI itself contains no command
+execution, systemd policy, network mutation, or CLI-output parsing. It renders
+reconciled state, runs host probes only when the inventory is opened/refreshed,
+shows the exact address transition before PXE start, requires `START PXE`, and
+leaves long-lived services under systemd when the view exits.
 
 ## Configuration ownership and editing
 

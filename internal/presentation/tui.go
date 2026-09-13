@@ -10,6 +10,7 @@ import (
 
 type DashboardActions struct {
 	Refresh      func() (domain.StatusReport, error)
+	LoadHosts    func() (domain.HostsReport, error)
 	PreparePXE   func() domain.ActionReport
 	PlanPXEStart func() domain.PXELifecycleReport
 	StartPXE     func() domain.PXELifecycleReport
@@ -21,6 +22,7 @@ type dashboardScreen int
 
 const (
 	dashboardHome dashboardScreen = iota
+	dashboardHosts
 	dashboardPXE
 	dashboardPXEStartReview
 )
@@ -33,6 +35,7 @@ type dashboardModel struct {
 	message      string
 	confirmation string
 	startPlan    domain.PXELifecycleReport
+	hosts        domain.HostsReport
 }
 
 type dashboardPlanMsg struct {
@@ -43,6 +46,12 @@ type dashboardOperationMsg struct {
 	message string
 	report  domain.StatusReport
 	err     error
+	screen  dashboardScreen
+}
+
+type dashboardHostsMsg struct {
+	report domain.HostsReport
+	err    error
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -79,7 +88,17 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			model.report = message.report
 		}
-		model.screen = dashboardPXE
+		model.screen = message.screen
+		return model, nil
+	case dashboardHostsMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = "Computer status refresh failed: " + message.err.Error()
+		} else {
+			model.hosts = message.report
+			model.message = ""
+		}
+		model.screen = dashboardHosts
 		return model, nil
 	}
 
@@ -97,9 +116,24 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardHome:
 		switch key.String() {
+		case "h":
+			model.screen = dashboardHosts
+			model.busy = "Checking configured computers"
+			model.message = ""
+			return model, model.loadHosts()
 		case "p", "enter":
 			model.screen = dashboardPXE
 			model.message = ""
+		}
+	case dashboardHosts:
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "r":
+			model.busy = "Refreshing computer status"
+			model.message = ""
+			return model, model.loadHosts()
 		}
 	case dashboardPXE:
 		switch key.String() {
@@ -112,7 +146,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, model.runAction(func() string {
 				report := model.actions.PreparePXE()
 				return report.Message
-			})
+			}, dashboardPXE)
 		case "s":
 			model.busy = "Checking PXE readiness"
 			model.message = ""
@@ -124,13 +158,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 			return model, model.runAction(func() string {
 				return model.actions.StopPXE().Message
-			})
+			}, dashboardPXE)
 		case "r":
 			model.busy = "Recovering normal controller networking"
 			model.message = ""
 			return model, model.runAction(func() string {
 				return model.actions.RecoverPXE().Message
-			})
+			}, dashboardPXE)
 		}
 	case dashboardPXEStartReview:
 		switch key.String() {
@@ -156,7 +190,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 			return model, model.runAction(func() string {
 				return model.actions.StartPXE().Message
-			})
+			}, dashboardPXE)
 		default:
 			if key.Type == tea.KeyRunes {
 				model.confirmation += string(key.Runes)
@@ -166,16 +200,25 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
-func (model dashboardModel) runAction(operation func() string) tea.Cmd {
+func (model dashboardModel) runAction(operation func() string, screen dashboardScreen) tea.Cmd {
 	return func() tea.Msg {
 		message := operation()
 		report, err := model.actions.Refresh()
-		return dashboardOperationMsg{message: message, report: report, err: err}
+		return dashboardOperationMsg{message: message, report: report, err: err, screen: screen}
+	}
+}
+
+func (model dashboardModel) loadHosts() tea.Cmd {
+	return func() tea.Msg {
+		report, err := model.actions.LoadHosts()
+		return dashboardHostsMsg{report: report, err: err}
 	}
 }
 
 func (model dashboardModel) View() string {
 	switch model.screen {
+	case dashboardHosts:
+		return model.hostsView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
 	default:
@@ -200,10 +243,34 @@ func (model dashboardModel) homeView() string {
 		fmt.Sprintf("  Git worktree         %s", cleanText(model.report.Git.Dirty, model.report.Git.Changes)),
 		"",
 		"Actions",
+		"  h           View computers",
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
 		"q: quit",
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) hostsView() string {
+	available, total := hostAvailability(model.hosts.Hosts)
+	lines := []string{
+		"Nixorium — Computers",
+		"",
+		fmt.Sprintf("SSH available: %d/%d", available, total),
+		"",
+		fmt.Sprintf("  %-10s %-15s %-12s %-11s", "NAME", "ADDRESS", "NETWORK", "SSH"),
+	}
+	for _, host := range model.hosts.Hosts {
+		lines = append(lines, fmt.Sprintf("  %-10s %-15s %-12s %-11s", host.Name, host.IP, host.Reachability, host.SSH))
+	}
+	if model.busy != "" {
+		lines = append(lines, "", model.busy+"…")
+	} else {
+		lines = append(lines, "", "r: refresh   Esc: back   q: quit")
+	}
+	if model.message != "" {
+		lines = append(lines, "", "Result: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -268,4 +335,14 @@ func serviceLabel(services []domain.ServiceState, name string) string {
 		}
 	}
 	return "unknown"
+}
+
+func hostAvailability(hosts []domain.HostStatus) (int, int) {
+	available := 0
+	for _, host := range hosts {
+		if host.SSH == domain.SSHAvailable {
+			available++
+		}
+	}
+	return available, len(hosts)
 }

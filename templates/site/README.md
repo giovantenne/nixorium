@@ -87,6 +87,7 @@ Run commands from the repository root:
 
 ```sh
 nix run .#nixorium -- status
+nix run .#nixorium -- hosts
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -103,7 +104,11 @@ nix run .#nixorium -- doctor --full
 ```
 
 Running `nix run .#nixorium` without a subcommand opens the task-oriented
-terminal dashboard. Its **Install computers over network** screen prepares
+terminal dashboard. **View computers** explicitly probes configured clients
+with bounded concurrency and reports network reachability separately from SSH
+availability; use `nixorium hosts --json` for the same typed data. The initial
+dashboard and `status` do not run network probes. Its **Install computers over
+network** screen prepares
 artifacts and reviews, starts, stops, or recovers PXE mode through the same
 typed operations as the CLI. Starting requires the exact `START PXE`
 confirmation; quitting the view does not stop systemd-owned services. Add

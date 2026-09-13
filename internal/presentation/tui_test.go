@@ -17,10 +17,55 @@ func testDashboardReport(mode string) domain.StatusReport {
 			{Name: "nixorium-harmonia.service", State: "active", Active: true},
 		},
 	}
+	report.Meta.Clients.Count = 2
 	report.Meta.Controller.Name = "pc99"
 	report.Meta.Controller.DHCPIP = "192.0.2.10"
 	report.Meta.Network.Interface = "enp1s0"
 	return report
+}
+
+func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
+	loads := 0
+	actions := DashboardActions{
+		LoadHosts: func() (domain.HostsReport, error) {
+			loads++
+			report := domain.HostsReport{State: "partial", Hosts: []domain.HostStatus{
+				{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
+				{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown},
+			}}
+			if loads > 1 {
+				report.State = "available"
+				report.Hosts[1].Reachability = domain.ReachabilityReachable
+				report.Hosts[1].SSH = domain.SSHAvailable
+			}
+			return report, nil
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	if !strings.Contains(model.View(), "Computers            2 configured") || !strings.Contains(model.View(), "View computers") {
+		t.Fatalf("home omits computer summary:\n%s", model.View())
+	}
+
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	model = updated.(dashboardModel)
+	if command == nil || !strings.Contains(model.View(), "Checking configured computers") {
+		t.Fatalf("opening inventory did not start explicit probe:\n%s", model.View())
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHosts || !strings.Contains(model.View(), "pc02") || !strings.Contains(model.View(), "unreachable  unknown") {
+		t.Fatalf("computer inventory is incomplete:\n%s", model.View())
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	model = updated.(dashboardModel)
+	if command == nil || !strings.Contains(model.View(), "Refreshing computer status") {
+		t.Fatalf("refresh did not enter busy state:\n%s", model.View())
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loads != 2 || model.screen != dashboardHosts || !strings.Contains(model.View(), "SSH available: 2/2") {
+		t.Fatalf("load count = %d, screen = %d:\n%s", loads, model.screen, model.View())
+	}
 }
 
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {

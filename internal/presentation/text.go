@@ -40,6 +40,15 @@ func StatusText(writer io.Writer, report domain.StatusReport) {
 	}
 }
 
+func HostsText(writer io.Writer, report domain.HostsReport) {
+	available, total := hostAvailability(report.Hosts)
+	fmt.Fprintf(writer, "Nixorium computers: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "SSH available:      %d/%d\n", available, total)
+	for _, host := range report.Hosts {
+		fmt.Fprintf(writer, "  %-10s %-15s network=%-12s ssh=%s\n", host.Name, host.IP, host.Reachability, host.SSH)
+	}
+}
+
 func DoctorText(writer io.Writer, report domain.DoctorReport) {
 	fmt.Fprintf(writer, "Nixorium doctor: %s\n", strings.ToUpper(report.State))
 	for _, finding := range report.Findings {

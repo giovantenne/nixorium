@@ -74,6 +74,9 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
 			},
+			LoadHosts: func() (domain.HostsReport, error) {
+				return inspector.Hosts(ctx, repository)
+			},
 			PreparePXE: func() domain.ActionReport {
 				return app.NewSystemActions(local).PreparePXE(ctx)
 			},
@@ -105,6 +108,17 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			err = presentation.JSON(stdout, report)
 		} else {
 			presentation.StatusText(stdout, report)
+		}
+	case "hosts":
+		report, inspectErr := inspector.Hosts(ctx, repository)
+		if inspectErr != nil {
+			fmt.Fprintln(stderr, "Error:", inspectErr)
+			return 1
+		}
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.HostsText(stdout, report)
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -296,7 +310,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "config", "setup", "pxe":
+		case "doctor", "hosts", "config", "setup", "pxe":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -450,7 +464,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
