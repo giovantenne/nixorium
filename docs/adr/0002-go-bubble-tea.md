@@ -28,3 +28,9 @@ state machine, including Bubble Tea's distinct space-key event, and the NixOS
 management VM drives the packaged application through a real PTY. Command
 execution and privilege decisions remain in the shared application and adapter
 layers.
+
+The computer inventory follows the same boundary: Bubble Tea triggers a typed
+host-report callback only when the administrator opens or refreshes the screen.
+The application preserves inventory semantics, while the adapter bounds and
+classifies network probes. CLI text, JSON, TUI, and doctor do not parse or
+reimplement one another's output.

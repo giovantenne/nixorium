@@ -343,6 +343,7 @@ Run these commands from the private deployment root:
 nix run .#nixorium
 nix run .#nixorium -- status
 nix run .#nixorium -- status --json
+nix run .#nixorium -- hosts
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -358,7 +359,13 @@ nix run .#nixorium -- doctor
 ```
 
 The dashboard and inspection commands evaluate `labMeta` and
-`deploymentStatus`. From the dashboard, **Install computers over network**
+`deploymentStatus`. Its **View computers** screen explicitly probes every
+configured client and distinguishes a reachable SSH service, a reachable host
+that refuses SSH, an unreachable host, and an unknown probe result. The same
+typed inventory is available through `nixorium hosts` and `--json`; probes run
+with bounded concurrency only when this view/command or `doctor` is requested,
+so the initial dashboard and `status` remain predictable and probe-free.
+From the dashboard, **Install computers over network**
 uses the same typed application operations as the CLI to prepare artifacts and
 to review, start, stop, or recover PXE mode. Starting requires the exact
 `START PXE` confirmation; quitting the view does not stop systemd-owned

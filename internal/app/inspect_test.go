@@ -19,7 +19,8 @@ type fakeSource struct {
 	key         domain.CacheKeyState
 	cacheErr    error
 	ports       []domain.PortUse
-	reachable   map[string]bool
+	ssh         map[string]domain.SSHProbe
+	sshCalls    int
 	buildErr    error
 	built       bool
 	preparation domain.PXEPreparationState
@@ -39,7 +40,10 @@ func readyFake() *fakeSource {
 			PrivateMode:    0600,
 			Matches:        true,
 		},
-		reachable: map[string]bool{"pc01": true, "pc02": true},
+		ssh: map[string]domain.SSHProbe{
+			"pc01": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
+			"pc02": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
+		},
 	}
 	source.meta.SchemaVersion = 2
 	source.meta.Version = "test"
@@ -97,8 +101,9 @@ func (f *fakeSource) CacheKeyState(context.Context, string) (domain.CacheKeyStat
 }
 func (f *fakeSource) CacheHealth(context.Context, string, int) error { return f.cacheErr }
 func (f *fakeSource) ListeningPorts() ([]domain.PortUse, error)      { return f.ports, nil }
-func (f *fakeSource) SSHReachability(context.Context, []domain.HostMeta, time.Duration) map[string]bool {
-	return f.reachable
+func (f *fakeSource) SSHStatus(context.Context, []domain.HostMeta, time.Duration) map[string]domain.SSHProbe {
+	f.sshCalls++
+	return f.ssh
 }
 func (f *fakeSource) ControllerBuild(context.Context, string, string) error {
 	f.built = true
@@ -125,6 +130,9 @@ func TestStatusReportsReadinessAndDirtyTree(t *testing.T) {
 	}
 	if report.Warnings[1] != "nixorium-harmonia.service is inactive" {
 		t.Fatalf("warnings = %v, want inactive-cache warning", report.Warnings)
+	}
+	if source.sshCalls != 0 {
+		t.Fatalf("cheap status performed %d SSH probe(s)", source.sshCalls)
 	}
 }
 
@@ -174,7 +182,11 @@ func TestDoctorFullBuildIsExplicit(t *testing.T) {
 func TestDoctorReportsPXEPortConflictAndOfflineHost(t *testing.T) {
 	source := readyFake()
 	source.ports = []domain.PortUse{{Protocol: "udp", Port: 67}}
-	source.reachable["pc02"] = false
+	source.ssh["pc02"] = domain.SSHProbe{
+		Reachability: domain.ReachabilityUnreachable,
+		SSH:          domain.SSHUnknown,
+		Detail:       "probe timed out",
+	}
 
 	report, err := NewInspector(source).Doctor(context.Background(), ".", DoctorOptions{})
 	if err != nil {
@@ -182,6 +194,25 @@ func TestDoctorReportsPXEPortConflictAndOfflineHost(t *testing.T) {
 	}
 	assertFinding(t, report.Findings, "PXE-PORTS", domain.LevelError)
 	assertFinding(t, report.Findings, "CLIENT-SSH", domain.LevelWarning)
+	if source.sshCalls != 1 {
+		t.Fatalf("doctor performed %d SSH probe batches, want one", source.sshCalls)
+	}
+}
+
+func TestHostsPreservesInventoryOrderAndUnknownProbeResult(t *testing.T) {
+	source := readyFake()
+	delete(source.ssh, "pc02")
+
+	report, err := NewInspector(source).Hosts(context.Background(), ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.State != "partial" || len(report.Hosts) != 2 || report.Hosts[0].Name != "pc01" {
+		t.Fatalf("hosts report = %+v, want ordered partial inventory", report)
+	}
+	if report.Hosts[1].Reachability != domain.ReachabilityUnknown || report.Hosts[1].SSH != domain.SSHUnknown || report.Hosts[1].Detail != "no probe result" {
+		t.Fatalf("missing probe status = %+v, want explicit unknown", report.Hosts[1])
+	}
 }
 
 func TestDoctorReportsStaleManagedPXEPreparation(t *testing.T) {

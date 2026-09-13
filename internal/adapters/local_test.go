@@ -8,7 +8,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func TestReadRegularFileNoFollowRejectsSymlink(t *testing.T) {
@@ -76,5 +81,45 @@ func TestCacheHealthValidatesNixMetadata(t *testing.T) {
 	}
 	if err := (Local{}).CacheHealth(context.Background(), address, port); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestClassifySSHErrorDistinguishesRefusalAndUnreachable(t *testing.T) {
+	refused := classifySSHError(syscall.ECONNREFUSED)
+	if refused.Reachability != domain.ReachabilityReachable || refused.SSH != domain.SSHUnavailable {
+		t.Fatalf("refused = %+v, want reachable without SSH", refused)
+	}
+	unreachable := classifySSHError(syscall.EHOSTUNREACH)
+	if unreachable.Reachability != domain.ReachabilityUnreachable || unreachable.SSH != domain.SSHUnknown {
+		t.Fatalf("unreachable = %+v, want unreachable with unknown SSH", unreachable)
+	}
+}
+
+func TestSSHStatusBoundsConcurrencyAndKeepsEveryHost(t *testing.T) {
+	hosts := make([]domain.HostMeta, 24)
+	for index := range hosts {
+		hosts[index] = domain.HostMeta{Name: fmt.Sprintf("pc%02d", index+1), IP: "192.0.2.1"}
+	}
+	var active int32
+	var maximum int32
+	probe := func(context.Context, domain.HostMeta, time.Duration) domain.SSHProbe {
+		current := atomic.AddInt32(&active, 1)
+		for {
+			observed := atomic.LoadInt32(&maximum)
+			if current <= observed || atomic.CompareAndSwapInt32(&maximum, observed, current) {
+				break
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		return domain.SSHProbe{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}
+	}
+
+	statuses := probeSSHStatuses(context.Background(), hosts, time.Second, probe)
+	if len(statuses) != len(hosts) {
+		t.Fatalf("statuses = %d, want %d", len(statuses), len(hosts))
+	}
+	if maximum < 2 || maximum > maximumConcurrentSSHProbes {
+		t.Fatalf("maximum concurrency = %d, want 2..%d", maximum, maximumConcurrentSSHProbes)
 	}
 }

@@ -33,7 +33,7 @@ type Source interface {
 	CacheKeyState(context.Context, string) (domain.CacheKeyState, error)
 	CacheHealth(context.Context, string, int) error
 	ListeningPorts() ([]domain.PortUse, error)
-	SSHReachability(context.Context, []domain.HostMeta, time.Duration) map[string]bool
+	SSHStatus(context.Context, []domain.HostMeta, time.Duration) map[string]domain.SSHProbe
 	ControllerBuild(context.Context, string, string) error
 	CommandAvailable(string) bool
 }
@@ -117,6 +117,33 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 		}
 	}
 	return report, nil
+}
+
+func (i *Inspector) Hosts(ctx context.Context, repository string) (domain.HostsReport, error) {
+	root, err := filepath.Abs(repository)
+	if err != nil {
+		return domain.HostsReport{}, fmt.Errorf("resolve repository path: %w", err)
+	}
+	meta, err := i.source.LabMeta(ctx, root)
+	if err != nil {
+		return domain.HostsReport{}, fmt.Errorf("evaluate labMeta: %w", err)
+	}
+	hosts := hostStatuses(meta.Clients.Hosts, i.source.SSHStatus(ctx, meta.Clients.Hosts, sshProbeTimeout))
+	state := "available"
+	for _, host := range hosts {
+		if host.SSH != domain.SSHAvailable {
+			state = "partial"
+			break
+		}
+	}
+	return domain.HostsReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "hosts",
+		GeneratedAt:   i.now().UTC(),
+		State:         state,
+		Repository:    root,
+		Hosts:         hosts,
+	}, nil
 }
 
 func (i *Inspector) Doctor(ctx context.Context, repository string, options DoctorOptions) (domain.DoctorReport, error) {
@@ -219,7 +246,8 @@ func (i *Inspector) Doctor(ctx context.Context, repository string, options Docto
 		}
 	}
 
-	i.addSSHFinding(ctx, status.Meta.Clients.Hosts, add)
+	hosts := hostStatuses(status.Meta.Clients.Hosts, i.source.SSHStatus(ctx, status.Meta.Clients.Hosts, sshProbeTimeout))
+	i.addSSHFinding(hosts, add)
 	if options.Full {
 		if buildErr := i.source.ControllerBuild(ctx, status.Repository, status.Meta.Controller.Name); buildErr != nil {
 			add(domain.Finding{ID: "CONTROLLER-BUILD", Level: domain.LevelError, Summary: "Controller configuration failed to build", Evidence: buildErr.Error(), Remediation: "Review the Nix build error before applying or deploying configuration."})
@@ -328,23 +356,45 @@ func (i *Inspector) addPortFindings(status domain.StatusReport, add func(domain.
 	add(domain.Finding{ID: "PXE-PORTS", Level: domain.LevelOK, Summary: "No conflicting PXE listeners were detected", Evidence: strings.Join(occupied, ", ")})
 }
 
-func (i *Inspector) addSSHFinding(ctx context.Context, hosts []domain.HostMeta, add func(domain.Finding)) {
-	results := i.source.SSHReachability(ctx, hosts, sshProbeTimeout)
-	reachable := 0
-	unreachable := []string{}
+func (i *Inspector) addSSHFinding(hosts []domain.HostStatus, add func(domain.Finding)) {
+	available := 0
+	unavailable := []string{}
 	for _, host := range hosts {
-		if results[host.Name] {
-			reachable++
+		if host.SSH == domain.SSHAvailable {
+			available++
 		} else {
-			unreachable = append(unreachable, host.Name)
+			unavailable = append(unavailable, host.Name)
 		}
 	}
-	if len(unreachable) == 0 {
-		add(domain.Finding{ID: "CLIENT-SSH", Level: domain.LevelOK, Summary: "Every configured client accepts TCP connections on SSH", Evidence: fmt.Sprintf("%d/%d reachable", reachable, len(hosts))})
+	if len(unavailable) == 0 {
+		add(domain.Finding{ID: "CLIENT-SSH", Level: domain.LevelOK, Summary: "Every configured client accepts TCP connections on SSH", Evidence: fmt.Sprintf("%d/%d available", available, len(hosts))})
 		return
 	}
-	sort.Strings(unreachable)
-	add(domain.Finding{ID: "CLIENT-SSH", Level: domain.LevelWarning, Summary: "Some configured clients are not reachable over SSH", Evidence: fmt.Sprintf("%d/%d reachable; unavailable: %s", reachable, len(hosts), strings.Join(unreachable, ", ")), Remediation: "Power on expected clients and check their static network path before deployment."})
+	sort.Strings(unavailable)
+	add(domain.Finding{ID: "CLIENT-SSH", Level: domain.LevelWarning, Summary: "SSH is unavailable or unknown on some configured clients", Evidence: fmt.Sprintf("%d/%d available; unavailable or unknown: %s", available, len(hosts), strings.Join(unavailable, ", ")), Remediation: "Power on expected clients and check their static network path before deployment."})
+}
+
+func hostStatuses(hosts []domain.HostMeta, probes map[string]domain.SSHProbe) []domain.HostStatus {
+	statuses := make([]domain.HostStatus, 0, len(hosts))
+	for _, host := range hosts {
+		probe, found := probes[host.Name]
+		if !found {
+			probe = domain.SSHProbe{
+				Reachability: domain.ReachabilityUnknown,
+				SSH:          domain.SSHUnknown,
+				Detail:       "no probe result",
+			}
+		}
+		statuses = append(statuses, domain.HostStatus{
+			Name:         host.Name,
+			IP:           host.IP,
+			Role:         "client",
+			Reachability: probe.Reachability,
+			SSH:          probe.SSH,
+			Detail:       probe.Detail,
+		})
+	}
+	return statuses
 }
 
 func containsAddress(addresses []string, expected string) bool {

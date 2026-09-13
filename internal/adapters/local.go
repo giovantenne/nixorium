@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -231,29 +232,74 @@ func (Local) CacheHealth(ctx context.Context, address string, port int) error {
 	return nil
 }
 
-func (Local) SSHReachability(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]bool {
+const maximumConcurrentSSHProbes = 8
+
+func (Local) SSHStatus(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.SSHProbe {
+	return probeSSHStatuses(ctx, hosts, timeout, probeHostSSH)
+}
+
+func probeSSHStatuses(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration, probe func(context.Context, domain.HostMeta, time.Duration) domain.SSHProbe) map[string]domain.SSHProbe {
 	type result struct {
-		name      string
-		reachable bool
+		name  string
+		probe domain.SSHProbe
 	}
+	if len(hosts) == 0 {
+		return map[string]domain.SSHProbe{}
+	}
+
+	workerCount := min(len(hosts), maximumConcurrentSSHProbes)
+	jobs := make(chan domain.HostMeta)
 	results := make(chan result, len(hosts))
-	for _, host := range hosts {
-		host := host
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
 		go func() {
-			dialer := net.Dialer{Timeout: timeout}
-			connection, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host.IP, "22"))
-			if err == nil {
-				connection.Close()
+			defer workers.Done()
+			for host := range jobs {
+				results <- result{name: host.Name, probe: probe(ctx, host, timeout)}
 			}
-			results <- result{name: host.Name, reachable: err == nil}
 		}()
 	}
-	reachable := make(map[string]bool, len(hosts))
+	go func() {
+		for _, host := range hosts {
+			jobs <- host
+		}
+		close(jobs)
+		workers.Wait()
+		close(results)
+	}()
+
+	statuses := make(map[string]domain.SSHProbe, len(hosts))
 	for range hosts {
 		result := <-results
-		reachable[result.name] = result.reachable
+		statuses[result.name] = result.probe
 	}
-	return reachable
+	return statuses
+}
+
+func probeHostSSH(ctx context.Context, host domain.HostMeta, timeout time.Duration) domain.SSHProbe {
+	dialer := net.Dialer{Timeout: timeout}
+	connection, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host.IP, "22"))
+	if err == nil {
+		connection.Close()
+		return domain.SSHProbe{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}
+	}
+	return classifySSHError(err)
+}
+
+func classifySSHError(err error) domain.SSHProbe {
+	probe := domain.SSHProbe{Reachability: domain.ReachabilityUnknown, SSH: domain.SSHUnknown, Detail: err.Error()}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		probe.Reachability = domain.ReachabilityReachable
+		probe.SSH = domain.SSHUnavailable
+		return probe
+	}
+	var networkError net.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.EHOSTUNREACH) ||
+		(errors.As(err, &networkError) && networkError.Timeout()) {
+		probe.Reachability = domain.ReachabilityUnreachable
+	}
+	return probe
 }
 
 func (Local) ControllerBuild(ctx context.Context, repository, controllerName string) error {
