@@ -29,6 +29,7 @@ cd "$REPO_ROOT"
 
 git diff --check
 bash -n install.sh setup.sh scripts/*.sh scripts/lib/*.sh
+bash tests/client-installer.sh
 diff -qr skills/nixorium-maintainer templates/site/skills/nixorium-maintainer
 test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md
@@ -38,6 +39,8 @@ if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.config-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.management-vm.drvPath" --raw --no-write-lock-file >/dev/null
 else
   nix flake check "path:${REPO_ROOT}" --no-write-lock-file
@@ -126,6 +129,12 @@ nix build "path:${SITE_DIR}#installerBundle" \
   --out-link "${TEMP_DIR}/installer-result"
 
 INSTALLER_STORE_PATH=$(readlink -f "${TEMP_DIR}/installer-result")
+test -x "${INSTALLER_STORE_PATH}/disko-install"
+jq -e '
+  .schemaVersion == 2 and
+  .clients.count > 0 and
+  (.clients.hosts | length) == .clients.count
+' "${INSTALLER_STORE_PATH}/lab-meta.json" >/dev/null
 OFFLINE_CLIENT_DRV=$(
   XDG_CACHE_HOME="${TEMP_DIR}/offline-cache" \
     nix eval "path:${INSTALLER_STORE_PATH}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" \

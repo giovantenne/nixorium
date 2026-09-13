@@ -48,6 +48,27 @@
       managementVmTest = pkgs.testers.runNixOSTest (import ./tests/management-vm.nix {
         nixoriumPackage = defaultLab.packages.${system}.nixorium;
       });
+      installerTestLab = mkLab {
+        deploymentSelf = self;
+        labConfig = import ./lab-config.nix;
+        publicKeys = {
+          cache = ./public-key;
+          ssh = ./id_ed25519.pub;
+          veyon = ./veyon-public-key.pem;
+        };
+        hostModules.pc01 = [ ./tests/client-installer-instrumentation.nix ];
+      };
+      clientInstallerVmTest = pkgs.testers.runNixOSTest (import ./tests/client-installer-vm.nix {
+        installerBundle = installerTestLab.packages.${system}.installerBundle;
+        clientSystem = installerTestLab.nixosConfigurations.pc01.config.system.build.toplevel;
+        diskoPackage = disko.packages.${system}.default;
+        diskoRuntimePackages = disko.lib.packages {
+          disko.devices = import ./lib/disko-layout.nix {
+            device = "/dev/nixorium-install-target";
+            studentUser = "student";
+          };
+        } pkgs;
+      });
     in
     defaultLab // {
       lib = {
@@ -68,6 +89,13 @@
         mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
           touch "$out"
         '';
+        client-installer = pkgs.runCommand "nixorium-client-installer-test" {
+          nativeBuildInputs = [ pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.jq ];
+        } ''
+          NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/client-installer.sh}
+          touch "$out"
+        '';
+        client-installer-vm = clientInstallerVmTest;
         management-vm = managementVmTest;
       };
       templates.site = {

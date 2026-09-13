@@ -305,13 +305,28 @@ foreground diagnostics, but it does not own the transactional network change.
 
 On each client PC, enable **UEFI network boot** in the BIOS/firmware settings. The PC will PXE-boot into a NixOS ramdisk environment.
 
-On the booted client:
+On the booted client, start guided enrollment without arguments:
 ```sh
-/installer/setup.sh XX
+/installer/setup.sh
 ```
-Where `XX` is the PC number (e.g., `/installer/setup.sh 5` for `pc05`).
 
-> `setup.sh` auto-selects the disk if only one is present; if multiple disks are detected, it asks for a choice.
+The installer shows firmware, system, CPU, memory, network interfaces, and all
+writable disks. Choose an identity from the configured host inventory and then
+the target disk. A reachable target identity is refused as a likely duplicate;
+a silent identity is explicitly reported as an unverified best-effort result,
+not a reservation. Before Disko runs, you must type a phrase containing both
+the exact hostname and disk, for example `ERASE /dev/sda INSTALL pc05`.
+
+Before offering a disk, the installer resolves the selected system entirely
+offline, verifies that its prepared store closure is available, and requires
+enough target capacity for that closure plus 2 GiB of installation headroom.
+The exact verified store path is then passed to `nixos-install`; missing paths
+are never built or fetched by the client.
+
+Progress is shown for partitioning, installation, and verification. On success,
+the installer asks separately whether to reboot. You may preselect the identity
+and disk with `/installer/setup.sh pc05 /dev/sda`, but the same destructive
+review and typed confirmation are always required. There is no unattended mode.
 
 When all clients are installed, run `nix run .#nixorium -- pxe stop` so normal
 controller addressing is restored before deploying with Colmena.

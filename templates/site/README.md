@@ -174,7 +174,17 @@ ports are admitted there only on the controller. Add any site-specific service
 rules in the private extension modules rather than changing upstream modules.
 
 The generated ramdisk contains a standalone installer bundle with the effective
-configuration, public cache key, local modules and assets.
+configuration, versioned host inventory, public cache key, local modules and
+assets. On a PXE-booted client run `/installer/setup.sh` for guided enrollment.
+It displays hardware and writable disks, constrains identity selection to the
+configured inventory, refuses an identity that responds to its best-effort
+network probe, and clearly states that a silent identity is not reserved.
+Disko runs only after an exact confirmation such as `ERASE /dev/sda INSTALL
+pc05`; the installer then reports partition/install/verification progress and
+offers a separate confirmed reboot. There is no unattended mode.
+Before disk selection, the chosen system closure is resolved and checked
+offline. Targets smaller than that closure plus 2 GiB are refused, and the
+verified store path is installed without client-side fallback or fetching.
 
 ## Updating nixorium
 

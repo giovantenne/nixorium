@@ -32,9 +32,10 @@ managed Harmonia service are now implemented. PXE preparation is systemd-owned
 and records immutable artifacts/client closures. Transactional PXE networking
 and systemd-owned listeners are also implemented. The public lifecycle now
 performs confirmed start, idempotent stop, explicit recovery, and typed state
-reconciliation through both CLI and the first task-oriented TUI screen. Client
-enrollment, deployment, updates, and richer recovery remain incremental work
-tracked externally.
+reconciliation through both CLI and the first task-oriented TUI screen. Local
+guided client enrollment now consumes immutable inventory and enforces reviewed
+disk installation; deployment, updates, and richer recovery remain incremental
+work tracked externally.
 
 Important constraints in the current implementation are:
 
@@ -47,9 +48,10 @@ Important constraints in the current implementation are:
 - the internal PXE network transition now has persistent session state and
   boot/explicit recovery and is ordered before the listener; CLI and TUI call
   the same confirmed start/stop/recover application operations;
-- the client installer is destructive and confirms the disk, but host
-  selection is a numeric command-line argument and duplicate assignment is not
-  coordinated;
+- the client installer shows hardware, constrains host selection to embedded
+  inventory, revalidates and exactly confirms the target disk, and reports
+  progress/result; duplicate probing is intentionally best-effort and does not
+  coordinate simultaneous installers;
 - the controller bootstrap installs an evaluable placeholder deployment, but
   there is no first-run application after reboot;
 - the firewall admits product ports only on the configured laboratory
@@ -451,6 +453,15 @@ runs, revalidates that target immediately before mutation, reports explicit
 progress and outcome, and treats reboot as a separate confirmed action. An
 unattended mode is disabled by default and requires an explicit deployment
 policy plus invocation token.
+
+The bundle contains a precompiled Disko no-dependency script generated from the
+shared layout and parameterized only by the validated device basename. The
+netboot system contains the exact runtime tools derived from that layout, so
+disk setup does not evaluate, fetch, or compile tooling in the client ramdisk.
+The selected client's prepared system path and closure size are also resolved
+offline before disk selection. The installer refuses a target smaller than the
+closure plus 2 GiB, then installs that exact path with substitution fallback
+disabled.
 
 Without a trusted controller protocol, the installer probes the chosen static
 address where routing permits and refuses a responding identity, but it cannot

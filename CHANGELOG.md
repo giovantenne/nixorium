@@ -79,6 +79,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Confirmed `nixorium pxe start`, idempotent `pxe stop`, and explicit `pxe
   recover` operations with exact polkit controls, typed lifecycle status,
   repeated readiness checks, and synchronous rollback after startup failure.
+- Guided PXE client enrollment with embedded versioned host inventory,
+  hardware and writable-disk display, constrained identity selection,
+  best-effort duplicate detection, hostname-and-disk destructive confirmation,
+  target revalidation, offline closure and capacity preflight, a precompiled
+  offline Disko action, explicit progress/failure results, and confirmed reboot.
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, systemd-owned runtime services, interface-scoped

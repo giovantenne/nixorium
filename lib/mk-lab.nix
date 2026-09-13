@@ -221,6 +221,7 @@ let
       teacher = teacherUser;
     };
   };
+  labMetaJson = builtins.toFile "nixorium-installer-lab-meta.json" (builtins.toJSON labMeta);
 
   renderPath = value:
     let
@@ -282,6 +283,18 @@ let
   bootstrapPkgs = import nixpkgs {
     inherit system;
   };
+  installerDiskoRuntimePackages = disko.lib.packages {
+    disko.devices = import (upstreamRoot + "/lib/disko-layout.nix") {
+      device = "/dev/nixorium-install-target";
+      inherit studentUser;
+    };
+  } bootstrapPkgs;
+  installerDiskoScript = disko.lib._cliDestroyFormatMountNoDeps {
+    disko.devices = import (upstreamRoot + "/lib/disko-layout.nix") {
+      device = "/dev/\${NIXORIUM_INSTALL_DISK}";
+      inherit studentUser;
+    };
+  } bootstrapPkgs;
   nixoriumPackage = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {};
 
   installerFlake = bootstrapPkgs.writeText "nixorium-installer-flake.nix" ''
@@ -347,7 +360,9 @@ let
     install -d -m 0755 "$out/lib" "$out/scripts/lib"
     install -m 0644 ${installerFlake} "$out/flake.nix"
     install -m 0644 ${labConfigJson} "$out/lab-config.json"
+    install -m 0644 ${labMetaJson} "$out/lab-meta.json"
     install -m 0755 ${upstreamRoot}/setup.sh "$out/setup.sh"
+    install -m 0755 ${installerDiskoScript}/bin/disko-destroy-format-mount "$out/disko-install"
     install -m 0644 ${upstreamRoot}/lib/disko-layout.nix "$out/lib/disko-layout.nix"
     install -m 0644 ${upstreamRoot}/scripts/lib/lab-meta.sh "$out/scripts/lib/lab-meta.sh"
     ${lib.optionalString (cachePublicKeyFile != null) ''
@@ -449,8 +464,10 @@ assert unknownVeyonNativeHosts == []
           services.openssh.enable = true;
           environment.systemPackages = [
             disko.packages.${system}.default
+            pkgs.iputils
             pkgs.jq
-          ];
+            pkgs.util-linux
+          ] ++ installerDiskoRuntimePackages;
           system.stateVersion = "25.11";
           system.activationScripts.copyFlakeToRamdisk.text = ''
             install -d -m 0755 /installer
