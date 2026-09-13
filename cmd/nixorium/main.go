@@ -53,7 +53,8 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		return 1
 	}
 
-	inspector := app.NewInspector(adapters.Local{})
+	local := adapters.Local{}
+	inspector := app.NewInspector(local)
 	switch options.command {
 	case "":
 		report, inspectErr := inspector.Status(ctx, repository)
@@ -68,7 +69,28 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 			return 0
 		}
-		if tuiErr := presentation.RunDashboard(report); tuiErr != nil {
+		lifecycle := app.NewPXELifecycle(local)
+		actions := presentation.DashboardActions{
+			Refresh: func() (domain.StatusReport, error) {
+				return inspector.Status(ctx, repository)
+			},
+			PreparePXE: func() domain.ActionReport {
+				return app.NewSystemActions(local).PreparePXE(ctx)
+			},
+			PlanPXEStart: func() domain.PXELifecycleReport {
+				return lifecycle.PlanStart(ctx, repository)
+			},
+			StartPXE: func() domain.PXELifecycleReport {
+				return lifecycle.Start(ctx, repository)
+			},
+			StopPXE: func() domain.PXELifecycleReport {
+				return lifecycle.Stop(ctx, repository)
+			},
+			RecoverPXE: func() domain.PXELifecycleReport {
+				return lifecycle.Recover(ctx, repository)
+			},
+		}
+		if tuiErr := presentation.RunDashboard(report, actions); tuiErr != nil {
 			fmt.Fprintln(stderr, "Error:", tuiErr)
 			return 1
 		}

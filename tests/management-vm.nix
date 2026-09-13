@@ -62,7 +62,7 @@
     };
 
     networking.hostName = "pc99";
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux ];
     users.groups.veyon-master = {};
     users.users.admin = {
       isNormalUser = true;
@@ -206,7 +206,9 @@
     controller.succeed("systemctl show nixorium-pxe.service nixorium-pxe-network.service nixorium-pxe-recover.service -p LoadState --value | grep -vFx not-found")
     controller.succeed("su - admin -c 'nixorium pxe start --repo ~/nixorium-deployment --json </dev/null > /tmp/pxe-confirmation-required.json' || test $? = 2")
     controller.succeed("test ! -e /var/lib/nixorium/pxe/session.json; ! su - admin -c 'systemctl start nixorium-pxe-network.service'")
-    controller.succeed("su - admin -c 'nixorium pxe start --repo ~/nixorium-deployment --yes --json' | jq -e '.operation == \"pxe-start\" and .state == \"completed\" and .mode == \"active\" and .interface == \"lab0\" and .dhcpAddress == \"192.0.2.10\" and .staticCidr == \"10.0.0.99/8\"'")
+    controller.succeed("su - admin -c \"(sleep 8; printf p; sleep 1; printf s; sleep 15; printf S; sleep 0.2; printf T; sleep 0.2; printf A; sleep 0.2; printf R; sleep 0.2; printf T; sleep 0.2; printf ' '; sleep 0.2; printf P; sleep 0.2; printf X; sleep 0.2; printf E; sleep 0.2; printf '\\r'; sleep 15; printf q) | TERM=xterm script -qefc 'nixorium --repo ~/nixorium-deployment' /tmp/nixorium-pxe-tui.log\"")
+    controller.succeed("grep -aF 'Install computers over network' /tmp/nixorium-pxe-tui.log")
+    controller.succeed("grep -aF 'Start review' /tmp/nixorium-pxe-tui.log")
     controller.succeed("systemctl is-active --quiet nixorium-pxe.service; systemctl is-active --quiet nixorium-pxe-network.service")
     controller.succeed("su - admin -c 'nixorium pxe start --repo ~/nixorium-deployment --yes --json' | jq -e '.state == \"completed\" and .mode == \"active\" and (.message | contains(\"already active\"))'")
     controller.succeed("su - admin -c 'nixorium status --repo ~/nixorium-deployment --json' | jq -e '.pxe.mode == \"active\" and .pxe.listener.active and .pxe.network.active'")
