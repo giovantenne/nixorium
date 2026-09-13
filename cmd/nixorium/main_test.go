@@ -23,6 +23,19 @@ func TestParseArgumentsAcceptsHosts(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsDeploymentPlan(t *testing.T) {
+	options, err := parseArguments([]string{"deploy", "plan", "--on", "pc01,pc02", "--json"})
+	if err != nil || options.command != "deploy" || options.subcommand != "plan" || options.on != "pc01,pc02" || !options.json {
+		t.Fatalf("deploy plan options = %+v, error = %v", options, err)
+	}
+	if _, err := parseArguments([]string{"deploy", "plan"}); err == nil {
+		t.Fatal("deploy plan without targets was accepted")
+	}
+	if _, err := parseArguments([]string{"status", "--on", "pc01"}); err == nil {
+		t.Fatal("status accepted deployment targets")
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

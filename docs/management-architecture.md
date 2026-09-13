@@ -156,6 +156,14 @@ and probe failure. The local adapter limits concurrent TCP/22 probes to eight.
 Both the CLI/JSON frontend and the TUI **Computers** screen consume the same
 report; `doctor` uses the same classification for its aggregate SSH finding.
 
+The first deployment slice is also read-only: `deploy plan --on` accepts one
+client, a comma-separated set, or `@lab`, then resolves only configured client
+identities into a canonical Colmena selector. A plan is ready only when
+`deploymentStatus` is ready, Git is clean, and HEAD is available; it records
+that revision and requires build-before-deploy. Unknown, empty, or duplicate
+targets fail closed. Execution, progress/log streaming, and confirmation bound
+to this plan are later slices; planning never invokes Colmena.
+
 `doctor` returns ordered findings with `OK`, `WARNING`, or `ERROR`, a stable
 finding identifier, evidence safe to display, and a remediation. Expensive
 checks are grouped behind `doctor --full`; its first such check performs a real

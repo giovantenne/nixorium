@@ -29,3 +29,21 @@ func TestHostsTextIncludesTypedComputerState(t *testing.T) {
 		}
 	}
 }
+
+func TestDeploymentPlanTextShowsTargetsAndBlockers(t *testing.T) {
+	report := domain.DeploymentPlanReport{
+		State:           "blocked",
+		Repository:      "/deployment",
+		Revision:        "abc123",
+		ColmenaSelector: "pc01",
+		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}},
+		Issues:          []domain.ValidationIssue{{Field: "git", Message: "worktree is dirty"}},
+	}
+	var output bytes.Buffer
+	DeploymentPlanText(&output, report)
+	for _, expected := range []string{"Deployment plan: BLOCKED", "Targets:         pc01", "pc01       10.0.0.1", "BLOCKED: git: worktree is dirty"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("deployment plan output omits %q:\n%s", expected, output.String())
+		}
+	}
+}

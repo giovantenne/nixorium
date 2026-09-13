@@ -55,6 +55,18 @@ func (Local) GitState(ctx context.Context, repository string) (domain.GitState, 
 	return domain.GitState{Available: true, Dirty: changes > 0, Changes: changes, Paths: paths}, nil
 }
 
+func (Local) GitRevision(ctx context.Context, repository string) (string, error) {
+	output, err := run(ctx, "git", "-C", repository, "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	revision := strings.TrimSpace(output)
+	if revision == "" {
+		return "", errors.New("Git revision is empty")
+	}
+	return revision, nil
+}
+
 func (Local) ServiceState(ctx context.Context, name string) domain.ServiceState {
 	state := domain.ServiceState{Name: name, State: "not-found"}
 	output, err := run(ctx, "systemctl", "show", name, "--property=LoadState", "--property=ActiveState", "--no-pager")

@@ -49,6 +49,24 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 	}
 }
 
+func DeploymentPlanText(writer io.Writer, report domain.DeploymentPlanReport) {
+	fmt.Fprintf(writer, "Deployment plan: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:      %s\n", report.Repository)
+	if report.Revision != "" {
+		fmt.Fprintf(writer, "Revision:        %s\n", report.Revision)
+	}
+	if len(report.Targets) > 0 {
+		fmt.Fprintf(writer, "Targets:         %s\n", report.ColmenaSelector)
+		for _, target := range report.Targets {
+			fmt.Fprintf(writer, "  %-10s %s\n", target.Name, target.IP)
+		}
+		fmt.Fprintln(writer, "Plan:            build selected configurations, then deploy with Colmena")
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
 func DoctorText(writer io.Writer, report domain.DoctorReport) {
 	fmt.Fprintf(writer, "Nixorium doctor: %s\n", strings.ToUpper(report.State))
 	for _, finding := range report.Findings {

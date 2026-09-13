@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -48,6 +49,30 @@ func TestGitStateCountsChangedPaths(t *testing.T) {
 	}
 	if !state.Dirty || state.Changes != 2 || len(state.Paths) != 2 {
 		t.Fatalf("state = %+v, want two changes", state)
+	}
+}
+
+func TestGitRevisionReturnsCommittedHead(t *testing.T) {
+	directory := t.TempDir()
+	if _, err := run(context.Background(), "git", "init", "-q", directory); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "tracked"), []byte("content"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", directory, "add", "tracked"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", directory, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"); err != nil {
+		t.Fatal(err)
+	}
+	want, err := run(context.Background(), "git", "-C", directory, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision, err := (Local{}).GitRevision(context.Background(), directory)
+	if err != nil || revision != strings.TrimSpace(want) {
+		t.Fatalf("revision = %q, error = %v, want %q", revision, err, strings.TrimSpace(want))
 	}
 }
 
