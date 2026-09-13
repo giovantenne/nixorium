@@ -29,6 +29,18 @@ the exact hostname and canonical disk path. Revalidate the disk immediately
 before Disko, show explicit partition/install/verification progress, report a
 clear terminal result, and make reboot a separate confirmed action.
 
+Precompile Disko's no-dependency destroy/format/mount script from the shared
+layout into the immutable installer bundle, parameterized only by the validated
+device basename. Include the exact runtime package set derived from that layout
+in the netboot system. The PXE client must not evaluate or compile disk tooling,
+or fetch missing dependencies, while preparing the disk.
+
+Resolve the chosen client's already-prepared system closure offline before disk
+selection. Verify both its store path and closure size, require target capacity
+of at least that size plus 2 GiB of installation headroom, and pass the exact
+path to `nixos-install --system` with fallback disabled. A missing closure or
+undersized target fails before destructive confirmation.
+
 Do not add a controller enrollment protocol in this milestone. Do not support
 unattended installation until a private deployment explicitly enables it and
 provides an invocation token with a documented lifetime and trust model.

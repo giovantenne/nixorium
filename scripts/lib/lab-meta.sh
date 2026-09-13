@@ -20,22 +20,25 @@ load_lab_meta() {
     return 1
   fi
 
-  if ! command -v nix >/dev/null 2>&1; then
-    echo "Error: nix is required to evaluate lab metadata." >&2
-    return 1
-  fi
-
   if ! command -v jq >/dev/null 2>&1; then
     echo "Error: jq is required to parse lab metadata." >&2
     return 1
   fi
 
-  LAB_META_JSON=$(
-    nix --extra-experimental-features "nix-command flakes" \
-      eval "${REPO_ROOT}#labMeta" \
-      --json \
-      --no-write-lock-file
-  )
+  if [[ -f "${REPO_ROOT}/lab-meta.json" ]]; then
+    LAB_META_JSON=$(jq -ec '.' "${REPO_ROOT}/lab-meta.json")
+  else
+    if ! command -v nix >/dev/null 2>&1; then
+      echo "Error: nix is required to evaluate lab metadata." >&2
+      return 1
+    fi
+    LAB_META_JSON=$(
+      nix --extra-experimental-features "nix-command flakes" \
+        eval "${REPO_ROOT}#labMeta" \
+        --json \
+        --no-write-lock-file
+    )
+  fi
 
   IFS=$'\t' read -r \
     LAB_META_SCHEMA_VERSION \
@@ -74,12 +77,22 @@ load_lab_meta() {
     return 1
   fi
 
+  LAB_CLIENT_HOSTS_JSON=$(printf '%s' "${LAB_META_JSON}" | jq -ce '
+    .clients.hosts
+    | if type == "array" and length > 0 and
+        all(.[]; (.name | type == "string") and (.ip | type == "string"))
+      then .
+      else error("invalid client host inventory")
+      end
+  ')
+
   export LAB_META_SCHEMA_VERSION
   export LAB_CONTROLLER_NAME
   export LAB_CONTROLLER_NUMBER
   export LAB_CONTROLLER_STATIC_IP
   export LAB_CONTROLLER_DHCP_IP
   export LAB_CLIENT_COUNT
+  export LAB_CLIENT_HOSTS_JSON
   export LAB_NETWORK_BASE
   export LAB_NETWORK_PREFIX_LENGTH
   export LAB_IFACE_NAME
