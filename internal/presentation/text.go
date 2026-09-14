@@ -123,6 +123,48 @@ func DeploymentExecutionText(writer io.Writer, report domain.DeploymentExecution
 	}
 }
 
+func ControllerRebuildPlanText(writer io.Writer, report domain.ControllerRebuildPlanReport) {
+	fmt.Fprintf(writer, "Controller rebuild plan: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:              %s\n", report.Repository)
+	if report.Controller != "" {
+		fmt.Fprintf(writer, "Controller:              %s\n", report.Controller)
+	}
+	if report.Revision != "" {
+		fmt.Fprintf(writer, "Reviewed revision:       %s\n", report.Revision)
+	}
+	fmt.Fprintf(writer, "Already current:         %t\n", report.Current)
+	if report.CurrentDetail != "" {
+		fmt.Fprintf(writer, "Current-state detail:    %s\n", report.CurrentDetail)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %-12s %s\n", issue.Field, issue.Message)
+	}
+	if !report.HasErrors() {
+		fmt.Fprintf(writer, "Apply: nixorium controller apply --expect %s\n", report.Revision)
+	}
+}
+
+func ControllerRebuildExecutionText(writer io.Writer, report domain.ControllerRebuildExecutionReport) {
+	fmt.Fprintf(writer, "Controller rebuild: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Phase:      %s\n", report.Phase)
+	fmt.Fprintf(writer, "Controller: %s\n", report.Controller)
+	fmt.Fprintf(writer, "Revision:   %s\n", report.Revision)
+	fmt.Fprintf(writer, "Applied:    %t\n", report.Applied)
+	fmt.Fprintf(writer, "Verified:   %t\n", report.Verified)
+	if report.Unit != "" {
+		fmt.Fprintf(writer, "Unit:       %s\n", report.Unit)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %-12s %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:     %s\n", report.Message)
+	}
+	if report.HasErrors() && report.RetrySafe {
+		fmt.Fprintln(writer, "Retry: inspect the unit journal, create a fresh plan, and retry the full workflow")
+	}
+}
+
 func DoctorText(writer io.Writer, report domain.DoctorReport) {
 	fmt.Fprintf(writer, "Nixorium doctor: %s\n", strings.ToUpper(report.State))
 	for _, finding := range report.Findings {

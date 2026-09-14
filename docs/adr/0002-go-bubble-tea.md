@@ -49,3 +49,9 @@ responsibilities; Bubble Tea only renders their typed counts and timestamps.
 Because Colmena is a foreground child rather than a systemd-owned service, the
 TUI refuses an accidental quit until it receives the operation's final typed
 result.
+
+Routine controller rebuild also enters Bubble Tea only as typed plan/apply
+callbacks. Presentation owns review and exact confirmation; revision checks,
+the systemd action, activation verification, and journal ownership remain in
+the application, adapter, and controller module layers. Unlike foreground
+Colmena, the systemd-owned rebuild may safely survive dashboard exit.

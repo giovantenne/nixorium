@@ -101,3 +101,27 @@ func TestDeploymentExecutionTextShowsFailureAndRecovery(t *testing.T) {
 		}
 	}
 }
+
+func TestControllerRebuildTextShowsReviewAndVerifiedResult(t *testing.T) {
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	planOutput := &bytes.Buffer{}
+	ControllerRebuildPlanText(planOutput, domain.ControllerRebuildPlanReport{
+		State: "ready", Repository: "/deployment", Controller: "pc99", Revision: revision,
+		CurrentDetail: "not active", Confirmation: "REBUILD pc99", Issues: []domain.ValidationIssue{},
+	})
+	for _, expected := range []string{"READY", "pc99", revision, "controller apply --expect"} {
+		if !strings.Contains(planOutput.String(), expected) {
+			t.Fatalf("controller plan omits %q:\n%s", expected, planOutput.String())
+		}
+	}
+	resultOutput := &bytes.Buffer{}
+	ControllerRebuildExecutionText(resultOutput, domain.ControllerRebuildExecutionReport{
+		State: "completed", Controller: "pc99", Revision: revision,
+		Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true,
+	})
+	for _, expected := range []string{"COMPLETED", "complete", "Applied:    true", "Verified:   true"} {
+		if !strings.Contains(resultOutput.String(), expected) {
+			t.Fatalf("controller result omits %q:\n%s", expected, resultOutput.String())
+		}
+	}
+}

@@ -49,6 +49,20 @@ func TestParseArgumentsAcceptsReviewedDeploymentApply(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsControllerPlanAndApply(t *testing.T) {
+	plan, err := parseArguments([]string{"controller", "plan", "--json"})
+	if err != nil || plan.command != "controller" || plan.subcommand != "plan" || !plan.json {
+		t.Fatalf("controller plan = %+v, error = %v", plan, err)
+	}
+	apply, err := parseArguments([]string{"controller", "apply", "--expect", "0123456789abcdef0123456789abcdef01234567", "--yes", "--json"})
+	if err != nil || apply.subcommand != "apply" || !apply.yes || apply.expect == "" {
+		t.Fatalf("controller apply = %+v, error = %v", apply, err)
+	}
+	if _, err := parseArguments([]string{"controller", "apply"}); err == nil {
+		t.Fatal("controller apply without reviewed revision was accepted")
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

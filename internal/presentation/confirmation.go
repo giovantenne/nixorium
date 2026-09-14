@@ -30,6 +30,21 @@ func ConfirmControllerApply(input io.Reader, output io.Writer, controller string
 	return strings.TrimSpace(value) == "APPLY", nil
 }
 
+func ConfirmControllerRebuild(input io.Reader, output io.Writer, report domain.ControllerRebuildPlanReport) (bool, error) {
+	fmt.Fprintln(output, "Controller rebuild review")
+	fmt.Fprintf(output, "Machine: %s (this controller only)\n", report.Controller)
+	fmt.Fprintf(output, "Revision: %s\n", report.Revision)
+	fmt.Fprintln(output, "Action: validate, build, activate, and verify the reviewed Git configuration")
+	fmt.Fprintln(output, "Impact: services and networking may restart; this terminal connection may be interrupted")
+	fmt.Fprintln(output, "Retry: safe after inspecting the systemd unit journal and creating a fresh plan")
+	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == report.Confirmation, nil
+}
+
 func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecycleReport) (bool, error) {
 	fmt.Fprintln(output, "PXE installation mode review")
 	fmt.Fprintf(output, "Interface: %s\n", report.Interface)

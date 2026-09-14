@@ -138,6 +138,7 @@ nixorium doctor             run actionable diagnostics
 nixorium config             review or change managed settings
 nixorium hosts              inspect configured machines
 nixorium deploy             build and deploy selected machines
+nixorium controller         review, rebuild, activate, and verify the controller
 nixorium pxe                prepare, start, inspect, stop, or recover PXE mode
 nixorium services           inspect relevant controller services
 nixorium update             prepare a reviewable upstream release update
@@ -240,6 +241,10 @@ inventory is opened/refreshed, shows exact PXE/deployment reviews, and requires
 the operation-specific confirmation phrase. Long-lived PXE services remain
 under systemd when the view exits; a foreground Colmena deployment instead
 blocks accidental TUI exit until its typed final result is available.
+The controller screen follows the same boundary: Bubble Tea renders the typed
+revision/current-state plan, collects exact `REBUILD <controller>` confirmation,
+and invokes the application callback. The systemd-owned rebuild may outlive the
+dashboard and retains its build/activation journal.
 
 ## Configuration ownership and editing
 
@@ -398,6 +403,16 @@ resulting store closure and executes its `switch-to-configuration switch`.
 Systemd/journald retain preflight, build, and activation output across TUI or
 terminal exits. Setup completion is reconciled by comparing the evaluated
 controller to `/run/current-system`, not by setting a flag.
+
+Routine administration reuses that implementation through `controller plan`
+and `controller apply --expect <revision>`. The latter starts only
+`nixorium-apply-controller@<40-hex-revision>.service`; the adapter and polkit
+policy independently constrain that unit shape. The root service validates the
+instance, pins the Git fetcher to the reviewed commit, builds as `admin`, and
+rechecks clean HEAD before activating the exact returned closure. The
+application then verifies both HEAD and `/run/current-system`. The original
+parameterless unit remains for first-run-compatible `setup apply` and now also
+pins/rechecks the revision it discovers internally.
 
 ## Managed services
 

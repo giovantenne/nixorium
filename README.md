@@ -348,6 +348,8 @@ nix run .#nixorium -- deploy plan --on pc05
 nix run .#nixorium -- deploy plan --on pc01,pc02
 nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
+nix run .#nixorium -- controller plan
+nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -403,6 +405,16 @@ plan, and type the exact `DEPLOY <targets>` phrase. It shows operation activity
 and the final phase, build/apply state, authenticated/recorded target counts,
 remediation, and durable log path.
 Closing the dashboard is disabled while its Colmena child is running.
+For routine controller changes, `controller plan` reviews the ready, clean
+deployment revision and whether its evaluated system is already active.
+`controller apply --expect <revision>` repeats that preflight, requires exact
+`REBUILD <controller>` confirmation, and starts only a revision-named systemd
+unit. The privileged service pins the Git fetcher to that commit, builds as the
+deployment owner, refuses worktree or HEAD drift before activating the exact
+closure, and the application verifies `/run/current-system` afterward. The
+dashboard's **Rebuild controller** task uses the same typed workflow; the
+systemd-owned job and journal survive closing the dashboard. `--yes` remains an
+explicit automation-only confirmation.
 From the dashboard, **Install computers over network**
 uses the same typed application operations as the CLI to prepare artifacts and
 to review, start, stop, or recover PXE mode. Starting requires the exact
@@ -546,7 +558,21 @@ host and records only hosts running the reviewed revision. A stale plan
 or dirty worktree is rejected before Colmena runs. For non-interactive
 automation, add `--yes`; the expected revision remains mandatory.
 
-First apply the latest configuration on the controller itself:
+### Rebuild the controller
+
+Review and activate the exact committed controller revision:
+
+```sh
+nix run .#nixorium -- controller plan
+nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
+```
+
+The apply runs through a narrow revision-bound systemd instance, builds the
+pinned Git source as the deployment owner, rejects repository drift before
+activation, and verifies the active system after completion. Use the
+**Rebuild controller** dashboard task for the same reviewed workflow.
+
+During first-run setup, the equivalent setup-stage action remains:
 ```sh
 nix run .#nixorium -- setup apply
 ```

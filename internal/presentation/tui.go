@@ -13,6 +13,8 @@ type DashboardActions struct {
 	LoadHosts       func() (domain.HostsReport, error)
 	PlanDeployment  func(string) domain.DeploymentPlanReport
 	ApplyDeployment func(domain.DeploymentPlanReport) domain.DeploymentExecutionReport
+	PlanController  func() domain.ControllerRebuildPlanReport
+	ApplyController func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
 	PreparePXE      func() domain.ActionReport
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
@@ -27,24 +29,28 @@ const (
 	dashboardHosts
 	dashboardDeploy
 	dashboardDeployReview
+	dashboardController
+	dashboardControllerReview
 	dashboardPXE
 	dashboardPXEStartReview
 )
 
 type dashboardModel struct {
-	report       domain.StatusReport
-	actions      DashboardActions
-	screen       dashboardScreen
-	busy         string
-	message      string
-	confirmation string
-	startPlan    domain.PXELifecycleReport
-	hosts        domain.HostsReport
-	deployCursor int
-	deployChosen map[string]bool
-	deployPlan   domain.DeploymentPlanReport
-	deployResult domain.DeploymentExecutionReport
-	deploying    bool
+	report           domain.StatusReport
+	actions          DashboardActions
+	screen           dashboardScreen
+	busy             string
+	message          string
+	confirmation     string
+	startPlan        domain.PXELifecycleReport
+	hosts            domain.HostsReport
+	deployCursor     int
+	deployChosen     map[string]bool
+	deployPlan       domain.DeploymentPlanReport
+	deployResult     domain.DeploymentExecutionReport
+	deploying        bool
+	controllerPlan   domain.ControllerRebuildPlanReport
+	controllerResult domain.ControllerRebuildExecutionReport
 }
 
 type dashboardPlanMsg struct {
@@ -69,6 +75,14 @@ type dashboardDeploymentPlanMsg struct {
 
 type dashboardDeploymentResultMsg struct {
 	report domain.DeploymentExecutionReport
+}
+
+type dashboardControllerPlanMsg struct {
+	report domain.ControllerRebuildPlanReport
+}
+
+type dashboardControllerResultMsg struct {
+	report domain.ControllerRebuildExecutionReport
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -136,6 +150,24 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardDeploy
 		return model, nil
+	case dashboardControllerPlanMsg:
+		model.busy = ""
+		model.controllerPlan = message.report
+		if message.report.HasErrors() {
+			model.message = controllerPlanIssues(message.report)
+			model.screen = dashboardController
+			return model, nil
+		}
+		model.confirmation = ""
+		model.message = ""
+		model.screen = dashboardControllerReview
+		return model, nil
+	case dashboardControllerResultMsg:
+		model.busy = ""
+		model.controllerResult = message.report
+		model.message = message.report.Message
+		model.screen = dashboardController
+		return model, nil
 	}
 
 	key, ok := message.(tea.KeyMsg)
@@ -161,6 +193,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 			model.deployChosen = map[string]bool{}
 			model.deployCursor = 0
+		case "c":
+			model.screen = dashboardController
+			model.busy = "Reviewing controller revision and active system"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardControllerPlanMsg{report: model.actions.PlanController()}
+			}
 		case "h":
 			model.screen = dashboardHosts
 			model.busy = "Checking configured computers"
@@ -243,6 +282,48 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			plan := model.deployPlan
 			return model, func() tea.Msg {
 				return dashboardDeploymentResultMsg{report: model.actions.ApplyDeployment(plan)}
+			}
+		default:
+			if key.Type == tea.KeyRunes {
+				model.confirmation += string(key.Runes)
+			}
+		}
+	case dashboardController:
+		if key.String() == "esc" || key.String() == "left" {
+			model.screen = dashboardHome
+			model.message = ""
+		} else if key.String() == "r" {
+			model.busy = "Reviewing controller revision and active system"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardControllerPlanMsg{report: model.actions.PlanController()}
+			}
+		}
+	case dashboardControllerReview:
+		switch key.String() {
+		case "esc":
+			model.screen = dashboardController
+			model.confirmation = ""
+			model.message = "Controller rebuild cancelled; no action was started."
+		case "backspace":
+			value := []rune(model.confirmation)
+			if len(value) > 0 {
+				model.confirmation = string(value[:len(value)-1])
+			}
+		case " ":
+			model.confirmation += " "
+		case "enter":
+			if model.confirmation != model.controllerPlan.Confirmation {
+				model.confirmation = ""
+				model.message = "Confirmation did not match; no controller action was started."
+				return model, nil
+			}
+			model.busy = "Building and activating the reviewed controller revision"
+			model.confirmation = ""
+			model.message = ""
+			plan := model.controllerPlan
+			return model, func() tea.Msg {
+				return dashboardControllerResultMsg{report: model.actions.ApplyController(plan)}
 			}
 		default:
 			if key.Type == tea.KeyRunes {
@@ -335,6 +416,8 @@ func (model dashboardModel) View() string {
 		return model.hostsView()
 	case dashboardDeploy, dashboardDeployReview:
 		return model.deployView()
+	case dashboardController, dashboardControllerReview:
+		return model.controllerView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
 	default:
@@ -361,12 +444,60 @@ func (model dashboardModel) homeView() string {
 		"Actions",
 		"  h           View computers",
 		"  d           Deploy updates",
+		"  c           Rebuild controller",
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
 		"q: quit",
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) controllerView() string {
+	lines := []string{"Nixorium — Rebuild controller", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…", "", "This systemd-owned action continues if the dashboard closes.")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	if model.screen == dashboardControllerReview {
+		lines = append(lines,
+			"Controller rebuild review",
+			fmt.Sprintf("  Machine:  %s", model.controllerPlan.Controller),
+			fmt.Sprintf("  Revision: %s", model.controllerPlan.Revision),
+			fmt.Sprintf("  Already current: %t", model.controllerPlan.Current),
+			"  Build as the deployment owner; activate only the resulting closure",
+			"  Services and networking may restart",
+			"",
+			fmt.Sprintf("Type %s to continue:", model.controllerPlan.Confirmation),
+			"> "+model.confirmation+"█",
+			"",
+			"Esc: cancel",
+		)
+		if model.message != "" {
+			lines = append(lines, "", model.message)
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
+	lines = append(lines, "Review the current committed controller configuration before rebuilding.", "", "r: create fresh review   Esc: back   q: quit")
+	if model.controllerResult.Operation != "" {
+		lines = append(lines,
+			"",
+			fmt.Sprintf("Last result: %s at phase %s", model.controllerResult.State, model.controllerResult.Phase),
+			fmt.Sprintf("Applied: %t   Verified: %t", model.controllerResult.Applied, model.controllerResult.Verified),
+		)
+	}
+	if model.message != "" {
+		lines = append(lines, "", "Result: "+model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func controllerPlanIssues(report domain.ControllerRebuildPlanReport) string {
+	parts := make([]string, 0, len(report.Issues))
+	for _, issue := range report.Issues {
+		parts = append(parts, issue.Field+": "+issue.Message)
+	}
+	return strings.Join(parts, "; ")
 }
 
 func (model dashboardModel) deployView() string {

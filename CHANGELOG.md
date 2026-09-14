@@ -53,6 +53,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   before apply, serialized runs, streamed mode-0600 operation logs, explicit
   partial-failure state, authenticated post-apply reconciliation, atomic
   per-host last-successful-verification history, and safe full-workflow retry.
+- Routine `nixorium controller plan`/`controller apply` CLI and TUI rebuild
+  workflow with exact confirmation, a narrowly revision-instanced systemd unit,
+  pinned unprivileged Git builds, pre-activation drift refusal, and active-system
+  verification.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments

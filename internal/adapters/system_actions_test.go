@@ -27,3 +27,18 @@ func TestControlSystemUnitRejectsUnknownVerbUnitPairs(t *testing.T) {
 		}
 	}
 }
+
+func TestControllerApplyUnitAllowlistAcceptsOnlyFullRevisionInstance(t *testing.T) {
+	if !controllerApplyUnitPattern.MatchString("nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service") {
+		t.Fatal("valid revision-bound controller unit was rejected")
+	}
+	for _, unit := range []string{
+		"nixorium-apply-controller@short.service",
+		"nixorium-apply-controller@0123456789abcdef0123456789abcdef0123456g.service",
+		"nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567/evil.service",
+	} {
+		if controllerApplyUnitPattern.MatchString(unit) {
+			t.Fatalf("unsafe unit %q was accepted", unit)
+		}
+	}
+}
