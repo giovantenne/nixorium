@@ -347,6 +347,7 @@ nix run .#nixorium -- hosts
 nix run .#nixorium -- deploy plan --on pc05
 nix run .#nixorium -- deploy plan --on pc01,pc02
 nix run .#nixorium -- deploy plan --on @lab
+nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -373,7 +374,14 @@ configured clients into a reviewable revision-bound target list. Planning is
 read-only and fails closed when the deployment is not ready, the Git worktree
 is dirty, HEAD cannot be resolved, or a selector is empty, duplicate, or
 unknown. It always states that selected configurations must build before
-deployment. This increment does not execute the plan yet.
+deployment and prints the exact revision-bound apply command. `deploy apply`
+repeats readiness, clean-Git, revision, and target checks, requires the exact
+`DEPLOY <targets>` confirmation, runs verbose `colmena build` before
+`colmena apply switch`, and streams output while retaining a private log under
+`~/.local/state/nixorium/operations/`. `--yes` is an explicit automation-only
+confirmation; `--json` keeps the final report on stdout and progress on stderr.
+An apply failure reports that target state may be mixed; review the log and
+current host state, make a fresh plan, and retry the convergent workflow.
 From the dashboard, **Install computers over network**
 uses the same typed application operations as the CLI to prepare artifacts and
 to review, start, stop, or recover PXE mode. Starting requires the exact
@@ -507,11 +515,14 @@ Review the exact committed target set first:
 
 ```sh
 nix run .#nixorium -- deploy plan --on @lab
+nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 ```
 
-Plan output does not authorize or execute a deployment yet. Until the reviewed
-apply workflow is implemented, the following raw Colmena commands are advanced
-manual operation.
+The plan prints the exact apply command with its full Git revision. Applying
+requires an exact target-specific confirmation, builds first, streams verbose
+progress, and records the detailed log path in its final report. A stale plan
+or dirty worktree is rejected before Colmena runs. For non-interactive
+automation, add `--yes`; the expected revision remains mandatory.
 
 First apply the latest configuration on the controller itself:
 ```sh
@@ -524,7 +535,11 @@ systemctl is-active nixorium-harmonia.service
 nix run .#nixorium -- doctor
 ```
 
-Deploy to all lab PCs:
+The following raw commands remain available as advanced manual operations.
+They bypass Nixorium's review binding, operation lock, and durable result
+summary.
+
+Deploy to all lab PCs manually:
 ```sh
 nix run nixpkgs#colmena -- apply --impure --on @lab
 ```

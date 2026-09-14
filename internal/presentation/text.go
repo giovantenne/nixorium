@@ -61,6 +61,34 @@ func DeploymentPlanText(writer io.Writer, report domain.DeploymentPlanReport) {
 			fmt.Fprintf(writer, "  %-10s %s\n", target.Name, target.IP)
 		}
 		fmt.Fprintln(writer, "Plan:            build selected configurations, then deploy with Colmena")
+		if report.State == "ready" && report.Revision != "" {
+			fmt.Fprintf(writer, "Next:            nixorium deploy apply --on %s --expect %s\n", report.ColmenaSelector, report.Revision)
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func DeploymentExecutionText(writer io.Writer, report domain.DeploymentExecutionReport) {
+	fmt.Fprintf(writer, "Deployment:      %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Phase:           %s\n", report.Phase)
+	if report.Revision != "" {
+		fmt.Fprintf(writer, "Revision:        %s\n", report.Revision)
+	}
+	if report.ColmenaSelector != "" {
+		fmt.Fprintf(writer, "Targets:         %s\n", report.ColmenaSelector)
+	}
+	fmt.Fprintf(writer, "Build completed: %t\n", report.BuildCompleted)
+	fmt.Fprintf(writer, "Apply completed: %t\n", report.ApplyCompleted)
+	if report.LogPath != "" {
+		fmt.Fprintf(writer, "Detailed log:    %s\n", report.LogPath)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:          %s\n", report.Message)
+	}
+	if report.HasErrors() && report.RetrySafe {
+		fmt.Fprintln(writer, "Retry:           safe after reviewing current host state and a fresh deploy plan")
 	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)

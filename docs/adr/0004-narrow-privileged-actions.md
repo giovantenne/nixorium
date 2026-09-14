@@ -51,6 +51,13 @@ The application performs readiness and Git checks unprivileged, starts the
 listener whose systemd dependencies enter installation mode, and synchronously
 stops both units if startup or post-start verification fails.
 
+Client deployment does not require local root. It runs Colmena as the
+administrator who owns the private deployment, accepts only target identities
+expanded from evaluated metadata, binds execution to a reviewed clean Git
+revision, and uses fixed build/apply argument arrays. Nixorium serializes its
+own deployments with a private state-directory lock and records streamed output
+in a private durable log; it does not expose a generic privileged command.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

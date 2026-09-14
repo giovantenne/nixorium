@@ -122,14 +122,18 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			presentation.HostsText(stdout, report)
 		}
 	case "deploy":
-		report := app.NewDeploymentManager(local).Plan(ctx, repository, options.on)
-		if options.json {
-			err = presentation.JSON(stdout, report)
+		if options.subcommand == "apply" {
+			return runDeploymentApply(ctx, repository, stdout, stderr, options.on, options.expect, options.yes, options.json)
 		} else {
-			presentation.DeploymentPlanText(stdout, report)
-		}
-		if report.HasErrors() {
-			return 1
+			report := app.NewDeploymentManager(local).Plan(ctx, repository, options.on)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.DeploymentPlanText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -299,7 +303,7 @@ func parseArguments(arguments []string) (options, error) {
 		case "--expect":
 			index++
 			if index >= len(arguments) || arguments[index] == "" {
-				return options{}, errors.New("--expect requires a fingerprint")
+				return options{}, errors.New("--expect requires a review token")
 			}
 			result.expect = arguments[index]
 		case "--on":
@@ -358,7 +362,7 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "install-secrets"
 		case "apply":
-			if result.command == "config" && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
@@ -386,8 +390,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start")) {
-		return options{}, errors.New("--yes is only valid with setup apply or pxe start")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || (result.command == "deploy" && result.subcommand == "apply")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, or deploy apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -398,20 +402,23 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && (result.command != "config" || result.subcommand != "apply") {
-		return options{}, errors.New("--expect is only valid with config apply")
+	if result.expect != "" && !((result.command == "config" || result.command == "deploy") && result.subcommand == "apply") {
+		return options{}, errors.New("--expect is only valid with config apply or deploy apply")
 	}
-	if result.on != "" && (result.command != "deploy" || result.subcommand != "plan") {
-		return options{}, errors.New("--on is only valid with deploy plan")
+	if result.on != "" && (result.command != "deploy" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--on is only valid with deploy plan or deploy apply")
 	}
-	if result.command == "deploy" && result.subcommand != "plan" {
-		return options{}, errors.New("deploy requires the plan subcommand")
+	if result.command == "deploy" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("deploy requires the plan or apply subcommand")
 	}
 	if result.command == "deploy" && result.on == "" {
-		return options{}, errors.New("deploy plan requires --on")
+		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
 	}
 	if result.command == "config" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("config apply requires --expect from config plan")
+	}
+	if result.command == "deploy" && result.subcommand == "apply" && result.expect == "" {
+		return options{}, errors.New("deploy apply requires --expect from deploy plan")
 	}
 	if result.command == "setup" && result.subcommand == "" {
 		result.subcommand = "configure"
@@ -490,13 +497,90 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
+	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
+}
+
+func runDeploymentApply(ctx context.Context, repository string, stdout, stderr io.Writer, requested, expectedRevision string, assumeYes, jsonOutput bool) int {
+	local := adapters.Local{}
+	manager := app.NewDeploymentManager(local)
+	plan := manager.Plan(ctx, repository, requested)
+	if plan.HasErrors() {
+		if jsonOutput {
+			if err := presentation.JSON(stdout, plan); err != nil {
+				fmt.Fprintln(stderr, "Error:", err)
+			}
+		} else {
+			presentation.DeploymentPlanText(stderr, plan)
+		}
+		return 1
+	}
+	if plan.Revision != expectedRevision {
+		report := manager.Execute(ctx, repository, requested, expectedRevision, "", io.Discard)
+		if jsonOutput {
+			if err := presentation.JSON(stdout, report); err != nil {
+				fmt.Fprintln(stderr, "Error:", err)
+			}
+		} else {
+			presentation.DeploymentExecutionText(stderr, report)
+		}
+		return 1
+	}
+	if !assumeYes {
+		if !presentation.IsInteractive(os.Stdin) {
+			fmt.Fprintln(stderr, "Error: deploy apply requires an interactive terminal or explicit --yes")
+			return 2
+		}
+		confirmationOutput := stdout
+		if jsonOutput {
+			confirmationOutput = stderr
+		}
+		approved, err := presentation.ConfirmDeploymentApply(os.Stdin, confirmationOutput, plan)
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: read confirmation:", err)
+			return 1
+		}
+		if !approved {
+			fmt.Fprintln(confirmationOutput, "Deployment cancelled; no build or apply was started.")
+			return 0
+		}
+	}
+
+	operation, err := adapters.OpenDeploymentOperation()
+	if err != nil {
+		fmt.Fprintln(stderr, "Error: prepare deployment operation:", err)
+		return 1
+	}
+	stream := stdout
+	if jsonOutput {
+		stream = stderr
+	}
+	progress := io.MultiWriter(stream, operation.Writer())
+	report := manager.Execute(ctx, repository, requested, expectedRevision, operation.Path, progress)
+	fmt.Fprintf(operation.Writer(), "\nResult: %s\nPhase: %s\nBuild completed: %t\nApply completed: %t\nDetail: %s\n", report.State, report.Phase, report.BuildCompleted, report.ApplyCompleted, report.Message)
+	if closeErr := operation.Close(); closeErr != nil {
+		report.State = "failed"
+		report.Message = fmt.Sprintf("%s; finalize durable log: %v", report.Message, closeErr)
+	}
+	if jsonOutput {
+		err = presentation.JSON(stdout, report)
+	} else {
+		presentation.DeploymentExecutionText(stdout, report)
+	}
+	if err != nil {
+		fmt.Fprintln(stderr, "Error:", err)
+		return 1
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
 }
 
 func runPXEStart(ctx context.Context, repository string, stdout, stderr io.Writer, assumeYes, jsonOutput bool) int {

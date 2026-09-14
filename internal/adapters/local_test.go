@@ -76,6 +76,28 @@ func TestGitRevisionReturnsCommittedHead(t *testing.T) {
 	}
 }
 
+func TestDeploymentCommandIsFixedAndUsesArgumentArray(t *testing.T) {
+	tests := []struct {
+		phase domain.DeploymentPhase
+		want  string
+	}{
+		{phase: domain.DeploymentPhaseBuild, want: "build --on pc01,pc02 --verbose --color never"},
+		{phase: domain.DeploymentPhaseApply, want: "apply switch --on pc01,pc02 --verbose --color never"},
+	}
+	for _, test := range tests {
+		arguments, err := deploymentCommand(test.phase, "pc01,pc02")
+		if err != nil || strings.Join(arguments, " ") != test.want {
+			t.Errorf("%s command = %q, %v", test.phase, strings.Join(arguments, " "), err)
+		}
+	}
+	if _, err := deploymentCommand(domain.DeploymentPhaseComplete, "pc01"); err == nil {
+		t.Fatal("unsupported deployment phase was accepted")
+	}
+	if _, err := deploymentCommand(domain.DeploymentPhaseBuild, ""); err == nil {
+		t.Fatal("empty deployment selector was accepted")
+	}
+}
+
 func TestParseProcNetFindsListeningPort(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tcp")
 	content := "  sl  local_address rem_address   st\n   0: 0100007F:1F90 00000000:00000000 0A 00000000:00000000\n"

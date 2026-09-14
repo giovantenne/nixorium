@@ -36,12 +36,17 @@ Use Colmena only after authorization:
 ```sh
 nixorium deploy plan --on pc05
 nixorium deploy plan --on @lab
+nixorium deploy apply --on @lab --expect REVISION_FROM_PLAN
 ```
 
 Planning requires a ready deployment and clean Git worktree, records HEAD, and
-rejects unknown or duplicate clients. It does not execute Colmena. Until the
-reviewed apply workflow is available, the raw commands below remain advanced
-manual operations:
+rejects unknown or duplicate clients. Use the exact command and revision shown
+by the plan. Apply revalidates the review, requires `DEPLOY <targets>`, runs a
+verbose build before activation, and records a private durable log. If apply
+fails, some targets may already have changed; inspect the reported log and
+host state, make a fresh plan, and retry. `--yes` is only for explicit
+automation. The raw commands below remain advanced manual operations and bypass
+these safeguards:
 
 ```sh
 colmena apply --on pc05

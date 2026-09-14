@@ -47,3 +47,37 @@ func TestDeploymentPlanTextShowsTargetsAndBlockers(t *testing.T) {
 		}
 	}
 }
+
+func TestReadyDeploymentPlanShowsRevisionBoundNextCommand(t *testing.T) {
+	report := domain.DeploymentPlanReport{
+		State:           "ready",
+		Revision:        "0123456789abcdef",
+		ColmenaSelector: "@lab",
+		Targets:         []domain.DeploymentTarget{{Name: "pc01", IP: "10.0.0.1"}},
+	}
+	output := &bytes.Buffer{}
+	DeploymentPlanText(output, report)
+	if !strings.Contains(output.String(), "nixorium deploy apply --on @lab --expect 0123456789abcdef") {
+		t.Fatalf("ready plan does not show exact next command:\n%s", output.String())
+	}
+}
+
+func TestDeploymentExecutionTextShowsFailureAndRecovery(t *testing.T) {
+	report := domain.DeploymentExecutionReport{
+		State:           "failed",
+		Phase:           domain.DeploymentPhaseApply,
+		Revision:        "0123456789abcdef",
+		ColmenaSelector: "pc01,pc02",
+		BuildCompleted:  true,
+		RetrySafe:       true,
+		LogPath:         "/state/deploy.log",
+		Message:         "apply failed; some targets may already have changed",
+	}
+	output := &bytes.Buffer{}
+	DeploymentExecutionText(output, report)
+	for _, expected := range []string{"FAILED", "apply", "pc01,pc02", "/state/deploy.log", "some targets may already have changed", "Retry:"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("deployment output omits %q:\n%s", expected, output.String())
+		}
+	}
+}

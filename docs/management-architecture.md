@@ -156,13 +156,24 @@ and probe failure. The local adapter limits concurrent TCP/22 probes to eight.
 Both the CLI/JSON frontend and the TUI **Computers** screen consume the same
 report; `doctor` uses the same classification for its aggregate SSH finding.
 
-The first deployment slice is also read-only: `deploy plan --on` accepts one
-client, a comma-separated set, or `@lab`, then resolves only configured client
-identities into a canonical Colmena selector. A plan is ready only when
-`deploymentStatus` is ready, Git is clean, and HEAD is available; it records
-that revision and requires build-before-deploy. Unknown, empty, or duplicate
-targets fail closed. Execution, progress/log streaming, and confirmation bound
-to this plan are later slices; planning never invokes Colmena.
+`deploy plan --on` accepts one client, a comma-separated set, or `@lab`, then
+resolves only configured client identities into a canonical Colmena selector.
+A plan is ready only when `deploymentStatus` is ready, Git is clean, and HEAD
+is available; it records that revision and requires build-before-deploy.
+Unknown, empty, or duplicate targets fail closed, and planning never invokes
+Colmena.
+
+`deploy apply --on ... --expect <revision>` is the corresponding unprivileged
+execution boundary. It repeats the plan checks before execution and after the
+build, requires exact `DEPLOY <canonical-targets>` confirmation (or explicit
+automation-only `--yes`), and constructs fixed argument arrays for verbose
+`colmena build` followed by `colmena apply switch`. A per-administrator
+non-blocking lock prevents overlapping Nixorium deploys. Output is streamed and
+duplicated to a no-follow, mode-0600 operation log under the XDG state
+directory. Reports distinguish preflight, build, apply, and complete phases;
+an apply failure warns that target state may be mixed. Retrying is convergent:
+it requires a fresh valid review and rebuilds before applying again. Direct
+Colmena remains an advanced compatibility surface.
 
 `doctor` returns ordered findings with `OK`, `WARNING`, or `ERROR`, a stable
 finding identifier, evidence safe to display, and a remediation. Expensive

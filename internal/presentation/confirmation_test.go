@@ -34,3 +34,21 @@ func TestConfirmPXEStartRequiresExactToken(t *testing.T) {
 		}
 	}
 }
+
+func TestConfirmDeploymentApplyRequiresExactTargets(t *testing.T) {
+	report := domain.DeploymentPlanReport{
+		Revision:        "0123456789abcdef",
+		ColmenaSelector: "pc01,pc03",
+		Targets:         []domain.DeploymentTarget{{Name: "pc01"}, {Name: "pc03"}},
+	}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"DEPLOY pc01,pc03\n", true}, {"DEPLOY pc01\n", false}, {"deploy pc01,pc03\n", false}} {
+		output := &bytes.Buffer{}
+		got, err := ConfirmDeploymentApply(strings.NewReader(test.input), output, report)
+		if err != nil || got != test.want || !strings.Contains(output.String(), report.Revision) || !strings.Contains(output.String(), "rebuilds before every apply") {
+			t.Fatalf("input %q: got %v, error %v, output %q", test.input, got, err, output)
+		}
+	}
+}

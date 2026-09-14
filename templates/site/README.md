@@ -90,6 +90,7 @@ nix run .#nixorium -- status
 nix run .#nixorium -- hosts
 nix run .#nixorium -- deploy plan --on pc01
 nix run .#nixorium -- deploy plan --on @lab
+nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -118,7 +119,13 @@ confirmation; quitting the view does not stop systemd-owned services. Add
 Use `deploy plan --on pc01`, a comma-separated client list, or `@lab` to review
 the exact clean Git revision and canonical Colmena target set. Planning is
 read-only, requires deployment readiness, and rejects dirty Git or unknown and
-duplicate clients; it does not execute Colmena yet.
+duplicate clients. It prints the revision-bound `deploy apply` command.
+Execution repeats every preflight, requires exact `DEPLOY <targets>`
+confirmation, builds before applying, streams verbose output, and retains a
+mode-0600 log under `~/.local/state/nixorium/operations/`. A failed apply may
+leave mixed target state; inspect the reported log and hosts, make a fresh
+plan, and retry safely. Use `--yes` only for intentional automation; the
+reviewed revision remains mandatory.
 Bare `setup` (or `setup configure`) opens the first-run terminal wizard. It
 proposes detected network values, supports backward navigation, collects
 passwords without echo, validates the complete candidate through Nix, shows a
