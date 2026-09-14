@@ -72,6 +72,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		}
 		lifecycle := app.NewPXELifecycle(local)
 		deploymentManager := app.NewDeploymentManager(local)
+		controllerManager := app.NewControllerManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -84,6 +85,12 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			},
 			ApplyDeployment: func(plan domain.DeploymentPlanReport) domain.DeploymentExecutionReport {
 				return executeDeploymentOperation(ctx, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard)
+			},
+			PlanController: func() domain.ControllerRebuildPlanReport {
+				return controllerManager.Plan(ctx, repository)
+			},
+			ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+				return controllerManager.Apply(ctx, repository, plan.Revision)
 			},
 			PreparePXE: func() domain.ActionReport {
 				return app.NewSystemActions(local).PreparePXE(ctx)
@@ -141,6 +148,20 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			if report.HasErrors() {
 				return 1
 			}
+		}
+	case "controller":
+		manager := app.NewControllerManager(local)
+		if options.subcommand == "apply" {
+			return runControllerApply(ctx, manager, repository, stdout, stderr, options.expect, options.yes, options.json)
+		}
+		report := manager.Plan(ctx, repository)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.ControllerRebuildPlanText(stdout, report)
+		}
+		if report.HasErrors() {
+			return 1
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -338,7 +359,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "config", "setup", "pxe":
+		case "doctor", "hosts", "deploy", "controller", "config", "setup", "pxe":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -349,8 +370,8 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "validate"
 		case "plan":
-			if (result.command != "config" && result.command != "deploy") || result.subcommand != "" {
-				return options{}, errors.New("plan must follow config or deploy")
+			if (result.command != "config" && result.command != "deploy" && result.command != "controller") || result.subcommand != "" {
+				return options{}, errors.New("plan must follow config, deploy, or controller")
 			}
 			result.subcommand = "plan"
 		case "keys":
@@ -369,7 +390,7 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "install-secrets"
 		case "apply":
-			if (result.command == "config" || result.command == "deploy") && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy" || result.command == "controller") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
@@ -397,8 +418,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || (result.command == "deploy" && result.subcommand == "apply")) {
-		return options{}, errors.New("--yes is only valid with setup apply, pxe start, or deploy apply")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller") && result.subcommand == "apply")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, or controller apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -409,14 +430,17 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !((result.command == "config" || result.command == "deploy") && result.subcommand == "apply") {
-		return options{}, errors.New("--expect is only valid with config apply or deploy apply")
+	if result.expect != "" && !((result.command == "config" || result.command == "deploy" || result.command == "controller") && result.subcommand == "apply") {
+		return options{}, errors.New("--expect is only valid with config apply, deploy apply, or controller apply")
 	}
 	if result.on != "" && (result.command != "deploy" || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--on is only valid with deploy plan or deploy apply")
 	}
 	if result.command == "deploy" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("deploy requires the plan or apply subcommand")
+	}
+	if result.command == "controller" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("controller requires the plan or apply subcommand")
 	}
 	if result.command == "deploy" && result.on == "" {
 		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
@@ -426,6 +450,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "deploy" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("deploy apply requires --expect from deploy plan")
+	}
+	if result.command == "controller" && result.subcommand == "apply" && result.expect == "" {
+		return options{}, errors.New("controller apply requires --expect from controller plan")
 	}
 	if result.command == "setup" && result.subcommand == "" {
 		result.subcommand = "configure"
@@ -504,9 +531,11 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
+	fmt.Fprintln(writer, "       controller plan")
+	fmt.Fprintln(writer, "       controller apply --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
@@ -645,6 +674,54 @@ func runPXEStart(ctx context.Context, repository string, stdout, stderr io.Write
 		}
 	} else {
 		presentation.PXELifecycleText(stdout, report)
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
+}
+
+func runControllerApply(ctx context.Context, manager *app.ControllerManager, repository string, stdout, stderr io.Writer, expectedRevision string, assumeYes, jsonOutput bool) int {
+	plan := manager.Plan(ctx, repository)
+	if plan.HasErrors() || plan.Revision != expectedRevision {
+		if plan.Revision != expectedRevision {
+			plan.State = "blocked"
+			plan.Issues = append(plan.Issues, domain.ValidationIssue{Field: "review", Message: "deployment revision differs from the reviewed controller plan"})
+		}
+		if jsonOutput {
+			_ = presentation.JSON(stdout, plan)
+		} else {
+			presentation.ControllerRebuildPlanText(stderr, plan)
+		}
+		return 1
+	}
+	if !assumeYes {
+		if !presentation.IsInteractive(os.Stdin) {
+			fmt.Fprintln(stderr, "Error: controller apply requires an interactive terminal or explicit --yes")
+			return 2
+		}
+		confirmationOutput := stdout
+		if jsonOutput {
+			confirmationOutput = stderr
+		}
+		approved, err := presentation.ConfirmControllerRebuild(os.Stdin, confirmationOutput, plan)
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: read confirmation:", err)
+			return 1
+		}
+		if !approved {
+			fmt.Fprintln(confirmationOutput, "Controller rebuild cancelled; no action started.")
+			return 0
+		}
+	}
+	report := manager.Apply(ctx, repository, expectedRevision)
+	if jsonOutput {
+		if err := presentation.JSON(stdout, report); err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+	} else {
+		presentation.ControllerRebuildExecutionText(stdout, report)
 	}
 	if report.HasErrors() {
 		return 1

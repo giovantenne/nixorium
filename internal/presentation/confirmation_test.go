@@ -21,6 +21,20 @@ func TestConfirmControllerApplyRequiresExactToken(t *testing.T) {
 	}
 }
 
+func TestConfirmControllerRebuildRequiresExactToken(t *testing.T) {
+	report := domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: "0123456789abcdef0123456789abcdef01234567", Confirmation: "REBUILD pc99"}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"REBUILD pc99\n", true}, {"REBUILD\n", false}, {"rebuild pc99\n", false}} {
+		output := &bytes.Buffer{}
+		got, err := ConfirmControllerRebuild(strings.NewReader(test.input), output, report)
+		if err != nil || got != test.want || !strings.Contains(output.String(), report.Revision) {
+			t.Fatalf("input %q: got %t, err %v, output %q", test.input, got, err, output.String())
+		}
+	}
+}
+
 func TestConfirmPXEStartRequiresExactToken(t *testing.T) {
 	report := domain.PXELifecycleReport{Interface: "enp1s0", DHCPAddress: "192.0.2.10", StaticCIDR: "10.0.0.99/8"}
 	for _, test := range []struct {

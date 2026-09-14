@@ -51,6 +51,19 @@ reported log and host state, make a fresh plan, and retry. `--yes` is only for
 explicit automation. The raw commands below remain advanced manual operations
 and bypass these safeguards:
 
+For routine changes to this controller, use the separate reviewed workflow:
+
+```sh
+nixorium controller plan
+nixorium controller apply --expect REVISION_FROM_PLAN
+```
+
+Apply requires exact `REBUILD <controller>` confirmation and starts only a
+revision-bound systemd instance. It builds the pinned Git source as the
+deployment owner, refuses repository drift before activation, and verifies the
+active system afterward. The TUI's **Rebuild controller** task uses the same
+typed operation; the systemd job and journal survive closing the dashboard.
+
 The default TUI's **Deploy updates** screen invokes the same plan/apply
 operations. Select the intended computers, review the resolved revision and
 targets, and enter the exact phrase shown. Do not close the controller terminal

@@ -61,6 +61,13 @@ queries and atomically stores per-repository successful-verification history as
 the administrator with mode 0600; neither operation introduces a root service
 or generic privileged command.
 
+Routine controller rebuild narrows its dynamic input to a systemd instance
+containing exactly one full lowercase Git object ID. Both the unprivileged
+adapter and polkit validate the unit shape. The root action validates that
+revision against clean HEAD, pins the Git fetcher, builds as the deployment
+owner, and refuses drift before exact-closure activation; it does not accept a
+path, hostname, executable, or arbitrary unit.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

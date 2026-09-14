@@ -91,6 +91,8 @@ nix run .#nixorium -- hosts
 nix run .#nixorium -- deploy plan --on pc01
 nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
+nix run .#nixorium -- controller plan
+nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -142,6 +144,13 @@ operations: select computers, review the revision and canonical targets, then
 type the exact phrase shown. It reports activity, authenticated/recorded target
 counts, and the final durable log; closing is disabled while its Colmena
 process is running.
+Use `controller plan` and revision-bound `controller apply --expect` for routine
+controller changes. Apply requires exact `REBUILD <controller>` confirmation,
+starts only the matching systemd unit instance, builds the pinned Git revision
+as the deployment owner, refuses repository drift before activation, and
+verifies the active system afterward. The dashboard's **Rebuild controller**
+task invokes the same typed workflow; the systemd-owned job and journal survive
+closing the dashboard. Use `--yes` only for intentional automation.
 Bare `setup` (or `setup configure`) opens the first-run terminal wizard. It
 proposes detected network values, supports backward navigation, collects
 passwords without echo, validates the complete candidate through Nix, shows a

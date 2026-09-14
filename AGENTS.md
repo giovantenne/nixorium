@@ -132,8 +132,9 @@ nix run .#nixorium -- pxe recover
 # Validate and review a complete settings candidate without writing it
 nix run .#nixorium -- config plan --file candidate.json
 
-# Rebuild and activate on the local machine (controller)
-sudo nixos-rebuild switch --flake .#pcNN --no-write-lock-file
+# Review, rebuild, activate, and verify this controller
+nix run .#nixorium -- controller plan
+nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 
 # Review and execute a managed client deployment
 nix run .#nixorium -- deploy plan --on @lab
@@ -183,6 +184,7 @@ Release from the matching changelog section.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.
+- Routine controller rebuild uses `controller plan`/`controller apply`, binds the privileged systemd instance to a full reviewed Git revision, builds a pinned Git source as the deployment owner, refuses repository drift before activation, and verifies `/run/current-system` afterward. Keep `setup apply` as the first-run-compatible path through the same fixed service implementation.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).

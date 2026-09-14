@@ -162,6 +162,62 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	}
 }
 
+func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	applied := 0
+	actions := DashboardActions{
+		PlanController: func() domain.ControllerRebuildPlanReport {
+			return domain.ControllerRebuildPlanReport{
+				SchemaVersion: domain.SchemaVersion,
+				Operation:     "controller-plan",
+				State:         "ready",
+				Controller:    "pc99",
+				Revision:      revision,
+				Confirmation:  "REBUILD pc99",
+				Issues:        []domain.ValidationIssue{},
+			}
+		},
+		ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			applied++
+			return domain.ControllerRebuildExecutionReport{
+				SchemaVersion: domain.SchemaVersion,
+				Operation:     "controller-apply",
+				State:         "completed",
+				Controller:    plan.Controller,
+				Revision:      plan.Revision,
+				Phase:         domain.ControllerRebuildPhaseComplete,
+				Applied:       true,
+				Verified:      true,
+			}
+		},
+	}
+	model := dashboardModel{actions: actions}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("controller plan did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardControllerReview || !strings.Contains(model.View(), revision) || !strings.Contains(model.View(), "REBUILD pc99") {
+		t.Fatalf("controller review missing:\n%s", model.View())
+	}
+	for _, character := range "REBUILD pc99" {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		model = updated.(dashboardModel)
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("controller apply did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if applied != 1 || model.screen != dashboardController || !strings.Contains(model.View(), "Applied: true   Verified: true") {
+		t.Fatalf("controller result missing: applied=%d\n%s", applied, model.View())
+	}
+}
+
 func TestDashboardDeploymentRejectsEmptySelectionAndBlockedPlan(t *testing.T) {
 	report := testDashboardReport("ready")
 	report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}}

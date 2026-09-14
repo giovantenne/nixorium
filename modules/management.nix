@@ -65,6 +65,7 @@ let
     ];
     text = ''
       REPOSITORY=${lib.escapeShellArg cfg.deploymentPath}
+      EXPECTED_REVISION="''${1:-}"
 
       fail() {
         echo "Error: $*" >&2
@@ -83,9 +84,19 @@ let
           secret-key admin-ssh veyon-private-key.pem)" ]] \
         || fail "private key files must not be tracked by Git"
 
-      # Use the Git fetcher so ignored private keys are never copied into the
-      # immutable Nix source tree or store during evaluation and builds.
-      FLAKE_URL="git+file://$REPOSITORY"
+      REVISION="$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)"
+      [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]] \
+        || fail "deployment HEAD is not a full Git object ID"
+      if [[ -n "$EXPECTED_REVISION" ]]; then
+        [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]] \
+          || fail "expected controller revision is invalid"
+        [[ "$REVISION" == "$EXPECTED_REVISION" ]] \
+          || fail "deployment revision differs from the reviewed controller plan"
+      fi
+
+      # Pin the Git fetcher to the reviewed commit so ignored private keys are
+      # excluded and a concurrent clean commit cannot change the build input.
+      FLAKE_URL="git+file://$REPOSITORY?rev=$REVISION"
       [[ -d /var/cache/nixorium/admin && ! -L /var/cache/nixorium/admin \
           && "$(stat -c '%U:%G:%a' /var/cache/nixorium/admin)" == admin:users:700 ]] \
         || fail "administrator Nix cache directory has unsafe ownership or permissions"
@@ -119,6 +130,9 @@ let
       [[ "$SYSTEM_PATH" == /nix/store/* && "$SYSTEM_PATH" != *[[:space:]]* \
           && -x "$SYSTEM_PATH/bin/switch-to-configuration" ]] \
         || fail "controller build did not return one valid NixOS system closure"
+      [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" \
+          && "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" ]] \
+        || fail "deployment changed while the controller was building; activation refused"
       exec "$SYSTEM_PATH/bin/switch-to-configuration" switch
     '';
   };
@@ -324,6 +338,7 @@ in
             ((verb == "start" &&
               (unit == "nixorium-install-secrets.service" ||
                unit == "nixorium-apply-controller.service" ||
+               /^nixorium-apply-controller@[0-9a-f]{40}\.service$/.test(unit) ||
                unit == "nixorium-prepare-pxe.service" ||
                unit == "nixorium-pxe-recover.service")) ||
              (unit == "nixorium-pxe.service" &&
@@ -373,6 +388,28 @@ in
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${applyController}/bin/nixorium-apply-controller";
+        User = "root";
+        Group = "root";
+        UMask = "0077";
+        CacheDirectory = "nixorium";
+        Environment = "XDG_CACHE_HOME=/var/cache/nixorium";
+        PrivateTmp = true;
+        ProtectHome = "read-only";
+        ReadOnlyPaths = [ cfg.deploymentPath ];
+        ReadWritePaths = [ "-/var/cache/nixorium" ];
+        Nice = 10;
+        IOSchedulingClass = "best-effort";
+        NoNewPrivileges = true;
+        TimeoutStartSec = "2h";
+      };
+    };
+
+    systemd.services."nixorium-apply-controller@" = {
+      description = "Build and activate reviewed Nixorium controller revision %i";
+      after = [ "nixorium-install-secrets.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${applyController}/bin/nixorium-apply-controller %i";
         User = "root";
         Group = "root";
         UMask = "0077";
