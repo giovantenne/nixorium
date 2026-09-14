@@ -339,7 +339,9 @@ controller addressing is restored before deploying with Colmena.
 
 For symptom-first recovery, safe retry behavior, and backup/restoration
 boundaries, see [Troubleshooting and recovery](docs/troubleshooting.md). The
-generated private deployment includes the same guide locally.
+generated private deployment includes the same guide locally. Use the separate
+[hardware and VirtualBox validation plan](docs/hardware-validation.md) before
+claiming real firmware, network, disk, or multi-machine compatibility.
 
 ### Management commands
 
