@@ -277,7 +277,9 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	loaded := ""
 	actions := DashboardActions{
 		LoadLogs: func() domain.OperationLogsReport {
-			return domain.OperationLogsReport{Operation: "logs-list", State: "available", Logs: []domain.OperationLogEntry{
+			return domain.OperationLogsReport{Operation: "logs-list", State: "available", Records: []domain.OperationRecord{
+				{RecordedAt: time.Date(2026, 9, 14, 11, 31, 0, 0, time.UTC), Operation: "pxe-start", State: "completed", Subject: "active", Summary: "PXE lifecycle transition finished"},
+			}, Logs: []domain.OperationLogEntry{
 				{ID: id, Kind: "deployment", StartedAt: time.Date(2026, 9, 14, 11, 30, 0, 0, time.UTC), SizeBytes: 70000, State: "partial", Available: true},
 			}}
 		},
@@ -298,7 +300,7 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardLogs || !strings.Contains(model.View(), id) || !strings.Contains(model.View(), "partial") {
+	if model.screen != dashboardLogs || !strings.Contains(model.View(), "Recent actions") || !strings.Contains(model.View(), "pxe-start") || !strings.Contains(model.View(), id) || !strings.Contains(model.View(), "partial") {
 		t.Fatalf("operation log list missing:\n%s", model.View())
 	}
 	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})

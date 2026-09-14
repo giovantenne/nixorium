@@ -12,11 +12,21 @@ type OperationLogEntry struct {
 	Detail    string    `json:"detail,omitempty"`
 }
 
+type OperationRecord struct {
+	ID         string    `json:"id"`
+	RecordedAt time.Time `json:"recordedAt"`
+	Operation  string    `json:"operation"`
+	State      string    `json:"state"`
+	Subject    string    `json:"subject,omitempty"`
+	Summary    string    `json:"summary"`
+}
+
 type OperationLogsReport struct {
 	SchemaVersion int                 `json:"schemaVersion"`
 	Operation     string              `json:"operation"`
 	State         string              `json:"state"`
 	Limit         int                 `json:"limit"`
+	Records       []OperationRecord   `json:"records"`
 	Logs          []OperationLogEntry `json:"logs"`
 	Issues        []ValidationIssue   `json:"issues"`
 }

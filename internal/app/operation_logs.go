@@ -1,6 +1,10 @@
 package app
 
-import "github.com/giovantenne/nixorium/internal/domain"
+import (
+	"fmt"
+
+	"github.com/giovantenne/nixorium/internal/domain"
+)
 
 const (
 	operationLogListLimit = 50
@@ -8,8 +12,13 @@ const (
 )
 
 type OperationLogSource interface {
+	OperationRecords(int) ([]domain.OperationRecord, error)
 	OperationLogs(int) ([]domain.OperationLogEntry, error)
 	OperationLog(string, int64) (domain.OperationLogReport, error)
+}
+
+type OperationRecordSink interface {
+	RecordOperation(domain.OperationRecord) error
 }
 
 type OperationLogManager struct {
@@ -26,12 +35,24 @@ func (m *OperationLogManager) List() domain.OperationLogsReport {
 		Operation:     "logs-list",
 		State:         "available",
 		Limit:         operationLogListLimit,
+		Records:       []domain.OperationRecord{},
 		Logs:          []domain.OperationLogEntry{},
 		Issues:        []domain.ValidationIssue{},
 	}
+	records, recordErr := m.source.OperationRecords(operationLogListLimit)
+	if recordErr != nil {
+		report.State = "partial"
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "records", Message: recordErr.Error()})
+	} else {
+		report.Records = records
+	}
 	logs, err := m.source.OperationLogs(operationLogListLimit)
 	if err != nil {
-		report.State = "blocked"
+		if recordErr != nil {
+			report.State = "blocked"
+		} else {
+			report.State = "partial"
+		}
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "logs", Message: err.Error()})
 		return report
 	}
@@ -43,6 +64,58 @@ func (m *OperationLogManager) List() domain.OperationLogsReport {
 		}
 	}
 	return report
+}
+
+func RecordOperationOutcome(sink OperationRecordSink, outcome any) error {
+	record, ok := operationRecordFor(outcome)
+	if !ok {
+		return fmt.Errorf("unsupported operation outcome %T", outcome)
+	}
+	return sink.RecordOperation(record)
+}
+
+func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
+	record := domain.OperationRecord{}
+	switch report := outcome.(type) {
+	case domain.ConfigApplyReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = fmt.Sprintf("%d setting change(s)", len(report.Changes))
+		record.Summary = "managed laboratory settings apply finished"
+	case domain.KeyReconcileReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = fmt.Sprintf("%d key pair(s)", len(report.Keys))
+		record.Summary = "key reconciliation finished"
+	case domain.ActionReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = report.Unit
+		record.Summary = "fixed controller action finished"
+	case domain.PXELifecycleReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = report.Mode
+		record.Summary = "PXE lifecycle transition finished"
+	case domain.DeploymentExecutionReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = report.ColmenaSelector
+		record.Summary = fmt.Sprintf("phase %s; verified %d/%d target(s)", report.Phase, report.Verification.Verified, report.Verification.Attempted)
+	case domain.ControllerRebuildExecutionReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = report.Controller
+		record.Summary = fmt.Sprintf("phase %s; applied=%t; verified=%t", report.Phase, report.Applied, report.Verified)
+	case domain.ServiceActionReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = report.Service
+		record.Summary = fmt.Sprintf("%s finished; verified=%t", report.Action, report.Verified)
+	default:
+		return domain.OperationRecord{}, false
+	}
+	return record, record.Operation != "" && record.State != ""
 }
 
 func (m *OperationLogManager) Show(id string) domain.OperationLogReport {

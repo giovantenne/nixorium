@@ -94,13 +94,17 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				return controllerManager.Plan(ctx, repository)
 			},
 			ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
-				return controllerManager.Apply(ctx, repository, plan.Revision)
+				report := controllerManager.Apply(ctx, repository, plan.Revision)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
 			},
 			LoadServices: func() domain.ServicesReport {
 				return serviceManager.Status(ctx, repository)
 			},
 			RestartService: func(service string) domain.ServiceActionReport {
-				return serviceManager.Restart(ctx, repository, service)
+				report := serviceManager.Restart(ctx, repository, service)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
 			},
 			LoadLogs: func() domain.OperationLogsReport {
 				return operationLogManager.List()
@@ -109,19 +113,27 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				return operationLogManager.Show(id)
 			},
 			PreparePXE: func() domain.ActionReport {
-				return app.NewSystemActions(local).PreparePXE(ctx)
+				report := app.NewSystemActions(local).PreparePXE(ctx)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
 			},
 			PlanPXEStart: func() domain.PXELifecycleReport {
 				return lifecycle.PlanStart(ctx, repository)
 			},
 			StartPXE: func() domain.PXELifecycleReport {
-				return lifecycle.Start(ctx, repository)
+				report := lifecycle.Start(ctx, repository)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
 			},
 			StopPXE: func() domain.PXELifecycleReport {
-				return lifecycle.Stop(ctx, repository)
+				report := lifecycle.Stop(ctx, repository)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
 			},
 			RecoverPXE: func() domain.PXELifecycleReport {
-				return lifecycle.Recover(ctx, repository)
+				report := lifecycle.Recover(ctx, repository)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
 			},
 		}
 		if tuiErr := presentation.RunDashboard(report, actions); tuiErr != nil {
@@ -265,6 +277,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				}
 			} else {
 				report := manager.Apply(ctx, repository, candidate, options.expect)
+				recordOperationWarning(stderr, report)
 				if options.json {
 					err = presentation.JSON(stdout, report)
 				} else {
@@ -283,6 +296,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			return runSetupApply(ctx, repository, stdout, stderr, options.yes, options.json)
 		} else if options.subcommand == "install-secrets" {
 			report := app.NewSystemActions(adapters.Local{}).InstallSecrets(ctx)
+			report.Message = operationRecordMessage(report.Message, report)
 			if options.json {
 				err = presentation.JSON(stdout, report)
 			} else {
@@ -298,6 +312,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				report = manager.VerifyKeys(ctx, repository)
 			} else {
 				report, reconcileErr = manager.ReconcileKeys(ctx, repository)
+				recordOperationWarning(stderr, report)
 			}
 			if options.json {
 				err = presentation.JSON(stdout, report)
@@ -322,6 +337,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		switch options.subcommand {
 		case "prepare":
 			report := app.NewSystemActions(adapters.Local{}).PreparePXE(ctx)
+			report.Message = operationRecordMessage(report.Message, report)
 			if options.json {
 				err = presentation.JSON(stdout, report)
 			} else {
@@ -340,6 +356,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			} else {
 				report = manager.Recover(ctx, repository)
 			}
+			report.Message = operationRecordMessage(report.Message, report)
 			if options.json {
 				err = presentation.JSON(stdout, report)
 			} else {
@@ -721,6 +738,7 @@ func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentMana
 		report.State = "failed"
 		report.Message = fmt.Sprintf("%s; finalize durable log: %v", report.Message, closeErr)
 	}
+	report.Message = operationRecordMessage(report.Message, report)
 	return report
 }
 
@@ -753,6 +771,7 @@ func runPXEStart(ctx context.Context, repository string, stdout, stderr io.Write
 		}
 	}
 	report := manager.Start(ctx, repository)
+	report.Message = operationRecordMessage(report.Message, report)
 	if jsonOutput {
 		if err := presentation.JSON(stdout, report); err != nil {
 			fmt.Fprintln(stderr, "Error:", err)
@@ -801,6 +820,7 @@ func runControllerApply(ctx context.Context, manager *app.ControllerManager, rep
 		}
 	}
 	report := manager.Apply(ctx, repository, expectedRevision)
+	report.Message = operationRecordMessage(report.Message, report)
 	if jsonOutput {
 		if err := presentation.JSON(stdout, report); err != nil {
 			fmt.Fprintln(stderr, "Error:", err)
@@ -845,6 +865,7 @@ func runServiceRestart(ctx context.Context, manager *app.ServiceManager, reposit
 		}
 	}
 	report := manager.Restart(ctx, repository, service)
+	report.Message = operationRecordMessage(report.Message, report)
 	if jsonOutput {
 		if err := presentation.JSON(stdout, report); err != nil {
 			fmt.Fprintln(stderr, "Error:", err)
@@ -893,6 +914,7 @@ func runSetupApply(ctx context.Context, repository string, stdout, stderr io.Wri
 		}
 	}
 	report := app.NewSystemActions(local).ApplyController(ctx)
+	report.Message = operationRecordMessage(report.Message, report)
 	if jsonOutput {
 		if err := presentation.JSON(stdout, report); err != nil {
 			fmt.Fprintln(stderr, "Error:", err)
@@ -987,18 +1009,21 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 		return 0
 	}
 	report := settingsManager.Apply(ctx, repository, candidateData, plan.BaseFingerprint)
+	recordOperationWarning(stderr, report)
 	presentation.ConfigApplyText(stdout, report)
 	if report.HasErrors() {
 		return 1
 	}
 	if reconcileKeys {
 		keyReport, keyErr := app.NewSetupManager(local).ReconcileKeys(ctx, repository)
+		recordOperationWarning(stderr, keyReport)
 		presentation.KeyReconcileText(stdout, keyReport)
 		if keyErr != nil {
 			fmt.Fprintln(stderr, "Error:", keyErr)
 			return 1
 		}
 		actionReport := app.NewSystemActions(local).InstallSecrets(ctx)
+		actionReport.Message = operationRecordMessage(actionReport.Message, actionReport)
 		presentation.ActionText(stdout, actionReport)
 		if actionReport.HasErrors() {
 			fmt.Fprintln(stderr, "The settings and repository keys are intact; retry with `nixorium setup install-secrets` on the controller.")
@@ -1007,4 +1032,21 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 		fmt.Fprintln(stdout, "Review and commit lab-settings.json and the public files under keys/ before applying the controller.")
 	}
 	return 0
+}
+
+func operationRecordMessage(message string, outcome any) string {
+	if err := app.RecordOperationOutcome(adapters.Local{}, outcome); err != nil {
+		warning := "operation outcome was not recorded: " + err.Error()
+		if message == "" {
+			return warning
+		}
+		return message + "; " + warning
+	}
+	return message
+}
+
+func recordOperationWarning(writer io.Writer, outcome any) {
+	if err := app.RecordOperationOutcome(adapters.Local{}, outcome); err != nil {
+		fmt.Fprintln(writer, "Warning: operation outcome was not recorded:", err)
+	}
 }

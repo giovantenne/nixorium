@@ -741,6 +741,18 @@ func (model dashboardModel) logsView() string {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
 	}
+	lines = append(lines, "Recent actions")
+	recordLimit := len(model.logs.Records)
+	if recordLimit > 10 {
+		recordLimit = 10
+	}
+	if recordLimit == 0 {
+		lines = append(lines, "  No recorded operation outcomes.")
+	}
+	for _, record := range model.logs.Records[:recordLimit] {
+		lines = append(lines, fmt.Sprintf("  %s  %-18s %-10s %s", record.RecordedAt.UTC().Format("2006-01-02 15:04Z"), record.Operation, record.State, record.Subject))
+	}
+	lines = append(lines, "", "Deployment logs")
 	if len(model.logs.Logs) == 0 {
 		lines = append(lines, "No deployment operation logs are available.")
 	}

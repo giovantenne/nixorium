@@ -149,9 +149,12 @@ type the exact phrase shown. It reports activity, authenticated/recorded target
 counts, and the final durable log; closing is disabled while its Colmena
 process is running.
 Use `logs` to list the newest 50 recognized deployment operation logs from the
-administrator's private XDG state, even outside a deployment checkout. Use
-`logs show <id>` to read at most the final 64 KiB of one listed log. Nixorium
-accepts only generated basename IDs, requires user ownership plus mode 0700
+administrator's private XDG state, even outside a deployment checkout. The
+same view shows compact typed outcomes for configuration, key, fixed controller,
+PXE, cache, and deployment actions. Their atomic private record retains the
+newest 1000 outcomes; this explicit retention never deletes detailed deployment
+logs. Use `logs show <id>` to read at most the final 64 KiB of one listed log.
+Nixorium accepts only generated basename IDs, requires user ownership plus mode 0700
 directories and 0600 regular files, refuses symlinks, and neutralizes terminal
 control characters before rendering. The dashboard's **View operation logs**
 task uses the same typed list/detail operations and provides bounded scrolling.
