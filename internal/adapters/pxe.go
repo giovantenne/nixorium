@@ -33,6 +33,7 @@ func (Local) PXEPreparation(ctx context.Context, repository string, meta domain.
 		return state
 	}
 	state.Revision = record.Revision
+	state.DHCPAddress = record.Controller.DHCPIP
 	state.PreparedAt = record.PreparedAt
 	state.Clients = record.Clients
 
@@ -46,10 +47,23 @@ func (Local) PXEPreparation(ctx context.Context, repository string, meta domain.
 		state.Detail = fmt.Sprintf("prepared revision %s differs from deployment revision %s", record.Revision, revision)
 		return state
 	}
-	if record.Controller.DHCPIP != meta.Controller.DHCPIP || record.Controller.StaticIP != meta.Controller.StaticIP ||
+	if record.Controller.StaticIP != meta.Controller.StaticIP ||
 		record.Network.Interface != meta.Network.Interface || record.Network.CachePort != meta.Network.CachePort ||
 		record.Network.PXEHTTPPort != meta.Network.PXEHTTPPort {
 		state.Detail = "prepared controller/network values differ from current labMeta"
+		return state
+	}
+	addresses, err := (Local{}).InterfaceAddresses(meta.Network.Interface)
+	if err != nil {
+		state.Detail = fmt.Sprintf("inspect prepared controller address: %v", err)
+		return state
+	}
+	addressPresent := false
+	for _, address := range addresses {
+		addressPresent = addressPresent || address == record.Controller.DHCPIP
+	}
+	if !addressPresent {
+		state.Detail = fmt.Sprintf("prepared controller address %s is no longer assigned; run nixorium pxe prepare again", record.Controller.DHCPIP)
 		return state
 	}
 	if len(record.Clients) != len(meta.Clients.Hosts) {
@@ -91,6 +105,6 @@ func (Local) PXEPreparation(ctx context.Context, repository string, meta domain.
 		}
 	}
 	state.Ready = true
-	state.Detail = fmt.Sprintf("prepared %d client closures at revision %s", len(record.Clients), record.Revision)
+	state.Detail = fmt.Sprintf("prepared %d client closures at revision %s for controller address %s", len(record.Clients), record.Revision, record.Controller.DHCPIP)
 	return state
 }

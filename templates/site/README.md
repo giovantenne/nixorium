@@ -252,15 +252,17 @@ and restarts the cache after process failures. Check readiness with
 `systemctl status nixorium-harmonia.service` and `nixorium doctor`; detailed
 service logs use the canonical `journalctl -u harmonia.service` unit name.
 Run `nixorium pxe prepare` before an installation session. The fixed
-systemd-owned action requires a clean and ready deployment, confirms that the
-configured DHCP address is currently assigned, checks Harmonia, and builds the
+systemd-owned action requires a clean and ready deployment, selects the
+configured DHCP hint or exactly one usable live non-static, non-link-local
+address, checks Harmonia, and builds the
 netboot artifacts, pinned iPXE firmware, and all configured client closures.
 It retains immutable store paths with managed Nix garbage-collector roots and
 records them at the current Git revision in
 `/var/lib/nixorium/prepared/prepared.json`; preparation is non-disruptive and
 safe to retry. Inspect failures with
-`journalctl -u nixorium-prepare-pxe.service` and rerun it after updating and
-committing a changed `masterDhcpIp`.
+`journalctl -u nixorium-prepare-pxe.service`. A changed unambiguous lease is
+captured without a configuration commit; multiple candidates fail closed and
+require the administrator to resolve the ambiguity.
 The `--full` doctor mode also builds the controller configuration; the default
 mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.

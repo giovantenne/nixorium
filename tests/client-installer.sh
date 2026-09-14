@@ -195,6 +195,19 @@ test_embedded_metadata_avoids_nix_evaluation() (
   test "$LAB_CLIENT_HOSTS_JSON" = '[{"name":"pc01","ip":"10.0.0.1"},{"name":"pc02","ip":"10.0.0.2"}]'
 )
 
+test_runtime_controller_address_overrides_embedded_hint() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  printf '%s\n' 'init=/nix/store/test-init quiet nixorium.controller-dhcp-ip=192.0.2.11' > "${FIXTURE_DIR}/cmdline"
+
+  apply_runtime_controller_address "${FIXTURE_DIR}/cmdline"
+  test "$LAB_CONTROLLER_DHCP_IP" = "192.0.2.11"
+
+  printf '%s\n' 'nixorium.controller-dhcp-ip=999.0.2.11' > "${FIXTURE_DIR}/cmdline"
+  ! apply_runtime_controller_address "${FIXTURE_DIR}/cmdline" >/dev/null 2>&1
+)
+
 test_too_small_disk_is_refused_before_mutation() (
   new_fixture
   trap 'rm -rf "$FIXTURE_DIR"' EXIT
@@ -267,6 +280,7 @@ test_disk_identity_change_is_refused
 test_failure_reports_modified_disk
 test_too_small_disk_is_refused_before_mutation
 test_embedded_metadata_avoids_nix_evaluation
+test_runtime_controller_address_overrides_embedded_hint
 test_offline_system_resolution_precedes_system_install
 test_precompiled_disko_receives_validated_basename
 

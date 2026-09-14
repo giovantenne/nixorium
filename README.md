@@ -176,7 +176,7 @@ passwords; the guided setup will create those hashes internally.
 
 You can leave the git identity fields at their defaults for now.
 
-> **Note**: `masterDhcpIp` is used only during PXE/netboot client installation. The generated iPXE script, the netboot ramdisk, and the PXE helper services all point to that DHCP address, so if the DHCP lease changes before a netboot session you must update `lab-settings.json` and rebuild the netboot artifacts. Regular Colmena deploys use the controller's static lab IP instead.
+> **Note**: `masterDhcpIp` is the initial controller address/hint for PXE installation. At preparation time Nixorium prefers it when still assigned, otherwise it safely adopts the only usable non-static, non-link-local IPv4 address on the configured interface. The observed address is bound to the prepared session and passed to the offline installer at boot. Ambiguous interfaces fail closed. Regular Colmena deploys use the controller's static lab IP instead.
 
 ### 4. Generate and install keys
 
@@ -264,15 +264,15 @@ journalctl -u nixorium-prepare-pxe.service
 ```
 
 Preparation is non-disruptive and safe to retry. It requires a clean,
-deployment-ready Git revision, the configured DHCP address on the configured
-interface, and a healthy Harmonia endpoint. It builds the kernel, initrd,
-generated iPXE script, pinned iPXE firmware, and every configured client
-closure without creating `result-*` links. The immutable store paths and Git
-revision are retained with managed garbage-collector roots and recorded
-atomically in
+deployment-ready Git revision, one unambiguous live controller address on the
+configured interface, and a healthy Harmonia endpoint. It builds the kernel,
+initrd, generated iPXE script, pinned iPXE firmware, and every configured
+client closure without creating `result-*` links. The immutable store paths and
+Git revision are retained with managed garbage-collector roots and recorded atomically in
 `/var/lib/nixorium/prepared/prepared.json`; `status`, `doctor`, and the PXE
-proxy reject a stale or invalid record. If the DHCP lease changed, update and
-commit `masterDhcpIp`, apply the controller, and run preparation again.
+proxy reject a stale or invalid record. If the DHCP lease changed, preparation
+records the new address without modifying the deployment; update
+`masterDhcpIp` only when multiple non-static addresses make selection ambiguous.
 
 ### 6. Start netboot services
 

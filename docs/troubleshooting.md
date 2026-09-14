@@ -29,20 +29,22 @@ output in journald, so use the exact unit named by the failed report.
 
 ## The controller DHCP lease changed
 
-Symptoms include PXE preparation reporting that `masterDhcpIp` is not present,
-or prepared artifacts being stale after the controller receives a new address.
-Normal administration and Colmena deployment use the static laboratory address;
-the DHCP address is required for generated netboot/cache URLs.
+Normal administration and Colmena deployment use the static laboratory address.
+PXE preparation separately binds one live non-static controller address to the
+session so a routine DHCP lease change does not require a configuration commit.
 
 1. Stop an active installation session with `nixorium pxe stop`.
-2. Run `nixorium setup configure` and review the detected DHCP address.
-3. Review and commit the generated `lab-settings.json` change.
-4. Run `nixorium controller plan`, then the displayed revision-bound
-   `controller apply` command.
-5. Run `nixorium pxe prepare` again before starting PXE.
+2. Run `nixorium pxe prepare` again.
+3. Confirm with `nixorium status` that the prepared controller address matches
+   the live lease, then start PXE normally.
 
-Preparation refuses a mismatched live address and retains the previous manifest;
-it does not silently publish artifacts containing an unverified address.
+Preparation prefers `masterDhcpIp` while it is assigned. If that hint is stale,
+exactly one other usable non-static, non-link-local IPv4 address is accepted
+and recorded without changing the deployment. If multiple candidates exist, preparation fails and
+retains the previous manifest. Inspect them with
+`ip -4 -o addr show dev INTERFACE scope global`; remove the unintended address
+or update the configured hint through `nixorium setup configure`, commit it,
+and apply the controller before retrying.
 
 ## A PXE client does not appear
 

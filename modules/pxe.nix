@@ -16,10 +16,10 @@ let
       SESSION_FILE=${lib.escapeShellArg sessionFile}
       LAST_SESSION_FILE=${lib.escapeShellArg lastSessionFile}
       CONFIGURED_IFACE=${lib.escapeShellArg labSettings.ifaceName}
-      CONFIGURED_DHCP_IP=${lib.escapeShellArg labSettings.masterDhcpIp}
       CONFIGURED_STATIC_IP=${lib.escapeShellArg labSettings.masterIp}
       CONFIGURED_PREFIX=${lib.escapeShellArg (toString labSettings.networkPrefixLength)}
       CONFIGURED_STATIC_CIDR="$CONFIGURED_STATIC_IP/$CONFIGURED_PREFIX"
+      PREPARED_DHCP_IP=""
 
       fail() {
         echo "Error: $*" >&2
@@ -122,10 +122,12 @@ let
         jq -e \
           --arg revision "$revision" \
           --arg iface "$CONFIGURED_IFACE" \
-          --arg dhcpIp "$CONFIGURED_DHCP_IP" \
           --arg staticIp "$CONFIGURED_STATIC_IP" \
-          '.schemaVersion == 1 and .revision == $revision and
-           .controller.dhcpIp == $dhcpIp and .controller.staticIp == $staticIp and
+          'def ipv4:
+             type == "string" and
+             (split(".") | length == 4 and all(.[]; test("^[0-9]+$") and (tonumber >= 0 and tonumber <= 255)));
+           .schemaVersion == 1 and .revision == $revision and
+           (.controller.dhcpIp | ipv4) and .controller.staticIp == $staticIp and
            .network.ifaceName == $iface and
            .artifacts.kernel.relativePath == "bzImage" and
            .artifacts.initrd.relativePath == "initrd" and
@@ -134,6 +136,7 @@ let
            (.clients | type == "array" and length > 0)' \
           "$PREPARATION_FILE" >/dev/null \
           || fail "managed PXE preparation is stale or invalid; run nixorium pxe prepare"
+        PREPARED_DHCP_IP="$(jq -er '.controller.dhcpIp' "$PREPARATION_FILE")"
 
         mapfile -t artifact_rows < <(jq -er '.artifacts | [.kernel, .initrd, .ipxeScript, .firmware][] | [.storePath, .relativePath] | @tsv' "$PREPARATION_FILE")
         [[ "''${#artifact_rows[@]}" -eq 4 ]] \
@@ -165,8 +168,8 @@ let
         validate_preparation
         ip link show dev "$CONFIGURED_IFACE" >/dev/null \
           || fail "configured interface $CONFIGURED_IFACE does not exist"
-        ip_present "$CONFIGURED_IFACE" "$CONFIGURED_DHCP_IP" \
-          || fail "configured DHCP address $CONFIGURED_DHCP_IP is not assigned to $CONFIGURED_IFACE"
+        ip_present "$CONFIGURED_IFACE" "$PREPARED_DHCP_IP" \
+          || fail "prepared controller address $PREPARED_DHCP_IP is not assigned to $CONFIGURED_IFACE; run nixorium pxe prepare again"
         address_present "$CONFIGURED_IFACE" "$CONFIGURED_STATIC_CIDR" \
           || fail "expected static address $CONFIGURED_STATIC_CIDR is not assigned; refusing an untracked transition"
 
@@ -180,7 +183,7 @@ let
           --arg revision "$PREPARATION_REVISION" \
           --arg startedAt "$(date --utc --iso-8601=seconds)" \
           --arg iface "$CONFIGURED_IFACE" \
-          --arg dhcpAddress "$CONFIGURED_DHCP_IP" \
+          --arg dhcpAddress "$PREPARED_DHCP_IP" \
           --arg staticAddress "$CONFIGURED_STATIC_IP" \
           --argjson prefixLength "$CONFIGURED_PREFIX" \
           --argjson originalAddresses "$original_json" \
@@ -208,7 +211,7 @@ let
           fail "could not remove $CONFIGURED_STATIC_CIDR from $CONFIGURED_IFACE"
         fi
         if address_present "$CONFIGURED_IFACE" "$CONFIGURED_STATIC_CIDR" \
-            || ! ip_present "$CONFIGURED_IFACE" "$CONFIGURED_DHCP_IP"; then
+            || ! ip_present "$CONFIGURED_IFACE" "$PREPARED_DHCP_IP"; then
           restore_session start-failed transition-verification-failed
           fail "PXE address transition verification failed and was rolled back"
         fi
@@ -223,7 +226,7 @@ let
           fail "could not publish active PXE network state; transition was rolled back"
         fi
         sync -f "$STATE_DIRECTORY"
-        echo "PXE networking active on $CONFIGURED_IFACE using $CONFIGURED_DHCP_IP"
+        echo "PXE networking active on $CONFIGURED_IFACE using $PREPARED_DHCP_IP"
       }
 
       case "$ACTION" in
@@ -251,7 +254,6 @@ let
       PREPARATION_FILE=${lib.escapeShellArg preparationFile}
       SESSION_FILE=${lib.escapeShellArg sessionFile}
       IFACE=${lib.escapeShellArg labSettings.ifaceName}
-      DHCP_IP=${lib.escapeShellArg labSettings.masterDhcpIp}
       STATIC_IP=${lib.escapeShellArg labSettings.masterIp}
       STATIC_CIDR=${lib.escapeShellArg "${labSettings.masterIp}/${toString labSettings.networkPrefixLength}"}
       HTTP_PORT=${lib.escapeShellArg (toString labSettings.pxeHttpPort)}
@@ -277,14 +279,19 @@ let
         || fail "active PXE network session exceeds the size limit"
 
       PREPARATION_REVISION="$(jq -er '.revision' "$PREPARATION_FILE")"
+      DHCP_IP="$(jq -er '.controller.dhcpIp' "$PREPARATION_FILE")"
       [[ "$PREPARATION_REVISION" =~ ^[0-9a-f]{40}$ ]] \
         || fail "deployment revision is invalid"
       jq -e \
         --arg revision "$PREPARATION_REVISION" \
         --arg iface "$IFACE" \
         --arg dhcpIp "$DHCP_IP" \
-        '.schemaVersion == 1 and .revision == $revision and
-         .controller.dhcpIp == $dhcpIp and .network.ifaceName == $iface and
+        'def ipv4:
+           type == "string" and
+           (split(".") | length == 4 and all(.[]; test("^[0-9]+$") and (tonumber >= 0 and tonumber <= 255)));
+         .schemaVersion == 1 and .revision == $revision and
+         .controller.dhcpIp == $dhcpIp and (.controller.dhcpIp | ipv4) and
+         .network.ifaceName == $iface and
          .artifacts.kernel.relativePath == "bzImage" and
          .artifacts.initrd.relativePath == "initrd" and
          .artifacts.ipxeScript.relativePath == "netboot.ipxe" and
@@ -306,7 +313,7 @@ let
       ip -4 -o addr show dev "$IFACE" scope global \
         | awk '{ split($4, value, "/"); print value[1] }' \
         | grep -Fxq "$DHCP_IP" \
-        || fail "configured DHCP address $DHCP_IP is not assigned to $IFACE"
+        || fail "prepared controller address $DHCP_IP is not assigned to $IFACE"
       ! ip -4 -o addr show dev "$IFACE" scope global \
         | awk '{ print $4 }' \
         | grep -Fxq "$STATIC_CIDR" \
@@ -339,7 +346,7 @@ let
       #!ipxe
       dhcp
       set base-url http://$DHCP_IP:$HTTP_PORT
-      kernel \''${base-url}/bzImage $CMDLINE
+      kernel \''${base-url}/bzImage $CMDLINE nixorium.controller-dhcp-ip=$DHCP_IP
       initrd \''${base-url}/initrd
       boot
       EOF

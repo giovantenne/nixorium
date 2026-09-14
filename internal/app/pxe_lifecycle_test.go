@@ -17,6 +17,7 @@ type fakePXELifecycleSource struct {
 	services    map[string]domain.ServiceState
 	addresses   []string
 	cacheErr    error
+	cacheCalls  []string
 	controlErr  map[string]error
 	controls    []string
 }
@@ -31,7 +32,7 @@ func readyPXESource() *fakePXELifecycleSource {
 	return &fakePXELifecycleSource{
 		meta:        meta,
 		deployment:  domain.DeploymentStatus{Ready: true},
-		preparation: domain.PXEPreparationState{Present: true, Ready: true, Detail: "current"},
+		preparation: domain.PXEPreparationState{Present: true, Ready: true, Detail: "current", DHCPAddress: "192.0.2.10"},
 		services: map[string]domain.ServiceState{
 			HarmoniaUnit:    {Name: HarmoniaUnit, Loaded: true, Active: true, State: "active"},
 			PXEListenerUnit: {Name: PXEListenerUnit, Loaded: true, State: "inactive"},
@@ -66,7 +67,8 @@ func (f *fakePXELifecycleSource) InterfaceAddresses(string) ([]string, error) {
 	return append([]string(nil), f.addresses...), nil
 }
 
-func (f *fakePXELifecycleSource) CacheHealth(context.Context, string, int) error {
+func (f *fakePXELifecycleSource) CacheHealth(_ context.Context, address string, _ int) error {
+	f.cacheCalls = append(f.cacheCalls, address)
 	return f.cacheErr
 }
 
@@ -86,7 +88,7 @@ func (f *fakePXELifecycleSource) ControlSystemUnit(_ context.Context, verb, unit
 		network.Active = true
 		network.State = "active"
 		f.services[PXENetworkUnit] = network
-		f.addresses = []string{f.meta.Controller.DHCPIP}
+		f.addresses = []string{f.preparation.DHCPAddress}
 	case "stop " + PXEListenerUnit:
 		listener := f.services[PXEListenerUnit]
 		listener.Active = false
@@ -97,7 +99,7 @@ func (f *fakePXELifecycleSource) ControlSystemUnit(_ context.Context, verb, unit
 		network.Active = false
 		network.State = "inactive"
 		f.services[PXENetworkUnit] = network
-		f.addresses = []string{f.meta.Controller.DHCPIP, f.meta.Controller.StaticIP}
+		f.addresses = []string{f.preparation.DHCPAddress, f.meta.Controller.StaticIP}
 	}
 	return nil
 }
@@ -148,6 +150,19 @@ func TestPXEStartPreflightsAndReconcilesState(t *testing.T) {
 	second := manager.Start(context.Background(), "/deployment")
 	if second.HasErrors() || len(source.controls) != 1 {
 		t.Fatalf("idempotent report = %+v, controls = %v", second, source.controls)
+	}
+}
+
+func TestPXEStartUsesPreparedRuntimeAddress(t *testing.T) {
+	source := readyPXESource()
+	source.preparation.DHCPAddress = "192.0.2.11"
+	source.addresses = []string{source.meta.Controller.StaticIP, source.preparation.DHCPAddress}
+	report := NewPXELifecycle(source).Start(context.Background(), "/deployment")
+	if report.HasErrors() || report.DHCPAddress != source.preparation.DHCPAddress {
+		t.Fatalf("report = %+v", report)
+	}
+	if want := []string{"192.0.2.11", "192.0.2.11"}; !reflect.DeepEqual(source.cacheCalls, want) {
+		t.Fatalf("cache addresses = %v, want %v", source.cacheCalls, want)
 	}
 }
 

@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Bound managed PXE sessions to the unambiguous live controller address at
+  preparation time and pass it to the offline installer at boot, so ordinary
+  DHCP lease changes no longer require rebuilding the controller configuration.
 - Made controller-apply reconciliation require an atomic, root-owned success
   receipt bound to both the reviewed Git revision and active NixOS closure, so
   late activation failures cannot be mistaken for completed setup.
