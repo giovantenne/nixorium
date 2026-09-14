@@ -609,6 +609,67 @@ push do not run. A partial result explicitly reports the rare case where HEAD
 advanced but index reconciliation failed; retry is then unsafe until inspected.
 A commit remains optional, requires exact confirmation, and needs no remote.
 
+## Guided upstream update
+
+The normal upgrade surface is a separate typed workflow:
+
+```text
+nixorium update check
+nixorium update plan --target vMAJOR.MINOR.PATCH[-PRERELEASE]
+nixorium update apply --target vMAJOR.MINOR.PATCH[-PRERELEASE] --expect TOKEN
+```
+
+`check` is the only release-discovery operation and may contact the configured
+public upstream when the controller has internet access. It is bounded,
+non-interactive, disables Git credential prompting/helpers, and reports stable
+and prerelease tags separately. An explicit target remains usable without
+discovery. Dashboard/status/doctor and all client operations remain independent
+of this external request.
+
+Planning requires a clean private deployment at a stable full Git revision and
+reads exactly one simple `inputs.nixorium.url` string assignment. The command
+preserves the configured upstream identity and accepts only a `v`-prefixed
+Semantic Version tag as the new reference; it never accepts an arbitrary source
+URL from the command line. Moving references such as `master` are reported as
+unpinned. Selecting a prerelease requires an explicit prerelease opt-in, and a
+known semantic-version downgrade requires a distinct downgrade opt-in and
+stronger confirmation. Complex computed input declarations remain a documented
+manual-operation case instead of being rewritten heuristically.
+
+The plan renders candidate `flake.nix` bytes in memory and asks Nix to write a
+candidate lock outside the checkout with `flake lock --override-input nixorium
+... --output-lock-file ...`. It validates that other top-level inputs remain
+owned by the deployment while allowing the selected upstream's transitive lock
+closure to change. All subsequent evaluation and builds use the explicit
+override plus `--reference-lock-file` and `--no-write-lock-file`; they never
+write the deployment lock during review.
+
+Before a plan becomes ready, evaluate `labMeta` and `deploymentStatus`, then
+build one configured client, the controller, netboot ramdisk, PXE firmware, and
+offline installer bundle with no result links. This work may download/build on
+the controller and populate the shared Nix store, but it does not deploy or
+introduce client internet access. The report contains current reference and
+revision, target/channel, bounded redacted `flake.nix`/`flake.lock` patch,
+validation results, a token bound to HEAD plus both original/candidate file
+digests, and exact confirmation.
+
+Apply takes the same target and opt-ins, repeats the complete plan so cached
+builds are normally reused, and requires the exact token and confirmation. It
+then takes the same deployment-root lock used by managed configuration writes,
+rechecks HEAD, clean Git state, and both original file digests, writes sibling
+fsynced temporary files, replaces `flake.lock` before `flake.nix`, and fsyncs
+the directory. In-process failure attempts to restore both originals; a crash
+between the two renames is detectable as a source/lock mismatch and recoverable
+by planning the same target again. Such an outcome is reported partial and is
+not blindly retry-safe.
+
+The successful result is deliberately an uncommitted, reviewable change to only
+`flake.nix` and `flake.lock`. The existing Git review/commit workflow can record
+it; deployment remains a separate explicit operation. Update never creates or
+switches branches, commits, merges, pushes, activates the controller, prepares
+PXE artifacts, or deploys clients. The TUI reuses these typed operations and
+does not own Nix, network, filesystem, or Git mutation logic.
+
 Privileged/systemd operations retain detailed output in journald. Foreground
 deployments stream output to private mode-0600 files under the administrator's
 XDG state, alongside a separate mode-0600 authenticated per-host success
