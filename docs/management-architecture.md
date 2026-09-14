@@ -430,8 +430,14 @@ because NixOS activation and user-generation reloads legitimately update both;
 path remains mounted explicitly read-only, and the command, target closure,
 Git revision, and polkit unit shape remain constrained independently.
 Systemd/journald retain preflight, build, and activation output across TUI or
-terminal exits. Setup completion is reconciled by comparing the evaluated
-controller to `/run/current-system`, not by setting a flag.
+terminal exits. Before switching, the service invalidates any earlier
+root-owned activation receipt. Only after `switch-to-configuration` exits zero
+and `/run/current-system` resolves to the built closure does it atomically
+write `/var/lib/nixorium/controller/applied.json`, bound to the reviewed Git
+revision and exact store path. Setup completion requires the evaluated
+controller, active symlink, current Git revision, and durable receipt to agree.
+This prevents a late activation-script failure from being mistaken for success
+when NixOS has already advanced `/run/current-system`.
 
 Routine administration reuses that implementation through `controller plan`
 and `controller apply --expect <revision>`. The latter starts only
@@ -439,7 +445,8 @@ and `controller apply --expect <revision>`. The latter starts only
 policy independently constrain that unit shape. The root service validates the
 instance, pins the Git fetcher to the reviewed commit, builds as `admin`, and
 rechecks clean HEAD before activating the exact returned closure. The
-application then verifies both HEAD and `/run/current-system`. The original
+application then verifies HEAD, `/run/current-system`, and the durable success
+receipt. The original
 parameterless unit remains for first-run-compatible `setup apply` and now also
 pins/rechecks the revision it discovers internally.
 

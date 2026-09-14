@@ -189,7 +189,8 @@ Use `controller plan` and revision-bound `controller apply --expect` for routine
 controller changes. Apply requires exact `REBUILD <controller>` confirmation,
 starts only the matching systemd unit instance, builds the pinned Git revision
 as the deployment owner, refuses repository drift before activation, and
-verifies the active system afterward. The dashboard's **Rebuild controller**
+verifies the active system plus its revision-bound durable success receipt
+afterward. The dashboard's **Rebuild controller**
 task invokes the same typed workflow; the systemd-owned job and journal survive
 closing the dashboard. Use `--yes` only for intentional automation.
 Use `services` to inspect the persistent signed cache and composite on-demand
@@ -235,6 +236,10 @@ and asks for the exact `APPLY` confirmation before building and activating
 this controller. The build runs as `admin`; only activation of the resulting
 closure runs as root. Use `journalctl -u nixorium-apply-controller.service`
 for durable failure details and retry the same command after correction.
+The setup stage completes only when the active system and the root-owned
+success receipt both match the reviewed revision. After upgrading from a
+version without receipts, one reviewed `setup apply` creates that proof even
+when the active closure already matches.
 Private deployments are evaluated through the Git Flake fetcher so ignored
 private keys do not enter the Nix source/store.
 The applied controller runs Harmonia as `nixorium-harmonia.service`; systemd

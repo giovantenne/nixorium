@@ -35,6 +35,9 @@
       ${pkgs.coreutils}/bin/mkdir -p /home/teacher/.config /run/user/1000
       ${pkgs.coreutils}/bin/touch /home/teacher/.config/nixorium-activation-test /run/user/1000/nixorium-activation-test
       ${pkgs.coreutils}/bin/ln -sfn "$SYSTEM_PATH" /run/current-system
+      if [[ -e /run/nixorium-test-activation-fail ]]; then
+        exit 4
+      fi
       ${pkgs.coreutils}/bin/touch /run/nixorium-controller-applied
       SCRIPT
       chmod +x "$out/bin/switch-to-configuration"
@@ -279,10 +282,17 @@
     controller.succeed("su - admin -c 'systemctl start nixorium-install-secrets.service'")
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'")
+    controller.succeed("readlink -f /run/current-system > /tmp/controller-system-before; touch /run/nixorium-test-activation-fail; su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json > /tmp/partial-apply.json' || test $? = 1")
+    controller.succeed("jq -e '.operation == \"setup-apply-controller\" and .state == \"failed\"' /tmp/partial-apply.json; test \"$(readlink -f /run/current-system)\" != \"$(cat /tmp/controller-system-before)\"; test ! -e /var/lib/nixorium/controller/applied.json")
+    controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\" and (.stages[] | select(.id == \"apply-controller\").detail | contains(\"no successful controller activation\"))'")
+    controller.succeed("rm /run/nixorium-test-activation-fail; systemctl reset-failed nixorium-apply-controller.service")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json' | jq -e '.operation == \"setup-apply-controller\" and .state == \"completed\"'")
     controller.succeed("test -e /run/nixorium-controller-applied")
+    controller.succeed("revision=$(git -c safe.directory=/home/admin/nixorium-deployment -C /home/admin/nixorium-deployment rev-parse HEAD); system_path=$(readlink -f /run/current-system); jq -e --arg revision \"$revision\" --arg systemPath \"$system_path\" '.schemaVersion == 1 and .revision == $revision and .systemPath == $systemPath and (.activatedAt | endswith(\"Z\"))' /var/lib/nixorium/controller/applied.json; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/controller/applied.json)\" = root:root:644")
     controller.succeed("test -e /home/teacher/.config/nixorium-activation-test; test -e /run/user/1000/nixorium-activation-test; test ! -e /home/admin/nixorium-deployment/activation-must-not-write")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"offer-client-installation\" and (.stages[] | select(.id == \"prepare-artifacts\").state) == \"complete\"'")
+    controller.succeed("touch /run/nixorium-test-activation-fail; ! systemctl start nixorium-apply-controller.service; test ! -e /var/lib/nixorium/controller/applied.json; rm /run/nixorium-test-activation-fail; systemctl reset-failed nixorium-apply-controller.service")
+    controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json' | jq -e '.state == \"completed\"'")
     controller.succeed("su - admin -c 'nixorium controller plan --repo ~/nixorium-deployment --json' > /tmp/controller-plan.json; jq -e '.operation == \"controller-plan\" and .state == \"current\" and .controller == \"pc99\" and .current and (.revision | length) == 40 and .confirmation == \"REBUILD pc99\"' /tmp/controller-plan.json")
     controller.succeed("su - admin -c 'nixorium controller apply --repo ~/nixorium-deployment --expect 0000000000000000000000000000000000000000 --yes --json >/tmp/controller-stale.json' || test $? = 1; jq -e '.state == \"blocked\" and any(.issues[]; .field == \"review\")' /tmp/controller-stale.json")
