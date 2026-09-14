@@ -39,6 +39,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Explicit `nixorium hosts` text/JSON inventory and a dashboard Computers
   screen with bounded SSH probes and distinct reachable, unreachable, refused,
   and unknown observations, while the default status path remains probe-free.
+  Managed generations now embed their private deployment revision and install
+  a fixed read-only host-state helper; authenticated bounded SSH observation
+  reconciles active system/revision against desired HEAD as current, outdated,
+  or unknown without evaluating every client closure during inventory.
 - Read-only `nixorium deploy plan --on` reports for one, selected, or all
   clients, bound to a clean Git revision and blocked by readiness, Git, or
   selector errors before any Colmena execution.

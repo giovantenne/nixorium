@@ -98,6 +98,19 @@ func TestDeploymentCommandIsFixedAndUsesArgumentArray(t *testing.T) {
 	}
 }
 
+func TestCurrentSystemSSHCommandIsFixedAndNonInteractive(t *testing.T) {
+	arguments := sshCurrentSystemArguments(domain.HostMeta{Name: "pc01", IP: "192.0.2.1"}, 2500*time.Millisecond)
+	joined := strings.Join(arguments, " ")
+	for _, expected := range []string{"BatchMode=yes", "ConnectTimeout=3", "PasswordAuthentication=no", "StrictHostKeyChecking=accept-new", "root@192.0.2.1 nixorium-host-state"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("SSH arguments omit %q: %s", expected, joined)
+		}
+	}
+	if !validSystemPath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01") || validSystemPath("/tmp/system") || validSystemPath("/nix/store/path with space") || !validGitRevision("0123456789abcdef0123456789abcdef01234567") || validGitRevision("not-a-revision") {
+		t.Fatal("host-state validation accepted or rejected the wrong value")
+	}
+}
+
 func TestParseProcNetFindsListeningPort(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tcp")
 	content := "  sl  local_address rem_address   st\n   0: 0100007F:1F90 00000000:00000000 0A 00000000:00000000\n"
@@ -163,6 +176,35 @@ func TestSSHStatusBoundsConcurrencyAndKeepsEveryHost(t *testing.T) {
 	}
 
 	statuses := probeSSHStatuses(context.Background(), hosts, time.Second, probe)
+	if len(statuses) != len(hosts) {
+		t.Fatalf("statuses = %d, want %d", len(statuses), len(hosts))
+	}
+	if maximum < 2 || maximum > maximumConcurrentSSHProbes {
+		t.Fatalf("maximum concurrency = %d, want 2..%d", maximum, maximumConcurrentSSHProbes)
+	}
+}
+
+func TestCurrentSystemObservationBoundsConcurrencyAndKeepsEveryHost(t *testing.T) {
+	hosts := make([]domain.HostMeta, 24)
+	for index := range hosts {
+		hosts[index] = domain.HostMeta{Name: fmt.Sprintf("pc%02d", index+1), IP: "192.0.2.1"}
+	}
+	var active int32
+	var maximum int32
+	probe := func(context.Context, domain.HostMeta, time.Duration) domain.HostSystemProbe {
+		current := atomic.AddInt32(&active, 1)
+		for {
+			observed := atomic.LoadInt32(&maximum)
+			if current <= observed || atomic.CompareAndSwapInt32(&maximum, observed, current) {
+				break
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		return domain.HostSystemProbe{SystemPath: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-system", Revision: "0123456789abcdef0123456789abcdef01234567"}
+	}
+
+	statuses := probeCurrentSystems(context.Background(), hosts, time.Second, probe)
 	if len(statuses) != len(hosts) {
 		t.Fatalf("statuses = %d, want %d", len(statuses), len(hosts))
 	}

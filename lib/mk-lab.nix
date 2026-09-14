@@ -10,12 +10,20 @@
   hostModules ? {},
   netbootModules ? [],
   installerSource ? null,
-  nixosVersionMetadata ? null
+  nixosVersionMetadata ? null,
+  deploymentRevision ? null
 }:
 let
   lib = nixpkgs.lib;
   upstreamRoot = upstreamSelf.outPath;
   deploymentRoot = if builtins.isAttrs deploymentSelf then deploymentSelf.outPath else deploymentSelf;
+  inferredDeploymentRevision =
+    if builtins.isAttrs deploymentSelf then
+      deploymentSelf.rev or deploymentSelf.dirtyRev or null
+    else
+      null;
+  effectiveDeploymentRevision =
+    if deploymentRevision != null then deploymentRevision else inferredDeploymentRevision;
   version = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile (upstreamRoot + "/VERSION"));
   config = import ./eval-lab-config.nix { inherit lib; } labConfig;
 
@@ -153,12 +161,17 @@ let
 
   baseHostModules = [
     { nixpkgs.overlays = [ labOverlay ]; }
-    ({ lib, ... }: {
-      warnings =
-        lib.optional (cachePublicKeyFile == null) "Missing cache public key"
-        ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key"
-        ++ lib.optional (veyonPublicKeyFile == null) "Missing Veyon public key";
-    })
+    ({ lib, ... }:
+      {
+        warnings =
+          lib.optional (cachePublicKeyFile == null) "Missing cache public key"
+          ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key"
+          ++ lib.optional (veyonPublicKeyFile == null) "Missing Veyon public key";
+        environment.systemPackages = [ hostState ];
+      }
+      // lib.optionalAttrs (effectiveDeploymentRevision != null) {
+        system.configurationRevision = effectiveDeploymentRevision;
+      })
     disko.nixosModules.disko
     (upstreamRoot + "/disko-uefi.nix")
     (upstreamRoot + "/modules/hardware.nix")
@@ -296,6 +309,20 @@ let
     };
   } bootstrapPkgs;
   nixoriumPackage = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {};
+  hostState = bootstrapPkgs.writeShellApplication {
+    name = "nixorium-host-state";
+    runtimeInputs = [ bootstrapPkgs.coreutils ];
+    text = ''
+      system_path="$(readlink -f /run/current-system)"
+      [[ "$system_path" == /nix/store/* && "$system_path" != *[[:space:]]* ]] \
+        || { echo "active system path is invalid" >&2; exit 1; }
+      revision="$(/run/current-system/sw/bin/nixos-version --configuration-revision)" \
+        || { echo "active deployment revision is unavailable" >&2; exit 1; }
+      [[ "$revision" =~ ^[0-9a-f]{40,64}$ ]] \
+        || { echo "active deployment revision is invalid" >&2; exit 1; }
+      printf '%s\n%s\n' "$system_path" "$revision"
+    '';
+  };
 
   installerFlake = bootstrapPkgs.writeText "nixorium-installer-flake.nix" ''
     {
@@ -352,6 +379,7 @@ let
             versionSuffix = ${builtins.toJSON sourceNixosVersionMetadata.versionSuffix};
             revision = ${builtins.toJSON sourceNixosVersionMetadata.revision};
           };
+          deploymentRevision = ${builtins.toJSON effectiveDeploymentRevision};
         };
     }
   '';

@@ -44,8 +44,21 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 	available, total := hostAvailability(report.Hosts)
 	fmt.Fprintf(writer, "Nixorium computers: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "SSH available:      %d/%d\n", available, total)
+	fmt.Fprintf(writer, "Deployment:         %d current, %d outdated, %d unknown\n", report.Deployment.Current, report.Deployment.Outdated, report.Deployment.Unknown)
+	if report.DesiredRevision != "" {
+		fmt.Fprintf(writer, "Desired revision:   %s\n", report.DesiredRevision)
+	}
 	for _, host := range report.Hosts {
-		fmt.Fprintf(writer, "  %-10s %-15s network=%-12s ssh=%s\n", host.Name, host.IP, host.Reachability, host.SSH)
+		fmt.Fprintf(writer, "  %-10s %-15s network=%-12s ssh=%-11s deployment=%s\n", host.Name, host.IP, host.Reachability, host.SSH, host.Deployment)
+		if host.CurrentSystem != "" {
+			fmt.Fprintf(writer, "    current: %s\n", host.CurrentSystem)
+		}
+		if host.CurrentRevision != "" {
+			fmt.Fprintf(writer, "    current revision: %s\n", host.CurrentRevision)
+		}
+		if host.DeploymentDetail != "" {
+			fmt.Fprintf(writer, "    detail:  %s\n", host.DeploymentDetail)
+		}
 	}
 }
 

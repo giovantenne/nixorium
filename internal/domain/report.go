@@ -61,22 +61,49 @@ type SSHProbe struct {
 	Detail       string          `json:"detail,omitempty"`
 }
 
+type DeploymentCurrency string
+
+const (
+	DeploymentCurrent  DeploymentCurrency = "current"
+	DeploymentOutdated DeploymentCurrency = "outdated"
+	DeploymentUnknown  DeploymentCurrency = "unknown"
+)
+
+type HostSystemProbe struct {
+	SystemPath string `json:"systemPath,omitempty"`
+	Revision   string `json:"revision,omitempty"`
+	Detail     string `json:"detail,omitempty"`
+}
+
+type HostDeploymentSummary struct {
+	Current  int `json:"current"`
+	Outdated int `json:"outdated"`
+	Unknown  int `json:"unknown"`
+}
+
 type HostStatus struct {
-	Name         string          `json:"name"`
-	IP           string          `json:"ip"`
-	Role         string          `json:"role"`
-	Reachability Reachability    `json:"reachability"`
-	SSH          SSHAvailability `json:"ssh"`
-	Detail       string          `json:"detail,omitempty"`
+	Name             string             `json:"name"`
+	IP               string             `json:"ip"`
+	Role             string             `json:"role"`
+	Reachability     Reachability       `json:"reachability"`
+	SSH              SSHAvailability    `json:"ssh"`
+	Deployment       DeploymentCurrency `json:"deployment"`
+	CurrentSystem    string             `json:"currentSystem,omitempty"`
+	CurrentRevision  string             `json:"currentRevision,omitempty"`
+	DesiredRevision  string             `json:"desiredRevision,omitempty"`
+	Detail           string             `json:"detail,omitempty"`
+	DeploymentDetail string             `json:"deploymentDetail,omitempty"`
 }
 
 type HostsReport struct {
-	SchemaVersion int          `json:"schemaVersion"`
-	Operation     string       `json:"operation"`
-	GeneratedAt   time.Time    `json:"generatedAt"`
-	State         string       `json:"state"`
-	Repository    string       `json:"repository"`
-	Hosts         []HostStatus `json:"hosts"`
+	SchemaVersion   int                   `json:"schemaVersion"`
+	Operation       string                `json:"operation"`
+	GeneratedAt     time.Time             `json:"generatedAt"`
+	State           string                `json:"state"`
+	Repository      string                `json:"repository"`
+	DesiredRevision string                `json:"desiredRevision,omitempty"`
+	Deployment      HostDeploymentSummary `json:"deployment"`
+	Hosts           []HostStatus          `json:"hosts"`
 }
 
 type DeploymentStatus struct {
