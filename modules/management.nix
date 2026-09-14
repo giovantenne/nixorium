@@ -395,7 +395,11 @@ in
         CacheDirectory = "nixorium";
         Environment = "XDG_CACHE_HOME=/var/cache/nixorium";
         PrivateTmp = true;
-        ProtectHome = "read-only";
+        # NixOS activation legitimately updates declared user homes and
+        # /run/user. Keep the reviewed deployment itself read-only instead of
+        # placing the entire switch-to-configuration process behind
+        # ProtectHome, which also makes /run/user read-only.
+        ProtectHome = false;
         ReadOnlyPaths = [ cfg.deploymentPath ];
         ReadWritePaths = [ "-/var/cache/nixorium" ];
         Nice = 10;
@@ -417,7 +421,9 @@ in
         CacheDirectory = "nixorium";
         Environment = "XDG_CACHE_HOME=/var/cache/nixorium";
         PrivateTmp = true;
-        ProtectHome = "read-only";
+        # See the parameterless first-run unit above. Revision binding and the
+        # explicit read-only deployment mount remain the security boundary.
+        ProtectHome = false;
         ReadOnlyPaths = [ cfg.deploymentPath ];
         ReadWritePaths = [ "-/var/cache/nixorium" ];
         Nice = 10;
