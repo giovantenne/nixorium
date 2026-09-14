@@ -72,7 +72,7 @@ scripts/
   cmd-screensaver.sh       # TTE screensaver animation loop
   launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
   screensaver-monitor.sh   # GNOME idle watcher for screensaver
-  validate.sh              # Full upstream validation matrix
+  validate.sh              # Tiered upstream validation entry point
 assets/
   backgrounds/             # Ristretto wallpapers (random at each home-reset)
   logo.txt                 # ASCII art for screensaver
@@ -151,13 +151,16 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
 ```
 
-`nix flake check` runs the configuration-schema tests. GitHub CI runs
-`scripts/validate.sh --ci`, which performs syntax, schema, representative-role,
-and fresh-template evaluations without visiting every generated client or
-building system closures. The default `scripts/validate.sh` remains the
-required local full matrix: it builds representative hosts, netboot, Disko,
-and installer bundles and verifies offline equivalence. There is no automatic
-formatter; follow the styles below and run `git diff --check`.
+`scripts/validate.sh` defaults to the quick local matrix: syntax, shell tests,
+skill coherence, schema and `mkLab` checks, and the packaged Go command with
+its unit tests. Use `--management-vm` or `--client-installer-vm` for the affected
+integration path. Use `--full` after public API, template, module, installer,
+asset, input, Disko, or netboot changes and before milestone or release
+completion; it builds representative hosts and artifacts and verifies offline
+equivalence. GitHub CI uses `--ci` for evaluation-only coverage without system
+closures. Validation reuses a persistent evaluation cache and creates no result
+roots; it must never garbage-collect the shared Nix store automatically. There
+is no automatic formatter; follow the styles below and run `git diff --check`.
 
 ## Releases
 

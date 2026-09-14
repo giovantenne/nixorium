@@ -37,6 +37,12 @@ creating commits, synchronizing branches, merging, rebasing, or pushing. Read
 [references/release.md](references/release.md) before versioning, tagging, or
 publishing.
 
+Use the default quick validation while iterating, then select the affected VM
+test when management or installer behavior changes. Reserve `--full` for the
+high-impact changes and checkpoints listed in the validation reference; do not
+repeatedly run the full matrix when the change cannot affect those outputs.
+Validation must never run Nix store garbage collection automatically.
+
 ## Keep distribution coherent
 
 Public API changes must update the template, both READMEs, `AGENTS.md`, and
