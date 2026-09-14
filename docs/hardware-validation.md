@@ -169,7 +169,10 @@ Pass when canonical configured targets are shown before confirmation, every
 target builds before apply, every client reports the reviewed revision and a
 concrete active path, and the authenticated success history matches the live
 result. Repeat once with one client unavailable to validate mixed-state recovery
-through a fresh plan and retry.
+through a fresh plan and retry. In a disposable iteration, close the initiating
+terminal during apply; pass when the private log remains readable, `hosts`
+reports only authenticated live state, and a fresh plan can converge the lab
+without an implied automatic rollback.
 
 ## Scenario 8: DHCP coexistence and lease change
 

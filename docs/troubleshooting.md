@@ -115,7 +115,8 @@ until their next normal deployment.
 ## A deployment failed
 
 A Colmena failure can leave selected machines at different generations.
-Nixorium does not claim an automatic rollback across hosts.
+Nixorium does not claim an automatic rollback across hosts. Unexpected terminal
+loss can interrupt the foreground deployment and uses this same recovery path.
 
 1. Read the operation-log ID from the result and run
    `nixorium logs show OPERATION_LOG_ID`.

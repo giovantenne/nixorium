@@ -157,6 +157,9 @@ operations: select computers, review the revision and canonical targets, then
 type the exact phrase shown. It reports activity, authenticated/recorded target
 counts, and the final durable log; closing is disabled while its Colmena
 process is running.
+Unexpected terminal loss can still interrupt that unprivileged process. Reopen
+Nixorium, inspect `logs` and fresh authenticated `hosts` state, then make a new
+plan before retrying; do not infer rollback or completion from the lost terminal.
 Use `logs` to list the newest 50 recognized deployment operation logs from the
 administrator's private XDG state, even outside a deployment checkout. The
 same view shows compact typed outcomes for configuration, key, fixed controller,
