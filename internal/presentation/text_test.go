@@ -223,3 +223,28 @@ func TestGitCommitTextShowsPlanAndLocalResult(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateTextShowsValidatedPlanAndReviewableResult(t *testing.T) {
+	plan := domain.UpdatePlanReport{
+		State: "ready", Repository: "/deployment", Revision: strings.Repeat("a", 40),
+		CurrentRef: "v2.0.0", CurrentRev: strings.Repeat("b", 40), CurrentChannel: domain.UpdateChannelStable,
+		Target: "v2.1.0-beta.1", TargetChannel: domain.UpdateChannelPrerelease,
+		ReviewToken: "sha256:review", Confirmation: "UPDATE NIXORIUM TO v2.1.0-beta.1",
+		Checks: []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
+		Diff:   domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
+	}
+	var output bytes.Buffer
+	UpdatePlanText(&output, plan)
+	for _, expected := range []string{"update plan: READY", "v2.0.0", "prerelease", "client", "PASSED", "sha256:review", plan.Confirmation, "No branch, commit, push", "flake.nix/flake.lock"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("update plan output omits %q:\n%s", expected, output.String())
+		}
+	}
+	output.Reset()
+	UpdateApplyText(&output, domain.UpdateApplyReport{State: "completed", Target: plan.Target, Updated: true, Message: "review and commit it separately"})
+	for _, expected := range []string{"update: COMPLETED", "Files updated:   true", "review and commit it separately"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("update apply output omits %q:\n%s", expected, output.String())
+		}
+	}
+}

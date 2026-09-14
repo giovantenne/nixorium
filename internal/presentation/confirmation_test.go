@@ -98,3 +98,17 @@ func TestConfirmGitCommitRequiresExactReviewPhrase(t *testing.T) {
 		}
 	}
 }
+
+func TestConfirmUpdateRequiresExactReleasePhrase(t *testing.T) {
+	report := domain.UpdatePlanReport{CurrentRef: "v2.0.0", CurrentRev: "abc", Target: "v2.1.0", TargetChannel: domain.UpdateChannelStable, Confirmation: "UPDATE NIXORIUM TO v2.1.0"}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"UPDATE NIXORIUM TO v2.1.0\n", true}, {"update nixorium to v2.1.0\n", false}, {"UPDATE NIXORIUM\n", false}} {
+		var output bytes.Buffer
+		approved, err := ConfirmUpdate(strings.NewReader(test.input), &output, report)
+		if err != nil || approved != test.want || !strings.Contains(output.String(), "no branch, commit, push, activation") {
+			t.Fatalf("confirmation %q = %t, %v:\n%s", test.input, approved, err, output.String())
+		}
+	}
+}

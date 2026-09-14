@@ -159,6 +159,27 @@ func TestParseArgumentsAcceptsGitCommitPlanAndApply(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsUpdatePlanAndApplyPolicy(t *testing.T) {
+	plan, err := parseArguments([]string{"update", "plan", "--target", "v2.1.0-beta.1", "--allow-prerelease", "--json"})
+	if err != nil || plan.command != "update" || plan.subcommand != "plan" || plan.target != "v2.1.0-beta.1" || !plan.allowPrerelease {
+		t.Fatalf("update plan = %+v, error = %v", plan, err)
+	}
+	apply, err := parseArguments([]string{"update", "apply", "--target", "v1.9.0", "--allow-downgrade", "--expect", "sha256:review", "--yes", "--json"})
+	if err != nil || apply.subcommand != "apply" || !apply.allowDowngrade || apply.expect != "sha256:review" || !apply.yes {
+		t.Fatalf("update apply = %+v, error = %v", apply, err)
+	}
+	for _, arguments := range [][]string{
+		{"update", "plan"},
+		{"update", "apply", "--target", "v2.1.0"},
+		{"status", "--target", "v2.1.0"},
+		{"status", "--allow-prerelease"},
+	} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("invalid update arguments accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

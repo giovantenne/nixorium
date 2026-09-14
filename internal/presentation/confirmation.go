@@ -104,3 +104,18 @@ func ConfirmGitCommit(input io.Reader, output io.Writer, report domain.GitCommit
 	}
 	return strings.TrimSpace(value) == report.Confirmation, nil
 }
+
+func ConfirmUpdate(input io.Reader, output io.Writer, report domain.UpdatePlanReport) (bool, error) {
+	fmt.Fprintln(output, "Nixorium release update review")
+	fmt.Fprintf(output, "Current: %s (%s)\n", report.CurrentRef, report.CurrentRev)
+	fmt.Fprintf(output, "Target: %s (%s)\n", report.Target, report.TargetChannel)
+	fmt.Fprintln(output, "Action: replace only flake.nix and flake.lock with the validated proposal")
+	fmt.Fprintln(output, "Safety: no branch, commit, push, activation, PXE action, or deployment is performed")
+	fmt.Fprintln(output, "Afterward: review and commit the two files separately before deploying")
+	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == report.Confirmation, nil
+}
