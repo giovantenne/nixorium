@@ -83,6 +83,9 @@ checkout is needed while installing clients without internet access.
 
 ## Operations
 
+For symptom-first diagnostics, safe retries, interrupted-operation behavior,
+and backup/restoration boundaries, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
 Run commands from the repository root:
 
 ```sh
@@ -263,7 +266,8 @@ mode avoids that potentially long build. Client inventory comes from the
 structured `labMeta.clients.hosts` output.
 PXE preparation, start, stop, and recovery no longer need foreground terminals,
 direct systemd commands, manual network repair, or mutable build links. Guided
-client enrollment remains a later management milestone.
+client enrollment is provided by the immutable installer bundle described
+below.
 
 The NixOS firewall is enabled on every installed host. SSH, mDNS, Veyon, and
 the optional VNC fallback are admitted only on `ifaceName`; Harmonia and PXE

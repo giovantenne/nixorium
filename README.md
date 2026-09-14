@@ -337,6 +337,10 @@ controller addressing is restored before deploying with Colmena.
 
 ## 🔧 Maintenance
 
+For symptom-first recovery, safe retry behavior, and backup/restoration
+boundaries, see [Troubleshooting and recovery](docs/troubleshooting.md). The
+generated private deployment includes the same guide locally.
+
 ### Management commands
 
 Run these commands from the private deployment root:
