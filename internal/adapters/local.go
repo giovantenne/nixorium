@@ -67,6 +67,35 @@ func (Local) GitRevision(ctx context.Context, repository string) (string, error)
 	return revision, nil
 }
 
+func (Local) RunDeploymentPhase(ctx context.Context, repository string, phase domain.DeploymentPhase, selector string, output io.Writer) error {
+	arguments, err := deploymentCommand(phase, selector)
+	if err != nil {
+		return err
+	}
+	command := exec.CommandContext(ctx, "colmena", arguments...)
+	command.Dir = repository
+	command.Stdout = output
+	command.Stderr = output
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("colmena %s: %w", phase, err)
+	}
+	return nil
+}
+
+func deploymentCommand(phase domain.DeploymentPhase, selector string) ([]string, error) {
+	if selector == "" {
+		return nil, errors.New("Colmena selector is empty")
+	}
+	switch phase {
+	case domain.DeploymentPhaseBuild:
+		return []string{"build", "--on", selector, "--verbose", "--color", "never"}, nil
+	case domain.DeploymentPhaseApply:
+		return []string{"apply", "switch", "--on", selector, "--verbose", "--color", "never"}, nil
+	default:
+		return nil, fmt.Errorf("unsupported deployment phase %q", phase)
+	}
+}
+
 func (Local) ServiceState(ctx context.Context, name string) domain.ServiceState {
 	state := domain.ServiceState{Name: name, State: "not-found"}
 	output, err := run(ctx, "systemctl", "show", name, "--property=LoadState", "--property=ActiveState", "--no-pager")

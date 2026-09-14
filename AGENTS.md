@@ -135,7 +135,11 @@ nix run .#nixorium -- config plan --file candidate.json
 # Rebuild and activate on the local machine (controller)
 sudo nixos-rebuild switch --flake .#pcNN --no-write-lock-file
 
-# Deploy to all lab PCs via Colmena
+# Review and execute a managed client deployment
+nix run .#nixorium -- deploy plan --on @lab
+nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
+
+# Advanced compatibility: deploy to all lab PCs via raw Colmena
 colmena apply --on @lab
 
 # Deploy to a single PC
@@ -175,6 +179,7 @@ Release from the matching changelog section.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
+- Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).

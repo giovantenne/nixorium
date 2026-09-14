@@ -44,3 +44,18 @@ func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecyc
 	}
 	return strings.TrimSpace(value) == "START PXE", nil
 }
+
+func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.DeploymentPlanReport) (bool, error) {
+	fmt.Fprintln(output, "Client deployment review")
+	fmt.Fprintf(output, "Revision: %s\n", report.Revision)
+	fmt.Fprintf(output, "Targets: %s (%d computer(s))\n", report.ColmenaSelector, len(report.Targets))
+	fmt.Fprintln(output, "Action: build every selected configuration, then apply it with Colmena")
+	fmt.Fprintln(output, "Impact: target services may restart; offline or failed targets will be reported")
+	fmt.Fprintln(output, "Retry: safe; Nixorium revalidates the revision and rebuilds before every apply")
+	fmt.Fprintf(output, "Type DEPLOY %s to continue: ", report.ColmenaSelector)
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == "DEPLOY "+report.ColmenaSelector, nil
+}

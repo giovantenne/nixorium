@@ -36,6 +36,19 @@ func TestParseArgumentsAcceptsDeploymentPlan(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsReviewedDeploymentApply(t *testing.T) {
+	options, err := parseArguments([]string{"deploy", "apply", "--on", "@lab", "--expect", "0123456789abcdef", "--yes", "--json"})
+	if err != nil || options.command != "deploy" || options.subcommand != "apply" || options.on != "@lab" || options.expect != "0123456789abcdef" || !options.yes || !options.json {
+		t.Fatalf("deploy apply options = %+v, error = %v", options, err)
+	}
+	if _, err := parseArguments([]string{"deploy", "apply", "--on", "pc01"}); err == nil {
+		t.Fatal("deploy apply without reviewed revision was accepted")
+	}
+	if _, err := parseArguments([]string{"deploy", "apply", "--expect", "revision"}); err == nil {
+		t.Fatal("deploy apply without targets was accepted")
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")
