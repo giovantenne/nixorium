@@ -67,6 +67,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   and scrollable tail rendering. A locked atomic mode-0600 newest-1000 record
   adds safe typed summaries for configuration, key, controller, PXE, cache, and
   deployment outcomes without copying raw messages or deleting detailed logs.
+- Read-only `nixorium git review` CLI/JSON and dashboard review of bounded
+  staged/unstaged patches plus untracked paths, with managed/unexpected
+  classification, disabled external diff drivers, settings-password redaction,
+  terminal sanitization, and private-key-path refusal before patch capture.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments
@@ -120,8 +124,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, systemd-owned runtime services, interface-scoped
-  firewall, local guided client-enrollment trust model, and bounded private
-  operation records.
+  firewall, local guided client-enrollment trust model, bounded private
+  operation records, and bounded read-only Git review.
 - An interactive controller-bootstrap version selector offering `master`, the
   latest GitHub prerelease, and published stable releases while preserving
   `--release` and `NIXORIUM_RELEASE` for unattended installations.

@@ -77,6 +77,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		controllerManager := app.NewControllerManager(local)
 		serviceManager := app.NewServiceManager(local)
 		operationLogManager := app.NewOperationLogManager(local)
+		gitReviewManager := app.NewGitReviewManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -111,6 +112,9 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			},
 			LoadLog: func(id string) domain.OperationLogReport {
 				return operationLogManager.Show(id)
+			},
+			LoadGitReview: func() domain.GitReviewReport {
+				return gitReviewManager.Review(ctx, repository)
 			},
 			PreparePXE: func() domain.ActionReport {
 				report := app.NewSystemActions(local).PreparePXE(ctx)
@@ -227,6 +231,16 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			if report.HasErrors() {
 				return 1
 			}
+		}
+	case "git":
+		report := app.NewGitReviewManager(local).Review(ctx, repository)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.GitReviewText(stdout, report)
+		}
+		if report.HasErrors() {
+			return 1
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -429,7 +443,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "config", "setup", "pxe":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -478,6 +492,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("show must follow logs")
 			}
 			result.subcommand = "show"
+		case "review":
+			if result.command != "git" || result.subcommand != "" {
+				return options{}, errors.New("review must follow git")
+			}
+			result.subcommand = "review"
 		case "cache":
 			if result.command != "services" || result.subcommand != "restart" || result.service != "" {
 				return options{}, fmt.Errorf("unexpected argument %q", arguments[index])
@@ -542,6 +561,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "logs" && result.subcommand == "show" && result.logID == "" {
 		return options{}, errors.New("logs show requires an operation log ID")
+	}
+	if result.command == "git" && result.subcommand != "review" {
+		return options{}, errors.New("git requires the review subcommand")
 	}
 	if result.command == "deploy" && result.on == "" {
 		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
@@ -632,13 +654,14 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")
 	fmt.Fprintln(writer, "       controller apply --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       services restart cache [--yes]")
 	fmt.Fprintln(writer, "       logs show <operation-log-id>")
+	fmt.Fprintln(writer, "       git review shows bounded staged and unstaged changes without mutating Git")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")

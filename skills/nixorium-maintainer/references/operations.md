@@ -89,6 +89,20 @@ The host report also shows the last successful post-apply verification stored
 locally. Treat it as history only: current/outdated/unknown always comes from
 the live authenticated observation.
 
+Review deployment changes without mutating the index or worktree:
+
+```sh
+nixorium git review
+```
+
+The report keeps staged, unstaged, and untracked paths distinct and labels
+Nixorium-managed settings/public keys separately from unexpected edits. It
+never opens untracked file contents, disables external diff/textconv drivers,
+bounds tracked patches, redacts settings password hashes, and blocks before
+patch capture if a known private-key path appears. The TUI's **Review Git
+changes** task uses the same report. Continue to inspect and stage intentionally;
+this read-only command never discards, stages, commits, or pushes.
+
 Browse the private deployment operation logs without copying paths manually:
 
 ```sh

@@ -578,9 +578,20 @@ recovery path.
 
 Configuration changes are prepared in the existing working tree. The
 application refuses to conflate its generated patch with overlapping existing
-edits, shows the diff, and can discard only its own staged draft before
-acceptance. A commit is optional and requires explicit confirmation; push is
-never implicit and no remote is required.
+edits. The read-only review adapter consumes NUL-delimited porcelain status,
+classifies index/worktree/untracked and Nixorium-managed/unexpected paths, and
+captures separate staged and unstaged patches with external diff and textconv
+drivers disabled. Each command result and path count is bounded. Untracked
+contents are not opened automatically, settings password hashes are redacted,
+terminal controls are neutralized, and the presence of a known private-key
+path stops patch capture and blocks the report. Private paths are independently
+excluded from every diff, and status plus HEAD are rechecked so a concurrent
+change discards the review. CLI/JSON and the TUI render the same typed report
+and cannot stage, discard, commit, or push.
+
+A later commit action may stage only an explicitly reviewed allowlist and must
+revalidate the worktree before mutation. A commit is optional and requires
+explicit confirmation; push is never implicit and no remote is required.
 
 Privileged/systemd operations retain detailed output in journald. Foreground
 deployments stream output to private mode-0600 files under the administrator's

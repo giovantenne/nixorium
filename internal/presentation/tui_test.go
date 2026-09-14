@@ -317,6 +317,50 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	}
 }
 
+func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
+	loads := 0
+	actions := DashboardActions{
+		LoadGitReview: func() domain.GitReviewReport {
+			loads++
+			return domain.GitReviewReport{
+				Operation: "git-review",
+				State:     "changes",
+				Summary:   domain.GitChangeSummary{Staged: 1, Untracked: 1, Managed: 1, Unexpected: 1},
+				Changes: []domain.GitChange{
+					{Path: "lab-settings.json", Staged: "modified", Managed: true},
+					{Path: "notes", Untracked: true},
+				},
+				Diffs: []domain.GitDiff{{Scope: "staged", Content: "line-01\nline-02\nline-03\nline-04\nline-05\nline-06\nline-07\n"}},
+			}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 12})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("Git review did not load: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loads != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View(), "Git change review") || !strings.Contains(model.View(), "lab-settings.json") {
+		t.Fatalf("Git review missing: loads=%d\n%s", loads, model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	model = updated.(dashboardModel)
+	if !strings.Contains(model.View(), "line-07") || strings.Contains(model.View(), "lab-settings.json") {
+		t.Fatalf("Git review did not scroll:\n%s", model.View())
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loads != 2 || model.gitScroll != 0 {
+		t.Fatalf("Git review refresh = loads %d, scroll %d", loads, model.gitScroll)
+	}
+}
+
 func TestDashboardDeploymentRejectsEmptySelectionAndBlockedPlan(t *testing.T) {
 	report := testDashboardReport("ready")
 	report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}}
