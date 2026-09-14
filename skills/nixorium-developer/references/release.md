@@ -15,7 +15,7 @@ Before release:
 3. Update `VERSION`, `DEFAULT_RELEASE` in `install.sh`, and the released tag in
    `templates/site/flake.nix`.
 4. Move Unreleased notes into a dated changelog section and update links.
-5. Run `./scripts/validate.sh`.
+5. Run `./scripts/validate.sh --full`.
 6. Commit the metadata as `chore: prepare v<version>` and push it to `master`.
 7. Run `./scripts/release.sh <version>` only with explicit authorization.
 8. Verify the GitHub workflow and published release.

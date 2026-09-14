@@ -8,6 +8,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Split local validation into a fast default cycle, targeted VM modes, and an
+  explicit full release matrix, with a reusable Nix evaluation cache.
 - Documented the complete per-host customization workflow in both READMEs and
   in the Nixorium maintainer skill.
 - Made `networkBase` a full IPv4 network address and added a configurable CIDR

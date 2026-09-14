@@ -506,7 +506,7 @@ To prepare a release:
 2. Move the relevant entries from `Unreleased` to a dated section in `CHANGELOG.md`.
 3. Update `DEFAULT_RELEASE` in `install.sh`, the tag in
    `templates/site/flake.nix`, and release examples when appropriate.
-4. Run `./scripts/validate.sh` and commit the release metadata.
+4. Run `./scripts/validate.sh --full` and commit the release metadata.
 5. Push `master`, then publish the tag:
 
 ```sh
@@ -807,7 +807,7 @@ scripts/
   screensaver-monitor.sh   # GNOME idle watcher for screensaver
   create-home-template.sh  # Home directory template builder
   home-reset.sh            # Boot-time snapshot rotation + home reset
-  validate.sh              # Full upstream validation matrix
+  validate.sh              # Tiered upstream validation entry point
 assets/
   backgrounds/             # Wallpapers (randomly selected at home reset)
   logo.txt                 # ASCII art for screensaver

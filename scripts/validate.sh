@@ -1,16 +1,50 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -gt 1 ]] || [[ $# -eq 1 && "$1" != "--ci" ]]; then
-  echo "Usage: ./scripts/validate.sh [--ci]" >&2
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/validate.sh [MODE]
+
+Modes:
+  --quick                Fast local checks (default)
+  --management-vm        Quick checks plus the management VM test
+  --client-installer-vm  Quick checks plus the client installer VM test
+  --full                 Complete release and milestone validation
+  --ci                   Evaluation-only CI validation
+EOF
+}
+
+if [[ $# -gt 1 ]]; then
+  usage >&2
   exit 1
 fi
 
-VALIDATION_MODE="${1:-full}"
+MODE="${1:---quick}"
+case "$MODE" in
+  --quick | --management-vm | --client-installer-vm | --full | --ci) ;;
+  --help | -h)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
+
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEMP_DIR=$(mktemp -d)
 SITE_DIR="${TEMP_DIR}/site"
-CACHE_DIR="${TEMP_DIR}/cache"
+
+if [[ -n "${NIXORIUM_VALIDATION_CACHE_HOME:-}" ]]; then
+  CACHE_DIR="${NIXORIUM_VALIDATION_CACHE_HOME}"
+elif [[ -n "${XDG_CACHE_HOME:-}" ]]; then
+  CACHE_DIR="${XDG_CACHE_HOME}/nixorium-validation"
+elif [[ -n "${HOME:-}" ]]; then
+  CACHE_DIR="${HOME}/.cache/nixorium-validation"
+else
+  CACHE_DIR="${TEMP_DIR}/cache"
+fi
 
 cleanup() {
   rm -rf "$TEMP_DIR"
@@ -21,11 +55,14 @@ mkdir -p "$CACHE_DIR" "$SITE_DIR"
 export XDG_CACHE_HOME="$CACHE_DIR"
 export NIX_CONFIG="${NIX_CONFIG:-}"$'\nexperimental-features = nix-command flakes'
 
-if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+if [[ "${MODE}" == "--ci" ]]; then
   export NIX_CONFIG="${NIX_CONFIG}"$'\nallow-import-from-derivation = false'
 fi
 
 cd "$REPO_ROOT"
+
+echo "Validation mode: ${MODE}"
+echo "Reusable Nix evaluation cache: ${CACHE_DIR}"
 
 git diff --check
 bash -n install.sh setup.sh scripts/*.sh scripts/lib/*.sh
@@ -35,7 +72,41 @@ test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md
 test -e .pi/skills/nixorium-developer/SKILL.md
 
-if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+run_quick_checks() {
+  nix build \
+    "path:${REPO_ROOT}#checks.x86_64-linux.config-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
+    "path:${REPO_ROOT}#packages.x86_64-linux.nixorium" \
+    --no-write-lock-file \
+    --no-link
+}
+
+case "$MODE" in
+  --quick)
+    run_quick_checks
+    echo "Quick validation completed successfully."
+    exit 0
+    ;;
+  --management-vm)
+    run_quick_checks
+    nix build "path:${REPO_ROOT}#checks.x86_64-linux.management-vm" \
+      --no-write-lock-file \
+      --no-link
+    echo "Management VM validation completed successfully."
+    exit 0
+    ;;
+  --client-installer-vm)
+    run_quick_checks
+    nix build "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm" \
+      --no-write-lock-file \
+      --no-link
+    echo "Client installer VM validation completed successfully."
+    exit 0
+    ;;
+esac
+
+if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.config-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
@@ -50,7 +121,7 @@ nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file >/dev/null
 
 CONTROLLER_NAME=$(nix eval "path:${REPO_ROOT}#labMeta.controller.name" --raw --no-write-lock-file)
 
-if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk.drvPath" --raw --no-write-lock-file >/dev/null
@@ -116,7 +187,7 @@ DIRECT_CLIENT_DRV=$(
     --no-write-lock-file
 )
 
-if [[ "${VALIDATION_MODE}" == "--ci" ]]; then
+if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${SITE_DIR}#installerBundle.drvPath" \
     --raw \
     --no-write-lock-file >/dev/null
@@ -150,4 +221,4 @@ if [[ "$DIRECT_CLIENT_DRV" != "$OFFLINE_CLIENT_DRV" ]]; then
   exit 1
 fi
 
-echo "Validation completed successfully."
+echo "Full validation completed successfully."
