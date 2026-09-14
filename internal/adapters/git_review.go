@@ -27,6 +27,7 @@ var managedDeploymentPaths = map[string]bool{
 }
 
 var passwordJSONValue = regexp.MustCompile(`("(?:admin|teacher|student)Password"[[:space:]]*:[[:space:]]*)"(?:\\.|[^"\\])*"`)
+var fullGitObjectIDPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 type boundedCommandBuffer struct {
 	buffer    bytes.Buffer
@@ -199,7 +200,14 @@ func redactGitDiff(content string) string {
 }
 
 func runBoundedGit(ctx context.Context, repository string, limit int, arguments ...string) (string, bool, error) {
+	return runBoundedGitWithEnvironment(ctx, repository, nil, limit, arguments...)
+}
+
+func runBoundedGitWithEnvironment(ctx context.Context, repository string, environment []string, limit int, arguments ...string) (string, bool, error) {
 	command := exec.CommandContext(ctx, "git", append([]string{"-C", repository}, arguments...)...)
+	if environment != nil {
+		command.Env = environment
+	}
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: 16 * 1024}
 	command.Stdout = stdout

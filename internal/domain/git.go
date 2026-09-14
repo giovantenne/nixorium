@@ -48,3 +48,47 @@ type GitReviewReport struct {
 func (r GitReviewReport) HasErrors() bool {
 	return r.State == "blocked" || r.State == "failed" || len(r.Issues) > 0
 }
+
+type GitCommitProposal struct {
+	TreeID string
+	Diff   GitDiff
+}
+
+type GitCommitPlanReport struct {
+	SchemaVersion int               `json:"schemaVersion"`
+	Operation     string            `json:"operation"`
+	GeneratedAt   time.Time         `json:"generatedAt"`
+	State         string            `json:"state"`
+	Repository    string            `json:"repository"`
+	Revision      string            `json:"revision,omitempty"`
+	Paths         []string          `json:"paths"`
+	TreeID        string            `json:"treeId,omitempty"`
+	ReviewToken   string            `json:"reviewToken,omitempty"`
+	CommitMessage string            `json:"commitMessage,omitempty"`
+	Confirmation  string            `json:"confirmation,omitempty"`
+	Diff          GitDiff           `json:"diff"`
+	Issues        []ValidationIssue `json:"issues"`
+}
+
+func (r GitCommitPlanReport) HasErrors() bool {
+	return r.State != "ready" || len(r.Issues) > 0
+}
+
+type GitCommitReport struct {
+	SchemaVersion    int               `json:"schemaVersion"`
+	Operation        string            `json:"operation"`
+	State            string            `json:"state"`
+	Repository       string            `json:"repository"`
+	PreviousRevision string            `json:"previousRevision,omitempty"`
+	Revision         string            `json:"revision,omitempty"`
+	Paths            []string          `json:"paths"`
+	CommitMessage    string            `json:"commitMessage,omitempty"`
+	Committed        bool              `json:"committed"`
+	RetrySafe        bool              `json:"retrySafe"`
+	Message          string            `json:"message,omitempty"`
+	Issues           []ValidationIssue `json:"issues"`
+}
+
+func (r GitCommitReport) HasErrors() bool {
+	return r.State == "blocked" || r.State == "failed" || r.State == "partial" || len(r.Issues) > 0
+}

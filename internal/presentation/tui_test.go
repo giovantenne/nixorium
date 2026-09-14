@@ -361,6 +361,81 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	}
 }
 
+func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	token := "sha256:" + strings.Repeat("b", 64)
+	confirmation := "COMMIT " + strings.Repeat("b", 12)
+	applied := 0
+	review := domain.GitReviewReport{
+		Operation: "git-review",
+		State:     "changes",
+		Summary:   domain.GitChangeSummary{Unstaged: 2, Managed: 1, Unexpected: 1},
+		Changes: []domain.GitChange{
+			{Path: "lab-settings.json", Unstaged: "modified", Managed: true},
+			{Path: "modules/site.nix", Unstaged: "modified"},
+		},
+	}
+	actions := DashboardActions{
+		LoadGitReview: func() domain.GitReviewReport { return review },
+		PlanGitCommit: func(paths string) domain.GitCommitPlanReport {
+			if paths != "lab-settings.json" {
+				t.Fatalf("planned paths = %q", paths)
+			}
+			return domain.GitCommitPlanReport{Operation: "git-commit-plan", State: "ready", Revision: revision, Paths: []string{"lab-settings.json"}, ReviewToken: token, CommitMessage: "chore: update laboratory settings", Confirmation: confirmation, Diff: domain.GitDiff{Content: "+settings\n"}}
+		},
+		ApplyGitCommit: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
+			applied++
+			if plan.ReviewToken != token {
+				t.Fatalf("applied token = %q", plan.ReviewToken)
+			}
+			return domain.GitCommitReport{Operation: "git-commit", State: "completed", Paths: plan.Paths, PreviousRevision: revision, Revision: strings.Repeat("c", 40), Committed: true, Message: "no remote push was attempted"}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardGitCommitSelect || !strings.Contains(model.View(), "Select Git commit paths") {
+		t.Fatalf("commit selection missing:\n%s", model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardGitCommitReview || !strings.Contains(model.View(), confirmation) || !strings.Contains(model.View(), "No hooks, signing actions, remote operations, or push") {
+		t.Fatalf("commit review missing:\n%s", model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("COMMIT")})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(strings.Repeat("b", 12))})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("commit apply did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if applied != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View(), "Last commit: completed; committed=true") || !strings.Contains(model.View(), "no remote push was attempted") {
+		t.Fatalf("commit result missing: applied=%d\n%s", applied, model.View())
+	}
+}
+
+func TestGitCommitSelectionPreservesReviewOrderAndSkipsPrivatePaths(t *testing.T) {
+	changes := []domain.GitChange{{Path: "z"}, {Path: "secret-key", Private: true}, {Path: "a"}}
+	chosen := toggleAllGitCommitPaths(changes, nil)
+	if chosen["secret-key"] || selectedGitCommitPaths(changes, chosen) != "z,a" {
+		t.Fatalf("unsafe or reordered selection = %v / %q", chosen, selectedGitCommitPaths(changes, chosen))
+	}
+}
+
 func TestDashboardDeploymentRejectsEmptySelectionAndBlockedPlan(t *testing.T) {
 	report := testDashboardReport("ready")
 	report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}}

@@ -103,6 +103,24 @@ patch capture if a known private-key path appears. The TUI's **Review Git
 changes** task uses the same report. Continue to inspect and stage intentionally;
 this read-only command never discards, stages, commits, or pushes.
 
+Create an optional local commit only through an explicit path allowlist:
+
+```sh
+nixorium git commit plan --paths lab-settings.json,keys/admin-ssh.pub
+nixorium git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
+```
+
+Planning uses an isolated HEAD-based index and returns the exact proposed tree,
+redacted patch, generated message, token, and confirmation phrase. It rejects
+conflicts, private/unknown/unchanged paths, directories, symbolic links,
+rename/copy changes, invalid managed settings, Git content transforms,
+oversized patches, and recognizable private-key, token, or plaintext-secret
+additions. Apply repeats the plan, advances HEAD only from the
+reviewed parent, and reconciles only selected index entries. Unrelated changes
+remain intact. Hooks, signing helpers, remotes, and push never run. The TUI
+offers the same select/plan/confirm flow under **Review Git changes**. Use
+`--yes` only for explicit automation with a fresh token.
+
 Browse the private deployment operation logs without copying paths manually:
 
 ```sh

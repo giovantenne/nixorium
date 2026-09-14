@@ -20,6 +20,8 @@ type DashboardActions struct {
 	LoadLogs        func() domain.OperationLogsReport
 	LoadLog         func(string) domain.OperationLogReport
 	LoadGitReview   func() domain.GitReviewReport
+	PlanGitCommit   func(string) domain.GitCommitPlanReport
+	ApplyGitCommit  func(domain.GitCommitPlanReport) domain.GitCommitReport
 	PreparePXE      func() domain.ActionReport
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
@@ -41,6 +43,8 @@ const (
 	dashboardLogs
 	dashboardLogDetail
 	dashboardGitReview
+	dashboardGitCommitSelect
+	dashboardGitCommitReview
 	dashboardPXE
 	dashboardPXEStartReview
 )
@@ -69,6 +73,10 @@ type dashboardModel struct {
 	logScroll        int
 	gitReview        domain.GitReviewReport
 	gitScroll        int
+	gitCommitCursor  int
+	gitCommitChosen  map[string]bool
+	gitCommitPlan    domain.GitCommitPlanReport
+	gitCommitResult  domain.GitCommitReport
 	height           int
 }
 
@@ -122,6 +130,15 @@ type dashboardLogMsg struct {
 
 type dashboardGitReviewMsg struct {
 	report domain.GitReviewReport
+}
+
+type dashboardGitCommitPlanMsg struct {
+	report domain.GitCommitPlanReport
+}
+
+type dashboardGitCommitResultMsg struct {
+	report domain.GitCommitReport
+	review domain.GitReviewReport
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -240,6 +257,28 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.gitReview = message.report
 		model.gitScroll = 0
 		model.message = operationLogIssues(message.report.Issues)
+		model.screen = dashboardGitReview
+		return model, nil
+	case dashboardGitCommitPlanMsg:
+		model.busy = ""
+		model.gitCommitPlan = message.report
+		if message.report.HasErrors() {
+			model.message = operationLogIssues(message.report.Issues)
+			model.screen = dashboardGitCommitSelect
+			return model, nil
+		}
+		model.confirmation = ""
+		model.gitScroll = 0
+		model.message = ""
+		model.screen = dashboardGitCommitReview
+		return model, nil
+	case dashboardGitCommitResultMsg:
+		model.busy = ""
+		model.gitCommitResult = message.report
+		model.gitReview = message.review
+		model.gitScroll = 0
+		model.confirmation = ""
+		model.message = message.report.Message
 		model.screen = dashboardGitReview
 		return model, nil
 	case tea.WindowSizeMsg:
@@ -575,6 +614,99 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, func() tea.Msg {
 				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
 			}
+		case "c":
+			if len(model.gitReview.Changes) == 0 || model.gitReview.HasErrors() {
+				model.message = "A clean, unblocked change review is required before selecting commit paths."
+				return model, nil
+			}
+			model.gitCommitChosen = map[string]bool{}
+			model.gitCommitCursor = 0
+			model.message = ""
+			model.screen = dashboardGitCommitSelect
+		}
+	case dashboardGitCommitSelect:
+		changes := model.gitReview.Changes
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardGitReview
+			model.message = ""
+		case "up", "k":
+			if model.gitCommitCursor > 0 {
+				model.gitCommitCursor--
+			}
+		case "down", "j":
+			if model.gitCommitCursor+1 < len(changes) {
+				model.gitCommitCursor++
+			}
+		case " ":
+			if len(changes) > 0 && !changes[model.gitCommitCursor].Private {
+				path := changes[model.gitCommitCursor].Path
+				model.gitCommitChosen[path] = !model.gitCommitChosen[path]
+			}
+		case "a":
+			model.gitCommitChosen = toggleAllGitCommitPaths(changes, model.gitCommitChosen)
+		case "enter":
+			paths := selectedGitCommitPaths(changes, model.gitCommitChosen)
+			if paths == "" {
+				model.message = "Select at least one changed path before creating a commit plan."
+				return model, nil
+			}
+			model.busy = "Building an isolated commit proposal from HEAD"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardGitCommitPlanMsg{report: model.actions.PlanGitCommit(paths)}
+			}
+		}
+	case dashboardGitCommitReview:
+		maximum := maximumGitCommitPlanScroll(model.gitCommitPlan, model.gitReviewHeight())
+		switch key.String() {
+		case "esc":
+			model.screen = dashboardGitCommitSelect
+			model.confirmation = ""
+			model.message = "Git commit cancelled; no repository state changed."
+		case "up":
+			if model.gitScroll > 0 {
+				model.gitScroll--
+			}
+		case "down":
+			if model.gitScroll < maximum {
+				model.gitScroll++
+			}
+		case "pgup":
+			model.gitScroll -= model.gitReviewHeight()
+			if model.gitScroll < 0 {
+				model.gitScroll = 0
+			}
+		case "pgdown":
+			model.gitScroll += model.gitReviewHeight()
+			if model.gitScroll > maximum {
+				model.gitScroll = maximum
+			}
+		case "backspace":
+			value := []rune(model.confirmation)
+			if len(value) > 0 {
+				model.confirmation = string(value[:len(value)-1])
+			}
+		case " ":
+			model.confirmation += " "
+		case "enter":
+			if model.confirmation != model.gitCommitPlan.Confirmation {
+				model.confirmation = ""
+				model.message = "Confirmation did not match; no Git commit was created."
+				return model, nil
+			}
+			model.busy = "Revalidating and creating the reviewed local commit"
+			model.confirmation = ""
+			model.message = ""
+			plan := model.gitCommitPlan
+			return model, func() tea.Msg {
+				result := model.actions.ApplyGitCommit(plan)
+				return dashboardGitCommitResultMsg{report: result, review: model.actions.LoadGitReview()}
+			}
+		default:
+			if key.Type == tea.KeyRunes {
+				model.confirmation += string(key.Runes)
+			}
 		}
 	case dashboardPXE:
 		switch key.String() {
@@ -670,7 +802,7 @@ func (model dashboardModel) View() string {
 		return model.logsView()
 	case dashboardLogDetail:
 		return model.logDetailView()
-	case dashboardGitReview:
+	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
 		return model.gitReviewView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
@@ -711,6 +843,12 @@ func (model dashboardModel) homeView() string {
 }
 
 func (model dashboardModel) gitReviewView() string {
+	if model.screen == dashboardGitCommitSelect {
+		return model.gitCommitSelectView()
+	}
+	if model.screen == dashboardGitCommitReview {
+		return model.gitCommitReviewView()
+	}
 	lines := []string{"Nixorium — Git change review", ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
@@ -733,11 +871,108 @@ func (model dashboardModel) gitReviewView() string {
 		"",
 	)
 	lines = append(lines, content[model.gitScroll:end]...)
-	lines = append(lines, "", "Up/Down/PgUp/PgDn/Home/End: scroll   f: refresh   Esc: back   q: quit")
+	lines = append(lines, "", "c: select paths to commit   Up/Down/PgUp/PgDn/Home/End: scroll", "f: refresh   Esc: back   q: quit")
+	if model.gitCommitResult.Operation != "" {
+		lines = append(lines, "", fmt.Sprintf("Last commit: %s; committed=%t; HEAD=%s", model.gitCommitResult.State, model.gitCommitResult.Committed, model.gitCommitResult.Revision))
+	}
 	if model.message != "" {
 		lines = append(lines, "", "Warning: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) gitCommitSelectView() string {
+	lines := []string{"Nixorium — Select Git commit paths", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	for index, change := range model.gitReview.Changes {
+		cursor := " "
+		if index == model.gitCommitCursor {
+			cursor = ">"
+		}
+		chosen := "[ ]"
+		if model.gitCommitChosen[change.Path] {
+			chosen = "[x]"
+		}
+		if change.Private {
+			chosen = "[!]"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %-10s %-10s %-9s %s", cursor, chosen, gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path))
+	}
+	lines = append(lines, "", "Space: select   a: toggle all safe paths   Enter: create plan", "Esc: back   q: quit")
+	if model.message != "" {
+		lines = append(lines, "", model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) gitCommitReviewView() string {
+	lines := []string{"Nixorium — Local Git commit review", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	diffLines := strings.Split(strings.TrimSuffix(model.gitCommitPlan.Diff.Content, "\n"), "\n")
+	height := model.gitReviewHeight()
+	maximum := maximumGitCommitPlanScroll(model.gitCommitPlan, height)
+	if model.gitScroll > maximum {
+		model.gitScroll = maximum
+	}
+	end := model.gitScroll + height
+	if end > len(diffLines) {
+		end = len(diffLines)
+	}
+	lines = append(lines,
+		"Paths: "+strings.Join(model.gitCommitPlan.Paths, ", "),
+		"Message: "+model.gitCommitPlan.CommitMessage,
+		"No hooks, signing actions, remote operations, or push will run.",
+		fmt.Sprintf("Diff lines %d-%d of %d", displayedLineStart(model.gitScroll, len(diffLines)), end, len(diffLines)),
+		"",
+	)
+	lines = append(lines, diffLines[model.gitScroll:end]...)
+	lines = append(lines, "", "Type "+model.gitCommitPlan.Confirmation+" to continue:", "> "+model.confirmation+"█", "", "Up/Down/PgUp/PgDn: scroll   Esc: cancel")
+	if model.message != "" {
+		lines = append(lines, "", model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func selectedGitCommitPaths(changes []domain.GitChange, chosen map[string]bool) string {
+	paths := []string{}
+	for _, change := range changes {
+		if chosen[change.Path] && !change.Private {
+			paths = append(paths, change.Path)
+		}
+	}
+	return strings.Join(paths, ",")
+}
+
+func toggleAllGitCommitPaths(changes []domain.GitChange, chosen map[string]bool) map[string]bool {
+	all := true
+	for _, change := range changes {
+		if !change.Private && !chosen[change.Path] {
+			all = false
+		}
+	}
+	result := map[string]bool{}
+	if !all {
+		for _, change := range changes {
+			if !change.Private {
+				result[change.Path] = true
+			}
+		}
+	}
+	return result
+}
+
+func maximumGitCommitPlanScroll(report domain.GitCommitPlanReport, height int) int {
+	maximum := len(strings.Split(strings.TrimSuffix(report.Diff.Content, "\n"), "\n")) - height
+	if maximum < 0 {
+		return 0
+	}
+	return maximum
 }
 
 func gitReviewContentLines(report domain.GitReviewReport) []string {

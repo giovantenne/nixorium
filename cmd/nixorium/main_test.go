@@ -137,6 +137,28 @@ func TestParseArgumentsAcceptsOnlyGitReview(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsGitCommitPlanAndApply(t *testing.T) {
+	plan, err := parseArguments([]string{"git", "commit", "plan", "--paths", "lab-settings.json,keys/admin-ssh.pub", "--json"})
+	if err != nil || plan.command != "git" || plan.subcommand != "commit-plan" || plan.paths == "" || !plan.json {
+		t.Fatalf("Git commit plan = %+v, error = %v", plan, err)
+	}
+	apply, err := parseArguments([]string{"git", "commit", "apply", "--paths", "lab-settings.json", "--expect", "sha256:review", "--yes", "--json"})
+	if err != nil || apply.subcommand != "commit-apply" || apply.paths != "lab-settings.json" || apply.expect != "sha256:review" || !apply.yes {
+		t.Fatalf("Git commit apply = %+v, error = %v", apply, err)
+	}
+	for _, arguments := range [][]string{
+		{"git", "commit"},
+		{"git", "commit", "plan"},
+		{"git", "commit", "apply", "--paths", "lab-settings.json"},
+		{"git", "review", "--paths", "lab-settings.json"},
+		{"status", "--paths", "flake.nix"},
+	} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("incomplete/unsafe Git commit arguments were accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

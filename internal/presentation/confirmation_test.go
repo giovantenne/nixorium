@@ -80,3 +80,21 @@ func TestConfirmDeploymentApplyRequiresExactTargets(t *testing.T) {
 		}
 	}
 }
+
+func TestConfirmGitCommitRequiresExactReviewPhrase(t *testing.T) {
+	report := domain.GitCommitPlanReport{Revision: "abc", Paths: []string{"lab-settings.json"}, CommitMessage: "chore: update laboratory settings", Confirmation: "COMMIT abcdef012345"}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{
+		{input: "COMMIT abcdef012345\n", want: true},
+		{input: "commit abcdef012345\n", want: false},
+		{input: "COMMIT wrong\n", want: false},
+	} {
+		var output bytes.Buffer
+		approved, err := ConfirmGitCommit(strings.NewReader(test.input), &output, report)
+		if err != nil || approved != test.want || !strings.Contains(output.String(), "no hook, signing action, remote, or push") {
+			t.Fatalf("confirmation %q = %t, %v:\n%s", test.input, approved, err, output.String())
+		}
+	}
+}

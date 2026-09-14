@@ -589,9 +589,25 @@ excluded from every diff, and status plus HEAD are rechecked so a concurrent
 change discards the review. CLI/JSON and the TUI render the same typed report
 and cannot stage, discard, commit, or push.
 
-A later commit action may stage only an explicitly reviewed allowlist and must
-revalidate the worktree before mutation. A commit is optional and requires
-explicit confirmation; push is never implicit and no remote is required.
+The optional commit workflow takes only clean repository-relative regular-file
+paths that were present in a fresh review. It rejects directories, symbolic
+links (including traversal through linked parents), and rename/copy changes
+whose two identities cannot be expressed by the selected review row. Planning
+rejects conflicts, private paths,
+unknown or unchanged selections, invalid managed settings, active Git filters/
+encoding/ident transforms, oversized patches, and recognizable private-key,
+access-token, or plaintext-secret additions. It creates an isolated temporary
+index from HEAD, stages only the allowlist there, and returns the exact proposed
+tree, redacted diff, generated message, content-bound token, and confirmation.
+
+Apply repeats the plan and compares the token, then recreates and verifies the
+tree. Git plumbing creates a commit object from that tree and atomically updates
+HEAD only if the reviewed parent is still current. Only selected entries in the
+real index are reconciled to the new HEAD, preserving unrelated staged,
+unstaged, and untracked state. Repository hooks, commit signing, remotes, and
+push do not run. A partial result explicitly reports the rare case where HEAD
+advanced but index reconciliation failed; retry is then unsafe until inspected.
+A commit remains optional, requires exact confirmation, and needs no remote.
 
 Privileged/systemd operations retain detailed output in journald. Foreground
 deployments stream output to private mode-0600 files under the administrator's

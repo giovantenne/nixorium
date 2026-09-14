@@ -112,6 +112,11 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 		record.State = report.State
 		record.Subject = report.Service
 		record.Summary = fmt.Sprintf("%s finished; verified=%t", report.Action, report.Verified)
+	case domain.GitCommitReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = fmt.Sprintf("%d path(s)", len(report.Paths))
+		record.Summary = fmt.Sprintf("reviewed local commit finished; committed=%t", report.Committed)
 	default:
 		return domain.OperationRecord{}, false
 	}
