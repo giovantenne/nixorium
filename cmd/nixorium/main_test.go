@@ -160,6 +160,10 @@ func TestParseArgumentsAcceptsGitCommitPlanAndApply(t *testing.T) {
 }
 
 func TestParseArgumentsAcceptsUpdatePlanAndApplyPolicy(t *testing.T) {
+	check, err := parseArguments([]string{"update", "check", "--json"})
+	if err != nil || check.command != "update" || check.subcommand != "check" || !check.json {
+		t.Fatalf("update check = %+v, error = %v", check, err)
+	}
 	plan, err := parseArguments([]string{"update", "plan", "--target", "v2.1.0-beta.1", "--allow-prerelease", "--json"})
 	if err != nil || plan.command != "update" || plan.subcommand != "plan" || plan.target != "v2.1.0-beta.1" || !plan.allowPrerelease {
 		t.Fatalf("update plan = %+v, error = %v", plan, err)
@@ -173,6 +177,8 @@ func TestParseArgumentsAcceptsUpdatePlanAndApplyPolicy(t *testing.T) {
 		{"update", "apply", "--target", "v2.1.0"},
 		{"status", "--target", "v2.1.0"},
 		{"status", "--allow-prerelease"},
+		{"update", "check", "--target", "v2.1.0"},
+		{"update", "check", "--allow-prerelease"},
 	} {
 		if _, err := parseArguments(arguments); err == nil {
 			t.Fatalf("invalid update arguments accepted: %v", arguments)

@@ -27,8 +27,11 @@ require explicit opt-ins for prerelease and downgrade targets. Refuse computed
 or ambiguous input declarations instead of rewriting arbitrary Nix syntax.
 
 Release discovery is optional and bounded. It disables Git credential helpers
-and prompting, and is the only update command that enumerates the remote. An
-explicit target can proceed directly and lets Nix resolve that exact release.
+and prompting plus user/system Git configuration, and is the only update
+command that enumerates the remote. It queries the configured GitHub identity
+over HTTPS, stops after 15 seconds, accepts at most 256 KiB of references, and
+returns at most the newest 20 stable and 20 prerelease SemVer tags. An explicit
+target can proceed directly and lets Nix resolve that exact release.
 
 During planning, generate the candidate lock outside the checkout with Nix's
 `--output-lock-file`. Evaluate and build against that candidate using an exact

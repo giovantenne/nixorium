@@ -84,6 +84,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   readiness and representative no-link builds, bounded patch review, exact
   confirmation, token-bound two-file apply, and no implicit Git, activation,
   PXE, or deployment actions.
+- Explicit read-only `nixorium update check` CLI/JSON release discovery against
+  only the configured public GitHub upstream, with Git credentials and prompts
+  disabled, strict timeout/output/result bounds, and separately sorted stable
+  and prerelease tags while all routine and client paths remain offline-first.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments

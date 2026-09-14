@@ -215,6 +215,9 @@ Release from the matching changelog section.
   and validate representative outputs against that exact lock. Apply only the
   token-bound `flake.nix`/`flake.lock` proposal under the deployment-root lock;
   never imply a branch, commit, push, activation, PXE action, or deployment.
+  Remote enumeration belongs only to explicit `update check`, must use the
+  configured public upstream with bounded time/output/results and no Git
+  prompting, credential helpers, or user/system Git configuration.
   The TUI must reuse this typed plan/apply boundary, with presentation limited
   to target/policy input, bounded review scrolling, exact confirmation, and
   typed result rendering.

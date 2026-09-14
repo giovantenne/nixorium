@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +18,10 @@ import (
 var updateReleasePattern = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
 var numericReleaseIdentifier = regexp.MustCompile(`^[0-9]+$`)
 
+const maximumUpdateReleasesPerChannel = 20
+
 type UpdateSource interface {
+	DiscoverUpdateReleases(context.Context, string) ([]domain.UpdateReleaseRef, error)
 	GitState(context.Context, string) (domain.GitState, error)
 	GitRevision(context.Context, string) (string, error)
 	InspectUpdateInput(string) (domain.UpdateInputSnapshot, error)
@@ -31,6 +35,84 @@ type UpdateManager struct {
 
 func NewUpdateManager(source UpdateSource) *UpdateManager {
 	return &UpdateManager{source: source}
+}
+
+func (m *UpdateManager) Check(ctx context.Context, repository string) domain.UpdateCheckReport {
+	report := domain.UpdateCheckReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "update-check",
+		GeneratedAt:   time.Now().UTC(),
+		State:         "failed",
+		Stable:        []domain.UpdateRelease{},
+		Prerelease:    []domain.UpdateRelease{},
+		Issues:        []domain.ValidationIssue{},
+	}
+	root, err := filepath.Abs(repository)
+	if err != nil {
+		return updateCheckIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
+	}
+	report.Repository = root
+	snapshot, err := m.source.InspectUpdateInput(root)
+	if err != nil {
+		return updateCheckIssue(report, "input", err.Error())
+	}
+	report.Upstream = "github:" + snapshot.SourcePrefix
+	report.CurrentRef = snapshot.CurrentRef
+	report.CurrentRev = snapshot.CurrentRev
+	if current, parseErr := parseUpdateRelease(snapshot.CurrentRef); parseErr == nil {
+		report.CurrentChannel = current.Channel()
+	} else {
+		report.CurrentChannel = domain.UpdateChannelMoving
+	}
+	refs, err := m.source.DiscoverUpdateReleases(ctx, snapshot.SourcePrefix)
+	if err != nil {
+		return updateCheckIssue(report, "network", err.Error())
+	}
+	for _, ref := range refs {
+		release, parseErr := parseUpdateRelease(ref.Tag)
+		if parseErr != nil {
+			continue
+		}
+		item := domain.UpdateRelease{Tag: ref.Tag, ObjectID: ref.ObjectID, Channel: release.Channel()}
+		if item.Channel == domain.UpdateChannelPrerelease {
+			report.Prerelease = append(report.Prerelease, item)
+		} else {
+			report.Stable = append(report.Stable, item)
+		}
+	}
+	sortUpdateReleases(report.Stable)
+	sortUpdateReleases(report.Prerelease)
+	if len(report.Stable) > maximumUpdateReleasesPerChannel {
+		report.Stable = report.Stable[:maximumUpdateReleasesPerChannel]
+		report.Truncated = true
+	}
+	if len(report.Prerelease) > maximumUpdateReleasesPerChannel {
+		report.Prerelease = report.Prerelease[:maximumUpdateReleasesPerChannel]
+		report.Truncated = true
+	}
+	if len(report.Stable) == 0 && len(report.Prerelease) == 0 {
+		return updateCheckIssue(report, "releases", "the configured upstream did not advertise any v-prefixed Semantic Version release tags")
+	}
+	report.State = "available"
+	return report
+}
+
+func sortUpdateReleases(releases []domain.UpdateRelease) {
+	sort.Slice(releases, func(left, right int) bool {
+		leftRelease, _ := parseUpdateRelease(releases[left].Tag)
+		rightRelease, _ := parseUpdateRelease(releases[right].Tag)
+		comparison := compareUpdateReleases(leftRelease, rightRelease)
+		if comparison == 0 {
+			return releases[left].Tag > releases[right].Tag
+		}
+		return comparison > 0
+	})
+}
+
+func updateCheckIssue(report domain.UpdateCheckReport, field, message string) domain.UpdateCheckReport {
+	report.State = "failed"
+	report.Issues = append(report.Issues, domain.ValidationIssue{Field: field, Message: message})
+	return report
 }
 
 func (m *UpdateManager) Plan(ctx context.Context, repository, target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {

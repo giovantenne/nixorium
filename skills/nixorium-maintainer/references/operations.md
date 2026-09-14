@@ -198,9 +198,16 @@ preflight failures.
 Use the reviewed workflow for a generated deployment:
 
 ```sh
+nixorium update check
 nixorium update plan --target v2.0.0
 nixorium update apply --target v2.0.0 --expect REVIEW_TOKEN
 ```
+
+`update check` is the only remote-enumerating operation. It queries only the
+configured public GitHub upstream, with Git prompts/helpers/config overrides
+disabled, a 15-second timeout, bounded output, and at most 20 newest stable plus
+20 newest prerelease tags. It is read-only and optional; use an explicit target
+without discovery when offline.
 
 It preserves upstream identity, validates a candidate lock outside the checkout,
 builds representative outputs, and writes only `flake.nix`/`flake.lock` after

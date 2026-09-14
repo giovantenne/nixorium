@@ -12,12 +12,20 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 var managedNixoriumInput = regexp.MustCompile(`(?m)^([ \t]*inputs\.nixorium\.url[ \t]*=[ \t]*")([^"\r\n]+)("[ \t]*;[ \t]*)$`)
 var githubNixoriumSource = regexp.MustCompile(`^github:([^/]+)/([^/]+)/([^/]+)$`)
+var safeGitHubSourcePrefix = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$`)
+var remoteGitObjectID = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+
+const (
+	updateDiscoveryTimeout = 15 * time.Second
+	updateDiscoveryBytes   = 256 * 1024
+)
 
 type flakeLockDocument struct {
 	Root  string `json:"root"`
@@ -78,6 +86,83 @@ func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, 
 	}
 	snapshot.CurrentRev = node.Locked.Rev
 	return snapshot, nil
+}
+
+func (Local) DiscoverUpdateReleases(ctx context.Context, sourcePrefix string) ([]domain.UpdateReleaseRef, error) {
+	if !safeGitHubSourcePrefix.MatchString(sourcePrefix) {
+		return nil, errors.New("configured GitHub upstream owner/repository is not safe for release discovery")
+	}
+	discoveryContext, cancel := context.WithTimeout(ctx, updateDiscoveryTimeout)
+	defer cancel()
+	upstream := "https://github.com/" + sourcePrefix + ".git"
+	command := exec.CommandContext(discoveryContext, "git",
+		"-c", "credential.helper=",
+		"-c", "core.askPass=",
+		"ls-remote", "--refs", "--tags", "--exit-code", upstream, "refs/tags/v*",
+	)
+	command.Env = updateDiscoveryEnvironment()
+	stdout := &boundedCommandBuffer{limit: updateDiscoveryBytes}
+	stderr := &boundedCommandBuffer{limit: 16 * 1024}
+	command.Stdout = stdout
+	command.Stderr = stderr
+	if err := command.Run(); err != nil {
+		if errors.Is(discoveryContext.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("release discovery exceeded the %s time limit", updateDiscoveryTimeout)
+		}
+		message := strings.TrimSpace(stderr.buffer.String())
+		if stderr.truncated {
+			message += "\n<output truncated>"
+		}
+		if message == "" {
+			message = err.Error()
+		}
+		return nil, fmt.Errorf("query configured public upstream: git: %s", sanitizeOperationLog([]byte(message)))
+	}
+	if stdout.truncated {
+		return nil, fmt.Errorf("release discovery output exceeds the %d KiB safety limit", updateDiscoveryBytes/1024)
+	}
+	refs := make([]domain.UpdateReleaseRef, 0)
+	seen := map[string]bool{}
+	for _, line := range strings.Split(strings.TrimSpace(stdout.buffer.String()), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || !remoteGitObjectID.MatchString(fields[0]) || !strings.HasPrefix(fields[1], "refs/tags/") {
+			return nil, errors.New("configured upstream returned a malformed release reference")
+		}
+		tag := strings.TrimPrefix(fields[1], "refs/tags/")
+		if seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		refs = append(refs, domain.UpdateReleaseRef{Tag: tag, ObjectID: fields[0]})
+	}
+	return refs, nil
+}
+
+func updateDiscoveryEnvironment() []string {
+	blocked := map[string]bool{
+		"GIT_TERMINAL_PROMPT": true,
+		"GIT_ASKPASS":         true,
+		"SSH_ASKPASS":         true,
+		"GCM_INTERACTIVE":     true,
+		"GIT_CONFIG_GLOBAL":   true,
+		"GIT_CONFIG_NOSYSTEM": true,
+		"GIT_CONFIG":          true,
+	}
+	environment := make([]string, 0, len(os.Environ())+6)
+	for _, item := range os.Environ() {
+		name, _, _ := strings.Cut(item, "=")
+		if !blocked[name] && !strings.HasPrefix(name, "GIT_CONFIG_") {
+			environment = append(environment, item)
+		}
+	}
+	return append(environment,
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_ASKPASS=",
+		"SSH_ASKPASS=",
+		"GCM_INTERACTIVE=Never",
+		"GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_CONFIG_NOSYSTEM=1",
+	)
 }
 
 func ProposedUpdateFlake(snapshot domain.UpdateInputSnapshot, target string) ([]byte, error) {

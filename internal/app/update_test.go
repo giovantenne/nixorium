@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -9,14 +11,22 @@ import (
 )
 
 type fakeUpdateSource struct {
-	revision string
-	dirty    bool
-	snapshot domain.UpdateInputSnapshot
-	proposal domain.UpdateProposal
-	prepared int
-	applied  int
-	partial  bool
-	applyErr error
+	revision    string
+	dirty       bool
+	snapshot    domain.UpdateInputSnapshot
+	proposal    domain.UpdateProposal
+	releases    []domain.UpdateReleaseRef
+	discover    int
+	discoverErr error
+	prepared    int
+	applied     int
+	partial     bool
+	applyErr    error
+}
+
+func (source *fakeUpdateSource) DiscoverUpdateReleases(context.Context, string) ([]domain.UpdateReleaseRef, error) {
+	source.discover++
+	return source.releases, source.discoverErr
 }
 
 func (source *fakeUpdateSource) GitState(context.Context, string) (domain.GitState, error) {
@@ -66,6 +76,47 @@ func TestParseUpdateReleaseClassifiesAndComparesTargets(t *testing.T) {
 	}
 	if _, err := parseUpdateRelease("v2.1.0-beta.01"); err == nil {
 		t.Fatal("leading-zero numeric prerelease identifier was accepted")
+	}
+}
+
+func TestUpdateCheckSeparatesSortsAndBoundsReleaseChannels(t *testing.T) {
+	source := &fakeUpdateSource{
+		snapshot: domain.UpdateInputSnapshot{
+			SourcePrefix: "owner/repo",
+			CurrentRef:   "v2.0.0",
+			CurrentRev:   strings.Repeat("a", 40),
+		},
+		releases: []domain.UpdateReleaseRef{
+			{Tag: "documentation", ObjectID: strings.Repeat("d", 40)},
+			{Tag: "v1.9.0", ObjectID: strings.Repeat("1", 40)},
+			{Tag: "v2.1.0-beta.2", ObjectID: strings.Repeat("2", 40)},
+			{Tag: "v2.1.0", ObjectID: strings.Repeat("3", 40)},
+			{Tag: "v2.1.0-beta.10", ObjectID: strings.Repeat("4", 40)},
+		},
+	}
+	for index := 0; index < maximumUpdateReleasesPerChannel; index++ {
+		source.releases = append(source.releases, domain.UpdateReleaseRef{Tag: fmt.Sprintf("v1.%d.0", index), ObjectID: strings.Repeat("5", 40)})
+	}
+	report := NewUpdateManager(source).Check(context.Background(), ".")
+	if report.State != "available" || report.Upstream != "github:owner/repo" || report.CurrentChannel != domain.UpdateChannelStable || source.discover != 1 {
+		t.Fatalf("check report = %+v, discovery calls = %d", report, source.discover)
+	}
+	if len(report.Stable) != maximumUpdateReleasesPerChannel || !report.Truncated || report.Stable[0].Tag != "v2.1.0" {
+		t.Fatalf("stable releases = %+v, truncated = %t", report.Stable, report.Truncated)
+	}
+	if len(report.Prerelease) != 2 || report.Prerelease[0].Tag != "v2.1.0-beta.10" || report.Prerelease[1].Tag != "v2.1.0-beta.2" {
+		t.Fatalf("prerelease releases = %+v", report.Prerelease)
+	}
+}
+
+func TestUpdateCheckReportsDiscoveryFailureWithoutReleaseData(t *testing.T) {
+	source := &fakeUpdateSource{
+		snapshot:    domain.UpdateInputSnapshot{SourcePrefix: "owner/repo", CurrentRef: "master"},
+		discoverErr: errors.New("offline"),
+	}
+	report := NewUpdateManager(source).Check(context.Background(), ".")
+	if report.State != "failed" || report.CurrentChannel != domain.UpdateChannelMoving || len(report.Issues) != 1 || report.Issues[0].Field != "network" || len(report.Stable) != 0 || len(report.Prerelease) != 0 {
+		t.Fatalf("failed check = %+v", report)
 	}
 }
 
