@@ -219,6 +219,103 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 }
 
+func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
+	target := "v2.1.0-beta.1"
+	confirmation := "DOWNGRADE NIXORIUM TO " + target
+	token := "sha256:" + strings.Repeat("d", 64)
+	planned := 0
+	applied := 0
+	actions := DashboardActions{
+		PlanUpdate: func(received string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+			planned++
+			if received != target || !allowPrerelease || !allowDowngrade {
+				t.Fatalf("update plan input = %q, prerelease=%t, downgrade=%t", received, allowPrerelease, allowDowngrade)
+			}
+			return domain.UpdatePlanReport{
+				SchemaVersion:  domain.SchemaVersion,
+				Operation:      "update-plan",
+				State:          "ready",
+				Revision:       strings.Repeat("a", 40),
+				CurrentRef:     "v2.2.0",
+				CurrentChannel: domain.UpdateChannelStable,
+				Target:         received,
+				TargetChannel:  domain.UpdateChannelPrerelease,
+				Downgrade:      true,
+				ReviewToken:    token,
+				Confirmation:   confirmation,
+				Checks:         []domain.UpdateCheck{{ID: "controller", State: "passed", Message: "candidate controller built"}},
+				Diff:           domain.GitDiff{Content: strings.Repeat("+ reviewed update\n", 20)},
+			}
+		},
+		ApplyUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
+			applied++
+			if plan.ReviewToken != token || plan.Target != target {
+				t.Fatalf("applied unexpected update plan: %+v", plan)
+			}
+			return domain.UpdateApplyReport{Operation: "update-apply", State: "completed", Target: target, Updated: true, Message: "review and commit the two updated files"}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	if !strings.Contains(model.View(), "Update Nixorium") {
+		t.Fatalf("home omits update task:\n%s", model.View())
+	}
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardUpdate || !strings.Contains(model.View(), "Allow prerelease: [ ]") {
+		t.Fatalf("update input missing:\n%s", model.View())
+	}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || !strings.Contains(model.View(), "explicit release tag") {
+		t.Fatalf("empty update target was planned:\n%s", model.View())
+	}
+	for _, key := range []tea.KeyMsg{{Type: tea.KeyF2}, {Type: tea.KeyF3}, {Type: tea.KeyRunes, Runes: []rune(target)}} {
+		updated, _ = model.Update(key)
+		model = updated.(dashboardModel)
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("update plan did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View(), "Validated release review") || !strings.Contains(model.View(), "candidate controller built") || !strings.Contains(model.View(), confirmation) || !strings.Contains(model.View(), "No commit, push, activation") {
+		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View())
+	}
+	updated, _ = model.Update(tea.WindowSizeMsg{Height: 24})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	model = updated.(dashboardModel)
+	if model.updateScroll == 0 {
+		t.Fatal("update diff did not scroll")
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("wrong")})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || applied != 0 || !strings.Contains(model.View(), "did not match") {
+		t.Fatalf("inexact update confirmation applied: %d", applied)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(confirmation)})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || !model.updating || !strings.Contains(model.View(), "Wait for the atomic two-file result") {
+		t.Fatalf("update apply did not enter protected busy state:\n%s", model.View())
+	}
+	updated, quitCommand := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	model = updated.(dashboardModel)
+	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
+		t.Fatal("dashboard allowed quit while update apply was running")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View(), "Last result: completed; files updated=true") || !strings.Contains(model.View(), "review and commit") {
+		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View())
+	}
+}
+
 func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	restarts := 0
 	serviceReport := domain.ServicesReport{

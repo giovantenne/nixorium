@@ -531,6 +531,10 @@ and installer bundle without result links. Prereleases require
 the plan, requires its exact confirmation, and changes only `flake.nix` and
 `flake.lock`. Review and optionally commit those files separately; no branch,
 commit, push, activation, PXE action, or client deployment is implicit.
+The default dashboard exposes the same flow as **Update Nixorium**: enter the
+release tag, enable prerelease or downgrade policy only when intended, review
+all candidate checks and the scrollable two-file patch, then type the exact
+confirmation shown.
 
 The following is the advanced manual fallback for a computed or otherwise
 unsupported input declaration. Lab administrators update the pinned input in

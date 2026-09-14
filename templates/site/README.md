@@ -298,6 +298,10 @@ Prereleases require `--allow-prerelease`; known downgrades require
 `--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
 `flake.lock`; review and optionally commit them separately. It never branches,
 commits, pushes, activates, starts PXE, or deploys clients.
+The default dashboard's **Update Nixorium** task uses the same typed workflow:
+enter the release tag, opt into prerelease/downgrade policy only when intended,
+review the candidate checks and scrollable two-file patch, then type the exact
+confirmation shown.
 
 For a computed input declaration that the managed workflow conservatively
 refuses, use this advanced manual fallback. In this example the

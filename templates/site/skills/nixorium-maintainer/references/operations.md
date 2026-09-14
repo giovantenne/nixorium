@@ -206,6 +206,9 @@ It preserves upstream identity, validates a candidate lock outside the checkout,
 builds representative outputs, and writes only `flake.nix`/`flake.lock` after
 exact confirmation. Prerelease and downgrade targets require their explicit
 policy flags. It never commits, pushes, activates, starts PXE, or deploys.
+The TUI's **Update Nixorium** task invokes the same typed workflow and presents
+target/policy entry, candidate checks, a scrollable patch, exact confirmation,
+and the final two-file result. It does not add any implicit follow-up action.
 
 For an unsupported computed input, create a temporary upgrade branch, change
 `inputs.nixorium.url` to the chosen released tag, and update only that input:

@@ -84,6 +84,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		operationLogManager := app.NewOperationLogManager(local)
 		gitReviewManager := app.NewGitReviewManager(local)
 		gitCommitManager := app.NewGitCommitManager(local)
+		updateManager := app.NewUpdateManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -127,6 +128,14 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			},
 			ApplyGitCommit: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
 				report := gitCommitManager.Apply(ctx, repository, strings.Join(plan.Paths, ","), plan.ReviewToken)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
+			},
+			PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+				return updateManager.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
+			},
+			ApplyUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
+				report := updateManager.ApplyPlan(ctx, plan, plan.ReviewToken)
 				report.Message = operationRecordMessage(report.Message, report)
 				return report
 			},
