@@ -92,6 +92,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   in every generated deployment, covering required failure symptoms, safe retry
   semantics, interrupted operations, private-key-aware backups, and restoration;
   quick validation keeps both copies identical.
+- A reproducible manual VirtualBox and physical-hardware validation plan with
+  isolated/offline topology, evidence records, destructive-disk warnings,
+  firmware/NIC/storage coverage, PXE power-loss and DHCP coexistence recovery,
+  single/multi-client deployment, and explicit pass/fail matrices.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments
