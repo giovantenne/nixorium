@@ -57,9 +57,7 @@ func (m SetupManager) keyReport(ctx context.Context, repository, operation strin
 }
 
 func (m SetupManager) Status(ctx context.Context, repository string) domain.SetupReport {
-	facts := domain.SetupFacts{
-		Install: domain.SetupObservation{Detail: "guided client installation is not available yet"},
-	}
+	facts := domain.SetupFacts{}
 	if gitState, err := m.source.GitState(ctx, repository); err != nil {
 		facts.Review.Detail = fmt.Sprintf("Git review state is unavailable: %v", err)
 	} else if gitState.Dirty {
@@ -198,6 +196,12 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 		}
 	} else {
 		facts.Readiness.Detail = fmt.Sprintf("deployment readiness evaluation failed: %v", err)
+	}
+	facts.Install.Complete = facts.Readiness.Complete && preparation.Ready
+	if facts.Install.Complete {
+		facts.Install.Detail = "guided installation is available: open nixorium and choose Install computers over network"
+	} else {
+		facts.Install.Detail = "guided installation requires deployment readiness and current prepared artifacts"
 	}
 	return domain.ReconcileSetup(repository, facts)
 }

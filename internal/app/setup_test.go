@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type fakeSetupSource struct {
-	data  []byte
-	dirty bool
+	data        []byte
+	dirty       bool
+	applied     bool
+	ready       bool
+	preparation domain.PXEPreparationState
 }
 
 func (f fakeSetupSource) ReadSettings(string) ([]byte, error) {
@@ -22,7 +26,10 @@ func (fakeSetupSource) LabMeta(context.Context, string) (domain.LabMeta, error) 
 	return domain.LabMeta{}, nil
 }
 
-func (fakeSetupSource) DeploymentStatus(context.Context, string) (domain.DeploymentStatus, error) {
+func (f fakeSetupSource) DeploymentStatus(context.Context, string) (domain.DeploymentStatus, error) {
+	if f.ready {
+		return domain.DeploymentStatus{Ready: true}, nil
+	}
 	return domain.DeploymentStatus{Ready: false, Issues: []string{"keys missing"}}, nil
 }
 
@@ -30,7 +37,10 @@ func (f fakeSetupSource) GitState(context.Context, string) (domain.GitState, err
 	return domain.GitState{Available: true, Dirty: f.dirty, Changes: 1}, nil
 }
 
-func (fakeSetupSource) ControllerApplied(context.Context, string) (bool, string) {
+func (f fakeSetupSource) ControllerApplied(context.Context, string) (bool, string) {
+	if f.applied {
+		return true, "reviewed controller configuration is active"
+	}
 	return false, "reviewed controller configuration is not active"
 }
 
@@ -38,8 +48,8 @@ func (fakeSetupSource) ArtifactState(_ string, name, path string) domain.Artifac
 	return domain.ArtifactState{Name: name, Path: path, Present: false}
 }
 
-func (fakeSetupSource) PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState {
-	return domain.PXEPreparationState{}
+func (f fakeSetupSource) PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState {
+	return f.preparation
 }
 
 func (fakeSetupSource) CommandAvailable(string) bool {
@@ -109,5 +119,27 @@ func TestSetupStatusStopsAtGitReviewWhenWorktreeIsDirty(t *testing.T) {
 	report := NewSetupManager(fakeSetupSource{data: data, dirty: true}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageReview {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageReview, report)
+	}
+}
+
+func TestSetupStatusCompletesWhenFirstInstallWorkflowIsAvailable(t *testing.T) {
+	data, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
+	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	report := NewSetupManager(fakeSetupSource{
+		data:        data,
+		applied:     true,
+		ready:       true,
+		preparation: domain.PXEPreparationState{Present: true, Ready: true},
+	}).Status(context.Background(), "/repo")
+	if report.State != "ready" || report.CurrentStage != "" {
+		t.Fatalf("report = %+v", report)
+	}
+	install := report.Stages[len(report.Stages)-1]
+	if install.ID != domain.SetupStageInstall || install.State != domain.SetupStageComplete || !strings.Contains(install.Detail, "Install computers over network") {
+		t.Fatalf("install stage = %+v", install)
 	}
 }

@@ -223,6 +223,9 @@ rechecks `lab-settings.json`, reports concurrent edits as conflicts, and writes
 only that managed file atomically.
 `setup status` is also read-only: it re-inspects the deployment and reports the
 first incomplete first-run stage so interrupted setup can resume predictably.
+When readiness and prepared artifacts are current it reports setup ready and
+offers the dashboard's **Install computers over network** task; this records
+workflow availability, not a claim that a client has already been installed.
 `pxe start` validates the committed preparation, live DHCP address, cache, and
 managed services before requiring the exact `START PXE` confirmation. `pxe
 stop` restores normal controller addressing, while `pxe recover` reconciles an

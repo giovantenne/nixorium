@@ -107,8 +107,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   `nixorium config validate` command. Existing `lab-config.nix` deployments
   remain compatible.
 - A deterministic, read-only `nixorium setup status` reconciler that reports
-  every first-run stage and selects the earliest incomplete one from observed
-  settings, credentials, key files, artifacts, and deployment readiness.
+  every first-run stage, selects the earliest incomplete one from observed
+  settings, credentials, key files, artifacts, and deployment readiness, and
+  marks the final installation offer available only with a current PXE
+  preparation.
 - A secure password-collection backend with terminal-only no-echo input,
   confirmation, default/length checks, best-effort memory wiping, and
   stdin-only salted SHA-512 hashing through the packaged `mkpasswd` tool.
