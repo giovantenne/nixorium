@@ -148,3 +148,25 @@ func TestServicesTextShowsModesWorkflowsAndVerifiedAction(t *testing.T) {
 		}
 	}
 }
+
+func TestOperationLogTextShowsBoundedListAndTail(t *testing.T) {
+	id := "deploy-20260914T113000.000000000Z-11.log"
+	entry := domain.OperationLogEntry{
+		ID: id, Kind: "deployment", StartedAt: time.Date(2026, 9, 14, 11, 30, 0, 0, time.UTC),
+		SizeBytes: 70000, State: "partial", Available: true,
+	}
+	listOutput := &bytes.Buffer{}
+	OperationLogsText(listOutput, domain.OperationLogsReport{State: "available", Logs: []domain.OperationLogEntry{entry}})
+	for _, expected := range []string{"AVAILABLE", "2026-09-14 11:30:00Z", "deployment", "partial", id} {
+		if !strings.Contains(listOutput.String(), expected) {
+			t.Fatalf("log list omits %q:\n%s", expected, listOutput.String())
+		}
+	}
+	detailOutput := &bytes.Buffer{}
+	OperationLogText(detailOutput, domain.OperationLogReport{State: "available", Log: &entry, Content: "Result: partial\n", Truncated: true})
+	for _, expected := range []string{id, "tail only", "Result:        partial", "Result: partial"} {
+		if !strings.Contains(detailOutput.String(), expected) {
+			t.Fatalf("log detail omits %q:\n%s", expected, detailOutput.String())
+		}
+	}
+}

@@ -352,6 +352,8 @@ nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 nix run .#nixorium -- services
 nix run .#nixorium -- services restart cache
+nix run .#nixorium -- logs
+nix run .#nixorium -- logs show OPERATION_LOG_ID
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -407,6 +409,13 @@ plan, and type the exact `DEPLOY <targets>` phrase. It shows operation activity
 and the final phase, build/apply state, authenticated/recorded target counts,
 remediation, and durable log path.
 Closing the dashboard is disabled while its Colmena child is running.
+Use `logs` to list the newest 50 recognized deployment operation logs from the
+administrator's private XDG state, even outside a deployment checkout. Use
+`logs show <id>` to read at most the final 64 KiB of one listed log. Nixorium
+accepts only generated basename IDs, requires user ownership plus mode 0700
+directories and 0600 regular files, refuses symlinks, and neutralizes terminal
+control characters before rendering. The dashboard's **View operation logs**
+task uses the same typed list/detail operations and provides bounded scrolling.
 For routine controller changes, `controller plan` reviews the ready, clean
 deployment revision and whether its evaluated system is already active.
 `controller apply --expect <revision>` repeats that preflight, requires exact

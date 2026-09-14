@@ -84,6 +84,27 @@ func TestParseArgumentsAcceptsServicesAndCacheRestart(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsOperationLogListAndShow(t *testing.T) {
+	list, err := parseArguments([]string{"logs", "--json"})
+	if err != nil || list.command != "logs" || list.subcommand != "" || !list.json {
+		t.Fatalf("logs = %+v, error = %v", list, err)
+	}
+	id := "deploy-20260914T113000.000000000Z-11.log"
+	show, err := parseArguments([]string{"logs", "show", id, "--json"})
+	if err != nil || show.command != "logs" || show.subcommand != "show" || show.logID != id || !show.json {
+		t.Fatalf("logs show = %+v, error = %v", show, err)
+	}
+	for _, arguments := range [][]string{
+		{"logs", "show"},
+		{"show", "logs", id},
+		{"logs", "show", id, "another"},
+	} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("invalid log arguments were accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")
@@ -207,6 +228,7 @@ func TestOnlyPXECleanupCanRunWithoutRepository(t *testing.T) {
 		required bool
 	}{
 		{options: options{command: "status"}, required: true},
+		{options: options{command: "logs"}, required: false},
 		{options: options{command: "pxe", subcommand: "prepare"}, required: true},
 		{options: options{command: "pxe", subcommand: "start"}, required: true},
 		{options: options{command: "pxe", subcommand: "stop"}, required: false},

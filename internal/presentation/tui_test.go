@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -268,6 +269,49 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	model = updated.(dashboardModel)
 	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View(), "verified=true") || !strings.Contains(model.View(), "cache healthy") {
 		t.Fatalf("verified restart result missing: restarts=%d\n%s", restarts, model.View())
+	}
+}
+
+func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
+	id := "deploy-20260914T113000.000000000Z-11.log"
+	loaded := ""
+	actions := DashboardActions{
+		LoadLogs: func() domain.OperationLogsReport {
+			return domain.OperationLogsReport{Operation: "logs-list", State: "available", Logs: []domain.OperationLogEntry{
+				{ID: id, Kind: "deployment", StartedAt: time.Date(2026, 9, 14, 11, 30, 0, 0, time.UTC), SizeBytes: 70000, State: "partial", Available: true},
+			}}
+		},
+		LoadLog: func(selected string) domain.OperationLogReport {
+			loaded = selected
+			lines := make([]string, 20)
+			for index := range lines {
+				lines[index] = fmt.Sprintf("line-%02d", index+1)
+			}
+			entry := domain.OperationLogEntry{ID: id, Kind: "deployment", StartedAt: time.Date(2026, 9, 14, 11, 30, 0, 0, time.UTC), SizeBytes: 70000, State: "partial", Available: true}
+			return domain.OperationLogReport{Operation: "logs-show", State: "available", Log: &entry, Content: strings.Join(lines, "\n") + "\n", Truncated: true}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardLogs || !strings.Contains(model.View(), id) || !strings.Contains(model.View(), "partial") {
+		t.Fatalf("operation log list missing:\n%s", model.View())
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loaded != id || model.screen != dashboardLogDetail || !strings.Contains(model.View(), "earlier bytes omitted") || !strings.Contains(model.View(), "line-20") || strings.Contains(model.View(), "line-01") {
+		t.Fatalf("bounded tail detail missing: loaded=%q\n%s", loaded, model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyHome})
+	model = updated.(dashboardModel)
+	if !strings.Contains(model.View(), "line-01") {
+		t.Fatalf("log detail did not scroll to the beginning:\n%s", model.View())
 	}
 }
 
