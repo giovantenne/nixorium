@@ -61,7 +61,8 @@ nixorium controller apply --expect REVISION_FROM_PLAN
 Apply requires exact `REBUILD <controller>` confirmation and starts only a
 revision-bound systemd instance. It builds the pinned Git source as the
 deployment owner, refuses repository drift before activation, and verifies the
-active system afterward. The TUI's **Rebuild controller** task uses the same
+active system plus its revision-bound durable success receipt afterward. The
+TUI's **Rebuild controller** task uses the same
 typed operation; the systemd job and journal survive closing the dashboard.
 
 The default TUI's **Deploy updates** screen invokes the same plan/apply

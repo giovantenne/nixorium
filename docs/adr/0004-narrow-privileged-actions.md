@@ -68,6 +68,16 @@ revision against clean HEAD, pins the Git fetcher, builds as the deployment
 owner, and refuses drift before exact-closure activation; it does not accept a
 path, hostname, executable, or arbitrary unit.
 
+Controller activation completion is fail-closed. The root action removes any
+earlier receipt before invoking `switch-to-configuration`, because NixOS can
+advance `/run/current-system` before a later activation snippet fails. It
+atomically writes a mode-0644, root-owned receipt under
+`/var/lib/nixorium/controller/` only after the switch returns success and the
+active symlink resolves to the exact built closure. Unprivileged reconciliation
+accepts the controller as current only when that strict record also matches the
+reviewed Git revision. The record contains no secret material and grants no
+new mutation capability.
+
 Routine service management does not grant a generic `systemctl restart`
 capability. The only generic-service mutation starts the fixed
 `nixorium-restart-cache.service` oneshot. That capability-free root action

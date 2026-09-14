@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made controller-apply reconciliation require an atomic, root-owned success
+  receipt bound to both the reviewed Git revision and active NixOS closure, so
+  late activation failures cannot be mistaken for completed setup.
 - Split local validation into a fast default cycle, targeted VM modes, and an
   explicit full release matrix, with a reusable Nix evaluation cache.
 - Documented the complete per-host customization workflow in both READMEs and

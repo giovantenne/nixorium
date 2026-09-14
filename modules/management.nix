@@ -59,6 +59,7 @@ let
       pkgs.coreutils
       pkgs.diffutils
       pkgs.git
+      pkgs.jq
       pkgs.nix
       pkgs.util-linux
       nixoriumPackage
@@ -133,7 +134,48 @@ let
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" \
           && "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" ]] \
         || fail "deployment changed while the controller was building; activation refused"
-      exec "$SYSTEM_PATH/bin/switch-to-configuration" switch
+
+      STATE_DIRECTORY=/var/lib/nixorium/controller
+      ACTIVATION_RECORD="$STATE_DIRECTORY/applied.json"
+      [[ -d "$STATE_DIRECTORY" && ! -L "$STATE_DIRECTORY" \
+          && "$(stat -c '%U:%G:%a' "$STATE_DIRECTORY")" == root:root:755 ]] \
+        || fail "controller state directory has unsafe ownership or permissions"
+      if [[ -L "$ACTIVATION_RECORD" ]]; then
+        fail "refusing symlink controller activation record"
+      fi
+      if [[ -e "$ACTIVATION_RECORD" && ! -f "$ACTIVATION_RECORD" ]]; then
+        fail "controller activation record is not a regular file"
+      fi
+
+      # Invalidate any earlier success before activation. A failed switch can
+      # update /run/current-system before a later activation snippet fails, so
+      # the active symlink alone is not durable evidence of completion.
+      rm -f -- "$ACTIVATION_RECORD"
+      "$SYSTEM_PATH/bin/switch-to-configuration" switch
+      ACTIVE_SYSTEM="$(readlink -f /run/current-system)"
+      [[ "$ACTIVE_SYSTEM" == "$SYSTEM_PATH" ]] \
+        || fail "active system differs after controller activation"
+
+      TEMPORARY_RECORD="$(mktemp --tmpdir="$STATE_DIRECTORY" .applied.json.XXXXXX)"
+      keep_temporary=true
+      cleanup_record() {
+        if [[ "$keep_temporary" == true ]]; then
+          rm -f -- "$TEMPORARY_RECORD"
+        fi
+      }
+      trap cleanup_record EXIT
+      jq -n \
+        --arg revision "$REVISION" \
+        --arg systemPath "$SYSTEM_PATH" \
+        --arg activatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{schemaVersion: 1, revision: $revision, systemPath: $systemPath, activatedAt: $activatedAt}' \
+        > "$TEMPORARY_RECORD"
+      chmod 0644 "$TEMPORARY_RECORD"
+      sync "$TEMPORARY_RECORD"
+      mv -fT -- "$TEMPORARY_RECORD" "$ACTIVATION_RECORD"
+      keep_temporary=false
+      sync "$STATE_DIRECTORY"
+      trap - EXIT
     '';
   };
   preparePxe = pkgs.writeShellApplication {
@@ -393,6 +435,8 @@ in
         Group = "root";
         UMask = "0077";
         CacheDirectory = "nixorium";
+        StateDirectory = "nixorium/controller";
+        StateDirectoryMode = "0755";
         Environment = "XDG_CACHE_HOME=/var/cache/nixorium";
         PrivateTmp = true;
         # NixOS activation legitimately updates declared user homes and
@@ -419,6 +463,8 @@ in
         Group = "root";
         UMask = "0077";
         CacheDirectory = "nixorium";
+        StateDirectory = "nixorium/controller";
+        StateDirectoryMode = "0755";
         Environment = "XDG_CACHE_HOME=/var/cache/nixorium";
         PrivateTmp = true;
         # See the parameterless first-run unit above. Revision binding and the

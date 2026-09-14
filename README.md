@@ -242,7 +242,9 @@ requires typing `APPLY`. The fixed systemd action builds as the unprivileged
 `admin` user and activates exactly that resulting NixOS closure as root. It is
 safe to retry after a failed build or activation; inspect durable output with
 `journalctl -u nixorium-apply-controller.service`. Non-interactive automation
-must opt in explicitly with `--yes`.
+must opt in explicitly with `--yes`. Completion is recorded only after the
+switch exits successfully and the active closure is verified; a partial
+activation that merely advances `/run/current-system` remains action-required.
 
 The applied controller configuration owns Harmonia as a persistent systemd
 service. It loads the installed signing key through systemd credentials, never
@@ -452,7 +454,8 @@ deployment revision and whether its evaluated system is already active.
 `REBUILD <controller>` confirmation, and starts only a revision-named systemd
 unit. The privileged service pins the Git fetcher to that commit, builds as the
 deployment owner, refuses worktree or HEAD drift before activating the exact
-closure, and the application verifies `/run/current-system` afterward. The
+closure, and the application verifies `/run/current-system` plus the
+revision-bound durable success receipt afterward. The
 dashboard's **Rebuild controller** task uses the same typed workflow; the
 systemd-owned job and journal survive closing the dashboard. `--yes` remains an
 explicit automation-only confirmation.
@@ -494,7 +497,8 @@ polkit rule; it never accepts a destination or command argument.
 `setup apply` similarly accepts no executable or machine target, requires all
 earlier observed setup stages, and starts only
 `nixorium-apply-controller.service`. Status marks the stage complete only when
-`/run/current-system` matches the evaluated controller generation.
+`/run/current-system` and the root-owned success receipt match the evaluated
+controller generation and current Git revision.
 `pxe prepare` starts only the fixed, administrator-owned preparation unit. It
 does not alter networking; its current manifest is exposed in `status --json`
 as `pxePreparation` and checked by `doctor`.
@@ -636,13 +640,18 @@ nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 
 The apply runs through a narrow revision-bound systemd instance, builds the
 pinned Git source as the deployment owner, rejects repository drift before
-activation, and verifies the active system after completion. Use the
+activation, and verifies both the active system and its revision-bound success
+receipt after completion. Use the
 **Rebuild controller** dashboard task for the same reviewed workflow.
 
 During first-run setup, the equivalent setup-stage action remains:
 ```sh
 nix run .#nixorium -- setup apply
 ```
+
+After upgrading a controller from a version without activation receipts,
+`setup status` intentionally requests one controller apply even if the active
+closure already matches. That single reviewed apply creates the missing proof.
 
 Then verify the managed binary cache:
 ```sh

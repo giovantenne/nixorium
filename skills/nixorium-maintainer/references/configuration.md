@@ -129,3 +129,7 @@ view of the deployment as `admin`, which excludes the three ignored private
 files from the Nix store, then activates only that exact closure as root.
 Inspect failures with `journalctl -u nixorium-apply-controller.service` and
 retry after correcting the reported preflight, build, or activation error.
+Completion requires a root-owned receipt matching both the current Git
+revision and active closure; `/run/current-system` alone is insufficient. After
+upgrading from a version without receipts, run one reviewed `setup apply` to
+create that proof even if the closure already matches.
