@@ -174,3 +174,25 @@ func TestOperationLogTextShowsBoundedListAndTail(t *testing.T) {
 		}
 	}
 }
+
+func TestGitReviewTextShowsScopesOwnershipAndRedactedDiff(t *testing.T) {
+	report := domain.GitReviewReport{
+		State:      "changes",
+		Repository: "/deployment",
+		Revision:   "0123456789abcdef0123456789abcdef01234567",
+		Summary:    domain.GitChangeSummary{Staged: 1, Unstaged: 1, Untracked: 1, Managed: 1, Unexpected: 2},
+		Changes: []domain.GitChange{
+			{Path: "lab-settings.json", Staged: "modified", Managed: true},
+			{Path: "module.nix", Unstaged: "modified"},
+			{Path: "notes", Untracked: true},
+		},
+		Diffs: []domain.GitDiff{{Scope: "staged", Content: "+  \"adminPassword\": \"<redacted>\"\n", Truncated: true}},
+	}
+	var output bytes.Buffer
+	GitReviewText(&output, report)
+	for _, expected := range []string{"Git review: CHANGES", "1 staged, 1 unstaged, 1 untracked", "managed", "unexpected", "lab-settings.json", "first 256 KiB", "<redacted>", "Untracked file contents are not opened"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("Git review output omits %q:\n%s", expected, output.String())
+		}
+	}
+}

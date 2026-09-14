@@ -144,6 +144,9 @@ nix run .#nixorium -- services restart cache
 nix run .#nixorium -- logs
 nix run .#nixorium -- logs show OPERATION_LOG_ID
 
+# Review staged, unstaged, and untracked deployment changes without mutation
+nix run .#nixorium -- git review
+
 # Review and execute a managed client deployment
 nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
@@ -193,6 +196,11 @@ Release from the matching changelog section.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
+- Git review is read-only and typed: preserve the staged/unstaged/untracked
+  distinction, managed-versus-unexpected classification, bounded patch output,
+  password-hash redaction, no automatic untracked-file reads, and refusal before
+  diff capture when a known private-key path appears. Never enable external diff
+  drivers or let presentation mutate the index/worktree.
 - Routine controller rebuild uses `controller plan`/`controller apply`, binds the privileged systemd instance to a full reviewed Git revision, builds a pinned Git source as the deployment owner, refuses repository drift before activation, and verifies `/run/current-system` afterward. Keep `setup apply` as the first-run-compatible path through the same fixed service implementation.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
@@ -306,6 +314,9 @@ set -euo pipefail
 
 - **Never commit** `secret-key` or `admin-ssh` (both in the deployment `.gitignore`)
 - **Never commit** `veyon-private-key.pem` (in `.gitignore`); deploy manually to `/etc/veyon/keys/private/teacher/key` with mode `0640` and group `veyon-master`
+- `nixorium git review` must refuse known private-key paths before reading any
+  patch content; do not weaken this boundary when adding the optional commit
+  workflow
 - `keys/cache-public-key`, `keys/admin-ssh.pub`, and `keys/veyon-public-key.pem` are public and may be committed
 - `nixorium setup keys` uses create-new semantics and refuses public-only or mismatched pairs; never bypass that refusal by overwriting an existing key
 - `nixorium setup install-secrets` may start only `nixorium-install-secrets.service`; its deployment path is declarative and destinations are fixed

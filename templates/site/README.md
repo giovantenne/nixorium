@@ -97,6 +97,7 @@ nix run .#nixorium -- services
 nix run .#nixorium -- services restart cache
 nix run .#nixorium -- logs
 nix run .#nixorium -- logs show OPERATION_LOG_ID
+nix run .#nixorium -- git review
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -158,6 +159,14 @@ Nixorium accepts only generated basename IDs, requires user ownership plus mode 
 directories and 0600 regular files, refuses symlinks, and neutralizes terminal
 control characters before rendering. The dashboard's **View operation logs**
 task uses the same typed list/detail operations and provides bounded scrolling.
+Use `git review` before committing deployment changes. It classifies every
+changed path as staged, unstaged, or untracked and separates Nixorium-managed
+settings/public-key paths from unexpected edits. Tracked patches are bounded
+and rendered without invoking external Git diff drivers; password hashes in
+`lab-settings.json` are redacted, untracked contents are not opened, and any
+tracked Harmonia, SSH, or Veyon private-key path blocks review before patch
+content is read. The dashboard's **Review Git changes** task uses the same
+read-only report. This command never stages, discards, commits, or pushes.
 Use `controller plan` and revision-bound `controller apply --expect` for routine
 controller changes. Apply requires exact `REBUILD <controller>` confirmation,
 starts only the matching systemd unit instance, builds the pinned Git revision

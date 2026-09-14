@@ -125,6 +125,18 @@ func TestParseArgumentsAcceptsOperationLogListAndShow(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsOnlyGitReview(t *testing.T) {
+	options, err := parseArguments([]string{"git", "review", "--json"})
+	if err != nil || options.command != "git" || options.subcommand != "review" || !options.json {
+		t.Fatalf("git review = %+v, error = %v", options, err)
+	}
+	for _, arguments := range [][]string{{"git"}, {"review", "git"}, {"git", "review", "review"}} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("invalid Git arguments were accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")
@@ -249,6 +261,7 @@ func TestOnlyPXECleanupCanRunWithoutRepository(t *testing.T) {
 	}{
 		{options: options{command: "status"}, required: true},
 		{options: options{command: "logs"}, required: false},
+		{options: options{command: "git", subcommand: "review"}, required: true},
 		{options: options{command: "pxe", subcommand: "prepare"}, required: true},
 		{options: options{command: "pxe", subcommand: "start"}, required: true},
 		{options: options{command: "pxe", subcommand: "stop"}, required: false},

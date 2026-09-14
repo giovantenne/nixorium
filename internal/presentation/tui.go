@@ -19,6 +19,7 @@ type DashboardActions struct {
 	RestartService  func(string) domain.ServiceActionReport
 	LoadLogs        func() domain.OperationLogsReport
 	LoadLog         func(string) domain.OperationLogReport
+	LoadGitReview   func() domain.GitReviewReport
 	PreparePXE      func() domain.ActionReport
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
@@ -39,6 +40,7 @@ const (
 	dashboardServicesRestartReview
 	dashboardLogs
 	dashboardLogDetail
+	dashboardGitReview
 	dashboardPXE
 	dashboardPXEStartReview
 )
@@ -65,6 +67,8 @@ type dashboardModel struct {
 	logDetail        domain.OperationLogReport
 	logCursor        int
 	logScroll        int
+	gitReview        domain.GitReviewReport
+	gitScroll        int
 	height           int
 }
 
@@ -114,6 +118,10 @@ type dashboardLogsMsg struct {
 
 type dashboardLogMsg struct {
 	report domain.OperationLogReport
+}
+
+type dashboardGitReviewMsg struct {
+	report domain.GitReviewReport
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -227,6 +235,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = operationLogIssues(message.report.Issues)
 		model.screen = dashboardLogDetail
 		return model, nil
+	case dashboardGitReviewMsg:
+		model.busy = ""
+		model.gitReview = message.report
+		model.gitScroll = 0
+		model.message = operationLogIssues(message.report.Issues)
+		model.screen = dashboardGitReview
+		return model, nil
 	case tea.WindowSizeMsg:
 		model.height = message.Height
 		if model.screen == dashboardLogDetail && model.logScroll > maximumLogScroll(model.logDetail, model.logDetailHeight()) {
@@ -283,6 +298,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 			return model, func() tea.Msg {
 				return dashboardLogsMsg{report: model.actions.LoadLogs()}
+			}
+		case "g":
+			model.screen = dashboardGitReview
+			model.busy = "Reviewing Git changes without modifying the worktree"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
 			}
 		case "p", "enter":
 			model.screen = dashboardPXE
@@ -519,6 +541,41 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "end":
 			model.logScroll = maximum
 		}
+	case dashboardGitReview:
+		maximum := maximumGitReviewScroll(model.gitReview, model.gitReviewHeight())
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "up", "k":
+			if model.gitScroll > 0 {
+				model.gitScroll--
+			}
+		case "down", "j":
+			if model.gitScroll < maximum {
+				model.gitScroll++
+			}
+		case "pgup":
+			model.gitScroll -= model.gitReviewHeight()
+			if model.gitScroll < 0 {
+				model.gitScroll = 0
+			}
+		case "pgdown":
+			model.gitScroll += model.gitReviewHeight()
+			if model.gitScroll > maximum {
+				model.gitScroll = maximum
+			}
+		case "home":
+			model.gitScroll = 0
+		case "end":
+			model.gitScroll = maximum
+		case "f":
+			model.busy = "Refreshing the read-only Git review"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+			}
+		}
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
@@ -613,6 +670,8 @@ func (model dashboardModel) View() string {
 		return model.logsView()
 	case dashboardLogDetail:
 		return model.logDetailView()
+	case dashboardGitReview:
+		return model.gitReviewView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
 	default:
@@ -642,12 +701,86 @@ func (model dashboardModel) homeView() string {
 		"  c           Rebuild controller",
 		"  s           Manage services",
 		"  l           View operation logs",
+		"  g           Review Git changes",
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
 		"q: quit",
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) gitReviewView() string {
+	lines := []string{"Nixorium — Git change review", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	content := gitReviewContentLines(model.gitReview)
+	height := model.gitReviewHeight()
+	maximum := maximumGitReviewScroll(model.gitReview, height)
+	if model.gitScroll > maximum {
+		model.gitScroll = maximum
+	}
+	end := model.gitScroll + height
+	if end > len(content) {
+		end = len(content)
+	}
+	lines = append(lines,
+		fmt.Sprintf("State: %s   paths: %d   staged/unstaged/untracked: %d/%d/%d", model.gitReview.State, len(model.gitReview.Changes), model.gitReview.Summary.Staged, model.gitReview.Summary.Unstaged, model.gitReview.Summary.Untracked),
+		fmt.Sprintf("Managed/unexpected/private: %d/%d/%d", model.gitReview.Summary.Managed, model.gitReview.Summary.Unexpected, model.gitReview.Summary.Private),
+		fmt.Sprintf("Showing lines %d-%d of %d", displayedLineStart(model.gitScroll, len(content)), end, len(content)),
+		"",
+	)
+	lines = append(lines, content[model.gitScroll:end]...)
+	lines = append(lines, "", "Up/Down/PgUp/PgDn/Home/End: scroll   f: refresh   Esc: back   q: quit")
+	if model.message != "" {
+		lines = append(lines, "", "Warning: "+model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func gitReviewContentLines(report domain.GitReviewReport) []string {
+	lines := []string{}
+	if len(report.Changes) == 0 {
+		lines = append(lines, "The deployment worktree is clean.")
+	}
+	for _, change := range report.Changes {
+		lines = append(lines, fmt.Sprintf("%-10s %-10s %-9s %s", gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path))
+		if change.OriginalPath != "" {
+			lines = append(lines, "  from "+change.OriginalPath)
+		}
+	}
+	for _, diff := range report.Diffs {
+		lines = append(lines, "", gitScopeTitle(diff.Scope)+" diff"+truncatedGitDiffLabel(diff.Truncated)+":")
+		lines = append(lines, strings.Split(strings.TrimSuffix(diff.Content, "\n"), "\n")...)
+	}
+	if report.Summary.Untracked > 0 {
+		lines = append(lines, "", "Untracked file contents are not opened automatically.")
+	}
+	for _, issue := range report.Issues {
+		lines = append(lines, "", "BLOCKED: "+issue.Field+": "+issue.Message)
+	}
+	return lines
+}
+
+func (model dashboardModel) gitReviewHeight() int {
+	if model.height <= 0 {
+		return 14
+	}
+	height := model.height - 9
+	if height < 4 {
+		return 4
+	}
+	return height
+}
+
+func maximumGitReviewScroll(report domain.GitReviewReport, height int) int {
+	maximum := len(gitReviewContentLines(report)) - height
+	if maximum < 0 {
+		return 0
+	}
+	return maximum
 }
 
 func (model dashboardModel) controllerView() string {

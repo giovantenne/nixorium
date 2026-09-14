@@ -129,6 +129,88 @@ func OperationLogText(writer io.Writer, report domain.OperationLogReport) {
 	}
 }
 
+func GitReviewText(writer io.Writer, report domain.GitReviewReport) {
+	fmt.Fprintf(writer, "Nixorium Git review: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:      %s\n", report.Repository)
+	if report.Revision != "" {
+		fmt.Fprintf(writer, "HEAD revision:   %s\n", report.Revision)
+	}
+	fmt.Fprintf(writer, "Changed paths:   %d\n", len(report.Changes))
+	fmt.Fprintf(writer, "Scopes:          %d staged, %d unstaged, %d untracked\n", report.Summary.Staged, report.Summary.Unstaged, report.Summary.Untracked)
+	fmt.Fprintf(writer, "Ownership:       %d managed, %d unexpected, %d private\n", report.Summary.Managed, report.Summary.Unexpected, report.Summary.Private)
+	if len(report.Changes) == 0 {
+		fmt.Fprintln(writer, "The deployment worktree is clean.")
+	} else {
+		fmt.Fprintln(writer, "Changes:")
+		for _, change := range report.Changes {
+			fmt.Fprintf(writer, "  %-10s %-10s %-9s %s\n", gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path)
+			if change.OriginalPath != "" {
+				fmt.Fprintf(writer, "    from %s\n", change.OriginalPath)
+			}
+		}
+	}
+	for _, diff := range report.Diffs {
+		fmt.Fprintf(writer, "\n%s diff%s:\n", gitScopeTitle(diff.Scope), truncatedGitDiffLabel(diff.Truncated))
+		fmt.Fprint(writer, diff.Content)
+		if diff.Content != "" && !strings.HasSuffix(diff.Content, "\n") {
+			fmt.Fprintln(writer)
+		}
+	}
+	if report.Summary.Untracked > 0 {
+		fmt.Fprintln(writer, "\nUntracked file contents are not opened automatically.")
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func gitChangeOwnership(change domain.GitChange) string {
+	if change.Private {
+		return "private"
+	}
+	if change.Managed {
+		return "managed"
+	}
+	return "unexpected"
+}
+
+func gitChangeIndex(change domain.GitChange) string {
+	if change.Untracked {
+		return "-"
+	}
+	if change.Staged == "" {
+		return "-"
+	}
+	return change.Staged
+}
+
+func gitChangeWorktree(change domain.GitChange) string {
+	if change.Untracked {
+		return "untracked"
+	}
+	if change.Unstaged == "" {
+		return "-"
+	}
+	return change.Unstaged
+}
+
+func truncatedGitDiffLabel(truncated bool) string {
+	if truncated {
+		return " (first 256 KiB; remaining output omitted)"
+	}
+	return ""
+}
+
+func gitScopeTitle(scope string) string {
+	if scope == "staged" {
+		return "Staged"
+	}
+	if scope == "unstaged" {
+		return "Unstaged"
+	}
+	return scope
+}
+
 func HostsText(writer io.Writer, report domain.HostsReport) {
 	available, total := hostAvailability(report.Hosts)
 	fmt.Fprintf(writer, "Nixorium computers: %s\n", strings.ToUpper(report.State))
