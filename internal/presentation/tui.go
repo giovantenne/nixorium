@@ -22,6 +22,8 @@ type DashboardActions struct {
 	LoadGitReview   func() domain.GitReviewReport
 	PlanGitCommit   func(string) domain.GitCommitPlanReport
 	ApplyGitCommit  func(domain.GitCommitPlanReport) domain.GitCommitReport
+	PlanUpdate      func(string, bool, bool) domain.UpdatePlanReport
+	ApplyUpdate     func(domain.UpdatePlanReport) domain.UpdateApplyReport
 	PreparePXE      func() domain.ActionReport
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
@@ -45,6 +47,8 @@ const (
 	dashboardGitReview
 	dashboardGitCommitSelect
 	dashboardGitCommitReview
+	dashboardUpdate
+	dashboardUpdateReview
 	dashboardPXE
 	dashboardPXEStartReview
 )
@@ -77,6 +81,13 @@ type dashboardModel struct {
 	gitCommitChosen  map[string]bool
 	gitCommitPlan    domain.GitCommitPlanReport
 	gitCommitResult  domain.GitCommitReport
+	updateTarget     string
+	updatePrerelease bool
+	updateDowngrade  bool
+	updatePlan       domain.UpdatePlanReport
+	updateResult     domain.UpdateApplyReport
+	updateScroll     int
+	updating         bool
 	height           int
 }
 
@@ -139,6 +150,14 @@ type dashboardGitCommitPlanMsg struct {
 type dashboardGitCommitResultMsg struct {
 	report domain.GitCommitReport
 	review domain.GitReviewReport
+}
+
+type dashboardUpdatePlanMsg struct {
+	report domain.UpdatePlanReport
+}
+
+type dashboardUpdateResultMsg struct {
+	report domain.UpdateApplyReport
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -281,10 +300,34 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardGitReview
 		return model, nil
+	case dashboardUpdatePlanMsg:
+		model.busy = ""
+		model.updatePlan = message.report
+		if message.report.HasErrors() {
+			model.message = operationLogIssues(message.report.Issues)
+			model.screen = dashboardUpdate
+			return model, nil
+		}
+		model.confirmation = ""
+		model.updateScroll = 0
+		model.message = ""
+		model.screen = dashboardUpdateReview
+		return model, nil
+	case dashboardUpdateResultMsg:
+		model.busy = ""
+		model.updating = false
+		model.updateResult = message.report
+		model.confirmation = ""
+		model.message = message.report.Message
+		model.screen = dashboardUpdate
+		return model, nil
 	case tea.WindowSizeMsg:
 		model.height = message.Height
 		if model.screen == dashboardLogDetail && model.logScroll > maximumLogScroll(model.logDetail, model.logDetailHeight()) {
 			model.logScroll = maximumLogScroll(model.logDetail, model.logDetailHeight())
+		}
+		if model.screen == dashboardUpdateReview && model.updateScroll > maximumUpdateScroll(model.updatePlan, model.updateReviewHeight()) {
+			model.updateScroll = maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
 		}
 		return model, nil
 	}
@@ -293,11 +336,11 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && model.deploying {
-		model.message = "Deployment is running; wait for its result before closing Nixorium."
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating) {
+		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
-	if key.String() == "ctrl+c" || key.String() == "q" {
+	if key.String() == "ctrl+c" || (key.String() == "q" && model.screen != dashboardUpdate && model.screen != dashboardUpdateReview) {
 		return model, tea.Quit
 	}
 	if model.busy != "" {
@@ -345,6 +388,12 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, func() tea.Msg {
 				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
 			}
+		case "u":
+			model.screen = dashboardUpdate
+			model.updateTarget = ""
+			model.updatePrerelease = false
+			model.updateDowngrade = false
+			model.message = ""
 		case "p", "enter":
 			model.screen = dashboardPXE
 			model.message = ""
@@ -708,6 +757,91 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				model.confirmation += string(key.Runes)
 			}
 		}
+	case dashboardUpdate:
+		switch key.String() {
+		case "esc":
+			model.screen = dashboardHome
+			model.message = ""
+		case "f2":
+			model.updatePrerelease = !model.updatePrerelease
+			model.message = ""
+		case "f3":
+			model.updateDowngrade = !model.updateDowngrade
+			model.message = ""
+		case "backspace":
+			value := []rune(model.updateTarget)
+			if len(value) > 0 {
+				model.updateTarget = string(value[:len(value)-1])
+			}
+		case "enter":
+			target := strings.TrimSpace(model.updateTarget)
+			if target == "" {
+				model.message = "Enter an explicit release tag before creating an update plan."
+				return model, nil
+			}
+			model.busy = "Validating the candidate release and representative builds"
+			model.message = ""
+			allowPrerelease := model.updatePrerelease
+			allowDowngrade := model.updateDowngrade
+			return model, func() tea.Msg {
+				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(target, allowPrerelease, allowDowngrade)}
+			}
+		default:
+			if key.Type == tea.KeyRunes && len([]rune(model.updateTarget))+len(key.Runes) <= 128 {
+				model.updateTarget += string(key.Runes)
+			}
+		}
+	case dashboardUpdateReview:
+		maximum := maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
+		switch key.String() {
+		case "esc":
+			model.screen = dashboardUpdate
+			model.confirmation = ""
+			model.message = "Update cancelled; flake.nix and flake.lock were not changed."
+		case "up":
+			if model.updateScroll > 0 {
+				model.updateScroll--
+			}
+		case "down":
+			if model.updateScroll < maximum {
+				model.updateScroll++
+			}
+		case "pgup":
+			model.updateScroll -= model.updateReviewHeight()
+			if model.updateScroll < 0 {
+				model.updateScroll = 0
+			}
+		case "pgdown":
+			model.updateScroll += model.updateReviewHeight()
+			if model.updateScroll > maximum {
+				model.updateScroll = maximum
+			}
+		case "backspace":
+			value := []rune(model.confirmation)
+			if len(value) > 0 {
+				model.confirmation = string(value[:len(value)-1])
+			}
+		case " ":
+			model.confirmation += " "
+		case "enter":
+			if model.confirmation != model.updatePlan.Confirmation {
+				model.confirmation = ""
+				model.message = "Confirmation did not match; flake.nix and flake.lock were not changed."
+				return model, nil
+			}
+			model.busy = "Writing the validated Nixorium release update"
+			model.updating = true
+			model.confirmation = ""
+			model.message = ""
+			plan := model.updatePlan
+			return model, func() tea.Msg {
+				return dashboardUpdateResultMsg{report: model.actions.ApplyUpdate(plan)}
+			}
+		default:
+			if key.Type == tea.KeyRunes {
+				model.confirmation += string(key.Runes)
+			}
+		}
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
@@ -804,6 +938,8 @@ func (model dashboardModel) View() string {
 		return model.logDetailView()
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
 		return model.gitReviewView()
+	case dashboardUpdate, dashboardUpdateReview:
+		return model.updateView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
 	default:
@@ -834,6 +970,7 @@ func (model dashboardModel) homeView() string {
 		"  s           Manage services",
 		"  l           View operation logs",
 		"  g           Review Git changes",
+		"  u           Update Nixorium",
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
@@ -973,6 +1110,110 @@ func maximumGitCommitPlanScroll(report domain.GitCommitPlanReport, height int) i
 		return 0
 	}
 	return maximum
+}
+
+func (model dashboardModel) updateView() string {
+	lines := []string{"Nixorium — Update Nixorium", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		if model.updating {
+			lines = append(lines, "", "Wait for the atomic two-file result before closing Nixorium.")
+		} else {
+			lines = append(lines, "", "Candidate evaluation and builds do not modify the deployment.")
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
+	if model.screen == dashboardUpdateReview {
+		diffLines := strings.Split(strings.TrimSuffix(model.updatePlan.Diff.Content, "\n"), "\n")
+		height := model.updateReviewHeight()
+		maximum := maximumUpdateScroll(model.updatePlan, height)
+		if model.updateScroll > maximum {
+			model.updateScroll = maximum
+		}
+		end := model.updateScroll + height
+		if end > len(diffLines) {
+			end = len(diffLines)
+		}
+		lines = append(lines,
+			"Validated release review",
+			fmt.Sprintf("  Current: %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.CurrentChannel),
+			fmt.Sprintf("  Target:  %s (%s)", model.updatePlan.Target, model.updatePlan.TargetChannel),
+			fmt.Sprintf("  Deployment revision: %s", model.updatePlan.Revision),
+			fmt.Sprintf("  Downgrade: %t", model.updatePlan.Downgrade),
+			"  Scope: flake.nix and flake.lock only",
+			"  No commit, push, activation, PXE action, or client deployment is implicit",
+			"",
+			"Candidate checks:",
+		)
+		for _, check := range model.updatePlan.Checks {
+			lines = append(lines, fmt.Sprintf("  %-18s %-8s %s", check.ID, check.State, check.Message))
+		}
+		lines = append(lines,
+			"",
+			fmt.Sprintf("Diff lines %d-%d of %d", displayedLineStart(model.updateScroll, len(diffLines)), end, len(diffLines)),
+			"",
+		)
+		lines = append(lines, diffLines[model.updateScroll:end]...)
+		lines = append(lines,
+			"",
+			"Type "+model.updatePlan.Confirmation+" to continue:",
+			"> "+model.confirmation+"█",
+			"",
+			"Up/Down/PgUp/PgDn: scroll   Esc: cancel",
+		)
+		if model.message != "" {
+			lines = append(lines, "", model.message)
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
+
+	lines = append(lines,
+		"Enter one explicit v-prefixed Semantic Version release tag.",
+		"Target: > "+model.updateTarget+"█",
+		"",
+		fmt.Sprintf("F2  Allow prerelease: %s", toggleLabel(model.updatePrerelease)),
+		fmt.Sprintf("F3  Allow downgrade:  %s", toggleLabel(model.updateDowngrade)),
+		"",
+		"Enter: validate release and build representative outputs",
+		"Esc: back",
+		"No file changes occur until the reviewed confirmation succeeds.",
+	)
+	if model.updateResult.Operation != "" {
+		lines = append(lines,
+			"",
+			fmt.Sprintf("Last result: %s; files updated=%t; retry safe=%t", model.updateResult.State, model.updateResult.Updated, model.updateResult.RetrySafe),
+		)
+	}
+	if model.message != "" {
+		lines = append(lines, "", "Result: "+model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) updateReviewHeight() int {
+	if model.height <= 0 {
+		return 10
+	}
+	height := model.height - 21
+	if height < 4 {
+		return 4
+	}
+	return height
+}
+
+func maximumUpdateScroll(report domain.UpdatePlanReport, height int) int {
+	maximum := len(strings.Split(strings.TrimSuffix(report.Diff.Content, "\n"), "\n")) - height
+	if maximum < 0 {
+		return 0
+	}
+	return maximum
+}
+
+func toggleLabel(enabled bool) string {
+	if enabled {
+		return "[x]"
+	}
+	return "[ ]"
 }
 
 func gitReviewContentLines(report domain.GitReviewReport) []string {

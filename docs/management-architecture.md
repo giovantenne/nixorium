@@ -248,15 +248,16 @@ Failures state what failed, what was left intact, whether retry is safe, and
 the next action. ASCII text conveys critical state; color and Unicode are
 enhancements only. The layout targets ordinary 80-column terminals and SSH.
 
-The implemented installation-mode, computer-inventory, and deployment screens
-follow this structure. Presentation callbacks invoke typed PXE lifecycle,
-host-inspection, and deployment services; the TUI itself contains no command
-execution, log creation, locking, systemd policy, network mutation, or
-CLI-output parsing. It renders reconciled state, runs host probes only when the
-inventory is opened/refreshed, shows exact PXE/deployment reviews, and requires
-the operation-specific confirmation phrase. Long-lived PXE services remain
-under systemd when the view exits; a foreground Colmena deployment instead
-blocks accidental TUI exit until its typed final result is available.
+The implemented installation-mode, computer-inventory, deployment, and update
+screens follow this structure. Presentation callbacks invoke typed PXE
+lifecycle, host-inspection, deployment, and upstream-update services; the TUI
+itself contains no command execution, log creation, locking, systemd policy,
+network/filesystem mutation, or CLI-output parsing. It renders reconciled state,
+runs host probes only when the inventory is opened/refreshed, shows exact
+PXE/deployment/update reviews, and requires the operation-specific confirmation
+phrase. Long-lived PXE services remain under systemd when the view exits;
+foreground Colmena deployment and update apply instead block accidental TUI
+exit until their typed final result is available.
 The controller screen follows the same boundary: Bubble Tea renders the typed
 revision/current-state plan, collects exact `REBUILD <controller>` confirmation,
 and invokes the application callback. The systemd-owned rebuild may outlive the
@@ -680,7 +681,11 @@ The successful result is deliberately an uncommitted, reviewable change to only
 it; deployment remains a separate explicit operation. Update never creates or
 switches branches, commits, merges, pushes, activates the controller, prepares
 PXE artifacts, or deploys clients. The TUI reuses these typed operations and
-does not own Nix, network, filesystem, or Git mutation logic.
+does not own Nix, network, filesystem, or Git mutation logic. Its **Update
+Nixorium** task collects the explicit target and separate prerelease/downgrade
+opt-ins, renders all typed candidate checks plus a bounded scrollable patch,
+requires the exact plan confirmation, and prevents exit only during the short
+two-file apply callback. Candidate planning remains safe to cancel.
 
 Privileged/systemd operations retain detailed output in journald. Foreground
 deployments stream output to private mode-0600 files under the administrator's

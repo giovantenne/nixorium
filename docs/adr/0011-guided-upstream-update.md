@@ -50,6 +50,12 @@ optional commit workflow if the administrator wants to record them. Never
 create branches, commits, merges, pushes, controller activations, PXE
 preparations, or client deployments from update apply.
 
+CLI and TUI reuse the same typed plan and apply operations. The TUI owns only
+explicit target/policy entry, bounded patch presentation, exact confirmation,
+and result rendering; it never reconstructs commands or performs Nix,
+filesystem, or Git operations itself. It prevents accidental exit while the
+mutating apply callback is in progress.
+
 ## Consequences
 
 Planning is intentionally expensive, may need controller internet access, and

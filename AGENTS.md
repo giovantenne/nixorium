@@ -215,6 +215,9 @@ Release from the matching changelog section.
   and validate representative outputs against that exact lock. Apply only the
   token-bound `flake.nix`/`flake.lock` proposal under the deployment-root lock;
   never imply a branch, commit, push, activation, PXE action, or deployment.
+  The TUI must reuse this typed plan/apply boundary, with presentation limited
+  to target/policy input, bounded review scrolling, exact confirmation, and
+  typed result rendering.
 - Routine controller rebuild uses `controller plan`/`controller apply`, binds the privileged systemd instance to a full reviewed Git revision, builds a pinned Git source as the deployment owner, refuses repository drift before activation, and writes a root-owned success record only after both `switch-to-configuration` and `/run/current-system` verification succeed. Reconciliation must require that record to match both the reviewed revision and evaluated closure; the active symlink alone is not completion evidence. Keep `setup apply` as the first-run-compatible path through the same fixed service implementation.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.

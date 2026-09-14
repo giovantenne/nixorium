@@ -79,10 +79,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   token, exact confirmation, generated message, file-type/secret/filter/size checks,
   atomic HEAD update, path-only index reconciliation, preserved unrelated
   changes, and no hooks, signing action, remote requirement, or implicit push.
-- Reviewed `nixorium update plan`/`apply` CLI/JSON workflow for explicit SemVer
-  releases, with prerelease/downgrade opt-ins, external candidate lock,
-  readiness and representative no-link builds, token-bound two-file apply, and
-  no implicit Git, activation, PXE, or deployment actions.
+- Reviewed `nixorium update plan`/`apply` CLI/JSON and TUI workflow for explicit
+  SemVer releases, with prerelease/downgrade opt-ins, external candidate lock,
+  readiness and representative no-link builds, bounded patch review, exact
+  confirmation, token-bound two-file apply, and no implicit Git, activation,
+  PXE, or deployment actions.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments
