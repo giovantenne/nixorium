@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Reworked the public README into a concise product overview and seven-step
+  guided quick start, moving workstation defaults and `lib.mkLab` extension
+  details into a dedicated system reference and linking the existing
+  administrator, troubleshooting, hardware, architecture, and contributor
+  guides instead of duplicating them inline.
 - Bound managed PXE sessions to the unambiguous live controller address at
   preparation time and pass it to the offline installer at boot, so ordinary
   DHCP lease changes no longer require rebuilding the controller configuration.
