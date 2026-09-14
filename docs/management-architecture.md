@@ -34,7 +34,9 @@ and systemd-owned listeners are also implemented. The public lifecycle now
 performs confirmed start, idempotent stop, explicit recovery, and typed state
 reconciliation through both CLI and the first task-oriented TUI screen. Local
 guided client enrollment now consumes immutable inventory and enforces reviewed
-disk installation; deployment, updates, and richer recovery remain incremental
+disk installation. Revision-bound client deployment now has CLI and TUI
+plan/apply workflows with mandatory build-first ordering, streamed/private
+logs, and explicit retry state; updates and richer recovery remain incremental
 work tracked externally.
 
 Important constraints in the current implementation are:
@@ -212,13 +214,15 @@ Failures state what failed, what was left intact, whether retry is safe, and
 the next action. ASCII text conveys critical state; color and Unicode are
 enhancements only. The layout targets ordinary 80-column terminals and SSH.
 
-The implemented installation-mode and computer-inventory screens are the first
-operational slices of this structure. Presentation callbacks invoke typed PXE
-lifecycle and host-inspection services; the TUI itself contains no command
-execution, systemd policy, network mutation, or CLI-output parsing. It renders
-reconciled state, runs host probes only when the inventory is opened/refreshed,
-shows the exact address transition before PXE start, requires `START PXE`, and
-leaves long-lived services under systemd when the view exits.
+The implemented installation-mode, computer-inventory, and deployment screens
+follow this structure. Presentation callbacks invoke typed PXE lifecycle,
+host-inspection, and deployment services; the TUI itself contains no command
+execution, log creation, locking, systemd policy, network mutation, or
+CLI-output parsing. It renders reconciled state, runs host probes only when the
+inventory is opened/refreshed, shows exact PXE/deployment reviews, and requires
+the operation-specific confirmation phrase. Long-lived PXE services remain
+under systemd when the view exits; a foreground Colmena deployment instead
+blocks accidental TUI exit until its typed final result is available.
 
 ## Configuration ownership and editing
 
@@ -521,8 +525,9 @@ Testing is layered:
 - Nix evaluation tests cover package/module exports, strict configuration,
   public metadata schemas, template generation, and unchanged legacy inputs;
 - NixOS VM tests cover first-run discovery, systemd ordering, Harmonia health,
-  PXE start/stop/recovery, permission boundaries, CLI status, and a real PTY
-  traversal of the TUI's reviewed PXE start flow;
+  PXE start/stop/recovery, permission boundaries, CLI status, fake-Colmena
+  success/failure/retry, and real PTY traversals of the TUI's reviewed PXE and
+  deployment flows;
 - offline equivalence continues comparing the direct and bundled client
   derivations;
 - a QEMU PXE scenario is added when deterministic ProxyDHCP behavior can be

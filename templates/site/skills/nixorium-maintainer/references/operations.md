@@ -48,6 +48,11 @@ host state, make a fresh plan, and retry. `--yes` is only for explicit
 automation. The raw commands below remain advanced manual operations and bypass
 these safeguards:
 
+The default TUI's **Deploy updates** screen invokes the same plan/apply
+operations. Select the intended computers, review the resolved revision and
+targets, and enter the exact phrase shown. Do not close the controller terminal
+until the final result and log path appear.
+
 ```sh
 colmena apply --on pc05
 colmena apply --on @lab

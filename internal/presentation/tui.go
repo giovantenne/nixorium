@@ -9,13 +9,15 @@ import (
 )
 
 type DashboardActions struct {
-	Refresh      func() (domain.StatusReport, error)
-	LoadHosts    func() (domain.HostsReport, error)
-	PreparePXE   func() domain.ActionReport
-	PlanPXEStart func() domain.PXELifecycleReport
-	StartPXE     func() domain.PXELifecycleReport
-	StopPXE      func() domain.PXELifecycleReport
-	RecoverPXE   func() domain.PXELifecycleReport
+	Refresh         func() (domain.StatusReport, error)
+	LoadHosts       func() (domain.HostsReport, error)
+	PlanDeployment  func(string) domain.DeploymentPlanReport
+	ApplyDeployment func(domain.DeploymentPlanReport) domain.DeploymentExecutionReport
+	PreparePXE      func() domain.ActionReport
+	PlanPXEStart    func() domain.PXELifecycleReport
+	StartPXE        func() domain.PXELifecycleReport
+	StopPXE         func() domain.PXELifecycleReport
+	RecoverPXE      func() domain.PXELifecycleReport
 }
 
 type dashboardScreen int
@@ -23,6 +25,8 @@ type dashboardScreen int
 const (
 	dashboardHome dashboardScreen = iota
 	dashboardHosts
+	dashboardDeploy
+	dashboardDeployReview
 	dashboardPXE
 	dashboardPXEStartReview
 )
@@ -36,6 +40,11 @@ type dashboardModel struct {
 	confirmation string
 	startPlan    domain.PXELifecycleReport
 	hosts        domain.HostsReport
+	deployCursor int
+	deployChosen map[string]bool
+	deployPlan   domain.DeploymentPlanReport
+	deployResult domain.DeploymentExecutionReport
+	deploying    bool
 }
 
 type dashboardPlanMsg struct {
@@ -52,6 +61,14 @@ type dashboardOperationMsg struct {
 type dashboardHostsMsg struct {
 	report domain.HostsReport
 	err    error
+}
+
+type dashboardDeploymentPlanMsg struct {
+	report domain.DeploymentPlanReport
+}
+
+type dashboardDeploymentResultMsg struct {
+	report domain.DeploymentExecutionReport
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -100,10 +117,33 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.screen = dashboardHosts
 		return model, nil
+	case dashboardDeploymentPlanMsg:
+		model.busy = ""
+		model.deployPlan = message.report
+		if message.report.HasErrors() {
+			model.message = deploymentPlanIssues(message.report)
+			model.screen = dashboardDeploy
+			return model, nil
+		}
+		model.confirmation = ""
+		model.message = ""
+		model.screen = dashboardDeployReview
+		return model, nil
+	case dashboardDeploymentResultMsg:
+		model.busy = ""
+		model.deploying = false
+		model.deployResult = message.report
+		model.message = message.report.Message
+		model.screen = dashboardDeploy
+		return model, nil
 	}
 
 	key, ok := message.(tea.KeyMsg)
 	if !ok {
+		return model, nil
+	}
+	if (key.String() == "ctrl+c" || key.String() == "q") && model.deploying {
+		model.message = "Deployment is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
 	if key.String() == "ctrl+c" || key.String() == "q" {
@@ -116,6 +156,11 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardHome:
 		switch key.String() {
+		case "d":
+			model.screen = dashboardDeploy
+			model.message = ""
+			model.deployChosen = map[string]bool{}
+			model.deployCursor = 0
 		case "h":
 			model.screen = dashboardHosts
 			model.busy = "Checking configured computers"
@@ -134,6 +179,75 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.busy = "Refreshing computer status"
 			model.message = ""
 			return model, model.loadHosts()
+		}
+	case dashboardDeploy:
+		hosts := model.report.Meta.Clients.Hosts
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "up", "k":
+			if model.deployCursor > 0 {
+				model.deployCursor--
+			}
+		case "down", "j":
+			if model.deployCursor+1 < len(hosts) {
+				model.deployCursor++
+			}
+		case " ":
+			if len(hosts) > 0 {
+				if model.deployChosen == nil {
+					model.deployChosen = map[string]bool{}
+				}
+				name := hosts[model.deployCursor].Name
+				model.deployChosen[name] = !model.deployChosen[name]
+			}
+		case "a":
+			model.deployChosen = toggleAllDeploymentTargets(hosts, model.deployChosen)
+		case "enter":
+			requested := selectedDeploymentTargets(hosts, model.deployChosen)
+			if requested == "" {
+				model.message = "Select at least one computer before reviewing a deployment."
+				return model, nil
+			}
+			model.busy = "Validating revision and selected computers"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardDeploymentPlanMsg{report: model.actions.PlanDeployment(requested)}
+			}
+		}
+	case dashboardDeployReview:
+		switch key.String() {
+		case "esc":
+			model.screen = dashboardDeploy
+			model.confirmation = ""
+			model.message = "Deployment cancelled; no build or apply was started."
+		case "backspace":
+			value := []rune(model.confirmation)
+			if len(value) > 0 {
+				model.confirmation = string(value[:len(value)-1])
+			}
+		case " ":
+			model.confirmation += " "
+		case "enter":
+			expected := "DEPLOY " + model.deployPlan.ColmenaSelector
+			if model.confirmation != expected {
+				model.confirmation = ""
+				model.message = "Confirmation did not match; no build or apply was started."
+				return model, nil
+			}
+			model.busy = "Building and applying the reviewed deployment"
+			model.deploying = true
+			model.confirmation = ""
+			model.message = ""
+			plan := model.deployPlan
+			return model, func() tea.Msg {
+				return dashboardDeploymentResultMsg{report: model.actions.ApplyDeployment(plan)}
+			}
+		default:
+			if key.Type == tea.KeyRunes {
+				model.confirmation += string(key.Runes)
+			}
 		}
 	case dashboardPXE:
 		switch key.String() {
@@ -219,6 +333,8 @@ func (model dashboardModel) View() string {
 	switch model.screen {
 	case dashboardHosts:
 		return model.hostsView()
+	case dashboardDeploy, dashboardDeployReview:
+		return model.deployView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
 	default:
@@ -244,10 +360,73 @@ func (model dashboardModel) homeView() string {
 		"",
 		"Actions",
 		"  h           View computers",
+		"  d           Deploy updates",
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
 		"q: quit",
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) deployView() string {
+	lines := []string{"Nixorium — Deploy updates", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		if model.deploying {
+			lines = append(lines, "", "Nixorium will show the durable log and result when Colmena exits.", "Closing is disabled while this deployment is running.")
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
+	if model.screen == dashboardDeployReview {
+		lines = append(lines,
+			"Deployment review",
+			fmt.Sprintf("  Revision: %s", model.deployPlan.Revision),
+			fmt.Sprintf("  Targets:  %s (%d computer(s))", model.deployPlan.ColmenaSelector, len(model.deployPlan.Targets)),
+			"  Build every selected configuration before applying it",
+			"  Target services may restart; offline computers will fail explicitly",
+			"  A failed apply may leave mixed target state; a fresh full retry is safe",
+			"",
+			fmt.Sprintf("Type DEPLOY %s to continue:", model.deployPlan.ColmenaSelector),
+			"> "+model.confirmation+"█",
+			"",
+			"Esc: cancel",
+		)
+		if model.message != "" {
+			lines = append(lines, "", model.message)
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
+
+	hosts := model.report.Meta.Clients.Hosts
+	lines = append(lines, "Select computers (Space toggles; a selects all):", "")
+	for index, host := range hosts {
+		cursor := " "
+		if index == model.deployCursor {
+			cursor = ">"
+		}
+		checked := " "
+		if model.deployChosen[host.Name] {
+			checked = "x"
+		}
+		lines = append(lines, fmt.Sprintf("%s [%s] %-10s %s", cursor, checked, host.Name, host.IP))
+	}
+	if len(hosts) == 0 {
+		lines = append(lines, "No configured client computers.")
+	}
+	lines = append(lines, "", "Enter: review selected targets   Esc: back   q: quit")
+	if model.deployResult.Operation != "" {
+		lines = append(lines,
+			"",
+			fmt.Sprintf("Last result: %s at phase %s", model.deployResult.State, model.deployResult.Phase),
+			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployResult.BuildCompleted, model.deployResult.ApplyCompleted),
+		)
+		if model.deployResult.LogPath != "" {
+			lines = append(lines, "Detailed log: "+model.deployResult.LogPath)
+		}
+	}
+	if model.message != "" {
+		lines = append(lines, "", "Result: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -345,4 +524,42 @@ func hostAvailability(hosts []domain.HostStatus) (int, int) {
 		}
 	}
 	return available, len(hosts)
+}
+
+func selectedDeploymentTargets(hosts []domain.HostMeta, chosen map[string]bool) string {
+	selected := []string{}
+	for _, host := range hosts {
+		if chosen[host.Name] {
+			selected = append(selected, host.Name)
+		}
+	}
+	if len(selected) == len(hosts) && len(hosts) > 0 {
+		return "@lab"
+	}
+	return strings.Join(selected, ",")
+}
+
+func toggleAllDeploymentTargets(hosts []domain.HostMeta, chosen map[string]bool) map[string]bool {
+	allSelected := len(hosts) > 0
+	for _, host := range hosts {
+		if !chosen[host.Name] {
+			allSelected = false
+			break
+		}
+	}
+	result := map[string]bool{}
+	if !allSelected {
+		for _, host := range hosts {
+			result[host.Name] = true
+		}
+	}
+	return result
+}
+
+func deploymentPlanIssues(report domain.DeploymentPlanReport) string {
+	issues := make([]string, 0, len(report.Issues))
+	for _, issue := range report.Issues {
+		issues = append(issues, issue.Field+": "+issue.Message)
+	}
+	return strings.Join(issues, "; ")
 }
