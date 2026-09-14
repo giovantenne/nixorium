@@ -10,21 +10,24 @@ import (
 )
 
 type fakeSource struct {
-	meta        domain.LabMeta
-	deployment  domain.DeploymentStatus
-	git         domain.GitState
-	addresses   []string
-	owners      []string
-	free        uint64
-	key         domain.CacheKeyState
-	cacheErr    error
-	ports       []domain.PortUse
-	ssh         map[string]domain.SSHProbe
-	sshCalls    int
-	buildErr    error
-	built       bool
-	preparation domain.PXEPreparationState
-	services    map[string]domain.ServiceState
+	meta         domain.LabMeta
+	deployment   domain.DeploymentStatus
+	git          domain.GitState
+	addresses    []string
+	owners       []string
+	free         uint64
+	key          domain.CacheKeyState
+	cacheErr     error
+	ports        []domain.PortUse
+	ssh          map[string]domain.SSHProbe
+	sshCalls     int
+	revision     string
+	current      map[string]domain.HostSystemProbe
+	currentCalls int
+	buildErr     error
+	built        bool
+	preparation  domain.PXEPreparationState
+	services     map[string]domain.ServiceState
 }
 
 func readyFake() *fakeSource {
@@ -43,6 +46,11 @@ func readyFake() *fakeSource {
 		ssh: map[string]domain.SSHProbe{
 			"pc01": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
 			"pc02": {Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
+		},
+		revision: "0123456789abcdef0123456789abcdef01234567",
+		current: map[string]domain.HostSystemProbe{
+			"pc01": {SystemPath: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pc01-system", Revision: "0123456789abcdef0123456789abcdef01234567"},
+			"pc02": {SystemPath: "/nix/store/oldoldoldoldoldoldoldoldoldoldol-pc02-system", Revision: "fedcba9876543210fedcba9876543210fedcba98"},
 		},
 	}
 	source.meta.SchemaVersion = 2
@@ -71,6 +79,8 @@ func (f *fakeSource) DeploymentStatus(context.Context, string) (domain.Deploymen
 func (f *fakeSource) GitState(context.Context, string) (domain.GitState, error) {
 	return f.git, nil
 }
+
+func (f *fakeSource) GitRevision(context.Context, string) (string, error) { return f.revision, nil }
 
 func (f *fakeSource) ServiceState(_ context.Context, name string) domain.ServiceState {
 	if service, found := f.services[name]; found {
@@ -105,6 +115,16 @@ func (f *fakeSource) SSHStatus(context.Context, []domain.HostMeta, time.Duration
 	f.sshCalls++
 	return f.ssh
 }
+func (f *fakeSource) CurrentSystems(_ context.Context, hosts []domain.HostMeta, _ time.Duration) map[string]domain.HostSystemProbe {
+	f.currentCalls++
+	result := make(map[string]domain.HostSystemProbe, len(hosts))
+	for _, host := range hosts {
+		if probe, found := f.current[host.Name]; found {
+			result[host.Name] = probe
+		}
+	}
+	return result
+}
 func (f *fakeSource) ControllerBuild(context.Context, string, string) error {
 	f.built = true
 	return f.buildErr
@@ -133,6 +153,9 @@ func TestStatusReportsReadinessAndDirtyTree(t *testing.T) {
 	}
 	if source.sshCalls != 0 {
 		t.Fatalf("cheap status performed %d SSH probe(s)", source.sshCalls)
+	}
+	if source.currentCalls != 0 {
+		t.Fatalf("cheap status performed %d authenticated host observation(s)", source.currentCalls)
 	}
 }
 
@@ -212,6 +235,29 @@ func TestHostsPreservesInventoryOrderAndUnknownProbeResult(t *testing.T) {
 	}
 	if report.Hosts[1].Reachability != domain.ReachabilityUnknown || report.Hosts[1].SSH != domain.SSHUnknown || report.Hosts[1].Detail != "no probe result" {
 		t.Fatalf("missing probe status = %+v, want explicit unknown", report.Hosts[1])
+	}
+	if report.Hosts[0].Deployment != domain.DeploymentCurrent || report.Hosts[1].Deployment != domain.DeploymentUnknown || report.Deployment.Current != 1 || report.Deployment.Unknown != 1 {
+		t.Fatalf("deployment reconciliation = %+v / %+v", report.Deployment, report.Hosts)
+	}
+	if report.DesiredRevision != source.revision || report.Hosts[0].DesiredRevision != source.revision {
+		t.Fatalf("desired revision was not propagated: %+v", report)
+	}
+}
+
+func TestHostsReportsOutdatedAuthenticatedSystem(t *testing.T) {
+	source := readyFake()
+	report, err := NewInspector(source).Hosts(context.Background(), ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Deployment.Current != 1 || report.Deployment.Outdated != 1 || report.Deployment.Unknown != 0 {
+		t.Fatalf("deployment summary = %+v", report.Deployment)
+	}
+	if report.Hosts[1].Deployment != domain.DeploymentOutdated || report.Hosts[1].CurrentRevision == report.Hosts[1].DesiredRevision {
+		t.Fatalf("outdated host = %+v", report.Hosts[1])
+	}
+	if source.currentCalls != 1 {
+		t.Fatalf("authenticated observation batches = %d, want one", source.currentCalls)
 	}
 }
 

@@ -109,8 +109,14 @@ nix run .#nixorium -- doctor --full
 Running `nix run .#nixorium` without a subcommand opens the task-oriented
 terminal dashboard. **View computers** explicitly probes configured clients
 with bounded concurrency and reports network reachability separately from SSH
-availability; use `nixorium hosts --json` for the same typed data. The initial
-dashboard and `status` do not run network probes. Its **Install computers over
+availability. Reachable SSH services are then queried through the fixed,
+read-only `nixorium-host-state` command using the existing Colmena root key;
+the active system path and embedded deployment revision are compared with the
+current desired Git revision and reported as `current`, `outdated`, or
+`unknown`. Use `nixorium hosts --json` for the same typed data. The initial
+dashboard and `status` do not run network probes. Systems from an older
+Nixorium generation report `unknown` until deployed once with the helper. Its
+**Install computers over
 network** screen prepares
 artifacts and reviews, starts, stops, or recovers PXE mode through the same
 typed operations as the CLI. Starting requires the exact `START PXE`

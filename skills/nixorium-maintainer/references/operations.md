@@ -62,6 +62,14 @@ Host keys are accepted on first connection and verified on later connections.
 Investigate changed-key failures instead of deleting `known_hosts` entries
 blindly.
 
+Use `nixorium hosts` to reconcile deployment state. It first distinguishes
+network/SSH availability, then uses the existing root deployment key to run the
+fixed read-only `nixorium-host-state` helper. `current` means the authenticated
+active generation embeds the desired clean Git revision; `outdated` means the
+two revisions differ; `unknown` means Nixorium could not prove either state.
+Do not infer success from a Colmena exit status. A client installed before this
+helper exists remains `unknown` until its next normal deployment.
+
 ## Binary cache
 
 After `nixorium setup apply`, the controller owns Harmonia through systemd; do

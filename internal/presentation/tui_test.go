@@ -29,14 +29,16 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	actions := DashboardActions{
 		LoadHosts: func() (domain.HostsReport, error) {
 			loads++
-			report := domain.HostsReport{State: "partial", Hosts: []domain.HostStatus{
-				{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
-				{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown},
+			report := domain.HostsReport{State: "partial", Deployment: domain.HostDeploymentSummary{Current: 1, Unknown: 1}, Hosts: []domain.HostStatus{
+				{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent},
+				{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown, Deployment: domain.DeploymentUnknown},
 			}}
 			if loads > 1 {
 				report.State = "available"
+				report.Deployment = domain.HostDeploymentSummary{Current: 2}
 				report.Hosts[1].Reachability = domain.ReachabilityReachable
 				report.Hosts[1].SSH = domain.SSHAvailable
+				report.Hosts[1].Deployment = domain.DeploymentCurrent
 			}
 			return report, nil
 		},
@@ -53,7 +55,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHosts || !strings.Contains(model.View(), "pc02") || !strings.Contains(model.View(), "unreachable  unknown") {
+	if model.screen != dashboardHosts || !strings.Contains(model.View(), "pc02") || !strings.Contains(model.View(), "unreachable  unknown") || !strings.Contains(model.View(), "1 current, 0 outdated, 1 unknown") {
 		t.Fatalf("computer inventory is incomplete:\n%s", model.View())
 	}
 	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})

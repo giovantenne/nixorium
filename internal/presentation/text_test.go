@@ -10,10 +10,12 @@ import (
 
 func TestHostsTextIncludesTypedComputerState(t *testing.T) {
 	report := domain.HostsReport{
-		State: "partial",
+		State:           "partial",
+		DesiredRevision: "0123456789abcdef",
+		Deployment:      domain.HostDeploymentSummary{Current: 1, Unknown: 1},
 		Hosts: []domain.HostStatus{
-			{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable},
-			{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnknown, SSH: domain.SSHUnknown},
+			{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, CurrentSystem: "/nix/store/current", CurrentRevision: "0123456789abcdef"},
+			{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnknown, SSH: domain.SSHUnknown, Deployment: domain.DeploymentUnknown, DeploymentDetail: "current deployment revision is unavailable"},
 		},
 	}
 	var output bytes.Buffer
@@ -21,8 +23,13 @@ func TestHostsTextIncludesTypedComputerState(t *testing.T) {
 	for _, expected := range []string{
 		"Nixorium computers: PARTIAL",
 		"SSH available:      1/2",
+		"Deployment:         1 current, 0 outdated, 1 unknown",
+		"Desired revision:   0123456789abcdef",
 		"pc01       10.0.0.1        network=reachable",
 		"pc02       10.0.0.2        network=unknown",
+		"current: /nix/store/current",
+		"current revision: 0123456789abcdef",
+		"detail:  current deployment revision is unavailable",
 	} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("status output omits %q:\n%s", expected, output.String())

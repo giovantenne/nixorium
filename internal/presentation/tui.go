@@ -437,11 +437,12 @@ func (model dashboardModel) hostsView() string {
 		"Nixorium — Computers",
 		"",
 		fmt.Sprintf("SSH available: %d/%d", available, total),
+		fmt.Sprintf("Deployment: %d current, %d outdated, %d unknown", model.hosts.Deployment.Current, model.hosts.Deployment.Outdated, model.hosts.Deployment.Unknown),
 		"",
-		fmt.Sprintf("  %-10s %-15s %-12s %-11s", "NAME", "ADDRESS", "NETWORK", "SSH"),
+		fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s", "NAME", "ADDRESS", "NETWORK", "SSH", "DEPLOY"),
 	}
 	for _, host := range model.hosts.Hosts {
-		lines = append(lines, fmt.Sprintf("  %-10s %-15s %-12s %-11s", host.Name, host.IP, host.Reachability, host.SSH))
+		lines = append(lines, fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s", host.Name, host.IP, host.Reachability, host.SSH, host.Deployment))
 	}
 	if model.busy != "" {
 		lines = append(lines, "", model.busy+"…")

@@ -33,7 +33,11 @@ The computer inventory follows the same boundary: Bubble Tea triggers a typed
 host-report callback only when the administrator opens or refreshes the screen.
 The application preserves inventory semantics, while the adapter bounds and
 classifies network probes. CLI text, JSON, TUI, and doctor do not parse or
-reimplement one another's output.
+reimplement one another's output. The richer inventory still follows this
+boundary: managed NixOS generations embed the private deployment revision and
+install a fixed read-only state helper; an authenticated, bounded SSH adapter
+observes it, the application reconciles it against desired HEAD, and Bubble Tea
+only renders the typed current/outdated/unknown result.
 
 The deployment screen also receives only typed plan/apply callbacks. Bubble Tea
 owns ordered target selection, review rendering, exact confirmation input,

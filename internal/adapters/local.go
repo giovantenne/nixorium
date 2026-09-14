@@ -279,6 +279,101 @@ func (Local) SSHStatus(ctx context.Context, hosts []domain.HostMeta, timeout tim
 	return probeSSHStatuses(ctx, hosts, timeout, probeHostSSH)
 }
 
+func (Local) CurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.HostSystemProbe {
+	return probeCurrentSystems(ctx, hosts, timeout, probeCurrentSystem)
+}
+
+func probeCurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration, probe func(context.Context, domain.HostMeta, time.Duration) domain.HostSystemProbe) map[string]domain.HostSystemProbe {
+	type result struct {
+		name  string
+		probe domain.HostSystemProbe
+	}
+	if len(hosts) == 0 {
+		return map[string]domain.HostSystemProbe{}
+	}
+	workerCount := min(len(hosts), maximumConcurrentSSHProbes)
+	jobs := make(chan domain.HostMeta)
+	results := make(chan result, len(hosts))
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for host := range jobs {
+				results <- result{name: host.Name, probe: probe(ctx, host, timeout)}
+			}
+		}()
+	}
+	go func() {
+		for _, host := range hosts {
+			jobs <- host
+		}
+		close(jobs)
+		workers.Wait()
+		close(results)
+	}()
+	probes := make(map[string]domain.HostSystemProbe, len(hosts))
+	for range hosts {
+		result := <-results
+		probes[result.name] = result.probe
+	}
+	return probes
+}
+
+func probeCurrentSystem(ctx context.Context, host domain.HostMeta, timeout time.Duration) domain.HostSystemProbe {
+	probeContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	command := exec.CommandContext(probeContext, "ssh", sshCurrentSystemArguments(host, timeout)...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		detail := strings.TrimSpace(string(output))
+		if detail == "" {
+			detail = err.Error()
+		}
+		if len(detail) > 512 {
+			detail = detail[:512]
+		}
+		return domain.HostSystemProbe{Detail: "authenticated system observation failed: " + detail}
+	}
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) != 2 || !validSystemPath(lines[0]) || !validGitRevision(lines[1]) {
+		return domain.HostSystemProbe{Detail: "authenticated system observation returned invalid state"}
+	}
+	return domain.HostSystemProbe{SystemPath: lines[0], Revision: lines[1]}
+}
+
+func sshCurrentSystemArguments(host domain.HostMeta, timeout time.Duration) []string {
+	seconds := max(1, int(timeout.Round(time.Second)/time.Second))
+	return []string{
+		"-T",
+		"-o", "BatchMode=yes",
+		"-o", fmt.Sprintf("ConnectTimeout=%d", seconds),
+		"-o", "ConnectionAttempts=1",
+		"-o", "PasswordAuthentication=no",
+		"-o", "KbdInteractiveAuthentication=no",
+		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", "LogLevel=ERROR",
+		"root@" + host.IP,
+		"nixorium-host-state",
+	}
+}
+
+func validSystemPath(path string) bool {
+	return strings.HasPrefix(path, "/nix/store/") && filepath.Clean(path) == path && !strings.ContainsAny(path, " \t\r\n")
+}
+
+func validGitRevision(revision string) bool {
+	if len(revision) < 40 || len(revision) > 64 {
+		return false
+	}
+	for _, character := range revision {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func probeSSHStatuses(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration, probe func(context.Context, domain.HostMeta, time.Duration) domain.SSHProbe) map[string]domain.SSHProbe {
 	type result struct {
 		name  string

@@ -155,8 +155,17 @@ are opt-in or belong to `doctor`, so opening the dashboard is predictable.
 layer preserves configured ordering and emits typed reachability and SSH
 availability rather than a boolean that conflates connection refusal, timeout,
 and probe failure. The local adapter limits concurrent TCP/22 probes to eight.
-Both the CLI/JSON frontend and the TUI **Computers** screen consume the same
-report; `doctor` uses the same classification for its aggregate SSH finding.
+For reachable SSH services, it then uses the existing non-interactive Colmena
+root identity to execute one fixed `nixorium-host-state` command, again with at
+most eight workers and a per-host timeout. The helper is installed in every
+managed generation and returns only the canonical active system path and the
+embedded private-deployment revision. The application compares that observed
+revision with the repository HEAD and preserves `current`, `outdated`, and
+`unknown` as distinct states. It never treats an open port or aggregate Colmena
+success as proof of convergence, and an older generation without the helper is
+explicitly unknown. Both the CLI/JSON frontend and the TUI **Computers** screen
+consume the same report; `doctor` retains the cheaper TCP classification for
+its aggregate SSH finding.
 
 `deploy plan --on` accepts one client, a comma-separated set, or `@lab`, then
 resolves only configured client identities into a canonical Colmena selector.
@@ -349,8 +358,11 @@ the controller and validated as a local, administrator-owned Git worktree.
 The administrator is already a wheel user, but the narrow interface still
 reduces accidental misuse and makes every disruptive operation auditable.
 Deployment to clients continues through SSH/Colmena with the existing keys and
-host-key policy. A future enrollment API, if justified, is separate from this
-local privilege interface and must have its own authentication design.
+host-key policy. Read-only current-generation reconciliation reuses that exact
+root trust path and a fixed installed helper; it neither adds a controller
+daemon nor grants new client privileges. A future enrollment API, if justified,
+is separate from this local privilege interface and must have its own
+authentication design.
 
 The first implemented privileged action is
 `nixorium-install-secrets.service`, reached only through `nixorium setup

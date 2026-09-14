@@ -368,7 +368,14 @@ configured client and distinguishes a reachable SSH service, a reachable host
 that refuses SSH, an unreachable host, and an unknown probe result. The same
 typed inventory is available through `nixorium hosts` and `--json`; probes run
 with bounded concurrency only when this view/command or `doctor` is requested,
-so the initial dashboard and `status` remain predictable and probe-free.
+so the initial dashboard and `status` remain predictable and probe-free. For
+hosts whose SSH port is reachable, the explicit inventory also authenticates
+as the existing Colmena `root` identity and invokes the fixed read-only
+`nixorium-host-state` helper. Every deployed generation embeds its private
+deployment Git revision; comparing that observed revision with the current
+clean-review revision yields `current`, `outdated`, or `unknown` without
+evaluating/building all client closures. Systems installed before this helper
+was introduced remain `unknown` until their next normal deployment.
 Before using Colmena, `deploy plan --on ...` expands one, several, or all
 configured clients into a reviewable revision-bound target list. Planning is
 read-only and fails closed when the deployment is not ready, the Git worktree
