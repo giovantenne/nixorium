@@ -88,6 +88,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   only the configured public GitHub upstream, with Git credentials and prompts
   disabled, strict timeout/output/result bounds, and separately sorted stable
   and prerelease tags while all routine and client paths remain offline-first.
+- A task-oriented troubleshooting and recovery guide shipped both upstream and
+  in every generated deployment, covering required failure symptoms, safe retry
+  semantics, interrupted operations, private-key-aware backups, and restoration;
+  quick validation keeps both copies identical.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments

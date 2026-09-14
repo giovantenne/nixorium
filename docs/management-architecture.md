@@ -37,7 +37,9 @@ guided client enrollment now consumes immutable inventory and enforces reviewed
 disk installation. Revision-bound client deployment now has CLI and TUI
 plan/apply workflows with mandatory build-first ordering, streamed/private
 logs, explicit retry state, and bounded typed log browsing. Updates and richer
-recovery remain incremental work tracked externally.
+recovery are now implemented through bounded release discovery, reviewed
+plan/apply, fail-visible two-file recovery, and the shared CLI/TUI operations.
+End-to-end documentation and physical validation remain tracked externally.
 
 Important constraints in the current implementation are:
 

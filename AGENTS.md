@@ -82,6 +82,7 @@ templates/site/            # Private deployment repository template
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 docs/management-architecture.md # Accepted management-system target design
+docs/troubleshooting.md         # Task-oriented recovery and backup guide
 docs/adr/                   # Product architecture decision records
 ```
 
@@ -148,6 +149,7 @@ nix run .#nixorium -- logs show OPERATION_LOG_ID
 nix run .#nixorium -- git review
 nix run .#nixorium -- git commit plan --paths lab-settings.json,keys/admin-ssh.pub
 nix run .#nixorium -- git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
+nix run .#nixorium -- update check
 nix run .#nixorium -- update plan --target v2.0.0
 nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 
@@ -168,8 +170,9 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --
 ```
 
 `scripts/validate.sh` defaults to the quick local matrix: syntax, shell tests,
-skill coherence, schema and `mkLab` checks, and the packaged Go command with
-its unit tests. Use `--management-vm` or `--client-installer-vm` for the affected
+skill and troubleshooting-copy coherence, schema and `mkLab` checks, and the
+packaged Go command with its unit tests. Use `--management-vm` or
+`--client-installer-vm` for the affected
 integration path. Use `--full` after public API, template, module, installer,
 asset, input, Disko, or netboot changes and before milestone or release
 completion; it builds representative hosts and artifacts and verifies offline

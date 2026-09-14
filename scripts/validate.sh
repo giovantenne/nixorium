@@ -68,6 +68,7 @@ git diff --check
 bash -n install.sh setup.sh scripts/*.sh scripts/lib/*.sh
 bash tests/client-installer.sh
 diff -qr skills/nixorium-maintainer templates/site/skills/nixorium-maintainer
+diff -u docs/troubleshooting.md templates/site/TROUBLESHOOTING.md
 test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md
 test -e .pi/skills/nixorium-developer/SKILL.md
