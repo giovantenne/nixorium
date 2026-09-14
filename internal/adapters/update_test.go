@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func TestInspectUpdateInputAndRenderTarget(t *testing.T) {
@@ -113,5 +115,63 @@ esac
 	}
 	if strings.Contains(string(log), repository+"/secret-key") {
 		t.Fatalf("private path entered Nix arguments:\n%s", log)
+	}
+}
+
+func TestApplyPreparedUpdateWritesOnlyReviewedFiles(t *testing.T) {
+	repository := newGitReviewRepository(t)
+	writeGitReviewFile(t, repository, "flake.nix", "{\n  inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n}\n")
+	writeGitReviewFile(t, repository, "flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`+"\n")
+	if _, err := run(context.Background(), "git", "-C", repository, "add", "flake.nix", "flake.lock"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "commit", "-qm", "deployment"); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := (Local{}).InspectUpdateInput(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposedFlake, err := ProposedUpdateFlake(snapshot, "v1.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal := domain.UpdateProposal{FlakeContent: proposedFlake, LockContent: []byte("{\"version\": 7}\n")}
+	revision, _ := (Local{}).GitRevision(context.Background(), repository)
+	partial, err := (Local{}).ApplyPreparedUpdate(context.Background(), repository, revision, snapshot, proposal)
+	if err != nil || partial {
+		t.Fatalf("apply partial = %t, error = %v", partial, err)
+	}
+	if content := readGitReviewFile(t, repository, "flake.nix"); !strings.Contains(content, "/v1.1.0") {
+		t.Fatalf("flake.nix = %q", content)
+	}
+	if content := readGitReviewFile(t, repository, "flake.lock"); content != "{\"version\": 7}\n" {
+		t.Fatalf("flake.lock = %q", content)
+	}
+	status, err := run(context.Background(), "git", "-C", repository, "status", "--porcelain=v1")
+	if err != nil || !strings.Contains(status, " M flake.lock") || !strings.Contains(status, " M flake.nix") || len(strings.Split(strings.TrimSpace(status), "\n")) != 2 {
+		t.Fatalf("status = %q, error = %v", status, err)
+	}
+}
+
+func TestApplyPreparedUpdateRefusesStaleWorktree(t *testing.T) {
+	repository := newGitReviewRepository(t)
+	writeGitReviewFile(t, repository, "flake.nix", "inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n")
+	writeGitReviewFile(t, repository, "flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`)
+	if _, err := run(context.Background(), "git", "-C", repository, "add", "flake.nix", "flake.lock"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "commit", "-qm", "deployment"); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, _ := (Local{}).InspectUpdateInput(repository)
+	revision, _ := (Local{}).GitRevision(context.Background(), repository)
+	writeGitReviewFile(t, repository, "unrelated", "dirty\n")
+	partial, err := (Local{}).ApplyPreparedUpdate(context.Background(), repository, revision, snapshot, domain.UpdateProposal{FlakeContent: []byte("new"), LockContent: []byte("new")})
+	if err == nil || partial || !strings.Contains(err.Error(), "worktree changed") {
+		t.Fatalf("stale apply partial = %t, error = %v", partial, err)
+	}
+	if readGitReviewFile(t, repository, "flake.nix") != string(snapshot.FlakeContent) {
+		t.Fatal("stale apply changed flake.nix")
 	}
 }

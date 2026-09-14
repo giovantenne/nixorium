@@ -22,6 +22,7 @@ type UpdateSource interface {
 	GitRevision(context.Context, string) (string, error)
 	InspectUpdateInput(string) (domain.UpdateInputSnapshot, error)
 	PrepareUpdate(context.Context, string, string) (domain.UpdateProposal, error)
+	ApplyPreparedUpdate(context.Context, string, string, domain.UpdateInputSnapshot, domain.UpdateProposal) (bool, error)
 }
 
 type UpdateManager struct {
@@ -106,6 +107,8 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 	}
 	report.Diff = proposal.Diff
 	report.Checks = append(report.Checks, proposal.Checks...)
+	report.Snapshot = snapshot
+	report.Proposal = proposal
 	report.ReviewToken = updateReviewToken(report, snapshot, proposal)
 	verb := "UPDATE"
 	if report.Downgrade {
@@ -113,6 +116,46 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 	}
 	report.Confirmation = verb + " NIXORIUM TO " + target
 	report.State = "ready"
+	return report
+}
+
+func (m *UpdateManager) Apply(ctx context.Context, repository, target, expectedToken string, allowPrerelease, allowDowngrade bool) domain.UpdateApplyReport {
+	plan := m.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
+	report := domain.UpdateApplyReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "update-apply",
+		State:         "blocked",
+		Repository:    plan.Repository,
+		Revision:      plan.Revision,
+		Target:        plan.Target,
+		RetrySafe:     true,
+		Issues:        append([]domain.ValidationIssue(nil), plan.Issues...),
+	}
+	if plan.HasErrors() {
+		report.Message = "update preflight failed; flake.nix and flake.lock were not changed"
+		return report
+	}
+	if expectedToken == "" || expectedToken != plan.ReviewToken {
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "review", Message: "review token does not match the current validated update proposal"})
+		report.Message = "update was not applied; run a fresh update plan"
+		return report
+	}
+	partial, err := m.source.ApplyPreparedUpdate(ctx, plan.Repository, plan.Revision, plan.Snapshot, plan.Proposal)
+	if err != nil {
+		report.State = "failed"
+		report.Message = fmt.Sprintf("update write failed: %v", err)
+		if partial {
+			report.State = "partial"
+			report.Updated = true
+			report.RetrySafe = false
+			report.Message += "; flake.nix and flake.lock may differ, so inspect them and create a fresh plan"
+		}
+		return report
+	}
+	report.State = "completed"
+	report.Updated = true
+	report.RetrySafe = false
+	report.Message = "validated Nixorium release written to flake.nix and flake.lock; review and commit it separately before deployment"
 	return report
 }
 
