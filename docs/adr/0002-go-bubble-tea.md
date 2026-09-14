@@ -50,6 +50,17 @@ Because Colmena is a foreground child rather than a systemd-owned service, the
 TUI refuses an accidental quit until it receives the operation's final typed
 result.
 
+This foreground model is retained for the current product scope. Moving the
+operation into a system service would detach it from the administrator's SSH
+authority and widen the privilege boundary. A transient user service would
+still require linger/session policy plus a second durable job/result protocol
+before it could honestly survive logout, while losing direct streamed output
+and cancellation semantics. Terminal or process loss can therefore interrupt
+Colmena. The private operation log and fresh authenticated host reconciliation
+are the explicit recovery surface; operators must make a new plan before
+retrying. Revisit a user-owned background executor only if real-lab evidence
+shows that survivable unattended deployment is a product requirement.
+
 Routine controller rebuild also enters Bubble Tea only as typed plan/apply
 callbacks. Presentation owns review and exact confirmation; revision checks,
 the systemd action, activation verification, and journal ownership remain in

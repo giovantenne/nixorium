@@ -261,6 +261,13 @@ PXE/deployment/update reviews, and requires the operation-specific confirmation
 phrase. Long-lived PXE services remain under systemd when the view exits;
 foreground Colmena deployment and update apply instead block accidental TUI
 exit until their typed final result is available.
+Colmena intentionally remains an unprivileged child of the administrator
+rather than a system service: it uses that account's SSH authority and streams
+direct output into the private operation log. Terminal or process loss may
+interrupt it, so recovery is `logs` plus fresh authenticated `hosts` state and
+a new revision-bound plan. A user-systemd executor is deferred because reliable
+logout survival would also require linger policy and a durable job/result
+protocol; it is not introduced merely to move the same process out of view.
 The controller screen follows the same boundary: Bubble Tea renders the typed
 revision/current-state plan, collects exact `REBUILD <controller>` confirmation,
 and invokes the application callback. The systemd-owned rebuild may outlive the
