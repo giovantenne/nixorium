@@ -490,12 +490,14 @@ commands including Colmena. `nixorium doctor --full` additionally performs a
 real controller build. The default remains quick and read-only.
 
 `setup status` reconciles observed state on every run and selects the earliest
-incomplete first-run stage. It currently reports environment, network,
+incomplete first-run stage. It reports environment, network,
 identity/locale, default credentials, key correspondence and private modes,
 candidate validation, artifacts, and deployment readiness. Git review is
 complete only when the deployment worktree is clean. Controller apply is a
-fixed, confirmed systemd action; guided installation remains an explicit
-future stage, and no global `configured` flag is trusted. Bare `setup`
+fixed, confirmed systemd action. Once readiness and the revision-bound PXE
+preparation are current, the final stage points directly to **Install computers
+over network**; it does not pretend that a client was already installed and no
+global `configured` flag is trusted. Bare `setup`
 continues from accepted settings to
 key reconciliation; `setup keys` exposes that same explicit, unprivileged
 create-new operation independently. `setup install-secrets` starts the fixed,

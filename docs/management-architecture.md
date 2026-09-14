@@ -371,7 +371,10 @@ Status derives stage state from the managed settings,
 required commands, password-hash readiness, verified key correspondence and
 private modes, clean Git review state, Nix evaluation, artifacts, and
 `deploymentStatus`; it never advances a stage by writing a global completion
-flag.
+flag. The final offer stage becomes complete only when deployment readiness and
+the current revision-bound PXE preparation are both observed; its detail routes
+the administrator to **Install computers over network** without recording or
+implying that any client installation has completed.
 
 Key creation uses create-new semantics. Existing keys are verified and reused;
 they are never overwritten. Regeneration is a separately named recovery action
