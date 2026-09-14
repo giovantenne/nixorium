@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,6 +71,17 @@ func TestRecordOperationOutcomeUsesOnlyTypedSafeSummary(t *testing.T) {
 	}
 	if sink.record.Summary == report.Message {
 		t.Fatal("raw report message entered the operation record")
+	}
+}
+
+func TestRecordOperationOutcomeSummarizesGitCommitWithoutPathsOrMessages(t *testing.T) {
+	sink := &fakeOperationRecordSink{}
+	report := domain.GitCommitReport{Operation: "git-commit", State: "completed", Paths: []string{"private/site-name.nix", "lab-settings.json"}, Committed: true, Message: "raw Git output"}
+	if err := RecordOperationOutcome(sink, report); err != nil {
+		t.Fatal(err)
+	}
+	if sink.record.Subject != "2 path(s)" || sink.record.Summary != "reviewed local commit finished; committed=true" || strings.Contains(sink.record.Summary, "site-name") || sink.record.Summary == report.Message {
+		t.Fatalf("record = %+v", sink.record)
 	}
 }
 

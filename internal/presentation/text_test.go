@@ -196,3 +196,30 @@ func TestGitReviewTextShowsScopesOwnershipAndRedactedDiff(t *testing.T) {
 		}
 	}
 }
+
+func TestGitCommitTextShowsPlanAndLocalResult(t *testing.T) {
+	plan := domain.GitCommitPlanReport{
+		State:         "ready",
+		Repository:    "/deployment",
+		Revision:      strings.Repeat("a", 40),
+		Paths:         []string{"lab-settings.json"},
+		ReviewToken:   "sha256:review",
+		CommitMessage: "chore: update laboratory settings",
+		Confirmation:  "COMMIT abcdef012345",
+		Diff:          domain.GitDiff{Content: "+password: <redacted>\n"},
+	}
+	var output bytes.Buffer
+	GitCommitPlanText(&output, plan)
+	for _, expected := range []string{"commit plan: READY", "lab-settings.json", "sha256:review", "COMMIT abcdef012345", "No remote or push", "<redacted>"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("commit plan output omits %q:\n%s", expected, output.String())
+		}
+	}
+	output.Reset()
+	GitCommitText(&output, domain.GitCommitReport{State: "completed", Paths: plan.Paths, PreviousRevision: plan.Revision, Revision: strings.Repeat("b", 40), CommitMessage: plan.CommitMessage, Committed: true, Message: "no remote push was attempted"})
+	for _, expected := range []string{"Git commit: COMPLETED", "Committed:      true", "no remote push was attempted"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("commit result output omits %q:\n%s", expected, output.String())
+		}
+	}
+}

@@ -164,6 +164,54 @@ func GitReviewText(writer io.Writer, report domain.GitReviewReport) {
 	}
 }
 
+func GitCommitPlanText(writer io.Writer, report domain.GitCommitPlanReport) {
+	fmt.Fprintf(writer, "Nixorium Git commit plan: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:      %s\n", report.Repository)
+	if report.Revision != "" {
+		fmt.Fprintf(writer, "HEAD revision:   %s\n", report.Revision)
+	}
+	if len(report.Paths) > 0 {
+		fmt.Fprintf(writer, "Selected paths:  %s\n", strings.Join(report.Paths, ", "))
+	}
+	if report.CommitMessage != "" {
+		fmt.Fprintf(writer, "Commit message:  %s\n", report.CommitMessage)
+		fmt.Fprintf(writer, "Review token:    %s\n", report.ReviewToken)
+		fmt.Fprintf(writer, "Confirmation:    %s\n", report.Confirmation)
+		fmt.Fprintln(writer, "No remote or push is part of this plan.")
+	}
+	if report.Diff.Content != "" {
+		fmt.Fprintln(writer, "\nProposed commit diff:")
+		fmt.Fprint(writer, report.Diff.Content)
+		if !strings.HasSuffix(report.Diff.Content, "\n") {
+			fmt.Fprintln(writer)
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func GitCommitText(writer io.Writer, report domain.GitCommitReport) {
+	fmt.Fprintf(writer, "Nixorium Git commit: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Paths:          %s\n", strings.Join(report.Paths, ", "))
+	if report.PreviousRevision != "" {
+		fmt.Fprintf(writer, "Previous HEAD:  %s\n", report.PreviousRevision)
+	}
+	if report.Revision != "" {
+		fmt.Fprintf(writer, "Current HEAD:   %s\n", report.Revision)
+	}
+	if report.CommitMessage != "" {
+		fmt.Fprintf(writer, "Commit message: %s\n", report.CommitMessage)
+	}
+	fmt.Fprintf(writer, "Committed:      %t\n", report.Committed)
+	if report.Message != "" {
+		fmt.Fprintln(writer, report.Message)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
 func gitChangeOwnership(change domain.GitChange) string {
 	if change.Private {
 		return "private"

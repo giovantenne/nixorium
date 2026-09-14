@@ -125,13 +125,19 @@ func newGitReviewRepository(t *testing.T) string {
 	if _, err := run(context.Background(), "git", "init", "-q", repository); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := run(context.Background(), "git", "-C", repository, "config", "user.name", "Test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "config", "user.email", "test@example.invalid"); err != nil {
+		t.Fatal(err)
+	}
 	writeGitReviewFile(t, repository, "lab-settings.json", "{\n  \"schemaVersion\": 1,\n  \"lab\": {\n    \"adminPassword\": \"$6$old$admin\",\n    \"teacherPassword\": \"$6$old$teacher\",\n    \"studentPassword\": \"$6$old$student\"\n  }\n}\n")
 	writeGitReviewFile(t, repository, "module.nix", "{ ... }: { services.openssh.enable = true; }\n")
 	writeGitReviewFile(t, repository, ".gitignore", "secret-key\nadmin-ssh\nveyon-private-key.pem\n")
 	if _, err := run(context.Background(), "git", "-C", repository, "add", "."); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := run(context.Background(), "git", "-C", repository, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"); err != nil {
+	if _, err := run(context.Background(), "git", "-C", repository, "commit", "-qm", "initial"); err != nil {
 		t.Fatal(err)
 	}
 	return repository

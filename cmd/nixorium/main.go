@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
@@ -24,6 +25,7 @@ type options struct {
 	on         string
 	service    string
 	logID      string
+	paths      string
 	json       bool
 	full       bool
 	help       bool
@@ -78,6 +80,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		serviceManager := app.NewServiceManager(local)
 		operationLogManager := app.NewOperationLogManager(local)
 		gitReviewManager := app.NewGitReviewManager(local)
+		gitCommitManager := app.NewGitCommitManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -115,6 +118,14 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			},
 			LoadGitReview: func() domain.GitReviewReport {
 				return gitReviewManager.Review(ctx, repository)
+			},
+			PlanGitCommit: func(paths string) domain.GitCommitPlanReport {
+				return gitCommitManager.Plan(ctx, repository, paths)
+			},
+			ApplyGitCommit: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
+				report := gitCommitManager.Apply(ctx, repository, strings.Join(plan.Paths, ","), plan.ReviewToken)
+				report.Message = operationRecordMessage(report.Message, report)
+				return report
 			},
 			PreparePXE: func() domain.ActionReport {
 				report := app.NewSystemActions(local).PreparePXE(ctx)
@@ -233,14 +244,28 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 		}
 	case "git":
-		report := app.NewGitReviewManager(local).Review(ctx, repository)
-		if options.json {
-			err = presentation.JSON(stdout, report)
+		if options.subcommand == "review" {
+			report := app.NewGitReviewManager(local).Review(ctx, repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.GitReviewText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		} else if options.subcommand == "commit-plan" {
+			report := app.NewGitCommitManager(local).Plan(ctx, repository, options.paths)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.GitCommitPlanText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
 		} else {
-			presentation.GitReviewText(stdout, report)
-		}
-		if report.HasErrors() {
-			return 1
+			return runGitCommitApply(ctx, app.NewGitCommitManager(local), repository, stdout, stderr, options.paths, options.expect, options.yes, options.json)
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -424,6 +449,12 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--on requires a client or @lab")
 			}
 			result.on = arguments[index]
+		case "--paths":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--paths requires comma-separated repository paths")
+			}
+			result.paths = arguments[index]
 		case "--json":
 			result.json = true
 		case "--full":
@@ -454,8 +485,12 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "validate"
 		case "plan":
+			if result.command == "git" && result.subcommand == "commit" {
+				result.subcommand = "commit-plan"
+				continue
+			}
 			if (result.command != "config" && result.command != "deploy" && result.command != "controller") || result.subcommand != "" {
-				return options{}, errors.New("plan must follow config, deploy, or controller")
+				return options{}, errors.New("plan must follow config, deploy, controller, or git commit")
 			}
 			result.subcommand = "plan"
 		case "keys":
@@ -474,6 +509,10 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "install-secrets"
 		case "apply":
+			if result.command == "git" && result.subcommand == "commit" {
+				result.subcommand = "commit-apply"
+				continue
+			}
 			if (result.command == "config" || result.command == "deploy" || result.command == "controller") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
@@ -497,6 +536,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("review must follow git")
 			}
 			result.subcommand = "review"
+		case "commit":
+			if result.command != "git" || result.subcommand != "" {
+				return options{}, errors.New("commit must follow git")
+			}
+			result.subcommand = "commit"
 		case "cache":
 			if result.command != "services" || result.subcommand != "restart" || result.service != "" {
 				return options{}, fmt.Errorf("unexpected argument %q", arguments[index])
@@ -526,8 +570,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart")) {
-		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, or services restart")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -538,8 +582,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !((result.command == "config" || result.command == "deploy" || result.command == "controller") && result.subcommand == "apply") {
-		return options{}, errors.New("--expect is only valid with config apply, deploy apply, or controller apply")
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, or git commit apply")
 	}
 	if result.on != "" && (result.command != "deploy" || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--on is only valid with deploy plan or deploy apply")
@@ -562,8 +606,14 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "logs" && result.subcommand == "show" && result.logID == "" {
 		return options{}, errors.New("logs show requires an operation log ID")
 	}
-	if result.command == "git" && result.subcommand != "review" {
-		return options{}, errors.New("git requires the review subcommand")
+	if result.paths != "" && (result.command != "git" || (result.subcommand != "commit-plan" && result.subcommand != "commit-apply")) {
+		return options{}, errors.New("--paths is only valid with git commit plan or git commit apply")
+	}
+	if result.command == "git" && result.subcommand != "review" && result.subcommand != "commit-plan" && result.subcommand != "commit-apply" {
+		return options{}, errors.New("git requires review, commit plan, or commit apply")
+	}
+	if result.command == "git" && (result.subcommand == "commit-plan" || result.subcommand == "commit-apply") && result.paths == "" {
+		return options{}, fmt.Errorf("git %s requires --paths", strings.ReplaceAll(result.subcommand, "-", " "))
 	}
 	if result.command == "deploy" && result.on == "" {
 		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
@@ -576,6 +626,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "controller" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("controller apply requires --expect from controller plan")
+	}
+	if result.command == "git" && result.subcommand == "commit-apply" && result.expect == "" {
+		return options{}, errors.New("git commit apply requires --expect from git commit plan")
 	}
 	if result.command == "setup" && result.subcommand == "" {
 		result.subcommand = "configure"
@@ -654,7 +707,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")
@@ -662,6 +715,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       services restart cache [--yes]")
 	fmt.Fprintln(writer, "       logs show <operation-log-id>")
 	fmt.Fprintln(writer, "       git review shows bounded staged and unstaged changes without mutating Git")
+	fmt.Fprintln(writer, "       git commit plan --paths <path[,path...]> creates an isolated proposal")
+	fmt.Fprintln(writer, "       git commit apply --paths <paths> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
@@ -763,6 +818,62 @@ func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentMana
 	}
 	report.Message = operationRecordMessage(report.Message, report)
 	return report
+}
+
+func runGitCommitApply(ctx context.Context, manager *app.GitCommitManager, repository string, stdout, stderr io.Writer, paths, expectedToken string, assumeYes, jsonOutput bool) int {
+	plan := manager.Plan(ctx, repository, paths)
+	if plan.HasErrors() {
+		if jsonOutput {
+			if err := presentation.JSON(stdout, plan); err != nil {
+				fmt.Fprintln(stderr, "Error:", err)
+			}
+		} else {
+			presentation.GitCommitPlanText(stderr, plan)
+		}
+		return 1
+	}
+	if plan.ReviewToken != expectedToken {
+		report := manager.Apply(ctx, repository, paths, expectedToken)
+		if jsonOutput {
+			_ = presentation.JSON(stdout, report)
+		} else {
+			presentation.GitCommitText(stderr, report)
+		}
+		return 1
+	}
+	if !assumeYes {
+		if !presentation.IsInteractive(os.Stdin) {
+			fmt.Fprintln(stderr, "Error: git commit apply requires an interactive terminal or explicit --yes")
+			return 2
+		}
+		confirmationOutput := stdout
+		if jsonOutput {
+			confirmationOutput = stderr
+		}
+		approved, err := presentation.ConfirmGitCommit(os.Stdin, confirmationOutput, plan)
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: read confirmation:", err)
+			return 1
+		}
+		if !approved {
+			fmt.Fprintln(confirmationOutput, "Git commit cancelled; HEAD, index, and worktree were not changed.")
+			return 0
+		}
+	}
+	report := manager.Apply(ctx, repository, paths, expectedToken)
+	report.Message = operationRecordMessage(report.Message, report)
+	if jsonOutput {
+		if err := presentation.JSON(stdout, report); err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+	} else {
+		presentation.GitCommitText(stdout, report)
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
 }
 
 func runPXEStart(ctx context.Context, repository string, stdout, stderr io.Writer, assumeYes, jsonOutput bool) int {

@@ -71,6 +71,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   staged/unstaged patches plus untracked paths, with managed/unexpected
   classification, disabled external diff drivers, settings-password redaction,
   terminal sanitization, and private-key-path refusal before patch capture.
+- Optional `nixorium git commit plan`/`apply` CLI/JSON and TUI workflow with an
+  explicit path allowlist, isolated HEAD-based proposal index, content-bound
+  token, exact confirmation, generated message, file-type/secret/filter/size checks,
+  atomic HEAD update, path-only index reconciliation, preserved unrelated
+  changes, and no hooks, signing action, remote requirement, or implicit push.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments
@@ -125,7 +130,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, systemd-owned runtime services, interface-scoped
   firewall, local guided client-enrollment trust model, bounded private
-  operation records, and bounded read-only Git review.
+  operation records, bounded read-only Git review, and reviewed local Git
+  commits.
 - An interactive controller-bootstrap version selector offering `master`, the
   latest GitHub prerelease, and published stable releases while preserving
   `--release` and `NIXORIUM_RELEASE` for unattended installations.

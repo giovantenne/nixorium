@@ -355,6 +355,8 @@ nix run .#nixorium -- services restart cache
 nix run .#nixorium -- logs
 nix run .#nixorium -- logs show OPERATION_LOG_ID
 nix run .#nixorium -- git review
+nix run .#nixorium -- git commit plan --paths lab-settings.json,keys/admin-ssh.pub
+nix run .#nixorium -- git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -428,6 +430,20 @@ and rendered without invoking external Git diff drivers; password hashes in
 tracked Harmonia, SSH, or Veyon private-key path blocks review before patch
 content is read. The dashboard's **Review Git changes** task uses the same
 read-only report. This command never stages, discards, commits, or pushes.
+For an optional local commit, pass an explicit comma-separated path allowlist
+to `git commit plan`. Nixorium builds the exact proposed tree in an isolated
+temporary index based on HEAD, rejects unknown/unchanged/private paths,
+conflicts, directories, symbolic links, rename/copy changes,
+content-transforming Git attributes, oversized patches, invalid
+managed settings, and recognizable private-key/token/plaintext-secret content.
+The plan returns a content-bound review token, fixed generated message, exact
+confirmation phrase, and redacted diff. `git commit apply` recreates that plan,
+requires the token and confirmation, creates only the reviewed tree, advances
+HEAD atomically, and reconciles only the selected index entries. Unrelated
+staged, unstaged, and untracked changes remain untouched. Repository hooks,
+implicit signing, remotes, and push are not invoked; a Git remote is optional.
+The TUI exposes the same path selection, plan, scrollable diff, confirmation,
+and typed result from **Review Git changes**.
 For routine controller changes, `controller plan` reviews the ready, clean
 deployment revision and whether its evaluated system is already active.
 `controller apply --expect <revision>` repeats that preflight, requires exact

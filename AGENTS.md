@@ -146,6 +146,8 @@ nix run .#nixorium -- logs show OPERATION_LOG_ID
 
 # Review staged, unstaged, and untracked deployment changes without mutation
 nix run .#nixorium -- git review
+nix run .#nixorium -- git commit plan --paths lab-settings.json,keys/admin-ssh.pub
+nix run .#nixorium -- git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
 
 # Review and execute a managed client deployment
 nix run .#nixorium -- deploy plan --on @lab
@@ -201,6 +203,11 @@ Release from the matching changelog section.
   password-hash redaction, no automatic untracked-file reads, and refusal before
   diff capture when a known private-key path appears. Never enable external diff
   drivers or let presentation mutate the index/worktree.
+- Optional Git commit uses an explicit clean relative-path allowlist, isolated
+  HEAD-based temporary index, content-bound review token, generated message,
+  and exact confirmation. Preserve secret/content-transform checks, atomic
+  compare-and-update of HEAD, path-only index reconciliation, unrelated index/
+  worktree state, disabled hooks/signing, and the no-remote/no-push boundary.
 - Routine controller rebuild uses `controller plan`/`controller apply`, binds the privileged systemd instance to a full reviewed Git revision, builds a pinned Git source as the deployment owner, refuses repository drift before activation, and verifies `/run/current-system` afterward. Keep `setup apply` as the first-run-compatible path through the same fixed service implementation.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
@@ -317,6 +324,9 @@ set -euo pipefail
 - `nixorium git review` must refuse known private-key paths before reading any
   patch content; do not weaken this boundary when adding the optional commit
   workflow
+- `nixorium git commit apply` must never invoke broad `git add`, normal commit
+  hooks, signing helpers, a remote, or push; commit only the exact reviewed tree
+  and reconcile only selected index paths
 - `keys/cache-public-key`, `keys/admin-ssh.pub`, and `keys/veyon-public-key.pem` are public and may be committed
 - `nixorium setup keys` uses create-new semantics and refuses public-only or mismatched pairs; never bypass that refusal by overwriting an existing key
 - `nixorium setup install-secrets` may start only `nixorium-install-secrets.service`; its deployment path is declarative and destinations are fixed

@@ -89,3 +89,18 @@ func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.Dep
 	}
 	return strings.TrimSpace(value) == "DEPLOY "+report.ColmenaSelector, nil
 }
+
+func ConfirmGitCommit(input io.Reader, output io.Writer, report domain.GitCommitPlanReport) (bool, error) {
+	fmt.Fprintln(output, "Local Git commit review")
+	fmt.Fprintf(output, "HEAD: %s\n", report.Revision)
+	fmt.Fprintf(output, "Paths: %s\n", strings.Join(report.Paths, ", "))
+	fmt.Fprintf(output, "Message: %s\n", report.CommitMessage)
+	fmt.Fprintln(output, "Action: create one local commit containing only the reviewed path versions")
+	fmt.Fprintln(output, "Safety: unrelated index/worktree changes remain; no hook, signing action, remote, or push is used")
+	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == report.Confirmation, nil
+}
