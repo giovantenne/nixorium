@@ -84,6 +84,7 @@ skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 docs/management-architecture.md # Accepted management-system target design
 docs/troubleshooting.md         # Task-oriented recovery and backup guide
 docs/hardware-validation.md     # Manual VM/physical evidence plan
+docs/system-reference.md        # Workstation defaults and mkLab extension reference
 docs/adr/                   # Product architecture decision records
 ```
 
