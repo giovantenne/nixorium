@@ -100,6 +100,8 @@ nix run .#nixorium -- logs show OPERATION_LOG_ID
 nix run .#nixorium -- git review
 nix run .#nixorium -- git commit plan --paths lab-settings.json,keys/admin-ssh.pub
 nix run .#nixorium -- git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
+nix run .#nixorium -- update plan --target v2.0.0
+nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -277,7 +279,23 @@ verified store path is installed without client-side fallback or fetching.
 
 ## Updating nixorium
 
-Run the upgrade from this private deployment repository. In this example the
+Use the guided workflow from this private deployment repository:
+
+```sh
+nix run .#nixorium -- update plan --target v2.0.0
+nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
+```
+
+Planning keeps the configured upstream identity, accepts only a SemVer release,
+generates the candidate lock outside the checkout, evaluates readiness, and
+builds representative controller/client/netboot/firmware/installer outputs.
+Prereleases require `--allow-prerelease`; known downgrades require
+`--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
+`flake.lock`; review and optionally commit them separately. It never branches,
+commits, pushes, activates, starts PXE, or deploys clients.
+
+For a computed input declaration that the managed workflow conservatively
+refuses, use this advanced manual fallback. In this example the
 new upstream release is `v2.0.0-beta.4`; replace it with the tag you actually
 want to install:
 
