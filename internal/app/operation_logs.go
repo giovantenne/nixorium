@@ -117,6 +117,11 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 		record.State = report.State
 		record.Subject = fmt.Sprintf("%d path(s)", len(report.Paths))
 		record.Summary = fmt.Sprintf("reviewed local commit finished; committed=%t", report.Committed)
+	case domain.UpdateApplyReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = report.Target
+		record.Summary = fmt.Sprintf("upstream release update finished; files updated=%t", report.Updated)
 	default:
 		return domain.OperationRecord{}, false
 	}

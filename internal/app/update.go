@@ -121,6 +121,10 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 
 func (m *UpdateManager) Apply(ctx context.Context, repository, target, expectedToken string, allowPrerelease, allowDowngrade bool) domain.UpdateApplyReport {
 	plan := m.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
+	return m.ApplyPlan(ctx, plan, expectedToken)
+}
+
+func (m *UpdateManager) ApplyPlan(ctx context.Context, plan domain.UpdatePlanReport, expectedToken string) domain.UpdateApplyReport {
 	report := domain.UpdateApplyReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "update-apply",

@@ -85,6 +85,17 @@ func TestRecordOperationOutcomeSummarizesGitCommitWithoutPathsOrMessages(t *test
 	}
 }
 
+func TestRecordOperationOutcomeSummarizesUpdateWithoutRawMessages(t *testing.T) {
+	sink := &fakeOperationRecordSink{}
+	report := domain.UpdateApplyReport{Operation: "update-apply", State: "completed", Target: "v2.1.0", Updated: true, Message: "raw Nix output"}
+	if err := RecordOperationOutcome(sink, report); err != nil {
+		t.Fatal(err)
+	}
+	if sink.record.Subject != "v2.1.0" || sink.record.Summary != "upstream release update finished; files updated=true" || strings.Contains(sink.record.Summary, "raw") {
+		t.Fatalf("record = %+v", sink.record)
+	}
+}
+
 func TestRecordOperationOutcomeRejectsUnsupportedValues(t *testing.T) {
 	if err := RecordOperationOutcome(&fakeOperationRecordSink{}, domain.StatusReport{}); err == nil {
 		t.Fatal("unsupported read-only report was recorded")

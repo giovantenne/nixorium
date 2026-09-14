@@ -212,6 +212,50 @@ func GitCommitText(writer io.Writer, report domain.GitCommitReport) {
 	}
 }
 
+func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
+	fmt.Fprintf(writer, "Nixorium update plan: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:       %s\n", report.Repository)
+	if report.Revision != "" {
+		fmt.Fprintf(writer, "Deployment HEAD:  %s\n", report.Revision)
+	}
+	if report.CurrentRef != "" {
+		fmt.Fprintf(writer, "Current upstream: %s (%s; %s)\n", report.CurrentRef, report.CurrentChannel, report.CurrentRev)
+	}
+	if report.Target != "" {
+		fmt.Fprintf(writer, "Target release:   %s (%s)\n", report.Target, report.TargetChannel)
+	}
+	for _, check := range report.Checks {
+		fmt.Fprintf(writer, "  %-18s %-8s %s\n", check.ID, strings.ToUpper(check.State), check.Message)
+	}
+	if report.ReviewToken != "" {
+		fmt.Fprintf(writer, "Review token:     %s\n", report.ReviewToken)
+		fmt.Fprintf(writer, "Confirmation:     %s\n", report.Confirmation)
+		fmt.Fprintln(writer, "No branch, commit, push, activation, PXE action, or deployment is part of this plan.")
+	}
+	if report.Diff.Content != "" {
+		fmt.Fprintln(writer, "\nProposed flake.nix/flake.lock changes:")
+		fmt.Fprint(writer, report.Diff.Content)
+		if !strings.HasSuffix(report.Diff.Content, "\n") {
+			fmt.Fprintln(writer)
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func UpdateApplyText(writer io.Writer, report domain.UpdateApplyReport) {
+	fmt.Fprintf(writer, "Nixorium update: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Target release:  %s\n", report.Target)
+	fmt.Fprintf(writer, "Files updated:   %t\n", report.Updated)
+	if report.Message != "" {
+		fmt.Fprintln(writer, report.Message)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
 func gitChangeOwnership(change domain.GitChange) string {
 	if change.Private {
 		return "private"

@@ -124,7 +124,12 @@ func TestUpdateApplyRequiresCurrentPlanToken(t *testing.T) {
 		t.Fatalf("blocked apply = %+v, calls = %d", blocked, source.applied)
 	}
 	report := manager.Apply(context.Background(), ".", "v1.1.0", plan.ReviewToken, false, false)
-	if report.State != "completed" || !report.Updated || report.RetrySafe || source.applied != 1 {
+	if report.State != "completed" || !report.Updated || report.RetrySafe || source.applied != 1 || source.prepared != 3 {
 		t.Fatalf("apply = %+v, calls = %d", report, source.applied)
+	}
+	prepared := source.prepared
+	report = manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+	if report.State != "completed" || source.prepared != prepared {
+		t.Fatalf("apply existing plan rebuilt proposal: report=%+v prepared=%d->%d", report, prepared, source.prepared)
 	}
 }
