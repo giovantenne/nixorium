@@ -69,3 +69,16 @@ writers and atomically retains the newest 1000 records. It also owns
 generated-ID validation, no-follow file access, current-user ownership and
 strict-mode checks, newest-log and byte limits, and terminal-control
 sanitization; neither CLI nor TUI accepts an arbitrary path.
+
+Git review/commit and upstream update screens preserve the same rule. Bubble
+Tea selects typed reviewed paths or release policy, renders bounded patches,
+collects the exact generated confirmation, and displays typed results. Git,
+filesystem, Nix, release discovery, operation recording, and every follow-up
+action remain in application/adapters. Only explicit `update check` enumerates
+the public remote; opening the dashboard never does.
+
+Systemd-owned PXE preparation can outlive its initiating terminal. The CLI
+writes immediate activity plus the fixed journal follow command to stderr so
+JSON stdout remains machine-clean; the TUI shows the same activity/log path
+while its typed callback waits. Detailed build output remains in journald rather
+than being copied into presentation or an unbounded in-memory channel.

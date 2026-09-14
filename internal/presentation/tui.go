@@ -1581,7 +1581,7 @@ func (model dashboardModel) pxeView() string {
 		fmt.Sprintf("Service address:    %s", model.report.Meta.Controller.DHCPIP),
 	}
 	if model.busy != "" {
-		lines = append(lines, "", model.busy+"…", "", "q: close this view; systemd-owned work continues")
+		lines = append(lines, "", model.busy+"…", "Detailed progress: journalctl -fu nixorium-prepare-pxe.service", "", "q: close this view; systemd-owned work continues")
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardPXEStartReview {
@@ -1610,7 +1610,7 @@ func (model dashboardModel) pxeView() string {
 	if model.report.PXE.Mode == "active" || model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required" {
 		lines = append(lines, "  x   Stop and restore normal networking")
 	}
-	lines = append(lines, "  r   Recover normal networking", "  Esc Back", "  q   Quit (active services keep running)")
+	lines = append(lines, "  r   Recover normal networking", "", "Preparation log: journalctl -u nixorium-prepare-pxe.service", "  Esc Back", "  q   Quit (active services keep running)")
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}

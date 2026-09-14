@@ -655,6 +655,9 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 		if command == nil {
 			t.Fatalf("%s did not schedule an operation", key)
 		}
+		if key == "p" && !strings.Contains(model.View(), "journalctl -fu nixorium-prepare-pxe.service") {
+			t.Fatalf("PXE preparation omits detailed live-log guidance:\n%s", model.View())
+		}
 		updated, _ = model.Update(command())
 		if called != expected {
 			t.Errorf("%s called %q, want %q", key, called, expected)
