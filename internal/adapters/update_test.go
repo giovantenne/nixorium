@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,5 +52,66 @@ func TestInspectUpdateInputRefusesAmbiguousComputedAndSymlinkSources(t *testing.
 	}
 	if _, err := (Local{}).InspectUpdateInput(repository); err == nil {
 		t.Fatal("symlinked flake.nix was accepted")
+	}
+}
+
+func TestPrepareUpdateUsesExternalCandidateLockAndRepresentativeBuilds(t *testing.T) {
+	repository := newGitReviewRepository(t)
+	writeGitReviewFile(t, repository, "flake.nix", "{\n  inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n}\n")
+	writeGitReviewFile(t, repository, "flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`+"\n")
+	if _, err := run(context.Background(), "git", "-C", repository, "add", "flake.nix", "flake.lock"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "commit", "-qm", "deployment"); err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "nix.log")
+	script := `#!/bin/sh
+set -eu
+printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
+case " $* " in
+  *" flake lock "*)
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = --output-lock-file ]; then
+        printf '%s\n' '{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"2222222222222222222222222222222222222222"}}}}' > "$2"
+        exit 0
+      fi
+      shift
+    done
+    exit 2
+    ;;
+  *"#labMeta "*)
+    printf '%s\n' '{"schemaVersion":2,"controller":{"name":"pc99"},"clients":{"count":1,"hosts":[{"name":"pc01","ip":"10.0.0.1"}]}}'
+    ;;
+  *"#deploymentStatus "*)
+    printf '%s\n' '{"ready":true,"issues":[]}'
+    ;;
+  *" build "*) exit 0 ;;
+  *) exit 3 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "nix"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
+	proposal, err := (Local{}).PrepareUpdate(context.Background(), repository, "v1.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposal.Checks) != 7 || !strings.Contains(string(proposal.FlakeContent), "/v1.1.0") || !strings.Contains(string(proposal.LockContent), strings.Repeat("2", 40)) || !strings.Contains(proposal.Diff.Content, "flake.nix") || !strings.Contains(proposal.Diff.Content, "flake.lock") {
+		t.Fatalf("proposal = %+v", proposal)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
+	if len(lines) != 8 || strings.Count(string(log), " build ") != 5 || strings.Count(string(log), "--no-link") != 5 || strings.Count(string(log), "--reference-lock-file") != 7 || strings.Count(string(log), "--no-write-lock-file") != 7 {
+		t.Fatalf("unexpected Nix invocations (%d):\n%s", len(lines), log)
+	}
+	if strings.Contains(string(log), repository+"/secret-key") {
+		t.Fatalf("private path entered Nix arguments:\n%s", log)
 	}
 }
