@@ -14,6 +14,7 @@ func (Local) StartSystemUnit(ctx context.Context, unit string) error {
 
 func (Local) ControlSystemUnit(ctx context.Context, verb, unit string) error {
 	allowed := map[string]map[string]bool{
+		"nixorium-restart-cache.service":    {"start": true},
 		"nixorium-install-secrets.service":  {"start": true},
 		"nixorium-apply-controller.service": {"start": true},
 		"nixorium-prepare-pxe.service":      {"start": true},

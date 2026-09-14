@@ -15,6 +15,8 @@ type DashboardActions struct {
 	ApplyDeployment func(domain.DeploymentPlanReport) domain.DeploymentExecutionReport
 	PlanController  func() domain.ControllerRebuildPlanReport
 	ApplyController func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
+	LoadServices    func() domain.ServicesReport
+	RestartService  func(string) domain.ServiceActionReport
 	PreparePXE      func() domain.ActionReport
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
@@ -31,6 +33,8 @@ const (
 	dashboardDeployReview
 	dashboardController
 	dashboardControllerReview
+	dashboardServices
+	dashboardServicesRestartReview
 	dashboardPXE
 	dashboardPXEStartReview
 )
@@ -51,6 +55,8 @@ type dashboardModel struct {
 	deploying        bool
 	controllerPlan   domain.ControllerRebuildPlanReport
 	controllerResult domain.ControllerRebuildExecutionReport
+	services         domain.ServicesReport
+	serviceResult    domain.ServiceActionReport
 }
 
 type dashboardPlanMsg struct {
@@ -83,6 +89,14 @@ type dashboardControllerPlanMsg struct {
 
 type dashboardControllerResultMsg struct {
 	report domain.ControllerRebuildExecutionReport
+}
+
+type dashboardServicesMsg struct {
+	report domain.ServicesReport
+}
+
+type dashboardServiceResultMsg struct {
+	report domain.ServiceActionReport
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -168,6 +182,18 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardController
 		return model, nil
+	case dashboardServicesMsg:
+		model.busy = ""
+		model.services = message.report
+		model.message = ""
+		model.screen = dashboardServices
+		return model, nil
+	case dashboardServiceResultMsg:
+		model.busy = ""
+		model.serviceResult = message.report
+		model.message = message.report.Message
+		model.screen = dashboardServices
+		return model, nil
 	}
 
 	key, ok := message.(tea.KeyMsg)
@@ -205,6 +231,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.busy = "Checking configured computers"
 			model.message = ""
 			return model, model.loadHosts()
+		case "s":
+			model.screen = dashboardServices
+			model.busy = "Checking managed controller services"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardServicesMsg{report: model.actions.LoadServices()}
+			}
 		case "p", "enter":
 			model.screen = dashboardPXE
 			model.message = ""
@@ -330,6 +363,56 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				model.confirmation += string(key.Runes)
 			}
 		}
+	case dashboardServices:
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "f":
+			model.busy = "Refreshing managed controller services"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardServicesMsg{report: model.actions.LoadServices()}
+			}
+		case "r":
+			if len(model.services.Services) == 0 || model.services.Services[0].ID != "cache" || len(model.services.Services[0].Units) == 0 || !model.services.Services[0].Units[0].Loaded {
+				model.message = "Binary cache restart is unavailable because the managed unit is not installed."
+				return model, nil
+			}
+			model.confirmation = ""
+			model.message = ""
+			model.screen = dashboardServicesRestartReview
+		}
+	case dashboardServicesRestartReview:
+		switch key.String() {
+		case "esc":
+			model.screen = dashboardServices
+			model.confirmation = ""
+			model.message = "Service restart cancelled; no action was started."
+		case "backspace":
+			value := []rune(model.confirmation)
+			if len(value) > 0 {
+				model.confirmation = string(value[:len(value)-1])
+			}
+		case " ":
+			model.confirmation += " "
+		case "enter":
+			if model.confirmation != "RESTART CACHE" {
+				model.confirmation = ""
+				model.message = "Confirmation did not match; the cache was not restarted."
+				return model, nil
+			}
+			model.busy = "Restarting and verifying the binary cache"
+			model.confirmation = ""
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardServiceResultMsg{report: model.actions.RestartService("cache")}
+			}
+		default:
+			if key.Type == tea.KeyRunes {
+				model.confirmation += string(key.Runes)
+			}
+		}
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
@@ -418,6 +501,8 @@ func (model dashboardModel) View() string {
 		return model.deployView()
 	case dashboardController, dashboardControllerReview:
 		return model.controllerView()
+	case dashboardServices, dashboardServicesRestartReview:
+		return model.servicesView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
 	default:
@@ -445,6 +530,7 @@ func (model dashboardModel) homeView() string {
 		"  h           View computers",
 		"  d           Deploy updates",
 		"  c           Rebuild controller",
+		"  s           Manage services",
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
@@ -485,6 +571,52 @@ func (model dashboardModel) controllerView() string {
 			fmt.Sprintf("Last result: %s at phase %s", model.controllerResult.State, model.controllerResult.Phase),
 			fmt.Sprintf("Applied: %t   Verified: %t", model.controllerResult.Applied, model.controllerResult.Verified),
 		)
+	}
+	if model.message != "" {
+		lines = append(lines, "", "Result: "+model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) servicesView() string {
+	lines := []string{"Nixorium — Managed services", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	if model.screen == dashboardServicesRestartReview {
+		lines = append(lines,
+			"Binary cache restart review",
+			"  The signed cache will be briefly unavailable",
+			"  Active PXE clients may retry downloads",
+			"  PXE networking and listeners are not controlled by this action",
+			"",
+			"Type RESTART CACHE to continue:",
+			"> "+model.confirmation+"█",
+			"",
+			"Esc: cancel",
+		)
+		if model.message != "" {
+			lines = append(lines, "", model.message)
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
+	for _, service := range model.services.Services {
+		lines = append(lines,
+			fmt.Sprintf("%s — %s", service.Name, service.State),
+			"  "+service.Detail,
+		)
+		for _, unit := range service.Units {
+			lines = append(lines, fmt.Sprintf("  %-32s %s", unit.Name, unit.State))
+		}
+		if service.ID == "pxe" {
+			lines = append(lines, "  Managed through the Install computers workflow")
+		}
+		lines = append(lines, "")
+	}
+	lines = append(lines, "r: restart cache   f: refresh   Esc: back   q: quit")
+	if model.serviceResult.Operation != "" {
+		lines = append(lines, "", fmt.Sprintf("Last action: %s; verified=%t", model.serviceResult.State, model.serviceResult.Verified))
 	}
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)

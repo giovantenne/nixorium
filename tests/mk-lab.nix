@@ -79,6 +79,8 @@ assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.signKey
 assert builtins.elem "nixorium-harmonia.service"
   subnetLab.nixosConfigurations.pc99.config.systemd.services.harmonia.aliases;
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-prepare-pxe";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-restart-cache";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-restart-cache".serviceConfig.CapabilityBoundingSet == "";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prepare-pxe".serviceConfig.User == "admin";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prepare-pxe".serviceConfig.CapabilityBoundingSet == "";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-network";
@@ -104,6 +106,7 @@ assert builtins.all (port: builtins.elem port controllerUDP) [ 67 69 4011 5353 ]
 assert builtins.length controllerUDP == 4;
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-prepare-pxe");
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-restart-cache");
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-pxe-network");
 assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-pxe");
 assert clientFirewall.enable;

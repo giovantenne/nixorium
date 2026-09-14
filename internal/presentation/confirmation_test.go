@@ -35,6 +35,20 @@ func TestConfirmControllerRebuildRequiresExactToken(t *testing.T) {
 	}
 }
 
+func TestConfirmServiceRestartRequiresExactToken(t *testing.T) {
+	service := domain.ManagedService{Name: "Binary cache"}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"RESTART CACHE\n", true}, {"restart cache\n", false}, {"RESTART\n", false}} {
+		output := &bytes.Buffer{}
+		got, err := ConfirmServiceRestart(strings.NewReader(test.input), output, service)
+		if err != nil || got != test.want || !strings.Contains(output.String(), "PXE networking") {
+			t.Fatalf("input %q: got %t, err %v, output %q", test.input, got, err, output.String())
+		}
+	}
+}
+
 func TestConfirmPXEStartRequiresExactToken(t *testing.T) {
 	report := domain.PXELifecycleReport{Interface: "enp1s0", DHCPAddress: "192.0.2.10", StaticCIDR: "10.0.0.99/8"}
 	for _, test := range []struct {

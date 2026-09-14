@@ -125,3 +125,26 @@ func TestControllerRebuildTextShowsReviewAndVerifiedResult(t *testing.T) {
 		}
 	}
 }
+
+func TestServicesTextShowsModesWorkflowsAndVerifiedAction(t *testing.T) {
+	servicesOutput := &bytes.Buffer{}
+	ServicesText(servicesOutput, domain.ServicesReport{
+		State: "healthy",
+		Services: []domain.ManagedService{
+			{ID: "cache", Name: "Binary cache", Mode: "persistent", State: "healthy", Detail: "HTTP-ready", Units: []domain.ServiceState{{Name: "nixorium-harmonia.service", State: "active"}}},
+			{ID: "pxe", Name: "PXE installation mode", Mode: "on-demand", State: "ready", Commands: []string{"nixorium pxe start"}, Units: []domain.ServiceState{{Name: "nixorium-pxe.service", State: "inactive"}}},
+		},
+	})
+	for _, expected := range []string{"HEALTHY", "Binary cache (persistent): healthy", "nixorium-harmonia.service", "PXE installation mode (on-demand): ready", "workflow: nixorium pxe start"} {
+		if !strings.Contains(servicesOutput.String(), expected) {
+			t.Fatalf("services output omits %q:\n%s", expected, servicesOutput.String())
+		}
+	}
+	actionOutput := &bytes.Buffer{}
+	ServiceActionText(actionOutput, domain.ServiceActionReport{State: "completed", Action: "restart", Service: "cache", Unit: "nixorium-restart-cache.service", Verified: true, Current: domain.ServiceState{State: "active"}})
+	for _, expected := range []string{"COMPLETED", "restart cache", "Verified:       true", "Current state:  active"} {
+		if !strings.Contains(actionOutput.String(), expected) {
+			t.Fatalf("service action output omits %q:\n%s", expected, actionOutput.String())
+		}
+	}
+}

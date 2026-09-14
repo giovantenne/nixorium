@@ -21,10 +21,19 @@ func TestControlSystemUnitRejectsUnknownVerbUnitPairs(t *testing.T) {
 		{verb: "start", unit: "nixorium-pxe-network.service"},
 		{verb: "stop", unit: "nixorium-pxe-recover.service"},
 		{verb: "stop", unit: "nixorium-prepare-pxe.service"},
+		{verb: "start", unit: "nixorium-harmonia.service"},
+		{verb: "restart", unit: "harmonia.service"},
+		{verb: "restart", unit: "nixorium-restart-cache.service"},
 	} {
 		if err := local.ControlSystemUnit(context.Background(), test.verb, test.unit); err == nil {
 			t.Fatalf("accepted %s %s", test.verb, test.unit)
 		}
+	}
+}
+
+func TestServiceRestartAllowlistRejectsDirectCacheStart(t *testing.T) {
+	if err := (Local{}).ControlSystemUnit(context.Background(), "start", "nixorium-harmonia.service"); err == nil {
+		t.Fatal("cache start was accepted outside the restart workflow")
 	}
 }
 

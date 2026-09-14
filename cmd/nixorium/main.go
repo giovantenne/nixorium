@@ -22,6 +22,7 @@ type options struct {
 	file       string
 	expect     string
 	on         string
+	service    string
 	json       bool
 	full       bool
 	help       bool
@@ -73,6 +74,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		lifecycle := app.NewPXELifecycle(local)
 		deploymentManager := app.NewDeploymentManager(local)
 		controllerManager := app.NewControllerManager(local)
+		serviceManager := app.NewServiceManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -91,6 +93,12 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			},
 			ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 				return controllerManager.Apply(ctx, repository, plan.Revision)
+			},
+			LoadServices: func() domain.ServicesReport {
+				return serviceManager.Status(ctx, repository)
+			},
+			RestartService: func(service string) domain.ServiceActionReport {
+				return serviceManager.Restart(ctx, repository, service)
 			},
 			PreparePXE: func() domain.ActionReport {
 				return app.NewSystemActions(local).PreparePXE(ctx)
@@ -159,6 +167,20 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			err = presentation.JSON(stdout, report)
 		} else {
 			presentation.ControllerRebuildPlanText(stdout, report)
+		}
+		if report.HasErrors() {
+			return 1
+		}
+	case "services":
+		manager := app.NewServiceManager(local)
+		if options.subcommand == "restart" {
+			return runServiceRestart(ctx, manager, repository, stdout, stderr, options.service, options.yes, options.json)
+		}
+		report := manager.Status(ctx, repository)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.ServicesText(stdout, report)
 		}
 		if report.HasErrors() {
 			return 1
@@ -359,7 +381,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "config", "setup", "pxe":
+		case "doctor", "hosts", "deploy", "controller", "services", "config", "setup", "pxe":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -398,6 +420,16 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("apply must follow config or setup")
 			}
 			result.subcommand = "apply"
+		case "restart":
+			if result.command != "services" || result.subcommand != "" {
+				return options{}, errors.New("restart must follow services")
+			}
+			result.subcommand = "restart"
+		case "cache":
+			if result.command != "services" || result.subcommand != "restart" || result.service != "" {
+				return options{}, fmt.Errorf("unexpected argument %q", arguments[index])
+			}
+			result.service = "cache"
 		case "prepare":
 			if result.command != "pxe" || result.subcommand != "" {
 				return options{}, errors.New("prepare must follow pxe")
@@ -418,8 +450,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller") && result.subcommand == "apply")) {
-		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, or controller apply")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, or services restart")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -441,6 +473,12 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "controller" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("controller requires the plan or apply subcommand")
+	}
+	if result.command == "services" && result.subcommand != "" && result.subcommand != "restart" {
+		return options{}, errors.New("services accepts only the restart subcommand")
+	}
+	if result.command == "services" && result.subcommand == "restart" && result.service == "" {
+		return options{}, errors.New("services restart requires cache")
 	}
 	if result.command == "deploy" && result.on == "" {
 		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
@@ -531,11 +569,12 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")
 	fmt.Fprintln(writer, "       controller apply --expect <git-revision> [--yes]")
+	fmt.Fprintln(writer, "       services restart cache [--yes]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
@@ -722,6 +761,50 @@ func runControllerApply(ctx context.Context, manager *app.ControllerManager, rep
 		}
 	} else {
 		presentation.ControllerRebuildExecutionText(stdout, report)
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
+}
+
+func runServiceRestart(ctx context.Context, manager *app.ServiceManager, repository string, stdout, stderr io.Writer, service string, assumeYes, jsonOutput bool) int {
+	status := manager.Status(ctx, repository)
+	if len(status.Issues) > 0 || len(status.Services) == 0 || status.Services[0].ID != service || len(status.Services[0].Units) == 0 || !status.Services[0].Units[0].Loaded {
+		if jsonOutput {
+			_ = presentation.JSON(stdout, status)
+		} else {
+			presentation.ServicesText(stderr, status)
+		}
+		return 1
+	}
+	if !assumeYes {
+		if !presentation.IsInteractive(os.Stdin) {
+			fmt.Fprintln(stderr, "Error: services restart requires an interactive terminal or explicit --yes")
+			return 2
+		}
+		confirmationOutput := stdout
+		if jsonOutput {
+			confirmationOutput = stderr
+		}
+		approved, err := presentation.ConfirmServiceRestart(os.Stdin, confirmationOutput, status.Services[0])
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: read confirmation:", err)
+			return 1
+		}
+		if !approved {
+			fmt.Fprintln(confirmationOutput, "Service restart cancelled; no action started.")
+			return 0
+		}
+	}
+	report := manager.Restart(ctx, repository, service)
+	if jsonOutput {
+		if err := presentation.JSON(stdout, report); err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+	} else {
+		presentation.ServiceActionText(stdout, report)
 	}
 	if report.HasErrors() {
 		return 1

@@ -68,6 +68,13 @@ revision against clean HEAD, pins the Git fetcher, builds as the deployment
 owner, and refuses drift before exact-closure activation; it does not accept a
 path, hostname, executable, or arbitrary unit.
 
+Routine service management does not grant a generic `systemctl restart`
+capability. The only generic-service mutation starts the fixed
+`nixorium-restart-cache.service` oneshot. That capability-free root action
+restarts the canonical Harmonia unit; the application then rechecks both the
+stable product alias and HTTP readiness. Direct Harmonia restart and all raw
+PXE unit mutations remain unauthorized through this path.
+
 ## Consequences
 
 Privileges and logs are auditable, and closing the TUI does not terminate

@@ -55,3 +55,8 @@ callbacks. Presentation owns review and exact confirmation; revision checks,
 the systemd action, activation verification, and journal ownership remain in
 the application, adapter, and controller module layers. Unlike foreground
 Colmena, the systemd-owned rebuild may safely survive dashboard exit.
+
+Service management follows the same typed callback rule. Bubble Tea displays
+the cache and composite PXE state, collects exact cache-restart confirmation,
+and renders the verified action report. It cannot select an arbitrary unit or
+verb, and it directs PXE mutations to the dedicated lifecycle operation.
