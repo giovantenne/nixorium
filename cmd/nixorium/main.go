@@ -281,7 +281,17 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		}
 	case "update":
 		manager := app.NewUpdateManager(local)
-		if options.subcommand == "plan" {
+		if options.subcommand == "check" {
+			report := manager.Check(ctx, repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.UpdateCheckText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		} else if options.subcommand == "plan" {
 			report := manager.Plan(ctx, repository, options.target, options.allowPrerelease, options.allowDowngrade)
 			if options.json {
 				err = presentation.JSON(stdout, report)
@@ -521,6 +531,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("validate must follow config")
 			}
 			result.subcommand = "validate"
+		case "check":
+			if result.command != "update" || result.subcommand != "" {
+				return options{}, errors.New("check must follow update")
+			}
+			result.subcommand = "check"
 		case "plan":
 			if result.command == "git" && result.subcommand == "commit" {
 				result.subcommand = "commit-plan"
@@ -631,16 +646,16 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "controller" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("controller requires the plan or apply subcommand")
 	}
-	if result.command == "update" && result.subcommand != "plan" && result.subcommand != "apply" {
-		return options{}, errors.New("update requires the plan or apply subcommand")
+	if result.command == "update" && result.subcommand != "check" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("update requires the check, plan, or apply subcommand")
 	}
 	if result.target != "" && (result.command != "update" || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--target is only valid with update plan or update apply")
 	}
-	if (result.allowPrerelease || result.allowDowngrade) && result.command != "update" {
-		return options{}, errors.New("update policy flags are only valid with update")
+	if (result.allowPrerelease || result.allowDowngrade) && (result.command != "update" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("update policy flags are only valid with update plan or update apply")
 	}
-	if result.command == "update" && result.target == "" {
+	if result.command == "update" && (result.subcommand == "plan" || result.subcommand == "apply") && result.target == "" {
 		return options{}, fmt.Errorf("update %s requires --target", result.subcommand)
 	}
 	if result.command == "services" && result.subcommand != "" && result.subcommand != "restart" {
@@ -759,7 +774,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")
@@ -769,6 +784,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       git review shows bounded staged and unstaged changes without mutating Git")
 	fmt.Fprintln(writer, "       git commit plan --paths <path[,path...]> creates an isolated proposal")
 	fmt.Fprintln(writer, "       git commit apply --paths <paths> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       update check explicitly queries the configured public upstream")
 	fmt.Fprintln(writer, "       update plan --target <vMAJOR.MINOR.PATCH[-PRERELEASE]>")
 	fmt.Fprintln(writer, "       update apply --target <release> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")

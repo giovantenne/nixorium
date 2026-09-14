@@ -10,6 +10,37 @@ const (
 	UpdateChannelMoving     UpdateChannel = "moving"
 )
 
+type UpdateReleaseRef struct {
+	Tag      string `json:"tag"`
+	ObjectID string `json:"objectId"`
+}
+
+type UpdateRelease struct {
+	Tag      string        `json:"tag"`
+	ObjectID string        `json:"objectId"`
+	Channel  UpdateChannel `json:"channel"`
+}
+
+type UpdateCheckReport struct {
+	SchemaVersion  int               `json:"schemaVersion"`
+	Operation      string            `json:"operation"`
+	GeneratedAt    time.Time         `json:"generatedAt"`
+	State          string            `json:"state"`
+	Repository     string            `json:"repository"`
+	Upstream       string            `json:"upstream,omitempty"`
+	CurrentRef     string            `json:"currentRef,omitempty"`
+	CurrentRev     string            `json:"currentRevision,omitempty"`
+	CurrentChannel UpdateChannel     `json:"currentChannel,omitempty"`
+	Stable         []UpdateRelease   `json:"stable"`
+	Prerelease     []UpdateRelease   `json:"prerelease"`
+	Truncated      bool              `json:"truncated"`
+	Issues         []ValidationIssue `json:"issues"`
+}
+
+func (r UpdateCheckReport) HasErrors() bool {
+	return r.State != "available" || len(r.Issues) > 0
+}
+
 type UpdateInputSnapshot struct {
 	SourceURL    string
 	SourcePrefix string

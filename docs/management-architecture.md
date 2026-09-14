@@ -635,9 +635,12 @@ nixorium update apply --target vMAJOR.MINOR.PATCH[-PRERELEASE] --expect TOKEN
 `check` is the only release-discovery operation and may contact the configured
 public upstream when the controller has internet access. It is bounded,
 non-interactive, disables Git credential prompting/helpers, and reports stable
-and prerelease tags separately. An explicit target remains usable without
-discovery. Dashboard/status/doctor and all client operations remain independent
-of this external request.
+and prerelease tags separately. The concrete adapter derives one HTTPS GitHub
+URL from the managed input identity, ignores user/system Git configuration,
+stops after 15 seconds and 256 KiB, and returns at most the newest 20 tags per
+channel with an explicit truncation flag. An explicit target remains usable
+without discovery. Dashboard/status/doctor and all client operations remain
+independent of this external request.
 
 Planning requires a clean private deployment at a stable full Git revision and
 reads exactly one simple `inputs.nixorium.url` string assignment. The command

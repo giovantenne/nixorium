@@ -57,6 +57,79 @@ func TestInspectUpdateInputRefusesAmbiguousComputedAndSymlinkSources(t *testing.
 	}
 }
 
+func TestDiscoverUpdateReleasesIsBoundedAndNonInteractive(t *testing.T) {
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "git.log")
+	script := `#!/bin/sh
+set -eu
+printf '%s\n' "$*" > "$NIXORIUM_TEST_GIT_LOG"
+printf 'prompt=%s askpass=%s sshaskpass=%s interactive=%s global=%s nosystem=%s count=%s\n' "${GIT_TERMINAL_PROMPT-}" "${GIT_ASKPASS-}" "${SSH_ASKPASS-}" "${GCM_INTERACTIVE-}" "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_NOSYSTEM-}" "${GIT_CONFIG_COUNT-}" >> "$NIXORIUM_TEST_GIT_LOG"
+printf '%s\t%s\n' 1111111111111111111111111111111111111111 refs/tags/v1.0.0
+printf '%s\t%s\n' 2222222222222222222222222222222222222222 refs/tags/v1.1.0-beta.1
+`
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("NIXORIUM_TEST_GIT_LOG", logPath)
+	t.Setenv("GIT_TERMINAL_PROMPT", "1")
+	t.Setenv("GIT_ASKPASS", "/tmp/unsafe-askpass")
+	t.Setenv("SSH_ASKPASS", "/tmp/unsafe-ssh-askpass")
+	t.Setenv("GIT_CONFIG_GLOBAL", "/tmp/unsafe-git-config")
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "url.https://attacker.invalid/.insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_0", "https://github.com/")
+	refs, err := (Local{}).DiscoverUpdateReleases(context.Background(), "owner/repository")
+	if err != nil || len(refs) != 2 || refs[0].Tag != "v1.0.0" || refs[1].Tag != "v1.1.0-beta.1" {
+		t.Fatalf("release refs = %+v, error = %v", refs, err)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{
+		"-c credential.helper= -c core.askPass= ls-remote --refs --tags --exit-code https://github.com/owner/repository.git refs/tags/v*",
+		"prompt=0 askpass= sshaskpass= interactive=Never global=/dev/null nosystem=1 count=",
+	} {
+		if !strings.Contains(string(log), expected) {
+			t.Fatalf("discovery log omits %q:\n%s", expected, log)
+		}
+	}
+	if _, err := (Local{}).DiscoverUpdateReleases(context.Background(), "owner/repository with space"); err == nil {
+		t.Fatal("unsafe upstream identity was accepted")
+	}
+}
+
+func TestDiscoverUpdateReleasesRejectsMalformedAndCancelledResults(t *testing.T) {
+	bin := t.TempDir()
+	scriptPath := filepath.Join(bin, "git")
+	if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nprintf 'not-a-revision refs/tags/v1.0.0\\n'\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if _, err := (Local{}).DiscoverUpdateReleases(context.Background(), "owner/repository"); err == nil || !strings.Contains(err.Error(), "malformed") {
+		t.Fatalf("malformed discovery error = %v", err)
+	}
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := (Local{}).DiscoverUpdateReleases(cancelled, "owner/repository"); err == nil {
+		t.Fatal("cancelled discovery succeeded")
+	}
+	oversized := `#!/bin/sh
+i=0
+while [ "$i" -lt 5000 ]; do
+  printf '%s\trefs/tags/v1.0.%s\n' 1111111111111111111111111111111111111111 "$i"
+  i=$((i + 1))
+done
+`
+	if err := os.WriteFile(scriptPath, []byte(oversized), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Local{}).DiscoverUpdateReleases(context.Background(), "owner/repository"); err == nil || !strings.Contains(err.Error(), "256 KiB") {
+		t.Fatalf("oversized discovery error = %v", err)
+	}
+}
+
 func TestPrepareUpdateUsesExternalCandidateLockAndRepresentativeBuilds(t *testing.T) {
 	repository := newGitReviewRepository(t)
 	writeGitReviewFile(t, repository, "flake.nix", "{\n  inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n}\n")

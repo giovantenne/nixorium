@@ -244,6 +244,37 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 	}
 }
 
+func UpdateCheckText(writer io.Writer, report domain.UpdateCheckReport) {
+	fmt.Fprintf(writer, "Nixorium release check: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Repository:       %s\n", report.Repository)
+	if report.Upstream != "" {
+		fmt.Fprintf(writer, "Public upstream:  %s\n", report.Upstream)
+	}
+	if report.CurrentRef != "" {
+		fmt.Fprintf(writer, "Current upstream: %s (%s; %s)\n", report.CurrentRef, report.CurrentChannel, report.CurrentRev)
+	}
+	printUpdateReleases(writer, "Stable releases", report.Stable)
+	printUpdateReleases(writer, "Prereleases", report.Prerelease)
+	if report.Truncated {
+		fmt.Fprintln(writer, "Only the newest 20 releases per channel are shown.")
+	}
+	fmt.Fprintln(writer, "This explicit check is the only update operation that enumerates the remote.")
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "FAILED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func printUpdateReleases(writer io.Writer, title string, releases []domain.UpdateRelease) {
+	fmt.Fprintf(writer, "%s:\n", title)
+	if len(releases) == 0 {
+		fmt.Fprintln(writer, "  none")
+		return
+	}
+	for _, release := range releases {
+		fmt.Fprintf(writer, "  %-24s %s\n", release.Tag, release.ObjectID)
+	}
+}
+
 func UpdateApplyText(writer io.Writer, report domain.UpdateApplyReport) {
 	fmt.Fprintf(writer, "Nixorium update: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Target release:  %s\n", report.Target)

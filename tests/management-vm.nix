@@ -92,6 +92,25 @@
           ;;
       esac
     '';
+    fakeUpdateGit = pkgs.writeShellScriptBin "nixorium-test-update-git" ''
+      set -eu
+      : "''${NIXORIUM_TEST_UPDATE_GIT_LOG:?}"
+      printf '%s\n' "$*" > "$NIXORIUM_TEST_UPDATE_GIT_LOG"
+      printf 'prompt=%s askpass=%s sshaskpass=%s interactive=%s global=%s nosystem=%s\n' \
+        "''${GIT_TERMINAL_PROMPT-}" "''${GIT_ASKPASS-}" "''${SSH_ASKPASS-}" \
+        "''${GCM_INTERACTIVE-}" "''${GIT_CONFIG_GLOBAL-}" "''${GIT_CONFIG_NOSYSTEM-}" \
+        >> "$NIXORIUM_TEST_UPDATE_GIT_LOG"
+      [[ "''${GIT_TERMINAL_PROMPT-}" == 0 ]]
+      [[ "''${GIT_ASKPASS+x}" == x && -z "''${GIT_ASKPASS}" ]]
+      [[ "''${SSH_ASKPASS+x}" == x && -z "''${SSH_ASKPASS}" ]]
+      [[ "''${GCM_INTERACTIVE-}" == Never ]]
+      [[ "''${GIT_CONFIG_GLOBAL-}" == /dev/null ]]
+      [[ "''${GIT_CONFIG_NOSYSTEM-}" == 1 ]]
+      [[ "$*" == "-c credential.helper= -c core.askPass= ls-remote --refs --tags --exit-code https://github.com/giovantenne/nixorium.git refs/tags/v*" ]]
+      printf '%s\t%s\n' 4444444444444444444444444444444444444444 refs/tags/v2.3.0
+      printf '%s\t%s\n' 5555555555555555555555555555555555555555 refs/tags/v2.4.0-beta.1
+      printf '%s\t%s\n' 6666666666666666666666666666666666666666 refs/tags/version-two
+    '';
   in
   {
     imports = [
@@ -118,7 +137,7 @@
     };
 
     networking.hostName = "pc99";
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeUpdateNix ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeUpdateNix fakeUpdateGit ];
     users.groups.veyon-master = {};
     users.users.admin = {
       isNormalUser = true;
@@ -212,7 +231,7 @@
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
     controller.wait_until_fails("systemctl is-active --quiet nixorium-harmonia.service")
     controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'Failed to set up credentials'")
-    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'")
+    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'; nixorium --help | grep -F 'update check'")
     controller.succeed("mkdir -p /tmp/deployment")
     controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
     controller.succeed("cp /etc/nixorium-test/lab-settings.json /tmp/deployment/lab-settings.json")
@@ -239,7 +258,8 @@
     controller.succeed("git -C /tmp/commit-deployment show HEAD:review-note | grep -Fx 'reviewed local note'; git -C /tmp/commit-deployment show HEAD:lab-settings.json | grep -F '$6$commit$new-admin'; ! git -C /tmp/commit-deployment show HEAD:flake.nix | grep -qF 'unrelated-staged-change'; test \"$(git -C /tmp/commit-deployment diff --cached --name-only)\" = flake.nix; test -z \"$(git -C /tmp/commit-deployment status --porcelain=v1 -- lab-settings.json review-note)\"")
     controller.succeed("printf 'first\n' > /tmp/commit-deployment/stale-note; nixorium git commit plan --repo /tmp/commit-deployment --paths stale-note --json > /tmp/git-stale-plan.json; token=$(jq -r .reviewToken /tmp/git-stale-plan.json); printf 'second\n' > /tmp/commit-deployment/stale-note; before=$(git -C /tmp/commit-deployment rev-parse HEAD); nixorium git commit apply --repo /tmp/commit-deployment --paths stale-note --expect \"$token\" --yes --json > /tmp/git-stale.json || test $? = 1; test \"$before\" = \"$(git -C /tmp/commit-deployment rev-parse HEAD)\"; jq -e '.state == \"blocked\" and (.committed | not) and any(.issues[]; .field == \"review\")' /tmp/git-stale.json")
     controller.succeed("printf '{ token = \"plaintext-secret\"; }\n' > /tmp/commit-deployment/unsafe.nix; nixorium git commit plan --repo /tmp/commit-deployment --paths unsafe.nix --json > /tmp/git-unsafe-plan.json || test $? = 1; jq -e '.state == \"blocked\" and any(.issues[]; .field == \"proposal\" and (.message | contains(\"plaintext\")))' /tmp/git-unsafe-plan.json")
-    controller.succeed("cp -a /tmp/deployment /tmp/update-deployment; printf '{\n  inputs.nixorium.url = \"github:giovantenne/nixorium/v2.0.0\";\n  outputs = { self, nixorium }: {};\n}\n' > /tmp/update-deployment/flake.nix; printf '%s\n' '{\"root\":\"root\",\"nodes\":{\"root\":{\"inputs\":{\"nixorium\":\"nixorium\"}},\"nixorium\":{\"locked\":{\"rev\":\"1111111111111111111111111111111111111111\"}}}}' > /tmp/update-deployment/flake.lock; chown -R admin:users /tmp/update-deployment; su - admin -c 'git -C /tmp/update-deployment add flake.nix flake.lock && git -C /tmp/update-deployment -c user.name=Test -c user.email=test@example.invalid commit -qm update-fixture'; mkdir /tmp/fake-update-bin; ln -s /run/current-system/sw/bin/nixorium-test-update-nix /tmp/fake-update-bin/nix")
+    controller.succeed("cp -a /tmp/deployment /tmp/update-deployment; printf '{\n  inputs.nixorium.url = \"github:giovantenne/nixorium/v2.0.0\";\n  outputs = { self, nixorium }: {};\n}\n' > /tmp/update-deployment/flake.nix; printf '%s\n' '{\"root\":\"root\",\"nodes\":{\"root\":{\"inputs\":{\"nixorium\":\"nixorium\"}},\"nixorium\":{\"locked\":{\"rev\":\"1111111111111111111111111111111111111111\"}}}}' > /tmp/update-deployment/flake.lock; chown -R admin:users /tmp/update-deployment; su - admin -c 'git -C /tmp/update-deployment add flake.nix flake.lock && git -C /tmp/update-deployment -c user.name=Test -c user.email=test@example.invalid commit -qm update-fixture'; mkdir /tmp/fake-update-bin /tmp/fake-update-check-bin; ln -s /run/current-system/sw/bin/nixorium-test-update-nix /tmp/fake-update-bin/nix; ln -s /run/current-system/sw/bin/nixorium-test-update-git /tmp/fake-update-check-bin/git")
+    controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_GIT_LOG=/tmp/update-git.log PATH=/tmp/fake-update-check-bin:$PATH nixorium update check --repo /tmp/update-deployment --json' > /tmp/update-check.json; jq -e '.operation == \"update-check\" and .state == \"available\" and .upstream == \"github:giovantenne/nixorium\" and .currentRef == \"v2.0.0\" and .currentChannel == \"stable\" and (.stable | length) == 1 and .stable[0].tag == \"v2.3.0\" and (.prerelease | length) == 1 and .prerelease[0].tag == \"v2.4.0-beta.1\" and (.truncated | not)' /tmp/update-check.json; grep -F 'credential.helper=' /tmp/update-git.log; grep -F 'prompt=0 askpass= sshaskpass= interactive=Never global=/dev/null nosystem=1' /tmp/update-git.log")
     controller.succeed("rm -f /tmp/update-nix.log; su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.1.0-beta.1 --json' > /tmp/update-prerelease.json || test $? = 1; jq -e '.operation == \"update-plan\" and .state == \"blocked\" and any(.issues[]; .field == \"target\" and (.message | contains(\"--allow-prerelease\")))' /tmp/update-prerelease.json; test ! -e /tmp/update-nix.log")
     controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.1.0 --json' > /tmp/update-plan.json; jq -e '.operation == \"update-plan\" and .state == \"ready\" and .currentRef == \"v2.0.0\" and .target == \"v2.1.0\" and .targetChannel == \"stable\" and (.reviewToken | startswith(\"sha256:\")) and .confirmation == \"UPDATE NIXORIUM TO v2.1.0\" and (.checks | length) == 7 and all(.checks[]; .state == \"passed\") and (.diff.content | contains(\"flake.nix\")) and (.diff.content | contains(\"flake.lock\"))' /tmp/update-plan.json; test \"$(wc -l < /tmp/update-nix.log)\" = 8; test \"$(grep -c ' build ' /tmp/update-nix.log)\" = 5")
     controller.succeed("before=$(sha256sum /tmp/update-deployment/flake.nix /tmp/update-deployment/flake.lock); token=$(jq -r .reviewToken /tmp/update-plan.json); su - admin -c \"NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:\$PATH nixorium update apply --repo /tmp/update-deployment --target v2.1.0 --expect '$token' </dev/null >/tmp/update-noninteractive.out 2>/tmp/update-noninteractive.err\" || test $? = 2; after=$(sha256sum /tmp/update-deployment/flake.nix /tmp/update-deployment/flake.lock); test \"$before\" = \"$after\"; test ! -s /tmp/update-noninteractive.out; grep -F 'requires an interactive terminal or explicit --yes' /tmp/update-noninteractive.err")

@@ -100,6 +100,7 @@ nix run .#nixorium -- logs show OPERATION_LOG_ID
 nix run .#nixorium -- git review
 nix run .#nixorium -- git commit plan --paths lab-settings.json,keys/admin-ssh.pub
 nix run .#nixorium -- git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
+nix run .#nixorium -- update check
 nix run .#nixorium -- update plan --target v2.0.0
 nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 nix run .#nixorium -- setup
@@ -287,9 +288,16 @@ verified store path is installed without client-side fallback or fetching.
 Use the guided workflow from this private deployment repository:
 
 ```sh
+nix run .#nixorium -- update check
 nix run .#nixorium -- update plan --target v2.0.0
 nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 ```
+
+`update check` is the only command that enumerates the configured public
+upstream. It disables Git credential prompting and helpers, stops after 15
+seconds, bounds remote output, and lists at most the newest 20 stable and 20
+prerelease tags separately. It does not change the repository. Skip it and use
+an explicit target when the controller is offline.
 
 Planning keeps the configured upstream identity, accepts only a SemVer release,
 generates the candidate lock outside the checkout, evaluates readiness, and
