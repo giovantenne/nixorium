@@ -16,6 +16,7 @@
         pkgs.nix
         pkgs.shadow
         pkgs.systemd
+        pkgs.util-linux
         fakeColmena
         nixoriumPackage
       ];
@@ -283,6 +284,9 @@
     controller.succeed("jq -e '.state == \"completed\" and .buildCompleted and .applyCompleted' /tmp/deploy-retry.json; test \"$(wc -l </tmp/colmena-retry)\" = 2")
     controller.succeed("su - admin -c 'NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-stale PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on pc01 --expect 0000000000000000000000000000000000000000 --yes --json >/tmp/deploy-stale.json' || test $? = 1")
     controller.succeed("jq -e '.state == \"blocked\" and .phase == \"preflight\" and any(.issues[]; .field == \"review\")' /tmp/deploy-stale.json; test ! -e /tmp/colmena-stale")
+    controller.succeed("su - admin -c \"(sleep 8; printf d; sleep 1; printf a; sleep 0.2; printf '\\r'; sleep 3; printf 'DEPLOY @lab\\r'; sleep 12; printf q; sleep 2; printf q) | NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-tui PATH=/tmp/fake-colmena-bin:\$PATH TERM=xterm timeout 45s script -qefc 'nixorium --repo /home/admin/nixorium-deployment' /tmp/nixorium-deploy-tui.log\"")
+    controller.succeed("grep -aF 'Deploy updates' /tmp/nixorium-deploy-tui.log; grep -aF 'Deployment review' /tmp/nixorium-deploy-tui.log; grep -aF 'Last result: completed at phase complete' /tmp/nixorium-deploy-tui.log")
+    controller.succeed("test \"$(head -n 1 /tmp/colmena-tui)\" = 'build --on @lab --verbose --color never'; test \"$(tail -n 1 /tmp/colmena-tui)\" = 'apply switch --on @lab --verbose --color never'; test \"$(wc -l </tmp/colmena-tui)\" = 2")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"action-required\" and .currentStage == \"offer-client-installation\"'")
     controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"PXE-PREPARATION\" and .level == \"OK\") and any(.findings[]; .id == \"PXE-LIFECYCLE\" and .level == \"OK\") and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\") and any(.findings[]; .id == \"DISK-FREE\" and .level == \"WARNING\")'")
     controller.succeed("systemctl start nixorium-pxe-network.service; test -e /var/lib/nixorium/pxe/session.json")

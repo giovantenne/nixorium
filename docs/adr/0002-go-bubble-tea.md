@@ -34,3 +34,11 @@ host-report callback only when the administrator opens or refreshes the screen.
 The application preserves inventory semantics, while the adapter bounds and
 classifies network probes. CLI text, JSON, TUI, and doctor do not parse or
 reimplement one another's output.
+
+The deployment screen also receives only typed plan/apply callbacks. Bubble Tea
+owns ordered target selection, review rendering, exact confirmation input,
+activity state, and the final report view. The composition root and adapters
+retain revision/readiness checks, operation locking, private logging, and fixed
+Colmena execution. Because Colmena is a foreground child rather than a
+systemd-owned service, the TUI refuses an accidental quit until it receives the
+operation's final typed result.

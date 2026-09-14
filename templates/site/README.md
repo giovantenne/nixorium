@@ -126,6 +126,10 @@ mode-0600 log under `~/.local/state/nixorium/operations/`. A failed apply may
 leave mixed target state; inspect the reported log and hosts, make a fresh
 plan, and retry safely. Use `--yes` only for intentional automation; the
 reviewed revision remains mandatory.
+The dashboard's **Deploy updates** screen uses the same typed plan/apply
+operations: select computers, review the revision and canonical targets, then
+type the exact phrase shown. It reports activity and the final durable log;
+closing is disabled while its Colmena process is running.
 Bare `setup` (or `setup configure`) opens the first-run terminal wizard. It
 proposes detected network values, supports backward navigation, collects
 passwords without echo, validates the complete candidate through Nix, shows a

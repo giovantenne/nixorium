@@ -382,6 +382,11 @@ repeats readiness, clean-Git, revision, and target checks, requires the exact
 confirmation; `--json` keeps the final report on stdout and progress on stderr.
 An apply failure reports that target state may be mixed; review the log and
 current host state, make a fresh plan, and retry the convergent workflow.
+The dashboard's **Deploy updates** screen exposes the same workflow without
+copying a revision: select one or more computers (or all), review the resolved
+plan, and type the exact `DEPLOY <targets>` phrase. It shows operation activity
+and the final phase, build/apply state, remediation, and durable log path.
+Closing the dashboard is disabled while its Colmena child is running.
 From the dashboard, **Install computers over network**
 uses the same typed application operations as the CLI to prepare artifacts and
 to review, start, stop, or recover PXE mode. Starting requires the exact

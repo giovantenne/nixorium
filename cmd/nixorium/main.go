@@ -71,12 +71,19 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			return 0
 		}
 		lifecycle := app.NewPXELifecycle(local)
+		deploymentManager := app.NewDeploymentManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
 			},
 			LoadHosts: func() (domain.HostsReport, error) {
 				return inspector.Hosts(ctx, repository)
+			},
+			PlanDeployment: func(requested string) domain.DeploymentPlanReport {
+				return deploymentManager.Plan(ctx, repository, requested)
+			},
+			ApplyDeployment: func(plan domain.DeploymentPlanReport) domain.DeploymentExecutionReport {
+				return executeDeploymentOperation(ctx, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard)
 			},
 			PreparePXE: func() domain.ActionReport {
 				return app.NewSystemActions(local).PreparePXE(ctx)
@@ -552,14 +559,45 @@ func runDeploymentApply(ctx context.Context, repository string, stdout, stderr i
 		}
 	}
 
-	operation, err := adapters.OpenDeploymentOperation()
-	if err != nil {
-		fmt.Fprintln(stderr, "Error: prepare deployment operation:", err)
-		return 1
-	}
 	stream := stdout
 	if jsonOutput {
 		stream = stderr
+	}
+	report := executeDeploymentOperation(ctx, manager, repository, requested, expectedRevision, stream)
+	var renderErr error
+	if jsonOutput {
+		renderErr = presentation.JSON(stdout, report)
+	} else {
+		presentation.DeploymentExecutionText(stdout, report)
+	}
+	if renderErr != nil {
+		fmt.Fprintln(stderr, "Error:", renderErr)
+		return 1
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
+}
+
+func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer) domain.DeploymentExecutionReport {
+	operation, err := adapters.OpenDeploymentOperation()
+	if err != nil {
+		plan := manager.Plan(ctx, repository, requested)
+		return domain.DeploymentExecutionReport{
+			SchemaVersion:   domain.SchemaVersion,
+			Operation:       "deploy-apply",
+			State:           "failed",
+			Repository:      plan.Repository,
+			Requested:       plan.Requested,
+			Revision:        plan.Revision,
+			ColmenaSelector: plan.ColmenaSelector,
+			Targets:         plan.Targets,
+			Phase:           domain.DeploymentPhasePreflight,
+			RetrySafe:       true,
+			Message:         "prepare deployment operation: " + err.Error(),
+			Issues:          plan.Issues,
+		}
 	}
 	progress := io.MultiWriter(stream, operation.Writer())
 	report := manager.Execute(ctx, repository, requested, expectedRevision, operation.Path, progress)
@@ -568,19 +606,7 @@ func runDeploymentApply(ctx context.Context, repository string, stdout, stderr i
 		report.State = "failed"
 		report.Message = fmt.Sprintf("%s; finalize durable log: %v", report.Message, closeErr)
 	}
-	if jsonOutput {
-		err = presentation.JSON(stdout, report)
-	} else {
-		presentation.DeploymentExecutionText(stdout, report)
-	}
-	if err != nil {
-		fmt.Fprintln(stderr, "Error:", err)
-		return 1
-	}
-	if report.HasErrors() {
-		return 1
-	}
-	return 0
+	return report
 }
 
 func runPXEStart(ctx context.Context, repository string, stdout, stderr io.Writer, assumeYes, jsonOutput bool) int {
