@@ -96,6 +96,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   isolated/offline topology, evidence records, destructive-disk warnings,
   firmware/NIC/storage coverage, PXE power-loss and DHCP coexistence recovery,
   single/multi-client deployment, and explicit pass/fail matrices.
+- Immediate stderr-safe PXE preparation activity and fixed journald follow
+  guidance in CLI/JSON and TUI views, keeping machine stdout clean and verbose
+  systemd-owned build output out of the presentation layer.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments

@@ -412,6 +412,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	case "pxe":
 		switch options.subcommand {
 		case "prepare":
+			writePXEPreparationActivity(stderr)
 			report := app.NewSystemActions(adapters.Local{}).PreparePXE(ctx)
 			report.Message = operationRecordMessage(report.Message, report)
 			if options.json {
@@ -452,6 +453,10 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		return 1
 	}
 	return 0
+}
+
+func writePXEPreparationActivity(writer io.Writer) {
+	fmt.Fprintln(writer, "Preparing PXE artifacts and client closures; detailed progress: journalctl -fu nixorium-prepare-pxe.service")
 }
 
 func commandRequiresRepository(options options) bool {

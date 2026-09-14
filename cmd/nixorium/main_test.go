@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,16 @@ import (
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
+
+func TestPXEPreparationActivityUsesStderrSafeGuidance(t *testing.T) {
+	var output bytes.Buffer
+	writePXEPreparationActivity(&output)
+	for _, expected := range []string{"Preparing PXE artifacts and client closures", "journalctl -fu nixorium-prepare-pxe.service"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("PXE preparation activity omits %q: %s", expected, output.String())
+		}
+	}
+}
 
 func TestOperationRecordMessagePersistsTypedOutcomeAndSurfacesFailure(t *testing.T) {
 	stateRoot := t.TempDir()

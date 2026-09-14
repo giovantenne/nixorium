@@ -539,6 +539,12 @@ and netboot artifacts, obtains the locked iPXE binary, and verifies cache
 reachability. Content-addressed build results are recorded by store path and
 configuration revision, not merely by the existence of `result-*` symlinks.
 
+Because preparation can take several minutes, CLI text and JSON modes emit an
+immediate activity line on stderr with the fixed journal follow command. The
+TUI shows the same activity and detailed-log path while the systemd-owned job
+runs. Final reports remain typed and bounded; verbose build output stays in
+journald and the job is not moved into presentation.
+
 Starting creates a root-owned session record under `/var/lib/nixorium/pxe/`
 containing a schema version, original observed addresses, desired transition,
 artifact store paths, and timestamps. The network unit then reconciles the
