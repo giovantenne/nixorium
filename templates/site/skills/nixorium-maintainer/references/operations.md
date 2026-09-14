@@ -194,8 +194,20 @@ preflight failures.
 
 ## Updating the upstream input
 
-Create a temporary upgrade branch, change `inputs.nixorium.url` to the chosen
-released tag, and update only that input:
+Use the reviewed workflow for a generated deployment:
+
+```sh
+nixorium update plan --target v2.0.0
+nixorium update apply --target v2.0.0 --expect REVIEW_TOKEN
+```
+
+It preserves upstream identity, validates a candidate lock outside the checkout,
+builds representative outputs, and writes only `flake.nix`/`flake.lock` after
+exact confirmation. Prerelease and downgrade targets require their explicit
+policy flags. It never commits, pushes, activates, starts PXE, or deploys.
+
+For an unsupported computed input, create a temporary upgrade branch, change
+`inputs.nixorium.url` to the chosen released tag, and update only that input:
 
 ```sh
 nix flake update nixorium

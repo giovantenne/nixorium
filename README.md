@@ -357,6 +357,8 @@ nix run .#nixorium -- logs show OPERATION_LOG_ID
 nix run .#nixorium -- git review
 nix run .#nixorium -- git commit plan --paths lab-settings.json,keys/admin-ssh.pub
 nix run .#nixorium -- git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
+nix run .#nixorium -- update plan --target v2.0.0
+nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -510,9 +512,26 @@ diagnostics and later deployment workflows do not need an ad-hoc online
 
 ### Update a lab deployment
 
-Lab administrators update the pinned input in their private repository; they do
-not merge this upstream into their configuration. Run the following commands
-from the private deployment repository.
+Use the guided local workflow from the private deployment repository:
+
+```sh
+nix run .#nixorium -- update plan --target v2.0.0
+nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
+```
+
+The plan preserves the configured upstream repository, accepts only a SemVer
+release tag, creates the candidate lock outside the checkout, evaluates
+readiness, and builds one client, the controller, netboot ramdisk, PXE firmware,
+and installer bundle without result links. Prereleases require
+`--allow-prerelease`; known downgrades require `--allow-downgrade`. Apply repeats
+the plan, requires its exact confirmation, and changes only `flake.nix` and
+`flake.lock`. Review and optionally commit those files separately; no branch,
+commit, push, activation, PXE action, or client deployment is implicit.
+
+The following is the advanced manual fallback for a computed or otherwise
+unsupported input declaration. Lab administrators update the pinned input in
+their private repository; they do not merge upstream source into their private
+configuration.
 
 In this example the new upstream release is `v2.0.0-beta.4`. Replace it with
 the tag you actually want to install. The upgrade branch keeps `master`
