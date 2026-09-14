@@ -36,8 +36,8 @@ reconciliation through both CLI and the first task-oriented TUI screen. Local
 guided client enrollment now consumes immutable inventory and enforces reviewed
 disk installation. Revision-bound client deployment now has CLI and TUI
 plan/apply workflows with mandatory build-first ordering, streamed/private
-logs, and explicit retry state; updates and richer recovery remain incremental
-work tracked externally.
+logs, explicit retry state, and bounded typed log browsing. Updates and richer
+recovery remain incremental work tracked externally.
 
 Important constraints in the current implementation are:
 
@@ -54,8 +54,8 @@ Important constraints in the current implementation are:
   inventory, revalidates and exactly confirms the target disk, and reports
   progress/result; duplicate probing is intentionally best-effort and does not
   coordinate simultaneous installers;
-- the controller bootstrap installs an evaluable placeholder deployment, but
-  there is no first-run application after reboot;
+- the controller bootstrap installs an evaluable placeholder deployment and
+  the resumable first-run application reconciles configuration after reboot;
 - the firewall admits product ports only on the configured laboratory
   interface, with controller-only rules for Harmonia and PXE;
 
@@ -141,6 +141,7 @@ nixorium deploy             build and deploy selected machines
 nixorium controller         review, rebuild, activate, and verify the controller
 nixorium pxe                prepare, start, inspect, stop, or recover PXE mode
 nixorium services           inspect services; restart only the signed cache
+nixorium logs               list or inspect bounded private operation logs
 nixorium update             prepare a reviewable upstream release update
 ```
 
@@ -194,6 +195,16 @@ an apply failure remains failed while still preserving independently verified
 hosts. Retrying is convergent: it requires a fresh valid review and rebuilds
 before applying again. Direct Colmena remains an advanced compatibility
 surface.
+
+`logs` lists at most the newest 50 recognized deployment logs in the current
+administrator's XDG state; it does not require a deployment checkout. `logs
+show <id>` accepts only the generated basename grammar and returns at most the
+final 64 KiB. The adapter opens directories/files without following symlinks,
+requires the current UID, exact 0700 directories and 0600 regular files, and
+neutralizes terminal control/format characters. Unsafe recognized entries are
+reported as unavailable rather than read. CLI text/JSON and the scrollable TUI
+detail use the same typed list/show reports. This is a read-only recovery
+surface, not a database or a substitute for live host reconciliation.
 
 `doctor` returns ordered findings with `OK`, `WARNING`, or `ERROR`, a stable
 finding identifier, evidence safe to display, and a remediation. Expensive
@@ -249,6 +260,10 @@ The services screen likewise receives typed component status and one cache
 restart callback. It renders the persistent cache and composite on-demand PXE
 lifecycle, requires exact `RESTART CACHE` confirmation, and cannot issue raw
 systemd actions. PXE remains linked to its dedicated transactional workflow.
+The operation-log screen receives typed bounded list/detail callbacks. Bubble
+Tea owns selection and viewport scrolling only; basename validation, no-follow
+filesystem access, ownership/mode enforcement, byte limits, and terminal-text
+sanitization stay in the adapter/application layers.
 
 ## Configuration ownership and editing
 
@@ -296,12 +311,10 @@ candidate-review workflow can apply the resulting hash without an unreviewed
 configuration write.
 
 Existing deployments that import `lab-config.nix` continue to work unchanged.
-The management application treats arbitrary Nix configuration as read-only and
-offers an explicit migration that evaluates current `labMeta` plus the typed
-configuration export, writes `lab-settings.json`, and shows the required small
-Flake diff. It never rewrites arbitrary Nix. Migration is accepted only after
-old and new `labMeta`, `deploymentStatus`, and representative derivations are
-equivalent.
+The management application treats arbitrary Nix configuration as read-only.
+No legacy migration workflow is in product scope because managed deployments
+are new; setup optimizes for `lab-settings.json` while preserving upstream
+standalone compatibility.
 
 ## First-run state machine
 
@@ -563,18 +576,22 @@ edits, shows the diff, and can discard only its own staged draft before
 acceptance. A commit is optional and requires explicit confirmation; push is
 never implicit and no remote is required.
 
-System operations log structured key/value events to journald with an operation
-identifier. A small root-owned state directory contains only active/recovery
-state that journald cannot provide. It is not an alternative configuration
-database. Logs redact credential input, private paths where useful, key
-contents, environment secrets, and command output known to contain secrets.
+Privileged/systemd operations retain detailed output in journald. Foreground
+deployments stream output to private mode-0600 files under the administrator's
+XDG state, alongside a separate mode-0600 authenticated per-host success
+history. Bounded typed list/detail operations make deployment logs available to
+CLI/JSON and the TUI without a database or arbitrary path reads. A small
+root-owned state directory contains only active/recovery state that journald
+cannot provide; it is not an alternative configuration database. Logs must
+never include credential input, key contents, environment secrets, or command
+output known to contain secrets.
 
 ## Testing strategy
 
 Testing is layered:
 
 - unit tests cover validation, command plans, status aggregation, state
-  transitions, migration, redaction, host selection, and cleanup decisions;
+  transitions, redaction, host selection, bounded log reads, and cleanup decisions;
 - adapter tests use temporary Git repositories and fake executables with
   recorded argument arrays and controlled output;
 - Nix evaluation tests cover package/module exports, strict configuration,
@@ -598,7 +615,7 @@ Evaluation alone is not evidence that affected packages or host roles build.
 
 1. Package the Go command with typed read-only `status` and `doctor`, JSON
    output, adapters, tests, and legacy deployment compatibility.
-2. Add structured settings, migration, setup state reconciliation, secure
+2. Add structured settings, setup state reconciliation, secure
    credential hashing and idempotent key handling.
 3. Add controller services, PXE preparation, transactional networking, and
    recovery tests.

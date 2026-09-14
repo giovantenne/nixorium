@@ -61,6 +61,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   persistent signed cache and composite on-demand PXE lifecycle, plus an exact
   confirmed cache restart through a fixed capability-free systemd/polkit action
   with post-restart unit and HTTP verification.
+- Typed `nixorium logs` list/detail CLI/JSON and dashboard browsing for private
+  deployment logs, with basename-only selection, strict owner/mode/type and
+  no-follow validation, 50-record/64-KiB bounds, terminal-control sanitization,
+  and scrollable tail rendering.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments

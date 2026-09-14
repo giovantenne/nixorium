@@ -23,6 +23,7 @@ type options struct {
 	expect     string
 	on         string
 	service    string
+	logID      string
 	json       bool
 	full       bool
 	help       bool
@@ -75,6 +76,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		deploymentManager := app.NewDeploymentManager(local)
 		controllerManager := app.NewControllerManager(local)
 		serviceManager := app.NewServiceManager(local)
+		operationLogManager := app.NewOperationLogManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -99,6 +101,12 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			},
 			RestartService: func(service string) domain.ServiceActionReport {
 				return serviceManager.Restart(ctx, repository, service)
+			},
+			LoadLogs: func() domain.OperationLogsReport {
+				return operationLogManager.List()
+			},
+			LoadLog: func(id string) domain.OperationLogReport {
+				return operationLogManager.Show(id)
 			},
 			PreparePXE: func() domain.ActionReport {
 				return app.NewSystemActions(local).PreparePXE(ctx)
@@ -184,6 +192,29 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		}
 		if report.HasErrors() {
 			return 1
+		}
+	case "logs":
+		manager := app.NewOperationLogManager(local)
+		if options.subcommand == "show" {
+			report := manager.Show(options.logID)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.OperationLogText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		} else {
+			report := manager.List()
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.OperationLogsText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -331,7 +362,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 }
 
 func commandRequiresRepository(options options) bool {
-	return options.command != "pxe" || (options.subcommand != "stop" && options.subcommand != "recover")
+	return options.command != "logs" && (options.command != "pxe" || (options.subcommand != "stop" && options.subcommand != "recover"))
 }
 
 func parseArguments(arguments []string) (options, error) {
@@ -381,7 +412,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "config", "setup", "pxe":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "config", "setup", "pxe":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -425,6 +456,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("restart must follow services")
 			}
 			result.subcommand = "restart"
+		case "show":
+			if result.command != "logs" || result.subcommand != "" {
+				return options{}, errors.New("show must follow logs")
+			}
+			result.subcommand = "show"
 		case "cache":
 			if result.command != "services" || result.subcommand != "restart" || result.service != "" {
 				return options{}, fmt.Errorf("unexpected argument %q", arguments[index])
@@ -441,6 +477,10 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = arguments[index]
 		default:
+			if result.command == "logs" && result.subcommand == "show" && result.logID == "" {
+				result.logID = arguments[index]
+				continue
+			}
 			return options{}, fmt.Errorf("unknown argument %q", arguments[index])
 		}
 	}
@@ -479,6 +519,12 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "services" && result.subcommand == "restart" && result.service == "" {
 		return options{}, errors.New("services restart requires cache")
+	}
+	if result.command == "logs" && result.subcommand != "" && result.subcommand != "show" {
+		return options{}, errors.New("logs accepts only the show subcommand")
+	}
+	if result.command == "logs" && result.subcommand == "show" && result.logID == "" {
+		return options{}, errors.New("logs show requires an operation log ID")
 	}
 	if result.command == "deploy" && result.on == "" {
 		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
@@ -569,12 +615,13 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")
 	fmt.Fprintln(writer, "       controller apply --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       services restart cache [--yes]")
+	fmt.Fprintln(writer, "       logs show <operation-log-id>")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")

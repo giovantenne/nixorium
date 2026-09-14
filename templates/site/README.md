@@ -95,6 +95,8 @@ nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 nix run .#nixorium -- services
 nix run .#nixorium -- services restart cache
+nix run .#nixorium -- logs
+nix run .#nixorium -- logs show OPERATION_LOG_ID
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -146,6 +148,13 @@ operations: select computers, review the revision and canonical targets, then
 type the exact phrase shown. It reports activity, authenticated/recorded target
 counts, and the final durable log; closing is disabled while its Colmena
 process is running.
+Use `logs` to list the newest 50 recognized deployment operation logs from the
+administrator's private XDG state, even outside a deployment checkout. Use
+`logs show <id>` to read at most the final 64 KiB of one listed log. Nixorium
+accepts only generated basename IDs, requires user ownership plus mode 0700
+directories and 0600 regular files, refuses symlinks, and neutralizes terminal
+control characters before rendering. The dashboard's **View operation logs**
+task uses the same typed list/detail operations and provides bounded scrolling.
 Use `controller plan` and revision-bound `controller apply --expect` for routine
 controller changes. Apply requires exact `REBUILD <controller>` confirmation,
 starts only the matching systemd unit instance, builds the pinned Git revision

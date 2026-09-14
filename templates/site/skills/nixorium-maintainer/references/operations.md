@@ -89,6 +89,21 @@ The host report also shows the last successful post-apply verification stored
 locally. Treat it as history only: current/outdated/unknown always comes from
 the live authenticated observation.
 
+Browse the private deployment operation logs without copying paths manually:
+
+```sh
+nixorium logs
+nixorium logs show OPERATION_LOG_ID
+```
+
+`logs` returns at most the newest 50 recognized deployment entries and works
+outside the deployment checkout. `logs show` accepts only an ID emitted by the
+list and displays at most the final 64 KiB. Nixorium refuses symlinks, foreign
+owners, non-0700 state directories, and non-0600 files, and neutralizes terminal
+control characters before text/TUI rendering. An unsafe entry is reported as
+unavailable; do not loosen its permissions merely to make the browser accept
+it. The TUI's **View operation logs** task uses the same bounded operations.
+
 ## Binary cache
 
 After `nixorium setup apply`, the controller owns Harmonia through systemd; do

@@ -17,6 +17,8 @@ type DashboardActions struct {
 	ApplyController func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
 	LoadServices    func() domain.ServicesReport
 	RestartService  func(string) domain.ServiceActionReport
+	LoadLogs        func() domain.OperationLogsReport
+	LoadLog         func(string) domain.OperationLogReport
 	PreparePXE      func() domain.ActionReport
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
@@ -35,6 +37,8 @@ const (
 	dashboardControllerReview
 	dashboardServices
 	dashboardServicesRestartReview
+	dashboardLogs
+	dashboardLogDetail
 	dashboardPXE
 	dashboardPXEStartReview
 )
@@ -57,6 +61,11 @@ type dashboardModel struct {
 	controllerResult domain.ControllerRebuildExecutionReport
 	services         domain.ServicesReport
 	serviceResult    domain.ServiceActionReport
+	logs             domain.OperationLogsReport
+	logDetail        domain.OperationLogReport
+	logCursor        int
+	logScroll        int
+	height           int
 }
 
 type dashboardPlanMsg struct {
@@ -97,6 +106,14 @@ type dashboardServicesMsg struct {
 
 type dashboardServiceResultMsg struct {
 	report domain.ServiceActionReport
+}
+
+type dashboardLogsMsg struct {
+	report domain.OperationLogsReport
+}
+
+type dashboardLogMsg struct {
+	report domain.OperationLogReport
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -194,6 +211,28 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardServices
 		return model, nil
+	case dashboardLogsMsg:
+		model.busy = ""
+		model.logs = message.report
+		if model.logCursor >= len(message.report.Logs) {
+			model.logCursor = 0
+		}
+		model.message = operationLogIssues(message.report.Issues)
+		model.screen = dashboardLogs
+		return model, nil
+	case dashboardLogMsg:
+		model.busy = ""
+		model.logDetail = message.report
+		model.logScroll = maximumLogScroll(message.report, model.logDetailHeight())
+		model.message = operationLogIssues(message.report.Issues)
+		model.screen = dashboardLogDetail
+		return model, nil
+	case tea.WindowSizeMsg:
+		model.height = message.Height
+		if model.screen == dashboardLogDetail && model.logScroll > maximumLogScroll(model.logDetail, model.logDetailHeight()) {
+			model.logScroll = maximumLogScroll(model.logDetail, model.logDetailHeight())
+		}
+		return model, nil
 	}
 
 	key, ok := message.(tea.KeyMsg)
@@ -237,6 +276,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 			return model, func() tea.Msg {
 				return dashboardServicesMsg{report: model.actions.LoadServices()}
+			}
+		case "l":
+			model.screen = dashboardLogs
+			model.busy = "Loading private operation logs"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardLogsMsg{report: model.actions.LoadLogs()}
 			}
 		case "p", "enter":
 			model.screen = dashboardPXE
@@ -413,6 +459,66 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				model.confirmation += string(key.Runes)
 			}
 		}
+	case dashboardLogs:
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "up", "k":
+			if model.logCursor > 0 {
+				model.logCursor--
+			}
+		case "down", "j":
+			if model.logCursor+1 < len(model.logs.Logs) {
+				model.logCursor++
+			}
+		case "f":
+			model.busy = "Refreshing private operation logs"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardLogsMsg{report: model.actions.LoadLogs()}
+			}
+		case "enter":
+			if len(model.logs.Logs) == 0 || !model.logs.Logs[model.logCursor].Available {
+				model.message = "The selected operation log is not available for safe reading."
+				return model, nil
+			}
+			id := model.logs.Logs[model.logCursor].ID
+			model.busy = "Reading the bounded operation log tail"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardLogMsg{report: model.actions.LoadLog(id)}
+			}
+		}
+	case dashboardLogDetail:
+		maximum := maximumLogScroll(model.logDetail, model.logDetailHeight())
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardLogs
+			model.message = ""
+		case "up", "k":
+			if model.logScroll > 0 {
+				model.logScroll--
+			}
+		case "down", "j":
+			if model.logScroll < maximum {
+				model.logScroll++
+			}
+		case "pgup":
+			model.logScroll -= model.logDetailHeight()
+			if model.logScroll < 0 {
+				model.logScroll = 0
+			}
+		case "pgdown":
+			model.logScroll += model.logDetailHeight()
+			if model.logScroll > maximum {
+				model.logScroll = maximum
+			}
+		case "home":
+			model.logScroll = 0
+		case "end":
+			model.logScroll = maximum
+		}
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
@@ -503,6 +609,10 @@ func (model dashboardModel) View() string {
 		return model.controllerView()
 	case dashboardServices, dashboardServicesRestartReview:
 		return model.servicesView()
+	case dashboardLogs:
+		return model.logsView()
+	case dashboardLogDetail:
+		return model.logDetailView()
 	case dashboardPXE, dashboardPXEStartReview:
 		return model.pxeView()
 	default:
@@ -531,6 +641,7 @@ func (model dashboardModel) homeView() string {
 		"  d           Deploy updates",
 		"  c           Rebuild controller",
 		"  s           Manage services",
+		"  l           View operation logs",
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
@@ -622,6 +733,110 @@ func (model dashboardModel) servicesView() string {
 		lines = append(lines, "", "Result: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) logsView() string {
+	lines := []string{"Nixorium — Operation logs", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	if len(model.logs.Logs) == 0 {
+		lines = append(lines, "No deployment operation logs are available.")
+	}
+	for index, entry := range model.logs.Logs {
+		cursor := " "
+		if index == model.logCursor {
+			cursor = ">"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s  %-10s %-11s %d bytes", cursor, entry.StartedAt.UTC().Format("2006-01-02 15:04Z"), entry.Kind, entry.State, entry.SizeBytes))
+		lines = append(lines, "    "+entry.ID)
+	}
+	lines = append(lines, "", "Up/Down: select   Enter: view tail   f: refresh   Esc: back   q: quit")
+	if model.message != "" {
+		lines = append(lines, "", "Warning: "+model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) logDetailView() string {
+	lines := []string{"Nixorium — Operation log detail", ""}
+	if model.busy != "" {
+		lines = append(lines, model.busy+"…")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	if model.logDetail.Log == nil {
+		lines = append(lines, "The selected operation log could not be read safely.")
+		if model.message != "" {
+			lines = append(lines, "", model.message)
+		}
+		lines = append(lines, "", "Esc: back   q: quit")
+		return strings.Join(lines, "\n") + "\n"
+	}
+	entry := model.logDetail.Log
+	contentLines := operationLogContentLines(model.logDetail.Content)
+	end := model.logScroll + model.logDetailHeight()
+	if end > len(contentLines) {
+		end = len(contentLines)
+	}
+	lines = append(lines,
+		fmt.Sprintf("%s — %s", entry.StartedAt.UTC().Format("2006-01-02 15:04:05Z"), entry.State),
+		entry.ID,
+		fmt.Sprintf("Showing lines %d-%d of %d%s", displayedLineStart(model.logScroll, len(contentLines)), end, len(contentLines), truncatedLogLabel(model.logDetail.Truncated)),
+		"",
+	)
+	lines = append(lines, contentLines[model.logScroll:end]...)
+	lines = append(lines, "", "Up/Down/PgUp/PgDn/Home/End: scroll   Esc: back   q: quit")
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) logDetailHeight() int {
+	if model.height <= 0 {
+		return 12
+	}
+	height := model.height - 9
+	if height < 4 {
+		return 4
+	}
+	return height
+}
+
+func maximumLogScroll(report domain.OperationLogReport, height int) int {
+	maximum := len(operationLogContentLines(report.Content)) - height
+	if maximum < 0 {
+		return 0
+	}
+	return maximum
+}
+
+func operationLogContentLines(content string) []string {
+	content = strings.TrimSuffix(content, "\n")
+	if content == "" {
+		return []string{"(empty log)"}
+	}
+	return strings.Split(content, "\n")
+}
+
+func operationLogIssues(issues []domain.ValidationIssue) string {
+	parts := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		parts = append(parts, issue.Field+": "+issue.Message)
+	}
+	return strings.Join(parts, "; ")
+}
+
+func displayedLineStart(offset, total int) int {
+	if total == 0 {
+		return 0
+	}
+	return offset + 1
+}
+
+func truncatedLogLabel(truncated bool) string {
+	if truncated {
+		return " (bounded tail; earlier bytes omitted)"
+	}
+	return ""
 }
 
 func controllerPlanIssues(report domain.ControllerRebuildPlanReport) string {

@@ -60,3 +60,9 @@ Service management follows the same typed callback rule. Bubble Tea displays
 the cache and composite PXE state, collects exact cache-restart confirmation,
 and renders the verified action report. It cannot select an arbitrary unit or
 verb, and it directs PXE mutations to the dedicated lifecycle operation.
+
+Operation-log browsing also enters presentation only as typed bounded list and
+detail reports. Bubble Tea owns selection and viewport scrolling. The adapter
+owns generated-ID validation, no-follow file access, current-user ownership and
+strict-mode checks, newest-record and byte limits, and terminal-control
+sanitization; neither CLI nor TUI accepts an arbitrary path.

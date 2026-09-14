@@ -78,6 +78,47 @@ func ServiceActionText(writer io.Writer, report domain.ServiceActionReport) {
 	}
 }
 
+func OperationLogsText(writer io.Writer, report domain.OperationLogsReport) {
+	fmt.Fprintf(writer, "Nixorium operation logs: %s\n", strings.ToUpper(report.State))
+	if len(report.Logs) == 0 {
+		fmt.Fprintln(writer, "No deployment operation logs are available.")
+	}
+	for _, entry := range report.Logs {
+		fmt.Fprintf(writer, "  %s  %-10s %-11s %d bytes\n", entry.StartedAt.UTC().Format("2006-01-02 15:04:05Z"), entry.Kind, entry.State, entry.SizeBytes)
+		fmt.Fprintf(writer, "    %s\n", entry.ID)
+		if entry.Detail != "" {
+			fmt.Fprintf(writer, "    unavailable: %s\n", entry.Detail)
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "WARNING: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func OperationLogText(writer io.Writer, report domain.OperationLogReport) {
+	if report.Log == nil {
+		fmt.Fprintf(writer, "Operation log: %s\n", strings.ToUpper(report.State))
+	} else {
+		fmt.Fprintf(writer, "Operation log: %s\n", report.Log.ID)
+		fmt.Fprintf(writer, "Started:       %s\n", report.Log.StartedAt.UTC().Format(time.RFC3339Nano))
+		fmt.Fprintf(writer, "Kind:          %s\n", report.Log.Kind)
+		fmt.Fprintf(writer, "Result:        %s\n", report.Log.State)
+		fmt.Fprintf(writer, "Size:          %d bytes\n", report.Log.SizeBytes)
+		if report.Truncated {
+			fmt.Fprintln(writer, "Content:       tail only (earlier output was truncated)")
+		} else {
+			fmt.Fprintln(writer, "Content:")
+		}
+		fmt.Fprint(writer, report.Content)
+		if report.Content != "" && !strings.HasSuffix(report.Content, "\n") {
+			fmt.Fprintln(writer)
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
 func HostsText(writer io.Writer, report domain.HostsReport) {
 	available, total := hostAvailability(report.Hosts)
 	fmt.Fprintf(writer, "Nixorium computers: %s\n", strings.ToUpper(report.State))
