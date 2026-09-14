@@ -44,6 +44,43 @@ require_uefi() {
   fi
 }
 
+valid_ipv4() {
+  local ADDRESS="$1"
+  local OCTET
+  local -a OCTETS
+  [[ "$ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+  IFS=. read -r -a OCTETS <<< "$ADDRESS"
+  for OCTET in "${OCTETS[@]}"; do
+    ((10#$OCTET <= 255)) || return 1
+  done
+}
+
+apply_runtime_controller_address() {
+  local CMDLINE_FILE="${1:-/proc/cmdline}"
+  local TOKEN CANDIDATE=""
+  [[ -r "$CMDLINE_FILE" ]] || return 0
+  while IFS= read -r TOKEN; do
+    case "$TOKEN" in
+      nixorium.controller-dhcp-ip=*)
+        TOKEN="${TOKEN#nixorium.controller-dhcp-ip=}"
+        valid_ipv4 "$TOKEN" || {
+          echo "Error: PXE boot supplied an invalid controller address." >&2
+          return 1
+        }
+        if [[ -n "$CANDIDATE" && "$CANDIDATE" != "$TOKEN" ]]; then
+          echo "Error: PXE boot supplied conflicting controller addresses." >&2
+          return 1
+        fi
+        CANDIDATE="$TOKEN"
+        ;;
+    esac
+  done < <(tr ' ' '\n' < "$CMDLINE_FILE")
+  if [[ -n "$CANDIDATE" ]]; then
+    LAB_CONTROLLER_DHCP_IP="$CANDIDATE"
+    export LAB_CONTROLLER_DHCP_IP
+  fi
+}
+
 display_hardware() {
   local CPU_MODEL MEMORY_KIB MEMORY_MIB INTERFACE MAC STATE
   CPU_MODEL=$(awk -F: '/^model name[[:space:]]*:/ { sub(/^[[:space:]]+/, "", $2); print $2; exit }' /proc/cpuinfo)
@@ -331,6 +368,7 @@ main() {
   fi
 
   load_lab_meta "$REPO_ROOT" || return 1
+  apply_runtime_controller_address || return 1
   require_deployment_ready "$REPO_ROOT" || return 1
   require_uefi || return 1
 

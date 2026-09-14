@@ -181,17 +181,19 @@ nixorium status
 nixorium doctor
 ```
 
-The fixed `nixorium-prepare-pxe.service` runs the build as `admin`, verifies
-that `masterDhcpIp` is currently assigned to the configured interface, checks
-Harmonia over that address, and builds every client closure plus the kernel,
-initrd, iPXE script, and pinned firmware. It retains their closures with
+The fixed `nixorium-prepare-pxe.service` runs the build as `admin`, prefers
+`masterDhcpIp` when it is assigned or selects the only usable non-static,
+non-link-local IPv4 address on the configured interface, checks Harmonia over
+that address, and builds every client closure plus the kernel, initrd, iPXE
+script, and pinned firmware. It retains their closures with
 managed Nix garbage-collector roots and atomically records the immutable store
 paths for the exact Git revision at
 `/var/lib/nixorium/prepared/prepared.json`; no `result-*` links are part of the
-normal workflow. The operation is non-disruptive and retry-safe. If the lease
-changed, update and commit the setting, apply the controller, then prepare
-again. Use `journalctl -u nixorium-prepare-pxe.service` for durable build and
-preflight failures.
+normal workflow. The operation is non-disruptive and retry-safe. A changed
+unambiguous lease needs only a new preparation; multiple candidates are
+refused until the ambiguity is resolved. Use
+`journalctl -u nixorium-prepare-pxe.service` for durable build and preflight
+failures.
 
 ## Updating the upstream input
 

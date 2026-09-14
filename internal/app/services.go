@@ -44,8 +44,8 @@ func (m *ServiceManager) Status(ctx context.Context, repository string) domain.S
 		return serviceStatusIssue(report, "configuration", fmt.Sprintf("evaluate labMeta: %v", err))
 	}
 
-	cache := m.cacheStatus(ctx, meta)
 	preparation := m.source.PXEPreparation(ctx, root, meta)
+	cache := m.cacheStatus(ctx, meta, preparation)
 	listener := m.source.ServiceState(ctx, PXEListenerUnit)
 	network := m.source.ServiceState(ctx, PXENetworkUnit)
 	pxe := ObservePXELifecycle(listener, network, preparation)
@@ -117,7 +117,7 @@ func (m *ServiceManager) Restart(ctx context.Context, repository, serviceID stri
 	return report
 }
 
-func (m *ServiceManager) cacheStatus(ctx context.Context, meta domain.LabMeta) domain.ManagedService {
+func (m *ServiceManager) cacheStatus(ctx context.Context, meta domain.LabMeta, preparation domain.PXEPreparationState) domain.ManagedService {
 	unit := m.source.ServiceState(ctx, HarmoniaUnit)
 	service := domain.ManagedService{
 		ID:      CacheServiceID,
@@ -133,13 +133,27 @@ func (m *ServiceManager) cacheStatus(ctx context.Context, meta domain.LabMeta) d
 		service.Detail = "managed cache unit is not installed"
 	case !unit.Active:
 		service.Detail = "managed cache unit is not active"
-	case m.source.CacheHealth(ctx, meta.Controller.DHCPIP, meta.Network.CachePort) != nil:
+	default:
+		addresses := []string{}
+		if preparation.Ready && preparation.DHCPAddress != "" {
+			addresses = append(addresses, preparation.DHCPAddress)
+		}
+		if meta.Controller.StaticIP != preparation.DHCPAddress || !preparation.Ready {
+			addresses = append(addresses, meta.Controller.StaticIP)
+		}
+		if meta.Controller.DHCPIP != meta.Controller.StaticIP && meta.Controller.DHCPIP != preparation.DHCPAddress {
+			addresses = append(addresses, meta.Controller.DHCPIP)
+		}
+		for _, address := range addresses {
+			if m.source.CacheHealth(ctx, address, meta.Network.CachePort) == nil {
+				service.State = "healthy"
+				service.Healthy = true
+				service.Detail = fmt.Sprintf("managed cache unit is active and HTTP-ready at %s:%d", address, meta.Network.CachePort)
+				return service
+			}
+		}
 		service.State = "unhealthy"
 		service.Detail = "cache process is active but its HTTP readiness check failed"
-	default:
-		service.State = "healthy"
-		service.Healthy = true
-		service.Detail = "managed cache unit is active and HTTP-ready"
 	}
 	return service
 }

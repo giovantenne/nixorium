@@ -54,13 +54,14 @@ type PXEPreparationRecord struct {
 }
 
 type PXEPreparationState struct {
-	Present    bool                `json:"present"`
-	Ready      bool                `json:"ready"`
-	Detail     string              `json:"detail,omitempty"`
-	Revision   string              `json:"revision,omitempty"`
-	PreparedAt time.Time           `json:"preparedAt,omitempty"`
-	Artifacts  []ArtifactState     `json:"artifacts,omitempty"`
-	Clients    []PXEPreparedClient `json:"clients,omitempty"`
+	Present     bool                `json:"present"`
+	Ready       bool                `json:"ready"`
+	Detail      string              `json:"detail,omitempty"`
+	Revision    string              `json:"revision,omitempty"`
+	DHCPAddress string              `json:"dhcpAddress,omitempty"`
+	PreparedAt  time.Time           `json:"preparedAt,omitempty"`
+	Artifacts   []ArtifactState     `json:"artifacts,omitempty"`
+	Clients     []PXEPreparedClient `json:"clients,omitempty"`
 }
 
 func DecodePXEPreparation(data []byte) (PXEPreparationRecord, error) {

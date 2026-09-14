@@ -229,7 +229,7 @@ let
         || fail "could not evaluate labMeta"
       IFACE="$(jq -er '.network.ifaceName' <<<"$META")" \
         || fail "labMeta does not contain a valid interface"
-      DHCP_IP="$(jq -er '.controller.dhcpIp' <<<"$META")" \
+      CONFIGURED_DHCP_IP="$(jq -er '.controller.dhcpIp' <<<"$META")" \
         || fail "labMeta does not contain a valid controller DHCP address"
       STATIC_IP="$(jq -er '.controller.staticIp' <<<"$META")" \
         || fail "labMeta does not contain a valid controller static address"
@@ -244,15 +244,22 @@ let
         | awk '{ split($4, address, "/"); print address[1] }')
       ((''${#ADDRESSES[@]} > 0)) \
         || fail "configured interface $IFACE has no global IPv4 address"
-      DHCP_PRESENT=false
+      DHCP_IP=""
       OBSERVED_NON_STATIC=()
       for address in "''${ADDRESSES[@]}"; do
-        [[ "$address" == "$DHCP_IP" ]] && DHCP_PRESENT=true
-        [[ "$address" == "$STATIC_IP" ]] || OBSERVED_NON_STATIC+=("$address")
+        if [[ "$address" != "$STATIC_IP" && "$address" != 169.254.* ]]; then
+          OBSERVED_NON_STATIC+=("$address")
+          [[ "$address" == "$CONFIGURED_DHCP_IP" ]] && DHCP_IP="$address"
+        fi
       done
-      if [[ "$DHCP_PRESENT" != true ]]; then
-        OBSERVED="''${OBSERVED_NON_STATIC[*]:-none}"
-        fail "configured DHCP address $DHCP_IP is not assigned to $IFACE (observed non-static addresses: $OBSERVED); review configuration before rebuilding address-bound artifacts"
+      if [[ -z "$DHCP_IP" ]]; then
+        if [[ "''${#OBSERVED_NON_STATIC[@]}" -eq 1 ]]; then
+          DHCP_IP="''${OBSERVED_NON_STATIC[0]}"
+          echo "Configured DHCP address $CONFIGURED_DHCP_IP is no longer assigned; preparing PXE for the unambiguous live address $DHCP_IP"
+        else
+          OBSERVED="''${OBSERVED_NON_STATIC[*]:-none}"
+          fail "configured DHCP address $CONFIGURED_DHCP_IP is not assigned to $IFACE and the live controller address is ambiguous (observed non-static addresses: $OBSERVED)"
+        fi
       fi
 
       systemctl is-active --quiet nixorium-harmonia.service \

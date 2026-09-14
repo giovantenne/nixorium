@@ -486,7 +486,9 @@ assert unknownVeyonNativeHosts == []
         "${nixpkgs}/nixos/modules/installer/netboot/netboot-minimal.nix"
         (upstreamRoot + "/modules/cache.nix")
         ({ pkgs, lib, ... }: {
-          nix.settings.substituters = lib.mkForce [ "http://${masterDhcpIp}:${toString labSettings.cachePort}" ];
+          # The managed listener passes its preparation-time address at boot;
+          # the installer uses that address explicitly for signed closure pulls.
+          nix.settings.substituters = lib.mkForce [ ];
           networking.useDHCP = lib.mkForce true;
           boot.zfs.forceImportRoot = false;
           services.openssh.enable = true;

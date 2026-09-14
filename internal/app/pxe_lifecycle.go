@@ -104,14 +104,14 @@ func (m PXELifecycle) Start(ctx context.Context, repository string) domain.PXELi
 	if err != nil {
 		return m.failStartedPXE(ctx, report, "PXE started but interface verification failed: "+err.Error())
 	}
-	if report.Mode != "active" || !containsIP(addresses, meta.Controller.DHCPIP) || containsIP(addresses, meta.Controller.StaticIP) {
+	if report.Mode != "active" || !containsIP(addresses, report.DHCPAddress) || containsIP(addresses, meta.Controller.StaticIP) {
 		return m.failStartedPXE(ctx, report, "PXE units did not reach a consistent active network state")
 	}
-	if err := m.source.CacheHealth(ctx, meta.Controller.DHCPIP, meta.Network.CachePort); err != nil {
+	if err := m.source.CacheHealth(ctx, report.DHCPAddress, meta.Network.CachePort); err != nil {
 		return m.failStartedPXE(ctx, report, "PXE started but cache readiness failed: "+err.Error())
 	}
 	report.State = "completed"
-	report.Message = fmt.Sprintf("PXE installation mode active on %s via %s", meta.Network.Interface, meta.Controller.DHCPIP)
+	report.Message = fmt.Sprintf("PXE installation mode active on %s via %s", meta.Network.Interface, report.DHCPAddress)
 	return report
 }
 
@@ -180,6 +180,10 @@ func (m PXELifecycle) startPreflight(ctx context.Context, repository string) (do
 	if !report.Preparation.Ready {
 		return failPXEReport(report, "managed PXE preparation is not current: "+report.Preparation.Detail), meta, nil
 	}
+	report.DHCPAddress = report.Preparation.DHCPAddress
+	if report.DHCPAddress == "" {
+		return failPXEReport(report, "managed PXE preparation does not record a controller address"), meta, nil
+	}
 
 	report = m.observeReport(report, ctx)
 	if report.Mode == "unavailable" {
@@ -193,15 +197,15 @@ func (m PXELifecycle) startPreflight(ctx context.Context, repository string) (do
 	if !harmonia.Loaded || !harmonia.Active {
 		return failPXEReport(report, "Harmonia cache service is not active"), meta, nil
 	}
-	if err := m.source.CacheHealth(ctx, meta.Controller.DHCPIP, meta.Network.CachePort); err != nil {
+	if err := m.source.CacheHealth(ctx, report.DHCPAddress, meta.Network.CachePort); err != nil {
 		return failPXEReport(report, "Harmonia cache readiness failed: "+err.Error()), meta, nil
 	}
 	addresses, err := m.source.InterfaceAddresses(meta.Network.Interface)
 	if err != nil {
 		return failPXEReport(report, "inspect configured interface: "+err.Error()), meta, nil
 	}
-	if !containsIP(addresses, meta.Controller.DHCPIP) {
-		return failPXEReport(report, fmt.Sprintf("configured DHCP address %s is not assigned to %s", meta.Controller.DHCPIP, meta.Network.Interface)), meta, addresses
+	if !containsIP(addresses, report.DHCPAddress) {
+		return failPXEReport(report, fmt.Sprintf("prepared controller address %s is not assigned to %s; run `nixorium pxe prepare` again", report.DHCPAddress, meta.Network.Interface)), meta, addresses
 	}
 	if report.Mode == "active" && containsIP(addresses, meta.Controller.StaticIP) {
 		return failPXEReport(report, "PXE units are active but the static address is still assigned; run `nixorium pxe recover`"), meta, addresses
@@ -217,6 +221,9 @@ func (m PXELifecycle) baseReport(ctx context.Context, repository, operation stri
 		report.DHCPAddress = meta.Controller.DHCPIP
 		report.StaticCIDR = fmt.Sprintf("%s/%d", meta.Controller.StaticIP, meta.Network.PrefixLength)
 		report.Preparation = m.source.PXEPreparation(ctx, repository, meta)
+		if report.Preparation.DHCPAddress != "" {
+			report.DHCPAddress = report.Preparation.DHCPAddress
+		}
 	}
 	return m.observeReport(report, ctx)
 }
@@ -264,7 +271,11 @@ func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository stri
 		*errors = append(*errors, fmt.Sprintf("static address %s was not restored on %s", meta.Controller.StaticIP, meta.Network.Interface))
 	}
 	report.Interface = meta.Network.Interface
-	report.DHCPAddress = meta.Controller.DHCPIP
+	if report.Preparation.DHCPAddress != "" {
+		report.DHCPAddress = report.Preparation.DHCPAddress
+	} else {
+		report.DHCPAddress = meta.Controller.DHCPIP
+	}
 	report.StaticCIDR = fmt.Sprintf("%s/%d", meta.Controller.StaticIP, meta.Network.PrefixLength)
 }
 

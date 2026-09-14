@@ -62,8 +62,10 @@ are offsets within that network. The controller number must be greater than
 the client count, and every generated address must fit before the broadcast
 address.
 
-`masterDhcpIp` is used only during PXE installation. Update it and rebuild
-netboot artifacts whenever the institutional DHCP lease changes.
+`masterDhcpIp` is the initial address/hint used only during PXE installation.
+Preparation prefers it while assigned, otherwise captures the only usable
+non-static, non-link-local IPv4 address on the configured interface. Update the
+hint only if multiple candidate addresses make runtime selection ambiguous.
 
 ## Per-host customization
 

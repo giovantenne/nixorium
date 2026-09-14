@@ -195,6 +195,17 @@ func TestDoctorDistinguishesErrorsAndWarnings(t *testing.T) {
 	assertFinding(t, report.Findings, "DISK-FREE", domain.LevelWarning)
 }
 
+func TestDoctorAcceptsPreparedRuntimeControllerAddress(t *testing.T) {
+	source := readyFake()
+	source.addresses = []string{"10.0.0.99", "192.0.2.11"}
+	source.preparation = domain.PXEPreparationState{Present: true, Ready: true, DHCPAddress: "192.0.2.11"}
+	report, err := NewInspector(source).Doctor(context.Background(), ".", DoctorOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertFinding(t, report.Findings, "NETWORK-DHCP-IP", domain.LevelOK)
+}
+
 func TestDoctorFullBuildIsExplicit(t *testing.T) {
 	source := readyFake()
 	inspector := NewInspector(source)

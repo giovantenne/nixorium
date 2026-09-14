@@ -43,8 +43,9 @@ End-to-end documentation and physical validation remain tracked externally.
 
 Important constraints in the current implementation are:
 
-- the controller DHCP address is embedded in the netboot closure and generated
-  iPXE script, so a lease change requires targeted artifact rebuilding;
+- `masterDhcpIp` is an initial selection hint; managed preparation binds an
+  observed unambiguous address to the session and iPXE passes it to the
+  installer, while ambiguous multi-address interfaces fail closed;
 - PXE listeners are owned by a controller-only systemd service; preparation is
   a fixed administrator-owned systemd action and Harmonia is controller-only
   and systemd-owned, while the old foreground helper remains an advanced
@@ -488,10 +489,13 @@ the address transaction cannot be bypassed.
 
 The preparation job is implemented as `nixorium-prepare-pxe.service`. It runs
 without root capabilities as the deployment owner, requires a clean and ready
-Git source plus the configured live DHCP address and healthy Harmonia service,
+Git source plus a healthy Harmonia service on an unambiguous live controller
+address,
 builds all netboot outputs and client closures, and atomically records schema
-version 1 under `/var/lib/nixorium/prepared/prepared.json`. The record binds
-fixed artifact names and canonical store roots to the full deployment revision.
+version 1 under `/var/lib/nixorium/prepared/prepared.json`. It prefers the
+configured `masterDhcpIp` hint when live, otherwise accepts exactly one usable
+non-static, non-link-local IPv4 candidate. The record binds that observed
+address, fixed artifact names, and canonical store roots to the full deployment revision.
 Revision-scoped indirect GC roots retain those closures; older roots are
 removed only after the new manifest has been durably published.
 Status/setup reconciliation validates it against current Git, `labMeta`, store
@@ -500,7 +504,7 @@ administrator-owned record rather than treating it as authority.
 
 The internal network unit is also implemented. Before removing the exact
 declarative static CIDR, it requires a strictly valid prepared revision whose
-network values match the active configuration, the configured live DHCP
+network values match the active configuration, the prepared live controller
 address, and the expected static address. It durably
 writes a root-owned mode-0600 session containing the original observed
 addresses and prepared artifacts, then removes only that static CIDR. Stop and
@@ -533,11 +537,15 @@ stopped -> inspecting -> preparing -> ready -> starting -> active
 ```
 
 Preparation is non-disruptive. The implemented action verifies deployment
-readiness, interface and DHCP address, refuses a changed lease until the
-managed setting is reviewed and committed, builds necessary client closures
-and netboot artifacts, obtains the locked iPXE binary, and verifies cache
-reachability. Content-addressed build results are recorded by store path and
-configuration revision, not merely by the existence of `result-*` symlinks.
+readiness and interface addresses, selects the configured DHCP hint or exactly
+one usable non-static, non-link-local candidate, builds necessary client
+closures and netboot artifacts, obtains the locked iPXE binary, and verifies cache reachability on
+the selected address. The listener generates the runtime iPXE script with that
+address in both its HTTP URL and a strictly parsed kernel parameter. The
+installer uses it explicitly for signed cache downloads; the netboot system
+therefore embeds no address-dependent substituter. Content-addressed build
+results are recorded by store path and configuration revision, not merely by
+the existence of `result-*` symlinks.
 
 Because preparation can take several minutes, CLI text and JSON modes emit an
 immediate activity line on stderr with the fixed journal follow command. The
@@ -758,8 +766,10 @@ operations.
 
 ## Risks and open questions
 
-- DHCP leases embedded in netboot artifacts can make a prepared session stale;
-  preparation must compare observed and configured addresses every time.
+- A multi-address controller interface can make runtime PXE address selection
+  ambiguous; preparation prefers the configured hint and otherwise fails
+  closed unless exactly one usable non-static, non-link-local IPv4 candidate
+  is present.
 - Address changes can interrupt controller connectivity; systemd cleanup and
   reboot reconciliation need VM and hardware testing before the workflow is
   called safe.
@@ -787,3 +797,9 @@ The following decisions are recorded separately:
 - [ADR-0004: narrow privileged actions](adr/0004-narrow-privileged-actions.md)
 - [ADR-0005: systemd-owned runtime services](adr/0005-systemd-owned-runtime-services.md)
 - [ADR-0006: interface-scoped laboratory firewall](adr/0006-interface-scoped-firewall.md)
+- [ADR-0007: local guided client enrollment](adr/0007-local-guided-client-enrollment.md)
+- [ADR-0008: bounded private operation records](adr/0008-bounded-private-operation-records.md)
+- [ADR-0009: bounded read-only Git review](adr/0009-bounded-read-only-git-review.md)
+- [ADR-0010: reviewed local Git commits](adr/0010-reviewed-local-git-commits.md)
+- [ADR-0011: guided upstream updates](adr/0011-guided-upstream-update.md)
+- [ADR-0012: preparation-bound PXE controller address](adr/0012-preparation-bound-pxe-address.md)

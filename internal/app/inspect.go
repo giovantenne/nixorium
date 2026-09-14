@@ -297,8 +297,10 @@ func (i *Inspector) addNetworkFindings(status domain.StatusReport, add func(doma
 		add(domain.Finding{ID: "NETWORK-INTERFACE", Level: domain.LevelOK, Summary: "Configured network interface exists", Evidence: strings.Join(addresses, ", ")})
 		if containsAddress(addresses, status.Meta.Controller.DHCPIP) {
 			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelOK, Summary: "Configured controller DHCP address is assigned"})
+		} else if status.PXEPreparation.Ready && status.PXEPreparation.DHCPAddress != "" && containsAddress(addresses, status.PXEPreparation.DHCPAddress) {
+			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelOK, Summary: "Prepared runtime controller address is assigned", Evidence: fmt.Sprintf("prepared: %s; configured hint: %s", status.PXEPreparation.DHCPAddress, status.Meta.Controller.DHCPIP)})
 		} else {
-			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelWarning, Summary: "Configured controller DHCP address is not currently assigned", Evidence: "configured: " + status.Meta.Controller.DHCPIP, Remediation: "Review the current DHCP lease and rebuild netboot artifacts after accepting any change."})
+			add(domain.Finding{ID: "NETWORK-DHCP-IP", Level: domain.LevelWarning, Summary: "Configured controller DHCP address is not currently assigned", Evidence: "configured hint: " + status.Meta.Controller.DHCPIP, Remediation: "Run `nixorium pxe prepare`; it will capture the live address when exactly one non-static candidate exists."})
 		}
 	}
 
@@ -340,9 +342,21 @@ func (i *Inspector) addCacheKeyFinding(ctx context.Context, repository string, a
 }
 
 func (i *Inspector) addCacheHealthFinding(ctx context.Context, status domain.StatusReport, add func(domain.Finding)) {
-	addresses := []string{status.Meta.Controller.StaticIP}
+	addresses := []string{}
+	if status.PXEPreparation.Ready && status.PXEPreparation.DHCPAddress != "" {
+		addresses = append(addresses, status.PXEPreparation.DHCPAddress)
+	}
+	if status.Meta.Controller.StaticIP != status.PXEPreparation.DHCPAddress || !status.PXEPreparation.Ready {
+		addresses = append(addresses, status.Meta.Controller.StaticIP)
+	}
 	if status.Meta.Controller.DHCPIP != status.Meta.Controller.StaticIP && status.Meta.Controller.DHCPIP != "MASTER_DHCP_IP" {
-		addresses = append(addresses, status.Meta.Controller.DHCPIP)
+		alreadyIncluded := false
+		for _, address := range addresses {
+			alreadyIncluded = alreadyIncluded || address == status.Meta.Controller.DHCPIP
+		}
+		if !alreadyIncluded {
+			addresses = append(addresses, status.Meta.Controller.DHCPIP)
+		}
 	}
 	errorsByAddress := []string{}
 	for _, address := range addresses {

@@ -177,10 +177,11 @@ With ordinary DHCP active, prove a client still receives its normal lease while
 Nixorium PXE is stopped and while ProxyDHCP is active. Then change the
 controller's DHCP lease without changing the deployment.
 
-Pass when PXE preparation refuses the stale configured address without
-replacing the prior valid manifest. Re-run guided configuration, review/commit,
-controller apply and preparation; pass when the new address is used and ordinary
-DHCP behavior remains intact.
+Pass when PXE preparation captures exactly one new non-static address without a
+deployment edit, the generated iPXE command passes that address to the client,
+and ordinary DHCP behavior remains intact. Add a second non-static address and
+repeat: preparation must refuse the ambiguity without replacing the prior valid
+manifest. Remove the extra address and verify normal preparation resumes.
 
 ## Scenario 9: update and controller recovery
 
