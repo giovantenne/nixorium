@@ -375,7 +375,10 @@ as the existing Colmena `root` identity and invokes the fixed read-only
 deployment Git revision; comparing that observed revision with the current
 clean-review revision yields `current`, `outdated`, or `unknown` without
 evaluating/building all client closures. Systems installed before this helper
-was introduced remain `unknown` until their next normal deployment.
+was introduced remain `unknown` until their next normal deployment. The report
+also shows each host's last successful post-apply verification when one has
+been recorded; this local history is informational and never overrides the
+live authenticated state.
 Before using Colmena, `deploy plan --on ...` expands one, several, or all
 configured clients into a reviewable revision-bound target list. Planning is
 read-only and fails closed when the deployment is not ready, the Git worktree
@@ -387,12 +390,18 @@ repeats readiness, clean-Git, revision, and target checks, requires the exact
 `colmena apply switch`, and streams output while retaining a private log under
 `~/.local/state/nixorium/operations/`. `--yes` is an explicit automation-only
 confirmation; `--json` keeps the final report on stdout and progress on stderr.
-An apply failure reports that target state may be mixed; review the log and
-current host state, make a fresh plan, and retry the convergent workflow.
+After every apply attempt, Nixorium queries the selected hosts through the
+authenticated state helper and atomically records only hosts that report the
+reviewed revision and a concrete system path under
+`~/.local/state/nixorium/deployments/`. Complete success requires every target
+to be verified and recorded. An apply failure still reports potentially mixed
+state and may record independently verified targets; review the log and current
+host state, make a fresh plan, and retry the convergent workflow.
 The dashboard's **Deploy updates** screen exposes the same workflow without
 copying a revision: select one or more computers (or all), review the resolved
 plan, and type the exact `DEPLOY <targets>` phrase. It shows operation activity
-and the final phase, build/apply state, remediation, and durable log path.
+and the final phase, build/apply state, authenticated/recorded target counts,
+remediation, and durable log path.
 Closing the dashboard is disabled while its Colmena child is running.
 From the dashboard, **Install computers over network**
 uses the same typed application operations as the CLI to prepare artifacts and
@@ -532,7 +541,8 @@ nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 
 The plan prints the exact apply command with its full Git revision. Applying
 requires an exact target-specific confirmation, builds first, streams verbose
-progress, and records the detailed log path in its final report. A stale plan
+progress, records the detailed log path, then authenticates every selected
+host and records only hosts running the reviewed revision. A stale plan
 or dirty worktree is rejected before Colmena runs. For non-interactive
 automation, add `--yes`; the expected revision remains mandatory.
 

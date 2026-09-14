@@ -421,6 +421,9 @@ func (model dashboardModel) deployView() string {
 			fmt.Sprintf("Last result: %s at phase %s", model.deployResult.State, model.deployResult.Phase),
 			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployResult.BuildCompleted, model.deployResult.ApplyCompleted),
 		)
+		if model.deployResult.Verification.Attempted > 0 {
+			lines = append(lines, fmt.Sprintf("Authenticated: %d/%d   Recorded: %d", model.deployResult.Verification.Verified, model.deployResult.Verification.Attempted, model.deployResult.Verification.Recorded))
+		}
 		if model.deployResult.LogPath != "" {
 			lines = append(lines, "Detailed log: "+model.deployResult.LogPath)
 		}
@@ -439,10 +442,17 @@ func (model dashboardModel) hostsView() string {
 		fmt.Sprintf("SSH available: %d/%d", available, total),
 		fmt.Sprintf("Deployment: %d current, %d outdated, %d unknown", model.hosts.Deployment.Current, model.hosts.Deployment.Outdated, model.hosts.Deployment.Unknown),
 		"",
-		fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s", "NAME", "ADDRESS", "NETWORK", "SSH", "DEPLOY"),
+		fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s %-17s", "NAME", "ADDRESS", "NETWORK", "SSH", "DEPLOY", "LAST VERIFIED"),
 	}
 	for _, host := range model.hosts.Hosts {
-		lines = append(lines, fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s", host.Name, host.IP, host.Reachability, host.SSH, host.Deployment))
+		lastVerified := "never"
+		if host.LastSuccessfulDeploy != nil {
+			lastVerified = host.LastSuccessfulDeploy.VerifiedAt.UTC().Format("2006-01-02 15:04Z")
+		}
+		lines = append(lines, fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s %-17s", host.Name, host.IP, host.Reachability, host.SSH, host.Deployment, lastVerified))
+	}
+	if model.hosts.HistoryDetail != "" {
+		lines = append(lines, "", "History warning: "+model.hosts.HistoryDetail)
 	}
 	if model.busy != "" {
 		lines = append(lines, "", model.busy+"…")

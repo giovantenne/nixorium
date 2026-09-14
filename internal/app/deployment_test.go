@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -22,6 +23,9 @@ type fakeDeploymentSource struct {
 	afterBuild  func()
 	addresses   []string
 	addressErr  error
+	current     map[string]domain.HostSystemProbe
+	recorded    map[string]domain.LastSuccessfulDeployment
+	recordErr   error
 }
 
 func readyDeploymentSource() *fakeDeploymentSource {
@@ -38,6 +42,13 @@ func readyDeploymentSource() *fakeDeploymentSource {
 	source.meta.Controller.StaticIP = "10.0.0.99"
 	source.meta.Network.Interface = "lab0"
 	source.addresses = []string{"10.0.0.99"}
+	source.current = map[string]domain.HostSystemProbe{}
+	for _, host := range source.meta.Clients.Hosts {
+		source.current[host.Name] = domain.HostSystemProbe{
+			SystemPath: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-" + host.Name + "-system",
+			Revision:   source.revision,
+		}
+	}
 	return source
 }
 
@@ -72,6 +83,24 @@ func (f *fakeDeploymentSource) RunDeploymentPhase(_ context.Context, _ string, p
 		f.afterBuild()
 	}
 	return f.runErrors[phase]
+}
+
+func (f *fakeDeploymentSource) CurrentSystems(_ context.Context, hosts []domain.HostMeta, _ time.Duration) map[string]domain.HostSystemProbe {
+	result := map[string]domain.HostSystemProbe{}
+	for _, host := range hosts {
+		if probe, found := f.current[host.Name]; found {
+			result[host.Name] = probe
+		}
+	}
+	return result
+}
+
+func (f *fakeDeploymentSource) RecordSuccessfulDeployments(_ string, records map[string]domain.LastSuccessfulDeployment) error {
+	if f.recordErr != nil {
+		return f.recordErr
+	}
+	f.recorded = records
+	return nil
 }
 
 func TestDeploymentPlanSelectsOneSeveralOrAllClients(t *testing.T) {
@@ -139,6 +168,9 @@ func TestDeploymentExecuteBuildsBeforeApplyAndStreamsOutput(t *testing.T) {
 	if report.LogPath != "/state/deploy.log" || !report.RetrySafe {
 		t.Fatalf("durability/retry fields = %+v", report)
 	}
+	if report.Verification.Attempted != 2 || report.Verification.Verified != 2 || report.Verification.Recorded != 2 || len(source.recorded) != 2 {
+		t.Fatalf("verification = %+v, recorded = %+v", report.Verification, source.recorded)
+	}
 }
 
 func TestDeploymentExecuteRejectsStaleReviewBeforeRunning(t *testing.T) {
@@ -165,7 +197,7 @@ func TestDeploymentExecuteReportsBuildAndPartialApplyFailures(t *testing.T) {
 		message        string
 	}{
 		{phase: domain.DeploymentPhaseBuild, buildCompleted: false, message: "before any deployment"},
-		{phase: domain.DeploymentPhaseApply, buildCompleted: true, message: "some targets may already have changed"},
+		{phase: domain.DeploymentPhaseApply, buildCompleted: true, message: "authenticated reconciliation"},
 	} {
 		source := readyDeploymentSource()
 		source.runErrors = map[domain.DeploymentPhase]error{test.phase: errors.New("fixture failure")}
@@ -173,5 +205,48 @@ func TestDeploymentExecuteReportsBuildAndPartialApplyFailures(t *testing.T) {
 		if report.State != "failed" || report.Phase != test.phase || report.BuildCompleted != test.buildCompleted || report.ApplyCompleted || !report.RetrySafe || !strings.Contains(report.Message, test.message) {
 			t.Errorf("%s failure report = %+v", test.phase, report)
 		}
+	}
+}
+
+func TestDeploymentExecuteRecordsOnlyAuthenticatedMatchingTargetsAfterPartialApply(t *testing.T) {
+	source := readyDeploymentSource()
+	source.runErrors = map[domain.DeploymentPhase]error{domain.DeploymentPhaseApply: errors.New("partial fixture failure")}
+	source.current["pc02"] = domain.HostSystemProbe{
+		SystemPath: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-pc02-system",
+		Revision:   "fedcba9876543210",
+	}
+	delete(source.current, "pc03")
+	manager := NewDeploymentManager(source)
+	manager.now = func() time.Time { return time.Unix(123, 0) }
+	report := manager.Execute(context.Background(), "/deployment", "@lab", source.revision, "", io.Discard)
+	if report.State != "failed" || report.Phase != domain.DeploymentPhaseApply || report.ApplyCompleted {
+		t.Fatalf("partial apply report = %+v", report)
+	}
+	if report.Verification.Attempted != 3 || report.Verification.Verified != 1 || report.Verification.Recorded != 1 {
+		t.Fatalf("verification = %+v", report.Verification)
+	}
+	if len(source.recorded) != 1 || source.recorded["pc01"].Revision != source.revision || !source.recorded["pc01"].VerifiedAt.Equal(time.Unix(123, 0)) {
+		t.Fatalf("recorded = %+v", source.recorded)
+	}
+}
+
+func TestDeploymentExecuteReportsIncompleteVerificationAfterSuccessfulApply(t *testing.T) {
+	source := readyDeploymentSource()
+	delete(source.current, "pc02")
+	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01,pc02", source.revision, "", io.Discard)
+	if report.State != "partial" || report.Phase != domain.DeploymentPhaseVerify || !report.ApplyCompleted || !report.HasErrors() {
+		t.Fatalf("incomplete verification report = %+v", report)
+	}
+	if report.Verification.Verified != 1 || report.Verification.Recorded != 1 || len(source.recorded) != 1 {
+		t.Fatalf("verification = %+v, recorded = %+v", report.Verification, source.recorded)
+	}
+}
+
+func TestDeploymentExecuteReportsHistoryWriteFailureAfterSuccessfulApply(t *testing.T) {
+	source := readyDeploymentSource()
+	source.recordErr = errors.New("read-only state")
+	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
+	if report.State != "failed" || report.Phase != domain.DeploymentPhaseVerify || !report.ApplyCompleted || report.Verification.Verified != 1 || report.Verification.Recorded != 0 || !strings.Contains(report.Message, "recording verification failed") {
+		t.Fatalf("history failure report = %+v", report)
 	}
 }

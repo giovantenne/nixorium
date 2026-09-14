@@ -82,17 +82,18 @@ type HostDeploymentSummary struct {
 }
 
 type HostStatus struct {
-	Name             string             `json:"name"`
-	IP               string             `json:"ip"`
-	Role             string             `json:"role"`
-	Reachability     Reachability       `json:"reachability"`
-	SSH              SSHAvailability    `json:"ssh"`
-	Deployment       DeploymentCurrency `json:"deployment"`
-	CurrentSystem    string             `json:"currentSystem,omitempty"`
-	CurrentRevision  string             `json:"currentRevision,omitempty"`
-	DesiredRevision  string             `json:"desiredRevision,omitempty"`
-	Detail           string             `json:"detail,omitempty"`
-	DeploymentDetail string             `json:"deploymentDetail,omitempty"`
+	Name                 string                    `json:"name"`
+	IP                   string                    `json:"ip"`
+	Role                 string                    `json:"role"`
+	Reachability         Reachability              `json:"reachability"`
+	SSH                  SSHAvailability           `json:"ssh"`
+	Deployment           DeploymentCurrency        `json:"deployment"`
+	CurrentSystem        string                    `json:"currentSystem,omitempty"`
+	CurrentRevision      string                    `json:"currentRevision,omitempty"`
+	DesiredRevision      string                    `json:"desiredRevision,omitempty"`
+	Detail               string                    `json:"detail,omitempty"`
+	DeploymentDetail     string                    `json:"deploymentDetail,omitempty"`
+	LastSuccessfulDeploy *LastSuccessfulDeployment `json:"lastSuccessfulDeploy,omitempty"`
 }
 
 type HostsReport struct {
@@ -103,6 +104,7 @@ type HostsReport struct {
 	Repository      string                `json:"repository"`
 	DesiredRevision string                `json:"desiredRevision,omitempty"`
 	Deployment      HostDeploymentSummary `json:"deployment"`
+	HistoryDetail   string                `json:"historyDetail,omitempty"`
 	Hosts           []HostStatus          `json:"hosts"`
 }
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -17,7 +18,11 @@ type DeploymentSource interface {
 	GitRevision(context.Context, string) (string, error)
 	InterfaceAddresses(string) ([]string, error)
 	RunDeploymentPhase(context.Context, string, domain.DeploymentPhase, string, io.Writer) error
+	CurrentSystems(context.Context, []domain.HostMeta, time.Duration) map[string]domain.HostSystemProbe
+	RecordSuccessfulDeployments(string, map[string]domain.LastSuccessfulDeployment) error
 }
+
+const deploymentVerificationTimeout = 3 * time.Second
 
 func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, expectedRevision, logPath string, progress io.Writer) domain.DeploymentExecutionReport {
 	plan := m.Plan(ctx, repository, requested)
@@ -63,16 +68,97 @@ func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, 
 
 	report.Phase = domain.DeploymentPhaseApply
 	fmt.Fprintln(progress, "\n==> Applying the built configurations with Colmena")
-	if err := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseApply, report.ColmenaSelector, progress); err != nil {
+	applyErr := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseApply, report.ColmenaSelector, progress)
+	if applyErr == nil {
+		report.ApplyCompleted = true
+	}
+	fmt.Fprintln(progress, "\n==> Verifying selected computers through authenticated host state")
+	recordErr := m.verifySuccessfulDeployments(ctx, &report, progress)
+	if applyErr != nil {
 		report.State = "failed"
-		report.Message = fmt.Sprintf("apply failed; some targets may already have changed: %v", err)
+		report.Phase = domain.DeploymentPhaseApply
+		report.Message = fmt.Sprintf("apply failed; authenticated reconciliation verified %d/%d targets at the reviewed revision: %v", report.Verification.Verified, report.Verification.Attempted, applyErr)
+		if recordErr != nil {
+			report.Message += fmt.Sprintf("; recording verified targets also failed: %v", recordErr)
+		}
 		return report
 	}
-	report.ApplyCompleted = true
+	if recordErr != nil {
+		report.State = "failed"
+		report.Phase = domain.DeploymentPhaseVerify
+		report.Message = fmt.Sprintf("apply completed and %d/%d targets were authenticated at the reviewed revision, but recording verification failed: %v", report.Verification.Verified, report.Verification.Attempted, recordErr)
+		return report
+	}
+	if report.Verification.Verified != report.Verification.Attempted {
+		report.State = "partial"
+		report.Phase = domain.DeploymentPhaseVerify
+		report.Message = fmt.Sprintf("apply completed, but authenticated reconciliation verified only %d/%d targets; inspect host state and retry from a fresh plan", report.Verification.Verified, report.Verification.Attempted)
+		return report
+	}
 	report.Phase = domain.DeploymentPhaseComplete
 	report.State = "completed"
-	report.Message = "all selected targets were built and applied successfully"
+	report.Message = "all selected targets were built, applied, authenticated, and recorded successfully"
 	return report
+}
+
+func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, progress io.Writer) error {
+	report.Verification = domain.DeploymentVerificationSummary{
+		Attempted: len(report.Targets),
+		Targets:   make([]domain.DeploymentTargetVerification, 0, len(report.Targets)),
+	}
+	hosts := make([]domain.HostMeta, 0, len(report.Targets))
+	for _, target := range report.Targets {
+		hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP})
+	}
+	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
+	updates := map[string]domain.LastSuccessfulDeployment{}
+	verifiedAt := m.now().UTC()
+	for _, target := range report.Targets {
+		probe, found := observed[target.Name]
+		verification := domain.DeploymentTargetVerification{
+			Name:       target.Name,
+			State:      "unverified",
+			Revision:   probe.Revision,
+			SystemPath: probe.SystemPath,
+			Detail:     probe.Detail,
+		}
+		switch {
+		case !found:
+			verification.Detail = "authenticated host state returned no result"
+		case probe.Revision == "" || probe.SystemPath == "":
+			if verification.Detail == "" {
+				verification.Detail = "authenticated host state is unavailable"
+			}
+		case probe.Revision != report.Revision:
+			verification.Detail = "authenticated host revision differs from the reviewed revision"
+		default:
+			verification.State = "verified"
+			verification.Detail = ""
+			report.Verification.Verified++
+			updates[target.Name] = domain.LastSuccessfulDeployment{
+				Revision:   probe.Revision,
+				SystemPath: probe.SystemPath,
+				VerifiedAt: verifiedAt,
+			}
+		}
+		report.Verification.Targets = append(report.Verification.Targets, verification)
+		fmt.Fprintf(progress, "  %-10s %s", target.Name, verification.State)
+		if verification.Detail != "" {
+			fmt.Fprintf(progress, ": %s", verification.Detail)
+		}
+		fmt.Fprintln(progress)
+	}
+	if len(updates) == 0 {
+		report.Verification.Detail = "no target was authenticated at the reviewed revision; deployment history was not changed"
+		return nil
+	}
+	if err := m.source.RecordSuccessfulDeployments(report.Repository, updates); err != nil {
+		report.Verification.Detail = "verified target state could not be recorded"
+		return err
+	}
+	report.Verification.Recorded = len(updates)
+	report.Verification.Detail = fmt.Sprintf("recorded %d authenticated target(s)", len(updates))
+	return nil
 }
 
 func executionFromPlan(plan domain.DeploymentPlanReport, logPath string) domain.DeploymentExecutionReport {
@@ -111,10 +197,11 @@ func sameDeploymentTargets(left, right []domain.DeploymentTarget) bool {
 
 type DeploymentManager struct {
 	source DeploymentSource
+	now    func() time.Time
 }
 
 func NewDeploymentManager(source DeploymentSource) *DeploymentManager {
-	return &DeploymentManager{source: source}
+	return &DeploymentManager{source: source, now: time.Now}
 }
 
 func (m *DeploymentManager) Plan(ctx context.Context, repository, requested string) domain.DeploymentPlanReport {

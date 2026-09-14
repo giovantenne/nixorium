@@ -17,13 +17,9 @@ type DeploymentOperation struct {
 }
 
 func OpenDeploymentOperation() (*DeploymentOperation, error) {
-	stateRoot := os.Getenv("XDG_STATE_HOME")
-	if stateRoot == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("resolve home for operation log: %w", err)
-		}
-		stateRoot = filepath.Join(home, ".local", "state")
+	stateRoot, err := userStateRoot()
+	if err != nil {
+		return nil, err
 	}
 	return openDeploymentOperation(stateRoot, time.Now())
 }

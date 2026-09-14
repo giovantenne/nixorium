@@ -3,6 +3,7 @@ package presentation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -30,7 +31,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 		LoadHosts: func() (domain.HostsReport, error) {
 			loads++
 			report := domain.HostsReport{State: "partial", Deployment: domain.HostDeploymentSummary{Current: 1, Unknown: 1}, Hosts: []domain.HostStatus{
-				{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent},
+				{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, LastSuccessfulDeploy: &domain.LastSuccessfulDeployment{Revision: "0123456789abcdef", VerifiedAt: time.Date(2026, 9, 14, 10, 30, 0, 0, time.UTC)}},
 				{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown, Deployment: domain.DeploymentUnknown},
 			}}
 			if loads > 1 {
@@ -55,7 +56,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHosts || !strings.Contains(model.View(), "pc02") || !strings.Contains(model.View(), "unreachable  unknown") || !strings.Contains(model.View(), "1 current, 0 outdated, 1 unknown") {
+	if model.screen != dashboardHosts || !strings.Contains(model.View(), "pc02") || !strings.Contains(model.View(), "unreachable  unknown") || !strings.Contains(model.View(), "1 current, 0 outdated, 1 unknown") || !strings.Contains(model.View(), "2026-09-14 10:30Z") || !strings.Contains(model.View(), "never") {
 		t.Fatalf("computer inventory is incomplete:\n%s", model.View())
 	}
 	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
@@ -114,6 +115,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 				ColmenaSelector: plan.ColmenaSelector,
 				BuildCompleted:  true,
 				ApplyCompleted:  true,
+				Verification:    domain.DeploymentVerificationSummary{Attempted: 2, Verified: 2, Recorded: 2},
 				LogPath:         "/state/deploy.log",
 				Message:         "all selected targets were built and applied successfully",
 			}
@@ -155,7 +157,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View(), "Last result: completed") || !strings.Contains(model.View(), "/state/deploy.log") {
+	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View(), "Last result: completed") || !strings.Contains(model.View(), "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View(), "/state/deploy.log") {
 		t.Fatalf("deployment result missing: applied=%d\n%s", applied, model.View())
 	}
 }

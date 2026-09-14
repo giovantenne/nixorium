@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -48,6 +49,9 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 	if report.DesiredRevision != "" {
 		fmt.Fprintf(writer, "Desired revision:   %s\n", report.DesiredRevision)
 	}
+	if report.HistoryDetail != "" {
+		fmt.Fprintf(writer, "History warning:    %s\n", report.HistoryDetail)
+	}
 	for _, host := range report.Hosts {
 		fmt.Fprintf(writer, "  %-10s %-15s network=%-12s ssh=%-11s deployment=%s\n", host.Name, host.IP, host.Reachability, host.SSH, host.Deployment)
 		if host.CurrentSystem != "" {
@@ -55,6 +59,9 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 		}
 		if host.CurrentRevision != "" {
 			fmt.Fprintf(writer, "    current revision: %s\n", host.CurrentRevision)
+		}
+		if host.LastSuccessfulDeploy != nil {
+			fmt.Fprintf(writer, "    last verified: %s at %s\n", host.LastSuccessfulDeploy.Revision, host.LastSuccessfulDeploy.VerifiedAt.UTC().Format(time.RFC3339))
 		}
 		if host.DeploymentDetail != "" {
 			fmt.Fprintf(writer, "    detail:  %s\n", host.DeploymentDetail)
@@ -94,6 +101,14 @@ func DeploymentExecutionText(writer io.Writer, report domain.DeploymentExecution
 	}
 	fmt.Fprintf(writer, "Build completed: %t\n", report.BuildCompleted)
 	fmt.Fprintf(writer, "Apply completed: %t\n", report.ApplyCompleted)
+	if report.Verification.Attempted > 0 {
+		fmt.Fprintf(writer, "Verified targets: %d/%d (recorded %d)\n", report.Verification.Verified, report.Verification.Attempted, report.Verification.Recorded)
+		for _, target := range report.Verification.Targets {
+			if target.State != "verified" {
+				fmt.Fprintf(writer, "  %-10s %s: %s\n", target.Name, target.State, target.Detail)
+			}
+		}
+	}
 	if report.LogPath != "" {
 		fmt.Fprintf(writer, "Detailed log:    %s\n", report.LogPath)
 	}

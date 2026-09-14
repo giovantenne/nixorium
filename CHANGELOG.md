@@ -51,7 +51,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Revision-bound `nixorium deploy apply` execution with exact target
   confirmation, repeated preflight checks, mandatory verbose Colmena build
   before apply, serialized runs, streamed mode-0600 operation logs, explicit
-  partial-failure state, and safe full-workflow retry.
+  partial-failure state, authenticated post-apply reconciliation, atomic
+  per-host last-successful-verification history, and safe full-workflow retry.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments
