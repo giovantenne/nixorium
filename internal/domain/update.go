@@ -18,6 +18,8 @@ type UpdateInputSnapshot struct {
 	FlakeContent []byte
 	LockContent  []byte
 	HasLock      bool
+	FlakeMode    uint32
+	LockMode     uint32
 }
 
 type UpdateProposal struct {
@@ -34,25 +36,44 @@ type UpdateCheck struct {
 }
 
 type UpdatePlanReport struct {
-	SchemaVersion  int               `json:"schemaVersion"`
-	Operation      string            `json:"operation"`
-	GeneratedAt    time.Time         `json:"generatedAt"`
-	State          string            `json:"state"`
-	Repository     string            `json:"repository"`
-	Revision       string            `json:"revision,omitempty"`
-	CurrentRef     string            `json:"currentRef,omitempty"`
-	CurrentRev     string            `json:"currentRevision,omitempty"`
-	CurrentChannel UpdateChannel     `json:"currentChannel,omitempty"`
-	Target         string            `json:"target,omitempty"`
-	TargetChannel  UpdateChannel     `json:"targetChannel,omitempty"`
-	Downgrade      bool              `json:"downgrade"`
-	ReviewToken    string            `json:"reviewToken,omitempty"`
-	Confirmation   string            `json:"confirmation,omitempty"`
-	Diff           GitDiff           `json:"diff"`
-	Checks         []UpdateCheck     `json:"checks"`
-	Issues         []ValidationIssue `json:"issues"`
+	SchemaVersion  int                 `json:"schemaVersion"`
+	Operation      string              `json:"operation"`
+	GeneratedAt    time.Time           `json:"generatedAt"`
+	State          string              `json:"state"`
+	Repository     string              `json:"repository"`
+	Revision       string              `json:"revision,omitempty"`
+	CurrentRef     string              `json:"currentRef,omitempty"`
+	CurrentRev     string              `json:"currentRevision,omitempty"`
+	CurrentChannel UpdateChannel       `json:"currentChannel,omitempty"`
+	Target         string              `json:"target,omitempty"`
+	TargetChannel  UpdateChannel       `json:"targetChannel,omitempty"`
+	Downgrade      bool                `json:"downgrade"`
+	ReviewToken    string              `json:"reviewToken,omitempty"`
+	Confirmation   string              `json:"confirmation,omitempty"`
+	Diff           GitDiff             `json:"diff"`
+	Checks         []UpdateCheck       `json:"checks"`
+	Issues         []ValidationIssue   `json:"issues"`
+	Snapshot       UpdateInputSnapshot `json:"-"`
+	Proposal       UpdateProposal      `json:"-"`
 }
 
 func (r UpdatePlanReport) HasErrors() bool {
 	return r.State != "ready" || len(r.Issues) > 0
+}
+
+type UpdateApplyReport struct {
+	SchemaVersion int               `json:"schemaVersion"`
+	Operation     string            `json:"operation"`
+	State         string            `json:"state"`
+	Repository    string            `json:"repository"`
+	Revision      string            `json:"revision,omitempty"`
+	Target        string            `json:"target,omitempty"`
+	Updated       bool              `json:"updated"`
+	RetrySafe     bool              `json:"retrySafe"`
+	Message       string            `json:"message,omitempty"`
+	Issues        []ValidationIssue `json:"issues"`
+}
+
+func (r UpdateApplyReport) HasErrors() bool {
+	return r.State == "blocked" || r.State == "failed" || r.State == "partial" || len(r.Issues) > 0
 }

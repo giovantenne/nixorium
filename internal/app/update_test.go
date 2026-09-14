@@ -14,6 +14,9 @@ type fakeUpdateSource struct {
 	snapshot domain.UpdateInputSnapshot
 	proposal domain.UpdateProposal
 	prepared int
+	applied  int
+	partial  bool
+	applyErr error
 }
 
 func (source *fakeUpdateSource) GitState(context.Context, string) (domain.GitState, error) {
@@ -31,6 +34,11 @@ func (source *fakeUpdateSource) InspectUpdateInput(string) (domain.UpdateInputSn
 func (source *fakeUpdateSource) PrepareUpdate(context.Context, string, string) (domain.UpdateProposal, error) {
 	source.prepared++
 	return source.proposal, nil
+}
+
+func (source *fakeUpdateSource) ApplyPreparedUpdate(context.Context, string, string, domain.UpdateInputSnapshot, domain.UpdateProposal) (bool, error) {
+	source.applied++
+	return source.partial, source.applyErr
 }
 
 func TestParseUpdateReleaseClassifiesAndComparesTargets(t *testing.T) {
@@ -100,5 +108,23 @@ func TestUpdatePlanBlocksDirtyMovingAndUnchangedTargets(t *testing.T) {
 	report = NewUpdateManager(source).Plan(context.Background(), ".", "v2.0.0", false, false)
 	if report.State != "blocked" || source.prepared != 0 {
 		t.Fatalf("unchanged plan = %+v", report)
+	}
+}
+
+func TestUpdateApplyRequiresCurrentPlanToken(t *testing.T) {
+	source := &fakeUpdateSource{
+		revision: strings.Repeat("a", 40),
+		snapshot: domain.UpdateInputSnapshot{CurrentRef: "v1.0.0", FlakeContent: []byte("old"), LockContent: []byte("old lock"), HasLock: true},
+		proposal: domain.UpdateProposal{FlakeContent: []byte("new"), LockContent: []byte("new lock"), Diff: domain.GitDiff{Content: "+new"}},
+	}
+	manager := NewUpdateManager(source)
+	plan := manager.Plan(context.Background(), ".", "v1.1.0", false, false)
+	blocked := manager.Apply(context.Background(), ".", "v1.1.0", "sha256:stale", false, false)
+	if blocked.State != "blocked" || source.applied != 0 {
+		t.Fatalf("blocked apply = %+v, calls = %d", blocked, source.applied)
+	}
+	report := manager.Apply(context.Background(), ".", "v1.1.0", plan.ReviewToken, false, false)
+	if report.State != "completed" || !report.Updated || report.RetrySafe || source.applied != 1 {
+		t.Fatalf("apply = %+v, calls = %d", report, source.applied)
 	}
 }

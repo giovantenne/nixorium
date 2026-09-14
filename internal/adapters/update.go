@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -29,7 +30,7 @@ type flakeLockDocument struct {
 }
 
 func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, error) {
-	flake, _, err := readRegularFileNoFollowLimit(filepath.Join(repository, "flake.nix"), 1024*1024)
+	flake, flakeMode, err := readRegularFileNoFollowLimit(filepath.Join(repository, "flake.nix"), 1024*1024)
 	if err != nil {
 		return domain.UpdateInputSnapshot{}, fmt.Errorf("read flake.nix: %w", err)
 	}
@@ -47,8 +48,9 @@ func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, 
 		SourcePrefix: strings.Join(source[1:3], "/"),
 		CurrentRef:   source[3],
 		FlakeContent: append([]byte(nil), flake...),
+		FlakeMode:    flakeMode,
 	}
-	lock, _, lockErr := readRegularFileNoFollowLimit(filepath.Join(repository, "flake.lock"), 4*1024*1024)
+	lock, lockMode, lockErr := readRegularFileNoFollowLimit(filepath.Join(repository, "flake.lock"), 4*1024*1024)
 	if os.IsNotExist(lockErr) {
 		return snapshot, nil
 	}
@@ -57,6 +59,7 @@ func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, 
 	}
 	snapshot.HasLock = true
 	snapshot.LockContent = append([]byte(nil), lock...)
+	snapshot.LockMode = lockMode
 	var document flakeLockDocument
 	if err := json.Unmarshal(lock, &document); err != nil {
 		return domain.UpdateInputSnapshot{}, fmt.Errorf("decode flake.lock: %w", err)
@@ -251,4 +254,109 @@ func updateProposalDiff(ctx context.Context, oldFlake, newFlake, oldLock, newLoc
 		return "", errors.New("target release does not change flake.nix or flake.lock")
 	}
 	return sanitizeOperationLog(combined.Bytes()), nil
+}
+
+func (local Local) ApplyPreparedUpdate(ctx context.Context, repository, expectedRevision string, expected domain.UpdateInputSnapshot, proposal domain.UpdateProposal) (bool, error) {
+	rootDescriptor, err := syscall.Open(repository, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return false, fmt.Errorf("open deployment root: %w", err)
+	}
+	root := os.NewFile(uintptr(rootDescriptor), repository)
+	defer root.Close()
+	if err := syscall.Flock(rootDescriptor, syscall.LOCK_EX); err != nil {
+		return false, fmt.Errorf("lock deployment root: %w", err)
+	}
+	defer syscall.Flock(rootDescriptor, syscall.LOCK_UN)
+	revision, err := local.GitRevision(ctx, repository)
+	if err != nil || revision != expectedRevision {
+		return false, errors.New("deployment HEAD changed after update review")
+	}
+	state, err := local.GitState(ctx, repository)
+	if err != nil || state.Dirty {
+		return false, errors.New("deployment worktree changed after update review")
+	}
+	current, err := local.InspectUpdateInput(repository)
+	if err != nil {
+		return false, fmt.Errorf("reinspect update input: %w", err)
+	}
+	if current.HasLock != expected.HasLock || current.FlakeMode != expected.FlakeMode || current.LockMode != expected.LockMode || !bytes.Equal(current.FlakeContent, expected.FlakeContent) || !bytes.Equal(current.LockContent, expected.LockContent) {
+		return false, errors.New("flake.nix or flake.lock changed after update review")
+	}
+	if len(proposal.FlakeContent) == 0 || len(proposal.LockContent) == 0 {
+		return false, errors.New("validated update proposal is incomplete")
+	}
+	lockMode := os.FileMode(expected.LockMode)
+	if !expected.HasLock {
+		lockMode = 0644
+	}
+	lockTemp, err := writeUpdateTemporary(repository, "flake.lock", proposal.LockContent, lockMode)
+	if err != nil {
+		return false, err
+	}
+	defer os.Remove(lockTemp)
+	flakeTemp, err := writeUpdateTemporary(repository, "flake.nix", proposal.FlakeContent, os.FileMode(expected.FlakeMode))
+	if err != nil {
+		return false, err
+	}
+	defer os.Remove(flakeTemp)
+	lockPath := filepath.Join(repository, "flake.lock")
+	flakePath := filepath.Join(repository, "flake.nix")
+	if err := os.Rename(lockTemp, lockPath); err != nil {
+		return false, fmt.Errorf("replace flake.lock: %w", err)
+	}
+	if err := os.Rename(flakeTemp, flakePath); err != nil {
+		rollbackErr := restoreUpdateLock(repository, expected)
+		if rollbackErr != nil {
+			return true, fmt.Errorf("replace flake.nix: %w; restoring flake.lock also failed: %v", err, rollbackErr)
+		}
+		return false, fmt.Errorf("replace flake.nix: %w; original flake.lock was restored", err)
+	}
+	if err := root.Sync(); err != nil {
+		return true, fmt.Errorf("sync deployment root after update: %w", err)
+	}
+	return false, nil
+}
+
+func writeUpdateTemporary(repository, name string, content []byte, mode os.FileMode) (string, error) {
+	file, err := os.CreateTemp(repository, "."+name+".nixorium-update-*")
+	if err != nil {
+		return "", fmt.Errorf("create %s update draft: %w", name, err)
+	}
+	path := file.Name()
+	failed := true
+	defer func() {
+		if failed {
+			_ = os.Remove(path)
+		}
+	}()
+	if err := file.Chmod(mode.Perm()); err != nil {
+		file.Close()
+		return "", fmt.Errorf("set %s update draft mode: %w", name, err)
+	}
+	if _, err := file.Write(content); err != nil {
+		file.Close()
+		return "", fmt.Errorf("write %s update draft: %w", name, err)
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		return "", fmt.Errorf("sync %s update draft: %w", name, err)
+	}
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("close %s update draft: %w", name, err)
+	}
+	failed = false
+	return path, nil
+}
+
+func restoreUpdateLock(repository string, expected domain.UpdateInputSnapshot) error {
+	path := filepath.Join(repository, "flake.lock")
+	if !expected.HasLock {
+		return os.Remove(path)
+	}
+	temporary, err := writeUpdateTemporary(repository, "flake.lock.rollback", expected.LockContent, os.FileMode(expected.LockMode))
+	if err != nil {
+		return err
+	}
+	defer os.Remove(temporary)
+	return os.Rename(temporary, path)
 }
