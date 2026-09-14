@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,8 @@ type fakeSource struct {
 	revision     string
 	current      map[string]domain.HostSystemProbe
 	currentCalls int
+	history      domain.DeploymentHistory
+	historyErr   error
 	buildErr     error
 	built        bool
 	preparation  domain.PXEPreparationState
@@ -64,6 +67,16 @@ func readyFake() *fakeSource {
 	source.meta.Clients.Hosts = []domain.HostMeta{
 		{Name: "pc01", IP: "10.0.0.1"},
 		{Name: "pc02", IP: "10.0.0.2"},
+	}
+	source.history = domain.DeploymentHistory{
+		SchemaVersion: domain.SchemaVersion,
+		Hosts: map[string]domain.LastSuccessfulDeployment{
+			"pc01": {
+				Revision:   source.revision,
+				SystemPath: source.current["pc01"].SystemPath,
+				VerifiedAt: time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC),
+			},
+		},
 	}
 	return source
 }
@@ -124,6 +137,9 @@ func (f *fakeSource) CurrentSystems(_ context.Context, hosts []domain.HostMeta, 
 		}
 	}
 	return result
+}
+func (f *fakeSource) DeploymentHistory(string) (domain.DeploymentHistory, error) {
+	return f.history, f.historyErr
 }
 func (f *fakeSource) ControllerBuild(context.Context, string, string) error {
 	f.built = true
@@ -242,6 +258,9 @@ func TestHostsPreservesInventoryOrderAndUnknownProbeResult(t *testing.T) {
 	if report.DesiredRevision != source.revision || report.Hosts[0].DesiredRevision != source.revision {
 		t.Fatalf("desired revision was not propagated: %+v", report)
 	}
+	if report.Hosts[0].LastSuccessfulDeploy == nil || report.Hosts[0].LastSuccessfulDeploy.Revision != source.revision || report.Hosts[1].LastSuccessfulDeploy != nil {
+		t.Fatalf("last successful deployments = %+v", report.Hosts)
+	}
 }
 
 func TestHostsReportsOutdatedAuthenticatedSystem(t *testing.T) {
@@ -258,6 +277,21 @@ func TestHostsReportsOutdatedAuthenticatedSystem(t *testing.T) {
 	}
 	if source.currentCalls != 1 {
 		t.Fatalf("authenticated observation batches = %d, want one", source.currentCalls)
+	}
+}
+
+func TestHostsPreservesLiveStateWhenDeploymentHistoryIsInvalid(t *testing.T) {
+	source := readyFake()
+	source.historyErr = errors.New("invalid history")
+	report, err := NewInspector(source).Hosts(context.Background(), ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.State != "partial" || !strings.Contains(report.HistoryDetail, "invalid history") {
+		t.Fatalf("history warning = %+v", report)
+	}
+	if report.Deployment.Current != 1 || report.Deployment.Outdated != 1 {
+		t.Fatalf("live state was lost: %+v", report.Deployment)
 	}
 }
 

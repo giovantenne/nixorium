@@ -601,7 +601,7 @@ func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentMana
 	}
 	progress := io.MultiWriter(stream, operation.Writer())
 	report := manager.Execute(ctx, repository, requested, expectedRevision, operation.Path, progress)
-	fmt.Fprintf(operation.Writer(), "\nResult: %s\nPhase: %s\nBuild completed: %t\nApply completed: %t\nDetail: %s\n", report.State, report.Phase, report.BuildCompleted, report.ApplyCompleted, report.Message)
+	fmt.Fprintf(operation.Writer(), "\nResult: %s\nPhase: %s\nBuild completed: %t\nApply completed: %t\nVerified targets: %d/%d\nRecorded targets: %d\nDetail: %s\n", report.State, report.Phase, report.BuildCompleted, report.ApplyCompleted, report.Verification.Verified, report.Verification.Attempted, report.Verification.Recorded, report.Message)
 	if closeErr := operation.Close(); closeErr != nil {
 		report.State = "failed"
 		report.Message = fmt.Sprintf("%s; finalize durable log: %v", report.Message, closeErr)

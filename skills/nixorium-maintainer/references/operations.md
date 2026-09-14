@@ -43,15 +43,18 @@ Planning requires a ready deployment and clean Git worktree, records HEAD, and
 rejects unknown or duplicate clients. Use the exact command and revision shown
 by the plan. Apply revalidates the review, requires `DEPLOY <targets>`, runs a
 verbose build before activation, and records a private durable log. If apply
-fails, some targets may already have changed; inspect the reported log and
-host state, make a fresh plan, and retry. `--yes` is only for explicit
-automation. The raw commands below remain advanced manual operations and bypass
-these safeguards:
+fails, some targets may already have changed. After every attempt, Nixorium
+authenticates to the selected hosts and records only those reporting the
+reviewed revision and a concrete system path; the private per-repository
+history lives under `~/.local/state/nixorium/deployments/`. Inspect the
+reported log and host state, make a fresh plan, and retry. `--yes` is only for
+explicit automation. The raw commands below remain advanced manual operations
+and bypass these safeguards:
 
 The default TUI's **Deploy updates** screen invokes the same plan/apply
 operations. Select the intended computers, review the resolved revision and
 targets, and enter the exact phrase shown. Do not close the controller terminal
-until the final result and log path appear.
+until the final result, authenticated/recorded counts, and log path appear.
 
 ```sh
 colmena apply --on pc05
@@ -69,6 +72,9 @@ active generation embeds the desired clean Git revision; `outdated` means the
 two revisions differ; `unknown` means Nixorium could not prove either state.
 Do not infer success from a Colmena exit status. A client installed before this
 helper exists remains `unknown` until its next normal deployment.
+The host report also shows the last successful post-apply verification stored
+locally. Treat it as history only: current/outdated/unknown always comes from
+the live authenticated observation.
 
 ## Binary cache
 

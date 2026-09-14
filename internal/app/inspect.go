@@ -37,6 +37,7 @@ type Source interface {
 	ListeningPorts() ([]domain.PortUse, error)
 	SSHStatus(context.Context, []domain.HostMeta, time.Duration) map[string]domain.SSHProbe
 	CurrentSystems(context.Context, []domain.HostMeta, time.Duration) map[string]domain.HostSystemProbe
+	DeploymentHistory(string) (domain.DeploymentHistory, error)
 	ControllerBuild(context.Context, string, string) error
 	CommandAvailable(string) bool
 }
@@ -143,13 +144,24 @@ func (i *Inspector) Hosts(ctx context.Context, repository string) (domain.HostsR
 		}
 	}
 	current := i.source.CurrentSystems(ctx, observable, hostSystemProbeTimeout)
-	hosts, deployment := hostStatuses(meta.Clients.Hosts, ssh, current, revision)
+	history, historyErr := i.source.DeploymentHistory(root)
+	lastSuccessful := map[string]domain.LastSuccessfulDeployment{}
+	historyDetail := ""
+	if historyErr != nil {
+		historyDetail = "last successful deployment history is unavailable: " + historyErr.Error()
+	} else {
+		lastSuccessful = history.Hosts
+	}
+	hosts, deployment := hostStatuses(meta.Clients.Hosts, ssh, current, lastSuccessful, revision)
 	state := "available"
 	for _, host := range hosts {
 		if host.SSH != domain.SSHAvailable {
 			state = "partial"
 			break
 		}
+	}
+	if historyErr != nil {
+		state = "partial"
 	}
 	return domain.HostsReport{
 		SchemaVersion:   domain.SchemaVersion,
@@ -159,6 +171,7 @@ func (i *Inspector) Hosts(ctx context.Context, repository string) (domain.HostsR
 		Repository:      root,
 		DesiredRevision: revision,
 		Deployment:      deployment,
+		HistoryDetail:   historyDetail,
 		Hosts:           hosts,
 	}, nil
 }
@@ -263,7 +276,7 @@ func (i *Inspector) Doctor(ctx context.Context, repository string, options Docto
 		}
 	}
 
-	hosts, _ := hostStatuses(status.Meta.Clients.Hosts, i.source.SSHStatus(ctx, status.Meta.Clients.Hosts, sshProbeTimeout), nil, "")
+	hosts, _ := hostStatuses(status.Meta.Clients.Hosts, i.source.SSHStatus(ctx, status.Meta.Clients.Hosts, sshProbeTimeout), nil, nil, "")
 	i.addSSHFinding(hosts, add)
 	if options.Full {
 		if buildErr := i.source.ControllerBuild(ctx, status.Repository, status.Meta.Controller.Name); buildErr != nil {
@@ -391,7 +404,7 @@ func (i *Inspector) addSSHFinding(hosts []domain.HostStatus, add func(domain.Fin
 	add(domain.Finding{ID: "CLIENT-SSH", Level: domain.LevelWarning, Summary: "SSH is unavailable or unknown on some configured clients", Evidence: fmt.Sprintf("%d/%d available; unavailable or unknown: %s", available, len(hosts), strings.Join(unavailable, ", ")), Remediation: "Power on expected clients and check their static network path before deployment."})
 }
 
-func hostStatuses(hosts []domain.HostMeta, probes map[string]domain.SSHProbe, current map[string]domain.HostSystemProbe, revision string) ([]domain.HostStatus, domain.HostDeploymentSummary) {
+func hostStatuses(hosts []domain.HostMeta, probes map[string]domain.SSHProbe, current map[string]domain.HostSystemProbe, lastSuccessful map[string]domain.LastSuccessfulDeployment, revision string) ([]domain.HostStatus, domain.HostDeploymentSummary) {
 	statuses := make([]domain.HostStatus, 0, len(hosts))
 	summary := domain.HostDeploymentSummary{}
 	for _, host := range hosts {
@@ -416,6 +429,10 @@ func hostStatuses(hosts []domain.HostMeta, probes map[string]domain.SSHProbe, cu
 		observed, observedFound := current[host.Name]
 		status.CurrentSystem = observed.SystemPath
 		status.CurrentRevision = observed.Revision
+		if last, found := lastSuccessful[host.Name]; found {
+			lastCopy := last
+			status.LastSuccessfulDeploy = &lastCopy
+		}
 		switch {
 		case revision == "":
 			status.DeploymentDetail = "desired revision is unavailable"

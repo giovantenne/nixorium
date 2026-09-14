@@ -165,7 +165,10 @@ revision with the repository HEAD and preserves `current`, `outdated`, and
 success as proof of convergence, and an older generation without the helper is
 explicitly unknown. Both the CLI/JSON frontend and the TUI **Computers** screen
 consume the same report; `doctor` retains the cheaper TCP classification for
-its aggregate SSH finding.
+its aggregate SSH finding. A separate per-repository, administrator-owned
+history records the last post-apply observation that authenticated each host at
+the reviewed revision with a concrete system path. Inventory renders that
+timestamp and revision, but live observation remains authoritative.
 
 `deploy plan --on` accepts one client, a comma-separated set, or `@lab`, then
 resolves only configured client identities into a canonical Colmena selector.
@@ -181,10 +184,15 @@ automation-only `--yes`), and constructs fixed argument arrays for verbose
 `colmena build` followed by `colmena apply switch`. A per-administrator
 non-blocking lock prevents overlapping Nixorium deploys. Output is streamed and
 duplicated to a no-follow, mode-0600 operation log under the XDG state
-directory. Reports distinguish preflight, build, apply, and complete phases;
-an apply failure warns that target state may be mixed. Retrying is convergent:
-it requires a fresh valid review and rebuilds before applying again. Direct
-Colmena remains an advanced compatibility surface.
+directory. After every apply attempt, the application reuses the bounded
+authenticated host-state adapter and atomically updates a mode-0600 deployment
+history only for selected hosts whose active revision matches the reviewed
+revision. Reports distinguish preflight, build, apply, verify, and complete
+phases. Apply success is partial until all targets are verified and recorded;
+an apply failure remains failed while still preserving independently verified
+hosts. Retrying is convergent: it requires a fresh valid review and rebuilds
+before applying again. Direct Colmena remains an advanced compatibility
+surface.
 
 `doctor` returns ordered findings with `OK`, `WARNING`, or `ERROR`, a stable
 finding identifier, evidence safe to display, and a remediation. Expensive
@@ -308,6 +316,8 @@ inspect environment
 The private deployment records only non-secret intent and completed review
 decisions. Runtime completion is inferred from configuration, public/private
 key correspondence, system generations, service state, and artifact metadata.
+Per-host deployment history is observed operational evidence stored outside the
+private Git repository, not declarative configuration or a setup stage marker.
 On restart, setup re-runs safe inspections and selects the earliest unmet
 stage. Going backward changes draft values without undoing applied operations.
 

@@ -43,6 +43,9 @@ The deployment screen also receives only typed plan/apply callbacks. Bubble Tea
 owns ordered target selection, review rendering, exact confirmation input,
 activity state, and the final report view. The composition root and adapters
 retain revision/readiness checks, operation locking, private logging, and fixed
-Colmena execution. Because Colmena is a foreground child rather than a
-systemd-owned service, the TUI refuses an accidental quit until it receives the
-operation's final typed result.
+Colmena execution. Post-apply host authentication, per-host history recording,
+and complete/partial classification likewise remain application and adapter
+responsibilities; Bubble Tea only renders their typed counts and timestamps.
+Because Colmena is a foreground child rather than a systemd-owned service, the
+TUI refuses an accidental quit until it receives the operation's final typed
+result.

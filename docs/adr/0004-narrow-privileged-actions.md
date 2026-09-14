@@ -56,7 +56,10 @@ administrator who owns the private deployment, accepts only target identities
 expanded from evaluated metadata, binds execution to a reviewed clean Git
 revision, and uses fixed build/apply argument arrays. Nixorium serializes its
 own deployments with a private state-directory lock and records streamed output
-in a private durable log; it does not expose a generic privileged command.
+in a private durable log. It also performs bounded authenticated host-state
+queries and atomically stores per-repository successful-verification history as
+the administrator with mode 0600; neither operation introduces a root service
+or generic privileged command.
 
 ## Consequences
 

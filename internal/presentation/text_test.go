@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -13,8 +14,9 @@ func TestHostsTextIncludesTypedComputerState(t *testing.T) {
 		State:           "partial",
 		DesiredRevision: "0123456789abcdef",
 		Deployment:      domain.HostDeploymentSummary{Current: 1, Unknown: 1},
+		HistoryDetail:   "one old history file was ignored",
 		Hosts: []domain.HostStatus{
-			{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, CurrentSystem: "/nix/store/current", CurrentRevision: "0123456789abcdef"},
+			{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, CurrentSystem: "/nix/store/current", CurrentRevision: "0123456789abcdef", LastSuccessfulDeploy: &domain.LastSuccessfulDeployment{Revision: "0123456789abcdef", VerifiedAt: time.Date(2026, 9, 14, 10, 30, 0, 0, time.UTC)}},
 			{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityUnknown, SSH: domain.SSHUnknown, Deployment: domain.DeploymentUnknown, DeploymentDetail: "current deployment revision is unavailable"},
 		},
 	}
@@ -25,10 +27,12 @@ func TestHostsTextIncludesTypedComputerState(t *testing.T) {
 		"SSH available:      1/2",
 		"Deployment:         1 current, 0 outdated, 1 unknown",
 		"Desired revision:   0123456789abcdef",
+		"History warning:    one old history file was ignored",
 		"pc01       10.0.0.1        network=reachable",
 		"pc02       10.0.0.2        network=unknown",
 		"current: /nix/store/current",
 		"current revision: 0123456789abcdef",
+		"last verified: 0123456789abcdef at 2026-09-14T10:30:00Z",
 		"detail:  current deployment revision is unavailable",
 	} {
 		if !strings.Contains(output.String(), expected) {
@@ -79,10 +83,19 @@ func TestDeploymentExecutionTextShowsFailureAndRecovery(t *testing.T) {
 		RetrySafe:       true,
 		LogPath:         "/state/deploy.log",
 		Message:         "apply failed; some targets may already have changed",
+		Verification: domain.DeploymentVerificationSummary{
+			Attempted: 2,
+			Verified:  1,
+			Recorded:  1,
+			Targets: []domain.DeploymentTargetVerification{
+				{Name: "pc01", State: "verified"},
+				{Name: "pc02", State: "unverified", Detail: "authentication failed"},
+			},
+		},
 	}
 	output := &bytes.Buffer{}
 	DeploymentExecutionText(output, report)
-	for _, expected := range []string{"FAILED", "apply", "pc01,pc02", "/state/deploy.log", "some targets may already have changed", "Retry:"} {
+	for _, expected := range []string{"FAILED", "apply", "pc01,pc02", "Verified targets: 1/2 (recorded 1)", "pc02       unverified: authentication failed", "/state/deploy.log", "some targets may already have changed", "Retry:"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("deployment output omits %q:\n%s", expected, output.String())
 		}
