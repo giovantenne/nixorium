@@ -99,10 +99,25 @@ systemctl status nixorium-harmonia.service
 nixorium doctor
 ```
 
-The stable product alias is used for status and service control. Query detailed
-logs with `journalctl -u harmonia.service`, the canonical nixpkgs unit name.
+The stable product alias is used for status; control enters through the fixed
+action below. Query detailed logs with `journalctl -u harmonia.service`, the
+canonical nixpkgs unit name.
 The signing key is loaded from `/var/lib/nixorium/keys/harmonia-secret-key` as
 an isolated systemd credential and must never be copied into Git or the store.
+
+Use the bounded management workflow for routine observation or recovery:
+
+```sh
+nixorium services
+nixorium services restart cache
+```
+
+Restart requires exact `RESTART CACHE` confirmation, invokes only the fixed
+capability-free `nixorium-restart-cache.service` action, and verifies both the
+unit and HTTP endpoint afterward. Do not use this path to control PXE units;
+their listener and network transition must remain coordinated through
+`nixorium pxe`. The TUI's **Manage services** task uses the same typed
+operations. `--yes` is only for intentional automation.
 
 ## PXE preparation
 

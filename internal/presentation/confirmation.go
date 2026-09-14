@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -43,6 +44,20 @@ func ConfirmControllerRebuild(input io.Reader, output io.Writer, report domain.C
 		return false, err
 	}
 	return strings.TrimSpace(value) == report.Confirmation, nil
+}
+
+func ConfirmServiceRestart(input io.Reader, output io.Writer, service domain.ManagedService) (bool, error) {
+	fmt.Fprintln(output, "Service restart review")
+	fmt.Fprintf(output, "Service: %s\n", service.Name)
+	fmt.Fprintln(output, "Impact: the binary cache will be briefly unavailable; active PXE clients may retry downloads")
+	fmt.Fprintln(output, "Safety: PXE networking and listeners are not controlled by this action")
+	fmt.Fprint(output, "Type RESTART CACHE to continue: ")
+	reader := bufio.NewReader(input)
+	value, err := reader.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	return strings.TrimSpace(value) == "RESTART CACHE", nil
 }
 
 func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecycleReport) (bool, error) {

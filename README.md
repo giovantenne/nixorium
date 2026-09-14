@@ -350,6 +350,8 @@ nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
+nix run .#nixorium -- services
+nix run .#nixorium -- services restart cache
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -415,6 +417,15 @@ closure, and the application verifies `/run/current-system` afterward. The
 dashboard's **Rebuild controller** task uses the same typed workflow; the
 systemd-owned job and journal survive closing the dashboard. `--yes` remains an
 explicit automation-only confirmation.
+`services` reports the persistent signed binary cache and the composite
+on-demand PXE lifecycle with raw unit states and operator-friendly health.
+`services restart cache` requires exact `RESTART CACHE` confirmation, starts
+only the fixed capability-free `nixorium-restart-cache.service` action, and
+returns success only after Harmonia is active and HTTP-ready. Direct generic
+service names and PXE unit actions are rejected; use the transactional `pxe`
+workflow for installation mode. The dashboard's **Manage services** screen
+uses the same typed status/restart operations. `--yes` is reserved for
+intentional automation.
 From the dashboard, **Install computers over network**
 uses the same typed application operations as the CLI to prepare artifacts and
 to review, start, stop, or recover PXE mode. Starting requires the exact

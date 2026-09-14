@@ -136,6 +136,10 @@ nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 
+# Inspect managed services or restart and verify only the signed cache
+nix run .#nixorium -- services
+nix run .#nixorium -- services restart cache
+
 # Review and execute a managed client deployment
 nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN

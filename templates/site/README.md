@@ -93,6 +93,8 @@ nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
+nix run .#nixorium -- services
+nix run .#nixorium -- services restart cache
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -151,6 +153,13 @@ as the deployment owner, refuses repository drift before activation, and
 verifies the active system afterward. The dashboard's **Rebuild controller**
 task invokes the same typed workflow; the systemd-owned job and journal survive
 closing the dashboard. Use `--yes` only for intentional automation.
+Use `services` to inspect the persistent signed cache and composite on-demand
+PXE lifecycle. `services restart cache` requires exact `RESTART CACHE`
+confirmation, starts only a fixed capability-free action, and succeeds only
+after Harmonia is active and HTTP-ready. PXE units cannot be controlled through
+this generic path; use `pxe prepare/start/stop/recover`. The dashboard's
+**Manage services** task uses the same typed operations. Use `--yes` only for
+intentional automation.
 Bare `setup` (or `setup configure`) opens the first-run terminal wizard. It
 proposes detected network values, supports backward navigation, collects
 passwords without echo, validates the complete candidate through Nix, shows a

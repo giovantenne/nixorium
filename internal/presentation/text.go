@@ -41,6 +41,43 @@ func StatusText(writer io.Writer, report domain.StatusReport) {
 	}
 }
 
+func ServicesText(writer io.Writer, report domain.ServicesReport) {
+	fmt.Fprintf(writer, "Nixorium services: %s\n", strings.ToUpper(report.State))
+	for _, service := range report.Services {
+		fmt.Fprintf(writer, "  %s (%s): %s\n", service.Name, service.Mode, service.State)
+		if service.Detail != "" {
+			fmt.Fprintf(writer, "    %s\n", service.Detail)
+		}
+		for _, unit := range service.Units {
+			fmt.Fprintf(writer, "    %-32s %s\n", unit.Name, unit.State)
+		}
+		for _, command := range service.Commands {
+			fmt.Fprintf(writer, "    workflow: %s\n", command)
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func ServiceActionText(writer io.Writer, report domain.ServiceActionReport) {
+	fmt.Fprintf(writer, "Service action: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Action:         %s %s\n", report.Action, report.Service)
+	if report.Unit != "" {
+		fmt.Fprintf(writer, "Unit:           %s\n", report.Unit)
+	}
+	fmt.Fprintf(writer, "Verified:       %t\n", report.Verified)
+	if report.Current.State != "" {
+		fmt.Fprintf(writer, "Current state:  %s\n", report.Current.State)
+	}
+	if report.Message != "" {
+		fmt.Fprintln(writer, report.Message)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
 func HostsText(writer io.Writer, report domain.HostsReport) {
 	available, total := hostAvailability(report.Hosts)
 	fmt.Fprintf(writer, "Nixorium computers: %s\n", strings.ToUpper(report.State))

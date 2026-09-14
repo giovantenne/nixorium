@@ -63,6 +63,27 @@ func TestParseArgumentsAcceptsControllerPlanAndApply(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsServicesAndCacheRestart(t *testing.T) {
+	list, err := parseArguments([]string{"services", "--json"})
+	if err != nil || list.command != "services" || list.subcommand != "" || !list.json {
+		t.Fatalf("services = %+v, error = %v", list, err)
+	}
+	restart, err := parseArguments([]string{"services", "restart", "cache", "--yes", "--json"})
+	if err != nil || restart.command != "services" || restart.subcommand != "restart" || restart.service != "cache" || !restart.yes || !restart.json {
+		t.Fatalf("services restart = %+v, error = %v", restart, err)
+	}
+	for _, arguments := range [][]string{
+		{"services", "restart"},
+		{"services", "restart", "pxe"},
+		{"services", "--yes"},
+		{"restart", "services", "cache"},
+	} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("unsafe/incomplete arguments were accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

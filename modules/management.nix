@@ -340,6 +340,7 @@ in
                unit == "nixorium-apply-controller.service" ||
                /^nixorium-apply-controller@[0-9a-f]{40}\.service$/.test(unit) ||
                unit == "nixorium-prepare-pxe.service" ||
+               unit == "nixorium-restart-cache.service" ||
                unit == "nixorium-pxe-recover.service")) ||
              (unit == "nixorium-pxe.service" &&
               (verb == "start" || verb == "stop")) ||
@@ -423,6 +424,21 @@ in
         IOSchedulingClass = "best-effort";
         NoNewPrivileges = true;
         TimeoutStartSec = "2h";
+      };
+    };
+
+    systemd.services.nixorium-restart-cache = {
+      description = "Restart the Nixorium binary cache";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${pkgs.systemd}/bin/systemctl restart harmonia.service";
+        User = "root";
+        Group = "root";
+        CapabilityBoundingSet = "";
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectHome = true;
+        ProtectSystem = "strict";
       };
     };
 

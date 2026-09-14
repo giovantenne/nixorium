@@ -140,7 +140,7 @@ nixorium hosts              inspect configured machines
 nixorium deploy             build and deploy selected machines
 nixorium controller         review, rebuild, activate, and verify the controller
 nixorium pxe                prepare, start, inspect, stop, or recover PXE mode
-nixorium services           inspect relevant controller services
+nixorium services           inspect services; restart only the signed cache
 nixorium update             prepare a reviewable upstream release update
 ```
 
@@ -245,6 +245,10 @@ The controller screen follows the same boundary: Bubble Tea renders the typed
 revision/current-state plan, collects exact `REBUILD <controller>` confirmation,
 and invokes the application callback. The systemd-owned rebuild may outlive the
 dashboard and retains its build/activation journal.
+The services screen likewise receives typed component status and one cache
+restart callback. It renders the persistent cache and composite on-demand PXE
+lifecycle, requires exact `RESTART CACHE` confirmation, and cannot issue raw
+systemd actions. PXE remains linked to its dedicated transactional workflow.
 
 ## Configuration ownership and editing
 
@@ -362,6 +366,7 @@ Root operations are exposed as fixed controller services/actions:
 - install or verify private key material at fixed destinations;
 - apply the controller NixOS configuration;
 - start, stop, and recover PXE networking and services;
+- restart the binary cache through one fixed action and verify it unprivileged;
 - inspect narrowly selected system units and journals.
 
 Systemd owns the long-running processes and root-only state. Polkit grants the
@@ -414,6 +419,12 @@ application then verifies both HEAD and `/run/current-system`. The original
 parameterless unit remains for first-run-compatible `setup apply` and now also
 pins/rechecks the revision it discovers internally.
 
+Routine cache recovery uses `nixorium-restart-cache.service`. Polkit permits
+wheel administrators only to start that fixed capability-free oneshot; it does
+not authorize restarting `harmonia.service` or arbitrary units. The action
+performs the exact native restart as root, while the application independently
+re-observes the product alias and HTTP endpoint before reporting success.
+
 ## Managed services
 
 The controller architecture defines:
@@ -433,6 +444,13 @@ The controller architecture defines:
   temporary address transition idempotently;
 - preparation/apply jobs as transient or oneshot units so their logs survive a
   TUI exit.
+
+`nixorium services` groups those raw units into two operator-facing typed
+components: a persistent signed binary cache and the composite on-demand PXE
+lifecycle. Inactive PXE units are healthy standby, while inconsistent or failed
+listener/network state is degraded. Generic service management exposes only
+cache restart; all PXE mutations remain behind prepare/start/stop/recover so
+the address transaction cannot be bypassed.
 
 The preparation job is implemented as `nixorium-prepare-pxe.service`. It runs
 without root capabilities as the deployment owner, requires a clean and ready

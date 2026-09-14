@@ -218,6 +218,59 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 }
 
+func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
+	restarts := 0
+	serviceReport := domain.ServicesReport{
+		Operation: "services",
+		State:     "healthy",
+		Services: []domain.ManagedService{
+			{ID: "cache", Name: "Binary cache", State: "healthy", Detail: "HTTP-ready", Units: []domain.ServiceState{{Name: "nixorium-harmonia.service", Loaded: true, Active: true, State: "active"}}},
+			{ID: "pxe", Name: "PXE installation mode", State: "ready", Detail: "prepared", Units: []domain.ServiceState{{Name: "nixorium-pxe.service", Loaded: true, State: "inactive"}}},
+		},
+	}
+	actions := DashboardActions{
+		LoadServices: func() domain.ServicesReport { return serviceReport },
+		RestartService: func(service string) domain.ServiceActionReport {
+			restarts++
+			if service != "cache" {
+				t.Fatalf("restarted unexpected service %q", service)
+			}
+			return domain.ServiceActionReport{Operation: "service-restart", State: "completed", Service: service, Verified: true, Message: "cache healthy"}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardServices || !strings.Contains(model.View(), "Binary cache — healthy") || !strings.Contains(model.View(), "Managed through the Install computers workflow") {
+		t.Fatalf("services screen missing:\n%s", model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View(), "RESTART CACHE") {
+		t.Fatalf("restart review missing:\n%s", model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("restart cache")})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || restarts != 0 || !strings.Contains(model.View(), "did not match") {
+		t.Fatalf("inexact restart was accepted: restarts=%d", restarts)
+	}
+	for _, key := range []tea.KeyMsg{{Type: tea.KeyRunes, Runes: []rune("RESTART")}, {Type: tea.KeySpace}, {Type: tea.KeyRunes, Runes: []rune("CACHE")}} {
+		updated, _ = model.Update(key)
+		model = updated.(dashboardModel)
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View(), "verified=true") || !strings.Contains(model.View(), "cache healthy") {
+		t.Fatalf("verified restart result missing: restarts=%d\n%s", restarts, model.View())
+	}
+}
+
 func TestDashboardDeploymentRejectsEmptySelectionAndBlockedPlan(t *testing.T) {
 	report := testDashboardReport("ready")
 	report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}}
