@@ -80,6 +80,16 @@ func ServiceActionText(writer io.Writer, report domain.ServiceActionReport) {
 
 func OperationLogsText(writer io.Writer, report domain.OperationLogsReport) {
 	fmt.Fprintf(writer, "Nixorium operation logs: %s\n", strings.ToUpper(report.State))
+	if len(report.Records) == 0 {
+		fmt.Fprintln(writer, "No recorded operation outcomes are available.")
+	} else {
+		fmt.Fprintln(writer, "Recent actions:")
+		for _, record := range report.Records {
+			fmt.Fprintf(writer, "  %s  %-20s %-11s %s\n", record.RecordedAt.UTC().Format("2006-01-02 15:04:05Z"), record.Operation, record.State, record.Subject)
+			fmt.Fprintf(writer, "    %s\n", record.Summary)
+		}
+	}
+	fmt.Fprintln(writer, "Deployment logs:")
 	if len(report.Logs) == 0 {
 		fmt.Fprintln(writer, "No deployment operation logs are available.")
 	}

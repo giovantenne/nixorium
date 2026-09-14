@@ -62,7 +62,10 @@ and renders the verified action report. It cannot select an arbitrary unit or
 verb, and it directs PXE mutations to the dedicated lifecycle operation.
 
 Operation-log browsing also enters presentation only as typed bounded list and
-detail reports. Bubble Tea owns selection and viewport scrolling. The adapter
-owns generated-ID validation, no-follow file access, current-user ownership and
-strict-mode checks, newest-record and byte limits, and terminal-control
+detail reports. Bubble Tea owns recent-outcome rendering, log selection, and
+viewport scrolling. The application reduces supported final reports to fixed
+safe summary fields without raw messages; the adapter serializes concurrent
+writers and atomically retains the newest 1000 records. It also owns
+generated-ID validation, no-follow file access, current-user ownership and
+strict-mode checks, newest-log and byte limits, and terminal-control
 sanitization; neither CLI nor TUI accepts an arbitrary path.

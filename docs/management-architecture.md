@@ -197,14 +197,19 @@ before applying again. Direct Colmena remains an advanced compatibility
 surface.
 
 `logs` lists at most the newest 50 recognized deployment logs in the current
-administrator's XDG state; it does not require a deployment checkout. `logs
-show <id>` accepts only the generated basename grammar and returns at most the
-final 64 KiB. The adapter opens directories/files without following symlinks,
-requires the current UID, exact 0700 directories and 0600 regular files, and
-neutralizes terminal control/format characters. Unsafe recognized entries are
-reported as unavailable rather than read. CLI text/JSON and the scrollable TUI
-detail use the same typed list/show reports. This is a read-only recovery
-surface, not a database or a substitute for live host reconciliation.
+administrator's XDG state; it does not require a deployment checkout. It also
+shows typed safe summaries recorded after important configuration, key, fixed
+controller, PXE, cache, and deployment actions. The compact record is locked,
+atomically replaced, mode 0600, and explicitly retains only the newest 1000
+outcomes; raw report messages are never copied and detailed deployment logs are
+never deleted by that retention. `logs show <id>` accepts only the generated
+basename grammar and returns at most the final 64 KiB. The adapter opens
+directories/files without following symlinks, requires the current UID, exact
+0700 directories and 0600 regular files, and neutralizes terminal
+control/format characters. Unsafe recognized entries are reported as
+unavailable rather than read. CLI text/JSON and the scrollable TUI detail use
+the same typed list/show reports. This is a recovery surface, not a database or
+a substitute for live host reconciliation.
 
 `doctor` returns ordered findings with `OK`, `WARNING`, or `ERROR`, a stable
 finding identifier, evidence safe to display, and a remediation. Expensive
@@ -261,9 +266,10 @@ restart callback. It renders the persistent cache and composite on-demand PXE
 lifecycle, requires exact `RESTART CACHE` confirmation, and cannot issue raw
 systemd actions. PXE remains linked to its dedicated transactional workflow.
 The operation-log screen receives typed bounded list/detail callbacks. Bubble
-Tea owns selection and viewport scrolling only; basename validation, no-follow
-filesystem access, ownership/mode enforcement, byte limits, and terminal-text
-sanitization stay in the adapter/application layers.
+Tea owns recent-outcome rendering, log selection, and viewport scrolling only;
+record construction, persistence, basename validation, no-follow filesystem
+access, ownership/mode enforcement, bounds, and terminal-text sanitization stay
+in the application/adapter layers.
 
 ## Configuration ownership and editing
 
@@ -579,12 +585,16 @@ never implicit and no remote is required.
 Privileged/systemd operations retain detailed output in journald. Foreground
 deployments stream output to private mode-0600 files under the administrator's
 XDG state, alongside a separate mode-0600 authenticated per-host success
-history. Bounded typed list/detail operations make deployment logs available to
-CLI/JSON and the TUI without a database or arbitrary path reads. A small
-root-owned state directory contains only active/recovery state that journald
-cannot provide; it is not an alternative configuration database. Logs must
-never include credential input, key contents, environment secrets, or command
-output known to contain secrets.
+history. Important user-facing action reports are reduced in the application
+layer to fixed typed fields—operation, state, bounded subject, and a generated
+summary—and appended under a separate lock by atomically replacing a strict
+mode-0600 newest-1000 record. Persistence failure is surfaced without changing
+the already-observed operation outcome. Bounded typed list/detail operations
+make records and deployment logs available to CLI/JSON and the TUI without a
+database or arbitrary path reads. A small root-owned state directory contains
+only active/recovery state that journald cannot provide; it is not an
+alternative configuration database. Logs must never include credential input,
+key contents, environment secrets, or command output known to contain secrets.
 
 ## Testing strategy
 

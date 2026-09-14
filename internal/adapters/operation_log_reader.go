@@ -32,7 +32,7 @@ func (Local) OperationLogs(limit int) ([]domain.OperationLogEntry, error) {
 		return nil, err
 	}
 	directory, err := openOperationLogDirectory(stateRoot)
-	if os.IsNotExist(err) {
+	if errors.Is(err, syscall.ENOENT) {
 		return []domain.OperationLogEntry{}, nil
 	}
 	if err != nil {

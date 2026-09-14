@@ -156,8 +156,12 @@ func TestOperationLogTextShowsBoundedListAndTail(t *testing.T) {
 		SizeBytes: 70000, State: "partial", Available: true,
 	}
 	listOutput := &bytes.Buffer{}
-	OperationLogsText(listOutput, domain.OperationLogsReport{State: "available", Logs: []domain.OperationLogEntry{entry}})
-	for _, expected := range []string{"AVAILABLE", "2026-09-14 11:30:00Z", "deployment", "partial", id} {
+	OperationLogsText(listOutput, domain.OperationLogsReport{
+		State:   "available",
+		Records: []domain.OperationRecord{{RecordedAt: time.Date(2026, 9, 14, 11, 31, 0, 0, time.UTC), Operation: "pxe-start", State: "completed", Subject: "active", Summary: "PXE lifecycle transition finished"}},
+		Logs:    []domain.OperationLogEntry{entry},
+	})
+	for _, expected := range []string{"AVAILABLE", "Recent actions", "pxe-start", "PXE lifecycle transition finished", "Deployment logs", "2026-09-14 11:30:00Z", "deployment", "partial", id} {
 		if !strings.Contains(listOutput.String(), expected) {
 			t.Fatalf("log list omits %q:\n%s", expected, listOutput.String())
 		}

@@ -64,7 +64,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Typed `nixorium logs` list/detail CLI/JSON and dashboard browsing for private
   deployment logs, with basename-only selection, strict owner/mode/type and
   no-follow validation, 50-record/64-KiB bounds, terminal-control sanitization,
-  and scrollable tail rendering.
+  and scrollable tail rendering. A locked atomic mode-0600 newest-1000 record
+  adds safe typed summaries for configuration, key, controller, PXE, cache, and
+  deployment outcomes without copying raw messages or deleting detailed logs.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments
@@ -118,7 +120,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The accepted management-system architecture and ADRs for the terminal-first
   interface, Go/Bubble Tea implementation, structured deployment settings,
   narrow privilege boundary, systemd-owned runtime services, interface-scoped
-  firewall, and local guided client-enrollment trust model.
+  firewall, local guided client-enrollment trust model, and bounded private
+  operation records.
 - An interactive controller-bootstrap version selector offering `master`, the
   latest GitHub prerelease, and published stable releases while preserving
   `--release` and `NIXORIUM_RELEASE` for unattended installations.

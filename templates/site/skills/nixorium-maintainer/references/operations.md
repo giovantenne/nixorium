@@ -97,8 +97,11 @@ nixorium logs show OPERATION_LOG_ID
 ```
 
 `logs` returns at most the newest 50 recognized deployment entries and works
-outside the deployment checkout. `logs show` accepts only an ID emitted by the
-list and displays at most the final 64 KiB. Nixorium refuses symlinks, foreign
+outside the deployment checkout. It also shows fixed typed summaries for recent
+configuration, key, controller, PXE, cache, and deployment outcomes. The
+private atomic summary file retains the newest 1000 records and never deletes
+detailed deployment logs. `logs show` accepts only an ID emitted by the list
+and displays at most the final 64 KiB. Nixorium refuses symlinks, foreign
 owners, non-0700 state directories, and non-0600 files, and neutralizes terminal
 control characters before text/TUI rendering. An unsafe entry is reported as
 unavailable; do not loosen its permissions merely to make the browser accept

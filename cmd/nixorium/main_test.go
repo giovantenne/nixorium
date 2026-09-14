@@ -3,8 +3,28 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/adapters"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
+
+func TestOperationRecordMessagePersistsTypedOutcomeAndSurfacesFailure(t *testing.T) {
+	stateRoot := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateRoot)
+	report := domain.ActionReport{Operation: "pxe-prepare", State: "completed", Unit: "nixorium-prepare-pxe.service"}
+	if message := operationRecordMessage("prepared", report); message != "prepared" {
+		t.Fatalf("message = %q", message)
+	}
+	records, err := (adapters.Local{}).OperationRecords(10)
+	if err != nil || len(records) != 1 || records[0].Operation != "pxe-prepare" {
+		t.Fatalf("records = %+v, error = %v", records, err)
+	}
+	if message := operationRecordMessage("failed", domain.StatusReport{}); !strings.Contains(message, "was not recorded") {
+		t.Fatalf("unsupported outcome failure was hidden: %q", message)
+	}
+}
 
 func TestParseArgumentsAllowsFlagsBeforeOrAfterCommand(t *testing.T) {
 	options, err := parseArguments([]string{"status", "--json", "--repo", "/tmp/site"})
