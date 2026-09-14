@@ -29,6 +29,11 @@
       #!${pkgs.runtimeShell}
       [[ "''${1:-}" == switch ]] || exit 2
       SYSTEM_PATH="$(${pkgs.coreutils}/bin/dirname "$(${pkgs.coreutils}/bin/dirname "$(${pkgs.coreutils}/bin/readlink -f "$0")")")"
+      if ${pkgs.coreutils}/bin/touch /home/admin/nixorium-deployment/activation-must-not-write 2>/dev/null; then
+        exit 3
+      fi
+      ${pkgs.coreutils}/bin/mkdir -p /home/teacher/.config /run/user/1000
+      ${pkgs.coreutils}/bin/touch /home/teacher/.config/nixorium-activation-test /run/user/1000/nixorium-activation-test
       ${pkgs.coreutils}/bin/ln -sfn "$SYSTEM_PATH" /run/current-system
       ${pkgs.coreutils}/bin/touch /run/nixorium-controller-applied
       SCRIPT
@@ -276,6 +281,7 @@
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json' | jq -e '.operation == \"setup-apply-controller\" and .state == \"completed\"'")
     controller.succeed("test -e /run/nixorium-controller-applied")
+    controller.succeed("test -e /home/teacher/.config/nixorium-activation-test; test -e /run/user/1000/nixorium-activation-test; test ! -e /home/admin/nixorium-deployment/activation-must-not-write")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"offer-client-installation\" and (.stages[] | select(.id == \"prepare-artifacts\").state) == \"complete\"'")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json' | jq -e '.state == \"completed\"'")
     controller.succeed("su - admin -c 'nixorium controller plan --repo ~/nixorium-deployment --json' > /tmp/controller-plan.json; jq -e '.operation == \"controller-plan\" and .state == \"current\" and .controller == \"pc99\" and .current and (.revision | length) == 40 and .confirmation == \"REBUILD pc99\"' /tmp/controller-plan.json")

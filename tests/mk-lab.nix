@@ -78,6 +78,12 @@ assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.signKey
 ];
 assert builtins.elem "nixorium-harmonia.service"
   subnetLab.nixosConfigurations.pc99.config.systemd.services.harmonia.aliases;
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-apply-controller".serviceConfig.ProtectHome == false;
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-apply-controller@".serviceConfig.ProtectHome == false;
+assert builtins.elem "/home/admin/nixorium-deployment"
+  subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-apply-controller".serviceConfig.ReadOnlyPaths;
+assert builtins.elem "/home/admin/nixorium-deployment"
+  subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-apply-controller@".serviceConfig.ReadOnlyPaths;
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-prepare-pxe";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-restart-cache";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-restart-cache".serviceConfig.CapabilityBoundingSet == "";

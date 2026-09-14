@@ -424,6 +424,11 @@ key mismatches, and installed-secret drift. Evaluation and the build run as
 the administrator through a `git+file` Flake URL, deliberately excluding
 ignored private keys from the Nix source/store. Root receives only the single
 resulting store closure and executes its `switch-to-configuration switch`.
+That activation unit permits writes to declared user homes and `/run/user`,
+because NixOS activation and user-generation reloads legitimately update both;
+`ProtectHome` therefore cannot wrap the switch process. The fixed deployment
+path remains mounted explicitly read-only, and the command, target closure,
+Git revision, and polkit unit shape remain constrained independently.
 Systemd/journald retain preflight, build, and activation output across TUI or
 terminal exits. Setup completion is reconciled by comparing the evaluated
 controller to `/run/current-system`, not by setting a flag.

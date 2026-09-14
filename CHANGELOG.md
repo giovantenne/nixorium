@@ -147,6 +147,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   other representative outputs plus a fresh template, and a separate local
   matrix for builds, netboot, and offline installer equivalence.
 
+### Fixed
+
+- Allowed the fixed controller activation units to update declared user homes
+  and `/run/user`, while retaining the reviewed private deployment as an
+  explicit read-only mount. This prevents valid NixOS activation scripts from
+  failing under `ProtectHome`.
+
 ### Security
 
 - Enabled the NixOS firewall on every installed host with role-specific ports
