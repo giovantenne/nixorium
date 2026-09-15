@@ -18,6 +18,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   layouts, and persistent confirmation controls in long reviews. Existing
   application operations, CLI contracts and exact safety confirmations remain
   shared. Software and shutdown limitations are explicitly documented in-app.
+- Completed the guided pilot-computer handoff in first setup. The operator now
+  selects an immutable configured identity, receives local identity/disk steps,
+  checks authenticated active-revision evidence separately from the practical
+  desktop check, and may finish after one computer without treating powered-off
+  clients as failures. The application layer validates and probes only the
+  selected pilot identity. Leaving PXE active requires an explicit consequence
+  review and exact confirmation.
 
 - Added one background-aware official Bubbles spinner to every dashboard wait
   state, so host checks, Git/service loading, settings validation, update

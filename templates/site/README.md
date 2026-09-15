@@ -47,9 +47,16 @@ step with `Enter`:
 3. **Prepare installation files.** Press `Enter`; progress and recent activity
    remain visible while Nix builds the netboot artifacts and client systems.
 4. **Install the first computer.** Open network installation, start PXE after
-   its explicit network review, and boot the client from UEFI network boot.
+   its explicit network review, choose a pilot identity from the saved
+   inventory, and boot that client from UEFI network boot. After the local
+   identity-and-disk confirmation and installed-disk boot, press `v` on the
+   controller to verify authenticated active-revision evidence. Complete the
+   separate practical desktop check, then install another client or stop PXE
+   and defer the rest.
 
-You can press `q` at any safe point. Running the setup command again observes
+You can press `q` at any safe point. While PXE is active, leaving it active is a
+separate exact-confirmation choice; stopping PXE restores normal controller
+networking. Running the setup command again observes
 Git, keys, the active controller, and prepared artifacts, then resumes at the
 first incomplete stage instead of repeating completed work.
 

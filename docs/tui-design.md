@@ -2,7 +2,7 @@
 
 Implementation follows the reviewed [installation and intervention plan](ux-review/README.md),
 with complete flows, layouts, delivery batches, and explicit decisions. This
-document records the implementation state; no commit is implied.
+document records the implementation state on the development branch.
 
 ## UX audit (2026-09-15)
 
@@ -117,6 +117,11 @@ compact, standard and wide sizes. Record physical testing separately.
   navigation, help isolation and six disruptive confirmation/cancel flows.
 - Added a post-build progress regression test so revalidation cannot visually
   jump back before the completed build.
+- Added focused-pilot tests proving that an identity outside the evaluated
+  inventory is rejected before network access and that only the selected
+  client's SSH and active-system probes run. Presentation tests cover pilot
+  selection, honest no-telemetry handoff, separate technical/practical checks,
+  partial-session summary, and exact confirmation before leaving PXE active.
 - Layout checks: PASS at 80×24, 120×30 and 180×45 with 200 computers;
   focused rows and exact-confirmation controls remain visible.
 - Color capability checks: PASS for no color, ANSI and ANSI256; meaning survives
@@ -132,11 +137,11 @@ of complete titles in incremental terminal output, and log browsing explicitly
 scrolls to the final result. No application safety check was removed.
 
 Final management VM derivation:
-`/nix/store/jhsyp9116k545wgs9h74h3297sdmz3ya-vm-test-run-nixorium-management.drv`.
+`/nix/store/41hkm7zln2i31cyy9g868vydg39d2qfy-vm-test-run-nixorium-management.drv`.
 
 No physical laboratory tests, full release matrix or client-installer VM ran
-for this frontend change. No live laboratory operations, repository commit,
-push or release were performed. Integrated package editing and managed power
+for this frontend change. No live laboratory operations, push or release were
+performed. Integrated package editing and managed power
 operations remain planned application work, not implemented TUI actions.
 
 ### Changed files
@@ -145,8 +150,8 @@ operations remain planned application work, not implemented TUI actions.
   `experience.go`, `components.go`, `settings_dashboard.go`, `setup_wizard.go`.
 - Read model: `internal/domain/computer_condition.go`.
 - Application wiring: `cmd/nixorium/main.go` adds existing Doctor and
-  UpdateManager release discovery to the typed TUI callbacks; existing CLI
-  command handlers are unchanged.
+  UpdateManager release discovery plus the single-inventory-identity observer
+  to the typed TUI callbacks; existing CLI command handlers are unchanged.
 - Tests: `internal/domain/computer_condition_test.go`,
   `internal/presentation/experience_test.go`, `tui_test.go`,
   `components_test.go`, and `tests/management-vm.nix`.

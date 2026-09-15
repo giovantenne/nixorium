@@ -22,9 +22,11 @@ type fakeSource struct {
 	ports        []domain.PortUse
 	ssh          map[string]domain.SSHProbe
 	sshCalls     int
+	sshHosts     []domain.HostMeta
 	revision     string
 	current      map[string]domain.HostSystemProbe
 	currentCalls int
+	currentHosts []domain.HostMeta
 	history      domain.DeploymentHistory
 	historyErr   error
 	buildErr     error
@@ -124,12 +126,14 @@ func (f *fakeSource) CacheKeyState(context.Context, string) (domain.CacheKeyStat
 }
 func (f *fakeSource) CacheHealth(context.Context, string, int) error { return f.cacheErr }
 func (f *fakeSource) ListeningPorts() ([]domain.PortUse, error)      { return f.ports, nil }
-func (f *fakeSource) SSHStatus(context.Context, []domain.HostMeta, time.Duration) map[string]domain.SSHProbe {
+func (f *fakeSource) SSHStatus(_ context.Context, hosts []domain.HostMeta, _ time.Duration) map[string]domain.SSHProbe {
 	f.sshCalls++
+	f.sshHosts = append([]domain.HostMeta(nil), hosts...)
 	return f.ssh
 }
 func (f *fakeSource) CurrentSystems(_ context.Context, hosts []domain.HostMeta, _ time.Duration) map[string]domain.HostSystemProbe {
 	f.currentCalls++
+	f.currentHosts = append([]domain.HostMeta(nil), hosts...)
 	result := make(map[string]domain.HostSystemProbe, len(hosts))
 	for _, host := range hosts {
 		if probe, found := f.current[host.Name]; found {
@@ -137,6 +141,34 @@ func (f *fakeSource) CurrentSystems(_ context.Context, hosts []domain.HostMeta, 
 		}
 	}
 	return result
+}
+
+func TestHostObservesOnlyOneEvaluatedIdentity(t *testing.T) {
+	source := readyFake()
+	report, err := NewInspector(source).Host(context.Background(), ".", "pc02")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Operation != "host" || len(report.Hosts) != 1 || report.Hosts[0].Name != "pc02" {
+		t.Fatalf("focused report = %+v", report)
+	}
+	if len(source.sshHosts) != 1 || source.sshHosts[0].Name != "pc02" {
+		t.Fatalf("SSH probe scope = %+v, want only pc02", source.sshHosts)
+	}
+	if len(source.currentHosts) != 1 || source.currentHosts[0].Name != "pc02" {
+		t.Fatalf("system probe scope = %+v, want only pc02", source.currentHosts)
+	}
+}
+
+func TestHostRejectsIdentityOutsideEvaluatedInventoryBeforeProbing(t *testing.T) {
+	source := readyFake()
+	_, err := NewInspector(source).Host(context.Background(), ".", "pc99")
+	if err == nil || !strings.Contains(err.Error(), "not in the evaluated inventory") {
+		t.Fatalf("unknown identity error = %v", err)
+	}
+	if source.sshCalls != 0 || source.currentCalls != 0 {
+		t.Fatalf("unknown identity triggered probes: ssh=%d current=%d", source.sshCalls, source.currentCalls)
+	}
 }
 func (f *fakeSource) DeploymentHistory(string) (domain.DeploymentHistory, error) {
 	return f.history, f.historyErr

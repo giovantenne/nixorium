@@ -61,6 +61,63 @@ enter continue  •  t technical steps  •  esc interventions  •  q quit  •
 The five steps are operator-facing groups. `t` reveals the existing eleven
 observed technical stages without making them compete for primary attention.
 
+## Choose and install the pilot computer
+
+```text
+Nixorium — First setup / First computer
+
+Installation mode:  ! active
+Prepared artifacts: ready
+Interface:          enp1s0
+Service address:    192.0.2.10
+
+Pilot computer
+  pc01
+
+! Continue at pc01
+  1. Power it on and choose UEFI network boot.
+  2. In the downloaded installer, run /installer/setup.sh.
+  3. Choose pc01 and inspect the target disk.
+  4. Confirm installation locally, then boot from the installed disk.
+
+! The disk selected on the computer will be erased.
+Nixorium has not yet verified an authenticated installed system.
+No remote progress is shown because the installer does not provide telemetry.
+
+v check pilot  •  x stop installation  •  esc change pilot  •  q leave PXE active
+```
+
+The pilot comes from the evaluated inventory. The application validates and
+probes only this identity; powered-off computers outside the selected operation
+are not contacted or labelled. Selecting the pilot on the controller does not
+select a disk and does not authorise installation on the client.
+
+## Verify the pilot and finish a partial session
+
+```text
+Nixorium — First setup / First computer
+
+Pilot computer
+  pc01
+
+✓ Up to date
+✓ Technical verification succeeded
+Authenticated management reports the saved revision as active.
+
+Check at the computer
+  • Log in and open the expected desktop session.
+  • Check required software, network and classroom peripherals.
+  • Confirm that the computer started from its installed disk.
+
+enter practical check passed  •  v check again  •  x stop installation
+```
+
+After the practical check, the operator may install another computer or stop
+PXE. The completion summary says which identities were verified **in this
+session** and counts the rest as unverified, not failed. Attempting to quit while
+PXE is active first reviews the consequences and requires the exact phrase
+`LEAVE PXE ACTIVE`.
+
 ## Restore choice
 
 ```text

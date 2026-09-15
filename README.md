@@ -109,8 +109,12 @@ key pairs, and presents a redacted review.
 After configuration, the same command opens a resumable setup checklist. Press
 `Enter` on its highlighted next step to review and commit the generated public
 configuration, activate the controller, prepare installation files, and open
-the first network installation. Each disruptive action still has its own
-review and confirmation. You may quit at any point and rerun the command; it
+the first network installation. Choose a pilot identity from the saved
+inventory, complete identity and disk confirmation locally on that computer,
+then ask the controller to check its authenticated active revision. The
+technical check remains separate from the practical login, desktop, software,
+network, and peripheral check. Each disruptive action still has its own review
+and confirmation. You may quit at any safe point and rerun the command; it
 continues from observed system and Git state. Keep the deployment repository
 **private**.
 
@@ -148,11 +152,14 @@ run:
 /installer/setup.sh
 ```
 
-Choose a configured identity and target disk. Installation begins only after
-you type a confirmation containing both values. After the installed client
-finishes, stop installation mode on the controller unless more clients are
-being installed. Then boot the installed disk and open **Computer inventory** in
-Nixorium.
+Choose the same configured pilot identity and a target disk. Installation
+begins only after you type a confirmation containing both values. Boot the
+installed disk, return to the controller, and press `v` to check authenticated
+system state. After that succeeds, perform the short practical checklist at
+the client. You may install another computer or press `x` to stop installation
+mode and finish with the remaining clients deferred. `q` reviews the
+consequences and requires `LEAVE PXE ACTIVE` before closing while PXE remains
+active.
 
 ## Occasional interventions
 
