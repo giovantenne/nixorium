@@ -157,3 +157,13 @@ the observed current stage; presentation maps that stage only to existing typed
 Git, controller, and PXE callbacks. It neither writes a completion flag nor
 duplicates operational completion decisions. Returning from a workflow reloads
 the setup report so a new process can safely resume the same path.
+
+Partial client installation uses a separate typed application manager. Its
+adapter writes an atomic `0600` record below the administrator's private state
+directory, keyed by the absolute deployment repository. The domain validates
+the schema, configured client identity, full Git revision, Nix store path and
+chronological technical/practical evidence. Bubble Tea renders the report and
+requests exact-target operations; it neither chooses the state path nor treats
+the checkpoint as current reachability, disk authority or desired
+configuration. Revision and inventory drift invalidate reuse, and only a
+focused authenticated host observation can add technical evidence.

@@ -196,6 +196,11 @@ Release from the matching changelog section.
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
 - Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
+- Partial installation evidence is private per-deployment operator state,
+  stored atomically outside Git by the adapter and validated in the domain.
+  Keep it bound to the evaluated client identity, full Git revision and
+  authenticated Nix store path; it is historical evidence, not desired
+  configuration, current reachability or disk-erasure authority.
 - Hostname + static IP are centralized in `lib/mk-lab.nix`. `networkBase` is a full IPv4 network address and `networkPrefixLength` its CIDR prefix; host numbers are validated offsets. Each PC gets both a DHCP address and a static address on the same interface.
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.

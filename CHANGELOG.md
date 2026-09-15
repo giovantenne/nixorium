@@ -29,6 +29,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   Reinstall now selects one evaluated computer before PXE review, repeats the
   local disk warning with that identity, verifies only the selected computer,
   and supports restoring another computer or ending a partial session.
+- Made first-installation and reinstallation sessions resumable across TUI
+  processes. Nixorium stores private, atomic, per-repository evidence bound to
+  the exact evaluated identity, Git revision and authenticated system path;
+  technical and operator practical checks remain distinct. An inventory or
+  revision change makes the saved session stale instead of reusing evidence,
+  and a new failed observation takes precedence over historical success.
 
 - Added one background-aware official Bubbles spinner to every dashboard wait
   state, so host checks, Git/service loading, settings validation, update

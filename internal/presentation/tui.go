@@ -13,36 +13,39 @@ import (
 )
 
 type DashboardActions struct {
-	LoadDoctor             func() (domain.DoctorReport, error)
-	Refresh                func() (domain.StatusReport, error)
-	LoadSetup              func() domain.SetupReport
-	LoadHosts              func() (domain.HostsReport, error)
-	LoadHost               func(string) (domain.HostsReport, error)
-	PlanDeployment         func(string) domain.DeploymentPlanReport
-	ApplyDeployment        func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
-	PlanController         func() domain.ControllerRebuildPlanReport
-	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
-	LoadControllerProgress func() (domain.OperationProgress, error)
-	LoadServices           func() domain.ServicesReport
-	RestartService         func(string) domain.ServiceActionReport
-	LoadLogs               func() domain.OperationLogsReport
-	LoadLog                func(string) domain.OperationLogReport
-	LoadGitReview          func() domain.GitReviewReport
-	PlanGitCommit          func(string) domain.GitCommitPlanReport
-	ApplyGitCommit         func(domain.GitCommitPlanReport) domain.GitCommitReport
-	CheckUpdate            func() domain.UpdateCheckReport
-	PlanUpdate             func(string, bool, bool) domain.UpdatePlanReport
-	ApplyUpdate            func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadSettings           func() (domain.LabSettingsFile, error)
-	PlanSettings           func(domain.LabSettingsFile) domain.ConfigPlanReport
-	ApplySettings          func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigApplyReport
-	ChangePassword         SettingsPasswordAction
-	PreparePXE             func() domain.ActionReport
-	LoadPXEProgress        func() (domain.OperationProgress, error)
-	PlanPXEStart           func() domain.PXELifecycleReport
-	StartPXE               func() domain.PXELifecycleReport
-	StopPXE                func() domain.PXELifecycleReport
-	RecoverPXE             func() domain.PXELifecycleReport
+	LoadDoctor                func() (domain.DoctorReport, error)
+	Refresh                   func() (domain.StatusReport, error)
+	LoadSetup                 func() domain.SetupReport
+	LoadHosts                 func() (domain.HostsReport, error)
+	LoadInstallationSession   func() domain.InstallationSessionReport
+	SelectInstallationTarget  func(string) domain.InstallationSessionReport
+	VerifyInstallationTarget  func(string) domain.InstallationSessionReport
+	ConfirmInstallationTarget func(string) domain.InstallationSessionReport
+	PlanDeployment            func(string) domain.DeploymentPlanReport
+	ApplyDeployment           func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
+	PlanController            func() domain.ControllerRebuildPlanReport
+	ApplyController           func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
+	LoadControllerProgress    func() (domain.OperationProgress, error)
+	LoadServices              func() domain.ServicesReport
+	RestartService            func(string) domain.ServiceActionReport
+	LoadLogs                  func() domain.OperationLogsReport
+	LoadLog                   func(string) domain.OperationLogReport
+	LoadGitReview             func() domain.GitReviewReport
+	PlanGitCommit             func(string) domain.GitCommitPlanReport
+	ApplyGitCommit            func(domain.GitCommitPlanReport) domain.GitCommitReport
+	CheckUpdate               func() domain.UpdateCheckReport
+	PlanUpdate                func(string, bool, bool) domain.UpdatePlanReport
+	ApplyUpdate               func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadSettings              func() (domain.LabSettingsFile, error)
+	PlanSettings              func(domain.LabSettingsFile) domain.ConfigPlanReport
+	ApplySettings             func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigApplyReport
+	ChangePassword            SettingsPasswordAction
+	PreparePXE                func() domain.ActionReport
+	LoadPXEProgress           func() (domain.OperationProgress, error)
+	PlanPXEStart              func() domain.PXELifecycleReport
+	StartPXE                  func() domain.PXELifecycleReport
+	StopPXE                   func() domain.PXELifecycleReport
+	RecoverPXE                func() domain.PXELifecycleReport
 }
 
 type dashboardScreen int
@@ -159,6 +162,8 @@ type dashboardModel struct {
 	pilotName            string
 	pilotPractical       bool
 	pilotVerified        []string
+	installationSummary  bool
+	installationSession  domain.InstallationSessionReport
 	width                int
 	height               int
 	isDark               bool
@@ -205,9 +210,9 @@ type dashboardHostsMsg struct {
 	err    error
 }
 
-type dashboardPilotHostsMsg struct {
-	report domain.HostsReport
-	err    error
+type dashboardInstallationSessionMsg struct {
+	report domain.InstallationSessionReport
+	screen dashboardScreen
 }
 
 type dashboardDeploymentPlanMsg struct {
@@ -406,6 +411,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.screen == dashboardPXE && model.guidedInstallation() && model.pilotPractical && model.report.PXE.Mode != "active" {
 			model.pilotName = ""
 			model.pilotPractical = false
+			model.installationSummary = true
 			model.hosts = domain.HostsReport{}
 		}
 		if preparationFinished && model.actions.LoadPXEProgress != nil {
@@ -439,15 +445,12 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.screen = dashboardHosts
 		return model, nil
-	case dashboardPilotHostsMsg:
+	case dashboardInstallationSessionMsg:
 		model.busy = ""
-		if message.err != nil {
-			model.message = "The selected computer could not be checked: " + message.err.Error()
-		} else {
-			model.hosts = message.report
-			model.message = "Selected-computer observation refreshed."
-		}
-		model.screen = dashboardPXE
+		model.installationSession = message.report
+		model.applyInstallationSession()
+		model.message = message.report.Message
+		model.screen = message.screen
 		return model, nil
 	case dashboardDeploymentPlanMsg:
 		model.busy = ""
@@ -864,6 +867,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.pilotName = ""
 			model.pilotPractical = false
 			model.pilotVerified = nil
+			model.installationSummary = false
 			model.message = ""
 		case "w":
 			model.screen = dashboardSoftware
@@ -959,8 +963,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				model.pilotName = ""
 				model.pilotPractical = false
 				model.pilotVerified = nil
+				model.installationSummary = false
 				model.hosts = domain.HostsReport{}
 				model.screen = dashboardPXE
+				if model.actions.LoadInstallationSession != nil {
+					model.busy = "Restoring installation session"
+					return model, model.loadInstallationSession(dashboardPXE)
+				}
 			}
 		}
 	case dashboardSetup:
@@ -1007,11 +1016,19 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, tea.Batch(operation, schedulePXEProgressTick(model.pxeProgressID))
 		case domain.SetupStageReadiness, domain.SetupStageInstall:
 			model.screen = dashboardPXE
-			model.message = "Continue by starting installation mode and booting the first computer from the network."
+			model.message = ""
+			if model.actions.LoadInstallationSession != nil {
+				model.busy = "Restoring installation session"
+				return model, model.loadInstallationSession(dashboardPXE)
+			}
 			return model, nil
 		case "":
 			model.screen = dashboardPXE
-			model.message = "Start installation mode, then boot the first computer from the network."
+			model.message = ""
+			if model.actions.LoadInstallationSession != nil {
+				model.busy = "Restoring installation session"
+				return model, model.loadInstallationSession(dashboardPXE)
+			}
 			return model, nil
 		default:
 			model.message = "Configuration input is still required; exit and run `nixorium setup` again."
@@ -1779,22 +1796,32 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if model.guidedInstallation() {
 				if model.pilotName == "" {
+					if model.installationSummary {
+						model.installationSummary = false
+						model.message = "Choose the next configured computer. Previous session evidence remains recorded."
+						return model, nil
+					}
 					if len(model.report.Meta.Clients.Hosts) == 0 {
 						model.message = "No client identity is configured. Return to laboratory settings and add one first."
 						return model, nil
 					}
 					pilot := model.report.Meta.Clients.Hosts[min(model.pilotCursor, len(model.report.Meta.Clients.Hosts)-1)]
-					model.pilotName = pilot.Name
-					model.pilotPractical = false
-					model.hosts = domain.HostsReport{}
+					if model.actions.SelectInstallationTarget == nil {
+						model.message = "Resumable installation sessions are not available in this build."
+						return model, nil
+					}
+					model.busy = "Recording selected computer " + pilot.Name
 					model.message = ""
-					return model, nil
+					return model, model.selectInstallationTarget(pilot.Name)
 				}
 				if model.pilotTechnicallyVerified() && !model.pilotPractical {
-					model.pilotPractical = true
-					model.pilotVerified = appendUnique(model.pilotVerified, model.pilotName)
-					model.message = model.pilotName + " was verified in this session."
-					return model, nil
+					if model.actions.ConfirmInstallationTarget == nil {
+						model.message = "Practical-check recording is not available in this build."
+						return model, nil
+					}
+					model.busy = "Recording the practical check for " + model.pilotName
+					model.message = ""
+					return model, model.confirmInstallationTarget(model.pilotName)
 				}
 				if model.pilotPractical {
 					model.pilotName = ""
@@ -1806,13 +1833,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "v":
 			if model.guidedInstallation() && model.pilotName != "" {
-				if model.actions.LoadHost == nil {
+				if model.actions.VerifyInstallationTarget == nil {
 					model.message = "Pilot verification is not available in this session."
 					return model, nil
 				}
 				model.busy = "Checking authenticated system state on " + model.pilotName
 				model.message = ""
-				return model, model.loadPilotHosts()
+				return model, model.verifyInstallationTarget(model.pilotName)
 			}
 		case "p":
 			model.busy = "Preparing netboot artifacts and client closures"
@@ -1972,10 +1999,27 @@ func (model dashboardModel) loadHosts() tea.Cmd {
 	}
 }
 
-func (model dashboardModel) loadPilotHosts() tea.Cmd {
+func (model dashboardModel) loadInstallationSession(screen dashboardScreen) tea.Cmd {
 	return func() tea.Msg {
-		report, err := model.actions.LoadHost(model.pilotName)
-		return dashboardPilotHostsMsg{report: report, err: err}
+		return dashboardInstallationSessionMsg{report: model.actions.LoadInstallationSession(), screen: screen}
+	}
+}
+
+func (model dashboardModel) selectInstallationTarget(name string) tea.Cmd {
+	return func() tea.Msg {
+		return dashboardInstallationSessionMsg{report: model.actions.SelectInstallationTarget(name), screen: dashboardPXE}
+	}
+}
+
+func (model dashboardModel) verifyInstallationTarget(name string) tea.Cmd {
+	return func() tea.Msg {
+		return dashboardInstallationSessionMsg{report: model.actions.VerifyInstallationTarget(name), screen: dashboardPXE}
+	}
+}
+
+func (model dashboardModel) confirmInstallationTarget(name string) tea.Cmd {
+	return func() tea.Msg {
+		return dashboardInstallationSessionMsg{report: model.actions.ConfirmInstallationTarget(name), screen: dashboardPXE}
 	}
 }
 
@@ -3068,6 +3112,35 @@ func (model dashboardModel) guidedInstallation() bool {
 	return model.setupMode || model.restoreMode
 }
 
+func (model *dashboardModel) applyInstallationSession() {
+	model.hosts = domain.HostsReport{}
+	model.pilotVerified = nil
+	model.pilotPractical = false
+	model.installationSummary = false
+	if model.installationSession.Observation != nil {
+		model.hosts = domain.HostsReport{Hosts: []domain.HostStatus{*model.installationSession.Observation}}
+	}
+	if model.installationSession.State == "none" || model.installationSession.State == "stale" || model.installationSession.HasErrors() {
+		model.pilotName = ""
+		return
+	}
+	model.pilotName = model.installationSession.Selected
+	for _, evidence := range model.installationSession.Evidence {
+		if evidence.PracticalConfirmedAt != nil {
+			model.pilotVerified = append(model.pilotVerified, evidence.Name)
+		}
+		if evidence.Name == model.pilotName && evidence.Revision == model.installationSession.Revision && evidence.PracticalConfirmedAt != nil {
+			model.pilotPractical = true
+		}
+	}
+	if model.report.PXE.Mode != "active" && model.pilotPractical {
+		model.pilotName = ""
+		model.pilotPractical = false
+		model.installationSummary = true
+		model.hosts = domain.HostsReport{}
+	}
+}
+
 func (model dashboardModel) pilotInstallationView() []string {
 	recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
 	if recovery {
@@ -3112,7 +3185,8 @@ func (model dashboardModel) pilotInstallationView() []string {
 	}
 
 	host, observed := model.pilotHostStatus()
-	if !observed {
+	technicallyVerified := model.pilotTechnicallyVerified()
+	if !observed && !technicallyVerified {
 		checkLabel := "check pilot"
 		if model.restoreMode {
 			checkLabel = "check computer"
@@ -3139,27 +3213,33 @@ func (model dashboardModel) pilotInstallationView() []string {
 		return lines
 	}
 
-	level, label, guidance := domain.ComputerCondition(host)
-	lines = append(lines, "", tuiStatus(label, statusLevel(level), model.isDark))
-	if !model.pilotTechnicallyVerified() {
-		lines = append(lines,
-			guidance,
-			"This does not prove that installation completed. Finish the local steps, boot from disk, then check again.",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"v"}, "v", "check again"),
-				tuiHelpBinding([]string{"x"}, "x", "stop installation"),
-				tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
-				tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
-			),
-		)
-		return lines
+	if observed {
+		level, label, guidance := domain.ComputerCondition(host)
+		lines = append(lines, "", tuiStatus(label, statusLevel(level), model.isDark))
+		if !technicallyVerified {
+			lines = append(lines,
+				guidance,
+				"This does not prove that installation completed. Finish the local steps, boot from disk, then check again.",
+				"",
+				tuiHelp(model.width, model.isDark,
+					tuiHelpBinding([]string{"v"}, "v", "check again"),
+					tuiHelpBinding([]string{"x"}, "x", "stop installation"),
+					tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
+					tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
+				),
+			)
+			return lines
+		}
 	}
 
 	if !model.pilotPractical {
+		verificationCopy := "Authenticated management reports the saved revision as active."
+		if !observed {
+			verificationCopy = "Authenticated technical evidence was restored from this session. Press v to check current state again."
+		}
 		lines = append(lines,
 			tuiResult("Technical verification succeeded", true, model.isDark),
-			"Authenticated management reports the saved revision as active.",
+			verificationCopy,
 			"",
 			tuiSection("Check at the computer", model.isDark),
 			"  • Log in and open the expected desktop session.",
@@ -3197,7 +3277,7 @@ func (model dashboardModel) pilotInstallationView() []string {
 
 func (model dashboardModel) pilotSelectionView() []string {
 	lines := []string{}
-	if len(model.pilotVerified) > 0 && model.report.PXE.Mode != "active" {
+	if model.installationSummary {
 		lines = append(lines,
 			tuiResult(model.installationSessionTitle(), true, model.isDark),
 			"Verified in this session: "+strings.Join(model.pilotVerified, ", "),
@@ -3206,6 +3286,7 @@ func (model dashboardModel) pilotSelectionView() []string {
 			"You can return later to install the remaining computers.",
 			"",
 			tuiHelp(model.width, model.isDark,
+				tuiHelpBinding([]string{"enter"}, "enter", model.installationChangeAnotherLabel()),
 				tuiHelpBinding([]string{"esc"}, "esc", "setup summary"),
 				tuiHelpBinding([]string{"q"}, "q", "quit"),
 			),
@@ -3218,6 +3299,20 @@ func (model dashboardModel) pilotSelectionView() []string {
 		selectionTitle = "Choose a computer to reinstall"
 	}
 	lines = append(lines, tuiSection(selectionTitle, model.isDark))
+	if model.installationSession.State == "stale" {
+		lines = append(lines,
+			tuiStatus("Saved session is out of date", tuiStatusAttention, model.isDark),
+			model.installationSession.Message,
+			"",
+		)
+	} else if model.installationSession.HasErrors() {
+		lines = append(lines,
+			tuiStatus("Saved session could not be restored", tuiStatusFailure, model.isDark),
+			model.installationSession.Message,
+			"Select a computer to retry after correcting the state-file problem.",
+			"",
+		)
+	}
 	if len(model.report.Meta.Clients.Hosts) == 0 {
 		return append(lines,
 			"No client identity is configured.",
@@ -3284,6 +3379,13 @@ func (model dashboardModel) installationChangeLabel() string {
 	return "change pilot"
 }
 
+func (model dashboardModel) installationChangeAnotherLabel() string {
+	if model.restoreMode {
+		return "reinstall another"
+	}
+	return "install another"
+}
+
 func (model dashboardModel) pilotHostStatus() (domain.HostStatus, bool) {
 	for _, host := range model.hosts.Hosts {
 		if host.Name == model.pilotName {
@@ -3295,14 +3397,18 @@ func (model dashboardModel) pilotHostStatus() (domain.HostStatus, bool) {
 
 func (model dashboardModel) pilotTechnicallyVerified() bool {
 	host, found := model.pilotHostStatus()
-	return found && host.SSH == domain.SSHAvailable && host.Deployment == domain.DeploymentCurrent
-}
-
-func appendUnique(values []string, value string) []string {
-	if containsString(values, value) {
-		return values
+	if found {
+		return host.SSH == domain.SSHAvailable &&
+			host.Deployment == domain.DeploymentCurrent &&
+			host.CurrentRevision == model.installationSession.Revision &&
+			host.CurrentSystem != ""
 	}
-	return append(values, value)
+	for _, evidence := range model.installationSession.Evidence {
+		if evidence.Name == model.pilotName && evidence.Revision == model.installationSession.Revision {
+			return true
+		}
+	}
+	return false
 }
 
 func containsString(values []string, value string) bool {

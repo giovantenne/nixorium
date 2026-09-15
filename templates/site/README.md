@@ -52,13 +52,18 @@ step with `Enter`:
    identity-and-disk confirmation and installed-disk boot, press `v` on the
    controller to verify authenticated active-revision evidence. Complete the
    separate practical desktop check, then install another client or stop PXE
-   and defer the rest.
+   and defer the rest. Reopening the TUI restores the selected identity and
+   completed checks from private operator state when they still match the
+   current deployment revision and evaluated inventory.
 
 You can press `q` at any safe point. While PXE is active, leaving it active is a
 separate exact-confirmation choice; stopping PXE restores normal controller
 networking. Running the setup command again observes
 Git, keys, the active controller, and prepared artifacts, then resumes at the
-first incomplete stage instead of repeating completed work.
+first incomplete stage instead of repeating completed work. Installation
+evidence is stored outside Git under the administrator's private state
+directory; it records a past authenticated check, not current reachability or
+permission to erase a disk.
 
 The bootstrap installer already created and committed this private deployment.
 When using the template manually instead, create a private Git repository and

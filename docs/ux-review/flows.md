@@ -340,5 +340,12 @@ Help cannot confirm mutations. Logs retain sanitisation, size bounds, and
 permissions. Events from an old attempt cannot update a new one. Checkpoints
 and history do not replace current observations or review tokens.
 
+Installation-session checkpoints are private per-repository state. Technical
+evidence is bound to the exact client identity, deployment revision and
+authenticated system path; the practical check is a separate operator claim.
+Changing the revision or evaluated inventory makes the checkpoint stale. A
+fresh failed observation must take precedence in the UI without deleting the
+older historical record.
+
 Completing an intervention provides a clear exit. Nixorium should not ask the
 operator to keep it open to monitor the room.
