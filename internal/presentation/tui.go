@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -130,6 +131,7 @@ type dashboardModel struct {
 	width                int
 	height               int
 	isDark               bool
+	activitySpinner      spinner.Model
 }
 
 type dashboardPlanMsg struct {
@@ -268,14 +270,21 @@ func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, act
 	}
 	return dashboardModel{
 		report: report, setup: setup, setupMode: setupMode, screen: screen, actions: actions,
-		homeMenu: newDashboardTaskMenu(false, 80, 24),
+		homeMenu: newDashboardTaskMenu(false, 80, 24), activitySpinner: newTUISpinner(false),
 	}
 }
 
-func (dashboardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
+func (model dashboardModel) Init() tea.Cmd {
+	return tea.Batch(tea.RequestBackgroundColor, model.activitySpinner.Tick)
+}
 
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case spinner.TickMsg:
+		var command tea.Cmd
+		model.activitySpinner, command = model.activitySpinner.Update(message)
+		return model, command
 	case dashboardSetupMsg:
 		model.busy = ""
 		model.setup = message.report
@@ -576,6 +585,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case tea.BackgroundColorMsg:
 		model.isDark = message.IsDark()
+		model.activitySpinner.Style = newTUISpinner(model.isDark).Style
 		selected := model.homeMenu.list.Index()
 		model.homeMenu = newDashboardTaskMenu(model.isDark, model.width, model.height)
 		model.homeMenu.list.Select(selected)
@@ -1556,6 +1566,17 @@ func (model *dashboardModel) ensureHomeMenu() {
 	}
 }
 
+func (model *dashboardModel) ensureActivitySpinner() {
+	if len(model.activitySpinner.Spinner.Frames) == 0 {
+		model.activitySpinner = newTUISpinner(model.isDark)
+	}
+}
+
+func (model dashboardModel) busyView() string {
+	model.ensureActivitySpinner()
+	return model.activitySpinner.View() + " " + model.busy
+}
+
 func (model dashboardModel) loadSetup() tea.Cmd {
 	return func() tea.Msg {
 		return dashboardSetupMsg{report: model.actions.LoadSetup()}
@@ -1699,7 +1720,7 @@ func (model dashboardModel) gitReviewView() string {
 	}
 	lines := []string{tuiTitle("Nixorium — Git change review", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.gitCommitResult.Operation != "" {
@@ -1759,7 +1780,7 @@ func (model dashboardModel) gitReviewView() string {
 func (model dashboardModel) gitCommitSelectView() string {
 	lines := []string{tuiTitle("Nixorium — Select Git commit paths", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
 	for index, change := range model.gitReview.Changes {
@@ -1791,7 +1812,7 @@ func (model dashboardModel) gitCommitSelectView() string {
 func (model dashboardModel) gitCommitReviewView() string {
 	lines := []string{tuiTitle("Nixorium — Local Git commit review", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
 	diffLines := strings.Split(strings.TrimSuffix(model.gitCommitPlan.Diff.Content, "\n"), "\n")
@@ -1861,7 +1882,7 @@ func maximumGitCommitPlanScroll(report domain.GitCommitPlanReport, height int) i
 func (model dashboardModel) updateView() string {
 	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		if model.updating {
 			lines = append(lines, "", "Wait for the atomic two-file result before closing Nixorium.")
 		} else {
@@ -2033,13 +2054,13 @@ func (model dashboardModel) controllerView() string {
 		if elapsed < 0 {
 			elapsed = 0
 		}
-		lines = append(lines, fmt.Sprintf("%s…  elapsed %s", model.busy, elapsed))
+		lines = append(lines, fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.operationProgressView(model.controllerProgress, "Current progress")...)
 		lines = append(lines, "", "q: close this view; systemd-owned work continues")
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…", "", "This systemd-owned action continues if the dashboard closes.")
+		lines = append(lines, model.busyView(), "", "This systemd-owned action continues if the dashboard closes.")
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardControllerReview {
@@ -2116,7 +2137,7 @@ func (model dashboardModel) controllerView() string {
 func (model dashboardModel) servicesView() string {
 	lines := []string{tuiTitle("Nixorium — Managed services", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.serviceResult.Operation != "" {
@@ -2191,7 +2212,7 @@ func (model dashboardModel) servicesView() string {
 func (model dashboardModel) logsView() string {
 	lines := []string{tuiTitle("Nixorium — Operation logs", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
 	lines = append(lines, tuiSection("Recent actions", model.isDark))
@@ -2232,7 +2253,7 @@ func (model dashboardModel) logsView() string {
 func (model dashboardModel) logDetailView() string {
 	lines := []string{tuiTitle("Nixorium — Operation log detail", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.logDetail.Log == nil {
@@ -2341,7 +2362,7 @@ func (model dashboardModel) deployView() string {
 		if elapsed < 0 {
 			elapsed = 0
 		}
-		lines = append(lines, fmt.Sprintf("%s…  elapsed %s", model.busy, elapsed))
+		lines = append(lines, fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.deploymentProgressView()...)
 		lines = append(lines,
 			"",
@@ -2351,7 +2372,7 @@ func (model dashboardModel) deployView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.busy != "" {
-		lines = append(lines, model.busy+"…")
+		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardDeployReview {
@@ -2495,7 +2516,7 @@ func (model dashboardModel) hostsView() string {
 		lines = append(lines, "", "History warning: "+model.hosts.HistoryDetail)
 	}
 	if model.busy != "" {
-		lines = append(lines, "", model.busy+"…")
+		lines = append(lines, "", model.busyView())
 	} else {
 		lines = append(lines, "", tuiHelp(model.width, model.isDark,
 			tuiHelpBinding([]string{"r"}, "r", "refresh"),
@@ -2530,13 +2551,13 @@ func (model dashboardModel) pxeView() string {
 		if elapsed < 0 {
 			elapsed = 0
 		}
-		lines = append(lines, "", fmt.Sprintf("%s…  elapsed %s", model.busy, elapsed))
+		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.operationProgressView(model.pxeProgress, "Current progress")...)
 		lines = append(lines, "", "q: close this view; systemd-owned work continues")
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.busy != "" {
-		lines = append(lines, "", model.busy+"…", "", "q: close this view; systemd-owned work continues")
+		lines = append(lines, "", model.busyView(), "", "q: close this view; systemd-owned work continues")
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardPXEStartReview {

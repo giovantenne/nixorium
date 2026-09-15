@@ -142,6 +142,17 @@ func TestRoutineScreensShareVisualTitleHierarchy(t *testing.T) {
 	}
 }
 
+func TestBusyScreensUseAnimatedSharedSpinner(t *testing.T) {
+	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	model.busy = "Validating candidate configuration"
+	initial := model.busyView()
+	updated, command := model.Update(model.activitySpinner.Tick())
+	model = updated.(dashboardModel)
+	if command == nil || !strings.Contains(initial, "Validating candidate configuration") || !strings.Contains(model.busyView(), "Validating candidate configuration") {
+		t.Fatalf("busy spinner did not remain active: initial=%q current=%q", initial, model.busyView())
+	}
+}
+
 func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	loads := 0
 	actions := DashboardActions{

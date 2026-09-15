@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added one background-aware official Bubbles spinner to every dashboard wait
+  state, so host checks, Git/service loading, settings validation, update
+  planning, and other operations without meaningful percentages visibly remain
+  active while preserving their plain-language activity label.
 - Made the PXE screen stage-aware: it now recommends artifact preparation,
   reviewed PXE start, first-computer boot/install, or network recovery from
   observed state, shows only pertinent controls, and includes the exact

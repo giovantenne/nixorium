@@ -251,7 +251,7 @@ func (command *settingsPasswordCommand) Run() error {
 
 func (model dashboardModel) settingsView() string {
 	if model.busy != "" {
-		return tuiTitle("Nixorium — Settings", model.isDark) + "\n\n" + model.busy + "…\n"
+		return tuiTitle("Nixorium — Settings", model.isDark) + "\n\n" + model.busyView() + "\n"
 	}
 	switch model.screen {
 	case dashboardSettingsEdit:

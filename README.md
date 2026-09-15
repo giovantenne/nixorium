@@ -168,6 +168,10 @@ provides the normal workflows:
   review, log, retry, or further-editing actions instead of returning silently
   to the previous input screen.
 
+Long builds use phase progress, elapsed time, and bounded recent activity.
+Shorter waits whose work has no honest percentage use an animated spinner plus
+their current plain-language action, so a remote terminal never looks frozen.
+
 | Task | What it does |
 |---|---|
 | **View computers** | Authenticates reachable hosts and compares their active revision with the desired Git revision |

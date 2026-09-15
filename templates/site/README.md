@@ -138,6 +138,11 @@ The network-installation screen remains state-oriented: it highlights one next
 step—prepare files, start PXE, boot/install a client, or recover networking—and
 shows only controls relevant to the observed mode.
 
+Long PXE, controller, and deployment work displays typed phase progress.
+Operations without a meaningful percentage—such as host checks, settings
+validation, Git/service loading, or update planning—display a shared animated
+spinner and the current plain-language action.
+
 | Dashboard task | Purpose |
 |---|---|
 | **View computers** | Inspect authenticated client state |
