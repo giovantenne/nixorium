@@ -86,6 +86,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		gitCommitManager := app.NewGitCommitManager(local)
 		updateManager := app.NewUpdateManager(local)
 		settingsManager := app.NewSettingsManager(local)
+		progressManager := app.NewOperationProgressManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -156,6 +157,9 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				report := app.NewSystemActions(local).PreparePXE(ctx)
 				report.Message = operationRecordMessage(report.Message, report)
 				return report
+			},
+			LoadPXEProgress: func() (domain.OperationProgress, error) {
+				return progressManager.Current("pxe-prepare")
 			},
 			PlanPXEStart: func() domain.PXELifecycleReport {
 				return lifecycle.PlanStart(ctx, repository)

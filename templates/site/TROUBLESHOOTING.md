@@ -81,8 +81,10 @@ nixorium pxe start
 ```
 
 Preparation verifies the current Git revision, live DHCP address, cache health,
-kernel, initrd, iPXE script, firmware, and every configured client closure. Read
-`journalctl -u nixorium-prepare-pxe.service -b` if it fails. Do not hand-edit
+kernel, initrd, iPXE script, firmware, and every configured client closure. The
+dashboard shows the current phase and five recent safe activities; read
+`journalctl -u nixorium-prepare-pxe.service -b` for verbose Nix output if it
+fails. Do not hand-edit
 `/var/lib/nixorium/prepared/prepared.json` or replace its store paths.
 
 ## The binary cache is unavailable

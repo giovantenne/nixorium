@@ -541,6 +541,14 @@ non-static, non-link-local IPv4 candidate. The record binds that observed
 address, fixed artifact names, and canonical store roots to the full deployment revision.
 Revision-scoped indirect GC roots retain those closures; older roots are
 removed only after the new manifest has been durably published.
+During the job, the service atomically replaces a private mode-0600 schema-1
+progress record under the same state directory. It contains only a fixed
+operation/state/phase vocabulary, timestamps, bounded counters, and the five
+most recent application-authored activities—not raw Nix or journal output. A
+no-follow, size- and mode-checking adapter passes it through strict domain
+decoding before Bubble Tea renders a Bubbles progress bar. Polling therefore
+does not widen journal access, allow an arbitrary path, or move operational
+logic into presentation; verbose output remains in journald.
 Status/setup reconciliation validates it against current Git, `labMeta`, store
 availability, and client ordering. Privileged consumers revalidate the
 administrator-owned record rather than treating it as authority.

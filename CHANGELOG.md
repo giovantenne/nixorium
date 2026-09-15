@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added live PXE preparation feedback to the dashboard using an official
+  Bubbles progress bar, elapsed time, typed phases, counters, and five bounded
+  recent activities. The systemd job atomically publishes a strict private
+  progress record while verbose Nix output remains in journald.
 - Introduced a task-oriented dashboard Settings area for Network, Computers,
   Accounts, Regional, Browser, Git, and Veyon edits. It reuses the typed
   Nix-backed plan/fingerprint apply boundary and provides a terminal-only,
@@ -122,8 +126,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   firmware/NIC/storage coverage, PXE power-loss and DHCP coexistence recovery,
   single/multi-client deployment, and explicit pass/fail matrices.
 - Immediate stderr-safe PXE preparation activity and fixed journald follow
-  guidance in CLI/JSON and TUI views, keeping machine stdout clean and verbose
-  systemd-owned build output out of the presentation layer.
+  guidance in CLI/JSON, keeping machine stdout clean and verbose systemd-owned
+  build output out of the presentation layer.
 - A versioned `lab-settings.json` format for new private deployments, strict Go
   and Nix validation, deterministic atomic file writing, and the read-only
   `nixorium config validate` command. Existing `lab-config.nix` deployments

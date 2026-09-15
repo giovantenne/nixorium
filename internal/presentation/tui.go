@@ -3,7 +3,9 @@ package presentation
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"charm.land/bubbles/v2/progress"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -29,6 +31,7 @@ type DashboardActions struct {
 	ApplySettings   func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigApplyReport
 	ChangePassword  SettingsPasswordAction
 	PreparePXE      func() domain.ActionReport
+	LoadPXEProgress func() (domain.OperationProgress, error)
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
 	StopPXE         func() domain.PXELifecycleReport
@@ -104,6 +107,10 @@ type dashboardModel struct {
 	settingsPlan         domain.ConfigPlanReport
 	settingsResult       domain.ConfigApplyReport
 	settingsApplying     bool
+	pxePreparing         bool
+	pxeProgress          domain.OperationProgress
+	pxeProgressStarted   time.Time
+	pxeProgressID        uint64
 	width                int
 	height               int
 	isDark               bool
@@ -118,6 +125,16 @@ type dashboardOperationMsg struct {
 	report  domain.StatusReport
 	err     error
 	screen  dashboardScreen
+}
+
+type dashboardPXEProgressTickMsg struct {
+	id uint64
+}
+
+type dashboardPXEProgressMsg struct {
+	id       uint64
+	progress domain.OperationProgress
+	err      error
 }
 
 type dashboardHostsMsg struct {
@@ -225,7 +242,11 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardPXEStartReview
 		return model, nil
 	case dashboardOperationMsg:
+		preparationFinished := model.pxePreparing && message.screen == dashboardPXE
 		model.busy = ""
+		if preparationFinished {
+			model.pxePreparing = false
+		}
 		model.message = message.message
 		if message.err != nil {
 			model.message += "; refresh failed: " + message.err.Error()
@@ -233,6 +254,25 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.report = message.report
 		}
 		model.screen = message.screen
+		if preparationFinished && model.actions.LoadPXEProgress != nil {
+			return model, model.loadPXEProgress(model.pxeProgressID)
+		}
+		return model, nil
+	case dashboardPXEProgressTickMsg:
+		if !model.pxePreparing || message.id != model.pxeProgressID || model.actions.LoadPXEProgress == nil {
+			return model, nil
+		}
+		return model, model.loadPXEProgress(message.id)
+	case dashboardPXEProgressMsg:
+		if message.id != model.pxeProgressID {
+			return model, nil
+		}
+		if message.err == nil && (model.pxeProgressStarted.IsZero() || !message.progress.StartedAt.Before(model.pxeProgressStarted)) {
+			model.pxeProgress = message.progress
+		}
+		if model.pxePreparing {
+			return model, schedulePXEProgressTick(message.id)
+		}
 		return model, nil
 	case dashboardHostsMsg:
 		model.busy = ""
@@ -1076,11 +1116,16 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 		case "p":
 			model.busy = "Preparing netboot artifacts and client closures"
+			model.pxePreparing = true
+			model.pxeProgress = domain.OperationProgress{}
+			model.pxeProgressStarted = time.Now().UTC()
+			model.pxeProgressID++
 			model.message = ""
-			return model, model.runAction(func() string {
+			operation := model.runAction(func() string {
 				report := model.actions.PreparePXE()
 				return report.Message
 			}, dashboardPXE)
+			return model, tea.Batch(operation, schedulePXEProgressTick(model.pxeProgressID))
 		case "s":
 			model.busy = "Checking PXE readiness"
 			model.message = ""
@@ -1146,6 +1191,19 @@ func (model dashboardModel) loadHosts() tea.Cmd {
 	return func() tea.Msg {
 		report, err := model.actions.LoadHosts()
 		return dashboardHostsMsg{report: report, err: err}
+	}
+}
+
+func schedulePXEProgressTick(id uint64) tea.Cmd {
+	return tea.Tick(350*time.Millisecond, func(time.Time) tea.Msg {
+		return dashboardPXEProgressTickMsg{id: id}
+	})
+}
+
+func (model dashboardModel) loadPXEProgress(id uint64) tea.Cmd {
+	return func() tea.Msg {
+		progress, err := model.actions.LoadPXEProgress()
+		return dashboardPXEProgressMsg{id: id, progress: progress, err: err}
 	}
 }
 
@@ -1812,8 +1870,18 @@ func (model dashboardModel) pxeView() string {
 		fmt.Sprintf("Interface:          %s", model.report.Meta.Network.Interface),
 		fmt.Sprintf("Service address:    %s", model.report.Meta.Controller.DHCPIP),
 	}
+	if model.pxePreparing {
+		elapsed := time.Since(model.pxeProgressStarted).Truncate(time.Second)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		lines = append(lines, "", fmt.Sprintf("%s…  elapsed %s", model.busy, elapsed))
+		lines = append(lines, model.pxeProgressView("Current progress")...)
+		lines = append(lines, "", "q: close this view; systemd-owned work continues")
+		return strings.Join(lines, "\n") + "\n"
+	}
 	if model.busy != "" {
-		lines = append(lines, "", model.busy+"…", "Detailed progress: journalctl -fu nixorium-prepare-pxe.service", "", "q: close this view; systemd-owned work continues")
+		lines = append(lines, "", model.busy+"…", "", "q: close this view; systemd-owned work continues")
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardPXEStartReview {
@@ -1842,11 +1910,54 @@ func (model dashboardModel) pxeView() string {
 	if model.report.PXE.Mode == "active" || model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required" {
 		lines = append(lines, "  x   Stop and restore normal networking")
 	}
-	lines = append(lines, "  r   Recover normal networking", "", "Preparation log: journalctl -u nixorium-prepare-pxe.service", "  Esc Back", "  q   Quit (active services keep running)")
+	lines = append(lines, "  r   Recover normal networking")
+	if model.pxeProgress.Operation != "" {
+		lines = append(lines, "")
+		lines = append(lines, model.pxeProgressView("Last preparation")...)
+	}
+	lines = append(lines, "", "  Esc Back", "  q   Quit (active services keep running)")
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) pxeProgressView(title string) []string {
+	if model.pxeProgress.Operation == "" {
+		return []string{"  Waiting for managed progress…"}
+	}
+	phaseLabels := map[string]string{
+		"starting":  "Starting",
+		"validate":  "Validating configuration",
+		"network":   "Checking network and cache",
+		"artifacts": "Building netboot artifacts",
+		"clients":   "Building client systems",
+		"publish":   "Publishing preparation",
+		"complete":  "Complete",
+	}
+	lines := []string{title, "  Phase: " + phaseLabels[model.pxeProgress.Phase]}
+	if model.pxeProgress.Total > 0 {
+		barWidth := model.width - 8
+		if barWidth < 24 {
+			barWidth = 24
+		}
+		if barWidth > 64 {
+			barWidth = 64
+		}
+		bar := progress.New(progress.WithDefaultBlend(), progress.WithWidth(barWidth))
+		percentage := float64(model.pxeProgress.Current) / float64(model.pxeProgress.Total)
+		lines = append(lines,
+			fmt.Sprintf("  %d/%d", model.pxeProgress.Current, model.pxeProgress.Total),
+			"  "+bar.ViewAs(percentage),
+		)
+	}
+	if len(model.pxeProgress.Recent) > 0 {
+		lines = append(lines, "  Recent activity:")
+		for _, activity := range model.pxeProgress.Recent {
+			lines = append(lines, "    • "+activity)
+		}
+	}
+	return lines
 }
 
 func serviceLabel(services []domain.ServiceState, name string) string {
