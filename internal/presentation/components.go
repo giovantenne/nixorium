@@ -1,9 +1,20 @@
 package presentation
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
+)
+
+type tuiStatusKind int
+
+const (
+	tuiStatusNeutral tuiStatusKind = iota
+	tuiStatusSuccess
+	tuiStatusAttention
+	tuiStatusFailure
 )
 
 func tuiTitle(value string, darkBackground bool) string {
@@ -14,6 +25,29 @@ func tuiTitle(value string, darkBackground bool) string {
 func tuiError(value string, darkBackground bool) string {
 	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#B91C1C"), lipgloss.Color("#F7768E"))
 	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(value)
+}
+
+func tuiSection(value string, darkBackground bool) string {
+	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#334155"), lipgloss.Color("#C0CAF5"))
+	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(value)
+}
+
+func tuiMuted(value string, darkBackground bool) string {
+	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#64748B"), lipgloss.Color("#7F849C"))
+	return lipgloss.NewStyle().Foreground(color).Render(value)
+}
+
+func tuiStatus(value string, kind tuiStatusKind, darkBackground bool) string {
+	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#475569"), lipgloss.Color("#A9B1D6"))
+	switch kind {
+	case tuiStatusSuccess:
+		color = lipgloss.LightDark(darkBackground)(lipgloss.Color("#047857"), lipgloss.Color("#9ECE6A"))
+	case tuiStatusAttention:
+		color = lipgloss.LightDark(darkBackground)(lipgloss.Color("#B45309"), lipgloss.Color("#E0AF68"))
+	case tuiStatusFailure:
+		color = lipgloss.LightDark(darkBackground)(lipgloss.Color("#B91C1C"), lipgloss.Color("#F7768E"))
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(strings.ToUpper(value))
 }
 
 func tuiResult(value string, success, darkBackground bool) string {

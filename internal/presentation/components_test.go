@@ -10,13 +10,16 @@ func TestTUIComponentsPreserveTextualMeaning(t *testing.T) {
 	failure := tuiError("Invalid value", true)
 	success := tuiResult("Completed", true, true)
 	warning := tuiResult("Needs attention", false, true)
+	status := tuiStatus("ready", tuiStatusSuccess, true)
+	section := tuiSection("Status", true)
+	muted := tuiMuted("Secondary", true)
 	help := tuiHelp(80, true,
 		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
 		tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
 	)
-	for _, expected := range []string{"Nixorium", "Invalid value", "Completed", "Needs attention", "enter", "continue", "esc", "cancel"} {
-		if !strings.Contains(title+failure+success+warning+help, expected) {
-			t.Fatalf("component rendering omits %q: %q", expected, title+failure+success+warning+help)
+	for _, expected := range []string{"Nixorium", "Invalid value", "Completed", "Needs attention", "READY", "Status", "Secondary", "enter", "continue", "esc", "cancel"} {
+		if !strings.Contains(title+failure+success+warning+status+section+muted+help, expected) {
+			t.Fatalf("component rendering omits %q", expected)
 		}
 	}
 }

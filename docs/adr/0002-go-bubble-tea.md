@@ -34,6 +34,13 @@ available width; future list, input, progress, spinner, table, and viewport
 usage must reuse this presentation-only foundation rather than introducing
 backend dependencies or parsing rendered output.
 
+The dashboard home composes an official Bubbles list into a keyboard-navigable
+task menu. Arrow keys and Enter provide the primary path while stable
+one-letter shortcuts remain available. Lip Gloss separates title, section,
+muted description, success, attention, and failure roles for both light and
+dark terminals. These roles supplement explicit text labels; color and Unicode
+are never the only carrier of state or action meaning.
+
 The first operational TUI screen implements this boundary with injected typed
 callbacks for PXE preparation and lifecycle operations. Unit tests drive its
 state machine, including Bubble Tea's distinct space-key event, and the NixOS

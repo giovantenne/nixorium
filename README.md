@@ -122,10 +122,11 @@ nix run .#nixorium
 
 The dashboard shows configuration, cache, installation-mode, computer, and Git
 state. When setup is incomplete it highlights the next step and `Enter` resumes
-the checklist. It also provides grouped **Change settings** editing for routine
-updates. Choose **Install computers over network**. Long PXE preparation shows
-its current phase, elapsed time, bounded recent activity, and client progress
-without requiring a second terminal.
+the checklist. Once setup is ready, use `Up`/`Down` and `Enter` in the colored
+task menu, or press the shortcut shown beside any task. It also provides grouped
+**Change settings** editing for routine updates. Choose **Install computers over
+network**. Long PXE preparation shows its current phase, elapsed time, bounded
+recent activity, and client progress without requiring a second terminal.
 
 ### 6. Prepare and start installation mode
 
@@ -154,6 +155,8 @@ Run `nix run .#nixorium` from the private deployment repository. The dashboard
 provides the normal workflows:
 
 - `Enter` follows the recommended first-run action when setup is incomplete;
+- once ready, `Up`/`Down` selects a task and `Enter` opens it; the displayed
+  one-letter shortcuts remain available;
 - each workflow shows its available keys, while `Esc` returns and `q` quits;
 - reviews describe impact before mutation and require the displayed phrase;
 - terminal results state what happened and expose the relevant next action.
