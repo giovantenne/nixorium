@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added live foreground deployment feedback with elapsed time, an official
+  Bubbles progress bar, typed build/apply/verification activities, and checked-
+  computer counts. Raw Colmena output stays in the private log, and the compact
+  result now offers dashboard, log, and fresh-review actions.
 - Replaced the dashboard's flat command wall with a paginated, keyboard-
   navigable Bubbles task menu, semantic light/dark status colors, task
   descriptions, and explicit key help while preserving textual state and all

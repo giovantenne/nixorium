@@ -204,8 +204,10 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 				Targets:         []domain.DeploymentTarget{{Name: "pc01"}, {Name: "pc02"}},
 			}
 		},
-		ApplyDeployment: func(plan domain.DeploymentPlanReport) domain.DeploymentExecutionReport {
+		ApplyDeployment: func(plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 			applied++
+			observe(domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4, Activity: "Building configurations for 2 selected computer(s)"})
+			observe(domain.DeploymentProgress{Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4, TargetCurrent: 2, TargetTotal: 2, Activity: "Checked authenticated state for 2/2 computer(s)"})
 			return domain.DeploymentExecutionReport{
 				Operation:       "deploy-apply",
 				State:           "completed",
@@ -253,10 +255,50 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
 		t.Fatal("dashboard allowed quit while deployment was running")
 	}
-	updated, _ = model.Update(command())
+	updated, command = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Last result: completed") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") {
+	if !strings.Contains(model.View().Content, "Building configurations") || !strings.Contains(model.View().Content, "Recent activity") || !strings.Contains(model.View().Content, "private deployment log") {
+		t.Fatalf("deployment progress missing:\n%s", model.View().Content)
+	}
+	for model.deploying && command != nil {
+		updated, command = model.Update(command())
+		model = updated.(dashboardModel)
+	}
+	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Deployment completed and verified") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") || !strings.Contains(model.View().Content, "new review") {
 		t.Fatalf("deployment result missing: applied=%d\n%s", applied, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHome {
+		t.Fatalf("deployment result did not return to dashboard: screen=%d", model.screen)
+	}
+}
+
+func TestDeploymentProgressKeepsOnlyFiveAuthoredActivities(t *testing.T) {
+	recent := []string{}
+	for _, activity := range []string{"one", "two", "three", "four", "five", "six"} {
+		recent = appendBoundedActivity(recent, activity, 5)
+	}
+	if got := strings.Join(recent, ","); got != "two,three,four,five,six" {
+		t.Fatalf("bounded deployment activity = %q", got)
+	}
+
+	model := dashboardModel{
+		deployProgress: domain.DeploymentProgress{
+			Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
+			TargetCurrent: 2, TargetTotal: 3,
+		},
+		deployRecent: recent,
+		width:        80,
+	}
+	view := strings.Join(model.deploymentProgressView(), "\n")
+	for _, expected := range []string{"Verifying computers", "3/4", "Computers checked: 2/3", "six"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("deployment progress omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "one") {
+		t.Fatalf("deployment progress retained more than five activities:\n%s", view)
 	}
 }
 

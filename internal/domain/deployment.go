@@ -17,6 +17,18 @@ type DeploymentTarget struct {
 	IP   string `json:"ip"`
 }
 
+// DeploymentProgress is an in-process, bounded update authored by the
+// application while a foreground deployment is running. Raw Colmena output
+// remains in the private deployment log and never crosses this boundary.
+type DeploymentProgress struct {
+	Phase         DeploymentPhase
+	Completed     int
+	Total         int
+	TargetCurrent int
+	TargetTotal   int
+	Activity      string
+}
+
 type DeploymentPlanReport struct {
 	SchemaVersion   int                `json:"schemaVersion"`
 	Operation       string             `json:"operation"`

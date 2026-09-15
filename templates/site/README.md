@@ -200,7 +200,12 @@ nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 Planning is read-only. It requires a ready deployment and clean Git revision,
 expands only configured clients, and prints the revision-bound apply command.
 Apply repeats the preflight, requires `DEPLOY <targets>`, builds before
-activation, and streams output to a mode-0600 log.
+activation, and streams output to a mode-0600 log. In the dashboard, the same
+foreground operation shows elapsed time, a four-stage progress bar, up to five
+application-authored activities, and authenticated-computer verification
+counts. Raw Colmena output remains in the private log instead of being rendered
+as terminal UI. Accidental quit stays disabled until the final report appears;
+that compact result offers direct dashboard, log, and fresh-review actions.
 
 After every attempt, Nixorium authenticates selected hosts and records only
 those running the reviewed revision. A failed apply may leave mixed target

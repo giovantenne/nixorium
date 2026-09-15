@@ -155,7 +155,10 @@ func TestDeploymentPlanRequiresControllerDeploymentAddress(t *testing.T) {
 func TestDeploymentExecuteBuildsBeforeApplyAndStreamsOutput(t *testing.T) {
 	source := readyDeploymentSource()
 	progress := &bytes.Buffer{}
-	report := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc03,pc01", source.revision, "/state/deploy.log", progress)
+	var observed []domain.DeploymentProgress
+	report := NewDeploymentManager(source).ExecuteWithProgress(context.Background(), "/deployment", "pc03,pc01", source.revision, "/state/deploy.log", progress, func(update domain.DeploymentProgress) {
+		observed = append(observed, update)
+	})
 	if report.HasErrors() || report.State != "completed" || !report.BuildCompleted || !report.ApplyCompleted || report.Phase != domain.DeploymentPhaseComplete {
 		t.Fatalf("execution report = %+v", report)
 	}
@@ -170,6 +173,14 @@ func TestDeploymentExecuteBuildsBeforeApplyAndStreamsOutput(t *testing.T) {
 	}
 	if report.Verification.Attempted != 2 || report.Verification.Verified != 2 || report.Verification.Recorded != 2 || len(source.recorded) != 2 {
 		t.Fatalf("verification = %+v, recorded = %+v", report.Verification, source.recorded)
+	}
+	if len(observed) < 6 || observed[0].Phase != domain.DeploymentPhaseBuild || observed[len(observed)-1].Phase != domain.DeploymentPhaseComplete || observed[len(observed)-1].Completed != 4 {
+		t.Fatalf("typed progress = %+v", observed)
+	}
+	for _, update := range observed {
+		if strings.Contains(update.Activity, "colmena build output") || strings.Contains(update.Activity, "colmena apply output") {
+			t.Fatalf("raw command output crossed typed progress boundary: %+v", update)
+		}
 	}
 }
 
