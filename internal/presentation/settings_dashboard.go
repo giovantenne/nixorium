@@ -262,6 +262,27 @@ func (model dashboardModel) settingsView() string {
 		return model.settingsReviewView()
 	}
 	lines := []string{tuiTitle("Nixorium — Settings", model.isDark), ""}
+	if model.settingsResult.Operation != "" {
+		success := !model.settingsResult.HasErrors() && model.settingsResult.State == "applied"
+		title := "Settings need attention"
+		if success {
+			title = "Settings updated"
+		}
+		lines = append(lines,
+			tuiResult(title, success, model.isDark),
+			"",
+			fmt.Sprintf("State: %s   Changed fields: %d", model.settingsResult.State, len(model.settingsResult.Changes)),
+		)
+		if model.message != "" {
+			lines = append(lines, "", "Result: "+model.message)
+		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"g"}, "g", "review Git changes"),
+			tuiHelpBinding([]string{"e"}, "e", "edit more"),
+			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
+		))
+		return strings.Join(lines, "\n") + "\n"
+	}
 	lines = append(lines,
 		"Choose one area to edit. Values are validated before any file changes.",
 		"",
@@ -270,9 +291,6 @@ func (model dashboardModel) settingsView() string {
 		"p: change one password through the secure no-echo credential flow",
 		"Enter: edit category   /: filter   Esc: back",
 	)
-	if model.settingsResult.Operation != "" {
-		lines = append(lines, "", fmt.Sprintf("Last apply: %s; %d field(s)", model.settingsResult.State, len(model.settingsResult.Changes)))
-	}
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}

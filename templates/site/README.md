@@ -131,7 +131,9 @@ states, but every state remains written explicitly. Each workflow displays its
 own available keys; `Esc` returns to the previous screen and `q` quits when no
 operation requires attention. Computers, deployment, controller, services,
 logs, Git, updates, and network installation reuse the same title, section,
-status, and width-adaptive key-help hierarchy.
+status, and width-adaptive key-help hierarchy. Completed Settings, service,
+Git, update, deployment, and controller operations show a compact result with
+the relevant next action rather than dropping back into the prior form or list.
 
 | Dashboard task | Purpose |
 |---|---|
