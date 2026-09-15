@@ -118,6 +118,33 @@ session** and counts the rest as unverified, not failed. Attempting to quit whil
 PXE is active first reviews the consequences and requires the exact phrase
 `LEAVE PXE ACTIVE`.
 
+If the TUI is closed and reopened after technical verification, it restores
+the checkpoint without claiming a new observation:
+
+```text
+Nixorium — First setup / First computer
+
+Pilot computer
+  pc01
+
+✓ Technical verification succeeded
+Authenticated technical evidence was restored from this session.
+Press v to check current state again.
+
+Check at the computer
+  • Log in and open the expected desktop session.
+  • Check required software, network and classroom peripherals.
+  • Confirm that the computer started from its installed disk.
+
+enter practical check passed  •  v check again  •  x stop installation
+```
+
+The checkpoint lives in private per-repository operator state and is bound to
+the exact Git revision and authenticated system path. A changed revision or
+inventory produces “Saved session is out of date” and returns to explicit
+computer selection; a fresh failed check is shown instead of the historical
+success.
+
 ## Restore choice
 
 ```text

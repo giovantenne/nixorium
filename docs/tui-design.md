@@ -125,6 +125,13 @@ compact, standard and wide sizes. Record physical testing separately.
 - Added restoration-path tests that keep reapply non-destructive and require an
   evaluated identity before disk-erasing reinstall, with verification scoped to
   that selected computer.
+- Added strict domain, application, adapter and presentation coverage for
+  durable installation sessions. Records are atomic, private and isolated per
+  repository; evidence is bound to identity, revision and installed system
+  path. Tests cover cross-process resume, stale revision/inventory rejection,
+  unknown identities, corrupt or unsafe state files, symlinks, clock rollback,
+  technical-before-practical ordering and failed current observations taking
+  precedence over stored evidence.
 - Layout checks: PASS at 80×24, 120×30 and 180×45 with 200 computers;
   focused rows and exact-confirmation controls remain visible.
 - Color capability checks: PASS for no color, ANSI and ANSI256; meaning survives
@@ -140,7 +147,7 @@ of complete titles in incremental terminal output, and log browsing explicitly
 scrolls to the final result. No application safety check was removed.
 
 Final management VM derivation:
-`/nix/store/41hkm7zln2i31cyy9g868vydg39d2qfy-vm-test-run-nixorium-management.drv`.
+`/nix/store/v7whpsp8n103rblk1djlxvmhma3pspsl-vm-test-run-nixorium-management.drv`.
 
 No physical laboratory tests, full release matrix or client-installer VM ran
 for this frontend change. No live laboratory operations, push or release were
@@ -154,7 +161,12 @@ operations remain planned application work, not implemented TUI actions.
 - Read model: `internal/domain/computer_condition.go`.
 - Application wiring: `cmd/nixorium/main.go` adds existing Doctor and
   UpdateManager release discovery plus the single-inventory-identity observer
-  to the typed TUI callbacks; existing CLI command handlers are unchanged.
+  and installation-session manager to the typed TUI callbacks; existing CLI
+  command handlers are unchanged.
+- Installation session: `internal/domain/installation_session.go`,
+  `internal/app/installation_session.go`, and
+  `internal/adapters/installation_session.go` own the versioned record,
+  reconciliation rules, focused observation and private atomic storage.
 - Tests: `internal/domain/computer_condition_test.go`,
   `internal/presentation/experience_test.go`, `tui_test.go`,
   `components_test.go`, and `tests/management-vm.nix`.

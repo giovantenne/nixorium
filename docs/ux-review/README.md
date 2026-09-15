@@ -130,9 +130,9 @@ off. Distribution requires checks only for selected targets.
 
 | Flow | Current implementation | Intervention |
 |---|---|---|
-| Controller bootstrap, setup, PXE | Guided setup, pilot handoff, session-local verification, stop/leave review | Highest priority: durable initial-provisioning evidence and physical validation |
+| Controller bootstrap, setup, PXE | Guided setup, pilot handoff, durable revision-bound verification, stop/leave review | Physical laboratory validation remains |
 | Client verification and deployment | Implemented | Place them in an explicit-target flow that supports partial sessions |
-| Restore | Explicit reapply/reinstall split; reinstall selects and verifies one identity at a time | Durable cross-process session evidence remains planned |
+| Restore | Explicit reapply/reinstall split; reinstall selects and verifies one identity at a time with cross-process evidence | Physical laboratory validation remains |
 | Guided software changes | Not implemented | New application service limited to supported changes |
 | Nixorium release update | Typed check/plan/apply exists | Discover releases, select one, validate, review, and apply |
 | Batch shutdown | Not implemented | Typed client-only operation after the priorities above |
@@ -258,7 +258,7 @@ UX success metric.
 | D01 | First installation is primary; later use is occasional maintenance | Owner direction accepted |
 | D02 | Computers are normally off; no fleet-availability alarm | Owner direction accepted |
 | D03 | Restore has two explicit paths: reapply configuration or reinstall and erase a locally confirmed disk | Implemented direction |
-| D04 | Use a pilot client and support partial installation sessions | Implemented with session-local evidence; durable evidence remains planned |
+| D04 | Use a pilot client and support partial installation sessions | Implemented with private, revision-bound cross-process evidence |
 | D05 | Guided software is limited to supported packages/configuration while preserving private modules | Review required |
 | D06 | No NixOS-upgrade action; Update Nixorium selects only releases discovered by the typed service | Owner direction accepted |
 | D07 | Shutdown targets clients only; session conflicts block by default and unknown sessions require explicit acknowledgement | Planned contract |

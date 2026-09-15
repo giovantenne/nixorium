@@ -405,6 +405,7 @@ func setupNeedsConfiguration(report domain.SetupReport) bool {
 func runDashboardProgram(ctx context.Context, repository string, report domain.StatusReport, setupMode bool, stderr io.Writer) int {
 	local := adapters.Local{}
 	inspector := app.NewInspector(local)
+	installationManager := app.NewInstallationSessionManager(local, inspector)
 	setupManager := app.NewSetupManager(local)
 	lifecycle := app.NewPXELifecycle(local)
 	deploymentManager := app.NewDeploymentManager(local)
@@ -430,8 +431,17 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 		LoadHosts: func() (domain.HostsReport, error) {
 			return inspector.Hosts(ctx, repository)
 		},
-		LoadHost: func(name string) (domain.HostsReport, error) {
-			return inspector.Host(ctx, repository, name)
+		LoadInstallationSession: func() domain.InstallationSessionReport {
+			return installationManager.Status(ctx, repository)
+		},
+		SelectInstallationTarget: func(name string) domain.InstallationSessionReport {
+			return installationManager.Select(ctx, repository, name)
+		},
+		VerifyInstallationTarget: func(name string) domain.InstallationSessionReport {
+			return installationManager.Verify(ctx, repository, name)
+		},
+		ConfirmInstallationTarget: func(name string) domain.InstallationSessionReport {
+			return installationManager.ConfirmPractical(ctx, repository, name)
 		},
 		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
 			return deploymentManager.Plan(ctx, repository, requested)

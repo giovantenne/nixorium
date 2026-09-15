@@ -159,14 +159,18 @@ system state. After that succeeds, perform the short practical checklist at
 the client. You may install another computer or press `x` to stop installation
 mode and finish with the remaining clients deferred. `q` reviews the
 consequences and requires `LEAVE PXE ACTIVE` before closing while PXE remains
-active.
+active. The selected identity and completed checks are stored in private
+operator state, so reopening the TUI resumes the partial session. Evidence is
+bound to the deployment revision and installed system path; changing the
+laboratory revision requires a new selection and verification.
 
 ## Occasional interventions
 
 Run `nix run .#nixorium` from the private deployment repository. The dashboard
 provides the normal workflows:
 
-- `nixorium setup` resumes the observed first-installation stage;
+- `nixorium setup` resumes the observed first-installation stage and any
+  compatible per-computer installation evidence;
 - on later openings, `Up`/`Down` selects an intervention and `Enter` opens it; the displayed
   one-letter shortcuts remain available;
 - each workflow shows its available keys; `Esc` returns, and `q` quits outside
