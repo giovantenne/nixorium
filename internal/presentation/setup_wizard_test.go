@@ -77,6 +77,9 @@ func TestFirstRunOmitsGitIdentityAndGroupsEssentialFields(t *testing.T) {
 }
 
 func TestRegionalFieldsUseSearchableSuggestedValues(t *testing.T) {
+	if localeChoices[0].value != "en_US.UTF-8" {
+		t.Fatalf("first locale choice = %q, want en_US.UTF-8", localeChoices[0].value)
+	}
 	model := newSettingsWizardModel(wizardSettings())
 	model = model.moveToField(settingsFieldIndex("lab.defaultLocale"))
 	if !model.selector.FilteringEnabled() || !strings.Contains(model.View().Content, "press / to filter") {

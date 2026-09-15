@@ -3,6 +3,7 @@ package domain
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/netip"
@@ -51,6 +52,22 @@ type LabSettings struct {
 	KeyboardLayout   string   `json:"keyboardLayout"`
 	ConsoleKeyMap    string   `json:"consoleKeyMap"`
 	VeyonNativeHosts []string `json:"veyonNativeHosts"`
+}
+
+func ControllerStaticAddress(lab LabSettings) (string, error) {
+	prefix, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", lab.NetworkBase, lab.NetworkPrefix))
+	if err != nil || !prefix.Addr().Is4() || prefix.Masked() != prefix || prefix.Bits() < 1 || prefix.Bits() > 30 {
+		return "", errors.New("laboratory network is not a canonical IPv4 prefix")
+	}
+	hostCapacity := uint64(1) << (32 - prefix.Bits())
+	if lab.MasterHostNumber < 1 || uint64(lab.MasterHostNumber) >= hostCapacity-1 {
+		return "", errors.New("controller host number does not fit in the laboratory prefix")
+	}
+	octets := prefix.Addr().As4()
+	base := uint32(octets[0])<<24 | uint32(octets[1])<<16 | uint32(octets[2])<<8 | uint32(octets[3])
+	value := base + uint32(lab.MasterHostNumber)
+	candidate := netip.AddrFrom4([4]byte{byte(value >> 24), byte(value >> 16), byte(value >> 8), byte(value)})
+	return candidate.String(), nil
 }
 
 type ValidationIssue struct {

@@ -43,8 +43,8 @@ var timeZoneChoices = []settingsChoice{
 }
 
 var localeChoices = []settingsChoice{
-	{value: "it_IT.UTF-8", label: "Italiano — Italia", description: "it_IT.UTF-8"},
 	{value: "en_US.UTF-8", label: "English — United States", description: "en_US.UTF-8"},
+	{value: "it_IT.UTF-8", label: "Italiano — Italia", description: "it_IT.UTF-8"},
 	{value: "en_GB.UTF-8", label: "English — United Kingdom", description: "en_GB.UTF-8"},
 	{value: "fr_FR.UTF-8", label: "Français — France", description: "fr_FR.UTF-8"},
 	{value: "de_DE.UTF-8", label: "Deutsch — Deutschland", description: "de_DE.UTF-8"},
