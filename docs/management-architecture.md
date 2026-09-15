@@ -390,8 +390,10 @@ stage. Going backward changes draft values without undoing applied operations.
 The implemented setup slices expose read-only reconciliation through
 `nixorium setup status`, guided configuration through `nixorium setup`, and
 explicit key reconciliation through `nixorium setup keys`. The wizard proposes
-detected network values and groups 15 essential questions into Network,
-Laboratory, Accounts, Regional settings, Preferences, and Classroom stages.
+the default-route interface and a non-static IPv4 address observed on that
+interface, so an already-active declarative controller address cannot mask the
+live DHCP lease. It groups 15 essential questions into Network, Laboratory,
+Accounts, Regional settings, Preferences, and Classroom stages.
 Time zone, locale, regional-format locale, desktop keyboard, and console keymap
 use offline Bubbles lists with fuzzy filtering, curated common values, and a
 validated custom path. Optional Git author identity retains the deployment

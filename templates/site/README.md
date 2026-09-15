@@ -270,14 +270,16 @@ nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- setup apply
 ```
 
-`setup` proposes detected network values, groups its essential questions by
-task, and provides searchable offline selectors for time zone, locale, and
-keyboard values while retaining validated custom entry. Optional Git identity
-is not requested during first run. The wizard supports backward navigation,
-collects passwords without echo, retries recoverable password mistakes in the
-current account without restarting configuration, validates the complete
-candidate, shows a redacted review, writes atomically after acceptance, and
-reconciles all three key pairs. It never overwrites existing key material.
+`setup` proposes the interface carrying the default route and its live DHCP
+address (not the controller's declarative static address), groups its essential
+questions by task, and provides searchable offline selectors for time zone,
+locale, and keyboard values while retaining validated custom entry. Optional
+Git identity is not requested during first run. The wizard supports backward
+navigation, collects passwords without echo, retries recoverable password
+mistakes in the current account without restarting configuration, validates
+the complete candidate, shows a redacted review, writes atomically after
+acceptance, and reconciles all three key pairs. It never overwrites existing
+key material.
 `setup status` observes
 the first incomplete stage without trusting a hidden completion flag.
 

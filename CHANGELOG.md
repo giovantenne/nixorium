@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made first-run network suggestions prefer the interface carrying the default
+  route and its live DHCP address, explicitly excluding the controller's
+  declarative static address; moved the US English locale to the first curated
+  locale choice.
 - Extended managed live feedback to first-run and routine controller apply:
   both fixed and revision-bound systemd units publish validation, build,
   activation, and verification progress. CLI JSON keeps stdout clean while the

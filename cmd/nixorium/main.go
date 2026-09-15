@@ -1290,7 +1290,8 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 		return 1
 	}
 	if settings.Lab.MasterDHCPIP == domain.MasterDHCPPlaceholder {
-		detected := local.DetectNetworkDefaults()
+		staticAddress, _ := domain.ControllerStaticAddress(settings.Lab)
+		detected := local.DetectNetworkDefaults(staticAddress)
 		if detected.DHCPAddress != "" {
 			settings.Lab.MasterDHCPIP = detected.DHCPAddress
 		}

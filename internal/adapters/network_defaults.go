@@ -8,24 +8,20 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func (Local) DetectNetworkDefaults() domain.NetworkDefaults {
+type networkAddressCandidate struct {
+	interfaceName string
+	address       string
+}
+
+func (Local) DetectNetworkDefaults(excludedAddresses ...string) domain.NetworkDefaults {
 	routeData, _ := os.ReadFile("/proc/net/route")
 	preferred := defaultRouteInterface(string(routeData))
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return domain.NetworkDefaults{InterfaceName: preferred}
 	}
-	ordered := interfaces
-	if preferred != "" {
-		ordered = append([]net.Interface{}, interfaces...)
-		for index, iface := range ordered {
-			if iface.Name == preferred {
-				ordered[0], ordered[index] = ordered[index], ordered[0]
-				break
-			}
-		}
-	}
-	for _, iface := range ordered {
+	candidates := []networkAddressCandidate{}
+	for _, iface := range interfaces {
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
@@ -36,11 +32,34 @@ func (Local) DetectNetworkDefaults() domain.NetworkDefaults {
 		for _, address := range addresses {
 			ip, _, parseErr := net.ParseCIDR(address.String())
 			if parseErr == nil && ip.To4() != nil && !ip.IsLinkLocalUnicast() {
-				return domain.NetworkDefaults{InterfaceName: iface.Name, DHCPAddress: ip.String()}
+				candidates = append(candidates, networkAddressCandidate{interfaceName: iface.Name, address: ip.String()})
 			}
 		}
 	}
-	return domain.NetworkDefaults{InterfaceName: preferred}
+	return selectNetworkDefaults(preferred, candidates, excludedAddresses)
+}
+
+func selectNetworkDefaults(preferred string, candidates []networkAddressCandidate, excludedAddresses []string) domain.NetworkDefaults {
+	excluded := map[string]bool{}
+	for _, address := range excludedAddresses {
+		if parsed := net.ParseIP(address); parsed != nil && parsed.To4() != nil {
+			excluded[parsed.String()] = true
+		}
+	}
+	if preferred != "" {
+		for _, candidate := range candidates {
+			if candidate.interfaceName == preferred && !excluded[candidate.address] {
+				return domain.NetworkDefaults{InterfaceName: preferred, DHCPAddress: candidate.address}
+			}
+		}
+		return domain.NetworkDefaults{InterfaceName: preferred}
+	}
+	for _, candidate := range candidates {
+		if !excluded[candidate.address] {
+			return domain.NetworkDefaults{InterfaceName: candidate.interfaceName, DHCPAddress: candidate.address}
+		}
+	}
+	return domain.NetworkDefaults{}
 }
 
 func defaultRouteInterface(routeTable string) string {

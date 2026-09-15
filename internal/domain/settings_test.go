@@ -5,6 +5,21 @@ import (
 	"testing"
 )
 
+func TestControllerStaticAddressMatchesNixHostOffset(t *testing.T) {
+	address, err := ControllerStaticAddress(LabSettings{NetworkBase: "10.20.0.0", NetworkPrefix: 24, MasterHostNumber: 99})
+	if err != nil || address != "10.20.0.99" {
+		t.Fatalf("address = %q, error = %v", address, err)
+	}
+	for _, lab := range []LabSettings{
+		{NetworkBase: "10.20.0.1", NetworkPrefix: 24, MasterHostNumber: 99},
+		{NetworkBase: "10.20.0.0", NetworkPrefix: 30, MasterHostNumber: 3},
+	} {
+		if _, err := ControllerStaticAddress(lab); err == nil {
+			t.Fatalf("invalid static address input accepted: %+v", lab)
+		}
+	}
+}
+
 func validSettings() LabSettingsFile {
 	return LabSettingsFile{
 		SchemaVersion: SettingsSchemaVersion,
