@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Turned bare first-run setup into a resumable guided handoff: after initial
+  configuration and key reconciliation it opens an observed 11-stage progress
+  screen whose single primary action routes through reviewed Git commit,
+  controller activation, PXE preparation, and the first network installation.
+  Reopening setup skips completed configuration stages.
 - Made the controller rebuild result actionable: the dashboard refreshes its
   reconciled status, collapses completed activity by default, and offers clear
   dashboard, detail, log, and new-review actions instead of leaving the

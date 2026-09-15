@@ -37,6 +37,19 @@ func (h *setupPasswordHasher) HashPassword(context.Context, []byte) (string, err
 	return "$6$salt$hash", nil
 }
 
+func TestBareSetupSkipsCompletedConfigurationStages(t *testing.T) {
+	for _, stage := range []string{"", domain.SetupStageReview, domain.SetupStageApply, domain.SetupStageArtifacts, domain.SetupStageReadiness, domain.SetupStageInstall} {
+		if setupNeedsConfiguration(domain.SetupReport{CurrentStage: stage}) {
+			t.Fatalf("stage %q unexpectedly reruns configuration", stage)
+		}
+	}
+	for _, stage := range []string{domain.SetupStageNetwork, domain.SetupStageIdentity, domain.SetupStageCredentials, domain.SetupStageKeys, domain.SetupStageValidate} {
+		if !setupNeedsConfiguration(domain.SetupReport{CurrentStage: stage}) {
+			t.Fatalf("stage %q unexpectedly skipped configuration", stage)
+		}
+	}
+}
+
 func TestCollectSetupCredentialsRetriesOnlyCurrentAccount(t *testing.T) {
 	inputs := [][]byte{
 		[]byte("short"),

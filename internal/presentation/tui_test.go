@@ -26,6 +26,78 @@ func testDashboardReport(mode string) domain.StatusReport {
 	return report
 }
 
+func testSetupReport(reviewed, applied, artifacts, ready bool) domain.SetupReport {
+	complete := domain.SetupObservation{Complete: true}
+	return domain.ReconcileSetup("/deployment", domain.SetupFacts{
+		Environment: complete,
+		Network:     complete,
+		Identity:    complete,
+		Credentials: complete,
+		Keys:        complete,
+		Validation:  complete,
+		Review:      domain.SetupObservation{Complete: reviewed},
+		Apply:       domain.SetupObservation{Complete: applied},
+		Artifacts:   domain.SetupObservation{Complete: artifacts},
+		Readiness:   domain.SetupObservation{Complete: ready},
+		Install:     domain.SetupObservation{Complete: ready},
+	})
+}
+
+func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
+	setup := testSetupReport(false, false, false, false)
+	loads := 0
+	model := dashboardModel{
+		report: testDashboardReport("ready"),
+		setup:  setup,
+		actions: DashboardActions{
+			LoadGitReview: func() domain.GitReviewReport {
+				return domain.GitReviewReport{Operation: "git-review", State: "changes"}
+			},
+			LoadSetup: func() domain.SetupReport {
+				loads++
+				return testSetupReport(true, false, false, false)
+			},
+		},
+	}
+	if view := model.View().Content; !strings.Contains(view, "Next: finish first setup") || !strings.Contains(view, "Review and accept Git changes") {
+		t.Fatalf("home does not expose resumable setup:\n%s", view)
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSetup || !strings.Contains(model.View().Content, "6/11 steps complete") || !strings.Contains(model.View().Content, "Review and commit the generated configuration") {
+		t.Fatalf("setup progress screen is incomplete:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen != dashboardGitReview {
+		t.Fatalf("setup did not open Git review: screen=%d", model.screen)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen != dashboardSetup {
+		t.Fatalf("Git review did not return to setup: screen=%d", model.screen)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loads != 1 || model.setup.CurrentStage != domain.SetupStageApply || !strings.Contains(model.View().Content, "Review and activate the controller configuration") {
+		t.Fatalf("setup did not resume from refreshed state: loads=%d setup=%+v\n%s", loads, model.setup, model.View().Content)
+	}
+}
+
+func TestCompletedSetupOpensFirstNetworkInstallation(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready"), setup: testSetupReport(true, true, true, true), setupMode: true, screen: dashboardSetup}
+	if !strings.Contains(model.View().Content, "Laboratory setup is ready") || !strings.Contains(model.View().Content, "opens network installation") {
+		t.Fatalf("completed setup omits first installation action:\n%s", model.View().Content)
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardPXE || !strings.Contains(model.View().Content, "Start installation mode") {
+		t.Fatalf("completed setup did not open network installation:\n%s", model.View().Content)
+	}
+}
+
 func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	loads := 0
 	actions := DashboardActions{

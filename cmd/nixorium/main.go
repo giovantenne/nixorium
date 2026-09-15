@@ -78,117 +78,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 			return 0
 		}
-		lifecycle := app.NewPXELifecycle(local)
-		deploymentManager := app.NewDeploymentManager(local)
-		controllerManager := app.NewControllerManager(local)
-		serviceManager := app.NewServiceManager(local)
-		operationLogManager := app.NewOperationLogManager(local)
-		gitReviewManager := app.NewGitReviewManager(local)
-		gitCommitManager := app.NewGitCommitManager(local)
-		updateManager := app.NewUpdateManager(local)
-		settingsManager := app.NewSettingsManager(local)
-		progressManager := app.NewOperationProgressManager(local)
-		actions := presentation.DashboardActions{
-			Refresh: func() (domain.StatusReport, error) {
-				return inspector.Status(ctx, repository)
-			},
-			LoadHosts: func() (domain.HostsReport, error) {
-				return inspector.Hosts(ctx, repository)
-			},
-			PlanDeployment: func(requested string) domain.DeploymentPlanReport {
-				return deploymentManager.Plan(ctx, repository, requested)
-			},
-			ApplyDeployment: func(plan domain.DeploymentPlanReport) domain.DeploymentExecutionReport {
-				return executeDeploymentOperation(ctx, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard)
-			},
-			PlanController: func() domain.ControllerRebuildPlanReport {
-				return controllerManager.Plan(ctx, repository)
-			},
-			ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
-				report := controllerManager.Apply(ctx, repository, plan.Revision)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-			LoadControllerProgress: func() (domain.OperationProgress, error) {
-				return progressManager.Current("controller-apply")
-			},
-			LoadServices: func() domain.ServicesReport {
-				return serviceManager.Status(ctx, repository)
-			},
-			RestartService: func(service string) domain.ServiceActionReport {
-				report := serviceManager.Restart(ctx, repository, service)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-			LoadLogs: func() domain.OperationLogsReport {
-				return operationLogManager.List()
-			},
-			LoadLog: func(id string) domain.OperationLogReport {
-				return operationLogManager.Show(id)
-			},
-			LoadGitReview: func() domain.GitReviewReport {
-				return gitReviewManager.Review(ctx, repository)
-			},
-			PlanGitCommit: func(paths string) domain.GitCommitPlanReport {
-				return gitCommitManager.Plan(ctx, repository, paths)
-			},
-			ApplyGitCommit: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
-				report := gitCommitManager.Apply(ctx, repository, strings.Join(plan.Paths, ","), plan.ReviewToken)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-			PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
-				return updateManager.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
-			},
-			ApplyUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
-				report := updateManager.ApplyPlan(ctx, plan, plan.ReviewToken)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-			LoadSettings: func() (domain.LabSettingsFile, error) {
-				return settingsManager.Current(repository)
-			},
-			PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
-				return settingsManager.PlanSettings(ctx, repository, candidate)
-			},
-			ApplySettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigApplyReport {
-				return settingsManager.ApplySettings(ctx, repository, candidate, plan.BaseFingerprint)
-			},
-			ChangePassword: func(account string, settings domain.LabSettingsFile, input *os.File, output io.Writer) (domain.LabSettingsFile, error) {
-				return collectSettingsPassword(ctx, local, input, output, account, settings)
-			},
-			PreparePXE: func() domain.ActionReport {
-				report := app.NewSystemActions(local).PreparePXE(ctx)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-			LoadPXEProgress: func() (domain.OperationProgress, error) {
-				return progressManager.Current("pxe-prepare")
-			},
-			PlanPXEStart: func() domain.PXELifecycleReport {
-				return lifecycle.PlanStart(ctx, repository)
-			},
-			StartPXE: func() domain.PXELifecycleReport {
-				report := lifecycle.Start(ctx, repository)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-			StopPXE: func() domain.PXELifecycleReport {
-				report := lifecycle.Stop(ctx, repository)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-			RecoverPXE: func() domain.PXELifecycleReport {
-				report := lifecycle.Recover(ctx, repository)
-				report.Message = operationRecordMessage(report.Message, report)
-				return report
-			},
-		}
-		if tuiErr := presentation.RunDashboard(report, actions); tuiErr != nil {
-			fmt.Fprintln(stderr, "Error:", tuiErr)
-			return 1
-		}
-		return 0
+		return runDashboardProgram(ctx, repository, report, false, stderr)
 	case "status":
 		report, inspectErr := inspector.Status(ctx, repository)
 		if inspectErr != nil {
@@ -388,7 +278,27 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	case "setup":
 		manager := app.NewSetupManager(adapters.Local{})
 		if options.subcommand == "configure" {
-			return runSetupConfigure(ctx, repository, stdout, stderr, options.guided)
+			if !options.guided {
+				return runSetupConfigure(ctx, repository, stdout, stderr, false)
+			}
+			setup := manager.Status(ctx, repository)
+			if setupNeedsConfiguration(setup) {
+				if code := runSetupConfigure(ctx, repository, stdout, stderr, true); code != 0 {
+					return code
+				}
+				setup = manager.Status(ctx, repository)
+				if setupNeedsConfiguration(setup) {
+					presentation.SetupText(stdout, setup)
+					fmt.Fprintln(stdout, "Setup paused before configuration was complete. Run `nixorium setup` to resume.")
+					return 0
+				}
+			}
+			report, inspectErr := inspector.Status(ctx, repository)
+			if inspectErr != nil {
+				fmt.Fprintln(stderr, "Error:", inspectErr)
+				return 1
+			}
+			return runDashboardProgram(ctx, repository, report, true, stderr)
 		} else if options.subcommand == "apply" {
 			return runSetupApply(ctx, repository, stdout, stderr, options.yes, options.json)
 		} else if options.subcommand == "install-secrets" {
@@ -478,6 +388,142 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	}
 	if err != nil {
 		fmt.Fprintln(stderr, "Error:", err)
+		return 1
+	}
+	return 0
+}
+
+func setupNeedsConfiguration(report domain.SetupReport) bool {
+	switch report.CurrentStage {
+	case "", domain.SetupStageReview, domain.SetupStageApply, domain.SetupStageArtifacts, domain.SetupStageReadiness, domain.SetupStageInstall:
+		return false
+	default:
+		return true
+	}
+}
+
+func runDashboardProgram(ctx context.Context, repository string, report domain.StatusReport, setupMode bool, stderr io.Writer) int {
+	local := adapters.Local{}
+	inspector := app.NewInspector(local)
+	setupManager := app.NewSetupManager(local)
+	lifecycle := app.NewPXELifecycle(local)
+	deploymentManager := app.NewDeploymentManager(local)
+	controllerManager := app.NewControllerManager(local)
+	serviceManager := app.NewServiceManager(local)
+	operationLogManager := app.NewOperationLogManager(local)
+	gitReviewManager := app.NewGitReviewManager(local)
+	gitCommitManager := app.NewGitCommitManager(local)
+	updateManager := app.NewUpdateManager(local)
+	settingsManager := app.NewSettingsManager(local)
+	progressManager := app.NewOperationProgressManager(local)
+	setup := setupManager.Status(ctx, repository)
+	actions := presentation.DashboardActions{
+		Refresh: func() (domain.StatusReport, error) {
+			return inspector.Status(ctx, repository)
+		},
+		LoadSetup: func() domain.SetupReport {
+			return setupManager.Status(ctx, repository)
+		},
+		LoadHosts: func() (domain.HostsReport, error) {
+			return inspector.Hosts(ctx, repository)
+		},
+		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
+			return deploymentManager.Plan(ctx, repository, requested)
+		},
+		ApplyDeployment: func(plan domain.DeploymentPlanReport) domain.DeploymentExecutionReport {
+			return executeDeploymentOperation(ctx, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard)
+		},
+		PlanController: func() domain.ControllerRebuildPlanReport {
+			return controllerManager.Plan(ctx, repository)
+		},
+		ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			report := controllerManager.Apply(ctx, repository, plan.Revision)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		LoadControllerProgress: func() (domain.OperationProgress, error) {
+			return progressManager.Current("controller-apply")
+		},
+		LoadServices: func() domain.ServicesReport {
+			return serviceManager.Status(ctx, repository)
+		},
+		RestartService: func(service string) domain.ServiceActionReport {
+			report := serviceManager.Restart(ctx, repository, service)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		LoadLogs: func() domain.OperationLogsReport {
+			return operationLogManager.List()
+		},
+		LoadLog: func(id string) domain.OperationLogReport {
+			return operationLogManager.Show(id)
+		},
+		LoadGitReview: func() domain.GitReviewReport {
+			return gitReviewManager.Review(ctx, repository)
+		},
+		PlanGitCommit: func(paths string) domain.GitCommitPlanReport {
+			return gitCommitManager.Plan(ctx, repository, paths)
+		},
+		ApplyGitCommit: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
+			report := gitCommitManager.Apply(ctx, repository, strings.Join(plan.Paths, ","), plan.ReviewToken)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+			return updateManager.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
+		},
+		ApplyUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
+			report := updateManager.ApplyPlan(ctx, plan, plan.ReviewToken)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		LoadSettings: func() (domain.LabSettingsFile, error) {
+			return settingsManager.Current(repository)
+		},
+		PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+			return settingsManager.PlanSettings(ctx, repository, candidate)
+		},
+		ApplySettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigApplyReport {
+			return settingsManager.ApplySettings(ctx, repository, candidate, plan.BaseFingerprint)
+		},
+		ChangePassword: func(account string, settings domain.LabSettingsFile, input *os.File, output io.Writer) (domain.LabSettingsFile, error) {
+			return collectSettingsPassword(ctx, local, input, output, account, settings)
+		},
+		PreparePXE: func() domain.ActionReport {
+			report := app.NewSystemActions(local).PreparePXE(ctx)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		LoadPXEProgress: func() (domain.OperationProgress, error) {
+			return progressManager.Current("pxe-prepare")
+		},
+		PlanPXEStart: func() domain.PXELifecycleReport {
+			return lifecycle.PlanStart(ctx, repository)
+		},
+		StartPXE: func() domain.PXELifecycleReport {
+			report := lifecycle.Start(ctx, repository)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		StopPXE: func() domain.PXELifecycleReport {
+			report := lifecycle.Stop(ctx, repository)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		RecoverPXE: func() domain.PXELifecycleReport {
+			report := lifecycle.Recover(ctx, repository)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+	}
+	var tuiErr error
+	if setupMode {
+		tuiErr = presentation.RunSetupDashboard(report, setup, actions)
+	} else {
+		tuiErr = presentation.RunDashboard(report, setup, actions)
+	}
+	if tuiErr != nil {
+		fmt.Fprintln(stderr, "Error:", tuiErr)
 		return 1
 	}
 	return 0
@@ -1363,7 +1409,7 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 			fmt.Fprintln(stderr, "The settings and repository keys are intact; retry with `nixorium setup install-secrets` on the controller.")
 			return 1
 		}
-		fmt.Fprintln(stdout, "Review and commit lab-settings.json and the public files under keys/ before applying the controller.")
+		fmt.Fprintln(stdout, "Configuration and keys are ready. Opening the resumable first-run guide…")
 	}
 	return 0
 }

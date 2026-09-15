@@ -402,8 +402,12 @@ validated custom path. Optional Git author identity retains the deployment
 template defaults instead of extending first run. The wizard retains entries
 across backward navigation, collects default credentials without echo, and
 uses the same candidate-plan/apply backend as automation. After acceptance,
-bare `setup` continues into
-idempotent key reconciliation; `setup configure` limits the run to settings.
+bare `setup` continues into idempotent key reconciliation and opens a
+stage-aware Bubble Tea progress screen. Its primary action routes from the
+observed current stage into the existing bounded Git review/commit, controller
+review/apply, PXE preparation, and first network-installation screens.
+Reopening bare setup skips completed configuration stages; `setup configure`
+limits the run to settings.
 Status derives stage state from the managed settings,
 required commands, password-hash readiness, verified key correspondence and
 private modes, clean Git review state, Nix evaluation, artifacts, and
