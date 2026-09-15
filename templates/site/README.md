@@ -129,7 +129,9 @@ The home screen separates current laboratory status from routine tasks. Use
 shortcut shown beside it. Color reinforces ready, attention, and failure
 states, but every state remains written explicitly. Each workflow displays its
 own available keys; `Esc` returns to the previous screen and `q` quits when no
-operation requires attention.
+operation requires attention. Computers, deployment, controller, services,
+logs, Git, updates, and network installation reuse the same title, section,
+status, and width-adaptive key-help hierarchy.
 
 | Dashboard task | Purpose |
 |---|---|

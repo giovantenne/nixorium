@@ -158,6 +158,8 @@ provides the normal workflows:
 - once ready, `Up`/`Down` selects a task and `Enter` opens it; the displayed
   one-letter shortcuts remain available;
 - each workflow shows its available keys, while `Esc` returns and `q` quits;
+- titles, sections, and ready/attention/failure colors form a consistent visual
+  hierarchy, while the same state always remains written in text;
 - reviews describe impact before mutation and require the displayed phrase;
 - terminal results state what happened and expose the relevant next action.
 
