@@ -289,6 +289,23 @@ record construction, persistence, basename validation, no-follow filesystem
 access, ownership/mode enforcement, bounds, and terminal-text sanitization stay
 in the application/adapter layers.
 
+The dashboard Settings area loads typed managed settings through an application
+callback and groups routine edits into Network, Computers, Accounts, Regional,
+Browser, Git, and Veyon. Each category reuses the field editor and regional
+Bubbles selectors from first-run setup, but validates the complete candidate
+through the same Nix-backed plan before showing a redacted semantic review.
+Apply is bound to the reviewed source fingerprint and atomically replaces only
+`lab-settings.json`; commit, push, rebuild, activation, and deployment remain
+explicit later tasks.
+
+Password changes are a separate account selector. Bubble Tea releases the
+terminal through its blocking interactive-command boundary, the composition
+root runs the existing no-echo confirmed credential collector for exactly one
+chosen account, and only the resulting hash returns to the dashboard candidate.
+Plaintext never becomes a Bubble Tea message or model field. Recoverable input
+errors retry inside that account step; terminal or hashing failures return to
+Settings without planning or writing a candidate.
+
 ## Configuration ownership and editing
 
 New deployments will opt into a deterministic `lab-settings.json` file:

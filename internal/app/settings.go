@@ -15,6 +15,54 @@ type SettingsSource interface {
 	WriteSettingsIfUnchanged(repository string, expected []byte, settings domain.LabSettingsFile) error
 }
 
+func (m SettingsManager) Current(repository string) (domain.LabSettingsFile, error) {
+	data, err := m.source.ReadSettings(repository)
+	if err != nil {
+		return domain.LabSettingsFile{}, err
+	}
+	settings, issues := domain.DecodeLabSettings(data)
+	if len(issues) > 0 {
+		return domain.LabSettingsFile{}, fmt.Errorf("%s: %s", issues[0].Field, issues[0].Message)
+	}
+	return settings, nil
+}
+
+func (m SettingsManager) PlanSettings(ctx context.Context, repository string, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+	data, err := domain.MarshalLabSettings(candidate)
+	if err != nil {
+		return invalidConfigPlan(repository, err)
+	}
+	return m.Plan(ctx, repository, data)
+}
+
+func (m SettingsManager) ApplySettings(ctx context.Context, repository string, candidate domain.LabSettingsFile, expectedFingerprint string) domain.ConfigApplyReport {
+	data, err := domain.MarshalLabSettings(candidate)
+	if err != nil {
+		return domain.ConfigApplyReport{
+			SchemaVersion: domain.SchemaVersion,
+			Operation:     "config-apply",
+			State:         "invalid",
+			Repository:    repository,
+			File:          "lab-settings.json",
+			Changes:       []domain.SettingChange{},
+			Issues:        []domain.ValidationIssue{{Field: "$candidate", Message: err.Error()}},
+		}
+	}
+	return m.Apply(ctx, repository, data, expectedFingerprint)
+}
+
+func invalidConfigPlan(repository string, err error) domain.ConfigPlanReport {
+	return domain.ConfigPlanReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "config-plan",
+		State:         "invalid",
+		Repository:    repository,
+		File:          "lab-settings.json",
+		Changes:       []domain.SettingChange{},
+		Issues:        []domain.ValidationIssue{{Field: "$candidate", Message: err.Error()}},
+	}
+}
+
 func (m SettingsManager) Plan(ctx context.Context, repository string, candidateData []byte) domain.ConfigPlanReport {
 	report, _, _ := m.planCandidate(ctx, repository, candidateData)
 	return report

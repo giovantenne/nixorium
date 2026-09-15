@@ -115,7 +115,8 @@ nix run .#nixorium
 ```
 
 The dashboard shows configuration, cache, installation-mode, computer, and Git
-state. Choose **Install computers over network**.
+state. It also provides grouped **Change settings** editing for routine updates.
+Choose **Install computers over network**.
 
 ### 6. Prepare and start installation mode
 
@@ -151,6 +152,7 @@ provides the normal workflows:
 | **Manage services** | Inspects PXE and the signed cache; performs a bounded cache restart |
 | **View operation logs** | Shows private, bounded deployment logs and typed action history |
 | **Review Git changes** | Displays redacted deployment changes and optionally creates a local reviewed commit |
+| **Change settings** | Edits one grouped area, including Git identity or one securely entered account password, then validates and reviews the complete candidate |
 | **Update Nixorium** | Plans and applies an explicit tagged upstream release |
 | **Install computers over network** | Prepares, starts, stops, or recovers PXE installation mode |
 

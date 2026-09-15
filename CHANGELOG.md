@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Introduced a task-oriented dashboard Settings area for Network, Computers,
+  Accounts, Regional, Browser, Git, and Veyon edits. It reuses the typed
+  Nix-backed plan/fingerprint apply boundary and provides a terminal-only,
+  no-echo single-account password path whose review remains redacted.
 - Reduced first-run configuration from 19 to 15 task-grouped steps by leaving
   optional Git author identity at its template defaults, and replaced raw time
   zone, locale, regional-format, desktop-keyboard, and console-keymap entry

@@ -321,6 +321,104 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 }
 
+func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
+	current := wizardSettings()
+	planned := 0
+	applied := 0
+	actions := DashboardActions{
+		Refresh: func() (domain.StatusReport, error) {
+			report := testDashboardReport("ready")
+			report.Git.Dirty = true
+			report.Git.Changes = 1
+			return report, nil
+		},
+		LoadSettings: func() (domain.LabSettingsFile, error) {
+			return current, nil
+		},
+		PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+			planned++
+			if candidate.Lab.StudentGitName != "Lab Student" {
+				t.Fatalf("unexpected settings candidate: %+v", candidate.Lab)
+			}
+			return domain.ConfigPlanReport{
+				Operation:       "config-plan",
+				State:           "valid",
+				BaseFingerprint: "sha256:reviewed",
+				Changes: []domain.SettingChange{{
+					Field:  "lab.studentGitName",
+					Before: current.Lab.StudentGitName,
+					After:  candidate.Lab.StudentGitName,
+				}},
+			}
+		},
+		ApplySettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigApplyReport {
+			applied++
+			if candidate.Lab.StudentGitName != "Lab Student" || plan.BaseFingerprint != "sha256:reviewed" {
+				t.Fatalf("unexpected reviewed apply: candidate=%+v plan=%+v", candidate.Lab, plan)
+			}
+			return domain.ConfigApplyReport{
+				Operation: "config-apply",
+				State:     "applied",
+				Changes:   plan.Changes,
+			}
+		},
+	}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions, width: 100, height: 30}
+	if !strings.Contains(model.View().Content, "Change settings") {
+		t.Fatalf("home omits settings task:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "e"})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("settings load did not start: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettings || len(model.settingsMenu.list.Items()) != len(routineSettingsGroups) || !strings.Contains(model.View().Content, "Regional") {
+		t.Fatalf("settings categories missing:\n%s", model.View().Content)
+	}
+	model.settingsMenu.list.Select(5)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettingsEdit || !strings.Contains(model.View().Content, "Edit Git") {
+		t.Fatalf("Git settings editor missing:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "Lab Student"})
+	model = updated.(dashboardModel)
+	for range 3 {
+		updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		model = updated.(dashboardModel)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("settings plan did not start: %+v", model)
+	}
+	if !strings.Contains(model.View().Content, "Validating the complete settings candidate") {
+		t.Fatalf("settings editor could not render while validation starts:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if planned != 1 || model.screen != dashboardSettingsReview || !strings.Contains(model.View().Content, "lab.studentGitName: Student → Lab Student") || !strings.Contains(model.View().Content, "Only lab-settings.json") {
+		t.Fatalf("settings review missing: planned=%d\n%s", planned, model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "y"})
+	model = updated.(dashboardModel)
+	if command == nil || !model.settingsApplying {
+		t.Fatalf("settings apply did not start: %+v", model)
+	}
+	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
+	model = updated.(dashboardModel)
+	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
+		t.Fatal("dashboard allowed quit while settings apply was running")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !model.report.Git.Dirty || !strings.Contains(model.View().Content, "Last apply: applied") {
+		t.Fatalf("settings result missing: applied=%d model=%+v\n%s", applied, model, model.View().Content)
+	}
+}
+
 func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	restarts := 0
 	serviceReport := domain.ServicesReport{

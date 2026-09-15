@@ -92,6 +92,41 @@ func TestCollectSetupCredentialsStopsOnTerminalFailure(t *testing.T) {
 	}
 }
 
+func TestCollectSettingsPasswordRetriesOnlySelectedAccount(t *testing.T) {
+	inputs := [][]byte{
+		[]byte("short"),
+		[]byte("new-teacher-password"), []byte("different-password"),
+		[]byte("new-teacher-password"), []byte("new-teacher-password"),
+	}
+	reader := &setupSecretReader{values: append([][]byte(nil), inputs...)}
+	hasher := &setupPasswordHasher{}
+	settings := domain.LabSettingsFile{Lab: domain.LabSettings{
+		AdminPassword:   "$6$old$admin",
+		TeacherPassword: "$6$old$teacher",
+		StudentPassword: "$6$old$student",
+	}}
+	var output bytes.Buffer
+	candidate, err := collectSettingsPasswordWithReader(context.Background(), reader, hasher, &output, "teacher", settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasher.calls != 1 || candidate.Lab.TeacherPassword != "$6$salt$hash" || candidate.Lab.AdminPassword != settings.Lab.AdminPassword || candidate.Lab.StudentPassword != settings.Lab.StudentPassword {
+		t.Fatalf("hasher calls = %d, candidate = %+v", hasher.calls, candidate.Lab)
+	}
+	for _, expected := range []string{"without leaving this password step", "password must contain at least 8 bytes", "password confirmation does not match", "Teacher password accepted"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("output omits %q: %s", expected, output.String())
+		}
+	}
+	for _, input := range inputs {
+		for _, value := range input {
+			if value != 0 {
+				t.Fatal("plaintext input was not wiped")
+			}
+		}
+	}
+}
+
 func TestPXEPreparationActivityUsesStderrSafeGuidance(t *testing.T) {
 	var output bytes.Buffer
 	writePXEPreparationActivity(&output)
