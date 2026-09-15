@@ -34,12 +34,22 @@ available width; future list, input, progress, spinner, table, and viewport
 usage must reuse this presentation-only foundation rather than introducing
 backend dependencies or parsing rendered output.
 
-The dashboard home composes an official Bubbles list into a keyboard-navigable
-task menu. Arrow keys and Enter provide the primary path while stable
-one-letter shortcuts remain available. Lip Gloss separates title, section,
+The dashboard home uses Bubbles list selection behind a compact intervention
+menu: restore, software guidance, distribute, install, update Nixorium, and
+advanced tools. It performs no fleet scan; client availability is observed only
+inside an operation that needs it. Arrow keys and Enter provide the primary path
+while stable one-letter shortcuts remain available. Lip Gloss separates title, section,
 muted description, success, attention, and failure roles for both light and
 dark terminals. These roles supplement explicit text labels; color and Unicode
 are never the only carrier of state or action meaning.
+
+Controller PXE recovery remains visible above the intervention menu because it
+can affect normal controller networking. Powered-off clients are not summarised
+as room health. Commands, permissions and safety checks remain in the existing
+application/adapters. Computers has filtered cursor navigation and wide list/detail composition;
+short layouts open details separately. Page overflow is scrollable, and typed
+confirmation/input stays visible beneath scrollable impact or patch content.
+See [the UX audit and navigation design](../tui-design.md).
 
 Dashboard waits without an honest completion fraction use one shared official
 Bubbles spinner and an explicit authored activity label. The spinner is only a
@@ -52,6 +62,12 @@ state machine, including Bubble Tea's distinct space-key event, and the NixOS
 management VM drives the packaged application through a real PTY. Command
 execution and privilege decisions remain in the shared application and adapter
 layers.
+
+Update Nixorium injects the existing typed release-discovery callback. Bubble
+Tea renders only the bounded stable/prerelease candidates returned by
+`UpdateManager.Check`; there is no free-form target or TUI downgrade policy.
+Planning and apply retain their exact application-owned diff, build checks,
+review token, confirmation, and two-file boundary.
 
 The computer inventory follows the same boundary: Bubble Tea triggers a typed
 host-report callback only when the administrator opens or refreshes the screen.
@@ -77,7 +93,8 @@ result.
 Foreground execution emits a small in-process `DeploymentProgress` event at
 application-owned build, revalidation, apply, verification, and completion
 boundaries. Bubble Tea retains at most five authored activities and renders a
-four-stage progress bar plus verification counts. It never parses or displays
+named stages plus verification counts; the progress bar and recent activities
+are disclosed on request. It never parses or displays
 the untrusted Colmena byte stream, which continues to flow only to the private
 mode-0600 log. The compact terminal result links back to the dashboard, the
 bounded log browser, or a fresh revision-bound review.

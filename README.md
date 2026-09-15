@@ -120,14 +120,17 @@ continues from observed system and Git state. Keep the deployment repository
 nix run .#nixorium
 ```
 
-The dashboard shows configuration, cache, installation-mode, computer, and Git
-state. When setup is incomplete it highlights the next step and `Enter` resumes
-the checklist. Once setup is ready, use `Up`/`Down` and `Enter` in the colored
-task menu, or press the shortcut shown beside any task. It also provides grouped
-**Change settings** editing for routine updates. Choose **Install computers over
-network**. Long PXE preparation shows its current phase, elapsed time, bounded
-recent activity, and client progress without requiring a second terminal.
-That screen then highlights exactly one next step from observed state: prepare,
+Nixorium asks what intervention you want to perform; it does not scan the room
+or turn powered-off computers into an alarm. Restore, software guidance,
+distribution, network installation, Nixorium updates, and advanced tools are
+separate choices. `?` opens help; `F1` also works during text entry. Computers
+is an explicit advanced check with search, selection, technical details, and a
+deployment route for the focused computer. Setup groups its observed checks into
+five operator stages, with `t` for the technical checklist.
+Long operations show meaningful progress; `l` expands bounded activity details.
+See the [TUI tour and renders](docs/tui-renders.md).
+120×30 is a comfortable terminal size; larger windows keep a bounded reading
+width. The installation screen highlights one next step from observed state: prepare,
 start PXE, boot and install a computer, or recover normal networking.
 
 ### 6. Prepare and start installation mode
@@ -148,16 +151,16 @@ run:
 Choose a configured identity and target disk. Installation begins only after
 you type a confirmation containing both values. After the installed client
 finishes, stop installation mode on the controller unless more clients are
-being installed. Then boot the installed disk and open **View computers** in
+being installed. Then boot the installed disk and open **Computer inventory** in
 Nixorium.
 
-## Everyday administration
+## Occasional interventions
 
 Run `nix run .#nixorium` from the private deployment repository. The dashboard
 provides the normal workflows:
 
-- `Enter` follows the recommended first-run action when setup is incomplete;
-- once ready, `Up`/`Down` selects a task and `Enter` opens it; the displayed
+- `nixorium setup` resumes the observed first-installation stage;
+- on later openings, `Up`/`Down` selects an intervention and `Enter` opens it; the displayed
   one-letter shortcuts remain available;
 - each workflow shows its available keys; `Esc` returns, and `q` quits outside
   text-entry fields;
@@ -174,15 +177,16 @@ their current plain-language action, so a remote terminal never looks frozen.
 
 | Task | What it does |
 |---|---|
-| **View computers** | Authenticates reachable hosts and compares their active revision with the desired Git revision |
-| **Deploy updates** | Reviews and applies one, selected, or all client configurations with live phase, elapsed-time, verification, and recent-activity feedback |
+| **Restore computers** | Chooses explicitly between reapplying the intended system and a locally confirmed disk-erasing reinstall |
+| **Distribute the prepared system** | Reviews and applies one, selected, or all client configurations with live phase, elapsed-time, verification, and recent-activity feedback |
+| **Computer inventory** | Explicitly authenticates reachable hosts and compares their active revision with the desired Git revision |
 | **Rebuild controller** | Builds and activates an exact reviewed revision, refreshes status, and offers dashboard, detail, log, or retry actions |
 | **Manage services** | Inspects PXE and the signed cache; performs a bounded cache restart |
 | **View operation logs** | Shows private, bounded deployment logs and typed action history |
 | **Review Git changes** | Displays redacted deployment changes and optionally creates a local reviewed commit |
 | **Change settings** | Edits one grouped area, including Git identity or one securely entered account password, then validates and reviews the complete candidate |
-| **Update Nixorium** | Plans and applies an explicit tagged upstream release |
-| **Install computers over network** | Prepares, starts, stops, or recovers PXE installation mode |
+| **Update Nixorium** | Fetches available upstream releases, then validates and applies the selected release |
+| **Install or reinstall computers** | Prepares, starts, stops, or recovers PXE installation mode |
 
 Operational commands, JSON output, customization examples, update procedure,
 and recovery semantics live in the

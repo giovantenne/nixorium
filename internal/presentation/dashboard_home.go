@@ -1,12 +1,12 @@
 package presentation
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type dashboardTask struct {
@@ -21,15 +21,22 @@ func (task dashboardTask) Description() string { return task.description }
 func (task dashboardTask) FilterValue() string { return task.title + " " + task.description }
 
 var dashboardTasks = []dashboardTask{
-	{id: "hosts", shortcut: "h", title: "View computers", description: "Reachability and deployed configuration"},
-	{id: "deploy", shortcut: "d", title: "Deploy updates", description: "Build and update selected computers"},
-	{id: "pxe", shortcut: "p", title: "Install computers over network", description: "Prepare, start, stop, or recover installation mode"},
+	{id: "restore", shortcut: "r", title: "Restore computers", description: "Reapply the intended system or reinstall from scratch"},
+	{id: "software", shortcut: "w", title: "Add or change software", description: "Open the supported workflow and current advanced path"},
+	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
+	{id: "pxe", shortcut: "p", title: "Install or reinstall computers", description: "Prepare and control network installation"},
+	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose from releases fetched from the configured upstream"},
+	{id: "admin", shortcut: "a", title: "Advanced tools", description: "Inventory, settings, revisions, services, logs and diagnostics"},
+}
+
+var administrationTasks = []dashboardTask{
+	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Explicitly check reachability and deployed configuration"},
 	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git, and Veyon"},
 	{id: "controller", shortcut: "c", title: "Rebuild controller", description: "Review and activate the committed controller revision"},
 	{id: "services", shortcut: "s", title: "Manage services", description: "Inspect services or restart the signed cache"},
 	{id: "git", shortcut: "g", title: "Review Git changes", description: "Inspect and commit selected safe deployment files"},
 	{id: "logs", shortcut: "l", title: "View operation logs", description: "Recent outcomes and bounded deployment log tails"},
-	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Review and apply an explicit upstream release"},
+	{id: "diagnostics", shortcut: "i", title: "Diagnostics", description: "Check the lab and see recovery instructions"},
 }
 
 type dashboardTaskMenu struct {
@@ -44,8 +51,10 @@ func newDashboardTaskMenu(isDark bool, width, height int) dashboardTaskMenu {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles = list.NewDefaultItemStyles(isDark)
 	delegate.SetSpacing(0)
+	delegate.Styles.SelectedTitle = lipgloss.NewStyle().Bold(true).PaddingLeft(2)
+	delegate.Styles.SelectedDesc = lipgloss.NewStyle().PaddingLeft(2)
 	menu := list.New(items, delegate, dashboardMenuWidth(width), dashboardMenuHeight(height))
-	menu.Title = "Laboratory tasks"
+	menu.Title = "Interventions"
 	menu.SetShowTitle(false)
 	menu.SetShowStatusBar(false)
 	menu.SetShowHelp(false)
@@ -96,56 +105,51 @@ func (model dashboardModel) homeView() string {
 	if len(menu.list.Items()) == 0 {
 		menu = newDashboardTaskMenu(model.isDark, model.width, model.height)
 	}
-	configuration := "action required"
-	configurationKind := tuiStatusAttention
-	if model.report.Deployment.Ready {
-		configuration = "ready"
-		configurationKind = tuiStatusSuccess
-	}
-	cache := serviceLabel(model.report.Services, "nixorium-harmonia.service")
-	cacheKind := tuiStatusAttention
-	if cache == "active" || cache == "healthy" {
-		cacheKind = tuiStatusSuccess
-	}
-	pxeKind := tuiStatusNeutral
-	if model.report.PXE.Mode == "active" {
-		pxeKind = tuiStatusAttention
-	} else if model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required" {
-		pxeKind = tuiStatusFailure
-	}
-	git := cleanText(model.report.Git.Dirty, model.report.Git.Changes)
-	gitKind := tuiStatusSuccess
-	if model.report.Git.Dirty {
-		gitKind = tuiStatusAttention
-	}
 	lines := []string{
-		tuiTitle("Nixorium", model.isDark),
-		tuiMuted("Laboratory control center", model.isDark),
+		tuiTitle("Nixorium  /  Computer laboratory", model.isDark),
 		"",
-		tuiSection("Status", model.isDark),
-		fmt.Sprintf("  %-20s %s", "Configuration", tuiStatus(configuration, configurationKind, model.isDark)),
-		fmt.Sprintf("  %-20s %s", "Controller cache", tuiStatus(cache, cacheKind, model.isDark)),
-		fmt.Sprintf("  %-20s %s", "Installation mode", tuiStatus(model.report.PXE.Mode, pxeKind, model.isDark)),
-		fmt.Sprintf("  %-20s %d configured", "Computers", model.report.Meta.Clients.Count),
-		fmt.Sprintf("  %-20s %s", "Git worktree", tuiStatus(git, gitKind, model.isDark)),
 	}
-	if model.setup.State != "" && model.setup.State != "ready" {
+	if model.report.PXE.Mode == "recovery-required" {
 		lines = append(lines,
+			tuiStatus("Controller network recovery required", tuiStatusAttention, model.isDark),
+			"A previous installation session must be reconciled before normal networking can be trusted.",
+			"Press p to open installation recovery.",
 			"",
-			tuiResult("Next: finish first setup", false, model.isDark),
-			"  "+setupCurrentTitle(model.setup),
-			"  Press Enter to continue",
 		)
-	} else {
-		lines = append(lines, "", tuiSection("Tasks", model.isDark), menu.list.View())
+	} else if model.report.PXE.Mode == "active" {
+		lines = append(lines,
+			tuiStatus("Network installation is active", tuiStatusAttention, model.isDark),
+			"Press p to continue installation or restore normal controller networking.",
+			"",
+		)
+	}
+	lines = append(lines,
+		tuiTitle("What do you want to do?", model.isDark),
+		tuiMuted("Choose an intervention. Computers are checked only when the selected task needs them.", model.isDark),
+	)
+	lines = append(lines, "")
+	if model.busy != "" {
+		lines = append(lines, model.busyView(), "")
+	}
+	for index, item := range dashboardTasks {
+		marker := "  "
+		if index == menu.list.Index() {
+			marker = "› "
+		}
+		label := marker + item.title
+		if index == menu.list.Index() {
+			label = tuiTitle(label, model.isDark)
+		}
+		lines = append(lines, label, tuiMuted("    "+item.description, model.isDark), "")
 	}
 	if model.message != "" {
-		lines = append(lines, "", tuiResult(model.message, true, model.isDark))
+		lines = append(lines, "", tuiMuted(model.message, model.isDark))
 	}
 	lines = append(lines, "", tuiHelp(model.width, model.isDark,
 		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
 		tuiHelpBinding([]string{"enter"}, "enter", "open"),
-		tuiHelpBinding([]string{"q", "ctrl+c"}, "q", "quit"),
+		tuiHelpBinding([]string{"?"}, "?", "help"),
+		tuiHelpBinding([]string{"q"}, "q", "quit"),
 	))
 	return strings.Join(lines, "\n") + "\n"
 }

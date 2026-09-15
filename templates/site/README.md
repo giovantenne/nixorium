@@ -16,7 +16,7 @@ for lab configuration, validation and upstream-update work.
 
 - [First setup](#first-setup)
 - [Local customization](#local-customization)
-- [Daily operations](#daily-operations)
+- [Occasional interventions](#occasional-interventions)
 - [Updating Nixorium](#updating-nixorium)
 - [Troubleshooting and recovery](TROUBLESHOOTING.md)
 
@@ -116,7 +116,7 @@ checkout is needed while installing clients without internet access.
 
 </details>
 
-## Daily operations
+## Occasional interventions
 
 Run the task-oriented dashboard from the repository root:
 
@@ -124,10 +124,14 @@ Run the task-oriented dashboard from the repository root:
 nix run .#nixorium
 ```
 
-The home screen separates current laboratory status from routine tasks. Use
-`Up`/`Down` to select a task and `Enter` to open it, or press the one-letter
-shortcut shown beside it. Color reinforces ready, attention, and failure
-states, but every state remains written explicitly. Each workflow displays its
+The opening screen asks which intervention you intend to perform. It does not
+scan clients or treat powered-off computers as unhealthy. `Up`/`Down` selects
+Restore, software guidance, distribution, network installation, Update
+Nixorium, or Advanced tools. `?` opens help; `F1` also works in text fields.
+Advanced Computer inventory performs the explicit client check and supports `/`
+search, Enter for detail, `t` for technical evidence, `d` for a focused
+deployment, and `i` for diagnostics.
+Every state has a symbol and text as well as semantic color. Each workflow displays its
 own available keys; `Esc` returns to the previous screen and `q` quits outside
 text-entry fields when no operation requires attention. Computers, deployment, controller, services,
 logs, Git, updates, and network installation reuse the same title, section,
@@ -145,15 +149,16 @@ spinner and the current plain-language action.
 
 | Dashboard task | Purpose |
 |---|---|
-| **View computers** | Inspect authenticated client state |
-| **Deploy updates** | Plan and apply one or more client configurations |
+| **Restore computers** | Choose reapply or a locally confirmed disk-erasing reinstall |
+| **Distribute the prepared system** | Plan and apply one or more client configurations |
+| **Computer inventory** | Explicitly inspect authenticated client state |
 | **Rebuild controller** | Review and activate the controller configuration |
 | **Manage services** | Inspect PXE and restart the signed cache |
 | **View operation logs** | Browse private deployment logs and action history |
 | **Review Git changes** | Review and optionally commit selected safe paths |
 | **Change settings** | Edit and validate one grouped configuration area or one account password |
-| **Update Nixorium** | Move to an explicit tagged upstream release |
-| **Install computers over network** | Prepare, start, stop, or recover PXE mode |
+| **Update Nixorium** | Fetch available releases, then validate and apply one selected release |
+| **Install or reinstall computers** | Prepare, start, stop, or recover PXE mode |
 
 The initial dashboard and `status` are local and do not probe clients. Add
 `--json` to supported CLI commands for structured output. Use `doctor` for
@@ -187,7 +192,7 @@ Settings action does not commit, push, rebuild, activate, or deploy implicitly.
 nix run .#nixorium -- hosts
 ```
 
-**View computers** performs bounded network and SSH probes. For authenticated
+**Computer inventory** performs bounded network and SSH probes. For authenticated
 hosts it runs the fixed read-only `nixorium-host-state` helper and compares the
 active system path and embedded deployment revision with the desired Git
 revision.
@@ -200,7 +205,7 @@ revision.
 The report also shows the most recent successful post-apply verification, but
 history never overrides live authenticated state.
 
-### Deploy updates
+### Distribute the prepared system
 
 ```sh
 nix run .#nixorium -- deploy plan --on pc01
@@ -213,15 +218,15 @@ Planning is read-only. It requires a ready deployment and clean Git revision,
 expands only configured clients, and prints the revision-bound apply command.
 Apply repeats the preflight, requires `DEPLOY <targets>`, builds before
 activation, and streams output to a mode-0600 log. In the dashboard, the same
-foreground operation shows elapsed time, a four-stage progress bar, up to five
-application-authored activities, and authenticated-computer verification
-counts. Raw Colmena output remains in the private log instead of being rendered
+foreground operation shows elapsed time, named stages and authenticated-computer
+verification counts. `l` expands the progress bar and up to five authored
+activities. Raw Colmena output remains in the private log instead of being rendered
 as terminal UI. Accidental quit stays disabled until the final report appears;
 that compact result offers direct dashboard, log, and fresh-review actions.
 
 After every attempt, Nixorium authenticates selected hosts and records only
 those running the reviewed revision. A failed apply may leave mixed target
-state. Inspect the log and fresh **View computers** results, make a new plan,
+state. Inspect the log and fresh **Computer inventory** results, make a new plan,
 and retry; never infer rollback or completion from a lost terminal. `--yes` is
 for deliberate automation and never removes the revision check.
 
@@ -363,8 +368,8 @@ their immutable store paths and Git revision under
 `/var/lib/nixorium/prepared/prepared.json` with managed GC roots.
 
 The dashboard follows the systemd-owned job in place: it shows the current
-phase, elapsed time, an explicit artifact/client progress bar, and the five
-most recent bounded activities. Closing the dashboard does not cancel the job.
+phase, elapsed time and counter. `l` expands the progress bar and five most
+recent bounded activities. Closing the dashboard does not cancel the job.
 Use the journal command above only when verbose Nix output is needed for
 troubleshooting.
 
@@ -471,10 +476,11 @@ Prereleases require `--allow-prerelease`; known downgrades require
 `--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
 `flake.lock`; review and optionally commit them separately. It never branches,
 commits, pushes, activates, starts PXE, or deploys clients.
-The default dashboard's **Update Nixorium** task uses the same typed workflow:
-enter the release tag, opt into prerelease/downgrade policy only when intended,
-review the candidate checks and scrollable two-file patch, then type the exact
-confirmation shown.
+The TUI's **Update Nixorium** intervention first fetches this bounded release
+list. Stable releases are shown by default; prereleases require explicit
+disclosure. The TUI has no editable target and does not offer downgrades. After
+selection, review the scrollable two-file patch (`F4` expands candidate checks),
+then type the exact confirmation shown.
 
 > [!IMPORTANT]
 > Updating these files does not activate the controller or deploy clients.

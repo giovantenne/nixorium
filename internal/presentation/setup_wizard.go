@@ -88,6 +88,7 @@ var settingsFields = []settingsField{
 }
 
 type settingsWizardModel struct {
+	helpOpen  bool
 	settings  domain.LabSettingsFile
 	fields    []settingsField
 	title     string
@@ -162,13 +163,12 @@ func (model *settingsWizardModel) prepareCurrentField() {
 		label:       "Custom…",
 		description: "Enter another validated value",
 	})
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles = list.NewDefaultItemStyles(model.isDark)
+	delegate := tuiListDelegate(model.isDark)
 	model.selector = list.New(items, delegate, model.choiceWidth(), model.choiceHeight())
 	model.selector.Title = field.label
 	model.selector.SetShowTitle(false)
 	model.selector.SetShowStatusBar(false)
-	model.selector.SetShowHelp(true)
+	model.selector.SetShowHelp(false)
 	model.selector.Styles = list.DefaultStyles(model.isDark)
 	model.selector.Help.Styles = help.DefaultStyles(model.isDark)
 	model.selector.Select(selected)
@@ -202,6 +202,18 @@ func (model settingsWizardModel) moveToField(index int) settingsWizardModel {
 func (settingsWizardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (model settingsWizardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := message.(tea.KeyPressMsg); ok {
+		if model.helpOpen {
+			if key.String() == "esc" || key.String() == "f1" || key.String() == "?" {
+				model.helpOpen = false
+			}
+			return model, nil
+		}
+		if key.String() == "f1" || (key.String() == "?" && len(model.fields[model.index].choices) > 0 && !model.custom && model.selector.FilterState() != list.Filtering) {
+			model.helpOpen = true
+			return model, nil
+		}
+	}
 	if size, ok := message.(tea.WindowSizeMsg); ok {
 		model.width = size.Width
 		model.height = size.Height
@@ -355,6 +367,9 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 }
 
 func (model settingsWizardModel) View() tea.View {
+	if model.helpOpen {
+		return tea.NewView(tuiTitle("First setup · Keyboard help", model.isDark) + "\n\nEnter continues after validation.\nShift Tab returns to the previous question.\nEsc cancels; existing settings are preserved.\n/ searches suggested values.\n\nEsc / F1 closes help.")
+	}
 	field := model.fields[model.index]
 	lines := []string{
 		tuiTitle(model.title, model.isDark),
@@ -364,6 +379,7 @@ func (model settingsWizardModel) View() tea.View {
 	}
 	if len(field.choices) > 0 && !model.custom {
 		lines = append(lines, "", "Choose a suggested value, or press / to filter.", "", model.selector.View())
+		lines = append(lines, "", "↑/↓ choose   enter continue   / search   esc cancel   F1 help")
 	} else {
 		if model.custom {
 			lines = append(lines, "", "Custom value; it will be validated before continuing.")
@@ -390,6 +406,7 @@ func (model settingsWizardModel) View() tea.View {
 }
 
 type configReviewModel struct {
+	helpOpen  bool
 	plan      domain.ConfigPlanReport
 	git       domain.GitState
 	accepted  bool
@@ -413,6 +430,18 @@ func RunConfigReview(plan domain.ConfigPlanReport, git domain.GitState) (bool, e
 func (configReviewModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (model configReviewModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := message.(tea.KeyPressMsg); ok {
+		if key.String() == "f1" || key.String() == "?" {
+			model.helpOpen = !model.helpOpen
+			return model, nil
+		}
+		if model.helpOpen && key.String() != "ctrl+c" {
+			if key.String() == "esc" {
+				model.helpOpen = false
+			}
+			return model, nil
+		}
+	}
 	if size, ok := message.(tea.WindowSizeMsg); ok {
 		model.width = size.Width
 		return model, nil
@@ -435,6 +464,11 @@ func (model configReviewModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (model configReviewModel) View() tea.View {
+	if model.helpOpen {
+		view := tea.NewView(tuiTitle("Configuration review help", model.isDark) + "\n\nReview the changes before applying.\n\ny  Apply the reviewed managed settings\nn / Esc  Cancel without changing files\n\nEsc / F1  Close help\n")
+		view.AltScreen = true
+		return view
+	}
 	lines := []string{tuiTitle("Review configuration", model.isDark), ""}
 	if len(model.plan.Changes) == 0 {
 		lines = append(lines, "No managed settings will change.")

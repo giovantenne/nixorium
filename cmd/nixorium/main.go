@@ -418,6 +418,9 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 	progressManager := app.NewOperationProgressManager(local)
 	setup := setupManager.Status(ctx, repository)
 	actions := presentation.DashboardActions{
+		LoadDoctor: func() (domain.DoctorReport, error) {
+			return inspector.Doctor(ctx, repository, app.DoctorOptions{})
+		},
 		Refresh: func() (domain.StatusReport, error) {
 			return inspector.Status(ctx, repository)
 		},
@@ -468,6 +471,9 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 			report := gitCommitManager.Apply(ctx, repository, strings.Join(plan.Paths, ","), plan.ReviewToken)
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
+		},
+		CheckUpdate: func() domain.UpdateCheckReport {
+			return updateManager.Check(ctx, repository)
 		},
 		PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
 			return updateManager.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
