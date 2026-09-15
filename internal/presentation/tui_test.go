@@ -47,8 +47,10 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 	setup := testSetupReport(false, false, false, false)
 	loads := 0
 	model := dashboardModel{
-		report: testDashboardReport("ready"),
-		setup:  setup,
+		report:    testDashboardReport("ready"),
+		setup:     setup,
+		screen:    dashboardSetup,
+		setupMode: true,
 		actions: DashboardActions{
 			LoadGitReview: func() domain.GitReviewReport {
 				return domain.GitReviewReport{Operation: "git-review", State: "changes"}
@@ -59,12 +61,7 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 			},
 		},
 	}
-	if view := model.View().Content; !strings.Contains(view, "Next: finish first setup") || !strings.Contains(view, "Review and accept Git changes") {
-		t.Fatalf("home does not expose resumable setup:\n%s", view)
-	}
-	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if model.screen != dashboardSetup || !strings.Contains(model.View().Content, "6/11 steps complete") || !strings.Contains(model.View().Content, "Review and commit the generated configuration") {
+	if view := model.View().Content; !strings.Contains(view, "Step 1 of 5") || !strings.Contains(view, "Laboratory settings") || !strings.Contains(view, "Review and commit the generated configuration") {
 		t.Fatalf("setup progress screen is incomplete:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -88,7 +85,7 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 
 func TestCompletedSetupOpensFirstNetworkInstallation(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), setup: testSetupReport(true, true, true, true), setupMode: true, screen: dashboardSetup}
-	if !strings.Contains(model.View().Content, "Laboratory setup is ready") || !strings.Contains(model.View().Content, "opens network installation") {
+	if !strings.Contains(model.View().Content, "Controller and client system are ready") || !strings.Contains(model.View().Content, "opens network installation") {
 		t.Fatalf("completed setup omits first installation action:\n%s", model.View().Content)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -104,10 +101,12 @@ func TestDashboardTaskMenuUsesSelectionAndKeepsShortcuts(t *testing.T) {
 	model.height = 30
 	model.homeMenu.setSize(model.width, model.height)
 	view := model.View().Content
-	if !strings.Contains(view, "View computers  [h]") || !strings.Contains(view, "Reachability and deployed configuration") || !strings.Contains(view, "\x1b[") {
+	if !strings.Contains(view, "Restore computers") || !strings.Contains(view, "Advanced tools") || !strings.Contains(view, "\x1b[") {
 		t.Fatalf("home task menu lacks hierarchy or color:\n%s", view)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
@@ -173,10 +172,12 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if !strings.Contains(model.View().Content, "Computers            2 configured") || !strings.Contains(model.View().Content, "View computers") {
-		t.Fatalf("home omits computer summary:\n%s", model.View().Content)
+	if strings.Contains(model.View().Content, "2 computers configured") || !strings.Contains(model.View().Content, "Advanced tools") {
+		t.Fatalf("home should not scan or summarise computers:\n%s", model.View().Content)
 	}
 
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "h"})
 	model = updated.(dashboardModel)
 	if command == nil || !strings.Contains(model.View().Content, "Checking configured computers") {
@@ -184,7 +185,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHosts || !strings.Contains(model.View().Content, "pc02") || !strings.Contains(model.View().Content, "unreachable  unknown") || !strings.Contains(model.View().Content, "1 current, 0 outdated, 1 unknown") || !strings.Contains(model.View().Content, "2026-09-14 10:30Z") || !strings.Contains(model.View().Content, "never") {
+	if model.screen != dashboardHosts || !strings.Contains(model.View().Content, "pc02") || !strings.Contains(model.View().Content, "Could not be reached") || !strings.Contains(model.View().Content, "1 up to date") {
 		t.Fatalf("computer inventory is incomplete:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
@@ -194,7 +195,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if loads != 2 || model.screen != dashboardHosts || !strings.Contains(model.View().Content, "SSH available: 2/2") {
+	if loads != 2 || model.screen != dashboardHosts || !strings.Contains(model.View().Content, "2 / 2 reachable") {
 		t.Fatalf("load count = %d, screen = %d:\n%s", loads, model.screen, model.View().Content)
 	}
 }
@@ -202,7 +203,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	view := model.View().Content
-	if !strings.Contains(view, "Installation mode") || !strings.Contains(view, "READY") || !strings.Contains(view, "Laboratory tasks") && !strings.Contains(view, "Tasks") {
+	if !strings.Contains(view, "Install or reinstall computers") || !strings.Contains(view, "What do you want to do?") {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 
@@ -211,6 +212,35 @@ func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	view = model.View().Content
 	if model.screen != dashboardPXE || !strings.Contains(view, "Prepared artifacts: ready") || !strings.Contains(view, "Next: start network installation") {
 		t.Fatalf("PXE screen is incomplete:\n%s", view)
+	}
+}
+
+func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
+	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "disk confirmed on the computer is erased") {
+		t.Fatalf("restore choice is ambiguous:\n%s", view)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardDeploy || !model.restoreMode {
+		t.Fatalf("reapply did not route to reviewed deployment: %+v", model)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardRestore || model.restoreMode {
+		t.Fatal("deployment did not return to the restoration choice")
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardPXE || !strings.Contains(model.message, "erases the disk confirmed locally") {
+		t.Fatalf("reinstall did not preserve the local disk warning: %s", model.View().Content)
 	}
 }
 
@@ -289,7 +319,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != "@lab" || model.screen != dashboardDeployReview || !strings.Contains(model.View().Content, "Revision: 0123456789abcdef") {
+	if planned != "@lab" || model.screen != dashboardDeployReview || !strings.Contains(model.View().Content, "Reviewed revision  0123456789abcdef") {
 		t.Fatalf("planned = %q, screen = %d:\n%s", planned, model.screen, model.View().Content)
 	}
 
@@ -313,7 +343,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	}
 	updated, command = model.Update(command())
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View().Content, "Building configurations") || !strings.Contains(model.View().Content, "Recent activity") || !strings.Contains(model.View().Content, "private deployment log") {
+	if !strings.Contains(model.View().Content, "Building configurations") || !strings.Contains(model.View().Content, "progress details") || !strings.Contains(model.View().Content, "private deployment log") {
 		t.Fatalf("deployment progress missing:\n%s", model.View().Content)
 	}
 	for model.deploying && command != nil {
@@ -344,8 +374,9 @@ func TestDeploymentProgressKeepsOnlyFiveAuthoredActivities(t *testing.T) {
 			Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
 			TargetCurrent: 2, TargetTotal: 3,
 		},
-		deployRecent: recent,
-		width:        80,
+		deployRecent:    recent,
+		progressDetails: true,
+		width:           80,
 	}
 	view := strings.Join(model.deploymentProgressView(), "\n")
 	for _, expected := range []string{"Verifying computers", "3/4", "Computers checked: 2/3", "six"} {
@@ -355,6 +386,14 @@ func TestDeploymentProgressKeepsOnlyFiveAuthoredActivities(t *testing.T) {
 	}
 	if strings.Contains(view, "one") {
 		t.Fatalf("deployment progress retained more than five activities:\n%s", view)
+	}
+}
+
+func TestDeploymentProgressDoesNotRegressAfterBuild(t *testing.T) {
+	model := dashboardModel{deployProgress: domain.DeploymentProgress{Phase: domain.DeploymentPhasePreflight}}
+	view := strings.Join(model.deploymentProgressView(), "\n")
+	if !strings.Contains(view, "✓ Building configurations") || !strings.Contains(view, "● Revalidating reviewed configuration · Running") {
+		t.Fatalf("post-build revalidation regressed to an initial step:\n%s", view)
 	}
 }
 
@@ -431,7 +470,7 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 		Operation: "controller-apply", State: "completed", Phase: "complete",
 		Current: 4, Total: 4, Recent: []string{"Controller revision activated and verified"},
 	}
-	if strings.Contains(model.View().Content, "Recent activity") {
+	if strings.Contains(model.View().Content, "progress details") {
 		t.Fatalf("completed controller details should start collapsed:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "d"})
@@ -472,7 +511,7 @@ func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
 		t.Fatal("controller apply did not schedule another progress poll")
 	}
 	view := model.View().Content
-	for _, expected := range []string{"Building system", "1/4", "Recent activity", "Building the reviewed controller system", "elapsed"} {
+	for _, expected := range []string{"Building system", "1/4", "progress details", "Building the reviewed controller system", "elapsed"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("controller progress omits %q:\n%s", expected, view)
 		}
@@ -480,15 +519,31 @@ func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
 }
 
 func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
-	target := "v2.1.0-beta.1"
-	confirmation := "DOWNGRADE NIXORIUM TO " + target
+	target := "v2.3.0"
+	confirmation := "UPDATE NIXORIUM TO " + target
 	token := "sha256:" + strings.Repeat("d", 64)
+	checked := 0
 	planned := 0
 	applied := 0
 	actions := DashboardActions{
+		CheckUpdate: func() domain.UpdateCheckReport {
+			checked++
+			return domain.UpdateCheckReport{
+				SchemaVersion: domain.SchemaVersion,
+				Operation:     "update-check",
+				State:         "available",
+				Upstream:      "github:giovantenne/nixorium",
+				CurrentRef:    "v2.2.0",
+				Stable: []domain.UpdateRelease{
+					{Tag: target, Channel: domain.UpdateChannelStable},
+					{Tag: "v2.2.0", Channel: domain.UpdateChannelStable},
+				},
+				Prerelease: []domain.UpdateRelease{{Tag: "v2.4.0-beta.1", Channel: domain.UpdateChannelPrerelease}},
+			}
+		},
 		PlanUpdate: func(received string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
 			planned++
-			if received != target || !allowPrerelease || !allowDowngrade {
+			if received != target || allowPrerelease || allowDowngrade {
 				t.Fatalf("update plan input = %q, prerelease=%t, downgrade=%t", received, allowPrerelease, allowDowngrade)
 			}
 			return domain.UpdatePlanReport{
@@ -499,8 +554,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 				CurrentRef:     "v2.2.0",
 				CurrentChannel: domain.UpdateChannelStable,
 				Target:         received,
-				TargetChannel:  domain.UpdateChannelPrerelease,
-				Downgrade:      true,
+				TargetChannel:  domain.UpdateChannelStable,
 				ReviewToken:    token,
 				Confirmation:   confirmation,
 				Checks:         []domain.UpdateCheck{{ID: "controller", State: "passed", Message: "candidate controller built"}},
@@ -516,22 +570,23 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if !strings.Contains(model.View().Content, "Tasks") || !strings.Contains(model.View().Content, "View computers") {
+	if !strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Advanced tools") {
 		t.Fatalf("home omits navigable task menu:\n%s", model.View().Content)
 	}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "u"})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Allow prerelease: [ ]") {
-		t.Fatalf("update input missing:\n%s", model.View().Content)
+	if command == nil || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Fetching available Nixorium releases") {
+		t.Fatalf("release discovery did not start:\n%s", model.View().Content)
 	}
-	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if command != nil || !strings.Contains(model.View().Content, "explicit release tag") {
-		t.Fatalf("empty update target was planned:\n%s", model.View().Content)
+	if checked != 1 || !strings.Contains(model.View().Content, target) || strings.Contains(model.View().Content, "v2.4.0-beta.1") || strings.Contains(model.View().Content, "Target: >") {
+		t.Fatalf("fetched stable release list is incorrect:\n%s", model.View().Content)
 	}
-	for _, key := range []tea.KeyPressMsg{{Code: tea.KeyF2}, {Code: tea.KeyF3}, {Text: target}} {
-		updated, _ = model.Update(key)
-		model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
+	model = updated.(dashboardModel)
+	if !strings.Contains(model.View().Content, "v2.4.0-beta.1") {
+		t.Fatalf("prerelease disclosure missing:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
@@ -586,6 +641,32 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 }
 
+func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
+	model := dashboardModel{
+		report: testDashboardReport("ready"),
+		actions: DashboardActions{CheckUpdate: func() domain.UpdateCheckReport {
+			return domain.UpdateCheckReport{
+				Operation: "update-check",
+				State:     "failed",
+				Issues:    []domain.ValidationIssue{{Field: "network", Message: "upstream unavailable"}},
+			}
+		}},
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	if !strings.Contains(view, "Releases could not be fetched") || !strings.Contains(view, "No candidate can be selected") || strings.Contains(view, "Target: >") {
+		t.Fatalf("failed discovery exposed an unsafe fallback:\n%s", view)
+	}
+	updated, planCommand := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if planCommand != nil || model.busy != "" {
+		t.Fatal("failed discovery could start planning")
+	}
+}
+
 func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	current := wizardSettings()
 	planned := 0
@@ -629,7 +710,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions, width: 100, height: 30}
-	if !strings.Contains(model.View().Content, "Change settings") {
+	if !strings.Contains(model.View().Content, "Advanced tools") {
 		t.Fatalf("home omits settings task:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "e"})
@@ -714,7 +795,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "HEALTHY") || !strings.Contains(model.View().Content, "Managed through the Install computers workflow") {
+	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "healthy") || !strings.Contains(model.View().Content, "Managed through the Install computers workflow") {
 		t.Fatalf("services screen missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "r"})
@@ -810,7 +891,7 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 12})
+	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)
@@ -1119,7 +1200,7 @@ func TestDashboardPXEProgressShowsPhaseBarAndRecentActivity(t *testing.T) {
 		t.Fatal("running preparation did not schedule the next progress poll")
 	}
 	view := model.View().Content
-	for _, expected := range []string{"Building client systems", "2/10", "Recent activity", "Built client pc02 (2/10)", "elapsed"} {
+	for _, expected := range []string{"Building client systems", "2/10", "progress details", "Built client pc02 (2/10)", "elapsed"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("PXE progress omits %q:\n%s", expected, view)
 		}

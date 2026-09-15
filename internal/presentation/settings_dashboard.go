@@ -133,28 +133,25 @@ func newRoutineSettingsMenu(isDark bool, width, height int) routineSettingsMenu 
 	for index, group := range routineSettingsGroups {
 		items = append(items, routineSettingsGroupItem{index: index, group: group})
 	}
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles = list.NewDefaultItemStyles(isDark)
+	delegate := tuiListDelegate(isDark)
 	menu := list.New(items, delegate, settingsMenuWidth(width), settingsMenuHeight(height))
 	menu.Title = "Settings categories"
 	menu.SetShowTitle(false)
 	menu.SetShowStatusBar(false)
+	menu.SetShowHelp(false)
 	menu.Styles = list.DefaultStyles(isDark)
 	menu.Help.Styles = help.DefaultStyles(isDark)
 	return routineSettingsMenu{list: menu}
 }
 
 func settingsMenuWidth(width int) int {
-	if width < 40 {
-		return 40
-	}
-	return width
+	return max(28, min(108, width-10))
 }
 
 func settingsMenuHeight(height int) int {
-	height -= 9
-	if height < 10 {
-		return 10
+	height -= 13
+	if height < 4 {
+		return 4
 	}
 	if height > 20 {
 		return 20
@@ -185,12 +182,12 @@ func newRoutinePasswordMenu(isDark bool, width, height int) routinePasswordMenu 
 	for _, choice := range routinePasswordChoices {
 		items = append(items, choice)
 	}
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles = list.NewDefaultItemStyles(isDark)
+	delegate := tuiListDelegate(isDark)
 	menu := list.New(items, delegate, settingsMenuWidth(width), settingsMenuHeight(height))
 	menu.Title = "Password account"
 	menu.SetShowTitle(false)
 	menu.SetShowStatusBar(false)
+	menu.SetShowHelp(false)
 	menu.SetFilteringEnabled(false)
 	menu.Styles = list.DefaultStyles(isDark)
 	menu.Help.Styles = help.DefaultStyles(isDark)
@@ -288,8 +285,7 @@ func (model dashboardModel) settingsView() string {
 		"",
 		model.settingsMenu.list.View(),
 		"",
-		"p: change one password through the secure no-echo credential flow",
-		"Enter: edit category   /: filter   Esc: back",
+		"enter edit   / search   p passwords   esc back   ? help",
 	)
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
@@ -301,8 +297,8 @@ func (model dashboardModel) settingsPasswordsView() string {
 	lines := []string{
 		tuiTitle("Nixorium — Change password", model.isDark),
 		"",
-		"Choose one account. Password entry temporarily leaves the dashboard",
-		"and uses a terminal-only, no-echo prompt with confirmation.",
+		"Choose the account whose password you want to change.",
+		"Your password stays hidden while you type.",
 		"",
 		model.settingsPasswordMenu.list.View(),
 		"",

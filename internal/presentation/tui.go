@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/key"
-	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type DashboardActions struct {
+	LoadDoctor             func() (domain.DoctorReport, error)
 	Refresh                func() (domain.StatusReport, error)
 	LoadSetup              func() domain.SetupReport
 	LoadHosts              func() (domain.HostsReport, error)
@@ -28,6 +29,7 @@ type DashboardActions struct {
 	LoadGitReview          func() domain.GitReviewReport
 	PlanGitCommit          func(string) domain.GitCommitPlanReport
 	ApplyGitCommit         func(domain.GitCommitPlanReport) domain.GitCommitReport
+	CheckUpdate            func() domain.UpdateCheckReport
 	PlanUpdate             func(string, bool, bool) domain.UpdatePlanReport
 	ApplyUpdate            func(domain.UpdatePlanReport) domain.UpdateApplyReport
 	LoadSettings           func() (domain.LabSettingsFile, error)
@@ -47,6 +49,7 @@ type dashboardScreen int
 const (
 	dashboardHome dashboardScreen = iota
 	dashboardSetup
+	dashboardRestore
 	dashboardHosts
 	dashboardDeploy
 	dashboardDeployReview
@@ -67,9 +70,30 @@ const (
 	dashboardSettingsReview
 	dashboardPXE
 	dashboardPXEStartReview
+	dashboardAdministration
+	dashboardDiagnostics
+	dashboardSoftware
 )
 
 type dashboardModel struct {
+	updateDetails        bool
+	returnAdmin          bool
+	restoreMode          bool
+	restoreCursor        int
+	diagnosticReturn     dashboardScreen
+	adminCursor          int
+	hostCursor           int
+	hostQuery            string
+	hostSearching        bool
+	hostDetail           bool
+	hostTechnical        bool
+	helpOpen             bool
+	pageScroll           int
+	setupDetails         bool
+	progressDetails      bool
+	doctor               domain.DoctorReport
+	diagnosticCursor     int
+	diagnosticDetails    bool
 	report               domain.StatusReport
 	setup                domain.SetupReport
 	setupMode            bool
@@ -109,9 +133,10 @@ type dashboardModel struct {
 	gitCommitChosen      map[string]bool
 	gitCommitPlan        domain.GitCommitPlanReport
 	gitCommitResult      domain.GitCommitReport
+	updateCheck          domain.UpdateCheckReport
+	updateCursor         int
 	updateTarget         string
 	updatePrerelease     bool
-	updateDowngrade      bool
 	updatePlan           domain.UpdatePlanReport
 	updateResult         domain.UpdateApplyReport
 	updateScroll         int
@@ -132,6 +157,16 @@ type dashboardModel struct {
 	height               int
 	isDark               bool
 	activitySpinner      spinner.Model
+}
+
+type dashboardStatusMsg struct {
+	report domain.StatusReport
+	err    error
+}
+
+type dashboardDoctorMsg struct {
+	report domain.DoctorReport
+	err    error
 }
 
 type dashboardPlanMsg struct {
@@ -229,6 +264,10 @@ type dashboardUpdatePlanMsg struct {
 	report domain.UpdatePlanReport
 }
 
+type dashboardUpdateCheckMsg struct {
+	report domain.UpdateCheckReport
+}
+
 type dashboardUpdateResultMsg struct {
 	report domain.UpdateApplyReport
 }
@@ -279,8 +318,41 @@ func (model dashboardModel) Init() tea.Cmd {
 }
 
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	updated, command := model.updateState(message)
+	next := updated.(dashboardModel)
+	if k, ok := message.(tea.KeyPressMsg); ok && (k.String() == "esc" || k.String() == "left") && model.returnAdmin && model.screen != dashboardAdministration && next.screen == dashboardHome {
+		next.screen = dashboardAdministration
+	}
+	if next.screen != model.screen {
+		next.pageScroll = 0
+	}
+	if next.screen == dashboardHome {
+		next.returnAdmin = false
+	}
+	return next, command
+}
+
+func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case dashboardStatusMsg:
+		if message.err == nil {
+			model.report = message.report
+		} else {
+			model.hosts = domain.HostsReport{}
+			model.message = "Status refresh failed. Check the laboratory again."
+		}
+		return model, nil
+	case dashboardDoctorMsg:
+		model.busy = ""
+		model.doctor = message.report
+		model.diagnosticCursor = 0
+		if message.err != nil {
+			model.message = "Checks could not finish: " + message.err.Error()
+		} else {
+			model.message = ""
+		}
+		return model, nil
 	case spinner.TickMsg:
 		var command tea.Cmd
 		model.activitySpinner, command = model.activitySpinner.Update(message)
@@ -346,6 +418,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = "Computer status refresh failed: " + message.err.Error()
 		} else {
 			model.hosts = message.report
+			model.hostCursor = 0
 			model.message = ""
 		}
 		model.screen = dashboardHosts
@@ -363,6 +436,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardDeployReview
 		return model, nil
 	case dashboardDeploymentResultMsg:
+		model.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.deploying = false
 		model.deployEvents = nil
@@ -390,6 +464,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardControllerReview
 		return model, nil
 	case dashboardControllerResultMsg:
+		model.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.controllerApplying = false
 		model.controllerResult = message.report
@@ -470,6 +545,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardGitCommitReview
 		return model, nil
 	case dashboardGitCommitResultMsg:
+		model.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.gitCommitResult = message.report
 		model.gitReview = message.review
@@ -477,6 +553,18 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.confirmation = ""
 		model.message = message.report.Message
 		model.screen = dashboardGitReview
+		return model, nil
+	case dashboardUpdateCheckMsg:
+		model.busy = ""
+		model.updateCheck = message.report
+		model.updateCursor = 0
+		model.updateTarget = ""
+		if message.report.HasErrors() {
+			model.message = operationLogIssues(message.report.Issues)
+		} else {
+			model.message = ""
+		}
+		model.screen = dashboardUpdate
 		return model, nil
 	case dashboardUpdatePlanMsg:
 		model.busy = ""
@@ -492,6 +580,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardUpdateReview
 		return model, nil
 	case dashboardUpdateResultMsg:
+		model.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.updating = false
 		model.updateResult = message.report
@@ -543,6 +632,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
 		}
 	case dashboardSettingsApplyMsg:
+		model.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.settingsApplying = false
 		model.settingsResult = message.report
@@ -621,15 +711,104 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return model, nil
 	}
+	if !model.helpOpen && model.screen == dashboardSettings && key.String() != "f1" && (model.settingsMenu.list.FilterState() == list.Filtering || (model.settingsMenu.list.FilterState() == list.FilterApplied && key.String() == "esc")) {
+		var command tea.Cmd
+		model.settingsMenu, command = model.settingsMenu.update(key)
+		return model, command
+	}
+	if model.helpOpen {
+		if key.String() == "?" || key.String() == "f1" || key.String() == "esc" {
+			model.helpOpen = false
+			model.pageScroll = 0
+		}
+		if key.String() == "shift+down" {
+			model.pageScroll++
+		}
+		if key.String() == "shift+up" {
+			model.pageScroll = max(0, model.pageScroll-1)
+		}
+		return model, nil
+	}
+	if key.String() == "f1" || (key.String() == "?" && !model.textEntry()) {
+		model.helpOpen = true
+		model.pageScroll = 0
+		return model, nil
+	}
+	if key.String() == "shift+down" {
+		model.pageScroll++
+		return model, nil
+	}
+	if key.String() == "shift+up" {
+		model.pageScroll = max(0, model.pageScroll-1)
+		return model, nil
+	}
+	if model.screen == dashboardHosts && model.hostSearching {
+		switch key.String() {
+		case "esc":
+			model.hostSearching = false
+			model.hostQuery = ""
+		case "enter":
+			model.hostSearching = false
+		case "backspace":
+			value := []rune(model.hostQuery)
+			if len(value) > 0 {
+				model.hostQuery = string(value[:len(value)-1])
+			}
+		default:
+			if key.Text != "" && len(model.hostQuery) < 128 {
+				model.hostQuery += key.Text
+			}
+		}
+		model.hostCursor = 0
+		return model, nil
+	}
+	if key.String() == "l" && (model.deploying || model.controllerApplying || model.pxePreparing) {
+		model.progressDetails = !model.progressDetails
+		return model, nil
+	}
 	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
-	if key.String() == "ctrl+c" || (key.String() == "q" && model.screen != dashboardUpdate && model.screen != dashboardUpdateReview && model.screen != dashboardSettingsEdit) {
+	if key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry()) {
 		return model, tea.Quit
 	}
 	if model.busy != "" {
 		return model, nil
+	}
+	if model.screen == dashboardAdministration {
+		model.returnAdmin = true
+		switch key.String() {
+		case "esc", "left":
+			model.returnAdmin = false
+			model.screen = dashboardHome
+			return model, nil
+		case "up", "k":
+			model.adminCursor = max(0, model.adminCursor-1)
+			return model, nil
+		case "down", "j":
+			model.adminCursor = min(len(administrationTasks)-1, model.adminCursor+1)
+			return model, nil
+		case "enter":
+			key = tea.KeyPressMsg{Code: []rune(administrationTasks[model.adminCursor].shortcut)[0], Text: administrationTasks[model.adminCursor].shortcut}
+		}
+		known := false
+		for _, task := range administrationTasks {
+			if key.String() == task.shortcut {
+				known = true
+				break
+			}
+		}
+		if !known {
+			return model, nil
+		}
+		model.screen = dashboardHome
+	}
+	if key.String() == "i" && (model.screen == dashboardHome || model.screen == dashboardHosts) {
+		model.diagnosticReturn = model.screen
+		model.screen = dashboardDiagnostics
+		command := model.startDiagnostics()
+		return model, command
 	}
 
 	switch model.screen {
@@ -637,19 +816,22 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.ensureHomeMenu()
 		action := key.String()
 		if action == "enter" {
-			if model.setup.State != "" && model.setup.State != "ready" {
-				model.setupMode = true
-				model.screen = dashboardSetup
-				model.message = ""
-				return model, nil
-			}
 			if selected, ok := model.homeMenu.selected(); ok {
 				action = selected.shortcut
 			}
 		}
 		switch action {
+		case "a":
+			model.screen = dashboardAdministration
+		case "r":
+			model.screen = dashboardRestore
+			model.restoreCursor = 0
+			model.message = ""
+		case "w":
+			model.screen = dashboardSoftware
 		case "d":
 			model.screen = dashboardDeploy
+			model.deployResult = domain.DeploymentExecutionReport{}
 			model.message = ""
 			model.deployChosen = map[string]bool{}
 			model.deployCursor = 0
@@ -661,6 +843,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardControllerPlanMsg{report: model.actions.PlanController()}
 			}
 		case "h":
+			model.hostDetail = false
+			model.hostTechnical = false
 			model.screen = dashboardHosts
 			model.busy = "Checking configured computers"
 			model.message = ""
@@ -688,10 +872,17 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "u":
 			model.screen = dashboardUpdate
-			model.updateTarget = ""
 			model.updatePrerelease = false
-			model.updateDowngrade = false
+			model.updateCheck = domain.UpdateCheckReport{}
+			model.updateCursor = 0
+			model.updateTarget = ""
 			model.message = ""
+			if model.actions.CheckUpdate == nil {
+				model.message = "Release discovery is not available in this session."
+				return model, nil
+			}
+			model.busy = "Fetching available Nixorium releases"
+			return model, model.checkUpdates()
 		case "e":
 			model.screen = dashboardSettings
 			model.busy = "Loading managed laboratory settings"
@@ -708,7 +899,33 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.homeMenu, command = model.homeMenu.update(key)
 			return model, command
 		}
+	case dashboardRestore:
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "up", "k":
+			model.restoreCursor = max(0, model.restoreCursor-1)
+		case "down", "j":
+			model.restoreCursor = min(1, model.restoreCursor+1)
+		case "enter":
+			model.restoreMode = true
+			model.message = ""
+			if model.restoreCursor == 0 {
+				model.screen = dashboardDeploy
+				model.deployResult = domain.DeploymentExecutionReport{}
+				model.deployChosen = map[string]bool{}
+				model.deployCursor = 0
+			} else {
+				model.screen = dashboardPXE
+				model.message = "Reinstallation erases the disk confirmed locally on each computer."
+			}
+		}
 	case dashboardSetup:
+		if key.String() == "t" {
+			model.setupDetails = !model.setupDetails
+			return model, nil
+		}
 		if key.String() == "esc" || key.String() == "left" {
 			model.setupMode = false
 			model.screen = dashboardHome
@@ -862,8 +1079,38 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardHosts:
 		switch key.String() {
 		case "esc", "left":
+			if model.hostDetail {
+				model.hostDetail = false
+				model.hostTechnical = false
+				return model, nil
+			}
+			if model.hostQuery != "" {
+				model.hostQuery = ""
+				model.hostCursor = 0
+				return model, nil
+			}
 			model.screen = dashboardHome
 			model.message = ""
+		case "/":
+			model.hostSearching = true
+			model.hostDetail = false
+		case "up", "k":
+			model.hostCursor = max(0, model.hostCursor-1)
+		case "down", "j":
+			model.hostCursor = max(0, min(len(model.filteredHosts())-1, model.hostCursor+1))
+		case "enter":
+			model.hostDetail = len(model.filteredHosts()) > 0
+		case "t":
+			model.hostTechnical = !model.hostTechnical
+			model.hostDetail = true
+		case "d":
+			hosts := model.filteredHosts()
+			if len(hosts) > 0 {
+				model.screen = dashboardDeploy
+				model.deployResult = domain.DeploymentExecutionReport{}
+				model.deployChosen = map[string]bool{hosts[min(model.hostCursor, len(hosts)-1)].Name: true}
+				model.deployCursor = 0
+			}
 		case "r":
 			model.busy = "Refreshing computer status"
 			model.message = ""
@@ -892,7 +1139,12 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		hosts := model.report.Meta.Clients.Hosts
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardHome
+			if model.restoreMode {
+				model.screen = dashboardRestore
+				model.restoreMode = false
+			} else {
+				model.screen = dashboardHome
+			}
 			model.message = ""
 		case "up", "k":
 			if model.deployCursor > 0 {
@@ -1344,8 +1596,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "r":
 				model.updateResult = domain.UpdateApplyReport{}
+				model.updateCheck = domain.UpdateCheckReport{}
 				model.updateTarget = ""
 				model.message = ""
+				if model.actions.CheckUpdate != nil {
+					model.busy = "Fetching available Nixorium releases"
+					return model, model.checkUpdates()
+				}
 			}
 			return model, nil
 		}
@@ -1353,38 +1610,51 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			model.screen = dashboardHome
 			model.message = ""
-		case "f2":
+		case "p", "f2":
 			model.updatePrerelease = !model.updatePrerelease
+			model.updateCursor = 0
 			model.message = ""
-		case "f3":
-			model.updateDowngrade = !model.updateDowngrade
-			model.message = ""
-		case "backspace":
-			value := []rune(model.updateTarget)
-			if len(value) > 0 {
-				model.updateTarget = string(value[:len(value)-1])
-			}
-		case "enter":
-			target := strings.TrimSpace(model.updateTarget)
-			if target == "" {
-				model.message = "Enter an explicit release tag before creating an update plan."
+		case "r":
+			if model.actions.CheckUpdate == nil {
+				model.message = "Release discovery is not available in this session."
 				return model, nil
 			}
+			model.updateCheck = domain.UpdateCheckReport{}
+			model.updateTarget = ""
+			model.message = ""
+			model.busy = "Fetching available Nixorium releases"
+			return model, model.checkUpdates()
+		case "up", "k":
+			model.updateCursor = max(0, model.updateCursor-1)
+		case "down", "j":
+			releases := model.availableUpdateReleases()
+			if model.updateCursor+1 < len(releases) {
+				model.updateCursor++
+			}
+		case "enter":
+			releases := model.availableUpdateReleases()
+			if model.updateCheck.HasErrors() || len(releases) == 0 {
+				model.message = "Fetch available releases before selecting an update."
+				return model, nil
+			}
+			target := releases[min(model.updateCursor, len(releases)-1)].Tag
+			if target == model.updateCheck.CurrentRef {
+				model.message = target + " is already the configured Nixorium release."
+				return model, nil
+			}
+			model.updateTarget = target
 			model.busy = "Validating the candidate release and representative builds"
 			model.message = ""
-			allowPrerelease := model.updatePrerelease
-			allowDowngrade := model.updateDowngrade
+			allowPrerelease := releases[min(model.updateCursor, len(releases)-1)].Channel == domain.UpdateChannelPrerelease
 			return model, func() tea.Msg {
-				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(target, allowPrerelease, allowDowngrade)}
-			}
-		default:
-			if key.Text != "" && len([]rune(model.updateTarget))+len([]rune(key.Text)) <= 128 {
-				model.updateTarget += key.Text
+				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(target, allowPrerelease, false)}
 			}
 		}
 	case dashboardUpdateReview:
 		maximum := maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
 		switch key.String() {
+		case "f4":
+			model.updateDetails = !model.updateDetails
 		case "esc":
 			model.screen = dashboardUpdate
 			model.confirmation = ""
@@ -1436,7 +1706,10 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
-			if model.setupMode {
+			if model.restoreMode {
+				model.screen = dashboardRestore
+				model.restoreMode = false
+			} else if model.setupMode {
 				model.screen = dashboardSetup
 			} else {
 				model.screen = dashboardHome
@@ -1476,6 +1749,25 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, model.runAction(func() string {
 				return model.actions.RecoverPXE().Message
 			}, dashboardPXE)
+		}
+	case dashboardDiagnostics:
+		switch key.String() {
+		case "esc", "left":
+			model.screen = model.diagnosticReturn
+			model.message = ""
+		case "up", "k":
+			model.diagnosticCursor = max(0, model.diagnosticCursor-1)
+		case "down", "j":
+			model.diagnosticCursor = max(0, min(len(model.doctor.Findings)-1, model.diagnosticCursor+1))
+		case "enter":
+			model.diagnosticDetails = !model.diagnosticDetails
+		case "r":
+			command := model.startDiagnostics()
+			return model, command
+		}
+	case dashboardSoftware:
+		if key.String() == "esc" || key.String() == "left" {
+			model.screen = dashboardAdministration
 		}
 	case dashboardPXEStartReview:
 		switch key.String() {
@@ -1610,12 +1902,25 @@ func (model dashboardModel) loadControllerProgress(id uint64) tea.Cmd {
 }
 
 func (model dashboardModel) View() tea.View {
+	if model.helpOpen {
+		view := tea.NewView(model.frame(model.helpView()))
+		view.AltScreen = true
+		return view
+	}
 	content := ""
 	switch model.screen {
 	case dashboardSetup:
 		content = model.setupView()
+	case dashboardRestore:
+		content = model.restoreView()
 	case dashboardHosts:
-		content = model.hostsView()
+		content = model.computersView()
+	case dashboardAdministration:
+		content = model.administrationView()
+	case dashboardDiagnostics:
+		content = model.diagnosticsView()
+	case dashboardSoftware:
+		content = model.softwareView()
 	case dashboardDeploy, dashboardDeployReview:
 		content = model.deployView()
 	case dashboardController, dashboardControllerReview:
@@ -1637,36 +1942,52 @@ func (model dashboardModel) View() tea.View {
 	default:
 		content = model.homeView()
 	}
-	return tea.NewView(content)
+	view := tea.NewView(model.frame(content))
+	view.AltScreen = true
+	return view
 }
 
 func (model dashboardModel) setupView() string {
-	completed := 0
-	for _, stage := range model.setup.Stages {
-		if stage.State == domain.SetupStageComplete {
-			completed++
-		}
-	}
+	groups, current := setupJourney(model.setup)
 	lines := []string{
 		tuiTitle("Nixorium — First setup", model.isDark),
 		"",
-		fmt.Sprintf("Laboratory setup: %d/%d steps complete", completed, len(model.setup.Stages)),
-		"You can quit safely and resume later with `nixorium setup`.",
+		fmt.Sprintf("Step %d of %d", current+1, len(groups)),
+		"You can leave safely and resume later with `nixorium setup`.",
 		"",
 	}
-	for _, stage := range model.setup.Stages {
-		marker := "[ ]"
-		if stage.State == domain.SetupStageComplete {
-			marker = "[x]"
-		} else if stage.State == domain.SetupStageCurrent {
-			marker = "[>]"
+	for index, group := range groups {
+		label := "○ " + group.title + " · " + group.pending
+		switch group.state {
+		case domain.SetupStageComplete:
+			label = "✓ " + group.title + " · Complete"
+		case domain.SetupStageCurrent:
+			label = "● " + group.title + " · In progress"
 		}
-		lines = append(lines, fmt.Sprintf("  %s %s", marker, stage.Title))
+		if index == current {
+			label = "› " + label
+		} else {
+			label = "  " + label
+		}
+		lines = append(lines, label)
+	}
+	if model.setupDetails {
+		lines = append(lines, "", tuiSection("Technical steps", model.isDark))
+		for _, stage := range model.setup.Stages {
+			marker := "○"
+			if stage.State == domain.SetupStageComplete {
+				marker = "✓"
+			} else if stage.State == domain.SetupStageCurrent {
+				marker = "●"
+			}
+			lines = append(lines, fmt.Sprintf("  %s %s", marker, stage.Title))
+		}
 	}
 	lines = append(lines, "")
 	if model.setup.State == "ready" {
 		lines = append(lines,
-			tuiResult("Laboratory setup is ready", true, model.isDark),
+			tuiResult("Controller and client system are ready", true, model.isDark),
+			"Next, install and verify a pilot computer. The other computers can remain powered off.",
 			"Enter opens network installation for the first computer.",
 		)
 	} else {
@@ -1681,10 +2002,60 @@ func (model dashboardModel) setupView() string {
 	}
 	lines = append(lines, "", tuiHelp(model.width, model.isDark,
 		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
-		tuiHelpBinding([]string{"esc"}, "esc", "dashboard"),
+		tuiHelpBinding([]string{"t"}, "t", "technical steps"),
+		tuiHelpBinding([]string{"esc"}, "esc", "interventions"),
 		tuiHelpBinding([]string{"q"}, "q", "quit"),
 	))
 	return strings.Join(lines, "\n") + "\n"
+}
+
+type setupJourneyGroup struct {
+	title   string
+	pending string
+	ids     []string
+	state   domain.SetupStageState
+}
+
+func setupJourney(report domain.SetupReport) ([]setupJourneyGroup, int) {
+	groups := []setupJourneyGroup{
+		{title: "Laboratory settings", pending: "To configure", ids: []string{domain.SetupStageInspectEnvironment, domain.SetupStageNetwork, domain.SetupStageIdentity, domain.SetupStageCredentials, domain.SetupStageKeys, domain.SetupStageValidate, domain.SetupStageReview}},
+		{title: "Controller", pending: "To configure", ids: []string{domain.SetupStageApply}},
+		{title: "Client system", pending: "To prepare", ids: []string{domain.SetupStageArtifacts}},
+		{title: "First computer", pending: "To install", ids: []string{domain.SetupStageReadiness, domain.SetupStageInstall}},
+		{title: "Other computers", pending: "Whenever you are ready"},
+	}
+	states := map[string]domain.SetupStageState{}
+	for _, stage := range report.Stages {
+		states[stage.ID] = stage.State
+	}
+	current := 0
+	for index := range groups {
+		group := &groups[index]
+		group.state = domain.SetupStageComplete
+		if len(group.ids) == 0 {
+			group.state = domain.SetupStagePending
+			continue
+		}
+		for _, id := range group.ids {
+			state, found := states[id]
+			if !found && report.State != "ready" {
+				group.state = domain.SetupStagePending
+			}
+			if state == domain.SetupStagePending {
+				group.state = domain.SetupStagePending
+			}
+			if state == domain.SetupStageCurrent {
+				group.state = domain.SetupStageCurrent
+				current = index
+				break
+			}
+		}
+	}
+	if report.State == "ready" {
+		groups[3].state = domain.SetupStageCurrent
+		current = 3
+	}
+	return groups, current
 }
 
 func setupCurrentTitle(report domain.SetupReport) string {
@@ -1783,7 +2154,9 @@ func (model dashboardModel) gitCommitSelectView() string {
 		lines = append(lines, model.busyView())
 		return strings.Join(lines, "\n") + "\n"
 	}
-	for index, change := range model.gitReview.Changes {
+	start, end := listWindow(len(model.gitReview.Changes), model.gitCommitCursor, model.rowCapacity())
+	for index := start; index < end; index++ {
+		change := model.gitReview.Changes[index]
 		cursor := " "
 		if index == model.gitCommitCursor {
 			cursor = ">"
@@ -1913,64 +2286,72 @@ func (model dashboardModel) updateView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardUpdateReview {
-		diffLines := strings.Split(strings.TrimSuffix(model.updatePlan.Diff.Content, "\n"), "\n")
-		height := model.updateReviewHeight()
-		maximum := maximumUpdateScroll(model.updatePlan, height)
-		if model.updateScroll > maximum {
-			model.updateScroll = maximum
-		}
-		end := model.updateScroll + height
-		if end > len(diffLines) {
-			end = len(diffLines)
-		}
+		return model.releaseReviewView()
+	}
+	if model.updateCheck.HasErrors() {
 		lines = append(lines,
-			"Validated release review",
-			fmt.Sprintf("  Current: %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.CurrentChannel),
-			fmt.Sprintf("  Target:  %s (%s)", model.updatePlan.Target, model.updatePlan.TargetChannel),
-			fmt.Sprintf("  Deployment revision: %s", model.updatePlan.Revision),
-			fmt.Sprintf("  Downgrade: %t", model.updatePlan.Downgrade),
-			"  Scope: flake.nix and flake.lock only",
-			"  No commit, push, activation, PXE action, or client deployment is implicit",
+			tuiResult("Releases could not be fetched", false, model.isDark),
 			"",
-			"Candidate checks:",
-		)
-		for _, check := range model.updatePlan.Checks {
-			lines = append(lines, fmt.Sprintf("  %-18s %-8s %s", check.ID, check.State, check.Message))
-		}
-		lines = append(lines,
-			"",
-			fmt.Sprintf("Diff lines %d-%d of %d", displayedLineStart(model.updateScroll, len(diffLines)), end, len(diffLines)),
-			"",
-		)
-		lines = append(lines, diffLines[model.updateScroll:end]...)
-		lines = append(lines,
-			"",
-			"Type "+model.updatePlan.Confirmation+" to continue:",
-			"> "+model.confirmation+"█",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"up", "down", "pgup", "pgdown"}, "↑/↓/pg", "scroll"),
-				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
-			),
+			"Nixorium could not obtain a usable release list from the configured upstream.",
+			"No candidate can be selected and no file changed.",
 		)
 		if model.message != "" {
-			lines = append(lines, "", model.message)
+			lines = append(lines, "", "Detail: "+model.message)
 		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"r"}, "r", "try again"),
+			tuiHelpBinding([]string{"esc"}, "esc", "back"),
+		))
 		return strings.Join(lines, "\n") + "\n"
 	}
 
+	releases := model.availableUpdateReleases()
 	lines = append(lines,
-		"Enter one explicit v-prefixed Semantic Version release tag.",
-		"Target: > "+model.updateTarget+"█",
+		fmt.Sprintf("Current release  %s", model.updateCheck.CurrentRef),
+		tuiMuted("Source  "+model.updateCheck.Upstream, model.isDark),
 		"",
-		fmt.Sprintf("F2  Allow prerelease: %s", toggleLabel(model.updatePrerelease)),
-		fmt.Sprintf("F3  Allow downgrade:  %s", toggleLabel(model.updateDowngrade)),
+		tuiSection("Available releases", model.isDark),
+	)
+	start, end := listWindow(len(releases), model.updateCursor, max(4, model.height-15))
+	for index := start; index < end; index++ {
+		release := releases[index]
+		marker := "  "
+		if index == model.updateCursor {
+			marker = "› "
+		}
+		note := ""
+		if release.Tag == model.updateCheck.CurrentRef {
+			note = "  Current"
+		} else if index == 0 && release.Channel == domain.UpdateChannelStable {
+			note = "  Latest stable"
+		}
+		if release.Channel == domain.UpdateChannelPrerelease {
+			note += "  Prerelease"
+		}
+		lines = append(lines, marker+release.Tag+tuiMuted(note, model.isDark))
+	}
+	if len(releases) == 0 {
+		lines = append(lines, "No releases are available in the selected channel.")
+	}
+	if model.updateCheck.Truncated {
+		lines = append(lines, "", tuiMuted("The upstream result was safely limited to the newest releases.", model.isDark))
+	}
+	prereleaseLabel := "show prereleases"
+	if model.updatePrerelease {
+		prereleaseLabel = "hide prereleases"
+	}
+	lines = append(lines,
+		"",
+		"Selecting a release starts validation; it does not change files.",
+		"Controller activation and client distribution remain separate operations.",
 		"",
 		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", "validate release"),
+			tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
+			tuiHelpBinding([]string{"enter"}, "enter", "validate"),
+			tuiHelpBinding([]string{"p"}, "p", prereleaseLabel),
+			tuiHelpBinding([]string{"r"}, "r", "fetch again"),
 			tuiHelpBinding([]string{"esc"}, "esc", "back"),
 		),
-		"No file changes occur until the reviewed confirmation succeeds.",
 	)
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
@@ -1978,15 +2359,29 @@ func (model dashboardModel) updateView() string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
+	releases := append([]domain.UpdateRelease{}, model.updateCheck.Stable...)
+	if model.updatePrerelease {
+		releases = append(releases, model.updateCheck.Prerelease...)
+	}
+	return releases
+}
+
+func (model dashboardModel) checkUpdates() tea.Cmd {
+	return func() tea.Msg {
+		return dashboardUpdateCheckMsg{report: model.actions.CheckUpdate()}
+	}
+}
+
 func (model dashboardModel) updateReviewHeight() int {
 	if model.height <= 0 {
 		return 10
 	}
-	height := model.height - 26
-	if height < 4 {
-		return 4
+	height := model.height - 21
+	if model.updateDetails {
+		height -= len(model.updatePlan.Checks) + 2
 	}
-	return height
+	return max(1, height)
 }
 
 func maximumUpdateScroll(report domain.UpdatePlanReport, height int) int {
@@ -1995,13 +2390,6 @@ func maximumUpdateScroll(report domain.UpdatePlanReport, height int) int {
 		return 0
 	}
 	return maximum
-}
-
-func toggleLabel(enabled bool) string {
-	if enabled {
-		return "[x]"
-	}
-	return "[ ]"
 }
 
 func gitReviewContentLines(report domain.GitReviewReport) []string {
@@ -2032,7 +2420,7 @@ func (model dashboardModel) gitReviewHeight() int {
 	if model.height <= 0 {
 		return 14
 	}
-	height := model.height - 9
+	height := model.height - 13
 	if height < 4 {
 		return 4
 	}
@@ -2064,26 +2452,7 @@ func (model dashboardModel) controllerView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardControllerReview {
-		lines = append(lines,
-			"Controller rebuild review",
-			fmt.Sprintf("  Machine:  %s", model.controllerPlan.Controller),
-			fmt.Sprintf("  Revision: %s", model.controllerPlan.Revision),
-			fmt.Sprintf("  Already current: %t", model.controllerPlan.Current),
-			"  Build as the deployment owner; activate only the resulting closure",
-			"  Services and networking may restart",
-			"",
-			fmt.Sprintf("Type %s to continue:", model.controllerPlan.Confirmation),
-			"> "+model.confirmation+"█",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"enter"}, "enter", "restart"),
-				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
-			),
-		)
-		if model.message != "" {
-			lines = append(lines, "", model.message)
-		}
-		return strings.Join(lines, "\n") + "\n"
+		return model.confirmationView("Update this controller?", model.controllerPlan.Controller+" (this controller only)", "Services and networking may restart; this connection may be interrupted.", "Build, activate and verify the reviewed configuration. A reboot is not normally required.", model.controllerPlan.Revision, model.controllerPlan.Confirmation)
 	}
 	if model.controllerResult.Operation != "" {
 		resultTitle := "Controller action needs attention"
@@ -2162,21 +2531,7 @@ func (model dashboardModel) servicesView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardServicesRestartReview {
-		lines = append(lines,
-			"Binary cache restart review",
-			"  The signed cache will be briefly unavailable",
-			"  Active PXE clients may retry downloads",
-			"  PXE networking and listeners are not controlled by this action",
-			"",
-			"Type RESTART CACHE to continue:",
-			"> "+model.confirmation+"█",
-			"",
-			"Esc: cancel",
-		)
-		if model.message != "" {
-			lines = append(lines, "", model.message)
-		}
-		return strings.Join(lines, "\n") + "\n"
+		return model.confirmationView("Restart the software cache?", "Controller cache; active installations may be affected", "The signed cache will be briefly unavailable. Active PXE clients may retry downloads.", "PXE networking and listeners are not controlled by this action. The cache is verified afterward.", "", "RESTART CACHE")
 	}
 	for _, service := range model.services.Services {
 		kind := tuiStatusAttention
@@ -2217,8 +2572,8 @@ func (model dashboardModel) logsView() string {
 	}
 	lines = append(lines, tuiSection("Recent actions", model.isDark))
 	recordLimit := len(model.logs.Records)
-	if recordLimit > 10 {
-		recordLimit = 10
+	if recordLimit > 3 {
+		recordLimit = 3
 	}
 	if recordLimit == 0 {
 		lines = append(lines, "  No recorded operation outcomes.")
@@ -2230,7 +2585,9 @@ func (model dashboardModel) logsView() string {
 	if len(model.logs.Logs) == 0 {
 		lines = append(lines, "No deployment operation logs are available.")
 	}
-	for index, entry := range model.logs.Logs {
+	start, end := listWindow(len(model.logs.Logs), model.logCursor, max(1, (model.height-16)/2))
+	for index := start; index < end; index++ {
+		entry := model.logs.Logs[index]
 		cursor := " "
 		if index == model.logCursor {
 			cursor = ">"
@@ -2292,7 +2649,7 @@ func (model dashboardModel) logDetailHeight() int {
 	if model.height <= 0 {
 		return 12
 	}
-	height := model.height - 9
+	height := model.height - 13
 	if height < 4 {
 		return 4
 	}
@@ -2356,7 +2713,7 @@ func gitReviewStatusKind(report domain.GitReviewReport) tuiStatusKind {
 }
 
 func (model dashboardModel) deployView() string {
-	lines := []string{tuiTitle("Nixorium — Deploy updates", model.isDark), ""}
+	lines := []string{tuiTitle("Nixorium — Distribute the prepared system", model.isDark), ""}
 	if model.deploying {
 		elapsed := time.Since(model.deployStarted).Truncate(time.Second)
 		if elapsed < 0 {
@@ -2376,26 +2733,7 @@ func (model dashboardModel) deployView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardDeployReview {
-		lines = append(lines,
-			"Deployment review",
-			fmt.Sprintf("  Revision: %s", model.deployPlan.Revision),
-			fmt.Sprintf("  Targets:  %s (%d computer(s))", model.deployPlan.ColmenaSelector, len(model.deployPlan.Targets)),
-			"  Build every selected configuration before applying it",
-			"  Target services may restart; offline computers will fail explicitly",
-			"  A failed apply may leave mixed target state; a fresh full retry is safe",
-			"",
-			fmt.Sprintf("Type DEPLOY %s to continue:", model.deployPlan.ColmenaSelector),
-			"> "+model.confirmation+"█",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"enter"}, "enter", "deploy"),
-				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
-			),
-		)
-		if model.message != "" {
-			lines = append(lines, "", model.message)
-		}
-		return strings.Join(lines, "\n") + "\n"
+		return model.confirmationView("Distribute the system?", fmt.Sprintf("%s · %d computer(s)", model.deployPlan.ColmenaSelector, len(model.deployPlan.Targets)), "Target services may restart; unreachable computers may remain unchanged.", "Build every selected configuration before applying it. A failed apply may leave mixed target state; a fresh full retry is safe.", model.deployPlan.Revision, "DEPLOY "+model.deployPlan.ColmenaSelector)
 	}
 
 	if model.deployResult.Operation != "" {
@@ -2428,8 +2766,16 @@ func (model dashboardModel) deployView() string {
 	}
 
 	hosts := model.report.Meta.Clients.Hosts
-	lines = append(lines, "Select computers (Space toggles; a selects all):", "")
-	for index, host := range hosts {
+	selected := 0
+	for _, host := range hosts {
+		if model.deployChosen[host.Name] {
+			selected++
+		}
+	}
+	lines = append(lines, "Choose where to apply the saved configuration.", tuiMuted("Select → Review → Deploy → Verify", model.isDark), "", fmt.Sprintf("%d of %d computers selected", selected, len(hosts)), "")
+	start, end := listWindow(len(hosts), model.deployCursor, model.rowCapacity())
+	for index := start; index < end; index++ {
+		host := hosts[index]
 		cursor := " "
 		if index == model.deployCursor {
 			cursor = ">"
@@ -2439,6 +2785,9 @@ func (model dashboardModel) deployView() string {
 			checked = "x"
 		}
 		lines = append(lines, fmt.Sprintf("%s [%s] %-10s %s", cursor, checked, host.Name, host.IP))
+	}
+	if len(hosts) > end || start > 0 {
+		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d", start+1, end, len(hosts)), model.isDark))
 	}
 	if len(hosts) == 0 {
 		lines = append(lines, "No configured client computers.")
@@ -2467,7 +2816,27 @@ func (model dashboardModel) deploymentProgressView() []string {
 		domain.DeploymentPhaseVerify:    "Verifying computers",
 		domain.DeploymentPhaseComplete:  "Complete",
 	}
-	lines := []string{"", tuiSection("Current progress", model.isDark), "  Phase: " + phaseLabels[progressState.Phase]}
+	index := 0
+	switch progressState.Phase {
+	case domain.DeploymentPhasePreflight:
+		index = 1
+	case domain.DeploymentPhaseBuild:
+		index = 0
+	case domain.DeploymentPhaseApply:
+		index = 2
+	case domain.DeploymentPhaseVerify:
+		index = 3
+	case domain.DeploymentPhaseComplete:
+		index = 4
+	}
+	lines := phaseSteps([]string{"Building configurations", "Revalidating reviewed configuration", "Updating computers", "Verifying computers"}, index, progressState.Phase == domain.DeploymentPhaseComplete, model.isDark)
+	if !model.progressDetails {
+		if progressState.TargetTotal > 0 {
+			lines = append(lines, "", fmt.Sprintf("Computers checked: %d/%d", progressState.TargetCurrent, progressState.TargetTotal))
+		}
+		return append(lines, "", "l progress details   F1 help")
+	}
+	lines = append(lines, "", tuiSection("Current progress", model.isDark), "  Phase: "+phaseLabels[progressState.Phase])
 	if progressState.Total > 0 {
 		barWidth := model.width - 8
 		if barWidth < 24 {
@@ -2476,7 +2845,7 @@ func (model dashboardModel) deploymentProgressView() []string {
 		if barWidth > 64 {
 			barWidth = 64
 		}
-		bar := progress.New(progress.WithDefaultBlend(), progress.WithWidth(barWidth))
+		bar := tuiProgress(barWidth, model.isDark)
 		percentage := float64(progressState.Completed) / float64(progressState.Total)
 		lines = append(lines,
 			fmt.Sprintf("  %d/%d", progressState.Completed, progressState.Total),
@@ -2495,40 +2864,7 @@ func (model dashboardModel) deploymentProgressView() []string {
 	return lines
 }
 
-func (model dashboardModel) hostsView() string {
-	available, total := hostAvailability(model.hosts.Hosts)
-	lines := []string{
-		tuiTitle("Nixorium — Computers", model.isDark),
-		"",
-		fmt.Sprintf("SSH available: %d/%d", available, total),
-		fmt.Sprintf("Deployment: %d current, %d outdated, %d unknown", model.hosts.Deployment.Current, model.hosts.Deployment.Outdated, model.hosts.Deployment.Unknown),
-		"",
-		fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s %-17s", "NAME", "ADDRESS", "NETWORK", "SSH", "DEPLOY", "LAST VERIFIED"),
-	}
-	for _, host := range model.hosts.Hosts {
-		lastVerified := "never"
-		if host.LastSuccessfulDeploy != nil {
-			lastVerified = host.LastSuccessfulDeploy.VerifiedAt.UTC().Format("2006-01-02 15:04Z")
-		}
-		lines = append(lines, fmt.Sprintf("  %-10s %-15s %-12s %-11s %-9s %-17s", host.Name, host.IP, host.Reachability, host.SSH, host.Deployment, lastVerified))
-	}
-	if model.hosts.HistoryDetail != "" {
-		lines = append(lines, "", "History warning: "+model.hosts.HistoryDetail)
-	}
-	if model.busy != "" {
-		lines = append(lines, "", model.busyView())
-	} else {
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"r"}, "r", "refresh"),
-			tuiHelpBinding([]string{"esc"}, "esc", "back"),
-			tuiHelpBinding([]string{"q"}, "q", "quit"),
-		))
-	}
-	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
-	}
-	return strings.Join(lines, "\n") + "\n"
-}
+func (model dashboardModel) hostsView() string { return model.computersView() }
 
 func (model dashboardModel) pxeView() string {
 	preparation := "missing"
@@ -2539,7 +2875,7 @@ func (model dashboardModel) pxeView() string {
 		preparation = "ready"
 	}
 	lines := []string{
-		tuiTitle("Nixorium — Install computers over network", model.isDark),
+		tuiTitle("Nixorium — Install or reinstall computers", model.isDark),
 		"",
 		fmt.Sprintf("Installation mode:  %s", tuiStatus(model.report.PXE.Mode, pxeStatusKind(model.report.PXE.Mode), model.isDark)),
 		fmt.Sprintf("Prepared artifacts: %s", preparation),
@@ -2561,26 +2897,7 @@ func (model dashboardModel) pxeView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardPXEStartReview {
-		lines = append(lines,
-			"",
-			"Start review",
-			fmt.Sprintf("  Temporarily remove %s", model.startPlan.StaticCIDR),
-			fmt.Sprintf("  Serve ProxyDHCP, TFTP, HTTP, and cache via %s", model.startPlan.DHCPAddress),
-			"  Institutional DHCP remains authoritative",
-			"  `nixorium pxe stop` or reboot recovery restores normal addressing",
-			"",
-			"Type START PXE to continue:",
-			"> "+model.confirmation+"█",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"enter"}, "enter", "start PXE"),
-				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
-			),
-		)
-		if model.message != "" {
-			lines = append(lines, "", model.message)
-		}
-		return strings.Join(lines, "\n") + "\n"
+		return model.confirmationView("Start network installation?", model.startPlan.Interface+" · controller network", "Temporarily remove "+model.startPlan.StaticCIDR+"; remote connections may be interrupted.", "Serve ProxyDHCP, TFTP, HTTP and cache via "+model.startPlan.DHCPAddress+". Institutional DHCP remains authoritative. `nixorium pxe stop` or reboot recovery restores normal addressing.", "", "START PXE")
 	}
 	lines = append(lines, "")
 	lines = append(lines, model.pxeNextStepView()...)
@@ -2672,6 +2989,36 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 		"verify":    "Verifying activation",
 	}
 	lines := []string{title, "  Phase: " + phaseLabels[operation.Phase]}
+	if !model.progressDetails && !model.controllerDetails {
+		kind := tuiStatusNeutral
+		label := "● " + phaseLabels[operation.Phase] + " · Running"
+		if operation.State == "completed" {
+			kind = tuiStatusSuccess
+			label = "Preparation completed"
+			if operation.Operation == "controller-apply" {
+				label = "Controller operation completed"
+			}
+		}
+		if operation.State == "failed" {
+			kind = tuiStatusFailure
+			label = phaseLabels[operation.Phase] + " failed"
+		}
+		if kind == tuiStatusNeutral {
+			lines = []string{tuiTitle(label, model.isDark)}
+		} else {
+			lines = []string{tuiStatus(label, kind, model.isDark)}
+		}
+		if operation.Total > 0 {
+			lines = append(lines, fmt.Sprintf("%d/%d steps complete", operation.Current, operation.Total))
+		}
+		if len(operation.Recent) > 0 {
+			lines = append(lines, tuiMuted(operation.Recent[len(operation.Recent)-1], model.isDark))
+		}
+		if model.pxePreparing || model.controllerApplying {
+			lines = append(lines, "", "l progress details   F1 help")
+		}
+		return lines
+	}
 	if operation.Total > 0 {
 		barWidth := model.width - 8
 		if barWidth < 24 {
@@ -2680,7 +3027,7 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 		if barWidth > 64 {
 			barWidth = 64
 		}
-		bar := progress.New(progress.WithDefaultBlend(), progress.WithWidth(barWidth))
+		bar := tuiProgress(barWidth, model.isDark)
 		percentage := float64(operation.Current) / float64(operation.Total)
 		lines = append(lines,
 			fmt.Sprintf("  %d/%d", operation.Current, operation.Total),

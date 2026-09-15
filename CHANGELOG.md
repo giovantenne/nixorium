@@ -8,6 +8,17 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Reorganized the TUI around first installation and explicit later
+  interventions instead of a fleet-health Overview. Restore distinguishes
+  reapply from disk-erasing reinstall, setup groups technical checks into five
+  operator stages, and Update Nixorium selects only releases fetched through
+  the typed application service. Searchable Computers remains an explicit
+  advanced check. Added contextual help,
+  diagnostics, compact setup/progress, symbol-and-text status, adaptive list
+  layouts, and persistent confirmation controls in long reviews. Existing
+  application operations, CLI contracts and exact safety confirmations remain
+  shared. Software and shutdown limitations are explicitly documented in-app.
+
 - Added one background-aware official Bubbles spinner to every dashboard wait
   state, so host checks, Git/service loading, settings validation, update
   planning, and other operations without meaningful percentages visibly remain
