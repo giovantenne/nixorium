@@ -15,12 +15,24 @@ Implement the application in Go. Use Bubble Tea for the terminal presentation
 layer only. Domain, application, and adapter packages must not import Bubble
 Tea, allowing both CLI/JSON and TUI frontends to use the same operations.
 
+Keep Bubble Tea, the official Bubbles components, and Lip Gloss on aligned
+major versions. The presentation layer may compose Bubbles for input,
+selection, progress, viewport, and help behavior, and Lip Gloss for visual
+hierarchy. Critical state and actions must remain explicit in text without
+depending on color or Unicode.
+
 ## Consequences
 
 Go provides straightforward cross-package tests and Nix packaging. Module
 dependencies must be pinned and vendored or otherwise built reproducibly by
 Nix. Bubble Tea adds terminal behavior that needs integration testing, but it
 does not become an operational dependency of the backend.
+
+The v2 presentation requests the terminal background color and selects
+light/dark styles explicitly. Shared Bubbles help/key components adapt to the
+available width; future list, input, progress, spinner, table, and viewport
+usage must reuse this presentation-only foundation rather than introducing
+backend dependencies or parsing rendered output.
 
 The first operational TUI screen implements this boundary with injected typed
 callbacks for PXE preparation and lifecycle operations. Unit tests drive its

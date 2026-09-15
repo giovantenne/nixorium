@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -45,11 +45,13 @@ type settingsWizardModel struct {
 	accepted  bool
 	cancelled bool
 	replace   bool
+	width     int
+	isDark    bool
 }
 
 func RunSettingsWizard(settings domain.LabSettingsFile) (domain.LabSettingsFile, bool, error) {
 	model := newSettingsWizardModel(settings)
-	final, err := tea.NewProgram(model, tea.WithAltScreen()).Run()
+	final, err := tea.NewProgram(model).Run()
 	if err != nil {
 		return settings, false, err
 	}
@@ -68,10 +70,18 @@ func newSettingsWizardModel(settings domain.LabSettingsFile) settingsWizardModel
 	return settingsWizardModel{settings: settings, drafts: drafts, replace: true}
 }
 
-func (settingsWizardModel) Init() tea.Cmd { return nil }
+func (settingsWizardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (model settingsWizardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
-	key, ok := message.(tea.KeyMsg)
+	if size, ok := message.(tea.WindowSizeMsg); ok {
+		model.width = size.Width
+		return model, nil
+	}
+	if background, ok := message.(tea.BackgroundColorMsg); ok {
+		model.isDark = background.IsDark()
+		return model, nil
+	}
+	key, ok := message.(tea.KeyPressMsg)
 	if !ok {
 		return model, nil
 	}
@@ -115,22 +125,22 @@ func (model settingsWizardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.err = ""
 		model.replace = false
 	default:
-		if key.Type == tea.KeyRunes {
+		if key.Text != "" {
 			if model.replace {
 				model.drafts[model.index] = ""
 				model.replace = false
 			}
-			model.drafts[model.index] += string(key.Runes)
+			model.drafts[model.index] += key.Text
 			model.err = ""
 		}
 	}
 	return model, nil
 }
 
-func (model settingsWizardModel) View() string {
+func (model settingsWizardModel) View() tea.View {
 	field := settingsFields[model.index]
 	lines := []string{
-		"Nixorium first-run configuration",
+		tuiTitle("Nixorium first-run configuration", model.isDark),
 		"",
 		fmt.Sprintf("Field %d of %d", model.index+1, len(settingsFields)),
 		field.label,
@@ -138,10 +148,16 @@ func (model settingsWizardModel) View() string {
 		"> " + model.drafts[model.index] + "█",
 	}
 	if model.err != "" {
-		lines = append(lines, "", "Invalid: "+model.err)
+		lines = append(lines, "", tuiError("Invalid: "+model.err, model.isDark))
 	}
-	lines = append(lines, "", "Enter: continue   Shift+Tab/Up: back   Esc: cancel")
-	return strings.Join(lines, "\n") + "\n"
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
+		tuiHelpBinding([]string{"shift+tab", "up"}, "shift+tab/up", "back"),
+		tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
+	))
+	view := tea.NewView(strings.Join(lines, "\n") + "\n")
+	view.AltScreen = true
+	return view
 }
 
 type configReviewModel struct {
@@ -149,10 +165,12 @@ type configReviewModel struct {
 	git       domain.GitState
 	accepted  bool
 	cancelled bool
+	width     int
+	isDark    bool
 }
 
 func RunConfigReview(plan domain.ConfigPlanReport, git domain.GitState) (bool, error) {
-	final, err := tea.NewProgram(configReviewModel{plan: plan, git: git}, tea.WithAltScreen()).Run()
+	final, err := tea.NewProgram(configReviewModel{plan: plan, git: git}).Run()
 	if err != nil {
 		return false, err
 	}
@@ -163,10 +181,18 @@ func RunConfigReview(plan domain.ConfigPlanReport, git domain.GitState) (bool, e
 	return result.accepted && !result.cancelled, nil
 }
 
-func (configReviewModel) Init() tea.Cmd { return nil }
+func (configReviewModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (model configReviewModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
-	if key, ok := message.(tea.KeyMsg); ok {
+	if size, ok := message.(tea.WindowSizeMsg); ok {
+		model.width = size.Width
+		return model, nil
+	}
+	if background, ok := message.(tea.BackgroundColorMsg); ok {
+		model.isDark = background.IsDark()
+		return model, nil
+	}
+	if key, ok := message.(tea.KeyPressMsg); ok {
 		switch strings.ToLower(key.String()) {
 		case "y":
 			model.accepted = true
@@ -179,8 +205,8 @@ func (model configReviewModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
-func (model configReviewModel) View() string {
-	lines := []string{"Review configuration", ""}
+func (model configReviewModel) View() tea.View {
+	lines := []string{tuiTitle("Review configuration", model.isDark), ""}
 	if len(model.plan.Changes) == 0 {
 		lines = append(lines, "No managed settings will change.")
 	}
@@ -197,8 +223,13 @@ func (model configReviewModel) View() string {
 			lines = append(lines, "Warning: other existing worktree changes will not be touched:", "  "+strings.Join(unexpected, "\n  "), "")
 		}
 	}
-	lines = append(lines, "Apply only these managed settings? [y/N]")
-	return strings.Join(lines, "\n") + "\n"
+	lines = append(lines, "Apply only these managed settings?", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"y"}, "y", "apply"),
+		tuiHelpBinding([]string{"n", "esc"}, "n/esc", "cancel"),
+	))
+	view := tea.NewView(strings.Join(lines, "\n") + "\n")
+	view.AltScreen = true
+	return view
 }
 
 func classifyExistingChanges(paths []string) (generated, unexpected []string) {

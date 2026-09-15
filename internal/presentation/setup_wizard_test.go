@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -25,12 +25,12 @@ func wizardSettings() domain.LabSettingsFile {
 
 func TestSettingsWizardPreservesValuesWhenNavigatingBack(t *testing.T) {
 	model := newSettingsWizardModel(wizardSettings())
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(settingsWizardModel)
 	model.drafts[1] = "10.1.0.0"
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(settingsWizardModel)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	model = updated.(settingsWizardModel)
 	if model.index != 1 || model.drafts[1] != "10.1.0.0" || model.settings.Lab.NetworkBase != "10.1.0.0" {
 		t.Fatalf("wizard lost state: %+v", model)
@@ -40,7 +40,7 @@ func TestSettingsWizardPreservesValuesWhenNavigatingBack(t *testing.T) {
 func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
 	model := newSettingsWizardModel(wizardSettings())
 	for range settingsFields {
-		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model = updated.(settingsWizardModel)
 	}
 	if !model.accepted || model.cancelled {
@@ -54,7 +54,7 @@ func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
 func TestConfigReviewNeverRendersPasswordHash(t *testing.T) {
 	plan := domain.ConfigPlanReport{Changes: []domain.SettingChange{{Field: "lab.adminPassword", Before: "configured", After: "updated", Sensitive: true}}}
 	view := (configReviewModel{plan: plan, git: domain.GitState{Dirty: true, Changes: 2, Paths: []string{"keys/admin-ssh.pub", "modules/local.nix"}}}).View()
-	if strings.Contains(view, "$6$") || !strings.Contains(view, "Setup-generated") || !strings.Contains(view, "other existing") {
-		t.Fatalf("unsafe or incomplete review:\n%s", view)
+	if strings.Contains(view.Content, "$6$") || !strings.Contains(view.Content, "Setup-generated") || !strings.Contains(view.Content, "other existing") {
+		t.Fatalf("unsafe or incomplete review:\n%s", view.Content)
 	}
 }

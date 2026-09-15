@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -46,42 +46,42 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if !strings.Contains(model.View(), "Computers            2 configured") || !strings.Contains(model.View(), "View computers") {
-		t.Fatalf("home omits computer summary:\n%s", model.View())
+	if !strings.Contains(model.View().Content, "Computers            2 configured") || !strings.Contains(model.View().Content, "View computers") {
+		t.Fatalf("home omits computer summary:\n%s", model.View().Content)
 	}
 
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "h"})
 	model = updated.(dashboardModel)
-	if command == nil || !strings.Contains(model.View(), "Checking configured computers") {
-		t.Fatalf("opening inventory did not start explicit probe:\n%s", model.View())
+	if command == nil || !strings.Contains(model.View().Content, "Checking configured computers") {
+		t.Fatalf("opening inventory did not start explicit probe:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHosts || !strings.Contains(model.View(), "pc02") || !strings.Contains(model.View(), "unreachable  unknown") || !strings.Contains(model.View(), "1 current, 0 outdated, 1 unknown") || !strings.Contains(model.View(), "2026-09-14 10:30Z") || !strings.Contains(model.View(), "never") {
-		t.Fatalf("computer inventory is incomplete:\n%s", model.View())
+	if model.screen != dashboardHosts || !strings.Contains(model.View().Content, "pc02") || !strings.Contains(model.View().Content, "unreachable  unknown") || !strings.Contains(model.View().Content, "1 current, 0 outdated, 1 unknown") || !strings.Contains(model.View().Content, "2026-09-14 10:30Z") || !strings.Contains(model.View().Content, "never") {
+		t.Fatalf("computer inventory is incomplete:\n%s", model.View().Content)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
-	if command == nil || !strings.Contains(model.View(), "Refreshing computer status") {
-		t.Fatalf("refresh did not enter busy state:\n%s", model.View())
+	if command == nil || !strings.Contains(model.View().Content, "Refreshing computer status") {
+		t.Fatalf("refresh did not enter busy state:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if loads != 2 || model.screen != dashboardHosts || !strings.Contains(model.View(), "SSH available: 2/2") {
-		t.Fatalf("load count = %d, screen = %d:\n%s", loads, model.screen, model.View())
+	if loads != 2 || model.screen != dashboardHosts || !strings.Contains(model.View().Content, "SSH available: 2/2") {
+		t.Fatalf("load count = %d, screen = %d:\n%s", loads, model.screen, model.View().Content)
 	}
 }
 
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
-	view := model.View()
+	view := model.View().Content
 	if !strings.Contains(view, "Installation mode    ready") || !strings.Contains(view, "Install computers over network") {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
-	view = model.View()
+	view = model.View().Content
 	if model.screen != dashboardPXE || !strings.Contains(view, "Prepared artifacts: ready") || !strings.Contains(view, "Start installation mode") {
 		t.Fatalf("PXE screen is incomplete:\n%s", view)
 	}
@@ -123,43 +123,43 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: report, actions: actions}
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "d"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardDeploy || !strings.Contains(model.View(), "[ ] pc01") {
-		t.Fatalf("deployment selection not shown:\n%s", model.View())
+	if model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "[ ] pc01") {
+		t.Fatalf("deployment selection not shown:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
 	model = updated.(dashboardModel)
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != "@lab" || model.screen != dashboardDeployReview || !strings.Contains(model.View(), "Revision: 0123456789abcdef") {
-		t.Fatalf("planned = %q, screen = %d:\n%s", planned, model.screen, model.View())
+	if planned != "@lab" || model.screen != dashboardDeployReview || !strings.Contains(model.View().Content, "Revision: 0123456789abcdef") {
+		t.Fatalf("planned = %q, screen = %d:\n%s", planned, model.screen, model.View().Content)
 	}
 
-	for _, key := range []tea.KeyMsg{
-		{Type: tea.KeyRunes, Runes: []rune("DEPLOY")},
-		{Type: tea.KeySpace},
-		{Type: tea.KeyRunes, Runes: []rune("@lab")},
+	for _, key := range []tea.KeyPressMsg{
+		{Text: "DEPLOY"},
+		{Code: tea.KeySpace},
+		{Text: "@lab"},
 	} {
 		updated, _ = model.Update(key)
 		model = updated.(dashboardModel)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || !model.deploying || !strings.Contains(model.View(), "Closing is disabled") {
-		t.Fatalf("confirmed deployment did not enter protected busy state:\n%s", model.View())
+	if command == nil || !model.deploying || !strings.Contains(model.View().Content, "Closing is disabled") {
+		t.Fatalf("confirmed deployment did not enter protected busy state:\n%s", model.View().Content)
 	}
-	updated, quitCommand := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
 	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
 		t.Fatal("dashboard allowed quit while deployment was running")
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View(), "Last result: completed") || !strings.Contains(model.View(), "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View(), "/state/deploy.log") {
-		t.Fatalf("deployment result missing: applied=%d\n%s", applied, model.View())
+	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Last result: completed") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") {
+		t.Fatalf("deployment result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 }
 
@@ -193,29 +193,29 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 		},
 	}
 	model := dashboardModel{actions: actions}
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
 		t.Fatalf("controller plan did not start: %+v", model)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardControllerReview || !strings.Contains(model.View(), revision) || !strings.Contains(model.View(), "REBUILD pc99") {
-		t.Fatalf("controller review missing:\n%s", model.View())
+	if model.screen != dashboardControllerReview || !strings.Contains(model.View().Content, revision) || !strings.Contains(model.View().Content, "REBUILD pc99") {
+		t.Fatalf("controller review missing:\n%s", model.View().Content)
 	}
 	for _, character := range "REBUILD pc99" {
-		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{character}})
+		updated, _ = model.Update(tea.KeyPressMsg{Code: character, Text: string(character)})
 		model = updated.(dashboardModel)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
 		t.Fatalf("controller apply did not start: %+v", model)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.screen != dashboardController || !strings.Contains(model.View(), "Applied: true   Verified: true") {
-		t.Fatalf("controller result missing: applied=%d\n%s", applied, model.View())
+	if applied != 1 || model.screen != dashboardController || !strings.Contains(model.View().Content, "Applied: true   Verified: true") {
+		t.Fatalf("controller result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 }
 
@@ -256,63 +256,63 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if !strings.Contains(model.View(), "Update Nixorium") {
-		t.Fatalf("home omits update task:\n%s", model.View())
+	if !strings.Contains(model.View().Content, "Update Nixorium") {
+		t.Fatalf("home omits update task:\n%s", model.View().Content)
 	}
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardUpdate || !strings.Contains(model.View(), "Allow prerelease: [ ]") {
-		t.Fatalf("update input missing:\n%s", model.View())
+	if model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Allow prerelease: [ ]") {
+		t.Fatalf("update input missing:\n%s", model.View().Content)
 	}
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command != nil || !strings.Contains(model.View(), "explicit release tag") {
-		t.Fatalf("empty update target was planned:\n%s", model.View())
+	if command != nil || !strings.Contains(model.View().Content, "explicit release tag") {
+		t.Fatalf("empty update target was planned:\n%s", model.View().Content)
 	}
-	for _, key := range []tea.KeyMsg{{Type: tea.KeyF2}, {Type: tea.KeyF3}, {Type: tea.KeyRunes, Runes: []rune(target)}} {
+	for _, key := range []tea.KeyPressMsg{{Code: tea.KeyF2}, {Code: tea.KeyF3}, {Text: target}} {
 		updated, _ = model.Update(key)
 		model = updated.(dashboardModel)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
 		t.Fatalf("update plan did not start: %+v", model)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View(), "Validated release review") || !strings.Contains(model.View(), "candidate controller built") || !strings.Contains(model.View(), confirmation) || !strings.Contains(model.View(), "No commit, push, activation") {
-		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View())
+	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release review") || !strings.Contains(model.View().Content, "candidate controller built") || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No commit, push, activation") {
+		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View().Content)
 	}
 	updated, _ = model.Update(tea.WindowSizeMsg{Height: 24})
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
 	model = updated.(dashboardModel)
 	if model.updateScroll == 0 {
 		t.Fatal("update diff did not scroll")
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("wrong")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "wrong"})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command != nil || applied != 0 || !strings.Contains(model.View(), "did not match") {
+	if command != nil || applied != 0 || !strings.Contains(model.View().Content, "did not match") {
 		t.Fatalf("inexact update confirmation applied: %d", applied)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(confirmation)})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: confirmation})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || !model.updating || !strings.Contains(model.View(), "Wait for the atomic two-file result") {
-		t.Fatalf("update apply did not enter protected busy state:\n%s", model.View())
+	if command == nil || !model.updating || !strings.Contains(model.View().Content, "Wait for the atomic two-file result") {
+		t.Fatalf("update apply did not enter protected busy state:\n%s", model.View().Content)
 	}
-	updated, quitCommand := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
 	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
 		t.Fatal("dashboard allowed quit while update apply was running")
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View(), "Last result: completed; files updated=true") || !strings.Contains(model.View(), "review and commit") {
-		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View())
+	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Last result: completed; files updated=true") || !strings.Contains(model.View().Content, "review and commit") {
+		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 }
 
@@ -337,35 +337,35 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "s"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServices || !strings.Contains(model.View(), "Binary cache — healthy") || !strings.Contains(model.View(), "Managed through the Install computers workflow") {
-		t.Fatalf("services screen missing:\n%s", model.View())
+	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "Binary cache — healthy") || !strings.Contains(model.View().Content, "Managed through the Install computers workflow") {
+		t.Fatalf("services screen missing:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View(), "RESTART CACHE") {
-		t.Fatalf("restart review missing:\n%s", model.View())
+	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View().Content, "RESTART CACHE") {
+		t.Fatalf("restart review missing:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("restart cache")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "restart cache"})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command != nil || restarts != 0 || !strings.Contains(model.View(), "did not match") {
+	if command != nil || restarts != 0 || !strings.Contains(model.View().Content, "did not match") {
 		t.Fatalf("inexact restart was accepted: restarts=%d", restarts)
 	}
-	for _, key := range []tea.KeyMsg{{Type: tea.KeyRunes, Runes: []rune("RESTART")}, {Type: tea.KeySpace}, {Type: tea.KeyRunes, Runes: []rune("CACHE")}} {
+	for _, key := range []tea.KeyPressMsg{{Text: "RESTART"}, {Code: tea.KeySpace}, {Text: "CACHE"}} {
 		updated, _ = model.Update(key)
 		model = updated.(dashboardModel)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View(), "verified=true") || !strings.Contains(model.View(), "cache healthy") {
-		t.Fatalf("verified restart result missing: restarts=%d\n%s", restarts, model.View())
+	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View().Content, "verified=true") || !strings.Contains(model.View().Content, "cache healthy") {
+		t.Fatalf("verified restart result missing: restarts=%d\n%s", restarts, model.View().Content)
 	}
 }
 
@@ -393,24 +393,24 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
 	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
 	model = updated.(dashboardModel)
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "l"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardLogs || !strings.Contains(model.View(), "Recent actions") || !strings.Contains(model.View(), "pxe-start") || !strings.Contains(model.View(), id) || !strings.Contains(model.View(), "partial") {
-		t.Fatalf("operation log list missing:\n%s", model.View())
+	if model.screen != dashboardLogs || !strings.Contains(model.View().Content, "Recent actions") || !strings.Contains(model.View().Content, "pxe-start") || !strings.Contains(model.View().Content, id) || !strings.Contains(model.View().Content, "partial") {
+		t.Fatalf("operation log list missing:\n%s", model.View().Content)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if loaded != id || model.screen != dashboardLogDetail || !strings.Contains(model.View(), "earlier bytes omitted") || !strings.Contains(model.View(), "line-20") || strings.Contains(model.View(), "line-01") {
-		t.Fatalf("bounded tail detail missing: loaded=%q\n%s", loaded, model.View())
+	if loaded != id || model.screen != dashboardLogDetail || !strings.Contains(model.View().Content, "earlier bytes omitted") || !strings.Contains(model.View().Content, "line-20") || strings.Contains(model.View().Content, "line-01") {
+		t.Fatalf("bounded tail detail missing: loaded=%q\n%s", loaded, model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyHome})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyHome})
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View(), "line-01") {
-		t.Fatalf("log detail did not scroll to the beginning:\n%s", model.View())
+	if !strings.Contains(model.View().Content, "line-01") {
+		t.Fatalf("log detail did not scroll to the beginning:\n%s", model.View().Content)
 	}
 }
 
@@ -434,22 +434,22 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
 	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 12})
 	model = updated.(dashboardModel)
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
 		t.Fatalf("Git review did not load: %+v", model)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if loads != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View(), "Git change review") || !strings.Contains(model.View(), "lab-settings.json") {
-		t.Fatalf("Git review missing: loads=%d\n%s", loads, model.View())
+	if loads != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Git change review") || !strings.Contains(model.View().Content, "lab-settings.json") {
+		t.Fatalf("Git review missing: loads=%d\n%s", loads, model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View(), "line-07") || strings.Contains(model.View(), "lab-settings.json") {
-		t.Fatalf("Git review did not scroll:\n%s", model.View())
+	if !strings.Contains(model.View().Content, "line-07") || strings.Contains(model.View().Content, "lab-settings.json") {
+		t.Fatalf("Git review did not scroll:\n%s", model.View().Content)
 	}
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "f"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -489,39 +489,39 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardGitCommitSelect || !strings.Contains(model.View(), "Select Git commit paths") {
-		t.Fatalf("commit selection missing:\n%s", model.View())
+	if model.screen != dashboardGitCommitSelect || !strings.Contains(model.View().Content, "Select Git commit paths") {
+		t.Fatalf("commit selection missing:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardGitCommitReview || !strings.Contains(model.View(), confirmation) || !strings.Contains(model.View(), "No hooks, signing actions, remote operations, or push") {
-		t.Fatalf("commit review missing:\n%s", model.View())
+	if model.screen != dashboardGitCommitReview || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No hooks, signing actions, remote operations, or push") {
+		t.Fatalf("commit review missing:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("COMMIT")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "COMMIT"})
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(strings.Repeat("b", 12))})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: strings.Repeat("b", 12)})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
 		t.Fatalf("commit apply did not start: %+v", model)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View(), "Last commit: completed; committed=true") || !strings.Contains(model.View(), "no remote push was attempted") {
-		t.Fatalf("commit result missing: applied=%d\n%s", applied, model.View())
+	if applied != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Last commit: completed; committed=true") || !strings.Contains(model.View().Content, "no remote push was attempted") {
+		t.Fatalf("commit result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 }
 
@@ -542,19 +542,19 @@ func TestDashboardDeploymentRejectsEmptySelectionAndBlockedPlan(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: report, actions: actions, screen: dashboardDeploy, deployChosen: map[string]bool{}}
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command != nil || !strings.Contains(model.View(), "Select at least one") {
-		t.Fatalf("empty selection was planned:\n%s", model.View())
+	if command != nil || !strings.Contains(model.View().Content, "Select at least one") {
+		t.Fatalf("empty selection was planned:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeySpace})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardDeploy || !strings.Contains(model.View(), "git: worktree is dirty") {
-		t.Fatalf("blocked plan was not surfaced:\n%s", model.View())
+	if model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "git: worktree is dirty") {
+		t.Fatalf("blocked plan was not surfaced:\n%s", model.View().Content)
 	}
 }
 
@@ -588,39 +588,39 @@ func TestDashboardPXEStartRequiresExactTypedConfirmation(t *testing.T) {
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions, screen: dashboardPXE}
 
-	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "s"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardPXEStartReview || !strings.Contains(model.View(), "Temporarily remove 10.0.0.99/24") {
-		t.Fatalf("start review not shown:\n%s", model.View())
+	if model.screen != dashboardPXEStartReview || !strings.Contains(model.View().Content, "Temporarily remove 10.0.0.99/24") {
+		t.Fatalf("start review not shown:\n%s", model.View().Content)
 	}
 
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("start pxe")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "start pxe"})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command != nil || starts != 0 || !strings.Contains(model.View(), "did not match") {
+	if command != nil || starts != 0 || !strings.Contains(model.View().Content, "did not match") {
 		t.Fatalf("inexact confirmation started PXE: starts=%d", starts)
 	}
 
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("START PXE")})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "START PXE"})
 	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if starts != 1 || model.report.PXE.Mode != "active" || !strings.Contains(model.View(), "PXE active") {
-		t.Fatalf("confirmed start did not refresh state: starts=%d view=%s", starts, model.View())
+	if starts != 1 || model.report.PXE.Mode != "active" || !strings.Contains(model.View().Content, "PXE active") {
+		t.Fatalf("confirmed start did not refresh state: starts=%d view=%s", starts, model.View().Content)
 	}
 }
 
 func TestDashboardPXEConfirmationAcceptsTerminalSpaceEvent(t *testing.T) {
 	model := dashboardModel{screen: dashboardPXEStartReview}
-	for _, key := range []tea.KeyMsg{
-		{Type: tea.KeyRunes, Runes: []rune("START")},
-		{Type: tea.KeySpace},
-		{Type: tea.KeyRunes, Runes: []rune("PXE")},
+	for _, key := range []tea.KeyPressMsg{
+		{Text: "START"},
+		{Code: tea.KeySpace},
+		{Text: "PXE"},
 	} {
 		updated, _ := model.Update(key)
 		model = updated.(dashboardModel)
@@ -650,13 +650,13 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 	for key, expected := range map[string]string{"p": "prepare", "x": "stop", "r": "recover"} {
 		called = ""
 		model := dashboardModel{report: testDashboardReport("active"), actions: actions, screen: dashboardPXE}
-		updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+		updated, command := model.Update(tea.KeyPressMsg{Text: key})
 		model = updated.(dashboardModel)
 		if command == nil {
 			t.Fatalf("%s did not schedule an operation", key)
 		}
-		if key == "p" && !strings.Contains(model.View(), "journalctl -fu nixorium-prepare-pxe.service") {
-			t.Fatalf("PXE preparation omits detailed live-log guidance:\n%s", model.View())
+		if key == "p" && !strings.Contains(model.View().Content, "journalctl -fu nixorium-prepare-pxe.service") {
+			t.Fatalf("PXE preparation omits detailed live-log guidance:\n%s", model.View().Content)
 		}
 		updated, _ = model.Update(command())
 		if called != expected {
