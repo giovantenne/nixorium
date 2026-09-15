@@ -184,7 +184,7 @@ their current plain-language action, so a remote terminal never looks frozen.
 
 | Task | What it does |
 |---|---|
-| **Restore computers** | Chooses explicitly between reapplying the intended system and a locally confirmed disk-erasing reinstall |
+| **Restore computers** | Chooses explicitly between reapplying the intended system and selecting one evaluated identity for a locally confirmed disk-erasing reinstall |
 | **Distribute the prepared system** | Reviews and applies one, selected, or all client configurations with live phase, elapsed-time, verification, and recent-activity feedback |
 | **Computer inventory** | Explicitly authenticates reachable hosts and compares their active revision with the desired Git revision |
 | **Rebuild controller** | Builds and activates an exact reviewed revision, refreshes status, and offers dashboard, detail, log, or retry actions |

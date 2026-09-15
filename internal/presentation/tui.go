@@ -403,7 +403,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.report = message.report
 		}
 		model.screen = message.screen
-		if message.screen == dashboardPXE && model.setupMode && model.pilotPractical && model.report.PXE.Mode != "active" {
+		if message.screen == dashboardPXE && model.guidedInstallation() && model.pilotPractical && model.report.PXE.Mode != "active" {
 			model.pilotName = ""
 			model.pilotPractical = false
 			model.hosts = domain.HostsReport{}
@@ -442,10 +442,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardPilotHostsMsg:
 		model.busy = ""
 		if message.err != nil {
-			model.message = "The pilot could not be checked: " + message.err.Error()
+			model.message = "The selected computer could not be checked: " + message.err.Error()
 		} else {
 			model.hosts = message.report
-			model.message = "Pilot observation refreshed."
+			model.message = "Selected-computer observation refreshed."
 		}
 		model.screen = dashboardPXE
 		return model, nil
@@ -796,7 +796,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
-	if key.String() == "q" && model.screen == dashboardPXE && model.setupMode && model.report.PXE.Mode == "active" {
+	if key.String() == "q" && model.screen == dashboardPXE && model.guidedInstallation() && model.report.PXE.Mode == "active" {
 		model.screen = dashboardPXELeaveReview
 		model.confirmation = ""
 		model.message = ""
@@ -845,6 +845,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch model.screen {
 	case dashboardHome:
+		// Restoration context never leaks into a later intervention after a
+		// completed result or a detour through logs.
+		model.restoreMode = false
 		model.ensureHomeMenu()
 		action := key.String()
 		if action == "enter" {
@@ -858,6 +861,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			model.screen = dashboardRestore
 			model.restoreCursor = 0
+			model.pilotName = ""
+			model.pilotPractical = false
+			model.pilotVerified = nil
 			model.message = ""
 		case "w":
 			model.screen = dashboardSoftware
@@ -941,16 +947,20 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			model.restoreCursor = min(1, model.restoreCursor+1)
 		case "enter":
-			model.restoreMode = true
 			model.message = ""
 			if model.restoreCursor == 0 {
+				model.restoreMode = true
 				model.screen = dashboardDeploy
 				model.deployResult = domain.DeploymentExecutionReport{}
 				model.deployChosen = map[string]bool{}
 				model.deployCursor = 0
 			} else {
+				model.restoreMode = true
+				model.pilotName = ""
+				model.pilotPractical = false
+				model.pilotVerified = nil
+				model.hosts = domain.HostsReport{}
 				model.screen = dashboardPXE
-				model.message = "Reinstallation erases the disk confirmed locally on each computer."
 			}
 		}
 	case dashboardSetup:
@@ -1738,7 +1748,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
-			if model.setupMode && model.pilotName != "" {
+			if model.guidedInstallation() && model.pilotName != "" {
 				model.pilotName = ""
 				model.pilotPractical = false
 				model.hosts = domain.HostsReport{}
@@ -1759,15 +1769,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model, model.loadSetup()
 			}
 		case "up", "k":
-			if model.setupMode && model.pilotName == "" {
+			if model.guidedInstallation() && model.pilotName == "" {
 				model.pilotCursor = max(0, model.pilotCursor-1)
 			}
 		case "down", "j":
-			if model.setupMode && model.pilotName == "" {
+			if model.guidedInstallation() && model.pilotName == "" {
 				model.pilotCursor = min(max(0, len(model.report.Meta.Clients.Hosts)-1), model.pilotCursor+1)
 			}
 		case "enter":
-			if model.setupMode {
+			if model.guidedInstallation() {
 				if model.pilotName == "" {
 					if len(model.report.Meta.Clients.Hosts) == 0 {
 						model.message = "No client identity is configured. Return to laboratory settings and add one first."
@@ -1795,7 +1805,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "v":
-			if model.setupMode && model.pilotName != "" {
+			if model.guidedInstallation() && model.pilotName != "" {
 				if model.actions.LoadHost == nil {
 					model.message = "Pilot verification is not available in this session."
 					return model, nil
@@ -2994,6 +3004,8 @@ func (model dashboardModel) pxeView() string {
 	title := "Nixorium — Install or reinstall computers"
 	if model.setupMode {
 		title = "Nixorium — First setup / First computer"
+	} else if model.restoreMode {
+		title = "Nixorium — Restore / Reinstall from scratch"
 	}
 	lines := []string{
 		tuiTitle(title, model.isDark),
@@ -3019,15 +3031,19 @@ func (model dashboardModel) pxeView() string {
 	}
 	if model.screen == dashboardPXEStartReview {
 		scope := model.startPlan.Interface + " · controller network"
-		if model.setupMode && model.pilotName != "" {
-			scope += " · pilot " + model.pilotName
+		if model.guidedInstallation() && model.pilotName != "" {
+			role := "pilot "
+			if model.restoreMode {
+				role = "selected computer "
+			}
+			scope += " · " + role + model.pilotName
 		}
 		return model.confirmationView("Start network installation?", scope, "Temporarily remove "+model.startPlan.StaticCIDR+"; remote connections may be interrupted.", "Serve ProxyDHCP, TFTP, HTTP and cache via "+model.startPlan.DHCPAddress+". Institutional DHCP remains authoritative. `nixorium pxe stop` or reboot recovery restores normal addressing.", "", "START PXE")
 	}
 	if model.screen == dashboardPXELeaveReview {
 		return model.confirmationView("Leave installation mode active?", "Controller PXE services and laboratory installation network", "Closing Nixorium will not stop installation mode.", "Configured computers may continue to network-boot into the installer. Run `nixorium pxe stop` later to restore normal controller networking.", "", "LEAVE PXE ACTIVE")
 	}
-	if model.setupMode {
+	if model.guidedInstallation() {
 		lines = append(lines, "")
 		lines = append(lines, model.pilotInstallationView()...)
 		if model.message != "" {
@@ -3046,6 +3062,10 @@ func (model dashboardModel) pxeView() string {
 		lines = append(lines, "", tuiSection("Last action", model.isDark), "  "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) guidedInstallation() bool {
+	return model.setupMode || model.restoreMode
 }
 
 func (model dashboardModel) pilotInstallationView() []string {
@@ -3067,8 +3087,15 @@ func (model dashboardModel) pilotInstallationView() []string {
 		return model.pilotSelectionView()
 	}
 
-	lines := []string{tuiSection("Pilot computer", model.isDark), "  " + model.pilotName}
+	computerLabel := "Pilot computer"
+	if model.restoreMode {
+		computerLabel = "Computer to reinstall"
+	}
+	lines := []string{tuiSection(computerLabel, model.isDark), "  " + model.pilotName}
 	if model.report.PXE.Mode != "active" {
+		if model.restoreMode {
+			lines = append(lines, "", tuiStatus("Reinstallation erases the disk confirmed locally on "+model.pilotName+".", tuiStatusAttention, model.isDark))
+		}
 		lines = append(lines, "")
 		lines = append(lines, model.pxeNextStepView()...)
 		bindings := []key.Binding{}
@@ -3078,7 +3105,7 @@ func (model dashboardModel) pilotInstallationView() []string {
 			bindings = append(bindings, tuiHelpBinding([]string{"s"}, "s", "review and start"))
 		}
 		bindings = append(bindings,
-			tuiHelpBinding([]string{"esc"}, "esc", "change pilot"),
+			tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
 			tuiHelpBinding([]string{"q"}, "q", "quit"),
 		)
 		return append(lines, "", tuiHelp(model.width, model.isDark, bindings...))
@@ -3086,6 +3113,10 @@ func (model dashboardModel) pilotInstallationView() []string {
 
 	host, observed := model.pilotHostStatus()
 	if !observed {
+		checkLabel := "check pilot"
+		if model.restoreMode {
+			checkLabel = "check computer"
+		}
 		lines = append(lines,
 			"",
 			tuiResult("Continue at "+model.pilotName, false, model.isDark),
@@ -3099,9 +3130,9 @@ func (model dashboardModel) pilotInstallationView() []string {
 			"No remote progress is shown because the installer does not provide telemetry.",
 			"",
 			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"v"}, "v", "check pilot"),
+				tuiHelpBinding([]string{"v"}, "v", checkLabel),
 				tuiHelpBinding([]string{"x"}, "x", "stop installation"),
-				tuiHelpBinding([]string{"esc"}, "esc", "change pilot"),
+				tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
 				tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
 			),
 		)
@@ -3118,7 +3149,7 @@ func (model dashboardModel) pilotInstallationView() []string {
 			tuiHelp(model.width, model.isDark,
 				tuiHelpBinding([]string{"v"}, "v", "check again"),
 				tuiHelpBinding([]string{"x"}, "x", "stop installation"),
-				tuiHelpBinding([]string{"esc"}, "esc", "change pilot"),
+				tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
 				tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
 			),
 		)
@@ -3145,14 +3176,18 @@ func (model dashboardModel) pilotInstallationView() []string {
 		return lines
 	}
 
+	nextLabel := "install another"
+	if model.restoreMode {
+		nextLabel = "reinstall another"
+	}
 	lines = append(lines,
 		"",
-		tuiResult(model.pilotName+" verified in this session", true, model.isDark),
-		"The other configured computers may be installed now or later.",
+		tuiResult(model.installationVerifiedTitle(), true, model.isDark),
+		model.installationRemainingGuidance(),
 		"Powered-off computers are not errors.",
 		"",
 		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", "install another"),
+			tuiHelpBinding([]string{"enter"}, "enter", nextLabel),
 			tuiHelpBinding([]string{"x"}, "x", "stop and finish"),
 			tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
 		),
@@ -3164,7 +3199,7 @@ func (model dashboardModel) pilotSelectionView() []string {
 	lines := []string{}
 	if len(model.pilotVerified) > 0 && model.report.PXE.Mode != "active" {
 		lines = append(lines,
-			tuiResult("Installation session complete", true, model.isDark),
+			tuiResult(model.installationSessionTitle(), true, model.isDark),
 			"Verified in this session: "+strings.Join(model.pilotVerified, ", "),
 			fmt.Sprintf("%d configured identities were not verified in this session.", max(0, len(model.report.Meta.Clients.Hosts)-len(model.pilotVerified))),
 			"",
@@ -3178,7 +3213,11 @@ func (model dashboardModel) pilotSelectionView() []string {
 		return lines
 	}
 
-	lines = append(lines, tuiSection("Choose a pilot computer", model.isDark))
+	selectionTitle := "Choose a pilot computer"
+	if model.restoreMode {
+		selectionTitle = "Choose a computer to reinstall"
+	}
+	lines = append(lines, tuiSection(selectionTitle, model.isDark))
 	if len(model.report.Meta.Clients.Hosts) == 0 {
 		return append(lines,
 			"No client identity is configured.",
@@ -3215,6 +3254,34 @@ func (model dashboardModel) pilotSelectionView() []string {
 		),
 	)
 	return lines
+}
+
+func (model dashboardModel) installationVerifiedTitle() string {
+	if model.restoreMode {
+		return model.pilotName + " reinstalled and verified in this session"
+	}
+	return model.pilotName + " verified in this session"
+}
+
+func (model dashboardModel) installationRemainingGuidance() string {
+	if model.restoreMode {
+		return "Other configured computers can remain unchanged or be reinstalled one at a time."
+	}
+	return "The other configured computers may be installed now or later."
+}
+
+func (model dashboardModel) installationSessionTitle() string {
+	if model.restoreMode {
+		return "Reinstallation session complete"
+	}
+	return "Installation session complete"
+}
+
+func (model dashboardModel) installationChangeLabel() string {
+	if model.restoreMode {
+		return "change computer"
+	}
+	return "change pilot"
 }
 
 func (model dashboardModel) pilotHostStatus() (domain.HostStatus, bool) {
