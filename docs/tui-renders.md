@@ -17,7 +17,7 @@ Choose an intervention. Computers are checked only when the selected task needs 
     Reapply the intended system or reinstall from scratch
 
   Add or change software
-    Open the supported workflow and current advanced path
+    Choose supported packages and save a reviewed declaration
 
   Distribute the prepared system
     Update only the computers selected for this intervention
@@ -185,6 +185,90 @@ After selection the screen repeats the identity-specific disk warning before
 PXE review. Once the local reinstall and installed-disk boot are complete, `v`
 checks only that computer. Reapply continues to use the separate reviewed
 deployment flow and never escalates into reinstall.
+
+## Add or change software
+
+The catalog is evaluated from pinned inputs before the screen opens. It does
+not accept arbitrary package names or contact clients:
+
+```text
+Nixorium  /  Add or change software
+
+Supported client software
+Resolved from the laboratory's pinned package set; searching does not update inputs.
+
+› GIMP
+    Edit bitmap images · gimp
+  VLC                  ✓ all clients, including future clients
+    Play audio and video · vlc
+
+Configuration can be prepared while every client is powered off.
+Declared does not mean committed, built, or distributed.
+Private modules remain untouched and are managed through Advanced tools.
+
+↑/↓ select  •  enter scope  •  r remove  •  / search  •  esc back
+```
+
+Selecting a package asks for configuration scope, not which machines happen to
+be powered on for today's distribution:
+
+```text
+Nixorium  /  Add or change software
+
+Add GIMP
+Choose where this declaration applies. This is not the set of computers deployed today.
+
+› All clients, including future clients
+  Group graphics (8 clients)
+  Selected configured computers
+
+Powered-on clients required: none
+Managed file: lab-software.json
+
+↑/↓ move   space select computer   enter review   esc catalog   ? help
+```
+
+The review is explicit about both its effect and everything it does not do:
+
+```text
+Nixorium  /  Add or change software
+
+Add gimp?
+
+Configuration scope  all clients, including future clients
+Affected identities  24
+Managed file         lab-software.json
+Powered-on clients   none required
+
+✓ Proposal validated
+○ Revision not saved
+○ System not prepared
+○ No client changed
+
+Only lab-software.json will be replaced atomically.
+No commit, build, activation, PXE action, or deployment is included.
+
+Type SAVE SOFTWARE abcdef012345 to continue:
+> _
+
+enter save declaration   esc cancel   F1 help
+```
+
+After the exact confirmation, the result promotes Git review instead of
+allowing distribution from an unsaved revision:
+
+```text
+✓ Software declaration saved
+
+✓ lab-software.json updated
+○ Git revision not saved
+○ System not prepared
+○ No client changed
+
+Review and commit the declaration before preparing or distributing systems.
+
+g review Git changes   enter interventions   ? help
+```
 
 ## Computers
 

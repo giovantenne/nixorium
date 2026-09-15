@@ -20,6 +20,7 @@ func TestGitReviewClassifiesChangesAndRedactsSettingsPasswords(t *testing.T) {
 }
 `
 	writeGitReviewFile(t, repository, "lab-settings.json", settings)
+	writeGitReviewFile(t, repository, "lab-software.json", "{\n  \"schemaVersion\": 1,\n  \"packages\": [{\"package\": \"vlc\", \"scope\": {\"kind\": \"all-clients\"}}]\n}\n")
 	writeGitReviewFile(t, repository, "module.nix", "{ ... }: { services.openssh.enable = false; }\n")
 	if _, err := run(context.Background(), "git", "-C", repository, "add", "lab-settings.json"); err != nil {
 		t.Fatal(err)
@@ -30,7 +31,7 @@ func TestGitReviewClassifiesChangesAndRedactsSettingsPasswords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snapshot.Changes) != 3 || len(snapshot.Diffs) != 2 {
+	if len(snapshot.Changes) != 4 || len(snapshot.Diffs) != 2 {
 		t.Fatalf("snapshot = %+v", snapshot)
 	}
 	byPath := map[string]struct {
@@ -45,6 +46,9 @@ func TestGitReviewClassifiesChangesAndRedactsSettingsPasswords(t *testing.T) {
 	}
 	if change := byPath["lab-settings.json"]; change.staged != "modified" || !change.managed {
 		t.Fatalf("settings change = %+v", change)
+	}
+	if change := byPath["lab-software.json"]; change.unstaged != "modified" || !change.managed {
+		t.Fatalf("software change = %+v", change)
 	}
 	if change := byPath["module.nix"]; change.unstaged != "modified" || change.managed {
 		t.Fatalf("module change = %+v", change)
@@ -132,6 +136,7 @@ func newGitReviewRepository(t *testing.T) string {
 		t.Fatal(err)
 	}
 	writeGitReviewFile(t, repository, "lab-settings.json", "{\n  \"schemaVersion\": 1,\n  \"lab\": {\n    \"adminPassword\": \"$6$old$admin\",\n    \"teacherPassword\": \"$6$old$teacher\",\n    \"studentPassword\": \"$6$old$student\"\n  }\n}\n")
+	writeGitReviewFile(t, repository, "lab-software.json", "{\n  \"schemaVersion\": 1,\n  \"packages\": []\n}\n")
 	writeGitReviewFile(t, repository, "module.nix", "{ ... }: { services.openssh.enable = true; }\n")
 	writeGitReviewFile(t, repository, ".gitignore", "secret-key\nadmin-ssh\nveyon-private-key.pem\n")
 	if _, err := run(context.Background(), "git", "-C", repository, "add", "."); err != nil {

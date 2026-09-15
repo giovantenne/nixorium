@@ -28,6 +28,8 @@ type options struct {
 	logID           string
 	paths           string
 	target          string
+	softwarePackage string
+	softwareScope   string
 	json            bool
 	full            bool
 	help            bool
@@ -36,6 +38,7 @@ type options struct {
 	yes             bool
 	allowPrerelease bool
 	allowDowngrade  bool
+	remove          bool
 }
 
 func main() {
@@ -214,6 +217,75 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 		} else {
 			return runUpdateApply(ctx, manager, repository, stdout, stderr, options.target, options.expect, options.allowPrerelease, options.allowDowngrade, options.yes, options.json)
+		}
+	case "software":
+		manager := app.NewSoftwareManager(local)
+		if options.subcommand == "catalog" {
+			report := manager.Catalog(ctx, repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.SoftwareCatalogText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		} else {
+			scope, scopeErr := parseSoftwareScope(options.softwareScope)
+			if scopeErr != nil {
+				fmt.Fprintln(stderr, "Error:", scopeErr)
+				return 2
+			}
+			request := domain.SoftwareChangeRequest{Package: options.softwarePackage, Present: !options.remove, Scope: scope}
+			if options.subcommand == "plan" {
+				report := manager.Plan(ctx, repository, request)
+				if options.json {
+					err = presentation.JSON(stdout, report)
+				} else {
+					presentation.SoftwareChangePlanText(stdout, report)
+				}
+				if report.HasErrors() {
+					return 1
+				}
+			} else {
+				plan := manager.Plan(ctx, repository, request)
+				if plan.HasErrors() {
+					if options.json {
+						err = presentation.JSON(stdout, plan)
+					} else {
+						presentation.SoftwareChangePlanText(stderr, plan)
+					}
+					return 1
+				}
+				if !options.yes {
+					if !presentation.IsInteractive(os.Stdin) {
+						fmt.Fprintln(stderr, "Error: software apply requires an interactive terminal or explicit --yes")
+						return 2
+					}
+					confirmationOutput := stdout
+					if options.json {
+						confirmationOutput = stderr
+					}
+					approved, confirmErr := presentation.ConfirmSoftwareChange(os.Stdin, confirmationOutput, plan)
+					if confirmErr != nil {
+						fmt.Fprintln(stderr, "Error: read confirmation:", confirmErr)
+						return 1
+					}
+					if !approved {
+						fmt.Fprintln(confirmationOutput, "Software change cancelled; lab-software.json was not changed.")
+						return 0
+					}
+				}
+				report := manager.ApplyPlan(ctx, plan, options.expect)
+				if options.json {
+					err = presentation.JSON(stdout, report)
+				} else {
+					presentation.SoftwareChangeApplyText(stdout, report)
+				}
+				if report.HasErrors() {
+					return 1
+				}
+			}
 		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
@@ -416,6 +488,7 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 	gitCommitManager := app.NewGitCommitManager(local)
 	updateManager := app.NewUpdateManager(local)
 	settingsManager := app.NewSettingsManager(local)
+	softwareManager := app.NewSoftwareManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	setup := setupManager.Status(ctx, repository)
 	actions := presentation.DashboardActions{
@@ -442,6 +515,13 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 		},
 		ConfirmInstallationTarget: func(name string) domain.InstallationSessionReport {
 			return installationManager.ConfirmPractical(ctx, repository, name)
+		},
+		LoadSoftware: func() domain.SoftwareCatalogReport { return softwareManager.Catalog(ctx, repository) },
+		PlanSoftware: func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+			return softwareManager.Plan(ctx, repository, request)
+		},
+		ApplySoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
+			return softwareManager.ApplyPlan(ctx, plan, plan.ReviewToken)
 		},
 		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
 			return deploymentManager.Plan(ctx, repository, requested)
@@ -636,6 +716,20 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--target requires a release tag")
 			}
 			result.target = arguments[index]
+		case "--package":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--package requires a catalog identifier")
+			}
+			result.softwarePackage = arguments[index]
+		case "--scope":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--scope requires all-clients, group:NAME, or clients:pcNN,...")
+			}
+			result.softwareScope = arguments[index]
+		case "--remove":
+			result.remove = true
 		case "--allow-prerelease":
 			result.allowPrerelease = true
 		case "--allow-downgrade":
@@ -659,7 +753,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update", "software":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -674,13 +768,18 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("check must follow update")
 			}
 			result.subcommand = "check"
+		case "catalog":
+			if result.command != "software" || result.subcommand != "" {
+				return options{}, errors.New("catalog must follow software")
+			}
+			result.subcommand = "catalog"
 		case "plan":
 			if result.command == "git" && result.subcommand == "commit" {
 				result.subcommand = "commit-plan"
 				continue
 			}
-			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update") || result.subcommand != "" {
-				return options{}, errors.New("plan must follow config, deploy, controller, update, or git commit")
+			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "software") || result.subcommand != "" {
+				return options{}, errors.New("plan must follow config, deploy, controller, update, software, or git commit")
 			}
 			result.subcommand = "plan"
 		case "keys":
@@ -703,12 +802,12 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "commit-apply"
 				continue
 			}
-			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update") && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
 			if result.command != "setup" || result.subcommand != "" {
-				return options{}, errors.New("apply must follow config, deploy, controller, update, or setup")
+				return options{}, errors.New("apply must follow config, deploy, controller, update, software, or setup")
 			}
 			result.subcommand = "apply"
 		case "restart":
@@ -760,8 +859,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, services restart, or git commit apply")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -772,8 +871,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, or git commit apply")
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, or git commit apply")
 	}
 	if result.on != "" && (result.command != "deploy" || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--on is only valid with deploy plan or deploy apply")
@@ -795,6 +894,23 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "update" && (result.subcommand == "plan" || result.subcommand == "apply") && result.target == "" {
 		return options{}, fmt.Errorf("update %s requires --target", result.subcommand)
+	}
+	if result.command == "software" && result.subcommand != "catalog" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("software requires catalog, plan, or apply")
+	}
+	if result.command == "software" && (result.subcommand == "plan" || result.subcommand == "apply") && (result.softwarePackage == "" || result.softwareScope == "") {
+		return options{}, fmt.Errorf("software %s requires --package and --scope", result.subcommand)
+	}
+	if result.command == "software" && (result.subcommand == "plan" || result.subcommand == "apply") {
+		if _, err := parseSoftwareScope(result.softwareScope); err != nil {
+			return options{}, err
+		}
+	}
+	if (result.softwarePackage != "" || result.softwareScope != "" || result.remove) && (result.command != "software" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("software change flags are only valid with software plan or apply")
+	}
+	if result.command == "software" && result.subcommand == "apply" && result.expect == "" {
+		return options{}, errors.New("software apply requires --expect from software plan")
 	}
 	if result.command == "services" && result.subcommand != "" && result.subcommand != "restart" {
 		return options{}, errors.New("services accepts only the restart subcommand")
@@ -912,7 +1028,10 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software plan|software apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "       software catalog")
+	fmt.Fprintln(writer, "       software plan --package <id> --scope <all-clients|group:NAME|clients:pcNN,...> [--remove]")
+	fmt.Fprintln(writer, "       software apply --package <id> --scope <scope> [--remove] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")
@@ -930,6 +1049,23 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
+}
+
+func parseSoftwareScope(value string) (domain.SoftwareScope, error) {
+	var scope domain.SoftwareScope
+	if value == domain.SoftwareScopeAllClients {
+		scope = domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}
+	} else if group, found := strings.CutPrefix(value, "group:"); found && group != "" {
+		scope = domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: group}
+	} else if clients, found := strings.CutPrefix(value, "clients:"); found && clients != "" {
+		scope = domain.SoftwareScope{Kind: domain.SoftwareScopeClients, Clients: strings.Split(clients, ",")}
+	} else {
+		return domain.SoftwareScope{}, errors.New("software scope must be all-clients, group:NAME, or clients:pcNN,...")
+	}
+	if err := domain.ValidateSoftwareScope(scope); err != nil {
+		return domain.SoftwareScope{}, fmt.Errorf("invalid software scope: %w", err)
+	}
+	return scope, nil
 }
 
 func runDeploymentApply(ctx context.Context, repository string, stdout, stderr io.Writer, requested, expectedRevision string, assumeYes, jsonOutput bool) int {

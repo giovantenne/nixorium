@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added guided client-software management through a strict versioned
+  `lab-software.json` file. The TUI and CLI share catalog/plan/apply services,
+  accept only curated packages resolved from the pinned package set, support
+  all-client, evaluated-group, and explicit-client configuration scopes, and
+  require a content-bound review phrase before an atomic file replacement.
+  Saving a declaration never commits, builds, activates, starts PXE, or deploys
+  a client; Git review and distribution remain explicit later operations.
 - Reorganized the TUI around first installation and explicit later
   interventions instead of a fleet-health Overview. Restore distinguishes
   reapply from disk-erasing reinstall, setup groups technical checks into five
@@ -17,7 +24,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   diagnostics, compact setup/progress, symbol-and-text status, adaptive list
   layouts, and persistent confirmation controls in long reviews. Existing
   application operations, CLI contracts and exact safety confirmations remain
-  shared. Software and shutdown limitations are explicitly documented in-app.
+  shared. The shutdown limitation is explicitly documented in-app.
 - Completed the guided pilot-computer handoff in first setup. The operator now
   selects an immutable configured identity, receives local identity/disk steps,
   checks authenticated active-revision evidence separately from the practical

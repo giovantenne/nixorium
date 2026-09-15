@@ -13,6 +13,7 @@ type fakeGitCommitSource struct {
 	review   domain.GitReviewSnapshot
 	proposal domain.GitCommitProposal
 	settings []byte
+	software []byte
 	commits  int
 }
 
@@ -31,6 +32,24 @@ func (source *fakeGitCommitSource) CommitGitPaths(context.Context, string, []str
 	return source.revision, nil
 }
 func (source *fakeGitCommitSource) ReadSettings(string) ([]byte, error) { return source.settings, nil }
+func (source *fakeGitCommitSource) ReadSoftware(string) ([]byte, error) { return source.software, nil }
+
+func TestGitCommitPlanAcceptsValidatedManagedSoftware(t *testing.T) {
+	software, err := domain.MarshalLabSoftware(domain.LabSoftwareFile{SchemaVersion: domain.SoftwareSchemaVersion, Packages: []domain.SoftwareDeclaration{{Package: "vlc", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := &fakeGitCommitSource{
+		revision: strings.Repeat("a", 40),
+		review:   domain.GitReviewSnapshot{Changes: []domain.GitChange{{Path: "lab-software.json", Unstaged: "modified", Managed: true}}},
+		proposal: domain.GitCommitProposal{TreeID: strings.Repeat("c", 40), Diff: domain.GitDiff{Scope: "proposed-commit", Content: "+vlc\n"}},
+		software: software,
+	}
+	plan := NewGitCommitManager(source).Plan(context.Background(), ".", "lab-software.json")
+	if plan.HasErrors() || plan.CommitMessage != "chore: update laboratory software" {
+		t.Fatalf("software commit plan = %+v", plan)
+	}
+}
 
 func TestGitCommitPlanAndApplyUseExactReviewToken(t *testing.T) {
 	source := &fakeGitCommitSource{

@@ -8,6 +8,8 @@
   controllerModules ? [],
   clientModules ? [],
   hostModules ? {},
+  labSoftware ? { schemaVersion = 1; packages = []; },
+  clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
   nixosVersionMetadata ? null,
@@ -195,7 +197,7 @@ let
     baseHostModules
     ++ sharedModules
     ++ lib.optionals isController controllerModules
-    ++ lib.optionals (!isController) clientModules
+    ++ lib.optionals (!isController) ([ managedSoftwareModule ] ++ clientModules)
     ++ (hostModules.${name} or []);
 
   specialArgsForHost = name: hostIp: {
@@ -221,6 +223,7 @@ let
         name = "pc${padNumber n}";
         ip = mkHostIp n;
       }) clientNumbers;
+      groups = clientGroups;
     };
     network = {
       base = networkBase;
@@ -260,6 +263,7 @@ let
     (name: modules: "    ${builtins.toJSON name} = ${renderPathList modules};")
     hostModules)}\n  }";
   labConfigJson = builtins.toFile "lab-config.json" (builtins.toJSON config);
+  labSoftwareJson = builtins.toFile "lab-software.json" (builtins.toJSON labSoftwareConfig);
   extensionModules = sharedModules
     ++ controllerModules
     ++ clientModules
@@ -268,7 +272,8 @@ let
   isModulePath = module: builtins.isPath module || builtins.isString module;
   unknownPublicKeyNames = builtins.attrNames (builtins.removeAttrs publicKeys [ "cache" "ssh" "veyon" ]);
   unknownAssetNames = builtins.attrNames (builtins.removeAttrs assets [ "logo" "backgrounds" "mimeApps" "vscodeSettings" ]);
-  validHostNames = map (n: "pc${padNumber n}") pcNumbers ++ [ masterHostName ];
+  validClientNames = map (n: "pc${padNumber n}") pcNumbers;
+  validHostNames = validClientNames ++ [ masterHostName ];
   unknownHostModuleNames = builtins.attrNames (builtins.removeAttrs hostModules validHostNames);
   unknownVeyonNativeHosts = builtins.filter (name: !builtins.elem name validHostNames) veyonNativeHosts;
   defaultPasswordHash = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
@@ -295,6 +300,26 @@ let
       };
   bootstrapPkgs = import nixpkgs {
     inherit system;
+  };
+  softwareCatalog = import ./software-catalog.nix {
+    inherit lib;
+    pkgs = bootstrapPkgs;
+  };
+  labSoftwareConfig = import ./eval-lab-software.nix {
+    inherit lib;
+    pkgs = bootstrapPkgs;
+    clientNames = validClientNames;
+    inherit clientGroups;
+    allowedPackages = map (entry: entry.id) softwareCatalog;
+  } labSoftware;
+  softwareAppliesTo = name: scope:
+    scope.kind == "all-clients"
+    || (scope.kind == "group" && builtins.elem name clientGroups.${scope.group})
+    || (scope.kind == "clients" && builtins.elem name scope.clients);
+  managedSoftwareModule = { pkgs, hostName, ... }: {
+    environment.systemPackages = map
+      (entry: builtins.getAttr entry.package pkgs)
+      (builtins.filter (entry: softwareAppliesTo hostName entry.scope) labSoftwareConfig.packages);
   };
   installerDiskoRuntimePackages = disko.lib.packages {
     disko.devices = import (upstreamRoot + "/lib/disko-layout.nix") {
@@ -358,6 +383,8 @@ let
         nixorium.lib.mkLab {
           deploymentSelf = site;
           labConfig = builtins.fromJSON (builtins.readFile ./lab-config.json);
+          labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
+          clientGroups = ${builtins.toJSON clientGroups};
           publicKeys = {
             cache = ${renderPath cachePublicKeyFile};
             ssh = ${renderPath adminSshKeyFile};
@@ -388,6 +415,7 @@ let
     install -d -m 0755 "$out/lib" "$out/scripts/lib"
     install -m 0644 ${installerFlake} "$out/flake.nix"
     install -m 0644 ${labConfigJson} "$out/lab-config.json"
+    install -m 0644 ${labSoftwareJson} "$out/lab-software.json"
     install -m 0644 ${labMetaJson} "$out/lab-meta.json"
     install -m 0755 ${upstreamRoot}/setup.sh "$out/setup.sh"
     install -m 0755 ${installerDiskoScript}/bin/disko-destroy-format-mount "$out/disko-install"
@@ -509,6 +537,15 @@ assert unknownVeyonNativeHosts == []
   };
 
   inherit labMeta;
+
+  nixoriumSoftware = {
+    schemaVersion = 1;
+    managedFile = "lab-software.json";
+    clients = validClientNames;
+    groups = clientGroups;
+    catalog = softwareCatalog;
+    packages = map (entry: entry // { origin = "managed"; }) labSoftwareConfig.packages;
+  };
 
   deploymentStatus = {
     ready = deploymentIssues == [];

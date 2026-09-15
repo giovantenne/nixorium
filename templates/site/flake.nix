@@ -7,9 +7,15 @@
     let
       labConfig = nixorium.lib.evalLabSettings
         (builtins.fromJSON (builtins.readFile ./lab-settings.json));
-      mkDeployment = candidateLabConfig: nixorium.lib.mkLab {
+      labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
+      clientGroups = {
+        # graphics = [ "pc01" "pc02" ];
+      };
+      mkDeployment = candidateLabConfig: candidateLabSoftware: nixorium.lib.mkLab {
         deploymentSelf = self;
         labConfig = candidateLabConfig;
+        labSoftware = candidateLabSoftware;
+        inherit clientGroups;
 
         publicKeys = {
           cache = ./keys/cache-public-key;
@@ -27,10 +33,10 @@
           # pc05 = [ ./modules/pc05.nix ];
         };
       };
-      deployment = mkDeployment labConfig;
+      deployment = mkDeployment labConfig labSoftware;
       validateCandidate = rawSettings:
         let
-          candidate = mkDeployment (nixorium.lib.evalLabSettings rawSettings);
+          candidate = mkDeployment (nixorium.lib.evalLabSettings rawSettings) labSoftware;
           controllerName = candidate.labMeta.controller.name;
         in
         builtins.deepSeq [
@@ -38,9 +44,20 @@
           candidate.deploymentStatus
           candidate.nixosConfigurations.${controllerName}.config.system.build.toplevel.drvPath
         ] true;
+      validateSoftwareCandidate = rawSoftware:
+        let
+          candidate = mkDeployment labConfig rawSoftware;
+          firstClient = builtins.head candidate.labMeta.clients.hosts;
+        in
+        builtins.deepSeq [
+          candidate.nixoriumSoftware
+          candidate.nixosConfigurations.${firstClient.name}.config.system.build.toplevel.drvPath
+        ] true;
     in
     deployment // {
       # Machine-facing validation hook used before lab-settings.json is written.
       nixoriumValidateCandidate = validateCandidate;
+      # Machine-facing validation hook used before lab-software.json is written.
+      nixoriumValidateSoftwareCandidate = validateSoftwareCandidate;
     };
 }

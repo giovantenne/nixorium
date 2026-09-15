@@ -77,6 +77,14 @@ func press(m dashboardModel, text string) dashboardModel {
 	return updated.(dashboardModel)
 }
 
+func hostMetaNames(hosts []domain.HostMeta) []string {
+	names := make([]string, 0, len(hosts))
+	for _, host := range hosts {
+		names = append(names, host.Name)
+	}
+	return names
+}
+
 func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
 	m := experienceFixture(200)
 	m.screen = dashboardHosts
@@ -147,7 +155,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		for _, screen := range []dashboardScreen{dashboardHome, dashboardRestore, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
+		for _, screen := range []dashboardScreen{dashboardHome, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
 			m := experienceFixture(200)
 			m.width = size[0]
 			m.height = size[1]
@@ -155,6 +163,16 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.hostCursor = 199
 			m.deployCursor = 199
 			m.deployPlan = domain.DeploymentPlanReport{Revision: strings.Repeat("a", 40), ColmenaSelector: "@lab", Targets: []domain.DeploymentTarget{{Name: "pc01"}}}
+			m.softwareCatalog = domain.SoftwareCatalogReport{
+				State: "ready", ManagedFile: "lab-software.json",
+				Catalog: []domain.SoftwareCatalogItem{{ID: "gimp", Label: "GIMP", Summary: "Edit bitmap images", Availability: "available"}},
+				Clients: hostMetaNames(m.report.Meta.Clients.Hosts), Groups: map[string][]string{}, Issues: []domain.ValidationIssue{},
+			}
+			m.softwareSelected = "gimp"
+			m.softwareScopeCursor = len(m.softwareScopeOptions()) - 1
+			m.softwareClientCursor = 199
+			m.softwarePlan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.softwareCatalog.Clients, Confirmation: "SAVE SOFTWARE abcdef012345"}
+			m.softwareResult = domain.SoftwareChangeApplyReport{State: "applied", ManagedFile: "lab-software.json"}
 			m.controllerPlan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD pc99"}
 			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 			if screen == dashboardPXELeaveReview {
@@ -166,12 +184,12 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 				t.Fatalf("%dx%d screen %d overflow: %dx%d", size[0], size[1], screen, lipgloss.Width(view), lipgloss.Height(view))
 			}
-			if screen == dashboardHosts || screen == dashboardDeploy {
+			if screen == dashboardHosts || screen == dashboardDeploy || screen == dashboardSoftwareScope {
 				if !strings.Contains(view, "pc200") {
 					t.Fatalf("focused row hidden screen %d size %v", screen, size)
 				}
 			}
-			if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
+			if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview || screen == dashboardSoftwareReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
@@ -220,13 +238,14 @@ func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 }
 
 func TestEveryDisruptiveReviewRejectsWrongConfirmationAndCancels(t *testing.T) {
-	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview, dashboardUpdateReview} {
+	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview, dashboardUpdateReview, dashboardSoftwareReview} {
 		m := experienceFixture(2)
 		m.screen = screen
 		m.confirmation = "wrong"
 		m.controllerPlan.Confirmation = "REBUILD pc99"
 		m.gitCommitPlan.Confirmation = "COMMIT 1 PATH"
 		m.updatePlan.Confirmation = "UPDATE NIXORIUM TO v2.3.0"
+		m.softwarePlan.Confirmation = "SAVE SOFTWARE abcdef012345"
 		m.deployPlan.ColmenaSelector = "@lab"
 		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		m = updated.(dashboardModel)
@@ -276,7 +295,7 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 func TestExperienceRenderGallery(t *testing.T) {
 	m := experienceFixture(24)
 	m.hosts.GeneratedAt = time.Now().Truncate(time.Minute)
-	for _, name := range []string{"interventions", "setup", "restore", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
+	for _, name := range []string{"interventions", "setup", "restore", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
 		m.screen = dashboardHome
 		m.busy = ""
 		m.deploying = false
@@ -294,6 +313,31 @@ func TestExperienceRenderGallery(t *testing.T) {
 		case "deploy":
 			m.screen = dashboardDeploy
 			m.deployChosen = map[string]bool{"pc01": true, "pc02": true}
+		case "software":
+			m.screen = dashboardSoftware
+			m.softwareCatalog = testSoftwareCatalogReport()
+		case "software-scope":
+			m.screen = dashboardSoftwareScope
+			m.softwareCatalog = testSoftwareCatalogReport()
+			m.softwareSelected = "gimp"
+			m.softwareClients = map[string]bool{}
+		case "software-confirmation":
+			m.screen = dashboardSoftwareReview
+			m.softwarePlan = domain.SoftwareChangePlanReport{
+				State: "ready", ManagedFile: "lab-software.json",
+				Request:         domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
+				AffectedClients: []string{"pc01", "pc02", "pc03"}, Confirmation: "SAVE SOFTWARE abcdef012345",
+			}
+		case "software-result":
+			m.screen = dashboardSoftwareResult
+			m.softwareResult = domain.SoftwareChangeApplyReport{State: "applied", ManagedFile: "lab-software.json"}
+		case "software-partial":
+			m.screen = dashboardSoftwareResult
+			m.softwareResult = domain.SoftwareChangeApplyReport{
+				State:   "partial",
+				Message: "lab-software.json was replaced, but durable storage could not be confirmed.",
+				Issues:  []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
+			}
 		case "update":
 			m.screen = dashboardUpdate
 			m.updateCheck = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.1", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}

@@ -359,6 +359,33 @@ func TestParseArgumentsAcceptsUpdatePlanAndApplyPolicy(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsReviewedSoftwareChanges(t *testing.T) {
+	catalog, err := parseArguments([]string{"software", "catalog", "--json"})
+	if err != nil || catalog.command != "software" || catalog.subcommand != "catalog" || !catalog.json {
+		t.Fatalf("software catalog = %+v, error = %v", catalog, err)
+	}
+	plan, err := parseArguments([]string{"software", "plan", "--package", "vlc", "--scope", "group:graphics", "--json"})
+	if err != nil || plan.softwarePackage != "vlc" || plan.softwareScope != "group:graphics" || plan.remove {
+		t.Fatalf("software plan = %+v, error = %v", plan, err)
+	}
+	apply, err := parseArguments([]string{"software", "apply", "--package", "gimp", "--scope", "clients:pc02,pc01", "--remove", "--expect", "sha256:review", "--yes"})
+	if err != nil || apply.subcommand != "apply" || !apply.remove || !apply.yes || apply.expect != "sha256:review" {
+		t.Fatalf("software apply = %+v, error = %v", apply, err)
+	}
+	for _, arguments := range [][]string{
+		{"software"},
+		{"software", "plan", "--package", "vlc"},
+		{"software", "plan", "--package", "vlc", "--scope", "arbitrary"},
+		{"software", "apply", "--package", "vlc", "--scope", "all-clients"},
+		{"software", "catalog", "--package", "vlc"},
+		{"status", "--remove"},
+	} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("invalid software arguments accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

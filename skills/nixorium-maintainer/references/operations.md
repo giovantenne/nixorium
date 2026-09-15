@@ -90,6 +90,27 @@ The host report also shows the last successful post-apply verification stored
 locally. Treat it as history only: current/outdated/unknown always comes from
 the live authenticated observation.
 
+## Guided client software
+
+Use the catalog and reviewed declaration workflow for supported packages:
+
+```sh
+nixorium software catalog
+nixorium software plan --package vlc --scope all-clients
+nixorium software apply --package vlc --scope all-clients --expect REVIEW_TOKEN
+```
+
+Scopes are `all-clients`, `group:NAME`, or comma-separated evaluated identities
+such as `clients:pc01,pc04`. Add `--remove` to both plan and apply to remove a
+managed declaration. The catalog is curated and resolved from pinned inputs;
+never substitute a raw package name if lookup fails.
+
+Apply re-evaluates the candidate, rechecks the content-bound token and source
+fingerprint, and atomically changes only `lab-software.json`. It does not
+commit, build, activate, prepare PXE, or deploy. Review and commit the file,
+then run a separate deployment for the intended powered-on clients. Packages
+and options in private NixOS modules remain outside this workflow.
+
 Review deployment changes without mutating the index or worktree:
 
 ```sh
@@ -97,7 +118,7 @@ nixorium git review
 ```
 
 The report keeps staged, unstaged, and untracked paths distinct and labels
-Nixorium-managed settings/public keys separately from unexpected edits. It
+Nixorium-managed settings, software, and public keys separately from unexpected edits. It
 never opens untracked file contents, disables external diff/textconv drivers,
 bounds tracked patches, redacts settings password hashes, and blocks before
 patch capture if a known private-key path appears. The TUI's **Review Git

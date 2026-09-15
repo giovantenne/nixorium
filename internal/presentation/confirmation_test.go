@@ -112,3 +112,21 @@ func TestConfirmUpdateRequiresExactReleasePhrase(t *testing.T) {
 		}
 	}
 }
+
+func TestConfirmSoftwareChangeRequiresExactReviewPhrase(t *testing.T) {
+	report := domain.SoftwareChangePlanReport{
+		Request:         domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "graphics"}},
+		AffectedClients: []string{"pc01", "pc02"},
+		Confirmation:    "SAVE SOFTWARE abcdef012345",
+	}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"SAVE SOFTWARE abcdef012345\n", true}, {"save software abcdef012345\n", false}, {"SAVE SOFTWARE wrong\n", false}} {
+		var output bytes.Buffer
+		approved, err := ConfirmSoftwareChange(strings.NewReader(test.input), &output, report)
+		if err != nil || approved != test.want || !strings.Contains(output.String(), "only lab-software.json") || !strings.Contains(output.String(), "no commit, build, controller activation") {
+			t.Fatalf("confirmation %q = %t, %v:\n%s", test.input, approved, err, output.String())
+		}
+	}
+}

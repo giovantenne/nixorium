@@ -119,3 +119,18 @@ func ConfirmUpdate(input io.Reader, output io.Writer, report domain.UpdatePlanRe
 	}
 	return strings.TrimSpace(value) == report.Confirmation, nil
 }
+
+func ConfirmSoftwareChange(input io.Reader, output io.Writer, report domain.SoftwareChangePlanReport) (bool, error) {
+	fmt.Fprintln(output, "Software declaration review")
+	fmt.Fprintf(output, "Package: %s\n", report.Request.Package)
+	fmt.Fprintf(output, "Configuration scope: %s (%d client(s))\n", report.Request.Scope.Kind, len(report.AffectedClients))
+	fmt.Fprintln(output, "Action: atomically update only lab-software.json")
+	fmt.Fprintln(output, "Safety: no commit, build, controller activation, PXE action, or client deployment is performed")
+	fmt.Fprintln(output, "Afterward: review and commit the managed file, then prepare or distribute the system separately")
+	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == report.Confirmation, nil
+}

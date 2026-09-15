@@ -217,10 +217,24 @@
           };
           packages.x86_64-linux.pxeFirmware = fakeSystem.outPath;
           nixoriumValidateCandidate = candidate: builtins.deepSeq candidate true;
+          nixoriumSoftware = {
+            schemaVersion = 1;
+            managedFile = "lab-software.json";
+            clients = [ "pc01" ];
+            groups.graphics = [ "pc01" ];
+            catalog = [
+              { id = "gimp"; label = "GIMP"; summary = "Edit bitmap images"; availability = "available"; }
+              { id = "vlc"; label = "VLC"; summary = "Play audio and video"; availability = "available"; }
+            ];
+            packages = map (entry: entry // { origin = "managed"; })
+              (builtins.fromJSON (builtins.readFile ./lab-software.json)).packages;
+          };
+          nixoriumValidateSoftwareCandidate = candidate: builtins.deepSeq candidate true;
         };
       }
     '';
     environment.etc."nixorium-test/lab-settings.json".source = ../templates/site/lab-settings.json;
+    environment.etc."nixorium-test/lab-software.json".source = ../templates/site/lab-software.json;
     environment.etc."nixorium-test/.gitignore".source = ../templates/site/.gitignore;
   };
 
@@ -236,14 +250,16 @@
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
     controller.wait_until_fails("systemctl is-active --quiet nixorium-harmonia.service")
     controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'Failed to set up credentials'")
-    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'; nixorium --help | grep -F 'update check'")
+    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'; nixorium --help | grep -F 'update check'; nixorium --help | grep -F 'software catalog'")
     controller.succeed("mkdir -p /tmp/deployment")
     controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
     controller.succeed("cp /etc/nixorium-test/lab-settings.json /tmp/deployment/lab-settings.json")
+    controller.succeed("cp /etc/nixorium-test/lab-software.json /tmp/deployment/lab-software.json")
     controller.succeed("cp /etc/nixorium-test/.gitignore /tmp/deployment/.gitignore")
     controller.succeed("jq --arg password '$6$vm$not-the-public-default' '.lab.masterDhcpIp = \"192.0.2.10\" | .lab.ifaceName = \"lab0\" | .lab.teacherPassword = $password | .lab.studentPassword = $password | .lab.adminPassword = $password' /tmp/deployment/lab-settings.json > /tmp/lab-settings.json && mv /tmp/lab-settings.json /tmp/deployment/lab-settings.json")
     controller.succeed("git -C /tmp/deployment init -q")
-    controller.succeed("git -C /tmp/deployment add flake.nix lab-settings.json .gitignore")
+    controller.succeed("git -C /tmp/deployment config user.name Test; git -C /tmp/deployment config user.email test@example.invalid")
+    controller.succeed("git -C /tmp/deployment add flake.nix lab-settings.json lab-software.json .gitignore")
     controller.succeed("git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm initial")
     controller.succeed("cp /tmp/deployment/lab-settings.json /tmp/candidate.json")
     controller.succeed("nixorium config plan --repo /tmp/deployment --file /tmp/candidate.json --json | jq -e '.operation == \"config-plan\" and .state == \"unchanged\" and (.changes | length) == 0'")
@@ -252,6 +268,13 @@
     controller.succeed("before=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh /tmp/deployment/veyon-private-key.pem); nixorium setup keys --repo /tmp/deployment --json >/dev/null; after=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh /tmp/deployment/veyon-private-key.pem); test \"$before\" = \"$after\"")
     controller.succeed("git -C /tmp/deployment add keys && git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm keys")
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
+    controller.succeed("nixorium software catalog --repo /tmp/deployment --json > /tmp/software-catalog.json; jq -e '.operation == \"software-catalog\" and .state == \"ready\" and .managedFile == \"lab-software.json\" and (.catalog | length) == 2 and (.packages | length) == 0 and .groups.graphics == [\"pc01\"]' /tmp/software-catalog.json")
+    controller.succeed("nixorium software plan --repo /tmp/deployment --package vlc --scope group:graphics --json > /tmp/software-plan.json; jq -e '.operation == \"software-change-plan\" and .state == \"ready\" and .request.package == \"vlc\" and .request.scope.group == \"graphics\" and .affectedClients == [\"pc01\"] and (.reviewToken | startswith(\"sha256:\")) and (.confirmation | startswith(\"SAVE SOFTWARE \"))' /tmp/software-plan.json")
+    controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); token=$(jq -r .reviewToken /tmp/software-plan.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect \"$token\" </dev/null >/tmp/software-noninteractive.out 2>/tmp/software-noninteractive.err || test $? = 2; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; grep -F 'requires an interactive terminal or explicit --yes' /tmp/software-noninteractive.err")
+    controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect sha256:stale --yes --json > /tmp/software-stale.json || test $? = 1; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; jq -e '.operation == \"software-change-apply\" and .state == \"conflict\" and any(.issues[]; .field == \"reviewToken\")' /tmp/software-stale.json")
+    controller.succeed("token=$(jq -r .reviewToken /tmp/software-plan.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect \"$token\" --yes --json > /tmp/software-apply.json; jq -e '.operation == \"software-change-apply\" and .state == \"applied\" and .managedFile == \"lab-software.json\" and .affectedClients == [\"pc01\"]' /tmp/software-apply.json; jq -e '.packages == [{\"package\":\"vlc\",\"scope\":{\"kind\":\"group\",\"group\":\"graphics\"}}]' /tmp/deployment/lab-software.json; test \"$(git -C /tmp/deployment status --porcelain=v1)\" = ' M lab-software.json'")
+    controller.succeed("nixorium git commit plan --repo /tmp/deployment --paths lab-software.json --json > /tmp/software-commit-plan.json; jq -e '.state == \"ready\" and .commitMessage == \"chore: update laboratory software\"' /tmp/software-commit-plan.json; token=$(jq -r .reviewToken /tmp/software-commit-plan.json); nixorium git commit apply --repo /tmp/deployment --paths lab-software.json --expect \"$token\" --yes --json > /tmp/software-commit.json; jq -e '.state == \"completed\" and .committed' /tmp/software-commit.json; test -z \"$(git -C /tmp/deployment status --porcelain=v1)\"")
+    controller.succeed("nixorium software plan --repo /tmp/deployment --package gimp --scope all-clients --json | jq -r .confirmation > /tmp/software-tui-confirmation; (sleep 8; printf w; sleep 5; printf '\\r'; sleep 1; printf '\\r'; sleep 5; cat /tmp/software-tui-confirmation; printf '\\r'; sleep 5; printf q) | TERM=xterm timeout 30s script -qefc 'stty rows 40 cols 120; nixorium --repo /tmp/deployment' /tmp/nixorium-software-tui.log; grep -aF 'Supported client software' /tmp/nixorium-software-tui.log; grep -aF 'This is not the set of computers deployed today' /tmp/nixorium-software-tui.log; grep -aF 'Proposal validated' /tmp/nixorium-software-tui.log; grep -aF 'Only lab-software.json will be replaced atomically' /tmp/nixorium-software-tui.log; grep -aF 'Software declaration saved' /tmp/nixorium-software-tui.log; jq -e 'any(.packages[]; .package == \"gimp\" and .scope.kind == \"all-clients\")' /tmp/deployment/lab-software.json; git -C /tmp/deployment restore lab-software.json")
     controller.succeed("printf '\n' >> /tmp/deployment/lab-settings.json; (sleep 8; printf '\r'; sleep 2; printf '\033'; sleep 1; printf q) | TERM=xterm timeout 20s script -qefc 'stty rows 40 cols 120; nixorium setup --repo /tmp/deployment' /tmp/nixorium-setup-resume.log")
     controller.succeed("grep -aF 'Nixorium — First setup' /tmp/nixorium-setup-resume.log; grep -aF 'Review and accept Git changes' /tmp/nixorium-setup-resume.log; grep -aF 'Review and commit the generated configuration' /tmp/nixorium-setup-resume.log; grep -aF 'Git change review' /tmp/nixorium-setup-resume.log; git -C /tmp/deployment restore lab-settings.json")
     controller.succeed("jq '.lab.adminPassword = \"$6$review$new-admin\"' /tmp/deployment/lab-settings.json > /tmp/review-settings.json; mv /tmp/review-settings.json /tmp/deployment/lab-settings.json; git -C /tmp/deployment add lab-settings.json; printf '\n# unstaged-review-fixture\n' >> /tmp/deployment/flake.nix; printf 'untracked contents are intentionally not opened\n' > /tmp/deployment/review-note")

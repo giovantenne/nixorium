@@ -13,7 +13,8 @@ installation or system updates, but may have internet during user sessions.
 
 The repository exports `lib.mkLab` for private per-lab deployment Flakes. The
 root `lab-config.nix` keeps the standalone example compatible, while new
-private deployments store managed site values in `lab-settings.json`. Public
+private deployments store managed site values in `lab-settings.json` and
+guided client packages in `lab-software.json`. Public
 keys, assets and local modules also belong in the private repository generated
 from `templates/site`.
 
@@ -34,6 +35,8 @@ lib/
   disko-layout.nix         # Shared Disko layout function (device + student user)
   eval-lab-config.nix      # Typed schema and validation for lab-config.nix
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
+  eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
+  software-catalog.nix     # Curated catalog resolved against pinned nixpkgs
   mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 pkgs/
@@ -206,6 +209,12 @@ Release from the matching changelog section.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
+- Guided software changes use `software catalog`, `software plan`, and
+  `software apply`. Keep package IDs restricted by both the curated pinned Nix
+  catalog and the deployment validator; scopes come only from evaluated client
+  identities/groups. Apply may atomically replace only `lab-software.json`
+  after token and fingerprint rechecks. It must not commit, build, activate,
+  prepare PXE, deploy, or rewrite packages supplied by private modules.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.
@@ -232,7 +241,7 @@ Release from the matching changelog section.
   to target/policy input, bounded review scrolling, exact confirmation, and
   typed result rendering.
 - Routine controller rebuild uses `controller plan`/`controller apply`, binds the privileged systemd instance to a full reviewed Git revision, builds a pinned Git source as the deployment owner, refuses repository drift before activation, and writes a root-owned success record only after both `switch-to-configuration` and `/run/current-system` verification succeed. Reconciliation must require that record to match both the reviewed revision and evaluated closure; the active symlink alone is not completion evidence. Keep `setup apply` as the first-run-compatible path through the same fixed service implementation.
-- `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
+- `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. `nixoriumSoftware` is the typed non-secret catalog/scope/declaration contract. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
