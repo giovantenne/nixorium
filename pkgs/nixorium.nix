@@ -5,7 +5,7 @@ buildGoModule {
   version = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ../VERSION);
   src = ../.;
 
-  vendorHash = "sha256-/AaHrboVqKF6bsE2O4IpRgPb3nd66mb7ATvf/LjcSWY=";
+  vendorHash = "sha256-wtmeoJiq2DEa/ZHY1JUFIs4A87Vi0khXNQEgmT0MkMA=";
   subPackages = [ "cmd/nixorium" ];
 
   nativeBuildInputs = [ makeWrapper ];

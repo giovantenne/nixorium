@@ -102,6 +102,10 @@ the public remote; opening the dashboard never does.
 
 Systemd-owned PXE preparation can outlive its initiating terminal. The CLI
 writes immediate activity plus the fixed journal follow command to stderr so
-JSON stdout remains machine-clean; the TUI shows the same activity/log path
-while its typed callback waits. Detailed build output remains in journald rather
-than being copied into presentation or an unbounded in-memory channel.
+JSON stdout remains machine-clean. The service also atomically publishes a
+private, bounded, versioned progress record containing fixed phases, counters,
+and at most five authored activities. A strict adapter/domain callback polls
+that record while the TUI renders elapsed time and an official Bubbles progress
+bar. Bubble Tea never reads the journal or chooses a filesystem path, stale
+pre-run records are ignored, and detailed build output remains in journald
+rather than being copied into presentation or an unbounded in-memory channel.

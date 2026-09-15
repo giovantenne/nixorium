@@ -194,10 +194,82 @@ let
     text = ''
       REPOSITORY=${lib.escapeShellArg cfg.deploymentPath}
 
+      PROGRESS_FILE="$STATE_DIRECTORY/progress.json"
+      PROGRESS_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+      PROGRESS_STATE=running
+      PROGRESS_PHASE=starting
+      PROGRESS_CURRENT=0
+      PROGRESS_TOTAL=0
+      PROGRESS_RECENT='[]'
+      CLIENTS_FILE=""
+      MANIFEST_TEMP=""
+
+      publish_progress() {
+        local state="$1"
+        local phase="$2"
+        local activity="$3"
+        local current="$4"
+        local total="$5"
+        local temporary
+
+        PROGRESS_STATE="$state"
+        PROGRESS_PHASE="$phase"
+        PROGRESS_CURRENT="$current"
+        PROGRESS_TOTAL="$total"
+        if [[ -n "$activity" ]]; then
+          PROGRESS_RECENT="$(jq -c --arg activity "$activity" \
+            '. + [$activity] | if length > 5 then .[-5:] else . end' \
+            <<<"$PROGRESS_RECENT")"
+        fi
+        temporary="$(mktemp "$STATE_DIRECTORY/.progress.XXXXXX")"
+        jq -n \
+          --arg operation pxe-prepare \
+          --arg state "$PROGRESS_STATE" \
+          --arg phase "$PROGRESS_PHASE" \
+          --arg startedAt "$PROGRESS_STARTED_AT" \
+          --arg updatedAt "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
+          --argjson current "$PROGRESS_CURRENT" \
+          --argjson total "$PROGRESS_TOTAL" \
+          --argjson recent "$PROGRESS_RECENT" \
+          '{
+            schemaVersion: 1,
+            operation: $operation,
+            state: $state,
+            phase: $phase,
+            startedAt: $startedAt,
+            updatedAt: $updatedAt,
+            current: $current,
+            total: $total,
+            recent: $recent
+          }' >"$temporary"
+        chmod 0600 "$temporary"
+        mv -fT -- "$temporary" "$PROGRESS_FILE"
+        [[ -z "$activity" ]] || echo "$activity"
+      }
+
+      cleanup() {
+        local status="$?"
+        [[ -z "$CLIENTS_FILE" ]] || rm -f -- "$CLIENTS_FILE"
+        [[ -z "$MANIFEST_TEMP" ]] || rm -f -- "$MANIFEST_TEMP"
+        if [[ "$status" -ne 0 && "$PROGRESS_STATE" == running ]]; then
+          publish_progress failed "$PROGRESS_PHASE" \
+            "Preparation stopped unexpectedly" "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" || true
+        fi
+      }
+      trap cleanup EXIT
+
       fail() {
-        echo "Error: $*" >&2
+        local message="$*"
+        if [[ "$PROGRESS_STATE" == running ]]; then
+          publish_progress failed "$PROGRESS_PHASE" \
+            "Failed: $message" "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" || true
+        fi
+        echo "Error: $message" >&2
         exit 1
       }
+
+      publish_progress running starting "Starting PXE preparation" 0 0
+      publish_progress running validate "Validating the reviewed deployment" 0 0
 
       [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
         || fail "configured deployment path is not a real directory"
@@ -224,6 +296,9 @@ let
         || fail "deploymentStatus.ready must be true before PXE preparation"
       REVISION="$(git -C "$REPOSITORY" rev-parse HEAD)" \
         || fail "could not resolve deployment revision"
+
+      publish_progress running validate "Validated deployment configuration" 0 0
+      publish_progress running network "Checking controller network and binary cache" 0 0
 
       META="$(nix eval "$FLAKE_URL#labMeta" --json --no-write-lock-file)" \
         || fail "could not evaluate labMeta"
@@ -268,6 +343,8 @@ let
         "http://$DHCP_IP:$CACHE_PORT/nix-cache-info" | grep -q '^StoreDir:' \
         || fail "Harmonia cache health check failed at $DHCP_IP:$CACHE_PORT"
 
+      publish_progress running network "Controller network and binary cache are ready" 0 0
+
       build_one() {
         local reference="$1"
         local output
@@ -278,10 +355,15 @@ let
         printf '%s' "$output"
       }
 
+      publish_progress running artifacts "Building shared netboot artifacts" 0 4
       KERNEL_PATH="$(build_one "$FLAKE_URL#nixosConfigurations.netboot.config.system.build.kernel")"
+      publish_progress running artifacts "Built netboot kernel (1/4)" 1 4
       INITRD_PATH="$(build_one "$FLAKE_URL#nixosConfigurations.netboot.config.system.build.netbootRamdisk")"
+      publish_progress running artifacts "Built netboot initrd (2/4)" 2 4
       IPXE_SCRIPT_PATH="$(build_one "$FLAKE_URL#nixosConfigurations.netboot.config.system.build.netbootIpxeScript")"
+      publish_progress running artifacts "Built iPXE boot script (3/4)" 3 4
       FIRMWARE_PATH="$(build_one "$FLAKE_URL#packages.x86_64-linux.pxeFirmware")"
+      publish_progress running artifacts "Built iPXE firmware (4/4)" 4 4
       [[ -f "$KERNEL_PATH/bzImage" ]] || fail "prepared kernel output lacks bzImage"
       [[ -f "$INITRD_PATH/initrd" ]] || fail "prepared initrd output lacks initrd"
       [[ -f "$IPXE_SCRIPT_PATH/netboot.ipxe" ]] || fail "prepared iPXE output lacks netboot.ipxe"
@@ -291,17 +373,20 @@ let
       ((''${#CLIENT_NAMES[@]} > 0)) || fail "labMeta contains no client hosts"
       CLIENTS_FILE="$(mktemp "$STATE_DIRECTORY/.clients.XXXXXX")"
       MANIFEST_TEMP="$(mktemp "$STATE_DIRECTORY/.prepared.XXXXXX")"
-      cleanup() {
-        rm -f "$CLIENTS_FILE" "$MANIFEST_TEMP"
-      }
-      trap cleanup EXIT
+      publish_progress running clients "Building client system closures" 0 "''${#CLIENT_NAMES[@]}"
+      client_index=0
       for name in "''${CLIENT_NAMES[@]}"; do
         [[ "$name" =~ ^pc[0-9]+$ ]] || fail "labMeta contains invalid client name"
         client_path="$(build_one "$FLAKE_URL#nixosConfigurations.$name.config.system.build.toplevel")"
         printf '%s\t%s\n' "$name" "$client_path" >>"$CLIENTS_FILE"
+        client_index=$((client_index + 1))
+        publish_progress running clients \
+          "Built client $name ($client_index/''${#CLIENT_NAMES[@]})" \
+          "$client_index" "''${#CLIENT_NAMES[@]}"
       done
       CLIENTS="$(jq -Rn '[inputs | split("\t") | {name: .[0], storePath: .[1]}]' <"$CLIENTS_FILE")"
 
+      publish_progress running publish "Retaining artifacts and publishing the manifest" 0 0
       ROOTS_DIRECTORY="$STATE_DIRECTORY/roots"
       ROOT_GENERATION="$ROOTS_DIRECTORY/$REVISION"
       install -d -m 0755 "$ROOT_GENERATION"
@@ -357,11 +442,16 @@ let
       sync -f "$MANIFEST_TEMP"
       mv -T "$MANIFEST_TEMP" "$STATE_DIRECTORY/prepared.json"
       sync -f "$STATE_DIRECTORY"
-      trap - EXIT
-      rm -f "$CLIENTS_FILE"
+      MANIFEST_TEMP=""
+      rm -f -- "$CLIENTS_FILE"
+      CLIENTS_FILE=""
       find "$ROOTS_DIRECTORY" -mindepth 1 -maxdepth 1 -type d \
         ! -name "$REVISION" -exec rm -rf -- {} +
-      echo "Prepared PXE artifacts for ''${#CLIENT_NAMES[@]} clients at revision $REVISION"
+      publish_progress completed complete \
+        "Prepared PXE artifacts for ''${#CLIENT_NAMES[@]} clients" \
+        "''${#CLIENT_NAMES[@]}" "''${#CLIENT_NAMES[@]}"
+      trap - EXIT
+      echo "Prepared PXE artifacts at revision $REVISION"
     '';
   };
 in

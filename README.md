@@ -116,7 +116,9 @@ nix run .#nixorium
 
 The dashboard shows configuration, cache, installation-mode, computer, and Git
 state. It also provides grouped **Change settings** editing for routine updates.
-Choose **Install computers over network**.
+Choose **Install computers over network**. Long PXE preparation shows its
+current phase, elapsed time, bounded recent activity, and client progress
+without requiring a second terminal.
 
 ### 6. Prepare and start installation mode
 

@@ -315,6 +315,12 @@ the kernel, initrd, iPXE firmware/script, and every client closure, then records
 their immutable store paths and Git revision under
 `/var/lib/nixorium/prepared/prepared.json` with managed GC roots.
 
+The dashboard follows the systemd-owned job in place: it shows the current
+phase, elapsed time, an explicit artifact/client progress bar, and the five
+most recent bounded activities. Closing the dashboard does not cancel the job.
+Use the journal command above only when verbose Nix output is needed for
+troubleshooting.
+
 An unambiguous DHCP lease change is captured without a configuration commit.
 Multiple usable addresses fail closed without replacing the prior preparation.
 

@@ -758,12 +758,93 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 		if command == nil {
 			t.Fatalf("%s did not schedule an operation", key)
 		}
-		if key == "p" && !strings.Contains(model.View().Content, "journalctl -fu nixorium-prepare-pxe.service") {
-			t.Fatalf("PXE preparation omits detailed live-log guidance:\n%s", model.View().Content)
+		if key == "p" && !strings.Contains(model.View().Content, "Waiting for managed progress") {
+			t.Fatalf("PXE preparation omits managed progress feedback:\n%s", model.View().Content)
 		}
-		updated, _ = model.Update(command())
+		message := command()
+		if key == "p" {
+			batch, ok := message.(tea.BatchMsg)
+			if !ok || len(batch) != 2 {
+				t.Fatalf("PXE preparation command = %#v, want action and progress poll", message)
+			}
+			message = batch[0]()
+		}
+		updated, _ = model.Update(message)
 		if called != expected {
 			t.Errorf("%s called %q, want %q", key, called, expected)
 		}
+	}
+}
+
+func TestDashboardPXEProgressShowsPhaseBarAndRecentActivity(t *testing.T) {
+	started := time.Now().UTC().Add(-3 * time.Second)
+	model := dashboardModel{
+		report:             testDashboardReport("ready"),
+		screen:             dashboardPXE,
+		busy:               "Preparing netboot artifacts and client closures",
+		pxePreparing:       true,
+		pxeProgressStarted: started,
+		pxeProgressID:      7,
+		width:              100,
+		actions: DashboardActions{
+			LoadPXEProgress: func() (domain.OperationProgress, error) {
+				return domain.OperationProgress{}, nil
+			},
+		},
+	}
+	updated, command := model.Update(dashboardPXEProgressMsg{
+		id: 7,
+		progress: domain.OperationProgress{
+			SchemaVersion: domain.OperationProgressSchemaVersion,
+			Operation:     "pxe-prepare",
+			State:         "running",
+			Phase:         "clients",
+			StartedAt:     started,
+			UpdatedAt:     time.Now().UTC(),
+			Current:       2,
+			Total:         10,
+			Recent:        []string{"Built netboot kernel (1/4)", "Built client pc02 (2/10)"},
+		},
+	})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("running preparation did not schedule the next progress poll")
+	}
+	view := model.View().Content
+	for _, expected := range []string{"Building client systems", "2/10", "Recent activity", "Built client pc02 (2/10)", "elapsed"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("PXE progress omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "journalctl") {
+		t.Fatalf("PXE progress exposes journal access instead of typed progress:\n%s", view)
+	}
+}
+
+func TestDashboardPXEProgressIgnoresRecordFromPreviousRun(t *testing.T) {
+	started := time.Now().UTC()
+	model := dashboardModel{
+		pxePreparing:       true,
+		pxeProgressStarted: started,
+		pxeProgressID:      9,
+		actions: DashboardActions{LoadPXEProgress: func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{}, nil
+		}},
+	}
+	updated, command := model.Update(dashboardPXEProgressMsg{
+		id: 9,
+		progress: domain.OperationProgress{
+			Operation: "pxe-prepare",
+			StartedAt: started.Add(-time.Second),
+			UpdatedAt: started.Add(-500 * time.Millisecond),
+			Recent:    []string{"Old preparation"},
+		},
+	})
+	model = updated.(dashboardModel)
+	if model.pxeProgress.Operation != "" {
+		t.Fatalf("stale progress was rendered: %+v", model.pxeProgress)
+	}
+	if command == nil {
+		t.Fatal("stale progress stopped polling for the current run")
 	}
 }
