@@ -12,6 +12,7 @@ import (
 
 type DashboardActions struct {
 	Refresh                func() (domain.StatusReport, error)
+	LoadSetup              func() domain.SetupReport
 	LoadHosts              func() (domain.HostsReport, error)
 	PlanDeployment         func(string) domain.DeploymentPlanReport
 	ApplyDeployment        func(domain.DeploymentPlanReport) domain.DeploymentExecutionReport
@@ -43,6 +44,7 @@ type dashboardScreen int
 
 const (
 	dashboardHome dashboardScreen = iota
+	dashboardSetup
 	dashboardHosts
 	dashboardDeploy
 	dashboardDeployReview
@@ -67,6 +69,8 @@ const (
 
 type dashboardModel struct {
 	report               domain.StatusReport
+	setup                domain.SetupReport
+	setupMode            bool
 	actions              DashboardActions
 	screen               dashboardScreen
 	busy                 string
@@ -124,6 +128,10 @@ type dashboardModel struct {
 
 type dashboardPlanMsg struct {
 	report domain.PXELifecycleReport
+}
+
+type dashboardSetupMsg struct {
+	report domain.SetupReport
 }
 
 type dashboardOperationMsg struct {
@@ -233,8 +241,13 @@ type dashboardSettingsApplyMsg struct {
 	statusErr error
 }
 
-func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
-	_, err := tea.NewProgram(dashboardModel{report: report, actions: actions}).Run()
+func RunDashboard(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions) error {
+	_, err := tea.NewProgram(dashboardModel{report: report, setup: setup, actions: actions}).Run()
+	return err
+}
+
+func RunSetupDashboard(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions) error {
+	_, err := tea.NewProgram(dashboardModel{report: report, setup: setup, setupMode: true, screen: dashboardSetup, actions: actions}).Run()
 	return err
 }
 
@@ -242,6 +255,11 @@ func (dashboardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
+	case dashboardSetupMsg:
+		model.busy = ""
+		model.setup = message.report
+		model.screen = dashboardSetup
+		return model, nil
 	case dashboardPlanMsg:
 		model.busy = ""
 		model.startPlan = message.report
@@ -621,9 +639,68 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				settings, err := model.actions.LoadSettings()
 				return dashboardSettingsMsg{settings: settings, err: err}
 			}
-		case "p", "enter":
+		case "enter":
+			if model.setup.State != "" && model.setup.State != "ready" {
+				model.setupMode = true
+				model.screen = dashboardSetup
+				model.message = ""
+				return model, nil
+			}
 			model.screen = dashboardPXE
 			model.message = ""
+		case "p":
+			model.screen = dashboardPXE
+			model.message = ""
+		}
+	case dashboardSetup:
+		if key.String() == "esc" || key.String() == "left" {
+			model.setupMode = false
+			model.screen = dashboardHome
+			model.message = ""
+			return model, nil
+		}
+		if key.String() != "enter" {
+			return model, nil
+		}
+		switch model.setup.CurrentStage {
+		case domain.SetupStageReview:
+			model.screen = dashboardGitReview
+			model.busy = "Reviewing generated setup changes"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+			}
+		case domain.SetupStageApply:
+			model.screen = dashboardController
+			model.busy = "Reviewing controller revision and active system"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardControllerPlanMsg{report: model.actions.PlanController()}
+			}
+		case domain.SetupStageArtifacts:
+			model.screen = dashboardPXE
+			model.busy = "Preparing netboot artifacts and client closures"
+			model.pxePreparing = true
+			model.pxeProgress = domain.OperationProgress{}
+			model.pxeProgressStarted = time.Now().UTC()
+			model.pxeProgressID++
+			model.message = ""
+			operation := model.runAction(func() string {
+				report := model.actions.PreparePXE()
+				return report.Message
+			}, dashboardPXE)
+			return model, tea.Batch(operation, schedulePXEProgressTick(model.pxeProgressID))
+		case domain.SetupStageReadiness, domain.SetupStageInstall:
+			model.screen = dashboardPXE
+			model.message = "Continue by starting installation mode and booting the first computer from the network."
+			return model, nil
+		case "":
+			model.screen = dashboardPXE
+			model.message = "Start installation mode, then boot the first computer from the network."
+			return model, nil
+		default:
+			model.message = "Configuration input is still required; exit and run `nixorium setup` again."
+			return model, nil
 		}
 	case dashboardSettings:
 		switch key.String() {
@@ -790,11 +867,19 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case dashboardController:
 		if key.String() == "esc" || key.String() == "left" || (key.String() == "enter" && model.controllerResult.Operation != "") {
-			model.screen = dashboardHome
+			if model.setupMode {
+				model.screen = dashboardSetup
+			} else {
+				model.screen = dashboardHome
+			}
 			if model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() {
 				model.message = "Controller configuration activated and verified."
 			} else {
 				model.message = ""
+			}
+			if model.setupMode && model.actions.LoadSetup != nil {
+				model.busy = "Refreshing first-run progress"
+				return model, model.loadSetup()
 			}
 		} else if key.String() == "d" && model.controllerResult.Operation != "" {
 			model.controllerDetails = !model.controllerDetails
@@ -906,8 +991,16 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardLogs:
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardHome
+			if model.setupMode {
+				model.screen = dashboardSetup
+			} else {
+				model.screen = dashboardHome
+			}
 			model.message = ""
+			if model.setupMode && model.actions.LoadSetup != nil {
+				model.busy = "Refreshing first-run progress"
+				return model, model.loadSetup()
+			}
 		case "up", "k":
 			if model.logCursor > 0 {
 				model.logCursor--
@@ -967,8 +1060,16 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		maximum := maximumGitReviewScroll(model.gitReview, model.gitReviewHeight())
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardHome
+			if model.setupMode {
+				model.screen = dashboardSetup
+			} else {
+				model.screen = dashboardHome
+			}
 			model.message = ""
+			if model.setupMode && model.actions.LoadSetup != nil {
+				model.busy = "Refreshing first-run progress"
+				return model, model.loadSetup()
+			}
 		case "up", "k":
 			if model.gitScroll > 0 {
 				model.gitScroll--
@@ -1179,8 +1280,16 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardHome
+			if model.setupMode {
+				model.screen = dashboardSetup
+			} else {
+				model.screen = dashboardHome
+			}
 			model.message = ""
+			if model.setupMode && model.actions.LoadSetup != nil {
+				model.busy = "Refreshing first-run progress"
+				return model, model.loadSetup()
+			}
 		case "p":
 			model.busy = "Preparing netboot artifacts and client closures"
 			model.pxePreparing = true
@@ -1261,6 +1370,12 @@ func (model dashboardModel) loadHosts() tea.Cmd {
 	}
 }
 
+func (model dashboardModel) loadSetup() tea.Cmd {
+	return func() tea.Msg {
+		return dashboardSetupMsg{report: model.actions.LoadSetup()}
+	}
+}
+
 func schedulePXEProgressTick(id uint64) tea.Cmd {
 	return tea.Tick(350*time.Millisecond, func(time.Time) tea.Msg {
 		return dashboardPXEProgressTickMsg{id: id}
@@ -1290,6 +1405,8 @@ func (model dashboardModel) loadControllerProgress(id uint64) tea.Cmd {
 func (model dashboardModel) View() tea.View {
 	content := ""
 	switch model.screen {
+	case dashboardSetup:
+		content = model.setupView()
 	case dashboardHosts:
 		content = model.hostsView()
 	case dashboardDeploy, dashboardDeployReview:
@@ -1331,6 +1448,16 @@ func (model dashboardModel) homeView() string {
 		fmt.Sprintf("  Installation mode    %s", model.report.PXE.Mode),
 		fmt.Sprintf("  Computers            %d configured", model.report.Meta.Clients.Count),
 		fmt.Sprintf("  Git worktree         %s", cleanText(model.report.Git.Dirty, model.report.Git.Changes)),
+	}
+	if model.setup.State != "" && model.setup.State != "ready" {
+		lines = append(lines,
+			"",
+			tuiResult("Next: finish first setup", false, model.isDark),
+			"  "+setupCurrentTitle(model.setup),
+			"  Enter       Continue setup",
+		)
+	}
+	lines = append(lines,
 		"",
 		"Actions",
 		"  h           View computers",
@@ -1341,12 +1468,83 @@ func (model dashboardModel) homeView() string {
 		"  g           Review Git changes",
 		"  e           Change settings",
 		"  u           Update Nixorium",
-		"  p / Enter   Install computers over network",
+		"  p           Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
 		tuiHelp(model.width, model.isDark, tuiHelpBinding([]string{"q", "ctrl+c"}, "q", "quit")),
-	}
+	)
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) setupView() string {
+	completed := 0
+	for _, stage := range model.setup.Stages {
+		if stage.State == domain.SetupStageComplete {
+			completed++
+		}
+	}
+	lines := []string{
+		tuiTitle("Nixorium — First setup", model.isDark),
+		"",
+		fmt.Sprintf("Laboratory setup: %d/%d steps complete", completed, len(model.setup.Stages)),
+		"You can quit safely and resume later with `nixorium setup`.",
+		"",
+	}
+	for _, stage := range model.setup.Stages {
+		marker := "[ ]"
+		if stage.State == domain.SetupStageComplete {
+			marker = "[x]"
+		} else if stage.State == domain.SetupStageCurrent {
+			marker = "[>]"
+		}
+		lines = append(lines, fmt.Sprintf("  %s %s", marker, stage.Title))
+	}
+	lines = append(lines, "")
+	if model.setup.State == "ready" {
+		lines = append(lines,
+			tuiResult("Laboratory setup is ready", true, model.isDark),
+			"Enter opens network installation for the first computer.",
+		)
+	} else {
+		lines = append(lines,
+			tuiResult("Next step", false, model.isDark),
+			"  "+setupCurrentTitle(model.setup),
+			"  "+setupCurrentAction(model.setup),
+		)
+	}
+	if model.message != "" {
+		lines = append(lines, "", "Result: "+model.message)
+	}
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
+		tuiHelpBinding([]string{"esc"}, "esc", "dashboard"),
+		tuiHelpBinding([]string{"q"}, "q", "quit"),
+	))
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func setupCurrentTitle(report domain.SetupReport) string {
+	for _, stage := range report.Stages {
+		if stage.State == domain.SetupStageCurrent {
+			return stage.Title
+		}
+	}
+	return "Setup is complete"
+}
+
+func setupCurrentAction(report domain.SetupReport) string {
+	switch report.CurrentStage {
+	case domain.SetupStageReview:
+		return "Review and commit the generated configuration"
+	case domain.SetupStageApply:
+		return "Review and activate the controller configuration"
+	case domain.SetupStageArtifacts:
+		return "Prepare installation files and client systems"
+	case domain.SetupStageReadiness, domain.SetupStageInstall:
+		return "Open network installation and install the first computer"
+	default:
+		return "Continue the guided laboratory configuration"
+	}
 }
 
 func (model dashboardModel) gitReviewView() string {
@@ -1686,8 +1884,12 @@ func (model dashboardModel) controllerView() string {
 		if model.controllerDetails {
 			detailsLabel = "hide details"
 		}
+		returnLabel := "dashboard"
+		if model.setupMode {
+			returnLabel = "setup"
+		}
 		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
+			tuiHelpBinding([]string{"enter"}, "enter", returnLabel),
 			tuiHelpBinding([]string{"d"}, "d", detailsLabel),
 			tuiHelpBinding([]string{"l"}, "l", "logs"),
 			tuiHelpBinding([]string{"r"}, "r", "new review"),

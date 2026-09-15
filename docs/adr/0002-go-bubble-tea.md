@@ -113,3 +113,10 @@ and an official Bubbles progress bar. Bubble Tea never reads the journal or
 chooses a filesystem path, stale pre-run records are ignored, detailed build
 output remains in journald, and the progress record is not success authority;
 the separate controller activation receipt and PXE manifest retain that role.
+
+Bare first-run setup reuses the same dashboard state machine after its terminal
+configuration and credential boundary. A typed setup-status callback supplies
+the observed current stage; presentation maps that stage only to existing typed
+Git, controller, and PXE callbacks. It neither writes a completion flag nor
+duplicates operational completion decisions. Returning from a workflow reloads
+the setup report so a new process can safely resume the same path.

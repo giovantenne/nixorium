@@ -104,10 +104,15 @@ Veyon settings, and offers searchable offline choices for locale, time zone,
 and keyboards. It leaves optional Git author identity at the template defaults
 during first run, hashes passwords without echoing them, retries a short or
 mismatched password without discarding earlier answers, creates the required
-key pairs, and presents a redacted review. Follow its Git and controller-apply
-guidance until the controller configuration is active. Publish this deployment
-only to a **private** Git repository. The final setup stage becomes ready after
-the PXE artifacts are prepared in step 6.
+key pairs, and presents a redacted review.
+
+After configuration, the same command opens a resumable setup checklist. Press
+`Enter` on its highlighted next step to review and commit the generated public
+configuration, activate the controller, prepare installation files, and open
+the first network installation. Each disruptive action still has its own
+review and confirmation. You may quit at any point and rerun the command; it
+continues from observed system and Git state. Keep the deployment repository
+**private**.
 
 ### 5. Open Nixorium
 
@@ -116,9 +121,10 @@ nix run .#nixorium
 ```
 
 The dashboard shows configuration, cache, installation-mode, computer, and Git
-state. It also provides grouped **Change settings** editing for routine updates.
-Choose **Install computers over network**. Long PXE preparation shows its
-current phase, elapsed time, bounded recent activity, and client progress
+state. When setup is incomplete it highlights the next step and `Enter` resumes
+the checklist. It also provides grouped **Change settings** editing for routine
+updates. Choose **Install computers over network**. Long PXE preparation shows
+its current phase, elapsed time, bounded recent activity, and client progress
 without requiring a second terminal.
 
 ### 6. Prepare and start installation mode
@@ -146,6 +152,11 @@ Nixorium.
 
 Run `nix run .#nixorium` from the private deployment repository. The dashboard
 provides the normal workflows:
+
+- `Enter` follows the recommended first-run action when setup is incomplete;
+- each workflow shows its available keys, while `Esc` returns and `q` quits;
+- reviews describe impact before mutation and require the displayed phrase;
+- terminal results state what happened and expose the relevant next action.
 
 | Task | What it does |
 |---|---|
