@@ -90,6 +90,31 @@ The host report also shows the last successful post-apply verification stored
 locally. Treat it as history only: current/outdated/unknown always comes from
 the live authenticated observation.
 
+## Client shutdown
+
+Use the reviewed client-only workflow:
+
+```sh
+nixorium shutdown plan --on pc05
+nixorium shutdown plan --on @lab
+nixorium shutdown apply --on @lab --expect REVIEW_TOKEN
+```
+
+The controller is never a valid target. Planning checks evaluated client
+identity, management access, interactive sessions, PXE/controller-network
+state, and concurrent client operations. An active user session blocks that
+target. Unknown session state remains blocked unless both plan and apply use
+`--acknowledge-unknown-sessions` after explicit review. Unreachable targets are
+shown as not sent and are never queued for later.
+
+Apply requires the generated `SHUTDOWN …` phrase, takes the same lock as
+deployment, and repeats inventory, conflict, and session checks immediately
+before issuing the fixed operating-system request. Results describe only
+`accepted`, `not-sent`, or `unconfirmed`. A successful request is not proof of
+physical power state; a lost connection may mean the request took effect, so
+do not retry an unconfirmed target blindly. `--yes` is only for deliberate
+automation with the exact fresh review token.
+
 ## Guided client software
 
 Use the catalog and reviewed declaration workflow for supported packages:

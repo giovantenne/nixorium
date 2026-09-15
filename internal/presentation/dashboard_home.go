@@ -26,6 +26,7 @@ var dashboardTasks = []dashboardTask{
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
 	{id: "pxe", shortcut: "p", title: "Install or reinstall computers", description: "Prepare and control network installation"},
 	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose from releases fetched from the configured upstream"},
+	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
 	{id: "admin", shortcut: "a", title: "Advanced tools", description: "Inventory, settings, revisions, services, logs and diagnostics"},
 }
 
@@ -140,7 +141,7 @@ func (model dashboardModel) homeView() string {
 		if index == menu.list.Index() {
 			label = tuiTitle(label, model.isDark)
 		}
-		lines = append(lines, label, tuiMuted("    "+item.description, model.isDark), "")
+		lines = append(lines, label, tuiMuted("    "+item.description, model.isDark))
 	}
 	if model.message != "" {
 		lines = append(lines, "", tuiMuted(model.message, model.isDark))

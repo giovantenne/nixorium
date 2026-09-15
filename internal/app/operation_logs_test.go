@@ -96,6 +96,17 @@ func TestRecordOperationOutcomeSummarizesUpdateWithoutRawMessages(t *testing.T) 
 	}
 }
 
+func TestRecordOperationOutcomeSummarizesShutdownWithoutTechnicalOutput(t *testing.T) {
+	sink := &fakeOperationRecordSink{}
+	report := domain.ShutdownApplyReport{Operation: "shutdown-apply", State: "partial", Targets: []domain.ShutdownTargetOutcome{{Name: "pc01"}, {Name: "pc02"}}, Accepted: 1, Unconfirmed: 1, Message: "raw SSH output"}
+	if err := RecordOperationOutcome(sink, report); err != nil {
+		t.Fatal(err)
+	}
+	if sink.record.Subject != "2 selected client(s)" || sink.record.Summary != "shutdown requests: accepted=1; not-sent=0; unconfirmed=1" || strings.Contains(sink.record.Summary, "raw") {
+		t.Fatalf("record = %+v", sink.record)
+	}
+}
+
 func TestRecordOperationOutcomeRejectsUnsupportedValues(t *testing.T) {
 	if err := RecordOperationOutcome(&fakeOperationRecordSink{}, domain.StatusReport{}); err == nil {
 		t.Fatal("unsupported read-only report was recorded")

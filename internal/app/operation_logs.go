@@ -122,6 +122,11 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 		record.State = report.State
 		record.Subject = report.Target
 		record.Summary = fmt.Sprintf("upstream release update finished; files updated=%t", report.Updated)
+	case domain.ShutdownApplyReport:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = fmt.Sprintf("%d selected client(s)", len(report.Targets))
+		record.Summary = fmt.Sprintf("shutdown requests: accepted=%d; not-sent=%d; unconfirmed=%d", report.Accepted, report.NotSent, report.Unconfirmed)
 	default:
 		return domain.OperationRecord{}, false
 	}

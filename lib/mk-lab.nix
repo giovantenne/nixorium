@@ -169,7 +169,7 @@ let
           lib.optional (cachePublicKeyFile == null) "Missing cache public key"
           ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key"
           ++ lib.optional (veyonPublicKeyFile == null) "Missing Veyon public key";
-        environment.systemPackages = [ hostState ];
+        environment.systemPackages = [ hostState hostSessionState ];
       }
       // lib.optionalAttrs (effectiveDeploymentRevision != null) {
         system.configurationRevision = effectiveDeploymentRevision;
@@ -346,6 +346,24 @@ let
       [[ "$revision" =~ ^[0-9a-f]{40,64}$ ]] \
         || { echo "active deployment revision is invalid" >&2; exit 1; }
       printf '%s\n%s\n' "$system_path" "$revision"
+    '';
+  };
+  hostSessionState = bootstrapPkgs.writeShellApplication {
+    name = "nixorium-session-state";
+    runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.systemd ];
+    text = ''
+      sessions="$(loginctl list-sessions --no-legend --no-pager)" \
+        || { echo "session inventory is unavailable" >&2; exit 2; }
+      while read -r session uid _rest; do
+        [[ -z "''${session:-}" ]] && continue
+        [[ "$uid" =~ ^[0-9]+$ ]] \
+          || { echo "session inventory is invalid" >&2; exit 2; }
+        if (( uid >= 1000 )); then
+          printf 'active\n'
+          exit 0
+        fi
+      done <<< "$sessions"
+      printf 'idle\n'
     '';
   };
 

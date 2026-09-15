@@ -51,9 +51,9 @@ progress, recovery instructions and the next explicit action.
   prerelease → validate → review → apply only the two managed Flake files.
 - Software: supported pinned catalog → configuration scope → validated proposal
   → exact confirmation → atomic managed declaration → explicit Git review.
+- Shutdown: explicit client selection → reachability/session review → exact
+  confirmation → immediate recheck → honest per-target request outcomes.
 
-Computer shutdown remains absent from the current application and CLI. Do not
-represent it as a working action or implement shell execution in presentation.
 Guided software editing is available only through its dedicated typed service;
 private-module customisation remains an explicit Advanced-tools path.
 
@@ -94,6 +94,7 @@ Preserve domain/application preflights and typed callbacks for every flow:
 | Update Nixorium | service-discovered release, candidate checks, exact phrase/token, two-file scope, no implicit activation |
 | Settings/password | full validation, redacted review, source fingerprint, atomic writer, no-echo password collector |
 | Software declaration | pinned curated catalog, evaluated scope, candidate validation, fingerprint/token recheck, one-file atomic writer, no implicit Git/build/deploy |
+| Client shutdown | evaluated clients only, controller exclusion, active-session block, explicit unknown-session acknowledgement, expiring review, immediate recheck, shared deployment lock, fixed SSH commands |
 | Client disk install | local immutable inventory and exact disk/identity confirmation; not a controller-side shortcut |
 
 ## Validation

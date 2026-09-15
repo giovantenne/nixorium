@@ -28,6 +28,9 @@ Choose an intervention. Computers are checked only when the selected task needs 
   Update Nixorium
     Choose from releases fetched from the configured upstream
 
+  Shut down computers
+    Send reviewed power-off requests to selected clients only
+
   Advanced tools
     Inventory, settings, revisions, services, logs and diagnostics
 
@@ -268,6 +271,79 @@ allowing distribution from an unsaved revision:
 Review and commit the declaration before preparing or distributing systems.
 
 g review Git changes   enter interventions   ? help
+```
+
+## Shut down computers
+
+Selection is client-only and performs no room-wide check until the operator
+continues:
+
+```text
+Nixorium  /  Shut down computers
+
+Which client computers should receive the request?
+Computers are checked only after you continue. The controller is never included.
+
+2 of 24 clients selected
+
+› [x] pc01       10.0.0.1
+  [x] pc02       10.0.0.2
+  [ ] pc03       10.0.0.3
+  [ ] pc04       10.0.0.4
+
+No request is queued for a computer that is off or unreachable.
+
+space select  •  a all clients  •  enter check  •  esc back
+```
+
+Planning checks authenticated management access, interactive sessions, PXE
+state, and conflicting client operations. Active sessions stay blocked;
+unknown session state becomes eligible only after the operator presses `u` and
+reviews a new plan:
+
+```text
+Nixorium  /  Shut down computers
+
+Shut down 2 eligible client(s)?
+
+Selected  3
+Eligible  2
+Controller  excluded
+Session policy  acknowledge-unknown
+
+✓ pc01 · Ready
+! pc02 · Session unknown · risk acknowledged
+○ pc07 · Not reachable · not sent
+
+! Unsaved user work may be lost.
+Checks run again immediately before requests are sent.
+An accepted request does not prove that a computer is physically off.
+
+Type SHUTDOWN 2 CLIENTS abcdef012345 to continue:
+> _
+
+enter send requests   u unknown-session policy   esc cancel   F1 help
+```
+
+The final screen reports only what Nixorium can prove about the request:
+
+```text
+! Shutdown requests need attention
+
+Accepted  1    Not sent  1    Unconfirmed  1
+
+✓ pc01       accepted
+  the operating system accepted the power-off request
+! pc02       unconfirmed
+  request result could not be confirmed; inspect the computer before retrying
+○ pc07       not-sent
+  not reachable
+
+Requests accepted for 1 computer; 1 not sent and 1 unconfirmed. Do not retry blindly.
+
+Network loss alone is not evidence of physical power state.
+
+r new review   l operation history   t technical details   enter interventions   ? help
 ```
 
 ## Computers

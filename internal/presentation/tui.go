@@ -24,6 +24,8 @@ type DashboardActions struct {
 	LoadSoftware              func() domain.SoftwareCatalogReport
 	PlanSoftware              func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
 	ApplySoftware             func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
+	PlanShutdown              func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
+	ApplyShutdown             func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
 	PlanDeployment            func(string) domain.DeploymentPlanReport
 	ApplyDeployment           func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
 	PlanController            func() domain.ControllerRebuildPlanReport
@@ -84,6 +86,9 @@ const (
 	dashboardSoftwareScope
 	dashboardSoftwareReview
 	dashboardSoftwareResult
+	dashboardShutdown
+	dashboardShutdownReview
+	dashboardShutdownResult
 )
 
 type dashboardModel struct {
@@ -181,6 +186,13 @@ type dashboardModel struct {
 	softwarePlan         domain.SoftwareChangePlanReport
 	softwareResult       domain.SoftwareChangeApplyReport
 	softwareApplying     bool
+	shutdownCursor       int
+	shutdownChosen       map[string]bool
+	shutdownPolicy       domain.ShutdownSessionPolicy
+	shutdownPlan         domain.ShutdownPlanReport
+	shutdownResult       domain.ShutdownApplyReport
+	shutdownApplying     bool
+	shutdownTechnical    bool
 	width                int
 	height               int
 	isDark               bool
@@ -332,6 +344,8 @@ type dashboardSoftwarePlanMsg struct {
 type dashboardSoftwareApplyMsg struct {
 	report domain.SoftwareChangeApplyReport
 }
+type dashboardShutdownPlanMsg struct{ report domain.ShutdownPlanReport }
+type dashboardShutdownApplyMsg struct{ report domain.ShutdownApplyReport }
 
 func RunDashboard(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions) error {
 	_, err := tea.NewProgram(newDashboardModel(report, setup, actions, false)).Run()
@@ -732,6 +746,25 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardSoftwareResult
 		return model, nil
+	case dashboardShutdownPlanMsg:
+		model.busy = ""
+		model.shutdownPlan = message.report
+		model.message = message.report.Message
+		if len(message.report.Targets) == 0 {
+			model.screen = dashboardShutdown
+			return model, nil
+		}
+		model.confirmation = ""
+		model.screen = dashboardShutdownReview
+		return model, nil
+	case dashboardShutdownApplyMsg:
+		model.busy = ""
+		model.shutdownApplying = false
+		model.shutdownResult = message.report
+		model.shutdownTechnical = false
+		model.message = message.report.Message
+		model.screen = dashboardShutdownResult
+		return model, nil
 	case tea.WindowSizeMsg:
 		model.width = message.Width
 		model.height = message.Height
@@ -867,7 +900,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.softwareApplying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.softwareApplying || model.shutdownApplying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -952,6 +985,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model, nil
 			}
 			return model, func() tea.Msg { return dashboardSoftwareCatalogMsg{report: model.actions.LoadSoftware()} }
+		case "x":
+			model.screen = dashboardShutdown
+			model.shutdownCursor = 0
+			model.shutdownChosen = map[string]bool{}
+			model.shutdownPolicy = domain.ShutdownRequireIdle
+			model.shutdownPlan = domain.ShutdownPlanReport{}
+			model.shutdownResult = domain.ShutdownApplyReport{}
+			model.shutdownTechnical = false
+			model.message = ""
 		case "d":
 			model.screen = dashboardDeploy
 			model.deployResult = domain.DeploymentExecutionReport{}
@@ -1258,6 +1300,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult:
 		return model.updateSoftware(key)
+	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
+		return model.updateShutdown(key)
 	case dashboardDeploy:
 		if model.deployResult.Operation != "" {
 			switch key.String() {
@@ -2171,6 +2215,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.diagnosticsView()
 	case dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult:
 		content = model.softwareView()
+	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
+		content = model.shutdownView()
 	case dashboardDeploy, dashboardDeployReview:
 		content = model.deployView()
 	case dashboardController, dashboardControllerReview:

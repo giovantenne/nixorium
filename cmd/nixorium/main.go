@@ -18,27 +18,28 @@ import (
 )
 
 type options struct {
-	command         string
-	subcommand      string
-	repository      string
-	file            string
-	expect          string
-	on              string
-	service         string
-	logID           string
-	paths           string
-	target          string
-	softwarePackage string
-	softwareScope   string
-	json            bool
-	full            bool
-	help            bool
-	guided          bool
-	verifyOnly      bool
-	yes             bool
-	allowPrerelease bool
-	allowDowngrade  bool
-	remove          bool
+	command            string
+	subcommand         string
+	repository         string
+	file               string
+	expect             string
+	on                 string
+	service            string
+	logID              string
+	paths              string
+	target             string
+	softwarePackage    string
+	softwareScope      string
+	json               bool
+	full               bool
+	help               bool
+	guided             bool
+	verifyOnly         bool
+	yes                bool
+	allowPrerelease    bool
+	allowDowngrade     bool
+	acknowledgeUnknown bool
+	remove             bool
 }
 
 func main() {
@@ -287,6 +288,25 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				}
 			}
 		}
+	case "shutdown":
+		manager := app.NewShutdownManager(local)
+		policy := domain.ShutdownRequireIdle
+		if options.acknowledgeUnknown {
+			policy = domain.ShutdownAcknowledgeUnknown
+		}
+		if options.subcommand == "plan" {
+			report := manager.Plan(ctx, repository, options.on, policy)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.ShutdownPlanText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		} else {
+			return runShutdownApply(ctx, manager, repository, stdout, stderr, options.on, policy, options.expect, options.yes, options.json)
+		}
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
 		if inspectErr != nil {
@@ -489,6 +509,7 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 	updateManager := app.NewUpdateManager(local)
 	settingsManager := app.NewSettingsManager(local)
 	softwareManager := app.NewSoftwareManager(local)
+	shutdownManager := app.NewShutdownManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	setup := setupManager.Status(ctx, repository)
 	actions := presentation.DashboardActions{
@@ -522,6 +543,14 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 		},
 		ApplySoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 			return softwareManager.ApplyPlan(ctx, plan, plan.ReviewToken)
+		},
+		PlanShutdown: func(requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+			return shutdownManager.Plan(ctx, repository, requested, policy)
+		},
+		ApplyShutdown: func(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
+			report := shutdownManager.ApplyPlan(ctx, plan, plan.ReviewToken)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
 		},
 		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
 			return deploymentManager.Plan(ctx, repository, requested)
@@ -734,6 +763,8 @@ func parseArguments(arguments []string) (options, error) {
 			result.allowPrerelease = true
 		case "--allow-downgrade":
 			result.allowDowngrade = true
+		case "--acknowledge-unknown-sessions":
+			result.acknowledgeUnknown = true
 		case "--json":
 			result.json = true
 		case "--full":
@@ -753,7 +784,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update", "software":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update", "software", "shutdown":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -778,8 +809,8 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "commit-plan"
 				continue
 			}
-			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "software") || result.subcommand != "" {
-				return options{}, errors.New("plan must follow config, deploy, controller, update, software, or git commit")
+			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "software" && result.command != "shutdown") || result.subcommand != "" {
+				return options{}, errors.New("plan must follow config, deploy, controller, update, software, shutdown, or git commit")
 			}
 			result.subcommand = "plan"
 		case "keys":
@@ -802,12 +833,12 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "commit-apply"
 				continue
 			}
-			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software") && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software" || result.command == "shutdown") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
 			if result.command != "setup" || result.subcommand != "" {
-				return options{}, errors.New("apply must follow config, deploy, controller, update, software, or setup")
+				return options{}, errors.New("apply must follow config, deploy, controller, update, software, shutdown, or setup")
 			}
 			result.subcommand = "apply"
 		case "restart":
@@ -859,8 +890,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, services restart, or git commit apply")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, shutdown apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -871,11 +902,11 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, or git commit apply")
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, shutdown apply, or git commit apply")
 	}
-	if result.on != "" && (result.command != "deploy" || (result.subcommand != "plan" && result.subcommand != "apply")) {
-		return options{}, errors.New("--on is only valid with deploy plan or deploy apply")
+	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown") || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--on is only valid with deploy or shutdown plan/apply")
 	}
 	if result.command == "deploy" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("deploy requires the plan or apply subcommand")
@@ -911,6 +942,18 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "software" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("software apply requires --expect from software plan")
+	}
+	if result.command == "shutdown" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("shutdown requires the plan or apply subcommand")
+	}
+	if result.command == "shutdown" && result.on == "" {
+		return options{}, fmt.Errorf("shutdown %s requires --on", result.subcommand)
+	}
+	if result.command == "shutdown" && result.subcommand == "apply" && result.expect == "" {
+		return options{}, errors.New("shutdown apply requires --expect from shutdown plan")
+	}
+	if result.acknowledgeUnknown && result.command != "shutdown" {
+		return options{}, errors.New("--acknowledge-unknown-sessions is only valid with shutdown")
 	}
 	if result.command == "services" && result.subcommand != "" && result.subcommand != "restart" {
 		return options{}, errors.New("services accepts only the restart subcommand")
@@ -1028,10 +1071,12 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software plan|software apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software plan|software apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       software catalog")
 	fmt.Fprintln(writer, "       software plan --package <id> --scope <all-clients|group:NAME|clients:pcNN,...> [--remove]")
 	fmt.Fprintln(writer, "       software apply --package <id> --scope <scope> [--remove] --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")
+	fmt.Fprintln(writer, "       shutdown apply --on <targets> [--acknowledge-unknown-sessions] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")
@@ -1049,6 +1094,51 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
 	fmt.Fprintln(writer, "       nixorium opens the read-only management dashboard")
 	fmt.Fprintln(writer, "       doctor --full also builds the controller configuration")
+}
+
+func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, repository string, stdout, stderr io.Writer, requested string, policy domain.ShutdownSessionPolicy, expectedToken string, assumeYes, jsonOutput bool) int {
+	plan := manager.Plan(ctx, repository, requested, policy)
+	if plan.HasErrors() {
+		if jsonOutput {
+			_ = presentation.JSON(stdout, plan)
+		} else {
+			presentation.ShutdownPlanText(stderr, plan)
+		}
+		return 1
+	}
+	if !assumeYes {
+		if !presentation.IsInteractive(os.Stdin) {
+			fmt.Fprintln(stderr, "Error: shutdown apply requires an interactive terminal or explicit --yes")
+			return 2
+		}
+		confirmationOutput := stdout
+		if jsonOutput {
+			confirmationOutput = stderr
+		}
+		approved, err := presentation.ConfirmShutdown(os.Stdin, confirmationOutput, plan)
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: read confirmation:", err)
+			return 1
+		}
+		if !approved {
+			fmt.Fprintln(confirmationOutput, "Shutdown cancelled; no request was sent.")
+			return 0
+		}
+	}
+	report := manager.ApplyPlan(ctx, plan, expectedToken)
+	report.Message = operationRecordMessage(report.Message, report)
+	if jsonOutput {
+		if err := presentation.JSON(stdout, report); err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+	} else {
+		presentation.ShutdownApplyText(stdout, report)
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
 }
 
 func parseSoftwareScope(value string) (domain.SoftwareScope, error) {

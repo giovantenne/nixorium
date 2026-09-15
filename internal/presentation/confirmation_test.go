@@ -130,3 +130,17 @@ func TestConfirmSoftwareChangeRequiresExactReviewPhrase(t *testing.T) {
 		}
 	}
 }
+
+func TestConfirmShutdownRequiresExactGeneratedPhrase(t *testing.T) {
+	report := domain.ShutdownPlanReport{Eligible: 2, Targets: []domain.ShutdownTargetPlan{{Name: "pc01"}, {Name: "pc02"}}, Policy: domain.ShutdownRequireIdle, Confirmation: "SHUTDOWN 2 CLIENTS abcdef012345"}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"SHUTDOWN 2 CLIENTS abcdef012345\n", true}, {"shutdown 2 clients abcdef012345\n", false}, {"SHUTDOWN pc01,pc02\n", false}} {
+		var output bytes.Buffer
+		approved, err := ConfirmShutdown(strings.NewReader(test.input), &output, report)
+		if err != nil || approved != test.want || !strings.Contains(output.String(), "Controller: always excluded") || !strings.Contains(output.String(), "not physical power state") {
+			t.Fatalf("confirmation %q = %t, %v:\n%s", test.input, approved, err, output.String())
+		}
+	}
+}
