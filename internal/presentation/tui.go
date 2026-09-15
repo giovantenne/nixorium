@@ -71,6 +71,7 @@ type dashboardModel struct {
 	report               domain.StatusReport
 	setup                domain.SetupReport
 	setupMode            bool
+	homeMenu             dashboardTaskMenu
 	actions              DashboardActions
 	screen               dashboardScreen
 	busy                 string
@@ -242,13 +243,24 @@ type dashboardSettingsApplyMsg struct {
 }
 
 func RunDashboard(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions) error {
-	_, err := tea.NewProgram(dashboardModel{report: report, setup: setup, actions: actions}).Run()
+	_, err := tea.NewProgram(newDashboardModel(report, setup, actions, false)).Run()
 	return err
 }
 
 func RunSetupDashboard(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions) error {
-	_, err := tea.NewProgram(dashboardModel{report: report, setup: setup, setupMode: true, screen: dashboardSetup, actions: actions}).Run()
+	_, err := tea.NewProgram(newDashboardModel(report, setup, actions, true)).Run()
 	return err
+}
+
+func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions, setupMode bool) dashboardModel {
+	screen := dashboardHome
+	if setupMode {
+		screen = dashboardSetup
+	}
+	return dashboardModel{
+		report: report, setup: setup, setupMode: setupMode, screen: screen, actions: actions,
+		homeMenu: newDashboardTaskMenu(false, 80, 24),
+	}
 }
 
 func (dashboardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
@@ -526,6 +538,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		model.width = message.Width
 		model.height = message.Height
+		model.ensureHomeMenu()
+		model.homeMenu.setSize(model.width, model.height)
 		if model.screen == dashboardLogDetail && model.logScroll > maximumLogScroll(model.logDetail, model.logDetailHeight()) {
 			model.logScroll = maximumLogScroll(model.logDetail, model.logDetailHeight())
 		}
@@ -545,6 +559,9 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case tea.BackgroundColorMsg:
 		model.isDark = message.IsDark()
+		selected := model.homeMenu.list.Index()
+		model.homeMenu = newDashboardTaskMenu(model.isDark, model.width, model.height)
+		model.homeMenu.list.Select(selected)
 		if model.screen == dashboardSettings {
 			model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		}
@@ -560,6 +577,10 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	key, ok := message.(tea.KeyPressMsg)
 	if !ok {
+		if model.screen == dashboardHome {
+			model.ensureHomeMenu()
+			model.homeMenu, _ = model.homeMenu.update(message)
+		}
 		if model.screen == dashboardSettings {
 			model.settingsMenu, _ = model.settingsMenu.update(message)
 		}
@@ -586,7 +607,20 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch model.screen {
 	case dashboardHome:
-		switch key.String() {
+		model.ensureHomeMenu()
+		action := key.String()
+		if action == "enter" {
+			if model.setup.State != "" && model.setup.State != "ready" {
+				model.setupMode = true
+				model.screen = dashboardSetup
+				model.message = ""
+				return model, nil
+			}
+			if selected, ok := model.homeMenu.selected(); ok {
+				action = selected.shortcut
+			}
+		}
+		switch action {
 		case "d":
 			model.screen = dashboardDeploy
 			model.message = ""
@@ -639,18 +673,13 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				settings, err := model.actions.LoadSettings()
 				return dashboardSettingsMsg{settings: settings, err: err}
 			}
-		case "enter":
-			if model.setup.State != "" && model.setup.State != "ready" {
-				model.setupMode = true
-				model.screen = dashboardSetup
-				model.message = ""
-				return model, nil
-			}
-			model.screen = dashboardPXE
-			model.message = ""
 		case "p":
 			model.screen = dashboardPXE
 			model.message = ""
+		default:
+			var command tea.Cmd
+			model.homeMenu, command = model.homeMenu.update(key)
+			return model, command
 		}
 	case dashboardSetup:
 		if key.String() == "esc" || key.String() == "left" {
@@ -1370,6 +1399,12 @@ func (model dashboardModel) loadHosts() tea.Cmd {
 	}
 }
 
+func (model *dashboardModel) ensureHomeMenu() {
+	if len(model.homeMenu.list.Items()) == 0 {
+		model.homeMenu = newDashboardTaskMenu(model.isDark, model.width, model.height)
+	}
+}
+
 func (model dashboardModel) loadSetup() tea.Cmd {
 	return func() tea.Msg {
 		return dashboardSetupMsg{report: model.actions.LoadSetup()}
@@ -1431,49 +1466,6 @@ func (model dashboardModel) View() tea.View {
 		content = model.homeView()
 	}
 	return tea.NewView(content)
-}
-
-func (model dashboardModel) homeView() string {
-	status := "ready"
-	if !model.report.Deployment.Ready {
-		status = "action required"
-	}
-	cache := serviceLabel(model.report.Services, "nixorium-harmonia.service")
-	lines := []string{
-		tuiTitle("Nixorium", model.isDark),
-		"",
-		"Laboratory",
-		fmt.Sprintf("  Configuration        %s", status),
-		fmt.Sprintf("  Controller cache     %s", cache),
-		fmt.Sprintf("  Installation mode    %s", model.report.PXE.Mode),
-		fmt.Sprintf("  Computers            %d configured", model.report.Meta.Clients.Count),
-		fmt.Sprintf("  Git worktree         %s", cleanText(model.report.Git.Dirty, model.report.Git.Changes)),
-	}
-	if model.setup.State != "" && model.setup.State != "ready" {
-		lines = append(lines,
-			"",
-			tuiResult("Next: finish first setup", false, model.isDark),
-			"  "+setupCurrentTitle(model.setup),
-			"  Enter       Continue setup",
-		)
-	}
-	lines = append(lines,
-		"",
-		"Actions",
-		"  h           View computers",
-		"  d           Deploy updates",
-		"  c           Rebuild controller",
-		"  s           Manage services",
-		"  l           View operation logs",
-		"  g           Review Git changes",
-		"  e           Change settings",
-		"  u           Update Nixorium",
-		"  p           Install computers over network",
-		"",
-		"Run `nixorium doctor` for actionable diagnostics.",
-		tuiHelp(model.width, model.isDark, tuiHelpBinding([]string{"q", "ctrl+c"}, "q", "quit")),
-	)
-	return strings.Join(lines, "\n") + "\n"
 }
 
 func (model dashboardModel) setupView() string {

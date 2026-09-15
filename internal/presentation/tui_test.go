@@ -98,6 +98,31 @@ func TestCompletedSetupOpensFirstNetworkInstallation(t *testing.T) {
 	}
 }
 
+func TestDashboardTaskMenuUsesSelectionAndKeepsShortcuts(t *testing.T) {
+	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	model.width = 90
+	model.height = 30
+	model.homeMenu.setSize(model.width, model.height)
+	view := model.View().Content
+	if !strings.Contains(view, "View computers  [h]") || !strings.Contains(view, "Reachability and deployed configuration") || !strings.Contains(view, "\x1b[") {
+		t.Fatalf("home task menu lacks hierarchy or color:\n%s", view)
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardDeploy {
+		t.Fatalf("selected dashboard task did not open: screen=%d", model.screen)
+	}
+
+	model = newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardPXE {
+		t.Fatalf("existing PXE shortcut stopped working: screen=%d", model.screen)
+	}
+}
+
 func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	loads := 0
 	actions := DashboardActions{
@@ -147,7 +172,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	view := model.View().Content
-	if !strings.Contains(view, "Installation mode    ready") || !strings.Contains(view, "Install computers over network") {
+	if !strings.Contains(view, "Installation mode") || !strings.Contains(view, "READY") || !strings.Contains(view, "Laboratory tasks") && !strings.Contains(view, "Tasks") {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 
@@ -393,8 +418,8 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if !strings.Contains(model.View().Content, "Update Nixorium") {
-		t.Fatalf("home omits update task:\n%s", model.View().Content)
+	if !strings.Contains(model.View().Content, "Tasks") || !strings.Contains(model.View().Content, "View computers") {
+		t.Fatalf("home omits navigable task menu:\n%s", model.View().Content)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)

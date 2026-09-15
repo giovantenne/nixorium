@@ -124,6 +124,13 @@ Run the task-oriented dashboard from the repository root:
 nix run .#nixorium
 ```
 
+The home screen separates current laboratory status from routine tasks. Use
+`Up`/`Down` to select a task and `Enter` to open it, or press the one-letter
+shortcut shown beside it. Color reinforces ready, attention, and failure
+states, but every state remains written explicitly. Each workflow displays its
+own available keys; `Esc` returns to the previous screen and `q` quits when no
+operation requires attention.
+
 | Dashboard task | Purpose |
 |---|---|
 | **View computers** | Inspect authenticated client state |

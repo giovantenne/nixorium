@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Replaced the dashboard's flat command wall with a paginated, keyboard-
+  navigable Bubbles task menu, semantic light/dark status colors, task
+  descriptions, and explicit key help while preserving textual state and all
+  existing one-letter shortcuts.
 - Turned bare first-run setup into a resumable guided handoff: after initial
   configuration and key reconciliation it opens an observed 11-stage progress
   screen whose single primary action routes through reviewed Git commit,

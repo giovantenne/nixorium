@@ -108,6 +108,12 @@ help. Bubbles list/input/progress/viewport primitives may manage interaction
 state, but operational state continues to arrive only through typed
 application callbacks.
 
+The dashboard home presents typed local status above a paginated Bubbles task
+list. Arrow keys plus Enter are the discoverable primary navigation; stable
+one-letter shortcuts remain direct alternatives. Shared semantic styles make
+title, sections, descriptions, and ready/attention/failure states visually
+distinct on light and dark terminals while preserving explicit textual labels.
+
 The initial package layout is:
 
 ```text
