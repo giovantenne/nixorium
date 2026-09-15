@@ -11,31 +11,32 @@ import (
 )
 
 type DashboardActions struct {
-	Refresh         func() (domain.StatusReport, error)
-	LoadHosts       func() (domain.HostsReport, error)
-	PlanDeployment  func(string) domain.DeploymentPlanReport
-	ApplyDeployment func(domain.DeploymentPlanReport) domain.DeploymentExecutionReport
-	PlanController  func() domain.ControllerRebuildPlanReport
-	ApplyController func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
-	LoadServices    func() domain.ServicesReport
-	RestartService  func(string) domain.ServiceActionReport
-	LoadLogs        func() domain.OperationLogsReport
-	LoadLog         func(string) domain.OperationLogReport
-	LoadGitReview   func() domain.GitReviewReport
-	PlanGitCommit   func(string) domain.GitCommitPlanReport
-	ApplyGitCommit  func(domain.GitCommitPlanReport) domain.GitCommitReport
-	PlanUpdate      func(string, bool, bool) domain.UpdatePlanReport
-	ApplyUpdate     func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadSettings    func() (domain.LabSettingsFile, error)
-	PlanSettings    func(domain.LabSettingsFile) domain.ConfigPlanReport
-	ApplySettings   func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigApplyReport
-	ChangePassword  SettingsPasswordAction
-	PreparePXE      func() domain.ActionReport
-	LoadPXEProgress func() (domain.OperationProgress, error)
-	PlanPXEStart    func() domain.PXELifecycleReport
-	StartPXE        func() domain.PXELifecycleReport
-	StopPXE         func() domain.PXELifecycleReport
-	RecoverPXE      func() domain.PXELifecycleReport
+	Refresh                func() (domain.StatusReport, error)
+	LoadHosts              func() (domain.HostsReport, error)
+	PlanDeployment         func(string) domain.DeploymentPlanReport
+	ApplyDeployment        func(domain.DeploymentPlanReport) domain.DeploymentExecutionReport
+	PlanController         func() domain.ControllerRebuildPlanReport
+	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
+	LoadControllerProgress func() (domain.OperationProgress, error)
+	LoadServices           func() domain.ServicesReport
+	RestartService         func(string) domain.ServiceActionReport
+	LoadLogs               func() domain.OperationLogsReport
+	LoadLog                func(string) domain.OperationLogReport
+	LoadGitReview          func() domain.GitReviewReport
+	PlanGitCommit          func(string) domain.GitCommitPlanReport
+	ApplyGitCommit         func(domain.GitCommitPlanReport) domain.GitCommitReport
+	PlanUpdate             func(string, bool, bool) domain.UpdatePlanReport
+	ApplyUpdate            func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadSettings           func() (domain.LabSettingsFile, error)
+	PlanSettings           func(domain.LabSettingsFile) domain.ConfigPlanReport
+	ApplySettings          func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigApplyReport
+	ChangePassword         SettingsPasswordAction
+	PreparePXE             func() domain.ActionReport
+	LoadPXEProgress        func() (domain.OperationProgress, error)
+	PlanPXEStart           func() domain.PXELifecycleReport
+	StartPXE               func() domain.PXELifecycleReport
+	StopPXE                func() domain.PXELifecycleReport
+	RecoverPXE             func() domain.PXELifecycleReport
 }
 
 type dashboardScreen int
@@ -80,6 +81,10 @@ type dashboardModel struct {
 	deploying            bool
 	controllerPlan       domain.ControllerRebuildPlanReport
 	controllerResult     domain.ControllerRebuildExecutionReport
+	controllerApplying   bool
+	controllerProgress   domain.OperationProgress
+	controllerStarted    time.Time
+	controllerProgressID uint64
 	services             domain.ServicesReport
 	serviceResult        domain.ServiceActionReport
 	logs                 domain.OperationLogsReport
@@ -156,6 +161,16 @@ type dashboardControllerPlanMsg struct {
 
 type dashboardControllerResultMsg struct {
 	report domain.ControllerRebuildExecutionReport
+}
+
+type dashboardControllerProgressTickMsg struct {
+	id uint64
+}
+
+type dashboardControllerProgressMsg struct {
+	id       uint64
+	progress domain.OperationProgress
+	err      error
 }
 
 type dashboardServicesMsg struct {
@@ -317,9 +332,29 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardControllerResultMsg:
 		model.busy = ""
+		model.controllerApplying = false
 		model.controllerResult = message.report
 		model.message = message.report.Message
 		model.screen = dashboardController
+		if model.actions.LoadControllerProgress != nil {
+			return model, model.loadControllerProgress(model.controllerProgressID)
+		}
+		return model, nil
+	case dashboardControllerProgressTickMsg:
+		if !model.controllerApplying || message.id != model.controllerProgressID || model.actions.LoadControllerProgress == nil {
+			return model, nil
+		}
+		return model, model.loadControllerProgress(message.id)
+	case dashboardControllerProgressMsg:
+		if message.id != model.controllerProgressID {
+			return model, nil
+		}
+		if message.err == nil && (model.controllerStarted.IsZero() || !message.progress.StartedAt.Before(model.controllerStarted)) {
+			model.controllerProgress = message.progress
+		}
+		if model.controllerApplying {
+			return model, scheduleControllerProgressTick(message.id)
+		}
 		return model, nil
 	case dashboardServicesMsg:
 		model.busy = ""
@@ -775,12 +810,17 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model, nil
 			}
 			model.busy = "Building and activating the reviewed controller revision"
+			model.controllerApplying = true
+			model.controllerProgress = domain.OperationProgress{}
+			model.controllerStarted = time.Now().UTC()
+			model.controllerProgressID++
 			model.confirmation = ""
 			model.message = ""
 			plan := model.controllerPlan
-			return model, func() tea.Msg {
+			operation := func() tea.Msg {
 				return dashboardControllerResultMsg{report: model.actions.ApplyController(plan)}
 			}
+			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controllerProgressID))
 		default:
 			if key.Text != "" {
 				model.confirmation += key.Text
@@ -1207,6 +1247,19 @@ func (model dashboardModel) loadPXEProgress(id uint64) tea.Cmd {
 	}
 }
 
+func scheduleControllerProgressTick(id uint64) tea.Cmd {
+	return tea.Tick(350*time.Millisecond, func(time.Time) tea.Msg {
+		return dashboardControllerProgressTickMsg{id: id}
+	})
+}
+
+func (model dashboardModel) loadControllerProgress(id uint64) tea.Cmd {
+	return func() tea.Msg {
+		progress, err := model.actions.LoadControllerProgress()
+		return dashboardControllerProgressMsg{id: id, progress: progress, err: err}
+	}
+}
+
 func (model dashboardModel) View() tea.View {
 	content := ""
 	switch model.screen {
@@ -1551,6 +1604,16 @@ func maximumGitReviewScroll(report domain.GitReviewReport, height int) int {
 
 func (model dashboardModel) controllerView() string {
 	lines := []string{"Nixorium — Rebuild controller", ""}
+	if model.controllerApplying {
+		elapsed := time.Since(model.controllerStarted).Truncate(time.Second)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		lines = append(lines, fmt.Sprintf("%s…  elapsed %s", model.busy, elapsed))
+		lines = append(lines, model.operationProgressView(model.controllerProgress, "Current progress")...)
+		lines = append(lines, "", "q: close this view; systemd-owned work continues")
+		return strings.Join(lines, "\n") + "\n"
+	}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…", "", "This systemd-owned action continues if the dashboard closes.")
 		return strings.Join(lines, "\n") + "\n"
@@ -1581,6 +1644,10 @@ func (model dashboardModel) controllerView() string {
 			fmt.Sprintf("Last result: %s at phase %s", model.controllerResult.State, model.controllerResult.Phase),
 			fmt.Sprintf("Applied: %t   Verified: %t", model.controllerResult.Applied, model.controllerResult.Verified),
 		)
+	}
+	if model.controllerProgress.Operation != "" {
+		lines = append(lines, "")
+		lines = append(lines, model.operationProgressView(model.controllerProgress, "Last controller apply")...)
 	}
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
@@ -1876,7 +1943,7 @@ func (model dashboardModel) pxeView() string {
 			elapsed = 0
 		}
 		lines = append(lines, "", fmt.Sprintf("%s…  elapsed %s", model.busy, elapsed))
-		lines = append(lines, model.pxeProgressView("Current progress")...)
+		lines = append(lines, model.operationProgressView(model.pxeProgress, "Current progress")...)
 		lines = append(lines, "", "q: close this view; systemd-owned work continues")
 		return strings.Join(lines, "\n") + "\n"
 	}
@@ -1913,7 +1980,7 @@ func (model dashboardModel) pxeView() string {
 	lines = append(lines, "  r   Recover normal networking")
 	if model.pxeProgress.Operation != "" {
 		lines = append(lines, "")
-		lines = append(lines, model.pxeProgressView("Last preparation")...)
+		lines = append(lines, model.operationProgressView(model.pxeProgress, "Last preparation")...)
 	}
 	lines = append(lines, "", "  Esc Back", "  q   Quit (active services keep running)")
 	if model.message != "" {
@@ -1922,8 +1989,8 @@ func (model dashboardModel) pxeView() string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func (model dashboardModel) pxeProgressView(title string) []string {
-	if model.pxeProgress.Operation == "" {
+func (model dashboardModel) operationProgressView(operation domain.OperationProgress, title string) []string {
+	if operation.Operation == "" {
 		return []string{"  Waiting for managed progress…"}
 	}
 	phaseLabels := map[string]string{
@@ -1934,9 +2001,12 @@ func (model dashboardModel) pxeProgressView(title string) []string {
 		"clients":   "Building client systems",
 		"publish":   "Publishing preparation",
 		"complete":  "Complete",
+		"build":     "Building system",
+		"activate":  "Activating system",
+		"verify":    "Verifying activation",
 	}
-	lines := []string{title, "  Phase: " + phaseLabels[model.pxeProgress.Phase]}
-	if model.pxeProgress.Total > 0 {
+	lines := []string{title, "  Phase: " + phaseLabels[operation.Phase]}
+	if operation.Total > 0 {
 		barWidth := model.width - 8
 		if barWidth < 24 {
 			barWidth = 24
@@ -1945,15 +2015,15 @@ func (model dashboardModel) pxeProgressView(title string) []string {
 			barWidth = 64
 		}
 		bar := progress.New(progress.WithDefaultBlend(), progress.WithWidth(barWidth))
-		percentage := float64(model.pxeProgress.Current) / float64(model.pxeProgress.Total)
+		percentage := float64(operation.Current) / float64(operation.Total)
 		lines = append(lines,
-			fmt.Sprintf("  %d/%d", model.pxeProgress.Current, model.pxeProgress.Total),
+			fmt.Sprintf("  %d/%d", operation.Current, operation.Total),
 			"  "+bar.ViewAs(percentage),
 		)
 	}
-	if len(model.pxeProgress.Recent) > 0 {
+	if len(operation.Recent) > 0 {
 		lines = append(lines, "  Recent activity:")
-		for _, activity := range model.pxeProgress.Recent {
+		for _, activity := range operation.Recent {
 			lines = append(lines, "    • "+activity)
 		}
 	}

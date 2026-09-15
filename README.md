@@ -150,7 +150,7 @@ provides the normal workflows:
 |---|---|
 | **View computers** | Authenticates reachable hosts and compares their active revision with the desired Git revision |
 | **Deploy updates** | Reviews and applies one, selected, or all client configurations |
-| **Rebuild controller** | Builds and activates an exact reviewed controller revision |
+| **Rebuild controller** | Builds and activates an exact reviewed controller revision with live typed phase progress |
 | **Manage services** | Inspects PXE and the signed cache; performs a bounded cache restart |
 | **View operation logs** | Shows private, bounded deployment logs and typed action history |
 | **Review Git changes** | Displays redacted deployment changes and optionally creates a local reviewed commit |

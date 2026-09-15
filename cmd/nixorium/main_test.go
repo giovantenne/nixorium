@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
@@ -134,6 +135,38 @@ func TestPXEPreparationActivityUsesStderrSafeGuidance(t *testing.T) {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("PXE preparation activity omits %q: %s", expected, output.String())
 		}
+	}
+}
+
+func TestManagedProgressRendersOnlyCurrentTypedActivity(t *testing.T) {
+	var output bytes.Buffer
+	now := time.Now().UTC().Add(time.Second)
+	result := runWithManagedProgress(
+		func() int { return 7 },
+		func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{
+				Operation: "controller-apply", State: "completed", Phase: "complete",
+				StartedAt: now, UpdatedAt: now.Add(time.Second), Current: 4, Total: 4,
+				Recent: []string{"Controller revision activated and verified"},
+			}, nil
+		},
+		&output,
+	)
+	if result != 7 || !strings.Contains(output.String(), "Progress [complete] (4/4): Controller revision activated and verified") {
+		t.Fatalf("result = %d, output = %q", result, output.String())
+	}
+
+	output.Reset()
+	old := time.Now().UTC().Add(-time.Hour)
+	runWithManagedProgress(
+		func() bool { return true },
+		func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{StartedAt: old, UpdatedAt: old}, nil
+		},
+		&output,
+	)
+	if output.Len() != 0 {
+		t.Fatalf("stale progress was rendered: %q", output.String())
 	}
 }
 

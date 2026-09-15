@@ -100,12 +100,13 @@ filesystem, Nix, release discovery, operation recording, and every follow-up
 action remain in application/adapters. Only explicit `update check` enumerates
 the public remote; opening the dashboard never does.
 
-Systemd-owned PXE preparation can outlive its initiating terminal. The CLI
-writes immediate activity plus the fixed journal follow command to stderr so
-JSON stdout remains machine-clean. The service also atomically publishes a
-private, bounded, versioned progress record containing fixed phases, counters,
-and at most five authored activities. A strict adapter/domain callback polls
-that record while the TUI renders elapsed time and an official Bubbles progress
-bar. Bubble Tea never reads the journal or chooses a filesystem path, stale
-pre-run records are ignored, and detailed build output remains in journald
-rather than being copied into presentation or an unbounded in-memory channel.
+Systemd-owned PXE preparation and controller apply can outlive their initiating
+terminal. The CLI writes immediate typed activity plus the fixed journal route
+to stderr so JSON stdout remains machine-clean. Each service atomically
+publishes a private, bounded, versioned progress record containing its fixed
+phases, counters, and at most five authored activities. A strict
+adapter/domain callback polls that record while the TUI renders elapsed time
+and an official Bubbles progress bar. Bubble Tea never reads the journal or
+chooses a filesystem path, stale pre-run records are ignored, detailed build
+output remains in journald, and the progress record is not success authority;
+the separate controller activation receipt and PXE manifest retain that role.

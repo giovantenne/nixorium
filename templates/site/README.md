@@ -239,8 +239,10 @@ nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 Apply requires `REBUILD <controller>`, starts only the matching revision-bound
 systemd unit, builds as the deployment owner, refuses repository drift, and
 records success only after activation and active-system verification. Closing
-the dashboard does not stop the systemd-owned job. Use `setup apply` for the
-equivalent first-run action.
+the dashboard does not stop the systemd-owned job. The dashboard shows elapsed
+time, four typed phases, recent activity, and a progress bar; CLI text/JSON
+flows write the same safe activity to stderr. Use `setup apply` for the
+equivalent first-run action with identical progress feedback.
 
 ### Manage services
 
@@ -285,6 +287,9 @@ keys are committed, `setup apply` requires a clean ready deployment and exact
 `APPLY` confirmation. The build runs as `admin`; only exact-closure activation
 runs as root. Completion requires the active system and root-owned success
 receipt to match the reviewed revision.
+While it runs, `setup apply` reports typed validation, build, activation, and
+verification progress on stderr; verbose Nix output remains in journald and
+JSON stdout stays machine-clean.
 
 For machine-managed settings changes:
 

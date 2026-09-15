@@ -68,10 +68,78 @@ let
       REPOSITORY=${lib.escapeShellArg cfg.deploymentPath}
       EXPECTED_REVISION="''${1:-}"
 
-      fail() {
-        echo "Error: $*" >&2
+      STATE_DIRECTORY=/var/lib/nixorium/controller
+      [[ -d "$STATE_DIRECTORY" && ! -L "$STATE_DIRECTORY" \
+          && "$(stat -c '%U:%G:%a' "$STATE_DIRECTORY")" == root:root:755 ]] || {
+        echo "Error: controller state directory has unsafe ownership or permissions" >&2
         exit 1
       }
+      PROGRESS_FILE="$STATE_DIRECTORY/progress.json"
+      PROGRESS_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+      PROGRESS_STATE=running
+      PROGRESS_PHASE=starting
+      PROGRESS_CURRENT=0
+      PROGRESS_TOTAL=4
+      PROGRESS_RECENT='[]'
+      TEMPORARY_RECORD=""
+      keep_temporary=false
+
+      publish_progress() {
+        local state="$1"
+        local phase="$2"
+        local activity="$3"
+        local current="$4"
+        local temporary
+
+        PROGRESS_STATE="$state"
+        PROGRESS_PHASE="$phase"
+        PROGRESS_CURRENT="$current"
+        PROGRESS_RECENT="$(jq -c --arg activity "$activity" \
+          '. + [$activity] | if length > 5 then .[-5:] else . end' \
+          <<<"$PROGRESS_RECENT")"
+        temporary="$(mktemp "$STATE_DIRECTORY/.progress.XXXXXX")"
+        jq -n \
+          --arg operation controller-apply \
+          --arg state "$PROGRESS_STATE" \
+          --arg phase "$PROGRESS_PHASE" \
+          --arg startedAt "$PROGRESS_STARTED_AT" \
+          --arg updatedAt "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
+          --argjson current "$PROGRESS_CURRENT" \
+          --argjson total "$PROGRESS_TOTAL" \
+          --argjson recent "$PROGRESS_RECENT" \
+          '{schemaVersion: 1, operation: $operation, state: $state, phase: $phase,
+            startedAt: $startedAt, updatedAt: $updatedAt, current: $current,
+            total: $total, recent: $recent}' >"$temporary"
+        chown admin:users "$temporary"
+        chmod 0600 "$temporary"
+        mv -fT -- "$temporary" "$PROGRESS_FILE"
+        echo "$activity"
+      }
+
+      cleanup_controller() {
+        local status="$?"
+        if [[ "$keep_temporary" == true && -n "$TEMPORARY_RECORD" ]]; then
+          rm -f -- "$TEMPORARY_RECORD"
+        fi
+        if [[ "$status" -ne 0 && "$PROGRESS_STATE" == running ]]; then
+          publish_progress failed "$PROGRESS_PHASE" \
+            "Controller apply stopped unexpectedly" "$PROGRESS_CURRENT" || true
+        fi
+      }
+      trap cleanup_controller EXIT
+
+      fail() {
+        local message="$*"
+        if [[ "$PROGRESS_STATE" == running ]]; then
+          publish_progress failed "$PROGRESS_PHASE" \
+            "Failed: $message" "$PROGRESS_CURRENT" || true
+        fi
+        echo "Error: $message" >&2
+        exit 1
+      }
+
+      publish_progress running starting "Starting controller apply" 0
+      publish_progress running validate "Validating the reviewed controller configuration" 0
 
       [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
         || fail "configured deployment path is not a real directory"
@@ -122,6 +190,9 @@ let
       cmp -s "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key \
         || fail "installed Harmonia signing key is absent or differs"
 
+      publish_progress running build "Validated configuration and installed keys" 1
+      publish_progress running build "Building the reviewed controller system" 1
+
       CONTROLLER_NAME="$(as_admin nix eval "$FLAKE_URL#labMeta.controller.name" --raw --no-write-lock-file)"
       [[ "$CONTROLLER_NAME" =~ ^pc[0-9]+$ ]] \
         || fail "evaluated controller name is invalid"
@@ -135,11 +206,8 @@ let
           && "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" ]] \
         || fail "deployment changed while the controller was building; activation refused"
 
-      STATE_DIRECTORY=/var/lib/nixorium/controller
+      publish_progress running activate "Built controller system; beginning activation" 2
       ACTIVATION_RECORD="$STATE_DIRECTORY/applied.json"
-      [[ -d "$STATE_DIRECTORY" && ! -L "$STATE_DIRECTORY" \
-          && "$(stat -c '%U:%G:%a' "$STATE_DIRECTORY")" == root:root:755 ]] \
-        || fail "controller state directory has unsafe ownership or permissions"
       if [[ -L "$ACTIVATION_RECORD" ]]; then
         fail "refusing symlink controller activation record"
       fi
@@ -156,14 +224,10 @@ let
       [[ "$ACTIVE_SYSTEM" == "$SYSTEM_PATH" ]] \
         || fail "active system differs after controller activation"
 
+      publish_progress running verify "Activated controller system; recording verification" 3
+
       TEMPORARY_RECORD="$(mktemp --tmpdir="$STATE_DIRECTORY" .applied.json.XXXXXX)"
       keep_temporary=true
-      cleanup_record() {
-        if [[ "$keep_temporary" == true ]]; then
-          rm -f -- "$TEMPORARY_RECORD"
-        fi
-      }
-      trap cleanup_record EXIT
       jq -n \
         --arg revision "$REVISION" \
         --arg systemPath "$SYSTEM_PATH" \
@@ -175,6 +239,7 @@ let
       mv -fT -- "$TEMPORARY_RECORD" "$ACTIVATION_RECORD"
       keep_temporary=false
       sync "$STATE_DIRECTORY"
+      publish_progress completed complete "Controller revision activated and verified" 4
       trap - EXIT
     '';
   };

@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Extended managed live feedback to first-run and routine controller apply:
+  both fixed and revision-bound systemd units publish validation, build,
+  activation, and verification progress. CLI JSON keeps stdout clean while the
+  dashboard shows elapsed time, recent activity, and a Bubbles progress bar.
 - Added live PXE preparation feedback to the dashboard using an official
   Bubbles progress bar, elapsed time, typed phases, counters, and five bounded
   recent activities. The systemd job atomically publishes a strict private

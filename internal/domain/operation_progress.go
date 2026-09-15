@@ -13,14 +13,15 @@ import (
 
 const OperationProgressSchemaVersion = 1
 
-var operationProgressPhases = map[string]bool{
-	"starting":  true,
-	"validate":  true,
-	"network":   true,
-	"artifacts": true,
-	"clients":   true,
-	"publish":   true,
-	"complete":  true,
+var operationProgressPhases = map[string]map[string]bool{
+	"pxe-prepare": {
+		"starting": true, "validate": true, "network": true, "artifacts": true,
+		"clients": true, "publish": true, "complete": true,
+	},
+	"controller-apply": {
+		"starting": true, "validate": true, "build": true, "activate": true,
+		"verify": true, "complete": true,
+	},
 }
 
 // OperationProgress is the bounded, terminal-safe status published by a
@@ -51,13 +52,14 @@ func DecodeOperationProgress(data []byte) (OperationProgress, error) {
 	if progress.SchemaVersion != OperationProgressSchemaVersion {
 		return progress, fmt.Errorf("unsupported operation progress schema version %d", progress.SchemaVersion)
 	}
-	if progress.Operation != "pxe-prepare" {
+	phases, supported := operationProgressPhases[progress.Operation]
+	if !supported {
 		return progress, fmt.Errorf("unsupported progress operation %q", progress.Operation)
 	}
 	if progress.State != "running" && progress.State != "completed" && progress.State != "failed" {
 		return progress, fmt.Errorf("invalid operation progress state %q", progress.State)
 	}
-	if !operationProgressPhases[progress.Phase] {
+	if !phases[progress.Phase] {
 		return progress, fmt.Errorf("invalid operation progress phase %q", progress.Phase)
 	}
 	if (progress.State == "completed") != (progress.Phase == "complete") {
