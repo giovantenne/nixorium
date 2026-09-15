@@ -373,9 +373,15 @@ stage. Going backward changes draft values without undoing applied operations.
 The implemented setup slices expose read-only reconciliation through
 `nixorium setup status`, guided configuration through `nixorium setup`, and
 explicit key reconciliation through `nixorium setup keys`. The wizard proposes
-detected network values, retains entries across backward navigation, collects
-default credentials without echo, and uses the same candidate-plan/apply
-backend as automation. After acceptance, bare `setup` continues into
+detected network values and groups 15 essential questions into Network,
+Laboratory, Accounts, Regional settings, Preferences, and Classroom stages.
+Time zone, locale, regional-format locale, desktop keyboard, and console keymap
+use offline Bubbles lists with fuzzy filtering, curated common values, and a
+validated custom path. Optional Git author identity retains the deployment
+template defaults instead of extending first run. The wizard retains entries
+across backward navigation, collects default credentials without echo, and
+uses the same candidate-plan/apply backend as automation. After acceptance,
+bare `setup` continues into
 idempotent key reconciliation; `setup configure` limits the run to settings.
 Status derives stage state from the managed settings,
 required commands, password-hash readiness, verified key correspondence and

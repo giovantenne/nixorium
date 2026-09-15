@@ -98,12 +98,14 @@ cd ~/nixorium-deployment
 nix run .#nixorium -- setup
 ```
 
-The wizard collects network, account, locale, Git, and Veyon settings; hashes
-passwords without echoing them; retries a short or mismatched password without
-discarding earlier answers; creates the required key pairs; and presents a
-redacted review. Follow its Git and controller-apply guidance until
-the controller configuration is active. Publish this deployment only to a
-**private** Git repository. The final setup stage becomes ready after the PXE
+The wizard groups essential network, laboratory, account, regional, browser,
+and Veyon settings; offers searchable offline choices for locale, time zone,
+and keyboards; and leaves optional Git author identity at the template defaults
+during first run. It hashes passwords without echoing them, retries a short or
+mismatched password without discarding earlier answers, creates the required
+key pairs, and presents a redacted review. Follow its Git and controller-apply
+guidance until the controller configuration is active. Publish this deployment
+only to a **private** Git repository. The final setup stage becomes ready after the PXE
 artifacts are prepared in step 6.
 
 ### 5. Open Nixorium
