@@ -20,8 +20,10 @@ a fault diagnosis and not a reason to put the whole laboratory in an alarm state
 
 The contracts and layouts in this review are now complete enough to implement
 in batches. They do not claim that unshipped services are already available.
-The preceding TUI implementation remains uncommitted, and its
-[actual renders](../tui-renders.md) predate this direction.
+The structural entry, restore, pilot-installation, deployment, and Nixorium
+update slices are implemented on the development branch. The
+[actual renders](../tui-renders.md) track the implementation rather than a
+separate mock-up.
 
 ### What changes from the previous proposal
 
@@ -128,7 +130,7 @@ off. Distribution requires checks only for selected targets.
 
 | Flow | Current implementation | Intervention |
 |---|---|---|
-| Controller bootstrap, setup, PXE | Implemented as separate steps | Highest priority: continuity, resume, handoff, and completion |
+| Controller bootstrap, setup, PXE | Guided setup, pilot handoff, session-local verification, stop/leave review | Highest priority: durable initial-provisioning evidence and physical validation |
 | Client verification and deployment | Implemented | Place them in an explicit-target flow that supports partial sessions |
 | Restore | PXE reinstall and deploy exist separately | Guide the choice without hiding disk risk |
 | Guided software changes | Not implemented | New application service limited to supported changes |
@@ -255,16 +257,16 @@ UX success metric.
 |---|---|---|
 | D01 | First installation is primary; later use is occasional maintenance | Owner direction accepted |
 | D02 | Computers are normally off; no fleet-availability alarm | Owner direction accepted |
-| D03 | Restore has two explicit paths: reapply configuration or reinstall and erase a locally confirmed disk | Review required |
-| D04 | Use a pilot client and support partial installation sessions | Review required |
+| D03 | Restore has two explicit paths: reapply configuration or reinstall and erase a locally confirmed disk | Implemented direction |
+| D04 | Use a pilot client and support partial installation sessions | Implemented with session-local evidence; durable evidence remains planned |
 | D05 | Guided software is limited to supported packages/configuration while preserving private modules | Review required |
 | D06 | No NixOS-upgrade action; Update Nixorium selects only releases discovered by the typed service | Owner direction accepted |
 | D07 | Shutdown targets clients only; session conflicts block by default and unknown sessions require explicit acknowledgement | Planned contract |
 | D08 | Keep Bubble Tea; defer Web UI; approve final language and palette separately | Review required |
 
-The owner approved implementation of this direction. The review does not
-authorise live operations, commits, publication, or presenting an unimplemented
-service as available.
+The owner approved implementation and incremental local commits. The review
+does not authorise live laboratory operations, publication, pushing commits, or
+presenting an unimplemented service as available.
 
 ## Website alignment
 

@@ -20,6 +20,10 @@ func testDashboardReport(mode string) domain.StatusReport {
 		},
 	}
 	report.Meta.Clients.Count = 2
+	report.Meta.Clients.Hosts = []domain.HostMeta{
+		{Name: "pc01", IP: "192.0.2.11"},
+		{Name: "pc02", IP: "192.0.2.12"},
+	}
 	report.Meta.Controller.Name = "pc99"
 	report.Meta.Controller.DHCPIP = "192.0.2.10"
 	report.Meta.Network.Interface = "enp1s0"
@@ -83,15 +87,125 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 	}
 }
 
-func TestCompletedSetupOpensFirstNetworkInstallation(t *testing.T) {
+func TestCompletedSetupOpensPilotSelection(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), setup: testSetupReport(true, true, true, true), setupMode: true, screen: dashboardSetup}
 	if !strings.Contains(model.View().Content, "Controller and client system are ready") || !strings.Contains(model.View().Content, "opens network installation") {
 		t.Fatalf("completed setup omits first installation action:\n%s", model.View().Content)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardPXE || !strings.Contains(model.View().Content, "Start installation mode") {
-		t.Fatalf("completed setup did not open network installation:\n%s", model.View().Content)
+	if model.screen != dashboardPXE || !strings.Contains(model.View().Content, "Choose a pilot computer") || !strings.Contains(model.View().Content, "pc01") {
+		t.Fatalf("completed setup did not open pilot selection:\n%s", model.View().Content)
+	}
+}
+
+func TestFirstSetupGuidesAndVerifiesPilotWithoutInventedProgress(t *testing.T) {
+	checks := 0
+	report := testDashboardReport("active")
+	actions := DashboardActions{LoadHost: func(name string) (domain.HostsReport, error) {
+		checks++
+		if name != "pc01" {
+			t.Fatalf("pilot check targeted %q, want pc01", name)
+		}
+		return domain.HostsReport{
+			DesiredRevision: "0123456789abcdef",
+			Hosts: []domain.HostStatus{{
+				Name:            "pc01",
+				IP:              "192.0.2.11",
+				Reachability:    domain.ReachabilityReachable,
+				SSH:             domain.SSHAvailable,
+				Deployment:      domain.DeploymentCurrent,
+				CurrentRevision: "0123456789abcdef",
+				DesiredRevision: "0123456789abcdef",
+			}},
+		}, nil
+	}}
+	model := dashboardModel{report: report, setupMode: true, screen: dashboardPXE, actions: actions, width: 100, height: 30}
+
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	for _, expected := range []string{"Continue at pc01", "run /installer/setup.sh", "disk selected on the computer will be erased", "does not provide telemetry"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("pilot handoff omits %q:\n%s", expected, view)
+		}
+	}
+
+	updated, command := model.Update(tea.KeyPressMsg{Text: "v"})
+	model = updated.(dashboardModel)
+	if command == nil || !strings.Contains(model.View().Content, "Checking authenticated system state") {
+		t.Fatalf("pilot check did not start:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if checks != 1 || !strings.Contains(model.View().Content, "Technical verification succeeded") || !strings.Contains(model.View().Content, "Check at the computer") {
+		t.Fatalf("pilot check did not separate technical and practical evidence:\n%s", model.View().Content)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if !model.pilotPractical || len(model.pilotVerified) != 1 || !strings.Contains(model.View().Content, "Powered-off computers are not errors") {
+		t.Fatalf("practical confirmation did not offer a partial-room exit:\n%s", model.View().Content)
+	}
+}
+
+func TestFirstSetupDoesNotTreatReachabilityAsPilotVerification(t *testing.T) {
+	report := testDashboardReport("active")
+	model := dashboardModel{
+		report: report, setupMode: true, screen: dashboardPXE, pilotName: "pc01",
+		hosts: domain.HostsReport{Hosts: []domain.HostStatus{{
+			Name: "pc01", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentUnknown,
+		}}},
+	}
+	view := model.View().Content
+	if strings.Contains(view, "Technical verification succeeded") || !strings.Contains(view, "does not prove that installation completed") {
+		t.Fatalf("weak evidence was presented as completed installation:\n%s", view)
+	}
+}
+
+func TestFirstSetupRequiresExplicitConfirmationToLeavePXEActive(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("active"), setupMode: true, screen: dashboardPXE, pilotName: "pc01"}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "Closing Nixorium will not stop installation mode") {
+		t.Fatalf("active PXE quit did not open consequence review:\n%s", model.View().Content)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "leave pxe active"})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || !strings.Contains(model.View().Content, "Confirmation did not match") {
+		t.Fatal("inexact leave confirmation quit the TUI")
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "LEAVE PXE ACTIVE"})
+	model = updated.(dashboardModel)
+	_, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("exact leave confirmation did not quit")
+	}
+}
+
+func TestFirstSetupStopSummarisesOnlySessionEvidence(t *testing.T) {
+	model := dashboardModel{
+		report:         testDashboardReport("active"),
+		setupMode:      true,
+		screen:         dashboardPXE,
+		pilotName:      "pc01",
+		pilotPractical: true,
+		pilotVerified:  []string{"pc01"},
+		message:        "pc01 was verified in this session.",
+	}
+	updated, _ := model.Update(dashboardOperationMsg{
+		message: "PXE stopped and normal networking restored.",
+		report:  testDashboardReport("ready"),
+		screen:  dashboardPXE,
+	})
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	if model.pilotName != "" || !strings.Contains(view, "Installation session complete") || !strings.Contains(view, "1 configured identities were not verified in this session") {
+		t.Fatalf("stopped session overclaimed completion:\n%s", view)
 	}
 }
 

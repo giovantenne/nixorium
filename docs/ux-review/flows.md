@@ -1,12 +1,13 @@
 # V3 flows — installation and occasional interventions
 
-**REVIEW PROPOSAL. No code change is authorised by this document.**
+**APPROVED IMPLEMENTATION REFERENCE. Individual availability is recorded in the plan.**
 
 [Plan](README.md) · [Layouts](layouts.md)
 
 The V3 numbering replaces the earlier proposal. F01 is the central flow; F02–F06
-are reasons to reopen the TUI after provisioning. Layouts are concepts, not
-evidence of implemented features.
+are reasons to reopen the TUI after provisioning. This document defines product
+behavior; the plan and render gallery distinguish shipped slices from planned
+services.
 
 ## F01 — First installation of the laboratory
 

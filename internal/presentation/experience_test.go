@@ -147,7 +147,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		for _, screen := range []dashboardScreen{dashboardHome, dashboardRestore, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
+		for _, screen := range []dashboardScreen{dashboardHome, dashboardRestore, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
 			m := experienceFixture(200)
 			m.width = size[0]
 			m.height = size[1]
@@ -157,6 +157,10 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.deployPlan = domain.DeploymentPlanReport{Revision: strings.Repeat("a", 40), ColmenaSelector: "@lab", Targets: []domain.DeploymentTarget{{Name: "pc01"}}}
 			m.controllerPlan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD pc99"}
 			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
+			if screen == dashboardPXELeaveReview {
+				m.setupMode = true
+				m.report.PXE.Mode = "active"
+			}
 			m.updateCheck = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}
 			view := m.View().Content
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
@@ -167,7 +171,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 					t.Fatalf("focused row hidden screen %d size %v", screen, size)
 				}
 			}
-			if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview {
+			if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}

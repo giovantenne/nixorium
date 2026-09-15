@@ -3,7 +3,7 @@
 **PROPOSED WIREFRAMES — NOT APPLICATION RENDERS.**
 
 [Plan](README.md) · [Flows](flows.md) ·
-[Current worktree renders](../tui-renders.md)
+[Current implementation renders](../tui-renders.md)
 
 All data is synthetic. L12 and L17 describe planned application operations and
 must not be presented as available features until their typed services ship.

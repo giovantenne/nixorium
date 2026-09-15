@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -124,6 +125,21 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 }
 
 func (i *Inspector) Hosts(ctx context.Context, repository string) (domain.HostsReport, error) {
+	return i.hosts(ctx, repository, "")
+}
+
+// Host observes one exact client identity from the evaluated inventory. It is
+// intentionally separate from Hosts so focused workflows do not wake, probe,
+// or label unrelated powered-off computers.
+func (i *Inspector) Host(ctx context.Context, repository, name string) (domain.HostsReport, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return domain.HostsReport{}, errors.New("client identity is required")
+	}
+	return i.hosts(ctx, repository, name)
+}
+
+func (i *Inspector) hosts(ctx context.Context, repository, requested string) (domain.HostsReport, error) {
 	root, err := filepath.Abs(repository)
 	if err != nil {
 		return domain.HostsReport{}, fmt.Errorf("resolve repository path: %w", err)
@@ -132,13 +148,28 @@ func (i *Inspector) Hosts(ctx context.Context, repository string) (domain.HostsR
 	if err != nil {
 		return domain.HostsReport{}, fmt.Errorf("evaluate labMeta: %w", err)
 	}
+	hostsToObserve := meta.Clients.Hosts
+	operation := "hosts"
+	if requested != "" {
+		operation = "host"
+		hostsToObserve = nil
+		for _, host := range meta.Clients.Hosts {
+			if host.Name == requested {
+				hostsToObserve = []domain.HostMeta{host}
+				break
+			}
+		}
+		if len(hostsToObserve) == 0 {
+			return domain.HostsReport{}, fmt.Errorf("client identity %q is not in the evaluated inventory", requested)
+		}
+	}
 	revision, err := i.source.GitRevision(ctx, root)
 	if err != nil {
 		return domain.HostsReport{}, fmt.Errorf("inspect desired Git revision: %w", err)
 	}
-	ssh := i.source.SSHStatus(ctx, meta.Clients.Hosts, sshProbeTimeout)
-	observable := make([]domain.HostMeta, 0, len(meta.Clients.Hosts))
-	for _, host := range meta.Clients.Hosts {
+	ssh := i.source.SSHStatus(ctx, hostsToObserve, sshProbeTimeout)
+	observable := make([]domain.HostMeta, 0, len(hostsToObserve))
+	for _, host := range hostsToObserve {
 		if probe, found := ssh[host.Name]; found && probe.SSH == domain.SSHAvailable {
 			observable = append(observable, host)
 		}
@@ -152,7 +183,7 @@ func (i *Inspector) Hosts(ctx context.Context, repository string) (domain.HostsR
 	} else {
 		lastSuccessful = history.Hosts
 	}
-	hosts, deployment := hostStatuses(meta.Clients.Hosts, ssh, current, lastSuccessful, revision)
+	hosts, deployment := hostStatuses(hostsToObserve, ssh, current, lastSuccessful, revision)
 	state := "available"
 	for _, host := range hosts {
 		if host.SSH != domain.SSHAvailable {
@@ -165,7 +196,7 @@ func (i *Inspector) Hosts(ctx context.Context, repository string) (domain.HostsR
 	}
 	return domain.HostsReport{
 		SchemaVersion:   domain.SchemaVersion,
-		Operation:       "hosts",
+		Operation:       operation,
 		GeneratedAt:     i.now().UTC(),
 		State:           state,
 		Repository:      root,

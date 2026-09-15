@@ -258,7 +258,7 @@ func (model dashboardModel) textEntry() bool {
 	switch model.screen {
 	case dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview,
 		dashboardGitCommitReview, dashboardUpdateReview,
-		dashboardSettingsEdit, dashboardPXEStartReview:
+		dashboardSettingsEdit, dashboardPXEStartReview, dashboardPXELeaveReview:
 		return true
 	case dashboardHosts:
 		return model.hostSearching
