@@ -77,7 +77,10 @@ Routine controller rebuild also enters Bubble Tea only as typed plan/apply
 callbacks. Presentation owns review and exact confirmation; revision checks,
 the systemd action, activation verification, and journal ownership remain in
 the application, adapter, and controller module layers. Unlike foreground
-Colmena, the systemd-owned rebuild may safely survive dashboard exit.
+Colmena, the systemd-owned rebuild may safely survive dashboard exit. Its
+terminal result refreshes the ordinary typed status callback, keeps completed
+activity collapsed until requested, and exposes explicit navigation; this
+presentation refresh does not become activation evidence.
 
 Service management follows the same typed callback rule. Bubble Tea displays
 the cache and composite PXE state, collects exact cache-restart confirmation,

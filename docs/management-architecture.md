@@ -278,7 +278,9 @@ protocol; it is not introduced merely to move the same process out of view.
 The controller screen follows the same boundary: Bubble Tea renders the typed
 revision/current-state plan, collects exact `REBUILD <controller>` confirmation,
 and invokes the application callback. The systemd-owned rebuild may outlive the
-dashboard and retains its build/activation journal.
+dashboard and retains its build/activation journal. Completion refreshes the
+ordinary typed dashboard status, presents a compact result, and leaves bounded
+activity available on demand with explicit dashboard, log, and review routes.
 The services screen likewise receives typed component status and one cache
 restart callback. It renders the persistent cache and composite on-demand PXE
 lifecycle, requires exact `RESTART CACHE` confirmation, and cannot issue raw

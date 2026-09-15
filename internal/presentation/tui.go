@@ -85,6 +85,7 @@ type dashboardModel struct {
 	controllerProgress   domain.OperationProgress
 	controllerStarted    time.Time
 	controllerProgressID uint64
+	controllerDetails    bool
 	services             domain.ServicesReport
 	serviceResult        domain.ServiceActionReport
 	logs                 domain.OperationLogsReport
@@ -160,7 +161,9 @@ type dashboardControllerPlanMsg struct {
 }
 
 type dashboardControllerResultMsg struct {
-	report domain.ControllerRebuildExecutionReport
+	report    domain.ControllerRebuildExecutionReport
+	status    domain.StatusReport
+	statusErr error
 }
 
 type dashboardControllerProgressTickMsg struct {
@@ -335,6 +338,12 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.controllerApplying = false
 		model.controllerResult = message.report
 		model.message = message.report.Message
+		model.controllerDetails = false
+		if message.statusErr != nil {
+			model.message += "; dashboard refresh failed: " + message.statusErr.Error()
+		} else {
+			model.report = message.status
+		}
 		model.screen = dashboardController
 		if model.actions.LoadControllerProgress != nil {
 			return model, model.loadControllerProgress(model.controllerProgressID)
@@ -780,9 +789,22 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case dashboardController:
-		if key.String() == "esc" || key.String() == "left" {
+		if key.String() == "esc" || key.String() == "left" || (key.String() == "enter" && model.controllerResult.Operation != "") {
 			model.screen = dashboardHome
+			if model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() {
+				model.message = "Controller configuration activated and verified."
+			} else {
+				model.message = ""
+			}
+		} else if key.String() == "d" && model.controllerResult.Operation != "" {
+			model.controllerDetails = !model.controllerDetails
+		} else if key.String() == "l" && model.controllerResult.Operation != "" {
+			model.screen = dashboardLogs
+			model.busy = "Loading private operation logs"
 			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardLogsMsg{report: model.actions.LoadLogs()}
+			}
 		} else if key.String() == "r" {
 			model.busy = "Reviewing controller revision and active system"
 			model.message = ""
@@ -818,7 +840,12 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 			plan := model.controllerPlan
 			operation := func() tea.Msg {
-				return dashboardControllerResultMsg{report: model.actions.ApplyController(plan)}
+				report := model.actions.ApplyController(plan)
+				if model.actions.Refresh == nil {
+					return dashboardControllerResultMsg{report: report}
+				}
+				status, err := model.actions.Refresh()
+				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
 			}
 			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controllerProgressID))
 		default:
@@ -1603,7 +1630,7 @@ func maximumGitReviewScroll(report domain.GitReviewReport, height int) int {
 }
 
 func (model dashboardModel) controllerView() string {
-	lines := []string{"Nixorium — Rebuild controller", ""}
+	lines := []string{tuiTitle("Nixorium — Rebuild controller", model.isDark), ""}
 	if model.controllerApplying {
 		elapsed := time.Since(model.controllerStarted).Truncate(time.Second)
 		if elapsed < 0 {
@@ -1637,18 +1664,45 @@ func (model dashboardModel) controllerView() string {
 		}
 		return strings.Join(lines, "\n") + "\n"
 	}
-	lines = append(lines, "Review the current committed controller configuration before rebuilding.", "", "r: create fresh review   Esc: back   q: quit")
 	if model.controllerResult.Operation != "" {
+		resultTitle := "Controller action needs attention"
+		if !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified {
+			resultTitle = "Controller updated and verified"
+		}
 		lines = append(lines,
+			tuiResult(resultTitle, !model.controllerResult.HasErrors(), model.isDark),
 			"",
 			fmt.Sprintf("Last result: %s at phase %s", model.controllerResult.State, model.controllerResult.Phase),
 			fmt.Sprintf("Applied: %t   Verified: %t", model.controllerResult.Applied, model.controllerResult.Verified),
 		)
+		if model.controllerDetails && model.controllerProgress.Operation != "" {
+			lines = append(lines, "")
+			lines = append(lines, model.operationProgressView(model.controllerProgress, "Last controller apply")...)
+		}
+		if model.message != "" {
+			lines = append(lines, "", "Result: "+model.message)
+		}
+		detailsLabel := "show details"
+		if model.controllerDetails {
+			detailsLabel = "hide details"
+		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
+			tuiHelpBinding([]string{"d"}, "d", detailsLabel),
+			tuiHelpBinding([]string{"l"}, "l", "logs"),
+			tuiHelpBinding([]string{"r"}, "r", "new review"),
+		))
+		return strings.Join(lines, "\n") + "\n"
 	}
-	if model.controllerProgress.Operation != "" {
-		lines = append(lines, "")
-		lines = append(lines, model.operationProgressView(model.controllerProgress, "Last controller apply")...)
-	}
+	lines = append(lines,
+		"Review the current committed controller configuration before rebuilding.",
+		"",
+		tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"r"}, "r", "create review"),
+			tuiHelpBinding([]string{"esc"}, "esc", "back"),
+			tuiHelpBinding([]string{"q"}, "q", "quit"),
+		),
+	)
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}

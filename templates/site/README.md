@@ -241,8 +241,11 @@ systemd unit, builds as the deployment owner, refuses repository drift, and
 records success only after activation and active-system verification. Closing
 the dashboard does not stop the systemd-owned job. The dashboard shows elapsed
 time, four typed phases, recent activity, and a progress bar; CLI text/JSON
-flows write the same safe activity to stderr. Use `setup apply` for the
-equivalent first-run action with identical progress feedback.
+flows write the same safe activity to stderr. When the job ends, the dashboard
+refreshes reconciled state and shows a compact result with explicit actions to
+return home, reveal the activity detail, inspect logs, or create a new review.
+Use `setup apply` for the equivalent first-run action with identical progress
+feedback.
 
 ### Manage services
 
