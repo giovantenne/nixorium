@@ -161,7 +161,9 @@ provides the normal workflows:
 - titles, sections, and ready/attention/failure colors form a consistent visual
   hierarchy, while the same state always remains written in text;
 - reviews describe impact before mutation and require the displayed phrase;
-- terminal results state what happened and expose the relevant next action.
+- terminal results state what happened and expose relevant dashboard, Git
+  review, log, retry, or further-editing actions instead of returning silently
+  to the previous input screen.
 
 | Task | What it does |
 |---|---|

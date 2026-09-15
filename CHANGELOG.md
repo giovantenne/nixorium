@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Replaced appended Settings, cache-service, local-Git-commit, and Nixorium-
+  update outcomes with compact success/attention screens and explicit routes to
+  the dashboard, Git review, logs, retry, or further editing. First-run Git
+  completion returns to the reconciled setup checklist.
 - Extended the shared light/dark visual hierarchy and width-adaptive Bubbles
   key help across Computers, Deploy, Controller, Services, Logs, Git, Update,
   and PXE screens; service, Git, and PXE states now use the same semantic color

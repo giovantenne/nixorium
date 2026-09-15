@@ -748,6 +748,23 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 	case dashboardSettings:
+		if model.settingsResult.Operation != "" {
+			switch key.String() {
+			case "enter", "esc", "left":
+				model.screen = dashboardHome
+				model.message = ""
+			case "g":
+				model.busy = "Reviewing Git changes without modifying the worktree"
+				model.message = ""
+				return model, func() tea.Msg {
+					return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+				}
+			case "e":
+				model.settingsResult = domain.ConfigApplyReport{}
+				model.message = ""
+			}
+			return model, nil
+		}
 		switch key.String() {
 		case "esc", "left":
 			model.screen = dashboardHome
@@ -1006,6 +1023,25 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case dashboardServices:
+		if model.serviceResult.Operation != "" {
+			switch key.String() {
+			case "enter", "esc", "left":
+				model.screen = dashboardHome
+				model.message = ""
+			case "l":
+				model.busy = "Loading private operation logs"
+				model.message = ""
+				return model, func() tea.Msg {
+					return dashboardLogsMsg{report: model.actions.LoadLogs()}
+				}
+			case "r":
+				model.serviceResult = domain.ServiceActionReport{}
+				model.confirmation = ""
+				model.message = ""
+				model.screen = dashboardServicesRestartReview
+			}
+			return model, nil
+		}
 		switch key.String() {
 		case "esc", "left":
 			model.screen = dashboardHome
@@ -1124,6 +1160,30 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.logScroll = maximum
 		}
 	case dashboardGitReview:
+		if model.gitCommitResult.Operation != "" {
+			switch key.String() {
+			case "enter", "esc", "left":
+				if model.setupMode {
+					model.screen = dashboardSetup
+					model.message = ""
+					if model.actions.LoadSetup != nil {
+						model.busy = "Refreshing first-run progress"
+						return model, model.loadSetup()
+					}
+				} else {
+					model.screen = dashboardHome
+					model.message = ""
+				}
+			case "f":
+				model.gitCommitResult = domain.GitCommitReport{}
+				model.busy = "Refreshing the read-only Git review"
+				model.message = ""
+				return model, func() tea.Msg {
+					return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+				}
+			}
+			return model, nil
+		}
 		maximum := maximumGitReviewScroll(model.gitReview, model.gitReviewHeight())
 		switch key.String() {
 		case "esc", "left":
@@ -1260,6 +1320,24 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case dashboardUpdate:
+		if model.updateResult.Operation != "" {
+			switch key.String() {
+			case "enter", "esc":
+				model.screen = dashboardHome
+				model.message = ""
+			case "g":
+				model.busy = "Reviewing Git changes without modifying the worktree"
+				model.message = ""
+				return model, func() tea.Msg {
+					return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+				}
+			case "r":
+				model.updateResult = domain.UpdateApplyReport{}
+				model.updateTarget = ""
+				model.message = ""
+			}
+			return model, nil
+		}
 		switch key.String() {
 		case "esc":
 			model.screen = dashboardHome
@@ -1623,6 +1701,31 @@ func (model dashboardModel) gitReviewView() string {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
 	}
+	if model.gitCommitResult.Operation != "" {
+		success := !model.gitCommitResult.HasErrors() && model.gitCommitResult.Committed
+		title := "Git commit needs attention"
+		if success {
+			title = "Git changes committed locally"
+		}
+		returnLabel := "dashboard"
+		if model.setupMode {
+			returnLabel = "setup"
+		}
+		lines = append(lines,
+			tuiResult(title, success, model.isDark),
+			"",
+			fmt.Sprintf("State: %s   Committed: %t", model.gitCommitResult.State, model.gitCommitResult.Committed),
+			"HEAD: "+model.gitCommitResult.Revision,
+		)
+		if model.message != "" {
+			lines = append(lines, "", "Result: "+model.message)
+		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"enter"}, "enter", returnLabel),
+			tuiHelpBinding([]string{"f"}, "f", "refresh review"),
+		))
+		return strings.Join(lines, "\n") + "\n"
+	}
 	content := gitReviewContentLines(model.gitReview)
 	height := model.gitReviewHeight()
 	maximum := maximumGitReviewScroll(model.gitReview, height)
@@ -1646,9 +1749,6 @@ func (model dashboardModel) gitReviewView() string {
 		tuiHelpBinding([]string{"f"}, "f", "refresh"),
 		tuiHelpBinding([]string{"esc"}, "esc", "back"),
 	))
-	if model.gitCommitResult.Operation != "" {
-		lines = append(lines, "", fmt.Sprintf("Last commit: %s; committed=%t; HEAD=%s", model.gitCommitResult.State, model.gitCommitResult.Committed, model.gitCommitResult.Revision))
-	}
 	if model.message != "" {
 		lines = append(lines, "", "Warning: "+model.message)
 	}
@@ -1768,6 +1868,28 @@ func (model dashboardModel) updateView() string {
 		}
 		return strings.Join(lines, "\n") + "\n"
 	}
+	if model.updateResult.Operation != "" {
+		success := !model.updateResult.HasErrors() && model.updateResult.Updated
+		title := "Nixorium update needs attention"
+		if success {
+			title = "Nixorium files updated"
+		}
+		lines = append(lines,
+			tuiResult(title, success, model.isDark),
+			"",
+			fmt.Sprintf("State: %s   Files updated: %t   Retry safe: %t", model.updateResult.State, model.updateResult.Updated, model.updateResult.RetrySafe),
+			"Target: "+model.updateResult.Target,
+		)
+		if model.message != "" {
+			lines = append(lines, "", "Result: "+model.message)
+		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"g"}, "g", "review Git changes"),
+			tuiHelpBinding([]string{"r"}, "r", "new update"),
+			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
+		))
+		return strings.Join(lines, "\n") + "\n"
+	}
 	if model.screen == dashboardUpdateReview {
 		diffLines := strings.Split(strings.TrimSuffix(model.updatePlan.Diff.Content, "\n"), "\n")
 		height := model.updateReviewHeight()
@@ -1828,12 +1950,6 @@ func (model dashboardModel) updateView() string {
 		),
 		"No file changes occur until the reviewed confirmation succeeds.",
 	)
-	if model.updateResult.Operation != "" {
-		lines = append(lines,
-			"",
-			fmt.Sprintf("Last result: %s; files updated=%t; retry safe=%t", model.updateResult.State, model.updateResult.Updated, model.updateResult.RetrySafe),
-		)
-	}
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}
@@ -2002,6 +2118,27 @@ func (model dashboardModel) servicesView() string {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
 	}
+	if model.serviceResult.Operation != "" {
+		success := !model.serviceResult.HasErrors() && model.serviceResult.Verified
+		title := "Service action needs attention"
+		if success {
+			title = "Binary cache restarted and verified"
+		}
+		lines = append(lines,
+			tuiResult(title, success, model.isDark),
+			"",
+			fmt.Sprintf("State: %s   Verified: %t   Retry safe: %t", model.serviceResult.State, model.serviceResult.Verified, model.serviceResult.RetrySafe),
+		)
+		if model.message != "" {
+			lines = append(lines, "", "Result: "+model.message)
+		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
+			tuiHelpBinding([]string{"l"}, "l", "logs"),
+			tuiHelpBinding([]string{"r"}, "r", "restart again"),
+		))
+		return strings.Join(lines, "\n") + "\n"
+	}
 	if model.screen == dashboardServicesRestartReview {
 		lines = append(lines,
 			"Binary cache restart review",
@@ -2044,9 +2181,6 @@ func (model dashboardModel) servicesView() string {
 		tuiHelpBinding([]string{"esc"}, "esc", "back"),
 		tuiHelpBinding([]string{"q"}, "q", "quit"),
 	))
-	if model.serviceResult.Operation != "" {
-		lines = append(lines, "", fmt.Sprintf("Last action: %s; verified=%t", model.serviceResult.State, model.serviceResult.Verified))
-	}
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}

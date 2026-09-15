@@ -115,6 +115,10 @@ title, sections, descriptions, and ready/attention/failure states visually
 distinct on light and dark terminals while preserving explicit textual labels.
 All routine screens reuse this hierarchy and the official width-adaptive help
 component instead of defining independent color or key-hint conventions.
+Mutating workflows terminate in compact typed result states. Presentation maps
+each result only to existing typed navigation callbacks—for example Git review,
+bounded logs, retry/review, further editing, dashboard, or the observed setup
+checklist—and never performs a follow-up mutation implicitly.
 
 The initial package layout is:
 

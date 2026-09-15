@@ -539,8 +539,13 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Last result: completed; files updated=true") || !strings.Contains(model.View().Content, "review and commit") {
+	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium files updated") || !strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "new update") {
 		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHome {
+		t.Fatalf("update result did not return to dashboard: screen=%d", model.screen)
 	}
 }
 
@@ -637,8 +642,13 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !model.report.Git.Dirty || !strings.Contains(model.View().Content, "Last apply: applied") {
+	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !model.report.Git.Dirty || !strings.Contains(model.View().Content, "Settings updated") || !strings.Contains(model.View().Content, "review Git changes") {
 		t.Fatalf("settings result missing: applied=%d model=%+v\n%s", applied, model, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "e"})
+	model = updated.(dashboardModel)
+	if model.settingsResult.Operation != "" || !strings.Contains(model.View().Content, "Choose one area to edit") {
+		t.Fatalf("settings result did not open another edit:\n%s", model.View().Content)
 	}
 }
 
@@ -690,8 +700,13 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View().Content, "verified=true") || !strings.Contains(model.View().Content, "cache healthy") {
+	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View().Content, "Binary cache restarted and verified") || !strings.Contains(model.View().Content, "cache healthy") || !strings.Contains(model.View().Content, "restart again") {
 		t.Fatalf("verified restart result missing: restarts=%d\n%s", restarts, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHome {
+		t.Fatalf("service result did not return to dashboard: screen=%d", model.screen)
 	}
 }
 
@@ -846,8 +861,41 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Last commit: completed; committed=true") || !strings.Contains(model.View().Content, "no remote push was attempted") {
+	if applied != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Git changes committed locally") || !strings.Contains(model.View().Content, "no remote push was attempted") || !strings.Contains(model.View().Content, "refresh review") {
 		t.Fatalf("commit result missing: applied=%d\n%s", applied, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHome {
+		t.Fatalf("Git result did not return to dashboard: screen=%d", model.screen)
+	}
+}
+
+func TestFirstSetupCommitResultReturnsToObservedChecklist(t *testing.T) {
+	loads := 0
+	model := dashboardModel{
+		setupMode: true,
+		screen:    dashboardGitReview,
+		gitCommitResult: domain.GitCommitReport{
+			Operation: "git-commit", State: "completed", Committed: true,
+		},
+		actions: DashboardActions{LoadSetup: func() domain.SetupReport {
+			loads++
+			return testSetupReport(true, false, false, false)
+		}},
+	}
+	if !strings.Contains(model.View().Content, "enter") || !strings.Contains(model.View().Content, "setup") {
+		t.Fatalf("setup return action missing:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen != dashboardSetup {
+		t.Fatalf("commit result did not begin setup refresh: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loads != 1 || model.screen != dashboardSetup || model.setup.CurrentStage != domain.SetupStageApply {
+		t.Fatalf("setup result was not reconciled: loads=%d model=%+v", loads, model.setup)
 	}
 }
 
