@@ -314,6 +314,7 @@
     controller.succeed("su - admin -c \"(sleep 8; printf p; sleep 1; printf p; sleep 3; printf s; sleep 5; printf S; sleep 0.2; printf T; sleep 0.2; printf A; sleep 0.2; printf R; sleep 0.2; printf T; sleep 0.2; printf ' '; sleep 0.2; printf P; sleep 0.2; printf X; sleep 0.2; printf E; sleep 0.2; printf '\\r'; sleep 5; printf q) | TERM=xterm timeout 40s script -qefc 'stty rows 40 cols 120; nixorium --repo ~/nixorium-deployment' /tmp/nixorium-pxe-tui.log\"")
     controller.succeed("grep -aF 'Install computers over network' /tmp/nixorium-pxe-tui.log")
     controller.succeed("grep -aF 'Recent activity:' /tmp/nixorium-pxe-tui.log; grep -aF 'Prepared PXE artifacts for 1 clients' /tmp/nixorium-pxe-tui.log")
+    controller.succeed("grep -aF 'Next: start network installation' /tmp/nixorium-pxe-tui.log; grep -aF 'Next: install a computer' /tmp/nixorium-pxe-tui.log; grep -aF '/installer/setup.sh' /tmp/nixorium-pxe-tui.log")
     controller.succeed("grep -aF 'Start review' /tmp/nixorium-pxe-tui.log")
     controller.succeed("systemctl is-active --quiet nixorium-pxe.service; systemctl is-active --quiet nixorium-pxe-network.service")
     controller.succeed("su - admin -c 'nixorium pxe start --repo ~/nixorium-deployment --yes --json' | jq -e '.state == \"completed\" and .mode == \"active\" and (.message | contains(\"already active\"))'")

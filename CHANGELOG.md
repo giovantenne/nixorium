@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made the PXE screen stage-aware: it now recommends artifact preparation,
+  reviewed PXE start, first-computer boot/install, or network recovery from
+  observed state, shows only pertinent controls, and includes the exact
+  `/installer/setup.sh` handoff while installation mode is active.
 - Replaced appended Settings, cache-service, local-Git-commit, and Nixorium-
   update outcomes with compact success/attention screens and explicit routes to
   the dashboard, Git review, logs, retry, or further editing. First-run Git

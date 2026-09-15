@@ -198,8 +198,34 @@ func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	view = model.View().Content
-	if model.screen != dashboardPXE || !strings.Contains(view, "Prepared artifacts: ready") || !strings.Contains(view, "Start installation mode") {
+	if model.screen != dashboardPXE || !strings.Contains(view, "Prepared artifacts: ready") || !strings.Contains(view, "Next: start network installation") {
 		t.Fatalf("PXE screen is incomplete:\n%s", view)
+	}
+}
+
+func TestPXEScreenRecommendsOnlyTheObservedNextStage(t *testing.T) {
+	report := testDashboardReport("ready")
+	report.PXEPreparation = domain.PXEPreparationState{}
+	view := (dashboardModel{report: report, screen: dashboardPXE}).View().Content
+	if !strings.Contains(view, "Next: prepare installation files") || strings.Contains(view, "start PXE") {
+		t.Fatalf("unprepared PXE guidance is ambiguous:\n%s", view)
+	}
+
+	report = testDashboardReport("active")
+	view = (dashboardModel{report: report, screen: dashboardPXE}).View().Content
+	for _, expected := range []string{"Next: install a computer", "/installer/setup.sh", "x", "stop PXE"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("active PXE guidance omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "p prepare") || strings.Contains(view, "s start PXE") {
+		t.Fatalf("active PXE guidance offers invalid setup actions:\n%s", view)
+	}
+
+	report.PXE.Mode = "recovery-required"
+	view = (dashboardModel{report: report, screen: dashboardPXE}).View().Content
+	if !strings.Contains(view, "Next: recover normal controller networking") || strings.Contains(view, "start PXE") {
+		t.Fatalf("recovery guidance is ambiguous:\n%s", view)
 	}
 }
 

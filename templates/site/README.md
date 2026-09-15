@@ -128,12 +128,15 @@ The home screen separates current laboratory status from routine tasks. Use
 `Up`/`Down` to select a task and `Enter` to open it, or press the one-letter
 shortcut shown beside it. Color reinforces ready, attention, and failure
 states, but every state remains written explicitly. Each workflow displays its
-own available keys; `Esc` returns to the previous screen and `q` quits when no
-operation requires attention. Computers, deployment, controller, services,
+own available keys; `Esc` returns to the previous screen and `q` quits outside
+text-entry fields when no operation requires attention. Computers, deployment, controller, services,
 logs, Git, updates, and network installation reuse the same title, section,
 status, and width-adaptive key-help hierarchy. Completed Settings, service,
 Git, update, deployment, and controller operations show a compact result with
 the relevant next action rather than dropping back into the prior form or list.
+The network-installation screen remains state-oriented: it highlights one next
+step—prepare files, start PXE, boot/install a client, or recover networking—and
+shows only controls relevant to the observed mode.
 
 | Dashboard task | Purpose |
 |---|---|

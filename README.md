@@ -127,6 +127,8 @@ task menu, or press the shortcut shown beside any task. It also provides grouped
 **Change settings** editing for routine updates. Choose **Install computers over
 network**. Long PXE preparation shows its current phase, elapsed time, bounded
 recent activity, and client progress without requiring a second terminal.
+That screen then highlights exactly one next step from observed state: prepare,
+start PXE, boot and install a computer, or recover normal networking.
 
 ### 6. Prepare and start installation mode
 
@@ -157,7 +159,8 @@ provides the normal workflows:
 - `Enter` follows the recommended first-run action when setup is incomplete;
 - once ready, `Up`/`Down` selects a task and `Enter` opens it; the displayed
   one-letter shortcuts remain available;
-- each workflow shows its available keys, while `Esc` returns and `q` quits;
+- each workflow shows its available keys; `Esc` returns, and `q` quits outside
+  text-entry fields;
 - titles, sections, and ready/attention/failure colors form a consistent visual
   hierarchy, while the same state always remains written in text;
 - reviews describe impact before mutation and require the displayed phrase;
