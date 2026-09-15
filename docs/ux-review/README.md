@@ -20,8 +20,8 @@ a fault diagnosis and not a reason to put the whole laboratory in an alarm state
 
 The contracts and layouts in this review are now complete enough to implement
 in batches. They do not claim that unshipped services are already available.
-The structural entry, restore, pilot-installation, deployment, and Nixorium
-update slices are implemented on the development branch. The
+The structural entry, restore, pilot-installation, guided software,
+deployment, and Nixorium update slices are implemented on the development branch. The
 [actual renders](../tui-renders.md) track the implementation rather than a
 separate mock-up.
 
@@ -133,7 +133,7 @@ off. Distribution requires checks only for selected targets.
 | Controller bootstrap, setup, PXE | Guided setup, pilot handoff, durable revision-bound verification, stop/leave review | Physical laboratory validation remains |
 | Client verification and deployment | Implemented | Place them in an explicit-target flow that supports partial sessions |
 | Restore | Explicit reapply/reinstall split; reinstall selects and verifies one identity at a time with cross-process evidence | Physical laboratory validation remains |
-| Guided software changes | Not implemented | New application service limited to supported changes |
+| Guided software changes | Typed catalog/plan/apply implemented for the managed declaration | Physical workflow validation remains |
 | Nixorium release update | Typed check/plan/apply exists | Discover releases, select one, validate, review, and apply |
 | Batch shutdown | Not implemented | Typed client-only operation after the priorities above |
 | File recovery and snapshot browser | Not implemented in the TUI | Outside the main path; separate design work |
@@ -197,7 +197,7 @@ Do not infer installation from ping, configured host count, or wizard completion
 A stored checkpoint is evidence to reconcile, not operational authority or a
 second configuration source.
 
-Software and power require typed plan/apply services. Preserve
+Software uses a typed plan/apply service; power still requires one. Preserve
 review tokens, evaluated inventory, narrow privileges, locks, pre-effect
 rechecks, and final verification. Detailed contracts are in [flows.md](flows.md).
 
@@ -213,13 +213,13 @@ back to the initial step. The UI must represent build → revalidation → apply
 | P0 | Review F01 and L01–L09, then later flows | Explicit approval of affected flows/layouts |
 | P1 | End-to-end first installation: entry, fields, controller, PXE, pilot, partial sessions, exit | Resumable comprehensible setup with the same safety rails |
 | P2 | Occasional entry and restoration of one/selected clients | No monitoring dashboard and no alarms for uninvolved computers |
-| P3 | Software plus prepare/distribute system | Supported change → review → build → pilot → explicit rollout |
+| P3 | Software plus prepare/distribute system | Implemented as separate declaration → Git → explicit rollout operations |
 | P4 | Nixorium release update | Fetched candidate list, validated proposal, exact confirmation, and honest result |
 | P5 | Client shutdown | Client scope, sessions/conflicts, honest per-target outcomes |
 | P6 | Site, guide, and actual-version renders | Installation/intervention story rather than monitoring |
 
 Existing prepare/distribute operations can be joined in P2. P3's software editor
-is not required to use them. Uniform durable jobs require separate technical
+deliberately stops before them. Uniform durable jobs require separate technical
 review; do not promise reconnection while an operation remains foreground.
 A Web UI is not a planned batch and no framework migration is proposed.
 
@@ -259,10 +259,10 @@ UX success metric.
 | D02 | Computers are normally off; no fleet-availability alarm | Owner direction accepted |
 | D03 | Restore has two explicit paths: reapply configuration or reinstall and erase a locally confirmed disk | Implemented direction |
 | D04 | Use a pilot client and support partial installation sessions | Implemented with private, revision-bound cross-process evidence |
-| D05 | Guided software is limited to supported packages/configuration while preserving private modules | Review required |
+| D05 | Guided software is limited to supported packages/configuration while preserving private modules | Implemented |
 | D06 | No NixOS-upgrade action; Update Nixorium selects only releases discovered by the typed service | Owner direction accepted |
 | D07 | Shutdown targets clients only; session conflicts block by default and unknown sessions require explicit acknowledgement | Planned contract |
-| D08 | Keep Bubble Tea; defer Web UI; approve final language and palette separately | Review required |
+| D08 | Keep Bubble Tea; defer Web UI; approve final language and palette separately | Bubble Tea direction implemented |
 
 The owner approved implementation and incremental local commits. The review
 does not authorise live laboratory operations, publication, pushing commits, or

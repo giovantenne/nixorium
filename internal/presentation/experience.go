@@ -191,10 +191,6 @@ func (model dashboardModel) diagnosticsView() string {
 	return strings.Join(append(lines, "", "↑/↓ move   enter evidence   r check again   esc back   ? help"), "\n")
 }
 
-func (model dashboardModel) softwareView() string {
-	return strings.Join([]string{tuiTitle("Nixorium  /  Add or change software", model.isDark), "", tuiSection("Supported editor is being implemented", model.isDark), "Software belongs to the laboratory's saved configuration.", "This build does not yet offer a safe package catalog and editor.", "", tuiSection("Current advanced path", model.isDark), "1. An experienced administrator edits a private client/shared module.", "2. Review and save those changes in Advanced tools → Review Git changes.", "3. Distribute the prepared system to the computers you choose.", "", "Every client may remain powered off while the configuration is prepared.", "Updating Nixorium changes the management framework; it does not install an app.", "", "esc back   ? help"}, "\n")
-}
-
 func (model dashboardModel) restoreView() string {
 	options := []struct {
 		title       string
@@ -257,11 +253,13 @@ func (model dashboardModel) frame(content string) string {
 func (model dashboardModel) textEntry() bool {
 	switch model.screen {
 	case dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview,
-		dashboardGitCommitReview, dashboardUpdateReview,
+		dashboardGitCommitReview, dashboardUpdateReview, dashboardSoftwareReview,
 		dashboardSettingsEdit, dashboardPXEStartReview, dashboardPXELeaveReview:
 		return true
 	case dashboardHosts:
 		return model.hostSearching
+	case dashboardSoftware:
+		return model.softwareSearching
 	default:
 		return false
 	}

@@ -21,6 +21,9 @@ type DashboardActions struct {
 	SelectInstallationTarget  func(string) domain.InstallationSessionReport
 	VerifyInstallationTarget  func(string) domain.InstallationSessionReport
 	ConfirmInstallationTarget func(string) domain.InstallationSessionReport
+	LoadSoftware              func() domain.SoftwareCatalogReport
+	PlanSoftware              func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
+	ApplySoftware             func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
 	PlanDeployment            func(string) domain.DeploymentPlanReport
 	ApplyDeployment           func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
 	PlanController            func() domain.ControllerRebuildPlanReport
@@ -78,6 +81,9 @@ const (
 	dashboardAdministration
 	dashboardDiagnostics
 	dashboardSoftware
+	dashboardSoftwareScope
+	dashboardSoftwareReview
+	dashboardSoftwareResult
 )
 
 type dashboardModel struct {
@@ -164,6 +170,17 @@ type dashboardModel struct {
 	pilotVerified        []string
 	installationSummary  bool
 	installationSession  domain.InstallationSessionReport
+	softwareCatalog      domain.SoftwareCatalogReport
+	softwareCursor       int
+	softwareQuery        string
+	softwareSearching    bool
+	softwareSelected     string
+	softwareScopeCursor  int
+	softwareClientCursor int
+	softwareClients      map[string]bool
+	softwarePlan         domain.SoftwareChangePlanReport
+	softwareResult       domain.SoftwareChangeApplyReport
+	softwareApplying     bool
 	width                int
 	height               int
 	isDark               bool
@@ -306,6 +323,14 @@ type dashboardSettingsApplyMsg struct {
 	report    domain.ConfigApplyReport
 	status    domain.StatusReport
 	statusErr error
+}
+
+type dashboardSoftwareCatalogMsg struct{ report domain.SoftwareCatalogReport }
+type dashboardSoftwarePlanMsg struct {
+	report domain.SoftwareChangePlanReport
+}
+type dashboardSoftwareApplyMsg struct {
+	report domain.SoftwareChangeApplyReport
 }
 
 func RunDashboard(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions) error {
@@ -680,6 +705,33 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.screen = dashboardSettings
 		return model, nil
+	case dashboardSoftwareCatalogMsg:
+		model.busy = ""
+		model.softwareCatalog = message.report
+		model.softwareCursor = 0
+		model.softwareQuery = ""
+		model.softwareSearching = false
+		model.message = message.report.Message
+		model.screen = dashboardSoftware
+		return model, nil
+	case dashboardSoftwarePlanMsg:
+		model.busy = ""
+		model.softwarePlan = message.report
+		model.message = message.report.Message
+		if message.report.HasErrors() || message.report.State == "unchanged" {
+			model.screen = dashboardSoftwareScope
+		} else {
+			model.confirmation = ""
+			model.screen = dashboardSoftwareReview
+		}
+		return model, nil
+	case dashboardSoftwareApplyMsg:
+		model.busy = ""
+		model.softwareApplying = false
+		model.softwareResult = message.report
+		model.message = message.report.Message
+		model.screen = dashboardSoftwareResult
+		return model, nil
 	case tea.WindowSizeMsg:
 		model.width = message.Width
 		model.height = message.Height
@@ -791,11 +843,31 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.hostCursor = 0
 		return model, nil
 	}
+	if model.screen == dashboardSoftware && model.softwareSearching {
+		switch key.String() {
+		case "esc":
+			model.softwareSearching = false
+			model.softwareQuery = ""
+		case "enter":
+			model.softwareSearching = false
+		case "backspace":
+			value := []rune(model.softwareQuery)
+			if len(value) > 0 {
+				model.softwareQuery = string(value[:len(value)-1])
+			}
+		default:
+			if key.Text != "" && len(model.softwareQuery) < 80 {
+				model.softwareQuery += key.Text
+			}
+		}
+		model.softwareCursor = 0
+		return model, nil
+	}
 	if key.String() == "l" && (model.deploying || model.controllerApplying || model.pxePreparing) {
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.softwareApplying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -871,6 +943,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 		case "w":
 			model.screen = dashboardSoftware
+			model.softwareResult = domain.SoftwareChangeApplyReport{}
+			model.busy = "Loading supported software from pinned inputs"
+			model.message = ""
+			if model.actions.LoadSoftware == nil {
+				model.busy = ""
+				model.message = "The supported software service is not available in this deployment."
+				return model, nil
+			}
+			return model, func() tea.Msg { return dashboardSoftwareCatalogMsg{report: model.actions.LoadSoftware()} }
 		case "d":
 			model.screen = dashboardDeploy
 			model.deployResult = domain.DeploymentExecutionReport{}
@@ -1175,6 +1256,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 			return model, model.loadHosts()
 		}
+	case dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult:
+		return model.updateSoftware(key)
 	case dashboardDeploy:
 		if model.deployResult.Operation != "" {
 			switch key.String() {
@@ -1887,10 +1970,6 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			command := model.startDiagnostics()
 			return model, command
 		}
-	case dashboardSoftware:
-		if key.String() == "esc" || key.String() == "left" {
-			model.screen = dashboardAdministration
-		}
 	case dashboardPXEStartReview:
 		switch key.String() {
 		case "esc":
@@ -2090,7 +2169,7 @@ func (model dashboardModel) View() tea.View {
 		content = model.administrationView()
 	case dashboardDiagnostics:
 		content = model.diagnosticsView()
-	case dashboardSoftware:
+	case dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult:
 		content = model.softwareView()
 	case dashboardDeploy, dashboardDeployReview:
 		content = model.deployView()

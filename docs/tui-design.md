@@ -49,12 +49,13 @@ progress, recovery instructions and the next explicit action.
   inventory and diagnostics.
 - Update Nixorium: fetch bounded releases → select stable or explicitly reveal
   prerelease → validate → review → apply only the two managed Flake files.
+- Software: supported pinned catalog → configuration scope → validated proposal
+  → exact confirmation → atomic managed declaration → explicit Git review.
 
-Software package editing and computer shutdown are absent from the current
-application and CLI. Do not represent them as working actions or implement
-shell execution in presentation. Explain the existing private-module software
-workflow and the limitation explicitly; dedicated typed plan/apply services
-are required before integrated package and power management can be enabled.
+Computer shutdown remains absent from the current application and CLI. Do not
+represent it as a working action or implement shell execution in presentation.
+Guided software editing is available only through its dedicated typed service;
+private-module customisation remains an explicit Advanced-tools path.
 
 ## Presentation and evidence
 
@@ -92,6 +93,7 @@ Preserve domain/application preflights and typed callbacks for every flow:
 | Git commit | selected safe paths, exact phrase, content token, secret checks, no push |
 | Update Nixorium | service-discovered release, candidate checks, exact phrase/token, two-file scope, no implicit activation |
 | Settings/password | full validation, redacted review, source fingerprint, atomic writer, no-echo password collector |
+| Software declaration | pinned curated catalog, evaluated scope, candidate validation, fingerprint/token recheck, one-file atomic writer, no implicit Git/build/deploy |
 | Client disk install | local immutable inventory and exact disk/identity confirmation; not a controller-side shortcut |
 
 ## Validation
@@ -111,6 +113,9 @@ compact, standard and wide sizes. Record physical testing separately.
 - `./scripts/validate.sh --management-vm`: PASS, including the quick matrix
   (shell syntax, installer shell tests, schema/mkLab checks, skill-copy
   consistency and packaged Go tests).
+- `./scripts/validate.sh --full`: PASS, including 43 Flake checks, explicit
+  client/controller/netboot and installer builds, both VM suites, a fresh
+  private template, and direct/offline installer client equivalence.
 - Added coverage for intervention entry without implicit scans, release
   discovery failure without manual fallback, restore-path separation, search
   and target identity, setup navigation, back
@@ -138,26 +143,28 @@ compact, standard and wide sizes. Record physical testing separately.
   through symbols, labels and selection markers.
 
 The management VM exercised the packaged TUI and shared application operations
-for setup continuation, settings, framework updates, PXE, controller activation,
-cache restart, deployment, log browsing and local Git review/commit. Existing
+for setup continuation, guided software changes, settings, framework updates,
+PXE, controller activation, cache restart, deployment, log browsing and local
+Git review/commit. Existing
 checks for stale reviews, secret redaction, permissions, fixed privileged units,
 deployment build-before-apply and recovery remain in place. Earlier attempts
 exposed outdated PTY assertions: Settings now checks stable body text instead
 of complete titles in incremental terminal output, and log browsing explicitly
 scrolls to the final result. No application safety check was removed.
 
-Final management VM derivation:
-`/nix/store/v7whpsp8n103rblk1djlxvmhma3pspsl-vm-test-run-nixorium-management.drv`.
+Validated VM derivations:
 
-No physical laboratory tests, full release matrix or client-installer VM ran
-for this frontend change. No live laboratory operations, push or release were
-performed. Integrated package editing and managed power
-operations remain planned application work, not implemented TUI actions.
+- management: `/nix/store/4l8mzpqxypmqvibxq0930afmi6aswakd-vm-test-run-nixorium-management.drv`;
+- client installer: `/nix/store/d402p7rgwiq1z8119bj3dnx6dc14qdp3-vm-test-run-nixorium-client-installer.drv`.
+
+No physical laboratory operations, push or release were performed. Managed
+power remains planned application work, not an implemented TUI action.
 
 ### Changed files
 
 - Presentation: `internal/presentation/tui.go`, `dashboard_home.go`,
-  `experience.go`, `components.go`, `settings_dashboard.go`, `setup_wizard.go`.
+  `software_dashboard.go`, `experience.go`, `components.go`,
+  `settings_dashboard.go`, `setup_wizard.go`.
 - Read model: `internal/domain/computer_condition.go`.
 - Application wiring: `cmd/nixorium/main.go` adds existing Doctor and
   UpdateManager release discovery plus the single-inventory-identity observer
@@ -167,6 +174,11 @@ operations remain planned application work, not implemented TUI actions.
   `internal/app/installation_session.go`, and
   `internal/adapters/installation_session.go` own the versioned record,
   reconciliation rules, focused observation and private atomic storage.
+- Guided software: `internal/domain/software.go`, `internal/app/software.go`,
+  `internal/adapters/software.go`, `lib/eval-lab-software.nix`,
+  `lib/software-catalog.nix`, and `templates/site/lab-software.json` implement
+  the allowlisted schema, typed plan/apply boundary, candidate evaluation and
+  atomic managed-file writer.
 - Tests: `internal/domain/computer_condition_test.go`,
   `internal/presentation/experience_test.go`, `tui_test.go`,
   `components_test.go`, and `tests/management-vm.nix`.

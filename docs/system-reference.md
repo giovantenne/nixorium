@@ -159,6 +159,8 @@ installer so client installation needs no second checkout.
 |---|---|
 | `deploymentSelf` | Downstream Flake `self`, used when packaging deployment files for offline installation |
 | `labConfig` | Required typed site settings, normally decoded from `lab-settings.json` |
+| `labSoftware` | Strict versioned supported client-package declarations, normally decoded from `lab-software.json` |
+| `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
 | `sharedModules` | NixOS modules applied to every generated host |
@@ -181,6 +183,7 @@ consume `lib.mkLab`. Important generated outputs include:
 - Colmena deployment metadata and target groups;
 - `labMeta` for non-sensitive operational identity and network data;
 - `deploymentStatus` for readiness blockers;
+- `nixoriumSoftware` for the supported pinned catalog, evaluated scopes, and managed declarations;
 - `nixorium` and supporting Flake applications;
 - `pxeFirmware` and `installerBundle`;
 - schema, compatibility, package, and VM checks.

@@ -76,6 +76,189 @@ func testInstallationReport(selected string, technical, practical bool) domain.I
 	return report
 }
 
+func testSoftwareCatalogReport() domain.SoftwareCatalogReport {
+	return domain.SoftwareCatalogReport{
+		SchemaVersion: domain.SoftwareSchemaVersion,
+		Operation:     "software-catalog",
+		State:         "ready",
+		Repository:    "/deployment",
+		ManagedFile:   "lab-software.json",
+		Clients:       []string{"pc01", "pc02", "pc03"},
+		Groups:        map[string][]string{"graphics": {"pc01", "pc02"}},
+		Catalog: []domain.SoftwareCatalogItem{
+			{ID: "gimp", Label: "GIMP", Summary: "Edit bitmap images", Availability: "available"},
+			{ID: "vlc", Label: "VLC", Summary: "Play audio and video", Availability: "available"},
+		},
+		Packages: []domain.SoftwareDeclaration{{Package: "vlc", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}, Origin: "managed"}},
+		Issues:   []domain.ValidationIssue{},
+	}
+}
+
+func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T) {
+	catalog := testSoftwareCatalogReport()
+	plans := 0
+	applies := 0
+	gitReviews := 0
+	actions := DashboardActions{
+		LoadSoftware: func() domain.SoftwareCatalogReport { return catalog },
+		PlanSoftware: func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+			plans++
+			if request.Package != "gimp" || !request.Present || request.Scope.Kind != domain.SoftwareScopeAllClients {
+				t.Fatalf("software request = %+v", request)
+			}
+			return domain.SoftwareChangePlanReport{
+				SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready",
+				Repository: "/deployment", ManagedFile: "lab-software.json", Request: request,
+				AffectedClients: catalog.Clients, ReviewToken: "sha256:abcdef0123456789", Confirmation: "SAVE SOFTWARE abcdef012345",
+			}
+		},
+		ApplySoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
+			applies++
+			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-apply", State: "applied", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: plan.AffectedClients}
+		},
+		LoadGitReview: func() domain.GitReviewReport {
+			gitReviews++
+			return domain.GitReviewReport{Operation: "git-review", State: "changes", Changes: []domain.GitChange{{Path: "lab-software.json", Managed: true}}}
+		},
+	}
+	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model.width, model.height = 100, 30
+
+	updated, command := model.Update(tea.KeyPressMsg{Text: "w"})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("software catalog was not loaded")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Supported client software") || !strings.Contains(model.View().Content, "Resolved from the laboratory's pinned package set") {
+		t.Fatalf("software catalog missing:\n%s", model.View().Content)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSoftwareScope || !strings.Contains(model.View().Content, "This is not the set of computers deployed today") {
+		t.Fatalf("software scope missing:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("software proposal was not requested")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	for _, expected := range []string{"Proposal validated", "Revision not saved", "System not prepared", "No client changed", "Only lab-software.json"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("software review omits %q:\n%s", expected, view)
+		}
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "save software abcdef012345"})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || applies != 0 || !strings.Contains(model.View().Content, "Confirmation did not match") {
+		t.Fatal("inexact software confirmation changed the declaration")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "SAVE SOFTWARE abcdef012345"})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("exact software confirmation did not start apply")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if plans != 1 || applies != 1 || model.screen != dashboardSoftwareResult || !strings.Contains(model.View().Content, "Git revision not saved") || strings.Contains(model.View().Content, "distribution targets") {
+		t.Fatalf("software result skipped revision boundary:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "g"})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen != dashboardGitReview {
+		t.Fatal("software result did not route to Git review")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if gitReviews != 1 || !strings.Contains(model.View().Content, "lab-software.json") {
+		t.Fatalf("Git review did not show the saved declaration:\n%s", model.View().Content)
+	}
+}
+
+func TestDashboardSoftwareResultDistinguishesNoChangeAndUncertainSave(t *testing.T) {
+	model := dashboardModel{screen: dashboardSoftwareResult, width: 100, height: 30}
+	model.softwareResult = domain.SoftwareChangeApplyReport{State: "unchanged", Message: "GIMP already has the requested declaration."}
+	view := model.View().Content
+	if !strings.Contains(view, "already current") || !strings.Contains(view, "No file changed") || strings.Contains(view, "declaration saved") {
+		t.Fatalf("unchanged software result is misleading:\n%s", view)
+	}
+
+	model.softwareResult = domain.SoftwareChangeApplyReport{
+		State:   "partial",
+		Message: "lab-software.json was replaced, but durable storage could not be confirmed.",
+		Issues:  []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
+	}
+	view = model.View().Content
+	for _, expected := range []string{"needs attention", "could not be confirmed", "Technical detail: directory sync failed", "Inspect the file and Git review", "No system was built or deployed"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("partial software result omits %q:\n%s", expected, view)
+		}
+	}
+}
+
+func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *testing.T) {
+	catalog := testSoftwareCatalogReport()
+	for index := 4; index <= 40; index++ {
+		catalog.Clients = append(catalog.Clients, fmt.Sprintf("pc%02d", index))
+	}
+	var request domain.SoftwareChangeRequest
+	model := dashboardModel{
+		report: testDashboardReport("ready"), screen: dashboardSoftware, softwareCatalog: catalog,
+		softwareClients: map[string]bool{}, width: 90, height: 22,
+		actions: DashboardActions{PlanSoftware: func(candidate domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+			request = candidate
+			return domain.SoftwareChangePlanReport{State: "ready", Request: candidate, Confirmation: "SAVE SOFTWARE token"}
+		}},
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "/"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "vl"})
+	model = updated.(dashboardModel)
+	if view := model.View().Content; !strings.Contains(view, "VLC") || strings.Contains(view, "GIMP") {
+		t.Fatalf("software search did not filter catalog:\n%s", view)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("managed software removal did not request a plan")
+	}
+	_ = command()
+	if request.Package != "vlc" || request.Present || request.Scope.Kind != domain.SoftwareScopeAllClients {
+		t.Fatalf("removal request = %+v", request)
+	}
+
+	model.busy = ""
+	model.screen = dashboardSoftwareScope
+	model.softwareSelected = "gimp"
+	model.softwareScopeCursor = len(model.softwareScopeOptions()) - 1
+	view := model.View().Content
+	if !strings.Contains(view, "pc01") || strings.Contains(view, "pc40") || strings.Count(view, "\npc") > 12 {
+		t.Fatalf("client selection is not bounded at 90x22:\n%s", view)
+	}
+}
+
+func TestDashboardSoftwareCatalogFailureBlocksManualPackageBypass(t *testing.T) {
+	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, softwareCatalog: domain.SoftwareCatalogReport{State: "failed", Message: "pinned evaluation failed", Issues: []domain.ValidationIssue{{Field: "catalog", Message: "failed"}}}}
+	view := model.View().Content
+	if !strings.Contains(view, "Software catalog unavailable") || !strings.Contains(view, "cannot be entered manually") {
+		t.Fatalf("catalog failure does not explain the safe boundary:\n%s", view)
+	}
+}
+
 func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 	setup := testSetupReport(false, false, false, false)
 	loads := 0

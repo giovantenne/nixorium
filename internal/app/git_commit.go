@@ -19,6 +19,7 @@ type GitCommitSource interface {
 	GitCommitProposal(context.Context, string, []string) (domain.GitCommitProposal, error)
 	CommitGitPaths(context.Context, string, []string, string, string, string) (string, error)
 	ReadSettings(string) ([]byte, error)
+	ReadSoftware(string) ([]byte, error)
 }
 
 type GitCommitManager struct {
@@ -85,6 +86,14 @@ func (m *GitCommitManager) Plan(ctx context.Context, repository, requestedPaths 
 			for _, issue := range issues {
 				report = gitCommitPlanIssue(report, issue.Field, issue.Message)
 			}
+		}
+	}
+	if containsString(paths, "lab-software.json") {
+		content, readErr := m.source.ReadSoftware(root)
+		if readErr != nil {
+			report = gitCommitPlanIssue(report, "lab-software.json", readErr.Error())
+		} else if _, decodeErr := domain.DecodeLabSoftware(content); decodeErr != nil {
+			report = gitCommitPlanIssue(report, "lab-software.json", decodeErr.Error())
 		}
 	}
 	if len(report.Issues) > 0 {
@@ -180,13 +189,16 @@ func generatedGitCommitMessage(paths []string) string {
 	if len(paths) == 1 && paths[0] == "lab-settings.json" {
 		return "chore: update laboratory settings"
 	}
+	if len(paths) == 1 && paths[0] == "lab-software.json" {
+		return "chore: update laboratory software"
+	}
 	publicKeys := true
 	managed := true
 	for _, path := range paths {
 		if path != "keys/cache-public-key" && path != "keys/admin-ssh.pub" && path != "keys/veyon-public-key.pem" {
 			publicKeys = false
 		}
-		if path != "lab-settings.json" && path != "keys/cache-public-key" && path != "keys/admin-ssh.pub" && path != "keys/veyon-public-key.pem" {
+		if path != "lab-settings.json" && path != "lab-software.json" && path != "keys/cache-public-key" && path != "keys/admin-ssh.pub" && path != "keys/veyon-public-key.pem" {
 			managed = false
 		}
 	}

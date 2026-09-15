@@ -1,0 +1,341 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
+	"sort"
+
+	"github.com/giovantenne/nixorium/internal/domain"
+)
+
+type SoftwareSource interface {
+	SoftwareDefinition(context.Context, string) (domain.SoftwareDefinition, error)
+	ReadSoftware(string) ([]byte, error)
+	ValidateSoftwareCandidate(context.Context, string, domain.LabSoftwareFile) error
+	WriteSoftwareIfUnchanged(string, []byte, domain.LabSoftwareFile) error
+}
+
+type SoftwareManager struct{ source SoftwareSource }
+
+func NewSoftwareManager(source SoftwareSource) SoftwareManager {
+	return SoftwareManager{source: source}
+}
+
+func (m SoftwareManager) Catalog(ctx context.Context, repository string) domain.SoftwareCatalogReport {
+	root, err := filepath.Abs(repository)
+	if err != nil {
+		return softwareCatalogFailure(repository, "repository", err.Error())
+	}
+	definition, err := m.source.SoftwareDefinition(ctx, root)
+	if err != nil {
+		return softwareCatalogFailure(root, "catalog", err.Error())
+	}
+	if err := validateSoftwareDefinition(definition); err != nil {
+		return softwareCatalogFailure(root, "catalog", err.Error())
+	}
+	return domain.SoftwareCatalogReport{
+		SchemaVersion: domain.SoftwareSchemaVersion,
+		Operation:     "software-catalog",
+		State:         "ready",
+		Repository:    root,
+		ManagedFile:   definition.ManagedFile,
+		Clients:       append([]string(nil), definition.Clients...),
+		Groups:        cloneSoftwareGroups(definition.Groups),
+		Catalog:       append([]domain.SoftwareCatalogItem(nil), definition.Catalog...),
+		Packages:      append([]domain.SoftwareDeclaration(nil), definition.Packages...),
+		Issues:        []domain.ValidationIssue{},
+		Message:       "Supported software was resolved from the pinned package set.",
+	}
+}
+
+func (m SoftwareManager) Plan(ctx context.Context, repository string, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+	catalog := m.Catalog(ctx, repository)
+	report := domain.SoftwareChangePlanReport{
+		SchemaVersion:   domain.SoftwareSchemaVersion,
+		Operation:       "software-change-plan",
+		State:           "invalid",
+		Repository:      catalog.Repository,
+		ManagedFile:     catalog.ManagedFile,
+		Request:         request,
+		Candidate:       domain.LabSoftwareFile{SchemaVersion: domain.SoftwareSchemaVersion, Packages: []domain.SoftwareDeclaration{}},
+		AffectedClients: []string{},
+		Issues:          append([]domain.ValidationIssue(nil), catalog.Issues...),
+	}
+	if catalog.HasErrors() {
+		report.Message = catalog.Message
+		return report
+	}
+	item, found := softwareCatalogItem(catalog.Catalog, request.Package)
+	if !found || item.Availability != "available" {
+		return softwarePlanIssue(report, "package", "select a package from the resolved supported catalog")
+	}
+	baseData, err := m.source.ReadSoftware(catalog.Repository)
+	if err != nil {
+		return softwarePlanIssue(report, "file", err.Error())
+	}
+	base, err := domain.DecodeLabSoftware(baseData)
+	if err != nil {
+		return softwarePlanIssue(report, "file", err.Error())
+	}
+	report.BaseFingerprint = domain.SoftwareFingerprint(baseData)
+	request.Scope = normalizeSoftwareScope(request.Scope)
+	existing, exists := softwareDeclaration(base.Packages, request.Package)
+	if !request.Present && exists {
+		request.Scope = existing.Scope
+	}
+	if err := validateSoftwareRequestScope(request.Scope, catalog.Clients, catalog.Groups); err != nil {
+		return softwarePlanIssue(report, "scope", err.Error())
+	}
+	report.Request = request
+	report.AffectedClients = softwareScopeClients(request.Scope, catalog.Clients, catalog.Groups)
+	candidate := domain.NormalizeLabSoftware(changeSoftwareDeclaration(base, request))
+	report.Candidate = candidate
+	candidateData, err := domain.MarshalLabSoftware(candidate)
+	if err != nil {
+		return softwarePlanIssue(report, "candidate", err.Error())
+	}
+	baseNormalized, err := domain.MarshalLabSoftware(base)
+	if err != nil {
+		return softwarePlanIssue(report, "file", err.Error())
+	}
+	if string(candidateData) == string(baseNormalized) {
+		report.State = "unchanged"
+		report.Message = item.Label + " already has the requested declaration."
+		return report
+	}
+	if err := m.source.ValidateSoftwareCandidate(ctx, catalog.Repository, candidate); err != nil {
+		return softwarePlanIssue(report, "validation", "Nix evaluation rejected the software proposal: "+err.Error())
+	}
+	report.State = "ready"
+	report.ReviewToken = domain.SoftwareReviewToken(report.BaseFingerprint, candidateData)
+	report.Confirmation = "SAVE SOFTWARE " + report.ReviewToken[len("sha256:"):len("sha256:")+12]
+	action := "Add "
+	if !request.Present {
+		action = "Remove "
+	}
+	report.Message = action + item.Label + " in " + report.ManagedFile + "; no system has been built or changed."
+	return report
+}
+
+func (m SoftwareManager) ApplyPlan(ctx context.Context, plan domain.SoftwareChangePlanReport, expectedToken string) domain.SoftwareChangeApplyReport {
+	report := domain.SoftwareChangeApplyReport{
+		SchemaVersion:   domain.SoftwareSchemaVersion,
+		Operation:       "software-change-apply",
+		State:           "invalid",
+		Repository:      plan.Repository,
+		ManagedFile:     plan.ManagedFile,
+		Request:         plan.Request,
+		AffectedClients: append([]string(nil), plan.AffectedClients...),
+		Issues:          []domain.ValidationIssue{},
+	}
+	fresh := m.Plan(ctx, plan.Repository, plan.Request)
+	if fresh.HasErrors() {
+		report.Issues = append(report.Issues, fresh.Issues...)
+		report.Message = fresh.Message
+		return report
+	}
+	if fresh.State == "unchanged" {
+		report.State = "unchanged"
+		report.Message = fresh.Message
+		return report
+	}
+	if expectedToken == "" || expectedToken != plan.ReviewToken || expectedToken != fresh.ReviewToken || plan.ManagedFile != fresh.ManagedFile {
+		report.State = "conflict"
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "reviewToken", Message: "the software proposal changed after review; create a new plan"})
+		report.Message = "Software was not changed because the reviewed proposal is stale."
+		return report
+	}
+	baseData, err := m.source.ReadSoftware(fresh.Repository)
+	if err != nil || domain.SoftwareFingerprint(baseData) != fresh.BaseFingerprint {
+		report.State = "conflict"
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "file", Message: "lab-software.json changed while applying; create a new plan"})
+		report.Message = "Software was not changed because the managed file changed."
+		return report
+	}
+	if err := m.source.WriteSoftwareIfUnchanged(fresh.Repository, baseData, fresh.Candidate); err != nil {
+		if errors.Is(err, domain.ErrSoftwareConflict) {
+			report.State = "conflict"
+			report.Issues = append(report.Issues, domain.ValidationIssue{Field: "file", Message: "lab-software.json changed while applying; create a new plan"})
+			report.Message = "Software was not changed because the managed file changed."
+		} else if errors.Is(err, domain.ErrSoftwareDurability) {
+			report.State = "partial"
+			report.Issues = append(report.Issues, domain.ValidationIssue{Field: "durability", Message: err.Error()})
+			report.Message = "lab-software.json was replaced, but durable storage could not be confirmed. Inspect the file and Git state before creating another proposal."
+		} else {
+			report.State = "failed"
+			report.Issues = append(report.Issues, domain.ValidationIssue{Field: "write", Message: err.Error()})
+			report.Message = "Software declaration was not saved."
+		}
+		return report
+	}
+	report.State = "applied"
+	report.Repository = fresh.Repository
+	report.ManagedFile = fresh.ManagedFile
+	report.Request = fresh.Request
+	report.AffectedClients = append([]string(nil), fresh.AffectedClients...)
+	report.Message = "Software declaration saved. Review and commit lab-software.json before preparing or distributing systems."
+	return report
+}
+
+func softwareCatalogFailure(repository, field, message string) domain.SoftwareCatalogReport {
+	return domain.SoftwareCatalogReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-catalog", State: "failed", Repository: repository, Clients: []string{}, Groups: map[string][]string{}, Catalog: []domain.SoftwareCatalogItem{}, Packages: []domain.SoftwareDeclaration{}, Issues: []domain.ValidationIssue{{Field: field, Message: message}}, Message: message}
+}
+
+func softwarePlanIssue(report domain.SoftwareChangePlanReport, field, message string) domain.SoftwareChangePlanReport {
+	report.State = "invalid"
+	report.Issues = append(report.Issues, domain.ValidationIssue{Field: field, Message: message})
+	report.Message = message
+	return report
+}
+
+func validateSoftwareDefinition(definition domain.SoftwareDefinition) error {
+	if definition.SchemaVersion != domain.SoftwareSchemaVersion || definition.ManagedFile != "lab-software.json" {
+		return errors.New("deployment exposes an unsupported software contract")
+	}
+	clients := map[string]bool{}
+	for _, name := range definition.Clients {
+		if !isClientName(name) || clients[name] {
+			return errors.New("software contract contains an invalid client inventory")
+		}
+		clients[name] = true
+	}
+	for group, names := range definition.Groups {
+		if err := domain.ValidateSoftwareScope(domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: group}); err != nil || len(names) == 0 {
+			return errors.New("software contract contains an invalid client group")
+		}
+		groupClients := map[string]bool{}
+		for _, name := range names {
+			if !clients[name] || groupClients[name] {
+				return errors.New("software contract group contains an unknown or duplicate client")
+			}
+			groupClients[name] = true
+		}
+	}
+	seen := map[string]bool{}
+	for _, item := range definition.Catalog {
+		if !softwareIDValid(item.ID) || item.Label == "" || item.Summary == "" || item.Availability != "available" || seen[item.ID] {
+			return errors.New("software contract contains an invalid catalog item")
+		}
+		seen[item.ID] = true
+	}
+	managed := map[string]bool{}
+	for _, entry := range definition.Packages {
+		if entry.Origin != "managed" || !seen[entry.Package] || managed[entry.Package] {
+			return errors.New("software contract contains an unsupported managed package")
+		}
+		managed[entry.Package] = true
+		entry.Origin = ""
+		if err := domain.ValidateLabSoftware(domain.LabSoftwareFile{SchemaVersion: domain.SoftwareSchemaVersion, Packages: []domain.SoftwareDeclaration{entry}}); err != nil {
+			return errors.New("software contract contains an invalid managed declaration")
+		}
+		if err := validateSoftwareRequestScope(entry.Scope, definition.Clients, definition.Groups); err != nil {
+			return errors.New("software contract contains a declaration outside the evaluated inventory")
+		}
+	}
+	return nil
+}
+
+func softwareIDValid(value string) bool {
+	_, err := domain.MarshalLabSoftware(domain.LabSoftwareFile{SchemaVersion: domain.SoftwareSchemaVersion, Packages: []domain.SoftwareDeclaration{{Package: value, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}}})
+	return err == nil
+}
+
+func isClientName(value string) bool {
+	return len(value) >= 3 && value[:2] == "pc" && softwareDigits(value[2:])
+}
+
+func softwareDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func softwareCatalogItem(items []domain.SoftwareCatalogItem, id string) (domain.SoftwareCatalogItem, bool) {
+	for _, item := range items {
+		if item.ID == id {
+			return item, true
+		}
+	}
+	return domain.SoftwareCatalogItem{}, false
+}
+
+func softwareDeclaration(entries []domain.SoftwareDeclaration, id string) (domain.SoftwareDeclaration, bool) {
+	for _, entry := range entries {
+		if entry.Package == id {
+			return entry, true
+		}
+	}
+	return domain.SoftwareDeclaration{}, false
+}
+
+func normalizeSoftwareScope(scope domain.SoftwareScope) domain.SoftwareScope {
+	scope.Clients = append([]string(nil), scope.Clients...)
+	sort.Strings(scope.Clients)
+	return scope
+}
+
+func validateSoftwareRequestScope(scope domain.SoftwareScope, clients []string, groups map[string][]string) error {
+	if err := domain.ValidateSoftwareScope(scope); err != nil {
+		return err
+	}
+	known := map[string]bool{}
+	for _, name := range clients {
+		known[name] = true
+	}
+	switch scope.Kind {
+	case domain.SoftwareScopeGroup:
+		if _, exists := groups[scope.Group]; !exists {
+			return fmt.Errorf("group %q is not in the evaluated deployment", scope.Group)
+		}
+	case domain.SoftwareScopeClients:
+		for _, name := range scope.Clients {
+			if !known[name] {
+				return fmt.Errorf("client %q is not in the evaluated inventory", name)
+			}
+		}
+	}
+	return nil
+}
+
+func softwareScopeClients(scope domain.SoftwareScope, clients []string, groups map[string][]string) []string {
+	var result []string
+	switch scope.Kind {
+	case domain.SoftwareScopeAllClients:
+		result = append(result, clients...)
+	case domain.SoftwareScopeGroup:
+		result = append(result, groups[scope.Group]...)
+	case domain.SoftwareScopeClients:
+		result = append(result, scope.Clients...)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func changeSoftwareDeclaration(base domain.LabSoftwareFile, request domain.SoftwareChangeRequest) domain.LabSoftwareFile {
+	result := domain.LabSoftwareFile{SchemaVersion: base.SchemaVersion, Packages: []domain.SoftwareDeclaration{}}
+	for _, entry := range base.Packages {
+		if entry.Package != request.Package {
+			result.Packages = append(result.Packages, entry)
+		}
+	}
+	if request.Present {
+		result.Packages = append(result.Packages, domain.SoftwareDeclaration{Package: request.Package, Scope: request.Scope})
+	}
+	return result
+}
+
+func cloneSoftwareGroups(groups map[string][]string) map[string][]string {
+	result := make(map[string][]string, len(groups))
+	for name, clients := range groups {
+		result[name] = append([]string(nil), clients...)
+	}
+	return result
+}

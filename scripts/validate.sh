@@ -77,6 +77,7 @@ run_quick_checks() {
   nix build \
     "path:${REPO_ROOT}#checks.x86_64-linux.config-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.software-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
     "path:${REPO_ROOT}#packages.x86_64-linux.nixorium" \
     --no-write-lock-file \
@@ -110,6 +111,7 @@ esac
 if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.config-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.software-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
@@ -158,6 +160,7 @@ fi
   test -e .pi/skills/nixorium-maintainer/SKILL.md
   test ! -e skills/nixorium-developer
   test -e lab-settings.json
+  test -e lab-software.json
   test ! -e lab-config.nix
 )
 
@@ -168,6 +171,11 @@ fi
 
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   config validate --repo "$SITE_DIR" --json >/dev/null
+nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
+  software catalog --repo "$SITE_DIR" --json >/dev/null
+nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
+  software plan --repo "$SITE_DIR" --package vlc --scope all-clients | \
+  grep -q 'Software proposal: READY'
 cp "$SITE_DIR/lab-settings.json" "$TEMP_DIR/candidate.json"
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   config plan --repo "$SITE_DIR" --file "$TEMP_DIR/candidate.json" | \

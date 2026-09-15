@@ -16,6 +16,15 @@ let
       veyonNativeHosts = [ "pc01" ];
     };
   });
+  softwareLab = mkLab (baseArgs // {
+    clientGroups.graphics = [ "pc01" ];
+    labSoftware = {
+      schemaVersion = 1;
+      packages = [
+        { package = "vlc"; scope = { kind = "group"; group = "graphics"; }; }
+      ];
+    };
+  });
   rejectsUnknownHost = !(builtins.tryEval (builtins.deepSeq
     (mkLab (baseArgs // {
       hostModules.pc00 = [ ../modules/common.nix ];
@@ -128,6 +137,12 @@ assert clientFirewall.interfaces.enp0s3.allowedUDPPorts == [ 5353 ];
 assert builtins.all (port: builtins.elem port nativeClientTCP) [ 22 11100 ];
 assert !(builtins.elem 5900 nativeClientTCP);
 assert builtins.length nativeClientTCP == 2;
+assert builtins.any (package: (package.pname or "") == "vlc")
+  softwareLab.nixosConfigurations.pc01.config.environment.systemPackages;
+assert !(builtins.any (package: (package.pname or "") == "vlc")
+  softwareLab.nixosConfigurations.pc02.config.environment.systemPackages);
+assert softwareLab.nixoriumSoftware.groups.graphics == [ "pc01" ];
+assert (builtins.head softwareLab.nixoriumSoftware.packages).origin == "managed";
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 true

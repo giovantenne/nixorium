@@ -35,7 +35,7 @@ usage must reuse this presentation-only foundation rather than introducing
 backend dependencies or parsing rendered output.
 
 The dashboard home uses Bubbles list selection behind a compact intervention
-menu: restore, software guidance, distribute, install, update Nixorium, and
+menu: restore, guided software changes, distribute, install, update Nixorium, and
 advanced tools. It performs no fleet scan; client availability is observed only
 inside an operation that needs it. Arrow keys and Enter provide the primary path
 while stable one-letter shortcuts remain available. Lip Gloss separates title, section,

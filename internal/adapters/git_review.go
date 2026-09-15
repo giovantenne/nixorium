@@ -21,6 +21,7 @@ const (
 
 var managedDeploymentPaths = map[string]bool{
 	"lab-settings.json":         true,
+	"lab-software.json":         true,
 	"keys/cache-public-key":     true,
 	"keys/admin-ssh.pub":        true,
 	"keys/veyon-public-key.pem": true,

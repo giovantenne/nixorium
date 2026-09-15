@@ -265,3 +265,37 @@ func TestUpdateCheckTextSeparatesReleaseChannels(t *testing.T) {
 		}
 	}
 }
+
+func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
+	catalog := domain.SoftwareCatalogReport{
+		State: "ready", ManagedFile: "lab-software.json",
+		Catalog:  []domain.SoftwareCatalogItem{{ID: "vlc", Label: "VLC", Summary: "Play media", Availability: "available"}},
+		Packages: []domain.SoftwareDeclaration{{Package: "vlc", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}, Origin: "managed"}},
+		Message:  "resolved from pinned inputs",
+	}
+	var output bytes.Buffer
+	SoftwareCatalogText(&output, catalog)
+	for _, expected := range []string{"Software catalog: READY", "lab-software.json", "VLC", "all-clients", "pinned inputs"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("software catalog omits %q:\n%s", expected, output.String())
+		}
+	}
+	output.Reset()
+	plan := domain.SoftwareChangePlanReport{
+		State: "ready", ManagedFile: "lab-software.json",
+		Request:         domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "media"}},
+		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review", Confirmation: "SAVE SOFTWARE abcdef012345",
+		Message: "no system has been built or changed",
+	}
+	SoftwareChangePlanText(&output, plan)
+	for _, expected := range []string{"Software proposal: READY", "vlc", "media", "pc01, pc02", "sha256:review", plan.Confirmation, "no system has been built or changed"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("software plan omits %q:\n%s", expected, output.String())
+		}
+	}
+	output.Reset()
+	SoftwareChangeApplyText(&output, domain.SoftwareChangeApplyReport{State: "applied", ManagedFile: "lab-software.json", Message: "Review and commit before preparing or distributing systems."})
+	if text := output.String(); !strings.Contains(text, "Software change: APPLIED") || !strings.Contains(text, "Review and commit") {
+		t.Fatalf("software result is incomplete:\n%s", text)
+	}
+}

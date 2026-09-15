@@ -426,21 +426,23 @@ never changes the selection to reinstall.
 
 ## L12 — Software and prepared system
 
-Flow F03. **PLANNED CONTRACT: not yet an executable action.**
+Flow F03. **IMPLEMENTED.** These renders describe the shipped typed workflow.
 
 ~~~text
    Change software
 
-   Declared client software
+   Supported client software
+   Resolved from the laboratory's pinned package set.
 
-   › VLC             Managed by the laboratory    All clients
-     Editor          Included by Nixorium          All clients
-     CAD tool        Private module                pc05
+   › GIMP
+       Edit bitmap images · gimp
+     VLC                 ✓ all clients, including future clients
+       Play audio and video files · vlc
 
-   Declared does not mean already distributed.
-   Private modules will not be rewritten automatically.
+   Configuration can be prepared while every client is powered off.
+   Declared does not mean committed, built, or distributed.
 
-   a add   Enter details   / search   Esc interventions   ? help
+   Enter scope   r remove   / search   Esc interventions   ? help
 ~~~
 
 Add:
@@ -448,7 +450,7 @@ Add:
 ~~~text
    Add software
 
-   Search the laboratory's pinned inputs: vlc_
+   Search  / vlc_
 
    › VLC · media player
      Package identifier: vlc
@@ -473,9 +475,11 @@ Draft review:
    ○ System not prepared
    ○ No client changed
 
-   › Review and save revision
-     Change scope
-     Technical diff
+   Only lab-software.json will be replaced atomically.
+   No commit, build, activation, PXE action, or deployment is included.
+
+   Type SAVE SOFTWARE abcdef012345 to continue:
+   > _
 ~~~
 
 After save: Prepare system, Pilot one client, Distribute to selected clients, or

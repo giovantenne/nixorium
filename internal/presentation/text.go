@@ -485,6 +485,69 @@ func ConfigValidationText(writer io.Writer, report domain.ConfigValidationReport
 	}
 }
 
+func SoftwareCatalogText(writer io.Writer, report domain.SoftwareCatalogReport) {
+	fmt.Fprintf(writer, "Software catalog: %s\n", strings.ToUpper(report.State))
+	if report.ManagedFile != "" {
+		fmt.Fprintf(writer, "Managed file:     %s\n", report.ManagedFile)
+	}
+	for _, item := range report.Catalog {
+		fmt.Fprintf(writer, "  %-18s %-20s %s\n", item.ID, item.Label, item.Summary)
+	}
+	if len(report.Packages) > 0 {
+		fmt.Fprintln(writer, "Configured declarations:")
+		for _, entry := range report.Packages {
+			fmt.Fprintf(writer, "  %-18s %s\n", entry.Package, softwareScopeText(entry.Scope))
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:           %s\n", report.Message)
+	}
+}
+
+func SoftwareChangePlanText(writer io.Writer, report domain.SoftwareChangePlanReport) {
+	fmt.Fprintf(writer, "Software proposal: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Package:           %s\n", report.Request.Package)
+	fmt.Fprintf(writer, "Managed file:      %s\n", report.ManagedFile)
+	fmt.Fprintf(writer, "Scope:             %s\n", softwareScopeText(report.Request.Scope))
+	if len(report.AffectedClients) > 0 {
+		fmt.Fprintf(writer, "Configuration:     %s\n", strings.Join(report.AffectedClients, ", "))
+	}
+	if report.ReviewToken != "" {
+		fmt.Fprintf(writer, "Review token:      %s\nConfirmation:      %s\n", report.ReviewToken, report.Confirmation)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:            %s\n", report.Message)
+	}
+}
+
+func softwareScopeText(scope domain.SoftwareScope) string {
+	switch scope.Kind {
+	case domain.SoftwareScopeGroup:
+		return "group:" + scope.Group
+	case domain.SoftwareScopeClients:
+		return "clients:" + strings.Join(scope.Clients, ",")
+	default:
+		return scope.Kind
+	}
+}
+
+func SoftwareChangeApplyText(writer io.Writer, report domain.SoftwareChangeApplyReport) {
+	fmt.Fprintf(writer, "Software change: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Managed file:    %s\n", report.ManagedFile)
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:          %s\n", report.Message)
+	}
+}
+
 func ConfigPlanText(writer io.Writer, report domain.ConfigPlanReport) {
 	fmt.Fprintf(writer, "Configuration plan: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Repository:         %s\n", report.Repository)

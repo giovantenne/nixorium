@@ -168,7 +168,7 @@ is affected before any effect.
 
 ## F03 — Add/change software and prepare the system
 
-Layout L12. Priority P3. New software use case over shared Go services.
+Layout L12. Priority P3. Implemented over shared Go services.
 
 ~~~text
 Choose Change software → find supported package → choose configuration scope
@@ -183,8 +183,8 @@ Final service contract:
 
 - `SoftwareCatalogReport` lists only package identifiers resolved from the
   deployment's pinned package set, with label, summary, availability, and
-  origin (`framework`, `managed`, or `private-module`). Catalog lookup is
-  read-only and never updates an input;
+  read-only and never updates an input. Current managed declarations carry the
+  explicit `managed` origin;
 - `SoftwareChangeRequest` contains package identifier, desired presence, and a
   typed configuration scope: all clients (including later generated clients),
   an evaluated group, or explicit evaluated client identities;
@@ -195,8 +195,9 @@ Final service contract:
 - `SoftwareChangeApplyReport` atomically writes only the managed declarative
   software file after rechecking its fingerprint and token. It does not commit,
   build, activate, or deploy;
-- private modules are visible as externally managed entries but never rewritten.
-  Removal of an externally managed package links to technical guidance;
+- private modules are never introspected or rewritten. The TUI links their
+  maintenance to Advanced tools rather than pretending it can safely remove
+  an arbitrary module-owned package;
 - drift after review blocks and requires a fresh plan. Unrelated worktree and
   index changes remain untouched;
 - catalog unavailability gives retry and technical guidance, never a raw-name
@@ -207,9 +208,9 @@ Final service contract:
 - software changes and Nixorium-release changes remain separate. Presentation
   never executes shell or agent-produced commands.
 
-The managed file location and Nix schema are an implementation decision for P3,
-but must be exposed by the adapter/application report rather than duplicated in
-the TUI. CLI commands will use the same catalog/plan/apply services.
+The managed location is the strict versioned `lab-software.json` file and is
+still exposed by the adapter/application report rather than treated as TUI
+state. CLI commands use the same catalog/plan/apply services.
 
 AI may assist advanced customisation outside this supported workflow, but is
 not required for it and receives no implicit mutation authority.

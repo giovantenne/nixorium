@@ -40,6 +40,10 @@
       settingsSchemaTest = import ./tests/eval-lab-settings.nix {
         inherit (nixpkgs) lib;
       };
+      softwareSchemaTest = import ./tests/eval-lab-software.nix {
+        inherit (nixpkgs) lib;
+        inherit pkgs;
+      };
       mkLabTest = import ./tests/mk-lab.nix {
         inherit mkLab;
         deploymentSelf = self;
@@ -75,6 +79,7 @@
         inherit mkLab;
         configSchemaVersion = 2;
         settingsSchemaVersion = 1;
+        softwareSchemaVersion = 1;
         evalLabSettings = import ./lib/eval-lab-settings.nix {
           inherit (nixpkgs) lib;
         };
@@ -84,6 +89,9 @@
           touch "$out"
         '';
         settings-schema = assert settingsSchemaTest; pkgs.runCommand "nixorium-settings-schema-test" {} ''
+          touch "$out"
+        '';
+        software-schema = assert softwareSchemaTest; pkgs.runCommand "nixorium-software-schema-test" {} ''
           touch "$out"
         '';
         mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''

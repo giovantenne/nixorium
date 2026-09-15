@@ -39,6 +39,9 @@ plan/apply workflows with mandatory build-first ordering, streamed/private
 logs, explicit retry state, and bounded typed log browsing. Updates and richer
 recovery are now implemented through bounded release discovery, reviewed
 plan/apply, fail-visible two-file recovery, and the shared CLI/TUI operations.
+Guided software changes now use a curated pinned catalog, evaluated client
+scopes, candidate validation, and a token-bound atomic `lab-software.json`
+writer; Git recording and client deployment remain separate operations.
 End-to-end documentation and physical validation remain tracked externally.
 
 Important constraints in the current implementation are:

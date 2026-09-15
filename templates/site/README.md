@@ -76,6 +76,8 @@ and NixOS policy can be added later under `assets/` and `modules/`.
 - `modules/shared.nix`: every machine
 - `modules/controller.nix`: controller only
 - `modules/clients.nix`: client PCs only
+- `lab-software.json`: guided supported packages and their client scopes
+- `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `hostModules` in `flake.nix`: individual hosts
 - `assets/logo.txt`: screensaver logo
 
@@ -138,7 +140,7 @@ nix run .#nixorium
 
 The opening screen asks which intervention you intend to perform. It does not
 scan clients or treat powered-off computers as unhealthy. `Up`/`Down` selects
-Restore, software guidance, distribution, network installation, Update
+Restore, guided software changes, distribution, network installation, Update
 Nixorium, or Advanced tools. `?` opens help; `F1` also works in text fields.
 Advanced Computer inventory performs the explicit client check and supports `/`
 search, Enter for detail, `t` for technical evidence, `d` for a focused
@@ -162,6 +164,7 @@ spinner and the current plain-language action.
 | Dashboard task | Purpose |
 |---|---|
 | **Restore computers** | Choose non-destructive reapply or select an evaluated identity for a locally confirmed disk-erasing reinstall |
+| **Add or change software** | Select a supported pinned package and save its reviewed client scope |
 | **Distribute the prepared system** | Plan and apply one or more client configurations |
 | **Computer inventory** | Explicitly inspect authenticated client state |
 | **Rebuild controller** | Review and activate the controller configuration |
@@ -197,6 +200,37 @@ replacement of `lab-settings.json`.
 After apply, use **Review Git changes** to inspect and commit the managed file.
 Then rebuild the controller and deploy affected clients as appropriate. The
 Settings action does not commit, push, rebuild, activate, or deploy implicitly.
+
+### Add or change software
+
+Open **Add or change software** to search the small supported catalog resolved
+from this deployment's pinned Nix package set. Choose whether the declaration
+applies to every client (including future generated clients), an evaluated
+group, or selected configured computers. Clients may all remain powered off.
+
+The same typed workflow is available from the CLI:
+
+```sh
+nix run .#nixorium -- software catalog
+nix run .#nixorium -- software plan --package vlc --scope all-clients
+nix run .#nixorium -- software plan --package gimp --scope group:graphics
+nix run .#nixorium -- software apply --package vlc --scope all-clients \
+  --expect REVIEW_TOKEN
+```
+
+Groups are declared in `flake.nix` through `clientGroups`; explicit client
+scopes accept comma-separated evaluated identities such as
+`clients:pc01,pc04`. Use `--remove` with plan and apply to remove a declaration
+owned by this workflow. Raw package names are never accepted as a fallback when
+the catalog is unavailable.
+
+Apply atomically replaces only `lab-software.json` after repeating pinned Nix
+validation and checking the review token and source fingerprint. It does not
+commit, build, activate the controller, prepare PXE, or distribute clients.
+Review and commit the file, then use **Distribute the prepared system** for the
+specific powered-on clients you intend to update. Packages supplied by private
+NixOS modules remain untouched and are edited through the advanced module
+workflow.
 
 ### Computers
 
