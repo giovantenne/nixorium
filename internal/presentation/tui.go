@@ -1202,7 +1202,7 @@ func (model dashboardModel) updateReviewHeight() int {
 	if model.height <= 0 {
 		return 10
 	}
-	height := model.height - 21
+	height := model.height - 26
 	if height < 4 {
 		return 4
 	}
