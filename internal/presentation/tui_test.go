@@ -283,6 +283,11 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release review") || !strings.Contains(model.View().Content, "candidate controller built") || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No commit, push, activation") {
 		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View().Content)
 	}
+	updated, _ = model.Update(tea.WindowSizeMsg{Height: 40})
+	model = updated.(dashboardModel)
+	if lines := strings.Count(model.View().Content, "\n"); lines > 40 {
+		t.Fatalf("update review exceeds terminal height: got %d lines\n%s", lines, model.View().Content)
+	}
 	updated, _ = model.Update(tea.WindowSizeMsg{Height: 24})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
