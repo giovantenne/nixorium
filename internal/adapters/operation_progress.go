@@ -7,7 +7,8 @@ import (
 const maximumOperationProgressBytes = 16 * 1024
 
 var operationProgressPaths = map[string]string{
-	"pxe-prepare": "/var/lib/nixorium/prepared/progress.json",
+	"pxe-prepare":      "/var/lib/nixorium/prepared/progress.json",
+	"controller-apply": "/var/lib/nixorium/controller/progress.json",
 }
 
 func (Local) ReadOperationProgress(operation string) ([]byte, error) {

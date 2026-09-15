@@ -477,7 +477,14 @@ because NixOS activation and user-generation reloads legitimately update both;
 path remains mounted explicitly read-only, and the command, target closure,
 Git revision, and polkit unit shape remain constrained independently.
 Systemd/journald retain preflight, build, and activation output across TUI or
-terminal exits. Before switching, the service invalidates any earlier
+terminal exits. A separate administrator-readable mode-0600 progress record
+inside the root-owned state directory uses the shared
+strict operation-progress contract to expose only four authored macro stages
+(validation, build, activation, verification), bounded recent activity, and
+timestamps/counters. CLI setup/routine apply renders changed activity on
+stderr, while the dashboard polls the typed callback and uses a Bubbles bar;
+neither frontend reads journald and JSON stdout remains clean. Before
+switching, the service invalidates any earlier
 root-owned activation receipt. Only after `switch-to-configuration` exits zero
 and `/run/current-system` resolves to the built closure does it atomically
 write `/var/lib/nixorium/controller/applied.json`, bound to the reviewed Git

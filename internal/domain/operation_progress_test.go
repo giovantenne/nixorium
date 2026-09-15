@@ -53,3 +53,14 @@ func TestDecodeOperationProgressBoundsRecentActivity(t *testing.T) {
 		t.Fatal("more than five progress activities were accepted")
 	}
 }
+
+func TestDecodeControllerOperationProgress(t *testing.T) {
+	data := strings.NewReplacer(
+		`"operation": "pxe-prepare"`, `"operation": "controller-apply"`,
+		`"phase": "clients"`, `"phase": "build"`,
+	).Replace(validOperationProgress)
+	progress, err := DecodeOperationProgress([]byte(data))
+	if err != nil || progress.Operation != "controller-apply" || progress.Phase != "build" {
+		t.Fatalf("progress = %+v, error = %v", progress, err)
+	}
+}

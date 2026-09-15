@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
@@ -107,6 +108,9 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				report := controllerManager.Apply(ctx, repository, plan.Revision)
 				report.Message = operationRecordMessage(report.Message, report)
 				return report
+			},
+			LoadControllerProgress: func() (domain.OperationProgress, error) {
+				return progressManager.Current("controller-apply")
 			},
 			LoadServices: func() domain.ServicesReport {
 				return serviceManager.Status(ctx, repository)
@@ -430,7 +434,14 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		switch options.subcommand {
 		case "prepare":
 			writePXEPreparationActivity(stderr)
-			report := app.NewSystemActions(adapters.Local{}).PreparePXE(ctx)
+			local := adapters.Local{}
+			report := runWithManagedProgress(
+				func() domain.ActionReport { return app.NewSystemActions(local).PreparePXE(ctx) },
+				func() (domain.OperationProgress, error) {
+					return app.NewOperationProgressManager(local).Current("pxe-prepare")
+				},
+				stderr,
+			)
 			report.Message = operationRecordMessage(report.Message, report)
 			if options.json {
 				err = presentation.JSON(stdout, report)
@@ -473,7 +484,47 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 }
 
 func writePXEPreparationActivity(writer io.Writer) {
-	fmt.Fprintln(writer, "Preparing PXE artifacts and client closures; detailed progress: journalctl -fu nixorium-prepare-pxe.service")
+	fmt.Fprintln(writer, "Preparing PXE artifacts and client closures; verbose output: journalctl -fu nixorium-prepare-pxe.service")
+}
+
+func writeControllerApplyActivity(writer io.Writer, unit string) {
+	fmt.Fprintf(writer, "Building and activating the reviewed controller; verbose output: journalctl -fu %s\n", unit)
+}
+
+func runWithManagedProgress[T any](action func() T, load func() (domain.OperationProgress, error), writer io.Writer) T {
+	started := time.Now().UTC()
+	results := make(chan T, 1)
+	go func() {
+		results <- action()
+	}()
+	ticker := time.NewTicker(350 * time.Millisecond)
+	defer ticker.Stop()
+	var lastUpdate time.Time
+	render := func() {
+		progress, err := load()
+		if err != nil || progress.StartedAt.Before(started) || !progress.UpdatedAt.After(lastUpdate) {
+			return
+		}
+		lastUpdate = progress.UpdatedAt
+		activity := "Waiting for the next managed activity"
+		if len(progress.Recent) > 0 {
+			activity = progress.Recent[len(progress.Recent)-1]
+		}
+		counter := ""
+		if progress.Total > 0 {
+			counter = fmt.Sprintf(" (%d/%d)", progress.Current, progress.Total)
+		}
+		fmt.Fprintf(writer, "Progress [%s]%s: %s\n", progress.Phase, counter, activity)
+	}
+	for {
+		select {
+		case result := <-results:
+			render()
+			return result
+		case <-ticker.C:
+			render()
+		}
+	}
 }
 
 func commandRequiresRepository(options options) bool {
@@ -1096,7 +1147,16 @@ func runControllerApply(ctx context.Context, manager *app.ControllerManager, rep
 			return 0
 		}
 	}
-	report := manager.Apply(ctx, repository, expectedRevision)
+	writeControllerApplyActivity(stderr, app.ControllerApplyUnit(expectedRevision))
+	report := runWithManagedProgress(
+		func() domain.ControllerRebuildExecutionReport {
+			return manager.Apply(ctx, repository, expectedRevision)
+		},
+		func() (domain.OperationProgress, error) {
+			return app.NewOperationProgressManager(adapters.Local{}).Current("controller-apply")
+		},
+		stderr,
+	)
 	report.Message = operationRecordMessage(report.Message, report)
 	if jsonOutput {
 		if err := presentation.JSON(stdout, report); err != nil {
@@ -1180,17 +1240,28 @@ func runSetupApply(ctx context.Context, repository string, stdout, stderr io.Wri
 			fmt.Fprintln(stderr, "Error: setup apply requires an interactive terminal or explicit --yes")
 			return 2
 		}
-		approved, confirmErr := presentation.ConfirmControllerApply(os.Stdin, stdout, meta.Controller.Name)
+		confirmationOutput := stdout
+		if jsonOutput {
+			confirmationOutput = stderr
+		}
+		approved, confirmErr := presentation.ConfirmControllerApply(os.Stdin, confirmationOutput, meta.Controller.Name)
 		if confirmErr != nil {
 			fmt.Fprintln(stderr, "Error: read confirmation:", confirmErr)
 			return 1
 		}
 		if !approved {
-			fmt.Fprintln(stdout, "Controller apply cancelled; no action started.")
+			fmt.Fprintln(confirmationOutput, "Controller apply cancelled; no action started.")
 			return 0
 		}
 	}
-	report := app.NewSystemActions(local).ApplyController(ctx)
+	writeControllerApplyActivity(stderr, app.ApplyControllerUnit)
+	report := runWithManagedProgress(
+		func() domain.ActionReport { return app.NewSystemActions(local).ApplyController(ctx) },
+		func() (domain.OperationProgress, error) {
+			return app.NewOperationProgressManager(local).Current("controller-apply")
+		},
+		stderr,
+	)
 	report.Message = operationRecordMessage(report.Message, report)
 	if jsonOutput {
 		if err := presentation.JSON(stdout, report); err != nil {

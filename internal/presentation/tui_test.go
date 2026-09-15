@@ -191,6 +191,9 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 				Verified:      true,
 			}
 		},
+		LoadControllerProgress: func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{}, nil
+		},
 	}
 	model := dashboardModel{actions: actions}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "c"})
@@ -212,10 +215,50 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	if command == nil || model.busy == "" {
 		t.Fatalf("controller apply did not start: %+v", model)
 	}
-	updated, _ = model.Update(command())
+	if !strings.Contains(model.View().Content, "Waiting for managed progress") {
+		t.Fatalf("controller apply omits managed progress feedback:\n%s", model.View().Content)
+	}
+	batch, ok := command().(tea.BatchMsg)
+	if !ok || len(batch) != 2 {
+		t.Fatalf("controller apply did not schedule action and progress polling")
+	}
+	updated, _ = model.Update(batch[0]())
 	model = updated.(dashboardModel)
 	if applied != 1 || model.screen != dashboardController || !strings.Contains(model.View().Content, "Applied: true   Verified: true") {
 		t.Fatalf("controller result missing: applied=%d\n%s", applied, model.View().Content)
+	}
+}
+
+func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
+	started := time.Now().UTC().Add(-2 * time.Second)
+	model := dashboardModel{
+		screen:               dashboardController,
+		busy:                 "Building and activating the reviewed controller revision",
+		controllerApplying:   true,
+		controllerStarted:    started,
+		controllerProgressID: 3,
+		width:                90,
+		actions: DashboardActions{LoadControllerProgress: func() (domain.OperationProgress, error) {
+			return domain.OperationProgress{}, nil
+		}},
+	}
+	updated, command := model.Update(dashboardControllerProgressMsg{
+		id: 3,
+		progress: domain.OperationProgress{
+			Operation: "controller-apply", State: "running", Phase: "build",
+			StartedAt: started, UpdatedAt: time.Now().UTC(), Current: 1, Total: 4,
+			Recent: []string{"Validated configuration and installed keys", "Building the reviewed controller system"},
+		},
+	})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("controller apply did not schedule another progress poll")
+	}
+	view := model.View().Content
+	for _, expected := range []string{"Building system", "1/4", "Recent activity", "Building the reviewed controller system", "elapsed"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("controller progress omits %q:\n%s", expected, view)
+		}
 	}
 }
 
