@@ -164,7 +164,7 @@ provides the normal workflows:
 | Task | What it does |
 |---|---|
 | **View computers** | Authenticates reachable hosts and compares their active revision with the desired Git revision |
-| **Deploy updates** | Reviews and applies one, selected, or all client configurations |
+| **Deploy updates** | Reviews and applies one, selected, or all client configurations with live phase, elapsed-time, verification, and recent-activity feedback |
 | **Rebuild controller** | Builds and activates an exact reviewed revision, refreshes status, and offers dashboard, detail, log, or retry actions |
 | **Manage services** | Inspects PXE and the signed cache; performs a bounded cache restart |
 | **View operation logs** | Shows private, bounded deployment logs and typed action history |

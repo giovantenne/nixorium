@@ -69,6 +69,14 @@ Because Colmena is a foreground child rather than a systemd-owned service, the
 TUI refuses an accidental quit until it receives the operation's final typed
 result.
 
+Foreground execution emits a small in-process `DeploymentProgress` event at
+application-owned build, revalidation, apply, verification, and completion
+boundaries. Bubble Tea retains at most five authored activities and renders a
+four-stage progress bar plus verification counts. It never parses or displays
+the untrusted Colmena byte stream, which continues to flow only to the private
+mode-0600 log. The compact terminal result links back to the dashboard, the
+bounded log browser, or a fresh revision-bound review.
+
 This foreground model is retained for the current product scope. Moving the
 operation into a system service would detach it from the administrator's SSH
 authority and widen the privilege boundary. A transient user service would

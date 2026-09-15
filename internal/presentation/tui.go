@@ -15,7 +15,7 @@ type DashboardActions struct {
 	LoadSetup              func() domain.SetupReport
 	LoadHosts              func() (domain.HostsReport, error)
 	PlanDeployment         func(string) domain.DeploymentPlanReport
-	ApplyDeployment        func(domain.DeploymentPlanReport) domain.DeploymentExecutionReport
+	ApplyDeployment        func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
 	PlanController         func() domain.ControllerRebuildPlanReport
 	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
 	LoadControllerProgress func() (domain.OperationProgress, error)
@@ -84,6 +84,10 @@ type dashboardModel struct {
 	deployPlan           domain.DeploymentPlanReport
 	deployResult         domain.DeploymentExecutionReport
 	deploying            bool
+	deployProgress       domain.DeploymentProgress
+	deployRecent         []string
+	deployStarted        time.Time
+	deployEvents         <-chan tea.Msg
 	controllerPlan       domain.ControllerRebuildPlanReport
 	controllerResult     domain.ControllerRebuildExecutionReport
 	controllerApplying   bool
@@ -163,6 +167,10 @@ type dashboardDeploymentPlanMsg struct {
 
 type dashboardDeploymentResultMsg struct {
 	report domain.DeploymentExecutionReport
+}
+
+type dashboardDeploymentProgressMsg struct {
+	progress domain.DeploymentProgress
 }
 
 type dashboardControllerPlanMsg struct {
@@ -347,10 +355,18 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardDeploymentResultMsg:
 		model.busy = ""
 		model.deploying = false
+		model.deployEvents = nil
 		model.deployResult = message.report
 		model.message = message.report.Message
 		model.screen = dashboardDeploy
 		return model, nil
+	case dashboardDeploymentProgressMsg:
+		if !model.deploying || model.deployEvents == nil {
+			return model, nil
+		}
+		model.deployProgress = message.progress
+		model.deployRecent = appendBoundedActivity(model.deployRecent, message.progress.Activity, 5)
+		return model, waitForDeploymentEvent(model.deployEvents)
 	case dashboardControllerPlanMsg:
 		model.busy = ""
 		model.controllerPlan = message.report
@@ -826,6 +842,25 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, model.loadHosts()
 		}
 	case dashboardDeploy:
+		if model.deployResult.Operation != "" {
+			switch key.String() {
+			case "enter", "esc", "left":
+				model.screen = dashboardHome
+				model.message = ""
+			case "l":
+				model.busy = "Loading operation logs"
+				model.message = ""
+				return model, func() tea.Msg {
+					return dashboardLogsMsg{report: model.actions.LoadLogs()}
+				}
+			case "r":
+				model.deployResult = domain.DeploymentExecutionReport{}
+				model.deployProgress = domain.DeploymentProgress{}
+				model.deployRecent = nil
+				model.message = ""
+			}
+			return model, nil
+		}
 		hosts := model.report.Meta.Clients.Hosts
 		switch key.String() {
 		case "esc", "left":
@@ -883,12 +918,15 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			model.busy = "Building and applying the reviewed deployment"
 			model.deploying = true
+			model.deployProgress = domain.DeploymentProgress{}
+			model.deployRecent = nil
+			model.deployStarted = time.Now()
 			model.confirmation = ""
 			model.message = ""
 			plan := model.deployPlan
-			return model, func() tea.Msg {
-				return dashboardDeploymentResultMsg{report: model.actions.ApplyDeployment(plan)}
-			}
+			events := make(chan tea.Msg)
+			model.deployEvents = events
+			return model, startDeployment(model.actions.ApplyDeployment, plan, events)
 		default:
 			if key.Text != "" {
 				model.confirmation += key.Text
@@ -1390,6 +1428,40 @@ func (model dashboardModel) runAction(operation func() string, screen dashboardS
 		report, err := model.actions.Refresh()
 		return dashboardOperationMsg{message: message, report: report, err: err, screen: screen}
 	}
+}
+
+func startDeployment(action func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport, plan domain.DeploymentPlanReport, events chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		go func() {
+			report := action(plan, func(progress domain.DeploymentProgress) {
+				events <- dashboardDeploymentProgressMsg{progress: progress}
+			})
+			events <- dashboardDeploymentResultMsg{report: report}
+			close(events)
+		}()
+		return <-events
+	}
+}
+
+func waitForDeploymentEvent(events <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		message, ok := <-events
+		if !ok {
+			return nil
+		}
+		return message
+	}
+}
+
+func appendBoundedActivity(recent []string, activity string, maximum int) []string {
+	if activity == "" || maximum < 1 {
+		return recent
+	}
+	recent = append(recent, activity)
+	if len(recent) > maximum {
+		recent = append([]string(nil), recent[len(recent)-maximum:]...)
+	}
+	return recent
 }
 
 func (model dashboardModel) loadHosts() tea.Cmd {
@@ -2074,12 +2146,23 @@ func controllerPlanIssues(report domain.ControllerRebuildPlanReport) string {
 }
 
 func (model dashboardModel) deployView() string {
-	lines := []string{"Nixorium — Deploy updates", ""}
+	lines := []string{tuiTitle("Nixorium — Deploy updates", model.isDark), ""}
+	if model.deploying {
+		elapsed := time.Since(model.deployStarted).Truncate(time.Second)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		lines = append(lines, fmt.Sprintf("%s…  elapsed %s", model.busy, elapsed))
+		lines = append(lines, model.deploymentProgressView()...)
+		lines = append(lines,
+			"",
+			tuiMuted("Detailed Colmena output is being saved in the private deployment log.", model.isDark),
+			"Closing is disabled while this foreground deployment is running.",
+		)
+		return strings.Join(lines, "\n") + "\n"
+	}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
-		if model.deploying {
-			lines = append(lines, "", "Nixorium will show the durable log and result when Colmena exits.", "Closing is disabled while this deployment is running.")
-		}
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.screen == dashboardDeployReview {
@@ -2102,6 +2185,35 @@ func (model dashboardModel) deployView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 
+	if model.deployResult.Operation != "" {
+		success := !model.deployResult.HasErrors()
+		resultTitle := "Deployment needs attention"
+		if success {
+			resultTitle = "Deployment completed and verified"
+		}
+		lines = append(lines,
+			tuiResult(resultTitle, success, model.isDark),
+			"",
+			fmt.Sprintf("State: %s   Phase: %s", model.deployResult.State, model.deployResult.Phase),
+			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployResult.BuildCompleted, model.deployResult.ApplyCompleted),
+		)
+		if model.deployResult.Verification.Attempted > 0 {
+			lines = append(lines, fmt.Sprintf("Authenticated: %d/%d   Recorded: %d", model.deployResult.Verification.Verified, model.deployResult.Verification.Attempted, model.deployResult.Verification.Recorded))
+		}
+		if model.deployResult.LogPath != "" {
+			lines = append(lines, "Detailed log: "+model.deployResult.LogPath)
+		}
+		if model.message != "" {
+			lines = append(lines, "", "Result: "+model.message)
+		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
+			tuiHelpBinding([]string{"l"}, "l", "logs"),
+			tuiHelpBinding([]string{"r"}, "r", "new review"),
+		))
+		return strings.Join(lines, "\n") + "\n"
+	}
+
 	hosts := model.report.Meta.Clients.Hosts
 	lines = append(lines, "Select computers (Space toggles; a selects all):", "")
 	for index, host := range hosts {
@@ -2119,23 +2231,50 @@ func (model dashboardModel) deployView() string {
 		lines = append(lines, "No configured client computers.")
 	}
 	lines = append(lines, "", "Enter: review selected targets   Esc: back   q: quit")
-	if model.deployResult.Operation != "" {
-		lines = append(lines,
-			"",
-			fmt.Sprintf("Last result: %s at phase %s", model.deployResult.State, model.deployResult.Phase),
-			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployResult.BuildCompleted, model.deployResult.ApplyCompleted),
-		)
-		if model.deployResult.Verification.Attempted > 0 {
-			lines = append(lines, fmt.Sprintf("Authenticated: %d/%d   Recorded: %d", model.deployResult.Verification.Verified, model.deployResult.Verification.Attempted, model.deployResult.Verification.Recorded))
-		}
-		if model.deployResult.LogPath != "" {
-			lines = append(lines, "Detailed log: "+model.deployResult.LogPath)
-		}
-	}
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) deploymentProgressView() []string {
+	progressState := model.deployProgress
+	if progressState.Phase == "" {
+		return []string{"", "  Waiting for deployment progress…"}
+	}
+	phaseLabels := map[domain.DeploymentPhase]string{
+		domain.DeploymentPhasePreflight: "Revalidating review",
+		domain.DeploymentPhaseBuild:     "Building configurations",
+		domain.DeploymentPhaseApply:     "Applying configurations",
+		domain.DeploymentPhaseVerify:    "Verifying computers",
+		domain.DeploymentPhaseComplete:  "Complete",
+	}
+	lines := []string{"", tuiSection("Current progress", model.isDark), "  Phase: " + phaseLabels[progressState.Phase]}
+	if progressState.Total > 0 {
+		barWidth := model.width - 8
+		if barWidth < 24 {
+			barWidth = 24
+		}
+		if barWidth > 64 {
+			barWidth = 64
+		}
+		bar := progress.New(progress.WithDefaultBlend(), progress.WithWidth(barWidth))
+		percentage := float64(progressState.Completed) / float64(progressState.Total)
+		lines = append(lines,
+			fmt.Sprintf("  %d/%d", progressState.Completed, progressState.Total),
+			"  "+bar.ViewAs(percentage),
+		)
+	}
+	if progressState.TargetTotal > 0 {
+		lines = append(lines, fmt.Sprintf("  Computers checked: %d/%d", progressState.TargetCurrent, progressState.TargetTotal))
+	}
+	if len(model.deployRecent) > 0 {
+		lines = append(lines, "  Recent activity:")
+		for _, activity := range model.deployRecent {
+			lines = append(lines, "    • "+activity)
+		}
+	}
+	return lines
 }
 
 func (model dashboardModel) hostsView() string {

@@ -430,8 +430,8 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
 			return deploymentManager.Plan(ctx, repository, requested)
 		},
-		ApplyDeployment: func(plan domain.DeploymentPlanReport) domain.DeploymentExecutionReport {
-			return executeDeploymentOperation(ctx, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard)
+		ApplyDeployment: func(plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+			return executeDeploymentOperationWithProgress(ctx, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard, observe)
 		},
 		PlanController: func() domain.ControllerRebuildPlanReport {
 			return controllerManager.Plan(ctx, repository)
@@ -980,6 +980,10 @@ func runDeploymentApply(ctx context.Context, repository string, stdout, stderr i
 }
 
 func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer) domain.DeploymentExecutionReport {
+	return executeDeploymentOperationWithProgress(ctx, manager, repository, requested, expectedRevision, stream, nil)
+}
+
+func executeDeploymentOperationWithProgress(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 	operation, err := adapters.OpenDeploymentOperation()
 	if err != nil {
 		plan := manager.Plan(ctx, repository, requested)
@@ -999,7 +1003,7 @@ func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentMana
 		}
 	}
 	progress := io.MultiWriter(stream, operation.Writer())
-	report := manager.Execute(ctx, repository, requested, expectedRevision, operation.Path, progress)
+	report := manager.ExecuteWithProgress(ctx, repository, requested, expectedRevision, operation.Path, progress, observe)
 	fmt.Fprintf(operation.Writer(), "\nResult: %s\nPhase: %s\nBuild completed: %t\nApply completed: %t\nVerified targets: %d/%d\nRecorded targets: %d\nDetail: %s\n", report.State, report.Phase, report.BuildCompleted, report.ApplyCompleted, report.Verification.Verified, report.Verification.Attempted, report.Verification.Recorded, report.Message)
 	if closeErr := operation.Close(); closeErr != nil {
 		report.State = "failed"

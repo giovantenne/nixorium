@@ -25,6 +25,10 @@ type DeploymentSource interface {
 const deploymentVerificationTimeout = 3 * time.Second
 
 func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, expectedRevision, logPath string, progress io.Writer) domain.DeploymentExecutionReport {
+	return m.ExecuteWithProgress(ctx, repository, requested, expectedRevision, logPath, progress, nil)
+}
+
+func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository, requested, expectedRevision, logPath string, output io.Writer, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 	plan := m.Plan(ctx, repository, requested)
 	report := executionFromPlan(plan, logPath)
 	if plan.HasErrors() {
@@ -36,20 +40,28 @@ func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, 
 	if plan.Revision != expectedRevision {
 		return deploymentExecutionIssue(report, "review", fmt.Sprintf("reviewed revision %s does not match current revision %s", expectedRevision, plan.Revision))
 	}
-	if progress == nil {
-		progress = io.Discard
+	if output == nil {
+		output = io.Discard
 	}
 
 	report.State = "running"
 	report.Phase = domain.DeploymentPhaseBuild
-	fmt.Fprintf(progress, "Deployment revision: %s\nTargets: %s\n\n", report.Revision, report.ColmenaSelector)
-	fmt.Fprintln(progress, "==> Building selected configurations with Colmena")
-	if err := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseBuild, report.ColmenaSelector, progress); err != nil {
+	emitDeploymentProgress(observe, domain.DeploymentProgress{
+		Phase: domain.DeploymentPhaseBuild, Total: 4,
+		Activity: fmt.Sprintf("Building configurations for %d selected computer(s)", len(report.Targets)),
+	})
+	fmt.Fprintf(output, "Deployment revision: %s\nTargets: %s\n\n", report.Revision, report.ColmenaSelector)
+	fmt.Fprintln(output, "==> Building selected configurations with Colmena")
+	if err := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseBuild, report.ColmenaSelector, output); err != nil {
 		report.State = "failed"
 		report.Message = fmt.Sprintf("build failed before any deployment was started: %v", err)
 		return report
 	}
 	report.BuildCompleted = true
+	emitDeploymentProgress(observe, domain.DeploymentProgress{
+		Phase: domain.DeploymentPhasePreflight, Completed: 1, Total: 4,
+		Activity: "Build completed; revalidating the reviewed revision and targets",
+	})
 
 	verified := m.Plan(ctx, repository, requested)
 	if verified.HasErrors() {
@@ -67,13 +79,21 @@ func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, 
 	}
 
 	report.Phase = domain.DeploymentPhaseApply
-	fmt.Fprintln(progress, "\n==> Applying the built configurations with Colmena")
-	applyErr := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseApply, report.ColmenaSelector, progress)
+	emitDeploymentProgress(observe, domain.DeploymentProgress{
+		Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4,
+		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(report.Targets)),
+	})
+	fmt.Fprintln(output, "\n==> Applying the built configurations with Colmena")
+	applyErr := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseApply, report.ColmenaSelector, output)
 	if applyErr == nil {
 		report.ApplyCompleted = true
 	}
-	fmt.Fprintln(progress, "\n==> Verifying selected computers through authenticated host state")
-	recordErr := m.verifySuccessfulDeployments(ctx, &report, progress)
+	emitDeploymentProgress(observe, domain.DeploymentProgress{
+		Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
+		TargetTotal: len(report.Targets), Activity: "Verifying authenticated client state",
+	})
+	fmt.Fprintln(output, "\n==> Verifying selected computers through authenticated host state")
+	recordErr := m.verifySuccessfulDeployments(ctx, &report, output, observe)
 	if applyErr != nil {
 		report.State = "failed"
 		report.Phase = domain.DeploymentPhaseApply
@@ -98,10 +118,15 @@ func (m *DeploymentManager) Execute(ctx context.Context, repository, requested, 
 	report.Phase = domain.DeploymentPhaseComplete
 	report.State = "completed"
 	report.Message = "all selected targets were built, applied, authenticated, and recorded successfully"
+	emitDeploymentProgress(observe, domain.DeploymentProgress{
+		Phase: domain.DeploymentPhaseComplete, Completed: 4, Total: 4,
+		TargetCurrent: report.Verification.Verified, TargetTotal: report.Verification.Attempted,
+		Activity: "Deployment completed and authenticated state was recorded",
+	})
 	return report
 }
 
-func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, progress io.Writer) error {
+func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, report *domain.DeploymentExecutionReport, output io.Writer, observe func(domain.DeploymentProgress)) error {
 	report.Verification = domain.DeploymentVerificationSummary{
 		Attempted: len(report.Targets),
 		Targets:   make([]domain.DeploymentTargetVerification, 0, len(report.Targets)),
@@ -113,7 +138,7 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
 	updates := map[string]domain.LastSuccessfulDeployment{}
 	verifiedAt := m.now().UTC()
-	for _, target := range report.Targets {
+	for index, target := range report.Targets {
 		probe, found := observed[target.Name]
 		verification := domain.DeploymentTargetVerification{
 			Name:       target.Name,
@@ -142,11 +167,16 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 			}
 		}
 		report.Verification.Targets = append(report.Verification.Targets, verification)
-		fmt.Fprintf(progress, "  %-10s %s", target.Name, verification.State)
+		fmt.Fprintf(output, "  %-10s %s", target.Name, verification.State)
 		if verification.Detail != "" {
-			fmt.Fprintf(progress, ": %s", verification.Detail)
+			fmt.Fprintf(output, ": %s", verification.Detail)
 		}
-		fmt.Fprintln(progress)
+		fmt.Fprintln(output)
+		emitDeploymentProgress(observe, domain.DeploymentProgress{
+			Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
+			TargetCurrent: index + 1, TargetTotal: len(report.Targets),
+			Activity: fmt.Sprintf("Checked authenticated state for %d/%d computer(s)", index+1, len(report.Targets)),
+		})
 	}
 	if len(updates) == 0 {
 		report.Verification.Detail = "no target was authenticated at the reviewed revision; deployment history was not changed"
@@ -159,6 +189,12 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 	report.Verification.Recorded = len(updates)
 	report.Verification.Detail = fmt.Sprintf("recorded %d authenticated target(s)", len(updates))
 	return nil
+}
+
+func emitDeploymentProgress(observe func(domain.DeploymentProgress), progress domain.DeploymentProgress) {
+	if observe != nil {
+		observe(progress)
+	}
 }
 
 func executionFromPlan(plan domain.DeploymentPlanReport, logPath string) domain.DeploymentExecutionReport {
