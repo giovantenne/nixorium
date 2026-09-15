@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/progress"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -2560,26 +2561,64 @@ func (model dashboardModel) pxeView() string {
 		}
 		return strings.Join(lines, "\n") + "\n"
 	}
-	lines = append(lines, "", tuiSection("Actions", model.isDark))
-	if model.report.PXE.Mode != "active" {
-		lines = append(lines, "  p   Prepare artifacts and client closures", "  s   Start installation mode")
-	}
-	if model.report.PXE.Mode == "active" || model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required" {
-		lines = append(lines, "  x   Stop and restore normal networking")
-	}
-	lines = append(lines, "  r   Recover normal networking")
+	lines = append(lines, "")
+	lines = append(lines, model.pxeNextStepView()...)
 	if model.pxeProgress.Operation != "" {
 		lines = append(lines, "")
 		lines = append(lines, model.operationProgressView(model.pxeProgress, "Last preparation")...)
 	}
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-		tuiHelpBinding([]string{"q"}, "q", "quit; services continue"),
-	))
+	lines = append(lines, "", tuiSection("Available actions", model.isDark), model.pxeActionHelp())
 	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+		lines = append(lines, "", tuiSection("Last action", model.isDark), "  "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) pxeNextStepView() []string {
+	switch model.report.PXE.Mode {
+	case "active":
+		return []string{
+			tuiResult("Next: install a computer", true, model.isDark),
+			"  1. Boot one configured computer using UEFI network boot.",
+			"  2. In the downloaded installer, run /installer/setup.sh.",
+			"  3. When installations are finished, press x here to stop PXE.",
+		}
+	case "degraded", "recovery-required":
+		return []string{
+			tuiResult("Next: recover normal controller networking", false, model.isDark),
+			"  Press r to reconcile the recorded address and managed PXE state.",
+		}
+	}
+	if !model.report.PXEPreparation.Ready {
+		return []string{
+			tuiResult("Next: prepare installation files", false, model.isDark),
+			"  Press p to build netboot artifacts and every configured client system.",
+		}
+	}
+	return []string{
+		tuiResult("Next: start network installation", false, model.isDark),
+		"  Press s to review the temporary address change and start PXE.",
+	}
+}
+
+func (model dashboardModel) pxeActionHelp() string {
+	bindings := []key.Binding{}
+	recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
+	if model.report.PXE.Mode != "active" && !recovery {
+		bindings = append(bindings, tuiHelpBinding([]string{"p"}, "p", "prepare"))
+		if model.report.PXEPreparation.Ready {
+			bindings = append(bindings, tuiHelpBinding([]string{"s"}, "s", "start PXE"))
+		}
+	}
+	if model.report.PXE.Mode == "active" || recovery {
+		bindings = append(bindings, tuiHelpBinding([]string{"x"}, "x", "stop PXE"))
+	}
+	bindings = append(bindings,
+		tuiHelpBinding([]string{"r"}, "r", "recover"),
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+		tuiHelpBinding([]string{"q"}, "q", "quit; services continue"),
+	)
+	return tuiHelp(model.width, model.isDark, bindings...)
 }
 
 func pxeStatusKind(mode string) tuiStatusKind {

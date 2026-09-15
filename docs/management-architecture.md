@@ -119,6 +119,10 @@ Mutating workflows terminate in compact typed result states. Presentation maps
 each result only to existing typed navigation callbacks—for example Git review,
 bounded logs, retry/review, further editing, dashboard, or the observed setup
 checklist—and never performs a follow-up mutation implicitly.
+PXE is the deliberate exception to a terminal result screen because it manages
+a live multi-step mode. Its view derives one recommended next step and the
+available controls from typed preparation and lifecycle state; it does not
+advance the mode or infer client installation from presentation state.
 
 The initial package layout is:
 
