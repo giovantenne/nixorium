@@ -6,35 +6,85 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type settingsField struct {
-	id    string
-	label string
+	id      string
+	group   string
+	label   string
+	choices []settingsChoice
+}
+
+type settingsChoice struct {
+	value       string
+	label       string
+	description string
+}
+
+type settingsChoiceItem settingsChoice
+
+func (item settingsChoiceItem) Title() string       { return item.label }
+func (item settingsChoiceItem) Description() string { return item.description }
+func (item settingsChoiceItem) FilterValue() string { return item.label + " " + item.value }
+
+const customSettingsChoice = "__custom__"
+
+var timeZoneChoices = []settingsChoice{
+	{value: "Europe/Rome", label: "Europe/Rome", description: "Italy"},
+	{value: "Europe/London", label: "Europe/London", description: "United Kingdom"},
+	{value: "Europe/Paris", label: "Europe/Paris", description: "France"},
+	{value: "Europe/Berlin", label: "Europe/Berlin", description: "Germany"},
+	{value: "Europe/Madrid", label: "Europe/Madrid", description: "Spain"},
+	{value: "UTC", label: "UTC", description: "Coordinated Universal Time"},
+}
+
+var localeChoices = []settingsChoice{
+	{value: "it_IT.UTF-8", label: "Italiano — Italia", description: "it_IT.UTF-8"},
+	{value: "en_US.UTF-8", label: "English — United States", description: "en_US.UTF-8"},
+	{value: "en_GB.UTF-8", label: "English — United Kingdom", description: "en_GB.UTF-8"},
+	{value: "fr_FR.UTF-8", label: "Français — France", description: "fr_FR.UTF-8"},
+	{value: "de_DE.UTF-8", label: "Deutsch — Deutschland", description: "de_DE.UTF-8"},
+	{value: "es_ES.UTF-8", label: "Español — España", description: "es_ES.UTF-8"},
+}
+
+var keyboardChoices = []settingsChoice{
+	{value: "it", label: "Italian", description: "XKB layout: it"},
+	{value: "us", label: "US English", description: "XKB layout: us"},
+	{value: "gb", label: "UK English", description: "XKB layout: gb"},
+	{value: "fr", label: "French", description: "XKB layout: fr"},
+	{value: "de", label: "German", description: "XKB layout: de"},
+	{value: "es", label: "Spanish", description: "XKB layout: es"},
+}
+
+var consoleKeyMapChoices = []settingsChoice{
+	{value: "it2", label: "Italian", description: "Console keymap: it2"},
+	{value: "us", label: "US English", description: "Console keymap: us"},
+	{value: "uk", label: "UK English", description: "Console keymap: uk"},
+	{value: "fr", label: "French", description: "Console keymap: fr"},
+	{value: "de", label: "German", description: "Console keymap: de"},
+	{value: "es", label: "Spanish", description: "Console keymap: es"},
 }
 
 var settingsFields = []settingsField{
-	{id: "lab.masterDhcpIp", label: "Current controller DHCP address"},
-	{id: "lab.networkBase", label: "Static laboratory network address"},
-	{id: "lab.networkPrefixLength", label: "Network prefix length"},
-	{id: "lab.pcCount", label: "Number of client computers"},
-	{id: "lab.masterHostNumber", label: "Controller host number"},
-	{id: "lab.ifaceName", label: "Laboratory network interface"},
-	{id: "lab.teacherUser", label: "Teacher user name"},
-	{id: "lab.studentUser", label: "Student user name"},
-	{id: "lab.homepageUrl", label: "Browser homepage"},
-	{id: "lab.studentGitName", label: "Student Git author name"},
-	{id: "lab.studentGitEmail", label: "Student Git author email"},
-	{id: "lab.adminGitName", label: "Administrator Git author name"},
-	{id: "lab.adminGitEmail", label: "Administrator Git author email"},
-	{id: "lab.timeZone", label: "Time zone"},
-	{id: "lab.defaultLocale", label: "Default locale"},
-	{id: "lab.extraLocale", label: "Regional-format locale"},
-	{id: "lab.keyboardLayout", label: "Keyboard layout"},
-	{id: "lab.consoleKeyMap", label: "Console key map"},
-	{id: "lab.veyonNativeHosts", label: "Veyon native hosts (comma-separated, optional)"},
+	{id: "lab.ifaceName", group: "Network", label: "Laboratory network interface"},
+	{id: "lab.masterDhcpIp", group: "Network", label: "Current controller DHCP address"},
+	{id: "lab.networkBase", group: "Network", label: "Static laboratory network address"},
+	{id: "lab.networkPrefixLength", group: "Network", label: "Network prefix length"},
+	{id: "lab.pcCount", group: "Laboratory", label: "Number of client computers"},
+	{id: "lab.masterHostNumber", group: "Laboratory", label: "Controller host number"},
+	{id: "lab.teacherUser", group: "Accounts", label: "Teacher user name"},
+	{id: "lab.studentUser", group: "Accounts", label: "Student user name"},
+	{id: "lab.timeZone", group: "Regional settings", label: "Time zone", choices: timeZoneChoices},
+	{id: "lab.defaultLocale", group: "Regional settings", label: "System language and locale", choices: localeChoices},
+	{id: "lab.extraLocale", group: "Regional settings", label: "Regional formats", choices: localeChoices},
+	{id: "lab.keyboardLayout", group: "Regional settings", label: "Desktop keyboard layout", choices: keyboardChoices},
+	{id: "lab.consoleKeyMap", group: "Regional settings", label: "Console keyboard layout", choices: consoleKeyMapChoices},
+	{id: "lab.homepageUrl", group: "Preferences", label: "Browser homepage"},
+	{id: "lab.veyonNativeHosts", group: "Classroom", label: "Veyon native hosts (comma-separated, optional)"},
 }
 
 type settingsWizardModel struct {
@@ -45,7 +95,10 @@ type settingsWizardModel struct {
 	accepted  bool
 	cancelled bool
 	replace   bool
+	custom    bool
+	selector  list.Model
 	width     int
+	height    int
 	isDark    bool
 }
 
@@ -67,7 +120,77 @@ func newSettingsWizardModel(settings domain.LabSettingsFile) settingsWizardModel
 	for index, field := range settingsFields {
 		drafts[index] = settingFieldValue(settings, field.id)
 	}
-	return settingsWizardModel{settings: settings, drafts: drafts, replace: true}
+	model := settingsWizardModel{settings: settings, drafts: drafts, replace: true, width: 80, height: 24}
+	model.prepareCurrentField()
+	return model
+}
+
+func (model *settingsWizardModel) prepareCurrentField() {
+	model.replace = true
+	model.custom = false
+	field := settingsFields[model.index]
+	if len(field.choices) == 0 {
+		return
+	}
+	items := make([]list.Item, 0, len(field.choices)+2)
+	current := model.drafts[model.index]
+	selected := 0
+	found := false
+	for index, choice := range field.choices {
+		items = append(items, settingsChoiceItem(choice))
+		if choice.value == current {
+			selected = index
+			found = true
+		}
+	}
+	if current != "" && !found {
+		items = append([]list.Item{settingsChoiceItem{
+			value:       current,
+			label:       current,
+			description: "Current custom value",
+		}}, items...)
+		selected = 0
+	}
+	items = append(items, settingsChoiceItem{
+		value:       customSettingsChoice,
+		label:       "Custom…",
+		description: "Enter another validated value",
+	})
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles = list.NewDefaultItemStyles(model.isDark)
+	model.selector = list.New(items, delegate, model.choiceWidth(), model.choiceHeight())
+	model.selector.Title = field.label
+	model.selector.SetShowTitle(false)
+	model.selector.SetShowStatusBar(false)
+	model.selector.SetShowHelp(true)
+	model.selector.Styles = list.DefaultStyles(model.isDark)
+	model.selector.Help.Styles = help.DefaultStyles(model.isDark)
+	model.selector.Select(selected)
+}
+
+func (model settingsWizardModel) choiceWidth() int {
+	if model.width < 40 {
+		return 40
+	}
+	return model.width
+}
+
+func (model settingsWizardModel) choiceHeight() int {
+	height := model.height - 8
+	if height < 8 {
+		return 8
+	}
+	if height > 16 {
+		return 16
+	}
+	return height
+}
+
+func (model settingsWizardModel) moveToField(index int) settingsWizardModel {
+	model.index = index
+	model.err = ""
+	model.prepareCurrentField()
+	return model
 }
 
 func (settingsWizardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
@@ -75,44 +198,60 @@ func (settingsWizardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
 func (model settingsWizardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if size, ok := message.(tea.WindowSizeMsg); ok {
 		model.width = size.Width
+		model.height = size.Height
+		if len(settingsFields[model.index].choices) > 0 && !model.custom {
+			model.selector.SetSize(model.choiceWidth(), model.choiceHeight())
+		}
 		return model, nil
 	}
 	if background, ok := message.(tea.BackgroundColorMsg); ok {
 		model.isDark = background.IsDark()
+		if len(settingsFields[model.index].choices) > 0 && !model.custom {
+			model.prepareCurrentField()
+		}
+		return model, nil
+	}
+	field := settingsFields[model.index]
+	if len(field.choices) > 0 && !model.custom {
+		if key, ok := message.(tea.KeyPressMsg); ok {
+			if key.String() == "ctrl+c" {
+				model.cancelled = true
+				return model, tea.Quit
+			}
+			return model.updateChoiceField(key)
+		}
+		updated, command := model.selector.Update(message)
+		model.selector = updated
+		return model, command
+	}
+	if paste, ok := message.(tea.PasteMsg); ok {
+		model = model.appendDraft(paste.Content)
 		return model, nil
 	}
 	key, ok := message.(tea.KeyPressMsg)
 	if !ok {
 		return model, nil
 	}
-	switch key.String() {
-	case "ctrl+c", "esc":
+	if key.String() == "ctrl+c" {
 		model.cancelled = true
 		return model, tea.Quit
-	case "shift+tab", "up", "ctrl+b":
-		if model.index > 0 {
-			model.index--
+	}
+	switch key.String() {
+	case "esc":
+		if model.custom {
+			model.custom = false
 			model.err = ""
-			model.replace = true
-		}
-	case "enter":
-		candidate, err := setSettingField(model.settings, settingsFields[model.index].id, model.drafts[model.index])
-		if err != nil {
-			model.err = err.Error()
+			model.prepareCurrentField()
 			return model, nil
 		}
-		model.settings = candidate
-		model.err = ""
-		if model.index == len(settingsFields)-1 {
-			if issues := candidate.Validate(); len(issues) > 0 {
-				model.err = issues[0].Field + ": " + issues[0].Message
-				return model, nil
-			}
-			model.accepted = true
-			return model, tea.Quit
+		model.cancelled = true
+		return model, tea.Quit
+	case "shift+tab", "up", "left", "ctrl+b":
+		if model.index > 0 {
+			model = model.moveToField(model.index - 1)
 		}
-		model.index++
-		model.replace = true
+	case "enter":
+		return model.acceptCurrentField()
 	case "backspace":
 		model.replace = false
 		value := []rune(model.drafts[model.index])
@@ -126,14 +265,86 @@ func (model settingsWizardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.replace = false
 	default:
 		if key.Text != "" {
-			if model.replace {
-				model.drafts[model.index] = ""
-				model.replace = false
-			}
-			model.drafts[model.index] += key.Text
-			model.err = ""
+			model = model.appendDraft(key.Text)
 		}
 	}
+	return model, nil
+}
+
+func (model settingsWizardModel) appendDraft(value string) settingsWizardModel {
+	if model.replace {
+		model.drafts[model.index] = ""
+		model.replace = false
+	}
+	model.drafts[model.index] += value
+	model.err = ""
+	return model
+}
+
+func (model settingsWizardModel) updateChoiceField(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch key.String() {
+	case "shift+tab", "left", "ctrl+b":
+		if model.selector.FilterState() == list.Filtering || model.selector.FilterState() == list.FilterApplied {
+			updated, command := model.selector.Update(key)
+			model.selector = updated
+			return model, command
+		}
+		if model.index > 0 {
+			model = model.moveToField(model.index - 1)
+		}
+		return model, nil
+	case "esc":
+		if model.selector.FilterState() == list.Filtering || model.selector.FilterState() == list.FilterApplied {
+			updated, command := model.selector.Update(key)
+			model.selector = updated
+			return model, command
+		}
+		model.cancelled = true
+		return model, tea.Quit
+	case "enter":
+		if model.selector.FilterState() == list.Filtering {
+			updated, command := model.selector.Update(key)
+			model.selector = updated
+			return model, command
+		}
+		selected, ok := model.selector.SelectedItem().(settingsChoiceItem)
+		if !ok {
+			model.err = "select a value"
+			return model, nil
+		}
+		if selected.value == customSettingsChoice {
+			model.custom = true
+			model.replace = true
+			model.err = ""
+			return model, nil
+		}
+		model.drafts[model.index] = selected.value
+		return model.acceptCurrentField()
+	default:
+		updated, command := model.selector.Update(key)
+		model.selector = updated
+		return model, command
+	}
+}
+
+func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
+	field := settingsFields[model.index]
+	candidate, err := setSettingField(model.settings, field.id, model.drafts[model.index])
+	if err != nil {
+		model.err = err.Error()
+		return model, nil
+	}
+	model.settings = candidate
+	model.err = ""
+	if model.index == len(settingsFields)-1 {
+		if issues := candidate.Validate(); len(issues) > 0 {
+			model.err = issues[0].Field + ": " + issues[0].Message
+			return model, nil
+		}
+		model.accepted = true
+		return model, tea.Quit
+	}
+	model = model.moveToField(model.index + 1)
 	return model, nil
 }
 
@@ -142,19 +353,31 @@ func (model settingsWizardModel) View() tea.View {
 	lines := []string{
 		tuiTitle("Nixorium first-run configuration", model.isDark),
 		"",
-		fmt.Sprintf("Field %d of %d", model.index+1, len(settingsFields)),
+		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(settingsFields), field.group),
 		field.label,
-		"",
-		"> " + model.drafts[model.index] + "█",
+	}
+	if len(field.choices) > 0 && !model.custom {
+		lines = append(lines, "", "Choose a suggested value, or press / to filter.", "", model.selector.View())
+	} else {
+		if model.custom {
+			lines = append(lines, "", "Custom value; it will be validated before continuing.")
+		}
+		lines = append(lines, "", "> "+model.drafts[model.index]+"█")
 	}
 	if model.err != "" {
 		lines = append(lines, "", tuiError("Invalid: "+model.err, model.isDark))
 	}
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
-		tuiHelpBinding([]string{"shift+tab", "up"}, "shift+tab/up", "back"),
-		tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
-	))
+	if len(field.choices) == 0 || model.custom {
+		backLabel := "cancel"
+		if model.custom {
+			backLabel = "suggestions"
+		}
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"enter"}, "enter", "continue"),
+			tuiHelpBinding([]string{"shift+tab", "up"}, "shift+tab/up", "previous"),
+			tuiHelpBinding([]string{"esc"}, "esc", backLabel),
+		))
+	}
 	view := tea.NewView(strings.Join(lines, "\n") + "\n")
 	view.AltScreen = true
 	return view

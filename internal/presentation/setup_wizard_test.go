@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -25,16 +26,25 @@ func wizardSettings() domain.LabSettingsFile {
 
 func TestSettingsWizardPreservesValuesWhenNavigatingBack(t *testing.T) {
 	model := newSettingsWizardModel(wizardSettings())
+	index := settingsFieldIndex("lab.networkBase")
+	model = model.moveToField(index)
+	model.drafts[index] = "10.1.0.0"
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(settingsWizardModel)
-	model.drafts[1] = "10.1.0.0"
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(settingsWizardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	model = updated.(settingsWizardModel)
-	if model.index != 1 || model.drafts[1] != "10.1.0.0" || model.settings.Lab.NetworkBase != "10.1.0.0" {
+	if model.index != index || model.drafts[index] != "10.1.0.0" || model.settings.Lab.NetworkBase != "10.1.0.0" {
 		t.Fatalf("wizard lost state: %+v", model)
 	}
+}
+
+func settingsFieldIndex(id string) int {
+	for index, field := range settingsFields {
+		if field.id == id {
+			return index
+		}
+	}
+	return -1
 }
 
 func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
@@ -48,6 +58,61 @@ func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
 	}
 	if model.settings.Lab.VeyonNativeHosts == nil {
 		t.Fatal("empty Veyon host list became null")
+	}
+}
+
+func TestFirstRunOmitsGitIdentityAndGroupsEssentialFields(t *testing.T) {
+	groups := map[string]bool{}
+	for _, field := range settingsFields {
+		groups[field.group] = true
+		if strings.Contains(field.id, "Git") {
+			t.Fatalf("first-run still asks for Git identity: %+v", field)
+		}
+	}
+	for _, expected := range []string{"Network", "Laboratory", "Accounts", "Regional settings", "Preferences", "Classroom"} {
+		if !groups[expected] {
+			t.Fatalf("first-run group %q is missing: %v", expected, groups)
+		}
+	}
+}
+
+func TestRegionalFieldsUseSearchableSuggestedValues(t *testing.T) {
+	model := newSettingsWizardModel(wizardSettings())
+	model = model.moveToField(settingsFieldIndex("lab.defaultLocale"))
+	if !model.selector.FilteringEnabled() || !strings.Contains(model.View().Content, "press / to filter") {
+		t.Fatalf("locale selector is not searchable:\n%s", model.View().Content)
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	model = updated.(settingsWizardModel)
+	if model.selector.FilterState() != list.Filtering {
+		t.Fatalf("slash did not open locale filtering: %s", model.selector.FilterState())
+	}
+	model.selector.SetFilterText("United States")
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(settingsWizardModel)
+	if model.settings.Lab.DefaultLocale != "en_US.UTF-8" {
+		t.Fatalf("selected locale was not applied: %+v", model.settings.Lab)
+	}
+}
+
+func TestRegionalSelectorAllowsValidatedCustomValue(t *testing.T) {
+	model := newSettingsWizardModel(wizardSettings())
+	index := settingsFieldIndex("lab.timeZone")
+	model = model.moveToField(index)
+	model.selector.Select(len(model.selector.Items()) - 1)
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(settingsWizardModel)
+	if !model.custom || !strings.Contains(model.View().Content, "Custom value") {
+		t.Fatalf("custom entry did not open: %+v", model)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	model = updated.(settingsWizardModel)
+	updated, _ = model.Update(tea.PasteMsg{Content: "Asia/Tokyo"})
+	model = updated.(settingsWizardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(settingsWizardModel)
+	if model.settings.Lab.TimeZone != "Asia/Tokyo" {
+		t.Fatalf("custom timezone was not applied: %+v", model.settings.Lab)
 	}
 }
 

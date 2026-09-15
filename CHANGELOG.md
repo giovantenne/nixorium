@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Reduced first-run configuration from 19 to 15 task-grouped steps by leaving
+  optional Git author identity at its template defaults, and replaced raw time
+  zone, locale, regional-format, desktop-keyboard, and console-keymap entry
+  with offline searchable Bubbles selectors plus validated custom entry.
 - Migrated the terminal frontend to the aligned Bubble Tea, Bubbles, and Lip
   Gloss v2 stack, adding reusable background-aware title, error, and
   width-adaptive key-help components as the foundation for richer setup and
