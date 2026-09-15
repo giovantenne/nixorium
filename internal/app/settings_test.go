@@ -70,13 +70,13 @@ func TestPlanAndApplySettingsRequireReviewedFingerprint(t *testing.T) {
 	}
 	candidate.Lab.MasterDHCPIP = "192.0.2.10"
 	candidate.Lab.TeacherPassword = "$6$new$teacher"
-	candidateData, err := domain.MarshalLabSettings(candidate)
-	if err != nil {
-		t.Fatal(err)
-	}
 	written := domain.LabSettingsFile{}
 	manager := NewSettingsManager(fakeSettingsSource{data: baseData, written: &written})
-	plan := manager.Plan(context.Background(), "/repo", candidateData)
+	current, err := manager.Current("/repo")
+	if err != nil || current.SchemaVersion != domain.SettingsSchemaVersion {
+		t.Fatalf("current = %+v, err = %v", current, err)
+	}
+	plan := manager.PlanSettings(context.Background(), "/repo", candidate)
 	if plan.State != "valid" || plan.BaseFingerprint == "" || len(plan.Changes) != 2 {
 		t.Fatalf("plan = %+v", plan)
 	}
@@ -84,11 +84,11 @@ func TestPlanAndApplySettingsRequireReviewedFingerprint(t *testing.T) {
 		t.Fatalf("password change was not redacted: %+v", plan.Changes[1])
 	}
 
-	conflict := manager.Apply(context.Background(), "/repo", candidateData, "sha256:stale")
+	conflict := manager.ApplySettings(context.Background(), "/repo", candidate, "sha256:stale")
 	if conflict.State != "conflict" || !conflict.HasErrors() || written.SchemaVersion != 0 {
 		t.Fatalf("conflict = %+v, written = %+v", conflict, written)
 	}
-	applied := manager.Apply(context.Background(), "/repo", candidateData, plan.BaseFingerprint)
+	applied := manager.ApplySettings(context.Background(), "/repo", candidate, plan.BaseFingerprint)
 	if applied.State != "applied" || applied.HasErrors() || written.Lab.MasterDHCPIP != "192.0.2.10" {
 		t.Fatalf("applied = %+v, written = %+v", applied, written)
 	}

@@ -24,6 +24,10 @@ type DashboardActions struct {
 	ApplyGitCommit  func(domain.GitCommitPlanReport) domain.GitCommitReport
 	PlanUpdate      func(string, bool, bool) domain.UpdatePlanReport
 	ApplyUpdate     func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadSettings    func() (domain.LabSettingsFile, error)
+	PlanSettings    func(domain.LabSettingsFile) domain.ConfigPlanReport
+	ApplySettings   func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigApplyReport
+	ChangePassword  SettingsPasswordAction
 	PreparePXE      func() domain.ActionReport
 	PlanPXEStart    func() domain.PXELifecycleReport
 	StartPXE        func() domain.PXELifecycleReport
@@ -49,48 +53,60 @@ const (
 	dashboardGitCommitReview
 	dashboardUpdate
 	dashboardUpdateReview
+	dashboardSettings
+	dashboardSettingsEdit
+	dashboardSettingsPasswords
+	dashboardSettingsReview
 	dashboardPXE
 	dashboardPXEStartReview
 )
 
 type dashboardModel struct {
-	report           domain.StatusReport
-	actions          DashboardActions
-	screen           dashboardScreen
-	busy             string
-	message          string
-	confirmation     string
-	startPlan        domain.PXELifecycleReport
-	hosts            domain.HostsReport
-	deployCursor     int
-	deployChosen     map[string]bool
-	deployPlan       domain.DeploymentPlanReport
-	deployResult     domain.DeploymentExecutionReport
-	deploying        bool
-	controllerPlan   domain.ControllerRebuildPlanReport
-	controllerResult domain.ControllerRebuildExecutionReport
-	services         domain.ServicesReport
-	serviceResult    domain.ServiceActionReport
-	logs             domain.OperationLogsReport
-	logDetail        domain.OperationLogReport
-	logCursor        int
-	logScroll        int
-	gitReview        domain.GitReviewReport
-	gitScroll        int
-	gitCommitCursor  int
-	gitCommitChosen  map[string]bool
-	gitCommitPlan    domain.GitCommitPlanReport
-	gitCommitResult  domain.GitCommitReport
-	updateTarget     string
-	updatePrerelease bool
-	updateDowngrade  bool
-	updatePlan       domain.UpdatePlanReport
-	updateResult     domain.UpdateApplyReport
-	updateScroll     int
-	updating         bool
-	width            int
-	height           int
-	isDark           bool
+	report               domain.StatusReport
+	actions              DashboardActions
+	screen               dashboardScreen
+	busy                 string
+	message              string
+	confirmation         string
+	startPlan            domain.PXELifecycleReport
+	hosts                domain.HostsReport
+	deployCursor         int
+	deployChosen         map[string]bool
+	deployPlan           domain.DeploymentPlanReport
+	deployResult         domain.DeploymentExecutionReport
+	deploying            bool
+	controllerPlan       domain.ControllerRebuildPlanReport
+	controllerResult     domain.ControllerRebuildExecutionReport
+	services             domain.ServicesReport
+	serviceResult        domain.ServiceActionReport
+	logs                 domain.OperationLogsReport
+	logDetail            domain.OperationLogReport
+	logCursor            int
+	logScroll            int
+	gitReview            domain.GitReviewReport
+	gitScroll            int
+	gitCommitCursor      int
+	gitCommitChosen      map[string]bool
+	gitCommitPlan        domain.GitCommitPlanReport
+	gitCommitResult      domain.GitCommitReport
+	updateTarget         string
+	updatePrerelease     bool
+	updateDowngrade      bool
+	updatePlan           domain.UpdatePlanReport
+	updateResult         domain.UpdateApplyReport
+	updateScroll         int
+	updating             bool
+	settings             domain.LabSettingsFile
+	settingsCandidate    domain.LabSettingsFile
+	settingsMenu         routineSettingsMenu
+	settingsPasswordMenu routinePasswordMenu
+	settingsEditor       settingsWizardModel
+	settingsPlan         domain.ConfigPlanReport
+	settingsResult       domain.ConfigApplyReport
+	settingsApplying     bool
+	width                int
+	height               int
+	isDark               bool
 }
 
 type dashboardPlanMsg struct {
@@ -160,6 +176,26 @@ type dashboardUpdatePlanMsg struct {
 
 type dashboardUpdateResultMsg struct {
 	report domain.UpdateApplyReport
+}
+
+type dashboardSettingsMsg struct {
+	settings domain.LabSettingsFile
+	err      error
+}
+
+type dashboardSettingsPlanMsg struct {
+	report domain.ConfigPlanReport
+}
+
+type dashboardSettingsPasswordMsg struct {
+	candidate domain.LabSettingsFile
+	err       error
+}
+
+type dashboardSettingsApplyMsg struct {
+	report    domain.ConfigApplyReport
+	status    domain.StatusReport
+	statusErr error
 }
 
 func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
@@ -323,6 +359,68 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardUpdate
 		return model, nil
+	case dashboardSettingsMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = "Settings could not be loaded: " + message.err.Error()
+			model.screen = dashboardHome
+			return model, nil
+		}
+		model.settings = message.settings
+		model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+		model.message = ""
+		model.screen = dashboardSettings
+		return model, nil
+	case dashboardSettingsPlanMsg:
+		model.busy = ""
+		model.settingsEditor = settingsWizardModel{}
+		model.settingsPlan = message.report
+		if message.report.HasErrors() {
+			model.message = "Candidate validation failed: " + settingsIssueMessage(message.report.Issues)
+			model.screen = dashboardSettings
+			return model, nil
+		}
+		if len(message.report.Changes) == 0 {
+			model.message = "No managed settings changed."
+			model.screen = dashboardSettings
+			return model, nil
+		}
+		model.message = ""
+		model.screen = dashboardSettingsReview
+		return model, nil
+	case dashboardSettingsPasswordMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = "Password change failed: " + message.err.Error()
+			model.screen = dashboardSettingsPasswords
+			return model, nil
+		}
+		model.settingsCandidate = message.candidate
+		model.busy = "Validating the password change through Nix"
+		model.message = ""
+		candidate := model.settingsCandidate
+		return model, func() tea.Msg {
+			return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
+		}
+	case dashboardSettingsApplyMsg:
+		model.busy = ""
+		model.settingsApplying = false
+		model.settingsResult = message.report
+		if !message.report.HasErrors() && message.report.State == "applied" {
+			model.settings = model.settingsCandidate
+			model.message = "Settings applied. Review and commit lab-settings.json, then rebuild or deploy affected machines."
+		} else if message.report.State == "unchanged" {
+			model.message = "No managed settings changed."
+		} else {
+			model.message = "Settings apply failed: " + settingsIssueMessage(message.report.Issues)
+		}
+		if message.statusErr != nil {
+			model.message += " Status refresh failed: " + message.statusErr.Error()
+		} else {
+			model.report = message.status
+		}
+		model.screen = dashboardSettings
+		return model, nil
 	case tea.WindowSizeMsg:
 		model.width = message.Width
 		model.height = message.Height
@@ -332,21 +430,52 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if model.screen == dashboardUpdateReview && model.updateScroll > maximumUpdateScroll(model.updatePlan, model.updateReviewHeight()) {
 			model.updateScroll = maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
 		}
+		if model.screen == dashboardSettings {
+			model.settingsMenu.setSize(model.width, model.height)
+		}
+		if model.screen == dashboardSettingsPasswords {
+			model.settingsPasswordMenu.setSize(model.width, model.height)
+		}
+		if model.screen == dashboardSettingsEdit {
+			updated, _ := model.settingsEditor.Update(message)
+			model.settingsEditor = updated.(settingsWizardModel)
+		}
 		return model, nil
 	case tea.BackgroundColorMsg:
 		model.isDark = message.IsDark()
+		if model.screen == dashboardSettings {
+			model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+		}
+		if model.screen == dashboardSettingsPasswords {
+			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+		}
+		if model.screen == dashboardSettingsEdit {
+			updated, _ := model.settingsEditor.Update(message)
+			model.settingsEditor = updated.(settingsWizardModel)
+		}
 		return model, nil
 	}
 
 	key, ok := message.(tea.KeyPressMsg)
 	if !ok {
+		if model.screen == dashboardSettings {
+			model.settingsMenu, _ = model.settingsMenu.update(message)
+		}
+		if model.screen == dashboardSettingsPasswords {
+			model.settingsPasswordMenu, _ = model.settingsPasswordMenu.update(message)
+		}
+		if model.screen == dashboardSettingsEdit {
+			updated, command := model.settingsEditor.Update(message)
+			model.settingsEditor = updated.(settingsWizardModel)
+			return model, command
+		}
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
-	if key.String() == "ctrl+c" || (key.String() == "q" && model.screen != dashboardUpdate && model.screen != dashboardUpdateReview) {
+	if key.String() == "ctrl+c" || (key.String() == "q" && model.screen != dashboardUpdate && model.screen != dashboardUpdateReview && model.screen != dashboardSettingsEdit) {
 		return model, tea.Quit
 	}
 	if model.busy != "" {
@@ -400,9 +529,101 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.updatePrerelease = false
 			model.updateDowngrade = false
 			model.message = ""
+		case "e":
+			model.screen = dashboardSettings
+			model.busy = "Loading managed laboratory settings"
+			model.message = ""
+			return model, func() tea.Msg {
+				settings, err := model.actions.LoadSettings()
+				return dashboardSettingsMsg{settings: settings, err: err}
+			}
 		case "p", "enter":
 			model.screen = dashboardPXE
 			model.message = ""
+		}
+	case dashboardSettings:
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "enter":
+			group, selected := model.settingsMenu.selected()
+			if !selected {
+				model.message = "Select a settings category."
+				return model, nil
+			}
+			model.settingsEditor = newSettingsEditorModel(model.settings, group.fields, "Nixorium — Edit "+group.label)
+			model.settingsEditor.width = model.width
+			model.settingsEditor.height = model.height
+			model.settingsEditor.isDark = model.isDark
+			model.settingsEditor.prepareCurrentField()
+			model.message = ""
+			model.screen = dashboardSettingsEdit
+		case "p":
+			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+			model.message = ""
+			model.screen = dashboardSettingsPasswords
+		default:
+			model.settingsMenu, _ = model.settingsMenu.update(key)
+		}
+	case dashboardSettingsEdit:
+		updated, command := model.settingsEditor.Update(key)
+		model.settingsEditor = updated.(settingsWizardModel)
+		if model.settingsEditor.cancelled {
+			model.settingsEditor = settingsWizardModel{}
+			model.message = "Settings edit cancelled; no file changed."
+			model.screen = dashboardSettings
+			return model, nil
+		}
+		if model.settingsEditor.accepted {
+			model.settingsCandidate = model.settingsEditor.settings
+			model.busy = "Validating the complete settings candidate through Nix"
+			model.message = ""
+			candidate := model.settingsCandidate
+			return model, func() tea.Msg {
+				return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
+			}
+		}
+		return model, command
+	case dashboardSettingsPasswords:
+		switch key.String() {
+		case "esc", "left":
+			model.message = ""
+			model.screen = dashboardSettings
+		case "enter":
+			choice, selected := model.settingsPasswordMenu.selected()
+			if !selected {
+				model.message = "Select an account."
+				return model, nil
+			}
+			command := &settingsPasswordCommand{
+				action:   model.actions.ChangePassword,
+				account:  choice.id,
+				settings: model.settings,
+			}
+			model.message = ""
+			return model, tea.Exec(command, func(err error) tea.Msg {
+				return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
+			})
+		default:
+			model.settingsPasswordMenu, _ = model.settingsPasswordMenu.update(key)
+		}
+	case dashboardSettingsReview:
+		switch strings.ToLower(key.String()) {
+		case "n", "esc":
+			model.message = "Settings apply cancelled; no file changed."
+			model.screen = dashboardSettings
+		case "y":
+			model.busy = "Applying the reviewed managed settings"
+			model.settingsApplying = true
+			model.message = ""
+			candidate := model.settingsCandidate
+			plan := model.settingsPlan
+			return model, func() tea.Msg {
+				report := model.actions.ApplySettings(candidate, plan)
+				status, err := model.actions.Refresh()
+				return dashboardSettingsApplyMsg{report: report, status: status, statusErr: err}
+			}
 		}
 	case dashboardHosts:
 		switch key.String() {
@@ -947,6 +1168,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.gitReviewView()
 	case dashboardUpdate, dashboardUpdateReview:
 		content = model.updateView()
+	case dashboardSettings, dashboardSettingsEdit, dashboardSettingsPasswords, dashboardSettingsReview:
+		content = model.settingsView()
 	case dashboardPXE, dashboardPXEStartReview:
 		content = model.pxeView()
 	default:
@@ -978,6 +1201,7 @@ func (model dashboardModel) homeView() string {
 		"  s           Manage services",
 		"  l           View operation logs",
 		"  g           Review Git changes",
+		"  e           Change settings",
 		"  u           Update Nixorium",
 		"  p / Enter   Install computers over network",
 		"",

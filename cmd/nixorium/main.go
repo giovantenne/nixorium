@@ -85,6 +85,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		gitReviewManager := app.NewGitReviewManager(local)
 		gitCommitManager := app.NewGitCommitManager(local)
 		updateManager := app.NewUpdateManager(local)
+		settingsManager := app.NewSettingsManager(local)
 		actions := presentation.DashboardActions{
 			Refresh: func() (domain.StatusReport, error) {
 				return inspector.Status(ctx, repository)
@@ -138,6 +139,18 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				report := updateManager.ApplyPlan(ctx, plan, plan.ReviewToken)
 				report.Message = operationRecordMessage(report.Message, report)
 				return report
+			},
+			LoadSettings: func() (domain.LabSettingsFile, error) {
+				return settingsManager.Current(repository)
+			},
+			PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+				return settingsManager.PlanSettings(ctx, repository, candidate)
+			},
+			ApplySettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigApplyReport {
+				return settingsManager.ApplySettings(ctx, repository, candidate, plan.BaseFingerprint)
+			},
+			ChangePassword: func(account string, settings domain.LabSettingsFile, input *os.File, output io.Writer) (domain.LabSettingsFile, error) {
+				return collectSettingsPassword(ctx, local, input, output, account, settings)
 			},
 			PreparePXE: func() domain.ActionReport {
 				report := app.NewSystemActions(local).PreparePXE(ctx)
@@ -1319,6 +1332,44 @@ func collectSetupCredentials(ctx context.Context, reader app.SecretReader, hashe
 		fmt.Fprintf(output, "%s accepted (%d/%d).\n", credential.label, completed, pending)
 	}
 	return nil
+}
+
+func collectSettingsPassword(ctx context.Context, hasher app.PasswordHasher, input *os.File, output io.Writer, account string, settings domain.LabSettingsFile) (domain.LabSettingsFile, error) {
+	reader := presentation.TerminalSecretReader{Input: input, Output: output}
+	return collectSettingsPasswordWithReader(ctx, reader, hasher, output, account, settings)
+}
+
+func collectSettingsPasswordWithReader(ctx context.Context, reader app.SecretReader, hasher app.PasswordHasher, output io.Writer, account string, settings domain.LabSettingsFile) (domain.LabSettingsFile, error) {
+	label := ""
+	target := (*string)(nil)
+	switch account {
+	case "admin":
+		label = "Administrator password"
+		target = &settings.Lab.AdminPassword
+	case "teacher":
+		label = "Teacher password"
+		target = &settings.Lab.TeacherPassword
+	case "student":
+		label = "Student password"
+		target = &settings.Lab.StudentPassword
+	default:
+		return settings, fmt.Errorf("unsupported password account %q", account)
+	}
+
+	fmt.Fprintln(output, "Set one account password. It must contain at least 8 bytes and must not use the public default.")
+	fmt.Fprintln(output, "A short or mismatched password can be retried without leaving this password step.")
+	for {
+		hash, err := app.CollectNamedPasswordHash(ctx, reader, hasher, label)
+		if err == nil {
+			*target = hash
+			fmt.Fprintln(output, label+" accepted. Returning to settings review…")
+			return settings, nil
+		}
+		if !app.IsPasswordInputError(err) {
+			return settings, fmt.Errorf("%s: %w", label, err)
+		}
+		fmt.Fprintf(output, "Invalid %s: %v. Try again.\n", strings.ToLower(label), err)
+	}
 }
 
 func operationRecordMessage(message string, outcome any) string {

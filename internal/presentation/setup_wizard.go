@@ -89,6 +89,8 @@ var settingsFields = []settingsField{
 
 type settingsWizardModel struct {
 	settings  domain.LabSettingsFile
+	fields    []settingsField
+	title     string
 	drafts    []string
 	index     int
 	err       string
@@ -116,11 +118,15 @@ func RunSettingsWizard(settings domain.LabSettingsFile) (domain.LabSettingsFile,
 }
 
 func newSettingsWizardModel(settings domain.LabSettingsFile) settingsWizardModel {
-	drafts := make([]string, len(settingsFields))
-	for index, field := range settingsFields {
+	return newSettingsEditorModel(settings, settingsFields, "Nixorium first-run configuration")
+}
+
+func newSettingsEditorModel(settings domain.LabSettingsFile, fields []settingsField, title string) settingsWizardModel {
+	drafts := make([]string, len(fields))
+	for index, field := range fields {
 		drafts[index] = settingFieldValue(settings, field.id)
 	}
-	model := settingsWizardModel{settings: settings, drafts: drafts, replace: true, width: 80, height: 24}
+	model := settingsWizardModel{settings: settings, fields: fields, title: title, drafts: drafts, replace: true, width: 80, height: 24}
 	model.prepareCurrentField()
 	return model
 }
@@ -128,7 +134,7 @@ func newSettingsWizardModel(settings domain.LabSettingsFile) settingsWizardModel
 func (model *settingsWizardModel) prepareCurrentField() {
 	model.replace = true
 	model.custom = false
-	field := settingsFields[model.index]
+	field := model.fields[model.index]
 	if len(field.choices) == 0 {
 		return
 	}
@@ -199,19 +205,19 @@ func (model settingsWizardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if size, ok := message.(tea.WindowSizeMsg); ok {
 		model.width = size.Width
 		model.height = size.Height
-		if len(settingsFields[model.index].choices) > 0 && !model.custom {
+		if len(model.fields[model.index].choices) > 0 && !model.custom {
 			model.selector.SetSize(model.choiceWidth(), model.choiceHeight())
 		}
 		return model, nil
 	}
 	if background, ok := message.(tea.BackgroundColorMsg); ok {
 		model.isDark = background.IsDark()
-		if len(settingsFields[model.index].choices) > 0 && !model.custom {
+		if len(model.fields[model.index].choices) > 0 && !model.custom {
 			model.prepareCurrentField()
 		}
 		return model, nil
 	}
-	field := settingsFields[model.index]
+	field := model.fields[model.index]
 	if len(field.choices) > 0 && !model.custom {
 		if key, ok := message.(tea.KeyPressMsg); ok {
 			if key.String() == "ctrl+c" {
@@ -328,7 +334,7 @@ func (model settingsWizardModel) updateChoiceField(key tea.KeyPressMsg) (tea.Mod
 }
 
 func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
-	field := settingsFields[model.index]
+	field := model.fields[model.index]
 	candidate, err := setSettingField(model.settings, field.id, model.drafts[model.index])
 	if err != nil {
 		model.err = err.Error()
@@ -336,7 +342,7 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 	}
 	model.settings = candidate
 	model.err = ""
-	if model.index == len(settingsFields)-1 {
+	if model.index == len(model.fields)-1 {
 		if issues := candidate.Validate(); len(issues) > 0 {
 			model.err = issues[0].Field + ": " + issues[0].Message
 			return model, nil
@@ -349,11 +355,11 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 }
 
 func (model settingsWizardModel) View() tea.View {
-	field := settingsFields[model.index]
+	field := model.fields[model.index]
 	lines := []string{
-		tuiTitle("Nixorium first-run configuration", model.isDark),
+		tuiTitle(model.title, model.isDark),
 		"",
-		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(settingsFields), field.group),
+		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(model.fields), field.group),
 		field.label,
 	}
 	if len(field.choices) > 0 && !model.custom {

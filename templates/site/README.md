@@ -119,6 +119,7 @@ nix run .#nixorium
 | **Manage services** | Inspect PXE and restart the signed cache |
 | **View operation logs** | Browse private deployment logs and action history |
 | **Review Git changes** | Review and optionally commit selected safe paths |
+| **Change settings** | Edit and validate one grouped configuration area or one account password |
 | **Update Nixorium** | Move to an explicit tagged upstream release |
 | **Install computers over network** | Prepare, start, stop, or recover PXE mode |
 
@@ -129,6 +130,24 @@ needed.
 
 For symptom-first recovery, safe retry rules, and backup boundaries, see
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+### Change settings
+
+Open **Change settings** for routine Network, Computers, Accounts, Regional,
+Browser, Git, or Veyon changes. Regional fields reuse the offline searchable
+selectors from first-run setup. Git author names and email addresses live here
+instead of extending the initial setup path.
+
+Choose `p` in Settings to change exactly one administrator, teacher, or student
+password. Nixorium temporarily suspends the dashboard and uses the same
+terminal-only no-echo, confirmed, retryable hashing flow as first-run setup;
+plaintext never enters the Bubble Tea model. Both ordinary and password edits
+return to one Nix-validated, redacted review before the fingerprint-bound atomic
+replacement of `lab-settings.json`.
+
+After apply, use **Review Git changes** to inspect and commit the managed file.
+Then rebuild the controller and deploy affected clients as appropriate. The
+Settings action does not commit, push, rebuild, activate, or deploy implicitly.
 
 ### Computers
 
