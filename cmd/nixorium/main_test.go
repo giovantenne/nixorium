@@ -2,14 +2,95 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
+
+type setupSecretReader struct {
+	values [][]byte
+}
+
+func (r *setupSecretReader) ReadSecret(string) ([]byte, error) {
+	if len(r.values) == 0 {
+		return nil, errors.New("terminal unavailable")
+	}
+	value := r.values[0]
+	r.values = r.values[1:]
+	return value, nil
+}
+
+type setupPasswordHasher struct {
+	calls int
+}
+
+func (h *setupPasswordHasher) HashPassword(context.Context, []byte) (string, error) {
+	h.calls++
+	return "$6$salt$hash", nil
+}
+
+func TestCollectSetupCredentialsRetriesOnlyCurrentAccount(t *testing.T) {
+	inputs := [][]byte{
+		[]byte("short"),
+		[]byte("admin-password"), []byte("admin-password"),
+		[]byte("teacher-password"), []byte("different-password"),
+		[]byte("teacher-password"), []byte("teacher-password"),
+		[]byte("nixos"),
+		[]byte("student-password"), []byte("student-password"),
+	}
+	reader := &setupSecretReader{values: append([][]byte(nil), inputs...)}
+	hasher := &setupPasswordHasher{}
+	candidate := domain.LabSettingsFile{Lab: domain.LabSettings{
+		PCCount:         42,
+		AdminPassword:   domain.DefaultPasswordHash,
+		TeacherPassword: domain.DefaultPasswordHash,
+		StudentPassword: domain.DefaultPasswordHash,
+	}}
+	var output bytes.Buffer
+	if err := collectSetupCredentials(context.Background(), reader, hasher, &output, &candidate); err != nil {
+		t.Fatal(err)
+	}
+	if hasher.calls != 3 || candidate.Lab.AdminPassword != "$6$salt$hash" || candidate.Lab.TeacherPassword != "$6$salt$hash" || candidate.Lab.StudentPassword != "$6$salt$hash" {
+		t.Fatalf("hasher calls = %d, candidate = %+v", hasher.calls, candidate.Lab)
+	}
+	if candidate.Lab.PCCount != 42 {
+		t.Fatalf("previous wizard value was lost: %+v", candidate.Lab)
+	}
+	for _, expected := range []string{
+		"retried without restarting configuration",
+		"password must contain at least 8 bytes",
+		"password confirmation does not match",
+		"password must not use the public default",
+		"Student password accepted (3/3)",
+	} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("output omits %q: %s", expected, output.String())
+		}
+	}
+	for _, input := range inputs {
+		for _, value := range input {
+			if value != 0 {
+				t.Fatal("plaintext input was not wiped")
+			}
+		}
+	}
+}
+
+func TestCollectSetupCredentialsStopsOnTerminalFailure(t *testing.T) {
+	candidate := domain.LabSettingsFile{Lab: domain.LabSettings{AdminPassword: domain.DefaultPasswordHash}}
+	reader := &setupSecretReader{values: [][]byte{[]byte("admin-password")}}
+	err := collectSetupCredentials(context.Background(), reader, &setupPasswordHasher{}, &bytes.Buffer{}, &candidate)
+	if err == nil || app.IsPasswordInputError(err) || !strings.Contains(err.Error(), "Administrator password: read password confirmation") {
+		t.Fatalf("error = %v", err)
+	}
+}
 
 func TestPXEPreparationActivityUsesStderrSafeGuidance(t *testing.T) {
 	var output bytes.Buffer

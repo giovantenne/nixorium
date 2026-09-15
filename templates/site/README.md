@@ -26,7 +26,9 @@ for lab configuration, validation and upstream-update work.
    template. Flakes only include files tracked by Git.
 2. Run `nix run .#nixorium -- setup`; review and accept the detected/default
    network, identity, locale, Git, Veyon, and normal-password settings. The
-   command then creates and verifies the key pairs. Keep the private files
+   current password step is retried after short or mismatched input without
+   discarding earlier answers. The command then creates and verifies the key
+   pairs. Keep the private files
    outside Git and commit `lab-settings.json` plus the public counterparts
    under `keys/`.
 3. Replace `assets/logo.txt` and add any local NixOS settings under `modules/`.
@@ -246,9 +248,11 @@ nix run .#nixorium -- setup apply
 ```
 
 `setup` proposes detected network values, supports backward navigation,
-collects passwords without echo, validates the complete candidate, shows a
-redacted review, writes atomically after acceptance, and reconciles all three
-key pairs. It never overwrites existing key material. `setup status` observes
+collects passwords without echo, retries recoverable password mistakes in the
+current account without restarting configuration, validates the complete
+candidate, shows a redacted review, writes atomically after acceptance, and
+reconciles all three key pairs. It never overwrites existing key material.
+`setup status` observes
 the first incomplete stage without trusting a hidden completion flag.
 
 `setup install-secrets` starts a fixed sandboxed action that installs only

@@ -1222,24 +1222,9 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 	}
 
 	secretReader := presentation.TerminalSecretReader{Input: os.Stdin, Output: stdout}
-	credentials := []struct {
-		label string
-		value *string
-	}{
-		{label: "Administrator password", value: &candidate.Lab.AdminPassword},
-		{label: "Teacher password", value: &candidate.Lab.TeacherPassword},
-		{label: "Student password", value: &candidate.Lab.StudentPassword},
-	}
-	for _, credential := range credentials {
-		if *credential.value != domain.DefaultPasswordHash {
-			continue
-		}
-		hash, hashErr := app.CollectNamedPasswordHash(ctx, secretReader, local, credential.label)
-		if hashErr != nil {
-			fmt.Fprintf(stderr, "Error: %s: %v\n", credential.label, hashErr)
-			return 1
-		}
-		*credential.value = hash
+	if err := collectSetupCredentials(ctx, secretReader, local, stdout, &candidate); err != nil {
+		fmt.Fprintln(stderr, "Error:", err)
+		return 1
 	}
 
 	candidateData, err := domain.MarshalLabSettings(candidate)
@@ -1292,6 +1277,48 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 		fmt.Fprintln(stdout, "Review and commit lab-settings.json and the public files under keys/ before applying the controller.")
 	}
 	return 0
+}
+
+func collectSetupCredentials(ctx context.Context, reader app.SecretReader, hasher app.PasswordHasher, output io.Writer, candidate *domain.LabSettingsFile) error {
+	credentials := []struct {
+		label string
+		value *string
+	}{
+		{label: "Administrator password", value: &candidate.Lab.AdminPassword},
+		{label: "Teacher password", value: &candidate.Lab.TeacherPassword},
+		{label: "Student password", value: &candidate.Lab.StudentPassword},
+	}
+	pending := 0
+	for _, credential := range credentials {
+		if *credential.value == domain.DefaultPasswordHash {
+			pending++
+		}
+	}
+	if pending == 0 {
+		return nil
+	}
+	fmt.Fprintln(output, "Set account passwords. Each password must contain at least 8 bytes and must not use the public default.")
+	fmt.Fprintln(output, "A short or mismatched password can be retried without restarting configuration.")
+	completed := 0
+	for _, credential := range credentials {
+		if *credential.value != domain.DefaultPasswordHash {
+			continue
+		}
+		for {
+			hash, err := app.CollectNamedPasswordHash(ctx, reader, hasher, credential.label)
+			if err == nil {
+				*credential.value = hash
+				break
+			}
+			if !app.IsPasswordInputError(err) {
+				return fmt.Errorf("%s: %w", credential.label, err)
+			}
+			fmt.Fprintf(output, "Invalid %s: %v. Try again.\n", strings.ToLower(credential.label), err)
+		}
+		completed++
+		fmt.Fprintf(output, "%s accepted (%d/%d).\n", credential.label, completed, pending)
+	}
+	return nil
 }
 
 func operationRecordMessage(message string, outcome any) string {
