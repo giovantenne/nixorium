@@ -7,10 +7,12 @@ import (
 )
 
 type queuedSecretReader struct {
-	values [][]byte
+	values  [][]byte
+	prompts []string
 }
 
-func (r *queuedSecretReader) ReadSecret(string) ([]byte, error) {
+func (r *queuedSecretReader) ReadSecret(prompt string) ([]byte, error) {
+	r.prompts = append(r.prompts, prompt)
 	if len(r.values) == 0 {
 		return nil, errors.New("no secret")
 	}
@@ -54,16 +56,54 @@ func TestCollectPasswordHashConfirmsHashesAndWipesInputs(t *testing.T) {
 func TestCollectPasswordHashRejectsMismatchAndPublicDefault(t *testing.T) {
 	for name, values := range map[string][][]byte{
 		"mismatch": {[]byte("long-enough-one"), []byte("long-enough-two")},
-		"default":  {[]byte("nixos"), []byte("nixos")},
+		"default":  {[]byte("nixos")},
 	} {
 		t.Run(name, func(t *testing.T) {
+			inputs := append([][]byte(nil), values...)
+			reader := &queuedSecretReader{values: inputs}
 			hasher := &recordingHasher{}
-			if _, err := CollectPasswordHash(context.Background(), &queuedSecretReader{values: values}, hasher); err == nil {
+			if _, err := CollectPasswordHash(context.Background(), reader, hasher); err == nil || !IsPasswordInputError(err) {
 				t.Fatal("unsafe password was accepted")
 			}
 			if hasher.calls != 0 {
 				t.Fatal("hasher ran for rejected input")
 			}
+			for _, input := range inputs {
+				for _, value := range input {
+					if value != 0 {
+						t.Fatal("rejected plaintext input was not wiped")
+					}
+				}
+			}
+			if name == "default" && len(reader.prompts) != 1 {
+				t.Fatalf("public default unnecessarily requested confirmation: %v", reader.prompts)
+			}
 		})
+	}
+}
+
+func TestCollectPasswordHashRejectsShortInputBeforeConfirmation(t *testing.T) {
+	password := []byte("short")
+	reader := &queuedSecretReader{values: [][]byte{password}}
+	hasher := &recordingHasher{}
+	_, err := CollectPasswordHash(context.Background(), reader, hasher)
+	if err == nil || !IsPasswordInputError(err) {
+		t.Fatalf("error = %v", err)
+	}
+	if len(reader.prompts) != 1 || hasher.calls != 0 {
+		t.Fatalf("prompts = %v, hasher calls = %d", reader.prompts, hasher.calls)
+	}
+	for _, value := range password {
+		if value != 0 {
+			t.Fatal("short plaintext input was not wiped")
+		}
+	}
+}
+
+func TestCollectPasswordHashDoesNotClassifyBackendFailureAsInputError(t *testing.T) {
+	reader := &queuedSecretReader{values: [][]byte{[]byte("long-enough")}}
+	_, err := CollectPasswordHash(context.Background(), reader, &recordingHasher{})
+	if err == nil || IsPasswordInputError(err) {
+		t.Fatalf("terminal failure classification = %v", err)
 	}
 }

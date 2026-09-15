@@ -323,9 +323,12 @@ the deployment and may be committed.
 
 The credential backend implements this boundary with terminal-only confirmed
 input, explicit rejection of short/default values, best-effort slice wiping,
-and `mkpasswd -m sha-512 --stdin`. It remains an application service until the
-candidate-review workflow can apply the resulting hash without an unreviewed
-configuration write.
+and `mkpasswd -m sha-512 --stdin`. Short, public-default, and confirmation
+mistakes are typed recoverable input errors: guided setup retries only the
+current account and preserves the already collected non-secret candidate.
+Terminal I/O, cancellation, and hashing failures remain fatal rather than
+looping indefinitely. The password flow stays outside ordinary Bubble Tea text
+inputs so immutable Go strings do not extend plaintext lifetime.
 
 Existing deployments that import `lab-config.nix` continue to work unchanged.
 The management application treats arbitrary Nix configuration as read-only.

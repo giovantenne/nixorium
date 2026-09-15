@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made first-run credential entry recover from short, public-default, and
+  mismatched passwords by retrying only the current account, preserving all
+  earlier wizard input while keeping terminal and hashing failures fatal.
 - Reworked the public README into a concise product overview and seven-step
   guided quick start, moving workstation defaults and `lib.mkLab` extension
   details into a dedicated system reference and linking the existing
