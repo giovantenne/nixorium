@@ -60,6 +60,25 @@
       readlink -f /run/current-system
       git -c safe.directory=/home/admin/nixorium-deployment -C /home/admin/nixorium-deployment rev-parse HEAD
     '';
+    fakeShutdownRemote = pkgs.writeShellScriptBin "nixorium-test-shutdown-remote" ''
+      set -eu
+      printf '%s\n' "''${SSH_ORIGINAL_COMMAND:-}" >> /tmp/nixorium-test-shutdown-ssh.log
+      case "''${SSH_ORIGINAL_COMMAND:-}" in
+        nixorium-session-state)
+          if [[ -e /tmp/nixorium-test-session-state ]]; then
+            cat /tmp/nixorium-test-session-state
+          else
+            printf 'idle\n'
+          fi
+          ;;
+        "systemctl poweroff --no-block")
+          printf 'accepted\n' >> /tmp/nixorium-test-shutdown-dispatch.log
+          ;;
+        *)
+          exit 64
+          ;;
+      esac
+    '';
     fakeUpdateNix = pkgs.writeShellScriptBin "nixorium-test-update-nix" ''
       set -eu
       : "''${NIXORIUM_TEST_UPDATE_NIX_LOG:?}"
@@ -142,7 +161,7 @@
     };
 
     networking.hostName = "pc99";
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeUpdateNix fakeUpdateGit ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit ];
     users.groups.veyon-master = {};
     users.users.admin = {
       isNormalUser = true;
@@ -250,7 +269,7 @@
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
     controller.wait_until_fails("systemctl is-active --quiet nixorium-harmonia.service")
     controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'Failed to set up credentials'")
-    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'; nixorium --help | grep -F 'update check'; nixorium --help | grep -F 'software catalog'")
+    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'; nixorium --help | grep -F 'update check'; nixorium --help | grep -F 'software catalog'; nixorium --help | grep -F 'shutdown plan'")
     controller.succeed("mkdir -p /tmp/deployment")
     controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
     controller.succeed("cp /etc/nixorium-test/lab-settings.json /tmp/deployment/lab-settings.json")
@@ -261,6 +280,14 @@
     controller.succeed("git -C /tmp/deployment config user.name Test; git -C /tmp/deployment config user.email test@example.invalid")
     controller.succeed("git -C /tmp/deployment add flake.nix lab-settings.json lab-software.json .gitignore")
     controller.succeed("git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm initial")
+    controller.succeed("install -d -m 0700 /root/.ssh; ssh-keygen -q -t ed25519 -N \"\" -f /root/.ssh/id_ed25519; printf 'restrict,command=\"/run/current-system/sw/bin/nixorium-test-shutdown-remote\" %s\n' \"$(cat /root/.ssh/id_ed25519.pub)\" > /root/.ssh/authorized_keys; chmod 0600 /root/.ssh/authorized_keys; systemctl reload sshd.service")
+    controller.succeed("nixorium shutdown plan --repo /tmp/deployment --on @lab --json > /tmp/shutdown-plan.json || { cat /tmp/shutdown-plan.json; false; }; jq -e '.operation == \"shutdown-plan\" and .state == \"ready\" and .requested == \"@lab\" and .policy == \"require-idle\" and .eligible == 1 and (.targets | length) == 1 and .targets[0].name == \"pc01\" and .targets[0].eligible and .targets[0].session == \"idle\" and (.reviewToken | startswith(\"sha256:\")) and (.confirmation | startswith(\"SHUTDOWN 1 CLIENTS \"))' /tmp/shutdown-plan.json || { cat /tmp/shutdown-plan.json; false; }")
+    controller.succeed("rm -f /tmp/nixorium-test-shutdown-dispatch.log; printf 'active\n' > /tmp/nixorium-test-session-state; nixorium shutdown plan --repo /tmp/deployment --on @lab --json > /tmp/shutdown-active.json || test $? = 1; jq -e '.state == \"blocked\" and .eligible == 0 and .targets[0].session == \"active\" and (.targets[0].eligible | not)' /tmp/shutdown-active.json; test ! -e /tmp/nixorium-test-shutdown-dispatch.log")
+    controller.succeed("printf 'unknown\n' > /tmp/nixorium-test-session-state; nixorium shutdown plan --repo /tmp/deployment --on @lab --json > /tmp/shutdown-unknown.json || test $? = 1; jq -e '.state == \"blocked\" and .eligible == 0 and .targets[0].session == \"unknown\"' /tmp/shutdown-unknown.json; nixorium shutdown plan --repo /tmp/deployment --on @lab --acknowledge-unknown-sessions --json | jq -e '.state == \"ready\" and .eligible == 1 and .policy == \"acknowledge-unknown\" and .targets[0].eligible'; test ! -e /tmp/nixorium-test-shutdown-dispatch.log; rm /tmp/nixorium-test-session-state")
+    controller.succeed("token=$(jq -r .reviewToken /tmp/shutdown-plan.json); nixorium shutdown apply --repo /tmp/deployment --on @lab --expect \"$token\" </dev/null >/tmp/shutdown-noninteractive.out 2>/tmp/shutdown-noninteractive.err || test $? = 2; grep -F 'requires an interactive terminal or explicit --yes' /tmp/shutdown-noninteractive.err; test ! -e /tmp/nixorium-test-shutdown-dispatch.log")
+    controller.succeed("nixorium shutdown apply --repo /tmp/deployment --on @lab --expect sha256:stale --yes --json > /tmp/shutdown-stale.json || test $? = 1; jq -e '.operation == \"shutdown-apply\" and .state == \"blocked\" and .retrySafe and any(.issues[]; .field == \"review\")' /tmp/shutdown-stale.json; test ! -e /tmp/nixorium-test-shutdown-dispatch.log")
+    controller.succeed("token=$(jq -r .reviewToken /tmp/shutdown-plan.json); nixorium shutdown apply --repo /tmp/deployment --on @lab --expect \"$token\" --yes --json > /tmp/shutdown-apply.json; jq -e '.operation == \"shutdown-apply\" and .state == \"completed\" and .accepted == 1 and .notSent == 0 and .unconfirmed == 0 and (.retrySafe | not) and .targets[0].name == \"pc01\" and .targets[0].state == \"accepted\"' /tmp/shutdown-apply.json; test \"$(wc -l < /tmp/nixorium-test-shutdown-dispatch.log)\" = 1; grep -Fx 'nixorium-session-state' /tmp/nixorium-test-shutdown-ssh.log; grep -Fx 'systemctl poweroff --no-block' /tmp/nixorium-test-shutdown-ssh.log")
+    controller.succeed("rm -f /tmp/nixorium-test-shutdown-dispatch.log; nixorium shutdown plan --repo /tmp/deployment --on @lab --json | jq -r .confirmation > /tmp/shutdown-tui-confirmation; (sleep 8; printf x; sleep 1; printf a; sleep 0.2; printf '\\r'; sleep 4; cat /tmp/shutdown-tui-confirmation; printf '\\r'; sleep 5; printf q) | TERM=xterm timeout 30s script -qefc 'stty rows 40 cols 120; nixorium --repo /tmp/deployment' /tmp/nixorium-shutdown-tui.log; grep -aF 'Which client computers should receive the request?' /tmp/nixorium-shutdown-tui.log; grep -aF 'Shut down 1 eligible client(s)?' /tmp/nixorium-shutdown-tui.log; grep -aF 'Unsaved user work may be lost' /tmp/nixorium-shutdown-tui.log; grep -aF 'Shutdown requests accepted' /tmp/nixorium-shutdown-tui.log; test \"$(wc -l < /tmp/nixorium-test-shutdown-dispatch.log)\" = 1")
     controller.succeed("cp /tmp/deployment/lab-settings.json /tmp/candidate.json")
     controller.succeed("nixorium config plan --repo /tmp/deployment --file /tmp/candidate.json --json | jq -e '.operation == \"config-plan\" and .state == \"unchanged\" and (.changes | length) == 0'")
     controller.succeed("nixorium setup keys --repo /tmp/deployment --json | jq -e '.operation == \"setup-keys\" and .state == \"ready\" and all(.keys[]; .verified and .matches and .privateMode == 384)'")

@@ -41,6 +41,8 @@ let
     builtins.any (package: (package.pname or "") == "nixorium") packages;
   hasHostState = packages:
     builtins.any (package: (package.name or "") == "nixorium-host-state") packages;
+  hasSessionState = packages:
+    builtins.any (package: (package.name or "") == "nixorium-session-state") packages;
   controllerFirewall = subnetLab.nixosConfigurations.pc99.config.networking.firewall;
   clientFirewall = subnetLab.nixosConfigurations.pc01.config.networking.firewall;
   controllerTCP = controllerFirewall.interfaces.enp0s3.allowedTCPPorts;
@@ -80,6 +82,8 @@ assert hasNixorium subnetLab.nixosConfigurations.pc99.config.environment.systemP
 assert !(hasNixorium subnetLab.nixosConfigurations.pc01.config.environment.systemPackages);
 assert hasHostState subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert hasHostState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
+assert hasSessionState subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
+assert hasSessionState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
 assert subnetLab.nixosConfigurations.pc01.config.system.configurationRevision == "0123456789abcdef0123456789abcdef01234567";
 assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.enable;
 assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.signKeyPaths == [

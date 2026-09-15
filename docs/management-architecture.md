@@ -42,6 +42,9 @@ plan/apply, fail-visible two-file recovery, and the shared CLI/TUI operations.
 Guided software changes now use a curated pinned catalog, evaluated client
 scopes, candidate validation, and a token-bound atomic `lab-software.json`
 writer; Git recording and client deployment remain separate operations.
+Reviewed client shutdown now uses the same CLI/TUI application service,
+evaluated identities, session observations, expiring review, shared client
+operation lock, and fixed SSH request without claiming physical power state.
 End-to-end documentation and physical validation remain tracked externally.
 
 Important constraints in the current implementation are:
@@ -171,6 +174,7 @@ nixorium doctor             run actionable diagnostics
 nixorium config             review or change managed settings
 nixorium hosts              inspect configured machines
 nixorium deploy             build and deploy selected machines
+nixorium shutdown           review and request power-off for selected clients
 nixorium controller         review, rebuild, activate, and verify the controller
 nixorium pxe                prepare, start, inspect, stop, or recover PXE mode
 nixorium services           inspect services; restart only the signed cache
@@ -229,6 +233,31 @@ hosts. Retrying is convergent: it requires a fresh valid review and rebuilds
 before applying again. Direct Colmena remains an advanced compatibility
 surface.
 
+`shutdown plan --on` accepts the same explicit client selector grammar as
+deployment but never permits the controller. It observes TCP reachability,
+authenticated SSH access, and the exact `active`/`idle` output of the fixed
+`nixorium-session-state` helper installed in every managed host generation.
+The helper treats interactive sessions for normal UIDs as active. Unreachable
+targets remain visible but ineligible and are never queued for later. Active
+sessions always block; unknown session state requires the distinct
+`acknowledge-unknown` policy and a new reviewed plan.
+
+The ready plan binds repository, normalized targets, evaluated addresses,
+observations, policy, and an expiry window to a review token and generated
+`SHUTDOWN …` phrase. `shutdown apply` validates that reviewed plan, takes the
+same non-blocking client-operation lock used by deployment, rejects active or
+degraded PXE networking, reevaluates inventory, and repeats session checks
+immediately before dispatch. The adapter receives only evaluated host metadata
+and constructs fixed non-interactive SSH argument arrays for
+`nixorium-session-state` and `systemctl poweroff --no-block`; presentation
+cannot provide a command, address, or shell fragment.
+
+Per-target outcomes are limited to `accepted`, `not-sent`, and `unconfirmed`.
+Accepted means only that the operating system accepted the request. A lost SSH
+connection or subsequent network absence never proves physical power state,
+and an unconfirmed dispatch is explicitly not safe for blind retry. Operation
+history stores the bounded typed outcome rather than remote command output.
+
 `logs` lists at most the newest 50 recognized deployment logs in the current
 administrator's XDG state; it does not require a deployment checkout. It also
 shows typed safe summaries recorded after important configuration, key, fixed
@@ -281,9 +310,9 @@ Failures state what failed, what was left intact, whether retry is safe, and
 the next action. ASCII text conveys critical state; color and Unicode are
 enhancements only. The layout targets ordinary 80-column terminals and SSH.
 
-The implemented installation-mode, computer-inventory, deployment, and update
+The implemented installation-mode, computer-inventory, deployment, shutdown, and update
 screens follow this structure. Presentation callbacks invoke typed PXE
-lifecycle, host-inspection, deployment, and upstream-update services; the TUI
+lifecycle, host-inspection, deployment, shutdown, and upstream-update services; the TUI
 itself contains no command execution, log creation, locking, systemd policy,
 network/filesystem mutation, or CLI-output parsing. It renders reconciled state,
 runs host probes only when the inventory is opened/refreshed, shows exact
@@ -824,8 +853,8 @@ Testing is layered:
   public metadata schemas, template generation, and unchanged legacy inputs;
 - NixOS VM tests cover first-run discovery, systemd ordering, Harmonia health,
   PXE start/stop/recovery, permission boundaries, CLI status, fake-Colmena
-  success/failure/retry, and real PTY traversals of the TUI's reviewed PXE and
-  deployment flows;
+  success/failure/retry, a forced-command SSH shutdown boundary, and real PTY
+  traversals of the TUI's reviewed PXE, deployment, and shutdown flows;
 - offline equivalence continues comparing the direct and bundled client
   derivations;
 - a QEMU PXE scenario is added when deterministic ProxyDHCP behavior can be
@@ -895,3 +924,5 @@ The following decisions are recorded separately:
 - [ADR-0010: reviewed local Git commits](adr/0010-reviewed-local-git-commits.md)
 - [ADR-0011: guided upstream updates](adr/0011-guided-upstream-update.md)
 - [ADR-0012: preparation-bound PXE controller address](adr/0012-preparation-bound-pxe-address.md)
+- [ADR-0013: guided software declarations](adr/0013-guided-software-declarations.md)
+- [ADR-0014: reviewed client shutdown](adr/0014-reviewed-client-shutdown.md)

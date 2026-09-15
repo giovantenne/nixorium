@@ -288,8 +288,8 @@ the controller or any client was updated.
 
 ## F06 — Shut down selected clients
 
-Layout L17. Priority P5. Planned typed plan/apply operation; it stays hidden
-from the executable menu until the service exists.
+Layout L17. Priority P5. Implemented through the shared typed plan/apply
+operation used by CLI and TUI.
 
 ~~~text
 Choose Shut down clients → explicit selection → check conflicts/sessions
@@ -325,8 +325,8 @@ Final service contract:
   immediately before dispatch;
 - the adapter receives a fixed shutdown operation for an evaluated hostname.
   Presentation cannot provide a command, host address, or shell fragment;
-- operation history stores bounded typed outcomes, while technical SSH output
-  remains in private logs.
+- operation history stores bounded typed outcomes; captured SSH detail is
+  bounded, sanitized, and hidden behind explicit technical disclosure.
 
 **Acceptance:** the action does not require the whole room to be on, never
 targets the controller, and never treats network absence as a fault.

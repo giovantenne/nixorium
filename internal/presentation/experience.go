@@ -129,7 +129,7 @@ func (model dashboardModel) helpView() string {
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
 	case dashboardHome:
-		lines = append(lines, "r restore   w software   d distribute   p install", "u update Nixorium   a advanced tools")
+		lines = append(lines, "r restore   w software   d distribute   p install", "u update Nixorium   x shut down clients   a advanced tools")
 	case dashboardRestore:
 		lines = append(lines, "Choose reapply to keep the disk, or reinstall to erase", "the disk confirmed locally on each selected computer.")
 	case dashboardAdministration:
@@ -138,6 +138,8 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail   i diagnostics", "d review a deployment for the focused computer", "Search owns all text keys until Enter or Esc.")
 	case dashboardDeploy:
 		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l progress details; q cannot interrupt", "After result: l logs   r new review   Enter overview")
+	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
+		lines = append(lines, "Space select   a select/deselect all   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state.")
 	case dashboardSetup:
 		lines = append(lines, "Enter continue the observed stage   t full checklist")
 	case dashboardPXE:
@@ -253,7 +255,7 @@ func (model dashboardModel) frame(content string) string {
 func (model dashboardModel) textEntry() bool {
 	switch model.screen {
 	case dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview,
-		dashboardGitCommitReview, dashboardUpdateReview, dashboardSoftwareReview,
+		dashboardGitCommitReview, dashboardUpdateReview, dashboardSoftwareReview, dashboardShutdownReview,
 		dashboardSettingsEdit, dashboardPXEStartReview, dashboardPXELeaveReview:
 		return true
 	case dashboardHosts:

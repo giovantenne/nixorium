@@ -141,7 +141,8 @@ nix run .#nixorium
 The opening screen asks which intervention you intend to perform. It does not
 scan clients or treat powered-off computers as unhealthy. `Up`/`Down` selects
 Restore, guided software changes, distribution, network installation, Update
-Nixorium, or Advanced tools. `?` opens help; `F1` also works in text fields.
+Nixorium, reviewed client shutdown, or Advanced tools. `?` opens help; `F1`
+also works in text fields.
 Advanced Computer inventory performs the explicit client check and supports `/`
 search, Enter for detail, `t` for technical evidence, `d` for a focused
 deployment, and `i` for diagnostics.
@@ -173,6 +174,7 @@ spinner and the current plain-language action.
 | **Review Git changes** | Review and optionally commit selected safe paths |
 | **Change settings** | Edit and validate one grouped configuration area or one account password |
 | **Update Nixorium** | Fetch available releases, then validate and apply one selected release |
+| **Shut down computers** | Check sessions and send reviewed power-off requests to selected clients only |
 | **Install or reinstall computers** | Prepare, start, stop, or recover PXE mode |
 
 The initial dashboard and `status` are local and do not probe clients. Add
@@ -275,6 +277,39 @@ those running the reviewed revision. A failed apply may leave mixed target
 state. Inspect the log and fresh **Computer inventory** results, make a new plan,
 and retry; never infer rollback or completion from a lost terminal. `--yes` is
 for deliberate automation and never removes the revision check.
+
+### Shut down computers
+
+Open **Shut down computers**, select the intended clients, and continue to run
+the preflight. The controller is never selectable. Computers that are off,
+unreachable, or lack authenticated management access remain visible as not
+sent; Nixorium does not queue a request for later.
+
+By default, an interactive user session blocks that target and unknown session
+state is ineligible. The TUI can explicitly acknowledge unknown-session risk
+with `u`, which creates a new reviewed plan. An observed active session remains
+blocked. The same operation is available from the CLI:
+
+```sh
+nix run .#nixorium -- shutdown plan --on pc01
+nix run .#nixorium -- shutdown plan --on pc01,pc02
+nix run .#nixorium -- shutdown plan --on @lab
+nix run .#nixorium -- shutdown apply --on @lab \
+  --expect REVIEW_TOKEN
+```
+
+Planning checks installation/network recovery and concurrent client work as
+well as access and sessions. Apply requires the generated phrase (or explicit
+automation-only `--yes`), takes the same client-operation lock as deployment,
+and repeats inventory, conflict, and session checks immediately before sending
+the fixed operating-system request. Use
+`--acknowledge-unknown-sessions` on both plan and apply only after reviewing
+that risk.
+
+Results are `accepted`, `not-sent`, or `unconfirmed`. Accepted means the remote
+operating system accepted the request; loss of network contact does not prove
+physical power state. An unconfirmed result may have taken effect, so inspect
+the target instead of retrying blindly.
 
 ### Operation logs
 
@@ -469,6 +504,8 @@ nix run .#nixorium -- doctor --full
 nix run .#nixorium -- deploy plan --on pc01
 nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
+nix run .#nixorium -- shutdown plan --on @lab
+nix run .#nixorium -- shutdown apply --on @lab --expect REVIEW_TOKEN
 nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 nix run .#nixorium -- services

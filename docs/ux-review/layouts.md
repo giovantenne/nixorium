@@ -641,62 +641,71 @@ reviewed operations.
 
 ## L17 — Shut down clients
 
-Flow F06. **PLANNED CONTRACT: hidden until the service exists.**
+Flow F06. **IMPLEMENTED.** The current render is in
+[the TUI gallery](../tui-renders.md#shut-down-computers).
 
 ~~~text
-   Shut down clients
+   Nixorium  /  Shut down computers
 
-   Select computers to receive the request
+   Which client computers should receive the request?
+   Computers are checked only after you continue. The controller is never included.
 
-   [x] pc01   ✓ Management available    no session detected
-   [x] pc02   ! Session unknown
-   [ ] pc03   ○ Not checked
-   [ ] pc07   ○ Not reachable
+   2 of 24 clients selected
 
-   2 selected · controller pc99 always excluded
+   › [x] pc01       10.0.0.1
+     [x] pc02       10.0.0.2
+     [ ] pc03       10.0.0.3
+     [ ] pc04       10.0.0.4
 
-   ! Unsaved work may be lost.
-   Unreachable clients will not be shut down automatically when they return.
+   No request is queued for a computer that is off or unreachable.
 
-   › Review 2 targets
-     Change selection
-     Cancel
-
-   Enter continue   Space select   Esc interventions   ? help
+   space select   a all clients   enter check   esc back
 ~~~
 
 Review with application-generated phrase and token:
 
 ~~~text
-   Shut down 2 clients?
+   Nixorium  /  Shut down computers
 
-   Targets       pc01, pc02
-   Controller    excluded
-   Sessions      pc02 unknown
-   Conflicts     no incompatible operation detected
+   Shut down 2 eligible client(s)?
 
-   Checks will run again before sending.
-   Cancellation after sending is not guaranteed.
+   Selected  3
+   Eligible  2
+   Controller  excluded
+   Session policy  acknowledge-unknown
 
-   Type SHUTDOWN pc01,pc02 to continue:
+   ✓ pc01 · Ready
+   ! pc02 · Session unknown · risk acknowledged
+   ○ pc07 · Not reachable · not sent
+
+   ! Unsaved user work may be lost.
+   Checks run again immediately before requests are sent.
+   An accepted request does not prove that a computer is physically off.
+
+   Type SHUTDOWN 2 CLIENTS abcdef012345 to continue:
    > _
 
-   Enter confirm   Esc cancel   F1 help
+   enter send requests   u unknown-session policy   esc cancel   F1 help
 ~~~
 
 Outcome qualifies the request, not physical power:
 
 ~~~text
-   Shutdown requests
+   ! Shutdown requests need attention
 
-   pc01   ✓ Request accepted · now unreachable
-   pc02   ! Request accepted · final state unconfirmed
+   Accepted  1    Not sent  1    Unconfirmed  1
 
-   Losing network contact does not prove a computer is powered off.
-   No other client was involved.
+   ✓ pc01   accepted
+     the operating system accepted the power-off request
+   ! pc02   unconfirmed
+     request result could not be confirmed; inspect before retrying
+   ○ pc07   not-sent
+     not reachable
 
-   › Exit
-     Show details
+   Do not retry blindly.
+   Network loss alone is not evidence of physical power state.
+
+   r new review   l operation history   t technical details   enter interventions
 ~~~
 
 ## V3 layout review checklist

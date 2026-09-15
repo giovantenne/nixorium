@@ -548,6 +548,48 @@ func SoftwareChangeApplyText(writer io.Writer, report domain.SoftwareChangeApply
 	}
 }
 
+func ShutdownPlanText(writer io.Writer, report domain.ShutdownPlanReport) {
+	fmt.Fprintf(writer, "Shutdown plan: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Targets:       %s\n", report.Requested)
+	fmt.Fprintf(writer, "Eligible:      %d/%d\n", report.Eligible, len(report.Targets))
+	fmt.Fprintf(writer, "Session policy: %s\n", report.Policy)
+	for _, target := range report.Targets {
+		status := "not eligible"
+		if target.Eligible {
+			status = "eligible"
+		}
+		fmt.Fprintf(writer, "  %-10s %-12s session=%-7s %s\n", target.Name, status, target.Session, target.Detail)
+	}
+	if report.ReviewToken != "" {
+		fmt.Fprintf(writer, "Review token:  %s\n", report.ReviewToken)
+		fmt.Fprintf(writer, "Expires:       %s\n", report.ExpiresAt.UTC().Format(time.RFC3339))
+		fmt.Fprintf(writer, "Confirmation:  %s\n", report.Confirmation)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:        %s\n", report.Message)
+	}
+}
+
+func ShutdownApplyText(writer io.Writer, report domain.ShutdownApplyReport) {
+	fmt.Fprintf(writer, "Shutdown requests: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Accepted: %d  Not sent: %d  Unconfirmed: %d\n", report.Accepted, report.NotSent, report.Unconfirmed)
+	for _, target := range report.Targets {
+		fmt.Fprintf(writer, "  %-10s %-11s %s\n", target.Name, target.State, target.Detail)
+		if target.TechnicalDetail != "" {
+			fmt.Fprintf(writer, "    technical: %s\n", target.TechnicalDetail)
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail: %s\n", report.Message)
+	}
+}
+
 func ConfigPlanText(writer io.Writer, report domain.ConfigPlanReport) {
 	fmt.Fprintf(writer, "Configuration plan: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Repository:         %s\n", report.Repository)

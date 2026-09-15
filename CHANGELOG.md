@@ -8,6 +8,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added reviewed client-only shutdown through shared CLI/TUI plan/apply
+  operations. Nixorium resolves only evaluated client identities, excludes the
+  controller, checks management access and interactive sessions, serializes
+  against deployments, blocks during PXE/network recovery, and rechecks before
+  sending a fixed power-off request. Active sessions remain blocked; unknown
+  session state requires explicit acknowledgement. Results distinguish
+  accepted, not sent, and unconfirmed requests without inferring physical power
+  state or retrying blindly.
 - Added guided client-software management through a strict versioned
   `lab-software.json` file. The TUI and CLI share catalog/plan/apply services,
   accept only curated packages resolved from the pinned package set, support
@@ -24,7 +32,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   diagnostics, compact setup/progress, symbol-and-text status, adaptive list
   layouts, and persistent confirmation controls in long reviews. Existing
   application operations, CLI contracts and exact safety confirmations remain
-  shared. The shutdown limitation is explicitly documented in-app.
+  shared.
 - Completed the guided pilot-computer handoff in first setup. The operator now
   selects an immutable configured identity, receives local identity/disk steps,
   checks authenticated active-revision evidence separately from the practical

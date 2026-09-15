@@ -162,6 +162,10 @@ nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 
+# Review and request client-only power-off
+nix run .#nixorium -- shutdown plan --on @lab
+nix run .#nixorium -- shutdown apply --on @lab --expect REVIEW_TOKEN
+
 # Advanced compatibility: deploy to all lab PCs via raw Colmena
 colmena apply --on @lab
 
@@ -218,6 +222,7 @@ Release from the matching changelog section.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.
+- Client shutdown expands only evaluated client identities and never the controller. Preserve the active-session block, explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the same non-blocking lock used by deployment. Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
 - Git review is read-only and typed: preserve the staged/unstaged/untracked
   distinction, managed-versus-unexpected classification, bounded patch output,

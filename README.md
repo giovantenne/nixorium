@@ -33,7 +33,7 @@ keys, assets, and policy stay in a small private deployment repository.
 
 - A terminal management application with guided setup plus a dashboard for
   diagnostics, PXE installation, deployments, services, logs, Git review,
-  controller rebuilds, and upgrades.
+  controller rebuilds, reviewed client shutdown, and Nixorium updates.
 - Offline-first client installation through ProxyDHCP, iPXE, and a signed local
   Harmonia binary cache.
 - Declarative deployment to one, selected, or all clients with Colmena.
@@ -198,6 +198,7 @@ their current plain-language action, so a remote terminal never looks frozen.
 | **Review Git changes** | Displays redacted deployment changes and optionally creates a local reviewed commit |
 | **Change settings** | Edits one grouped area, including Git identity or one securely entered account password, then validates and reviews the complete candidate |
 | **Update Nixorium** | Fetches available upstream releases, then validates and applies the selected release |
+| **Shut down computers** | Checks selected clients and sessions, then sends reviewed power-off requests without targeting the controller |
 | **Install or reinstall computers** | Prepares, starts, stops, or recovers PXE installation mode |
 
 Operational commands, JSON output, customization examples, update procedure,
@@ -218,6 +219,9 @@ interrupted action, start with the
   restores only the exact recorded address.
 - Client installation is guided, destructive confirmation is explicit, and
   unattended installation is disabled.
+- Client shutdown selects evaluated clients only, blocks active user sessions,
+  requires explicit acknowledgement for unknown sessions, and never treats
+  lost network contact as proof that a computer is powered off.
 - The firewall exposes product services only on the configured lab interface
   and only on the roles that need them.
 - Client closures are built by the controller and verified through the signed

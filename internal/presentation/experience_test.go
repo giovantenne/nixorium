@@ -155,7 +155,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		for _, screen := range []dashboardScreen{dashboardHome, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
+		for _, screen := range []dashboardScreen{dashboardHome, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
 			m := experienceFixture(200)
 			m.width = size[0]
 			m.height = size[1]
@@ -173,6 +173,10 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.softwareClientCursor = 199
 			m.softwarePlan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.softwareCatalog.Clients, Confirmation: "SAVE SOFTWARE abcdef012345"}
 			m.softwareResult = domain.SoftwareChangeApplyReport{State: "applied", ManagedFile: "lab-software.json"}
+			m.shutdownCursor = 199
+			m.shutdownChosen = map[string]bool{"pc200": true}
+			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownRequireIdle, Confirmation: "SHUTDOWN 1 CLIENTS abcdef012345", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
+			m.shutdownResult = domain.ShutdownApplyReport{State: "completed", Accepted: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc200", State: "accepted", Detail: "request accepted"}}}
 			m.controllerPlan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD pc99"}
 			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 			if screen == dashboardPXELeaveReview {
@@ -184,12 +188,15 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 				t.Fatalf("%dx%d screen %d overflow: %dx%d", size[0], size[1], screen, lipgloss.Width(view), lipgloss.Height(view))
 			}
-			if screen == dashboardHosts || screen == dashboardDeploy || screen == dashboardSoftwareScope {
+			if screen == dashboardHosts || screen == dashboardDeploy || screen == dashboardSoftwareScope || screen == dashboardShutdown {
 				if !strings.Contains(view, "pc200") {
 					t.Fatalf("focused row hidden screen %d size %v", screen, size)
 				}
 			}
-			if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview || screen == dashboardSoftwareReview {
+			if screen == dashboardShutdown && (!strings.Contains(view, "No request is queued") || !strings.Contains(view, "space")) {
+				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
+			}
+			if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview || screen == dashboardSoftwareReview || screen == dashboardShutdownReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
@@ -295,7 +302,7 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 func TestExperienceRenderGallery(t *testing.T) {
 	m := experienceFixture(24)
 	m.hosts.GeneratedAt = time.Now().Truncate(time.Minute)
-	for _, name := range []string{"interventions", "setup", "restore", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
+	for _, name := range []string{"interventions", "setup", "restore", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "shutdown", "shutdown-confirmation", "shutdown-result", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
 		m.screen = dashboardHome
 		m.busy = ""
 		m.deploying = false
@@ -338,6 +345,15 @@ func TestExperienceRenderGallery(t *testing.T) {
 				Message: "lab-software.json was replaced, but durable storage could not be confirmed.",
 				Issues:  []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
 			}
+		case "shutdown":
+			m.screen = dashboardShutdown
+			m.shutdownChosen = map[string]bool{"pc01": true, "pc02": true}
+		case "shutdown-confirmation":
+			m.screen = dashboardShutdownReview
+			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 2, Policy: domain.ShutdownAcknowledgeUnknown, Confirmation: "SHUTDOWN 2 CLIENTS abcdef012345", Targets: []domain.ShutdownTargetPlan{{Name: "pc01", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}, {Name: "pc02", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionUnknown, Eligible: true}, {Name: "pc07", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown, Session: domain.ShutdownSessionUnknown}}}
+		case "shutdown-result":
+			m.screen = dashboardShutdownResult
+			m.shutdownResult = domain.ShutdownApplyReport{State: "partial", Accepted: 1, NotSent: 1, Unconfirmed: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc01", State: "accepted", Detail: "the operating system accepted the power-off request"}, {Name: "pc02", State: "unconfirmed", Detail: "request result could not be confirmed; inspect the computer before retrying", TechnicalDetail: "connection closed during dispatch"}, {Name: "pc07", State: "not-sent", Detail: "not reachable"}}, Message: "Requests accepted for 1 computer; 1 not sent and 1 unconfirmed. Do not retry blindly."}
 		case "update":
 			m.screen = dashboardUpdate
 			m.updateCheck = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.1", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}
@@ -357,5 +373,27 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.report.PXE.Mode = "recovery-required"
 		}
 		fmt.Printf("CAPTURE %s\n%s\nEND CAPTURE\n", name, m.View().Content)
+	}
+}
+
+func TestShutdownResultDisclosesTechnicalDetailOnlyOnRequest(t *testing.T) {
+	m := experienceFixture(2)
+	m.screen = dashboardShutdownResult
+	m.shutdownResult = domain.ShutdownApplyReport{
+		State:       "partial",
+		Unconfirmed: 1,
+		Targets: []domain.ShutdownTargetOutcome{{
+			Name:            "pc01",
+			State:           "unconfirmed",
+			Detail:          "request result could not be confirmed; inspect the computer before retrying",
+			TechnicalDetail: "ssh: connection closed by remote host",
+		}},
+	}
+	if strings.Contains(m.View().Content, "connection closed by remote host") {
+		t.Fatal("technical SSH detail shown in the primary result")
+	}
+	m = press(m, "t")
+	if !strings.Contains(m.View().Content, "Technical: ssh: connection closed by remote host") {
+		t.Fatal("technical SSH detail was not available on request")
 	}
 }

@@ -386,6 +386,27 @@ func TestParseArgumentsAcceptsReviewedSoftwareChanges(t *testing.T) {
 	}
 }
 
+func TestParseShutdownCommandsAndSessionAcknowledgement(t *testing.T) {
+	plan, err := parseArguments([]string{"shutdown", "plan", "--on", "pc01,pc02", "--acknowledge-unknown-sessions", "--json"})
+	if err != nil || plan.command != "shutdown" || plan.subcommand != "plan" || plan.on != "pc01,pc02" || !plan.acknowledgeUnknown || !plan.json {
+		t.Fatalf("shutdown plan = %+v, error = %v", plan, err)
+	}
+	apply, err := parseArguments([]string{"shutdown", "apply", "--on", "@lab", "--expect", "sha256:review", "--yes"})
+	if err != nil || apply.subcommand != "apply" || apply.on != "@lab" || apply.expect != "sha256:review" || !apply.yes {
+		t.Fatalf("shutdown apply = %+v, error = %v", apply, err)
+	}
+	for _, arguments := range [][]string{
+		{"shutdown", "plan"},
+		{"shutdown", "apply", "--on", "pc01"},
+		{"shutdown", "--on", "pc01"},
+		{"status", "--acknowledge-unknown-sessions"},
+	} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("unsafe shutdown arguments accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsRejectsUnknownInput(t *testing.T) {
 	if _, err := parseArguments([]string{"deploy"}); err == nil {
 		t.Fatal("unknown command was accepted")

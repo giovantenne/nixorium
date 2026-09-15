@@ -134,3 +134,19 @@ func ConfirmSoftwareChange(input io.Reader, output io.Writer, report domain.Soft
 	}
 	return strings.TrimSpace(value) == report.Confirmation, nil
 }
+
+func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPlanReport) (bool, error) {
+	fmt.Fprintln(output, "Client shutdown review")
+	fmt.Fprintf(output, "Targets: %d eligible of %d selected computer(s)\n", report.Eligible, len(report.Targets))
+	fmt.Fprintln(output, "Controller: always excluded")
+	fmt.Fprintf(output, "Session policy: %s\n", report.Policy)
+	fmt.Fprintln(output, "Impact: unsaved user work may be lost; checks run again before dispatch")
+	fmt.Fprintln(output, "Outcome: acceptance confirms only that the operating system received the request, not physical power state")
+	fmt.Fprintln(output, "Retry: do not retry an unconfirmed request blindly")
+	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == report.Confirmation, nil
+}

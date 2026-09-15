@@ -299,3 +299,26 @@ func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
 		t.Fatalf("software result is incomplete:\n%s", text)
 	}
 }
+
+func TestShutdownTextQualifiesRequestsAndPhysicalState(t *testing.T) {
+	plan := domain.ShutdownPlanReport{
+		State: "ready", Requested: "pc01,pc02", Policy: domain.ShutdownRequireIdle, Eligible: 1,
+		Targets:     []domain.ShutdownTargetPlan{{Name: "pc01", Eligible: true, Session: domain.ShutdownSessionIdle}, {Name: "pc02", Session: domain.ShutdownSessionActive, Detail: "interactive session active"}},
+		ReviewToken: "sha256:review", Confirmation: "SHUTDOWN 1 CLIENTS abcdef012345", ExpiresAt: time.Unix(100, 0),
+	}
+	var output bytes.Buffer
+	ShutdownPlanText(&output, plan)
+	for _, expected := range []string{"Shutdown plan: READY", "1/2", "pc01", "pc02", "interactive session active", plan.Confirmation} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("shutdown plan omits %q:\n%s", expected, output.String())
+		}
+	}
+	output.Reset()
+	result := domain.ShutdownApplyReport{State: "partial", Accepted: 1, Unconfirmed: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc01", State: "accepted"}, {Name: "pc02", State: "unconfirmed", Detail: "inspect the computer", TechnicalDetail: "connection closed"}}, Message: "Physical power state is not inferred from network loss."}
+	ShutdownApplyText(&output, result)
+	for _, expected := range []string{"Shutdown requests: PARTIAL", "Accepted: 1", "unconfirmed", "technical: connection closed", "Physical power state is not inferred"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("shutdown result omits %q:\n%s", expected, output.String())
+		}
+	}
+}
