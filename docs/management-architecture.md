@@ -101,6 +101,13 @@ deployable binary, explicit process execution, straightforward unit testing,
 and good Nix packaging. Bubble Tea is used only in the presentation package.
 The domain and adapter packages have no Bubble Tea dependency.
 
+The frontend uses the aligned v2 Bubble Tea, Bubbles, and Lip Gloss family.
+Reusable presentation components query whether the terminal background is
+light or dark, add color only as a secondary cue, and render width-aware key
+help. Bubbles list/input/progress/viewport primitives may manage interaction
+state, but operational state continues to arrive only through typed
+application callbacks.
+
 The initial package layout is:
 
 ```text

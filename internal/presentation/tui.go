@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -88,7 +88,9 @@ type dashboardModel struct {
 	updateResult     domain.UpdateApplyReport
 	updateScroll     int
 	updating         bool
+	width            int
 	height           int
+	isDark           bool
 }
 
 type dashboardPlanMsg struct {
@@ -165,7 +167,7 @@ func RunDashboard(report domain.StatusReport, actions DashboardActions) error {
 	return err
 }
 
-func (dashboardModel) Init() tea.Cmd { return nil }
+func (dashboardModel) Init() tea.Cmd { return tea.RequestBackgroundColor }
 
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
@@ -322,6 +324,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardUpdate
 		return model, nil
 	case tea.WindowSizeMsg:
+		model.width = message.Width
 		model.height = message.Height
 		if model.screen == dashboardLogDetail && model.logScroll > maximumLogScroll(model.logDetail, model.logDetailHeight()) {
 			model.logScroll = maximumLogScroll(model.logDetail, model.logDetailHeight())
@@ -330,9 +333,12 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.updateScroll = maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
 		}
 		return model, nil
+	case tea.BackgroundColorMsg:
+		model.isDark = message.IsDark()
+		return model, nil
 	}
 
-	key, ok := message.(tea.KeyMsg)
+	key, ok := message.(tea.KeyPressMsg)
 	if !ok {
 		return model, nil
 	}
@@ -422,7 +428,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if model.deployCursor+1 < len(hosts) {
 				model.deployCursor++
 			}
-		case " ":
+		case "space":
 			if len(hosts) > 0 {
 				if model.deployChosen == nil {
 					model.deployChosen = map[string]bool{}
@@ -455,7 +461,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if len(value) > 0 {
 				model.confirmation = string(value[:len(value)-1])
 			}
-		case " ":
+		case "space":
 			model.confirmation += " "
 		case "enter":
 			expected := "DEPLOY " + model.deployPlan.ColmenaSelector
@@ -473,8 +479,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardDeploymentResultMsg{report: model.actions.ApplyDeployment(plan)}
 			}
 		default:
-			if key.Type == tea.KeyRunes {
-				model.confirmation += string(key.Runes)
+			if key.Text != "" {
+				model.confirmation += key.Text
 			}
 		}
 	case dashboardController:
@@ -499,7 +505,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if len(value) > 0 {
 				model.confirmation = string(value[:len(value)-1])
 			}
-		case " ":
+		case "space":
 			model.confirmation += " "
 		case "enter":
 			if model.confirmation != model.controllerPlan.Confirmation {
@@ -515,8 +521,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardControllerResultMsg{report: model.actions.ApplyController(plan)}
 			}
 		default:
-			if key.Type == tea.KeyRunes {
-				model.confirmation += string(key.Runes)
+			if key.Text != "" {
+				model.confirmation += key.Text
 			}
 		}
 	case dashboardServices:
@@ -550,7 +556,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if len(value) > 0 {
 				model.confirmation = string(value[:len(value)-1])
 			}
-		case " ":
+		case "space":
 			model.confirmation += " "
 		case "enter":
 			if model.confirmation != "RESTART CACHE" {
@@ -565,8 +571,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardServiceResultMsg{report: model.actions.RestartService("cache")}
 			}
 		default:
-			if key.Type == tea.KeyRunes {
-				model.confirmation += string(key.Runes)
+			if key.Text != "" {
+				model.confirmation += key.Text
 			}
 		}
 	case dashboardLogs:
@@ -687,7 +693,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if model.gitCommitCursor+1 < len(changes) {
 				model.gitCommitCursor++
 			}
-		case " ":
+		case "space":
 			if len(changes) > 0 && !changes[model.gitCommitCursor].Private {
 				path := changes[model.gitCommitCursor].Path
 				model.gitCommitChosen[path] = !model.gitCommitChosen[path]
@@ -736,7 +742,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if len(value) > 0 {
 				model.confirmation = string(value[:len(value)-1])
 			}
-		case " ":
+		case "space":
 			model.confirmation += " "
 		case "enter":
 			if model.confirmation != model.gitCommitPlan.Confirmation {
@@ -753,8 +759,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardGitCommitResultMsg{report: result, review: model.actions.LoadGitReview()}
 			}
 		default:
-			if key.Type == tea.KeyRunes {
-				model.confirmation += string(key.Runes)
+			if key.Text != "" {
+				model.confirmation += key.Text
 			}
 		}
 	case dashboardUpdate:
@@ -787,8 +793,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(target, allowPrerelease, allowDowngrade)}
 			}
 		default:
-			if key.Type == tea.KeyRunes && len([]rune(model.updateTarget))+len(key.Runes) <= 128 {
-				model.updateTarget += string(key.Runes)
+			if key.Text != "" && len([]rune(model.updateTarget))+len([]rune(key.Text)) <= 128 {
+				model.updateTarget += key.Text
 			}
 		}
 	case dashboardUpdateReview:
@@ -821,7 +827,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if len(value) > 0 {
 				model.confirmation = string(value[:len(value)-1])
 			}
-		case " ":
+		case "space":
 			model.confirmation += " "
 		case "enter":
 			if model.confirmation != model.updatePlan.Confirmation {
@@ -838,8 +844,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardUpdateResultMsg{report: model.actions.ApplyUpdate(plan)}
 			}
 		default:
-			if key.Type == tea.KeyRunes {
-				model.confirmation += string(key.Runes)
+			if key.Text != "" {
+				model.confirmation += key.Text
 			}
 		}
 	case dashboardPXE:
@@ -884,7 +890,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if len(value) > 0 {
 				model.confirmation = string(value[:len(value)-1])
 			}
-		case " ":
+		case "space":
 			model.confirmation += " "
 		case "enter":
 			if model.confirmation != "START PXE" {
@@ -899,8 +905,8 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model.actions.StartPXE().Message
 			}, dashboardPXE)
 		default:
-			if key.Type == tea.KeyRunes {
-				model.confirmation += string(key.Runes)
+			if key.Text != "" {
+				model.confirmation += key.Text
 			}
 		}
 	}
@@ -922,29 +928,31 @@ func (model dashboardModel) loadHosts() tea.Cmd {
 	}
 }
 
-func (model dashboardModel) View() string {
+func (model dashboardModel) View() tea.View {
+	content := ""
 	switch model.screen {
 	case dashboardHosts:
-		return model.hostsView()
+		content = model.hostsView()
 	case dashboardDeploy, dashboardDeployReview:
-		return model.deployView()
+		content = model.deployView()
 	case dashboardController, dashboardControllerReview:
-		return model.controllerView()
+		content = model.controllerView()
 	case dashboardServices, dashboardServicesRestartReview:
-		return model.servicesView()
+		content = model.servicesView()
 	case dashboardLogs:
-		return model.logsView()
+		content = model.logsView()
 	case dashboardLogDetail:
-		return model.logDetailView()
+		content = model.logDetailView()
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
-		return model.gitReviewView()
+		content = model.gitReviewView()
 	case dashboardUpdate, dashboardUpdateReview:
-		return model.updateView()
+		content = model.updateView()
 	case dashboardPXE, dashboardPXEStartReview:
-		return model.pxeView()
+		content = model.pxeView()
 	default:
-		return model.homeView()
+		content = model.homeView()
 	}
+	return tea.NewView(content)
 }
 
 func (model dashboardModel) homeView() string {
@@ -954,7 +962,7 @@ func (model dashboardModel) homeView() string {
 	}
 	cache := serviceLabel(model.report.Services, "nixorium-harmonia.service")
 	lines := []string{
-		"Nixorium",
+		tuiTitle("Nixorium", model.isDark),
 		"",
 		"Laboratory",
 		fmt.Sprintf("  Configuration        %s", status),
@@ -974,7 +982,7 @@ func (model dashboardModel) homeView() string {
 		"  p / Enter   Install computers over network",
 		"",
 		"Run `nixorium doctor` for actionable diagnostics.",
-		"q: quit",
+		tuiHelp(model.width, model.isDark, tuiHelpBinding([]string{"q", "ctrl+c"}, "q", "quit")),
 	}
 	return strings.Join(lines, "\n") + "\n"
 }

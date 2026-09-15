@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Migrated the terminal frontend to the aligned Bubble Tea, Bubbles, and Lip
+  Gloss v2 stack, adding reusable background-aware title, error, and
+  width-adaptive key-help components as the foundation for richer setup and
+  operation-progress screens.
 - Made first-run credential entry recover from short, public-default, and
   mismatched passwords by retrying only the current account, preserving all
   earlier wizard input while keeping terminal and hashing failures fatal.
