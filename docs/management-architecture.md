@@ -113,6 +113,8 @@ list. Arrow keys plus Enter are the discoverable primary navigation; stable
 one-letter shortcuts remain direct alternatives. Shared semantic styles make
 title, sections, descriptions, and ready/attention/failure states visually
 distinct on light and dark terminals while preserving explicit textual labels.
+All routine screens reuse this hierarchy and the official width-adaptive help
+component instead of defining independent color or key-hint conventions.
 
 The initial package layout is:
 

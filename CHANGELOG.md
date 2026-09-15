@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Extended the shared light/dark visual hierarchy and width-adaptive Bubbles
+  key help across Computers, Deploy, Controller, Services, Logs, Git, Update,
+  and PXE screens; service, Git, and PXE states now use the same semantic color
+  roles while retaining explicit text.
 - Added live foreground deployment feedback with elapsed time, an official
   Bubbles progress bar, typed build/apply/verification activities, and checked-
   computer counts. Raw Colmena output stays in the private log, and the compact

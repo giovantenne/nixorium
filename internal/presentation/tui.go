@@ -1618,7 +1618,7 @@ func (model dashboardModel) gitReviewView() string {
 	if model.screen == dashboardGitCommitReview {
 		return model.gitCommitReviewView()
 	}
-	lines := []string{"Nixorium — Git change review", ""}
+	lines := []string{tuiTitle("Nixorium — Git change review", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
@@ -1634,13 +1634,18 @@ func (model dashboardModel) gitReviewView() string {
 		end = len(content)
 	}
 	lines = append(lines,
-		fmt.Sprintf("State: %s   paths: %d   staged/unstaged/untracked: %d/%d/%d", model.gitReview.State, len(model.gitReview.Changes), model.gitReview.Summary.Staged, model.gitReview.Summary.Unstaged, model.gitReview.Summary.Untracked),
+		fmt.Sprintf("State: %s   paths: %d   staged/unstaged/untracked: %d/%d/%d", tuiStatus(model.gitReview.State, gitReviewStatusKind(model.gitReview), model.isDark), len(model.gitReview.Changes), model.gitReview.Summary.Staged, model.gitReview.Summary.Unstaged, model.gitReview.Summary.Untracked),
 		fmt.Sprintf("Managed/unexpected/private: %d/%d/%d", model.gitReview.Summary.Managed, model.gitReview.Summary.Unexpected, model.gitReview.Summary.Private),
 		fmt.Sprintf("Showing lines %d-%d of %d", displayedLineStart(model.gitScroll, len(content)), end, len(content)),
 		"",
 	)
 	lines = append(lines, content[model.gitScroll:end]...)
-	lines = append(lines, "", "c: select paths to commit   Up/Down/PgUp/PgDn/Home/End: scroll", "f: refresh   Esc: back   q: quit")
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"c"}, "c", "commit paths"),
+		tuiHelpBinding([]string{"up", "down", "pgup", "pgdown"}, "↑/↓/pg", "scroll"),
+		tuiHelpBinding([]string{"f"}, "f", "refresh"),
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+	))
 	if model.gitCommitResult.Operation != "" {
 		lines = append(lines, "", fmt.Sprintf("Last commit: %s; committed=%t; HEAD=%s", model.gitCommitResult.State, model.gitCommitResult.Committed, model.gitCommitResult.Revision))
 	}
@@ -1651,7 +1656,7 @@ func (model dashboardModel) gitReviewView() string {
 }
 
 func (model dashboardModel) gitCommitSelectView() string {
-	lines := []string{"Nixorium — Select Git commit paths", ""}
+	lines := []string{tuiTitle("Nixorium — Select Git commit paths", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
@@ -1670,7 +1675,12 @@ func (model dashboardModel) gitCommitSelectView() string {
 		}
 		lines = append(lines, fmt.Sprintf("%s %s %-10s %-10s %-9s %s", cursor, chosen, gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path))
 	}
-	lines = append(lines, "", "Space: select   a: toggle all safe paths   Enter: create plan", "Esc: back   q: quit")
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"space"}, "space", "select"),
+		tuiHelpBinding([]string{"a"}, "a", "all safe"),
+		tuiHelpBinding([]string{"enter"}, "enter", "review"),
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+	))
 	if model.message != "" {
 		lines = append(lines, "", model.message)
 	}
@@ -1678,7 +1688,7 @@ func (model dashboardModel) gitCommitSelectView() string {
 }
 
 func (model dashboardModel) gitCommitReviewView() string {
-	lines := []string{"Nixorium — Local Git commit review", ""}
+	lines := []string{tuiTitle("Nixorium — Local Git commit review", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
@@ -1701,7 +1711,10 @@ func (model dashboardModel) gitCommitReviewView() string {
 		"",
 	)
 	lines = append(lines, diffLines[model.gitScroll:end]...)
-	lines = append(lines, "", "Type "+model.gitCommitPlan.Confirmation+" to continue:", "> "+model.confirmation+"█", "", "Up/Down/PgUp/PgDn: scroll   Esc: cancel")
+	lines = append(lines, "", "Type "+model.gitCommitPlan.Confirmation+" to continue:", "> "+model.confirmation+"█", "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"up", "down", "pgup", "pgdown"}, "↑/↓/pg", "scroll"),
+		tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
+	))
 	if model.message != "" {
 		lines = append(lines, "", model.message)
 	}
@@ -1745,7 +1758,7 @@ func maximumGitCommitPlanScroll(report domain.GitCommitPlanReport, height int) i
 }
 
 func (model dashboardModel) updateView() string {
-	lines := []string{"Nixorium — Update Nixorium", ""}
+	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
 		if model.updating {
@@ -1791,7 +1804,10 @@ func (model dashboardModel) updateView() string {
 			"Type "+model.updatePlan.Confirmation+" to continue:",
 			"> "+model.confirmation+"█",
 			"",
-			"Up/Down/PgUp/PgDn: scroll   Esc: cancel",
+			tuiHelp(model.width, model.isDark,
+				tuiHelpBinding([]string{"up", "down", "pgup", "pgdown"}, "↑/↓/pg", "scroll"),
+				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
+			),
 		)
 		if model.message != "" {
 			lines = append(lines, "", model.message)
@@ -1806,8 +1822,10 @@ func (model dashboardModel) updateView() string {
 		fmt.Sprintf("F2  Allow prerelease: %s", toggleLabel(model.updatePrerelease)),
 		fmt.Sprintf("F3  Allow downgrade:  %s", toggleLabel(model.updateDowngrade)),
 		"",
-		"Enter: validate release and build representative outputs",
-		"Esc: back",
+		tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"enter"}, "enter", "validate release"),
+			tuiHelpBinding([]string{"esc"}, "esc", "back"),
+		),
 		"No file changes occur until the reviewed confirmation succeeds.",
 	)
 	if model.updateResult.Operation != "" {
@@ -1919,7 +1937,10 @@ func (model dashboardModel) controllerView() string {
 			fmt.Sprintf("Type %s to continue:", model.controllerPlan.Confirmation),
 			"> "+model.confirmation+"█",
 			"",
-			"Esc: cancel",
+			tuiHelp(model.width, model.isDark,
+				tuiHelpBinding([]string{"enter"}, "enter", "restart"),
+				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
+			),
 		)
 		if model.message != "" {
 			lines = append(lines, "", model.message)
@@ -1976,7 +1997,7 @@ func (model dashboardModel) controllerView() string {
 }
 
 func (model dashboardModel) servicesView() string {
-	lines := []string{"Nixorium — Managed services", ""}
+	lines := []string{tuiTitle("Nixorium — Managed services", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
@@ -1999,8 +2020,14 @@ func (model dashboardModel) servicesView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	for _, service := range model.services.Services {
+		kind := tuiStatusAttention
+		if service.State == "healthy" || service.State == "active" || service.State == "standby" {
+			kind = tuiStatusSuccess
+		} else if service.State == "failed" || service.State == "degraded" {
+			kind = tuiStatusFailure
+		}
 		lines = append(lines,
-			fmt.Sprintf("%s — %s", service.Name, service.State),
+			fmt.Sprintf("%s — %s", tuiSection(service.Name, model.isDark), tuiStatus(service.State, kind, model.isDark)),
 			"  "+service.Detail,
 		)
 		for _, unit := range service.Units {
@@ -2011,7 +2038,12 @@ func (model dashboardModel) servicesView() string {
 		}
 		lines = append(lines, "")
 	}
-	lines = append(lines, "r: restart cache   f: refresh   Esc: back   q: quit")
+	lines = append(lines, tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"r"}, "r", "restart cache"),
+		tuiHelpBinding([]string{"f"}, "f", "refresh"),
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+		tuiHelpBinding([]string{"q"}, "q", "quit"),
+	))
 	if model.serviceResult.Operation != "" {
 		lines = append(lines, "", fmt.Sprintf("Last action: %s; verified=%t", model.serviceResult.State, model.serviceResult.Verified))
 	}
@@ -2022,12 +2054,12 @@ func (model dashboardModel) servicesView() string {
 }
 
 func (model dashboardModel) logsView() string {
-	lines := []string{"Nixorium — Operation logs", ""}
+	lines := []string{tuiTitle("Nixorium — Operation logs", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
 	}
-	lines = append(lines, "Recent actions")
+	lines = append(lines, tuiSection("Recent actions", model.isDark))
 	recordLimit := len(model.logs.Records)
 	if recordLimit > 10 {
 		recordLimit = 10
@@ -2038,7 +2070,7 @@ func (model dashboardModel) logsView() string {
 	for _, record := range model.logs.Records[:recordLimit] {
 		lines = append(lines, fmt.Sprintf("  %s  %-18s %-10s %s", record.RecordedAt.UTC().Format("2006-01-02 15:04Z"), record.Operation, record.State, record.Subject))
 	}
-	lines = append(lines, "", "Deployment logs")
+	lines = append(lines, "", tuiSection("Deployment logs", model.isDark))
 	if len(model.logs.Logs) == 0 {
 		lines = append(lines, "No deployment operation logs are available.")
 	}
@@ -2050,7 +2082,12 @@ func (model dashboardModel) logsView() string {
 		lines = append(lines, fmt.Sprintf("%s %s  %-10s %-11s %d bytes", cursor, entry.StartedAt.UTC().Format("2006-01-02 15:04Z"), entry.Kind, entry.State, entry.SizeBytes))
 		lines = append(lines, "    "+entry.ID)
 	}
-	lines = append(lines, "", "Up/Down: select   Enter: view tail   f: refresh   Esc: back   q: quit")
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
+		tuiHelpBinding([]string{"enter"}, "enter", "view tail"),
+		tuiHelpBinding([]string{"f"}, "f", "refresh"),
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+	))
 	if model.message != "" {
 		lines = append(lines, "", "Warning: "+model.message)
 	}
@@ -2058,7 +2095,7 @@ func (model dashboardModel) logsView() string {
 }
 
 func (model dashboardModel) logDetailView() string {
-	lines := []string{"Nixorium — Operation log detail", ""}
+	lines := []string{tuiTitle("Nixorium — Operation log detail", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busy+"…")
 		return strings.Join(lines, "\n") + "\n"
@@ -2068,7 +2105,10 @@ func (model dashboardModel) logDetailView() string {
 		if model.message != "" {
 			lines = append(lines, "", model.message)
 		}
-		lines = append(lines, "", "Esc: back   q: quit")
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"esc"}, "esc", "back"),
+			tuiHelpBinding([]string{"q"}, "q", "quit"),
+		))
 		return strings.Join(lines, "\n") + "\n"
 	}
 	entry := model.logDetail.Log
@@ -2084,7 +2124,11 @@ func (model dashboardModel) logDetailView() string {
 		"",
 	)
 	lines = append(lines, contentLines[model.logScroll:end]...)
-	lines = append(lines, "", "Up/Down/PgUp/PgDn/Home/End: scroll   Esc: back   q: quit")
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"up", "down", "pgup", "pgdown", "home", "end"}, "↑/↓/pg/home/end", "scroll"),
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+		tuiHelpBinding([]string{"q"}, "q", "quit"),
+	))
 	return strings.Join(lines, "\n") + "\n"
 }
 
@@ -2145,6 +2189,16 @@ func controllerPlanIssues(report domain.ControllerRebuildPlanReport) string {
 	return strings.Join(parts, "; ")
 }
 
+func gitReviewStatusKind(report domain.GitReviewReport) tuiStatusKind {
+	if report.HasErrors() {
+		return tuiStatusFailure
+	}
+	if len(report.Changes) > 0 {
+		return tuiStatusAttention
+	}
+	return tuiStatusSuccess
+}
+
 func (model dashboardModel) deployView() string {
 	lines := []string{tuiTitle("Nixorium — Deploy updates", model.isDark), ""}
 	if model.deploying {
@@ -2177,7 +2231,10 @@ func (model dashboardModel) deployView() string {
 			fmt.Sprintf("Type DEPLOY %s to continue:", model.deployPlan.ColmenaSelector),
 			"> "+model.confirmation+"█",
 			"",
-			"Esc: cancel",
+			tuiHelp(model.width, model.isDark,
+				tuiHelpBinding([]string{"enter"}, "enter", "deploy"),
+				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
+			),
 		)
 		if model.message != "" {
 			lines = append(lines, "", model.message)
@@ -2230,7 +2287,12 @@ func (model dashboardModel) deployView() string {
 	if len(hosts) == 0 {
 		lines = append(lines, "No configured client computers.")
 	}
-	lines = append(lines, "", "Enter: review selected targets   Esc: back   q: quit")
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"space"}, "space", "select"),
+		tuiHelpBinding([]string{"a"}, "a", "all"),
+		tuiHelpBinding([]string{"enter"}, "enter", "review"),
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+	))
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}
@@ -2280,7 +2342,7 @@ func (model dashboardModel) deploymentProgressView() []string {
 func (model dashboardModel) hostsView() string {
 	available, total := hostAvailability(model.hosts.Hosts)
 	lines := []string{
-		"Nixorium — Computers",
+		tuiTitle("Nixorium — Computers", model.isDark),
 		"",
 		fmt.Sprintf("SSH available: %d/%d", available, total),
 		fmt.Sprintf("Deployment: %d current, %d outdated, %d unknown", model.hosts.Deployment.Current, model.hosts.Deployment.Outdated, model.hosts.Deployment.Unknown),
@@ -2300,7 +2362,11 @@ func (model dashboardModel) hostsView() string {
 	if model.busy != "" {
 		lines = append(lines, "", model.busy+"…")
 	} else {
-		lines = append(lines, "", "r: refresh   Esc: back   q: quit")
+		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"r"}, "r", "refresh"),
+			tuiHelpBinding([]string{"esc"}, "esc", "back"),
+			tuiHelpBinding([]string{"q"}, "q", "quit"),
+		))
 	}
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
@@ -2317,9 +2383,9 @@ func (model dashboardModel) pxeView() string {
 		preparation = "ready"
 	}
 	lines := []string{
-		"Nixorium — Install computers over network",
+		tuiTitle("Nixorium — Install computers over network", model.isDark),
 		"",
-		fmt.Sprintf("Installation mode:  %s", model.report.PXE.Mode),
+		fmt.Sprintf("Installation mode:  %s", tuiStatus(model.report.PXE.Mode, pxeStatusKind(model.report.PXE.Mode), model.isDark)),
 		fmt.Sprintf("Prepared artifacts: %s", preparation),
 		fmt.Sprintf("Interface:          %s", model.report.Meta.Network.Interface),
 		fmt.Sprintf("Service address:    %s", model.report.Meta.Controller.DHCPIP),
@@ -2350,14 +2416,17 @@ func (model dashboardModel) pxeView() string {
 			"Type START PXE to continue:",
 			"> "+model.confirmation+"█",
 			"",
-			"Esc: cancel",
+			tuiHelp(model.width, model.isDark,
+				tuiHelpBinding([]string{"enter"}, "enter", "start PXE"),
+				tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
+			),
 		)
 		if model.message != "" {
 			lines = append(lines, "", model.message)
 		}
 		return strings.Join(lines, "\n") + "\n"
 	}
-	lines = append(lines, "", "Actions")
+	lines = append(lines, "", tuiSection("Actions", model.isDark))
 	if model.report.PXE.Mode != "active" {
 		lines = append(lines, "  p   Prepare artifacts and client closures", "  s   Start installation mode")
 	}
@@ -2369,11 +2438,27 @@ func (model dashboardModel) pxeView() string {
 		lines = append(lines, "")
 		lines = append(lines, model.operationProgressView(model.pxeProgress, "Last preparation")...)
 	}
-	lines = append(lines, "", "  Esc Back", "  q   Quit (active services keep running)")
+	lines = append(lines, "", tuiHelp(model.width, model.isDark,
+		tuiHelpBinding([]string{"esc"}, "esc", "back"),
+		tuiHelpBinding([]string{"q"}, "q", "quit; services continue"),
+	))
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func pxeStatusKind(mode string) tuiStatusKind {
+	switch mode {
+	case "ready", "stopped":
+		return tuiStatusSuccess
+	case "active", "preparing":
+		return tuiStatusAttention
+	case "degraded", "recovery-required":
+		return tuiStatusFailure
+	default:
+		return tuiStatusNeutral
+	}
 }
 
 func (model dashboardModel) operationProgressView(operation domain.OperationProgress, title string) []string {

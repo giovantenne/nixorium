@@ -123,6 +123,25 @@ func TestDashboardTaskMenuUsesSelectionAndKeepsShortcuts(t *testing.T) {
 	}
 }
 
+func TestRoutineScreensShareVisualTitleHierarchy(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready"), isDark: true, width: 100, height: 30}
+	screens := map[string]string{
+		"computers":  model.hostsView(),
+		"deploy":     model.deployView(),
+		"controller": model.controllerView(),
+		"services":   model.servicesView(),
+		"logs":       model.logsView(),
+		"git":        model.gitReviewView(),
+		"update":     model.updateView(),
+		"pxe":        model.pxeView(),
+	}
+	for name, view := range screens {
+		if !strings.Contains(view, "Nixorium —") || !strings.Contains(view, "\x1b[") {
+			t.Errorf("%s screen lacks shared visual title hierarchy:\n%s", name, view)
+		}
+	}
+}
+
 func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	loads := 0
 	actions := DashboardActions{
@@ -648,7 +667,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "Binary cache — healthy") || !strings.Contains(model.View().Content, "Managed through the Install computers workflow") {
+	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "HEALTHY") || !strings.Contains(model.View().Content, "Managed through the Install computers workflow") {
 		t.Fatalf("services screen missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "r"})
