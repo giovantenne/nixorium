@@ -8,13 +8,15 @@ import (
 func TestTUIComponentsPreserveTextualMeaning(t *testing.T) {
 	title := tuiTitle("Nixorium", true)
 	failure := tuiError("Invalid value", true)
+	success := tuiResult("Completed", true, true)
+	warning := tuiResult("Needs attention", false, true)
 	help := tuiHelp(80, true,
 		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
 		tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
 	)
-	for _, expected := range []string{"Nixorium", "Invalid value", "enter", "continue", "esc", "cancel"} {
-		if !strings.Contains(title+failure+help, expected) {
-			t.Fatalf("component rendering omits %q: %q", expected, title+failure+help)
+	for _, expected := range []string{"Nixorium", "Invalid value", "Completed", "Needs attention", "enter", "continue", "esc", "cancel"} {
+		if !strings.Contains(title+failure+success+warning+help, expected) {
+			t.Fatalf("component rendering omits %q: %q", expected, title+failure+success+warning+help)
 		}
 	}
 }

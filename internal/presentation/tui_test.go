@@ -166,7 +166,12 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	revision := "0123456789abcdef0123456789abcdef01234567"
 	applied := 0
+	refreshed := 0
 	actions := DashboardActions{
+		Refresh: func() (domain.StatusReport, error) {
+			refreshed++
+			return domain.StatusReport{Deployment: domain.DeploymentStatus{Ready: true}}, nil
+		},
 		PlanController: func() domain.ControllerRebuildPlanReport {
 			return domain.ControllerRebuildPlanReport{
 				SchemaVersion: domain.SchemaVersion,
@@ -224,8 +229,25 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 	updated, _ = model.Update(batch[0]())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.screen != dashboardController || !strings.Contains(model.View().Content, "Applied: true   Verified: true") {
-		t.Fatalf("controller result missing: applied=%d\n%s", applied, model.View().Content)
+	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Controller updated and verified") || !strings.Contains(model.View().Content, "enter") || !strings.Contains(model.View().Content, "dashboard") {
+		t.Fatalf("controller result missing: applied=%d refreshed=%d\n%s", applied, refreshed, model.View().Content)
+	}
+	model.controllerProgress = domain.OperationProgress{
+		Operation: "controller-apply", State: "completed", Phase: "complete",
+		Current: 4, Total: 4, Recent: []string{"Controller revision activated and verified"},
+	}
+	if strings.Contains(model.View().Content, "Recent activity") {
+		t.Fatalf("completed controller details should start collapsed:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "d"})
+	model = updated.(dashboardModel)
+	if !strings.Contains(model.View().Content, "Recent activity") || !strings.Contains(model.View().Content, "hide details") {
+		t.Fatalf("controller details did not expand:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardHome {
+		t.Fatalf("controller completion did not return to dashboard: screen=%d", model.screen)
 	}
 }
 

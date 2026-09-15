@@ -16,6 +16,14 @@ func tuiError(value string, darkBackground bool) string {
 	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(value)
 }
 
+func tuiResult(value string, success, darkBackground bool) string {
+	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#B45309"), lipgloss.Color("#E0AF68"))
+	if success {
+		color = lipgloss.LightDark(darkBackground)(lipgloss.Color("#047857"), lipgloss.Color("#9ECE6A"))
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(value)
+}
+
 func tuiHelp(width int, darkBackground bool, bindings ...key.Binding) string {
 	model := help.New()
 	model.Styles = help.DefaultStyles(darkBackground)
