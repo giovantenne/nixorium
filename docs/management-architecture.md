@@ -119,6 +119,10 @@ Mutating workflows terminate in compact typed result states. Presentation maps
 each result only to existing typed navigation callbacks—for example Git review,
 bounded logs, retry/review, further editing, dashboard, or the observed setup
 checklist—and never performs a follow-up mutation implicitly.
+All non-terminal dashboard wait states reuse one background-aware official
+Bubbles spinner. It provides liveness only: the accompanying authored activity
+label describes the work, while spinner state is never treated as operational
+progress or success evidence.
 PXE is the deliberate exception to a terminal result screen because it manages
 a live multi-step mode. Its view derives one recommended next step and the
 available controls from typed preparation and lifecycle state; it does not

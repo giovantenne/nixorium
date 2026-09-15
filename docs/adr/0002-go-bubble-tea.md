@@ -41,6 +41,11 @@ muted description, success, attention, and failure roles for both light and
 dark terminals. These roles supplement explicit text labels; color and Unicode
 are never the only carrier of state or action meaning.
 
+Dashboard waits without an honest completion fraction use one shared official
+Bubbles spinner and an explicit authored activity label. The spinner is only a
+liveness cue; typed progress records/events and final application reports remain
+the sole sources of phase and completion meaning.
+
 The first operational TUI screen implements this boundary with injected typed
 callbacks for PXE preparation and lifecycle operations. Unit tests drive its
 state machine, including Bubble Tea's distinct space-key event, and the NixOS

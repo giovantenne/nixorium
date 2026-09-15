@@ -5,6 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
 )
 
@@ -35,6 +36,14 @@ func tuiSection(value string, darkBackground bool) string {
 func tuiMuted(value string, darkBackground bool) string {
 	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#64748B"), lipgloss.Color("#7F849C"))
 	return lipgloss.NewStyle().Foreground(color).Render(value)
+}
+
+func newTUISpinner(darkBackground bool) spinner.Model {
+	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#1D4ED8"), lipgloss.Color("#7AA2F7"))
+	return spinner.New(
+		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(color)),
+	)
 }
 
 func tuiStatus(value string, kind tuiStatusKind, darkBackground bool) string {
