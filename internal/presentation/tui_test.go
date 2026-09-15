@@ -353,8 +353,55 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardPXE || !strings.Contains(model.message, "erases the disk confirmed locally") {
-		t.Fatalf("reinstall did not preserve the local disk warning: %s", model.View().Content)
+	if model.screen != dashboardPXE || !model.restoreMode || !strings.Contains(model.View().Content, "Choose a computer to reinstall") {
+		t.Fatalf("reinstall did not require an explicit identity: %s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.pilotName != "pc01" || !strings.Contains(model.View().Content, "Reinstallation erases the disk confirmed locally on pc01") {
+		t.Fatalf("reinstall did not preserve the selected local disk warning: %s", model.View().Content)
+	}
+}
+
+func TestReinstallChecksOnlyTheSelectedComputer(t *testing.T) {
+	target := ""
+	report := testDashboardReport("active")
+	model := dashboardModel{
+		report: report, restoreMode: true, screen: dashboardPXE, pilotName: "pc02",
+		actions: DashboardActions{LoadHost: func(name string) (domain.HostsReport, error) {
+			target = name
+			return domain.HostsReport{Hosts: []domain.HostStatus{{
+				Name: name, Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent,
+			}}}, nil
+		}},
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "v"})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("reinstall verification did not start")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if target != "pc02" || !strings.Contains(model.View().Content, "Technical verification succeeded") {
+		t.Fatalf("reinstall verified %q instead of pc02:\n%s", target, model.View().Content)
+	}
+}
+
+func TestCompletedRestoreContextDoesNotLeakIntoLaterInstallation(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready"), restoreMode: true, screen: dashboardHome}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "p"})
+	model = updated.(dashboardModel)
+	if model.restoreMode || model.screen != dashboardPXE || strings.Contains(model.View().Content, "Choose a computer to reinstall") {
+		t.Fatalf("stale restore context changed a later installation:\n%s", model.View().Content)
+	}
+}
+
+func TestReinstallReviewsConsequencesBeforeLeavingPXEActive(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("active"), restoreMode: true, screen: dashboardPXE, pilotName: "pc01"}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "LEAVE PXE ACTIVE") {
+		t.Fatalf("reinstall quit bypassed the active-PXE review:\n%s", model.View().Content)
 	}
 }
 

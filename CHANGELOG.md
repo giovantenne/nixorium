@@ -25,6 +25,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   clients as failures. The application layer validates and probes only the
   selected pilot identity. Leaving PXE active requires an explicit consequence
   review and exact confirmation.
+- Extended the same explicit-identity boundary to disk-erasing restoration.
+  Reinstall now selects one evaluated computer before PXE review, repeats the
+  local disk warning with that identity, verifies only the selected computer,
+  and supports restoring another computer or ending a partial session.
 
 - Added one background-aware official Bubbles spinner to every dashboard wait
   state, so host checks, Git/service loading, settings validation, update

@@ -132,7 +132,7 @@ off. Distribution requires checks only for selected targets.
 |---|---|---|
 | Controller bootstrap, setup, PXE | Guided setup, pilot handoff, session-local verification, stop/leave review | Highest priority: durable initial-provisioning evidence and physical validation |
 | Client verification and deployment | Implemented | Place them in an explicit-target flow that supports partial sessions |
-| Restore | PXE reinstall and deploy exist separately | Guide the choice without hiding disk risk |
+| Restore | Explicit reapply/reinstall split; reinstall selects and verifies one identity at a time | Durable cross-process session evidence remains planned |
 | Guided software changes | Not implemented | New application service limited to supported changes |
 | Nixorium release update | Typed check/plan/apply exists | Discover releases, select one, validate, review, and apply |
 | Batch shutdown | Not implemented | Typed client-only operation after the priorities above |

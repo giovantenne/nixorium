@@ -156,7 +156,7 @@ spinner and the current plain-language action.
 
 | Dashboard task | Purpose |
 |---|---|
-| **Restore computers** | Choose reapply or a locally confirmed disk-erasing reinstall |
+| **Restore computers** | Choose non-destructive reapply or select an evaluated identity for a locally confirmed disk-erasing reinstall |
 | **Distribute the prepared system** | Plan and apply one or more client configurations |
 | **Computer inventory** | Explicitly inspect authenticated client state |
 | **Rebuild controller** | Review and activate the controller configuration |

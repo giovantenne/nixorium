@@ -136,6 +136,29 @@ A failed reapply never becomes a reinstall automatically.
 ↑/↓ move   enter continue   esc interventions   ? help
 ```
 
+Choosing reinstall does not jump directly to a generic PXE console:
+
+```text
+Nixorium — Restore / Reinstall from scratch
+
+Installation mode:  ✓ ready
+Prepared artifacts: ready
+
+Choose a computer to reinstall
+› pc01         10.0.0.1
+  pc02         10.0.0.2
+  pc03         10.0.0.3
+
+The identity comes from the saved inventory. Disk selection and erasure are confirmed locally.
+
+↑/↓ move  •  enter select  •  esc back  •  q quit
+```
+
+After selection the screen repeats the identity-specific disk warning before
+PXE review. Once the local reinstall and installed-disk boot are complete, `v`
+checks only that computer. Reapply continues to use the separate reviewed
+deployment flow and never escalates into reinstall.
+
 ## Computers
 
 ```text

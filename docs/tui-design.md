@@ -122,6 +122,9 @@ compact, standard and wide sizes. Record physical testing separately.
   client's SSH and active-system probes run. Presentation tests cover pilot
   selection, honest no-telemetry handoff, separate technical/practical checks,
   partial-session summary, and exact confirmation before leaving PXE active.
+- Added restoration-path tests that keep reapply non-destructive and require an
+  evaluated identity before disk-erasing reinstall, with verification scoped to
+  that selected computer.
 - Layout checks: PASS at 80×24, 120×30 and 180×45 with 200 computers;
   focused rows and exact-confirmation controls remain visible.
 - Color capability checks: PASS for no color, ANSI and ANSI256; meaning survives
