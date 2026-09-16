@@ -31,6 +31,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   The TUI no longer sends operators through Git review after adding or removing
   software, rejects ambiguous pre-existing edits to the managed file, and can
   recover a completed file write without applying the declaration twice.
+- Applied the transparent local-save contract to guided Nixorium updates in the
+  TUI. The reviewed `flake.nix` and `flake.lock` proposal is recorded locally
+  without exposing Git or pushing anything; an interrupted recording can be
+  completed only when both files still match the reviewed proposal exactly.
 - Made interactive startup render immediately before repository inspection.
   The dashboard now shows an English opening activity while status and setup
   checks run once in the background, routes to first setup only after those

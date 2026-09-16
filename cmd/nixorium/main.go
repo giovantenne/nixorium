@@ -495,6 +495,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	settingsManager := app.NewSettingsManager(local)
 	settingsSaveManager := app.NewSettingsSaveManager(settingsManager, gitReviewManager, gitCommitManager)
 	configurationSaveManager := app.NewManagedConfigurationSaveManager(gitReviewManager, gitCommitManager)
+	updateSaveManager := app.NewUpdateSaveManager(updateManager, local, gitReviewManager, configurationSaveManager)
 	softwareManager := app.NewSoftwareManager(local)
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
@@ -619,8 +620,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
 			return updateManager.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
 		},
-		ApplyUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
-			report := updateManager.ApplyPlan(ctx, plan, plan.ReviewToken)
+		SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
+			report := updateSaveManager.Save(ctx, plan)
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},

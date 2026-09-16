@@ -816,16 +816,18 @@ between the two renames is detectable as a source/lock mismatch and recoverable
 by planning the same target again. Such an outcome is reported partial and is
 not blindly retry-safe.
 
-The successful result is deliberately an uncommitted, reviewable change to only
-`flake.nix` and `flake.lock`. The existing Git review/commit workflow can record
-it; deployment remains a separate explicit operation. Update never creates or
-switches branches, commits, merges, pushes, activates the controller, prepares
-PXE artifacts, or deploys clients. The TUI reuses these typed operations and
-does not own Nix, network, filesystem, or Git mutation logic. Its **Update
-Nixorium** task collects the explicit target and separate prerelease/downgrade
-opt-ins, renders all typed candidate checks plus a bounded scrollable patch,
-requires the exact plan confirmation, and prevents exit only during the short
-two-file apply callback. Candidate planning remains safe to cancel.
+The explicit CLI apply result is deliberately an uncommitted, reviewable change
+to only `flake.nix` and `flake.lock`. The ordinary TUI records that exact pair
+locally through the bounded managed-configuration save after the update review;
+repository mechanics remain available only under Advanced. Deployment remains
+a separate explicit operation. Update never creates or switches branches,
+merges, pushes, activates the controller, prepares PXE artifacts, or deploys
+clients. The TUI reuses these typed operations and does not own Nix, network,
+filesystem, or repository mutation logic. Its **Update Nixorium** task collects
+the explicit target and separate prerelease/downgrade opt-ins, renders all typed
+candidate checks plus a bounded scrollable patch, requires the exact plan
+confirmation, and prevents exit only during the short save callback. Candidate
+planning remains safe to cancel.
 
 Privileged/systemd operations retain detailed output in journald. Foreground
 deployments stream output to private mode-0600 files under the administrator's

@@ -22,6 +22,10 @@ type fakeUpdateSource struct {
 	applied     int
 	partial     bool
 	applyErr    error
+	mutate      bool
+	review      domain.GitReviewSnapshot
+	commitPlan  domain.GitCommitProposal
+	commits     int
 }
 
 func (source *fakeUpdateSource) DiscoverUpdateReleases(context.Context, string) ([]domain.UpdateReleaseRef, error) {
@@ -48,8 +52,37 @@ func (source *fakeUpdateSource) PrepareUpdate(context.Context, string, string) (
 
 func (source *fakeUpdateSource) ApplyPreparedUpdate(context.Context, string, string, domain.UpdateInputSnapshot, domain.UpdateProposal) (bool, error) {
 	source.applied++
+	if source.mutate && source.applyErr == nil {
+		source.snapshot.FlakeContent = append([]byte(nil), source.proposal.FlakeContent...)
+		source.snapshot.LockContent = append([]byte(nil), source.proposal.LockContent...)
+		source.snapshot.HasLock = true
+		source.dirty = true
+		source.review = domain.GitReviewSnapshot{Changes: []domain.GitChange{
+			{Path: "flake.lock", Unstaged: "modified", Managed: true},
+			{Path: "flake.nix", Unstaged: "modified", Managed: true},
+		}}
+	}
 	return source.partial, source.applyErr
 }
+
+func (source *fakeUpdateSource) GitReview(context.Context, string) (domain.GitReviewSnapshot, error) {
+	return source.review, nil
+}
+
+func (source *fakeUpdateSource) GitCommitProposal(context.Context, string, []string) (domain.GitCommitProposal, error) {
+	return source.commitPlan, nil
+}
+
+func (source *fakeUpdateSource) CommitGitPaths(context.Context, string, []string, string, string, string) (string, error) {
+	source.commits++
+	source.revision = strings.Repeat("b", 40)
+	source.dirty = false
+	source.review = domain.GitReviewSnapshot{}
+	return source.revision, nil
+}
+
+func (source *fakeUpdateSource) ReadSettings(string) ([]byte, error) { return nil, nil }
+func (source *fakeUpdateSource) ReadSoftware(string) ([]byte, error) { return nil, nil }
 
 func TestParseUpdateReleaseClassifiesAndComparesTargets(t *testing.T) {
 	stable, err := parseUpdateRelease("v2.1.0")
@@ -182,5 +215,73 @@ func TestUpdateApplyRequiresCurrentPlanToken(t *testing.T) {
 	report = manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
 	if report.State != "completed" || source.prepared != prepared {
 		t.Fatalf("apply existing plan rebuilt proposal: report=%+v prepared=%d->%d", report, prepared, source.prepared)
+	}
+}
+
+func TestUpdateSaveWritesAndRecordsOnlyReviewedUpdateFiles(t *testing.T) {
+	source := updateSaveSource()
+	update := NewUpdateManager(source)
+	plan := update.Plan(context.Background(), ".", "v1.1.0", false, false)
+	source.mutate = true
+	review := NewGitReviewManager(source)
+	manager := NewUpdateSaveManager(update, source, review, NewManagedConfigurationSaveManager(review, NewGitCommitManager(source)))
+
+	report := manager.Save(context.Background(), plan)
+	if report.State != "saved" || report.HasErrors() || !report.Updated || report.RecoveryRequired || source.applied != 1 || source.commits != 1 {
+		t.Fatalf("save = %+v, applied=%d commits=%d", report, source.applied, source.commits)
+	}
+	if report.Operation != "update-save" || report.Revision != strings.Repeat("b", 40) {
+		t.Fatalf("save evidence = %+v", report)
+	}
+}
+
+func TestUpdateSaveRecoversFilesWrittenBeforeLocalRecord(t *testing.T) {
+	source := updateSaveSource()
+	update := NewUpdateManager(source)
+	plan := update.Plan(context.Background(), ".", "v1.1.0", false, false)
+	source.snapshot.FlakeContent = append([]byte(nil), source.proposal.FlakeContent...)
+	source.snapshot.LockContent = append([]byte(nil), source.proposal.LockContent...)
+	source.snapshot.HasLock = true
+	source.dirty = true
+	source.review = domain.GitReviewSnapshot{Changes: []domain.GitChange{
+		{Path: "flake.lock", Unstaged: "modified", Managed: true},
+		{Path: "flake.nix", Unstaged: "modified", Managed: true},
+	}}
+	review := NewGitReviewManager(source)
+	manager := NewUpdateSaveManager(update, source, review, NewManagedConfigurationSaveManager(review, NewGitCommitManager(source)))
+
+	report := manager.Save(context.Background(), plan)
+	if report.State != "saved" || report.HasErrors() || source.applied != 0 || source.commits != 1 {
+		t.Fatalf("recovered save = %+v, applied=%d commits=%d", report, source.applied, source.commits)
+	}
+}
+
+func TestUpdateSaveRefusesUnreviewedDeploymentChanges(t *testing.T) {
+	source := updateSaveSource()
+	update := NewUpdateManager(source)
+	plan := update.Plan(context.Background(), ".", "v1.1.0", false, false)
+	source.dirty = true
+	source.review = domain.GitReviewSnapshot{Changes: []domain.GitChange{{Path: "hosts.nix", Unstaged: "modified", Managed: false}}}
+	review := NewGitReviewManager(source)
+	manager := NewUpdateSaveManager(update, source, review, NewManagedConfigurationSaveManager(review, NewGitCommitManager(source)))
+
+	report := manager.Save(context.Background(), plan)
+	if report.State != "blocked" || !report.HasErrors() || source.applied != 0 || source.commits != 0 || !strings.Contains(report.Message, "Other deployment files") {
+		t.Fatalf("blocked save = %+v, applied=%d commits=%d", report, source.applied, source.commits)
+	}
+}
+
+func updateSaveSource() *fakeUpdateSource {
+	return &fakeUpdateSource{
+		revision: strings.Repeat("a", 40),
+		snapshot: domain.UpdateInputSnapshot{
+			SourceURL: "github:owner/repo/v1.0.0", SourcePrefix: "owner/repo", CurrentRef: "v1.0.0",
+			FlakeContent: []byte("old flake"), LockContent: []byte("old lock"), HasLock: true,
+		},
+		proposal: domain.UpdateProposal{
+			FlakeContent: []byte("new flake"), LockContent: []byte("new lock"),
+			Diff: domain.GitDiff{Content: "+new"}, Checks: []domain.UpdateCheck{{ID: "controller", State: "passed"}},
+		},
+		commitPlan: domain.GitCommitProposal{TreeID: strings.Repeat("c", 40), Diff: domain.GitDiff{Scope: "proposed-commit", Content: "+update"}},
 	}
 }

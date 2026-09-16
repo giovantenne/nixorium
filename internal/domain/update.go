@@ -93,16 +93,17 @@ func (r UpdatePlanReport) HasErrors() bool {
 }
 
 type UpdateApplyReport struct {
-	SchemaVersion int               `json:"schemaVersion"`
-	Operation     string            `json:"operation"`
-	State         string            `json:"state"`
-	Repository    string            `json:"repository"`
-	Revision      string            `json:"revision,omitempty"`
-	Target        string            `json:"target,omitempty"`
-	Updated       bool              `json:"updated"`
-	RetrySafe     bool              `json:"retrySafe"`
-	Message       string            `json:"message,omitempty"`
-	Issues        []ValidationIssue `json:"issues"`
+	SchemaVersion    int               `json:"schemaVersion"`
+	Operation        string            `json:"operation"`
+	State            string            `json:"state"`
+	Repository       string            `json:"repository"`
+	Revision         string            `json:"revision,omitempty"`
+	Target           string            `json:"target,omitempty"`
+	Updated          bool              `json:"updated"`
+	RetrySafe        bool              `json:"retrySafe"`
+	RecoveryRequired bool              `json:"recoveryRequired"`
+	Message          string            `json:"message,omitempty"`
+	Issues           []ValidationIssue `json:"issues"`
 }
 
 func (r UpdateApplyReport) HasErrors() bool {

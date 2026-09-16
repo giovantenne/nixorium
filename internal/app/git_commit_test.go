@@ -84,6 +84,12 @@ func TestParseGitCommitPathsRejectsTraversalDuplicatesAndGitMetadata(t *testing.
 	}
 }
 
+func TestGeneratedGitCommitMessageDescribesNixoriumUpdate(t *testing.T) {
+	if message := generatedGitCommitMessage([]string{"flake.lock", "flake.nix"}); message != "chore: update Nixorium" {
+		t.Fatalf("update commit message = %q", message)
+	}
+}
+
 func TestGitCommitPlanRejectsRenameWithoutBuildingProposal(t *testing.T) {
 	source := &fakeGitCommitSource{
 		revision: strings.Repeat("a", 40),

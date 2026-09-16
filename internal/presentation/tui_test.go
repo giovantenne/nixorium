@@ -1210,12 +1210,12 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 				Diff:           domain.GitDiff{Content: strings.Repeat("+ reviewed update\n", 20)},
 			}
 		},
-		ApplyUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
+		SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
 			applied++
 			if plan.ReviewToken != token || plan.Target != target {
 				t.Fatalf("applied unexpected update plan: %+v", plan)
 			}
-			return domain.UpdateApplyReport{Operation: "update-apply", State: "completed", Target: target, Updated: true, Message: "review and commit the two updated files"}
+			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: target, Updated: true, Message: "Nixorium update saved locally. Running systems were not changed."}
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
@@ -1244,7 +1244,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release review") || !strings.Contains(model.View().Content, "candidate controller built") || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No commit, push, activation") {
+	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release review") || !strings.Contains(model.View().Content, "candidate controller built") || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No push, controller activation") {
 		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View().Content)
 	}
 	updated, _ = model.Update(tea.WindowSizeMsg{Height: 40})
@@ -1280,7 +1280,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium files updated") || !strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "new update") {
+	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium update saved") || strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "Running controller and clients are unchanged") || !strings.Contains(model.View().Content, "new update") {
 		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1313,6 +1313,38 @@ func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 	model = updated.(dashboardModel)
 	if planCommand != nil || model.busy != "" {
 		t.Fatal("failed discovery could start planning")
+	}
+}
+
+func TestNixoriumUpdatePartialSaveOffersInPlaceRecovery(t *testing.T) {
+	calls := 0
+	model := dashboardModel{
+		report: testDashboardReport("ready"),
+		screen: dashboardUpdate,
+		updatePlan: domain.UpdatePlanReport{
+			Operation: "update-plan", State: "ready", Target: "v2.3.0", ReviewToken: "sha256:review",
+		},
+		updateResult: domain.UpdateApplyReport{
+			Operation: "update-save", State: "partial", Target: "v2.3.0", Updated: true,
+			RecoveryRequired: true, Message: "The update files are ready, but saving needs recovery.",
+		},
+		actions: DashboardActions{SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
+			calls++
+			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: plan.Target, Updated: true, Message: "Nixorium update saved locally."}
+		}},
+	}
+	if !strings.Contains(model.View().Content, "complete save") || strings.Contains(model.View().Content, "review Git changes") {
+		t.Fatalf("partial save does not expose bounded recovery:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
+	model = updated.(dashboardModel)
+	if command == nil || !model.updating || !strings.Contains(model.View().Content, "Completing the local update save") {
+		t.Fatalf("recovery did not start in place: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if calls != 1 || model.updating || model.updateResult.State != "saved" || !strings.Contains(model.View().Content, "Nixorium update saved") {
+		t.Fatalf("recovery result missing: calls=%d\n%s", calls, model.View().Content)
 	}
 }
 

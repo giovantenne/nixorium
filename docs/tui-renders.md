@@ -412,7 +412,7 @@ space select  •  a all  •  enter review  •  esc back  •  F1 help
 ```text
 Nixorium — Update Nixorium
 
-Current release  v2.2.0
+Configured release  v2.2.0
 Source  github:giovantenne/nixorium
 
 Available releases
@@ -428,6 +428,12 @@ Controller activation and client distribution remain separate operations.
 
 If discovery fails, the screen offers retry and back. It never exposes an
 editable target as a fallback.
+
+After validation, the review states that only `flake.nix` and `flake.lock` are
+saved in the local deployment configuration. The result is “Nixorium update
+saved” and explicitly says that the running controller and clients are
+unchanged. Git review, commit language, hashes, and push actions are absent from
+this ordinary flow; Advanced retains the explicit repository tools.
 
 ## Destructive confirmation
 
