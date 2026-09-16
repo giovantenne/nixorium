@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made dashboard sessions start from fresh task state: reopening Settings or
+  Update no longer shows a previous result, cancelling a software removal
+  returns to the selected package, and setup refreshes now render their active
+  wait. Every managed quit path while PXE is active opens the same consequence
+  review, including `Ctrl+C` and exits outside the installation screen; the
+  operator can stop and verify installation mode before exit or explicitly
+  confirm that it should remain active.
 - Added reviewed client-only shutdown through shared CLI/TUI plan/apply
   operations. Nixorium resolves only evaluated client identities, excludes the
   controller, checks management access and interactive sessions, serializes

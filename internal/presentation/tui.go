@@ -234,6 +234,12 @@ type dashboardPXEProgressMsg struct {
 	err      error
 }
 
+type dashboardPXEExitMsg struct {
+	lifecycle domain.PXELifecycleReport
+	status    domain.StatusReport
+	statusErr error
+}
+
 type dashboardHostsMsg struct {
 	report domain.HostsReport
 	err    error
@@ -473,6 +479,25 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, schedulePXEProgressTick(message.id)
 		}
 		return model, nil
+	case dashboardPXEExitMsg:
+		model.busy = ""
+		if message.lifecycle.HasErrors() {
+			model.message = "Installation mode could not be stopped: " + message.lifecycle.Message
+			model.screen = dashboardPXELeaveReview
+			return model, nil
+		}
+		if message.statusErr != nil {
+			model.message = "Installation mode stopped, but its final state could not be verified: " + message.statusErr.Error()
+			model.screen = dashboardPXELeaveReview
+			return model, nil
+		}
+		model.report = message.status
+		if message.status.PXE.Mode == "active" {
+			model.message = "Installation mode still reports as active; Nixorium remains open."
+			model.screen = dashboardPXELeaveReview
+			return model, nil
+		}
+		return model, tea.Quit
 	case dashboardHostsMsg:
 		model.busy = ""
 		if message.err != nil {
@@ -733,7 +758,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.softwarePlan = message.report
 		model.message = message.report.Message
 		if message.report.HasErrors() || message.report.State == "unchanged" {
-			model.screen = dashboardSoftwareScope
+			if message.report.Request.Present {
+				model.screen = dashboardSoftwareScope
+			} else {
+				model.screen = dashboardSoftware
+			}
 		} else {
 			model.confirmation = ""
 			model.screen = dashboardSoftwareReview
@@ -904,7 +933,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
-	if key.String() == "q" && model.screen == dashboardPXE && model.guidedInstallation() && model.report.PXE.Mode == "active" {
+	if (key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry())) && model.report.PXE.Mode == "active" && model.screen != dashboardPXELeaveReview {
 		model.screen = dashboardPXELeaveReview
 		model.confirmation = ""
 		model.message = ""
@@ -1037,6 +1066,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "u":
 			model.screen = dashboardUpdate
+			model.updateResult = domain.UpdateApplyReport{}
+			model.updatePlan = domain.UpdatePlanReport{}
 			model.updatePrerelease = false
 			model.updateCheck = domain.UpdateCheckReport{}
 			model.updateCursor = 0
@@ -1050,6 +1081,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, model.checkUpdates()
 		case "e":
 			model.screen = dashboardSettings
+			model.settingsResult = domain.ConfigApplyReport{}
+			model.settingsPlan = domain.ConfigPlanReport{}
+			model.settingsCandidate = domain.LabSettingsFile{}
 			model.busy = "Loading managed laboratory settings"
 			model.message = ""
 			return model, func() tea.Msg {
@@ -2064,6 +2098,19 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model, nil
 			}
 			return model, tea.Quit
+		case "x":
+			if model.actions.StopPXE == nil || model.actions.Refresh == nil {
+				model.message = "Installation mode cannot be stopped from this session. Return and use the installation controls."
+				return model, nil
+			}
+			model.busy = "Stopping installation mode before exit"
+			model.confirmation = ""
+			model.message = ""
+			return model, func() tea.Msg {
+				lifecycle := model.actions.StopPXE()
+				status, err := model.actions.Refresh()
+				return dashboardPXEExitMsg{lifecycle: lifecycle, status: status, statusErr: err}
+			}
 		default:
 			if key.Text != "" {
 				model.confirmation += key.Text
@@ -2249,8 +2296,11 @@ func (model dashboardModel) setupView() string {
 		tuiTitle("Nixorium — First setup", model.isDark),
 		"",
 		fmt.Sprintf("Step %d of %d", current+1, len(groups)),
-		"You can leave safely and resume later with `nixorium setup`.",
+		"You can leave safely and resume this setup later.",
 		"",
+	}
+	if model.busy != "" {
+		lines = append(lines, model.busyView(), "")
 	}
 	for index, group := range groups {
 		label := "○ " + group.title + " · " + group.pending
@@ -3210,7 +3260,29 @@ func (model dashboardModel) pxeView() string {
 		return model.confirmationView("Start network installation?", scope, "Temporarily remove "+model.startPlan.StaticCIDR+"; remote connections may be interrupted.", "Serve ProxyDHCP, TFTP, HTTP and cache via "+model.startPlan.DHCPAddress+". Institutional DHCP remains authoritative. `nixorium pxe stop` or reboot recovery restores normal addressing.", "", "START PXE")
 	}
 	if model.screen == dashboardPXELeaveReview {
-		return model.confirmationView("Leave installation mode active?", "Controller PXE services and laboratory installation network", "Closing Nixorium will not stop installation mode.", "Configured computers may continue to network-boot into the installer. Run `nixorium pxe stop` later to restore normal controller networking.", "", "LEAVE PXE ACTIVE")
+		lines := []string{
+			tuiTitle("Nixorium — Exit while installation mode is active?", model.isDark),
+			"",
+			"Closing Nixorium will not stop installation mode.",
+			"It changes controller networking and can continue after Nixorium closes.",
+			"Configured computers may continue to network-boot into the installer.",
+			"",
+			tuiSection("Recommended", model.isDark),
+			"  x  Stop installation mode, verify normal networking, and exit",
+			"",
+			tuiSection("Keep it active", model.isDark),
+			"  Type LEAVE PXE ACTIVE to continue:",
+			"> " + model.confirmation + "_",
+			"",
+			"esc cancel   x stop and exit   enter confirm active exit   F1 help",
+		}
+		if model.busy != "" {
+			lines = append(lines, "", model.busyView())
+		}
+		if model.message != "" {
+			lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
+		}
+		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.guidedInstallation() {
 		lines = append(lines, "")

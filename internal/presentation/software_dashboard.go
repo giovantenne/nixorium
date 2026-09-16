@@ -54,6 +54,7 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 				model.message = item.Label + " is not managed by lab-software.json."
 				return model, nil
 			}
+			model.softwareSelected = item.ID
 			return model.startSoftwarePlan(domain.SoftwareChangeRequest{Package: item.ID, Present: false, Scope: entry.Scope})
 		}
 	case dashboardSoftwareScope:
@@ -103,7 +104,11 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 		case "esc":
 			model.confirmation = ""
 			model.message = "Software change cancelled; no file changed."
-			model.screen = dashboardSoftwareScope
+			if model.softwarePlan.Request.Present {
+				model.screen = dashboardSoftwareScope
+			} else {
+				model.screen = dashboardSoftware
+			}
 		case "backspace":
 			value := []rune(model.confirmation)
 			if len(value) > 0 {
