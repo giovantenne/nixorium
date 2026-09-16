@@ -554,6 +554,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return installationManager.ConfirmPractical(ctx, repository, name)
 		},
 		LoadSoftware: func() domain.SoftwareCatalogReport { return softwareManager.Catalog(ctx, repository) },
+		SearchSoftware: func(searchContext context.Context, query string) domain.SoftwareSearchReport {
+			return softwareManager.Search(searchContext, repository, query)
+		},
 		PlanSoftware: func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 			return softwareManager.Plan(ctx, repository, request)
 		},

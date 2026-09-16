@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ type DashboardActions struct {
 	VerifyInstallationTarget  func(string) domain.InstallationSessionReport
 	ConfirmInstallationTarget func(string) domain.InstallationSessionReport
 	LoadSoftware              func() domain.SoftwareCatalogReport
+	SearchSoftware            func(context.Context, string) domain.SoftwareSearchReport
 	PlanSoftware              func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
 	SaveSoftware              func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
 	PlanShutdown              func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
@@ -194,9 +196,14 @@ type dashboardModel struct {
 	installationSummary  bool
 	installationSession  domain.InstallationSessionReport
 	softwareCatalog      domain.SoftwareCatalogReport
+	softwareMode         softwareListMode
 	softwareCursor       int
 	softwareQuery        string
 	softwareSearching    bool
+	softwareSearch       domain.SoftwareSearchReport
+	softwareSearchID     uint64
+	softwareSearchBusy   bool
+	softwareSearchCancel context.CancelFunc
 	softwareSelected     string
 	softwareScopeCursor  int
 	softwareClientCursor int
@@ -392,6 +399,15 @@ type dashboardSettingsApplyMsg struct {
 }
 
 type dashboardSoftwareCatalogMsg struct{ report domain.SoftwareCatalogReport }
+type dashboardSoftwareSearchStartMsg struct {
+	id    uint64
+	query string
+	ctx   context.Context
+}
+type dashboardSoftwareSearchMsg struct {
+	id     uint64
+	report domain.SoftwareSearchReport
+}
 type dashboardSoftwarePlanMsg struct {
 	report domain.SoftwareChangePlanReport
 }
@@ -895,13 +911,52 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardSettings
 		return model, nil
 	case dashboardSoftwareCatalogMsg:
+		if model.softwareSearchCancel != nil {
+			model.softwareSearchCancel()
+			model.softwareSearchCancel = nil
+		}
 		model.busy = ""
 		model.softwareCatalog = message.report
 		model.softwareCursor = 0
 		model.softwareQuery = ""
 		model.softwareSearching = false
+		model.softwareSearch = domain.SoftwareSearchReport{}
+		model.softwareSearchBusy = false
+		model.softwareSearchID++
+		model.softwareMode = softwareSuggested
+		if len(message.report.Packages) > 0 {
+			model.softwareMode = softwareConfigured
+		}
 		model.message = message.report.Message
 		model.screen = dashboardSoftware
+		return model, nil
+	case dashboardSoftwareSearchStartMsg:
+		if model.screen != dashboardSoftware || model.softwareMode != softwareSearch || message.id != model.softwareSearchID || message.query != strings.TrimSpace(model.softwareQuery) || model.actions.SearchSoftware == nil {
+			return model, nil
+		}
+		model.softwareSearchBusy = true
+		query := message.query
+		id := message.id
+		searchContext := message.ctx
+		return model, func() tea.Msg {
+			return dashboardSoftwareSearchMsg{id: id, report: model.actions.SearchSoftware(searchContext, query)}
+		}
+	case dashboardSoftwareSearchMsg:
+		if model.screen != dashboardSoftware || model.softwareMode != softwareSearch || message.id != model.softwareSearchID {
+			return model, nil
+		}
+		model.softwareSearchBusy = false
+		if model.softwareSearchCancel != nil {
+			model.softwareSearchCancel()
+			model.softwareSearchCancel = nil
+		}
+		model.softwareSearch = message.report
+		model.softwareCursor = 0
+		if message.report.HasErrors() {
+			model.message = message.report.Message
+		} else {
+			model.message = ""
+		}
 		return model, nil
 	case dashboardSoftwarePlanMsg:
 		model.busy = ""
@@ -1056,23 +1111,34 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	if model.screen == dashboardSoftware && model.softwareSearching {
+		changed := false
 		switch key.String() {
+		case "tab":
+			model = model.changeSoftwareMode(1)
+			return model, nil
+		case "shift+tab":
+			model = model.changeSoftwareMode(-1)
+			return model, nil
 		case "esc":
 			model.softwareSearching = false
-			model.softwareQuery = ""
 		case "enter":
 			model.softwareSearching = false
 		case "backspace":
 			value := []rune(model.softwareQuery)
 			if len(value) > 0 {
 				model.softwareQuery = string(value[:len(value)-1])
+				changed = true
 			}
 		default:
 			if key.Text != "" && len(model.softwareQuery) < 80 {
 				model.softwareQuery += key.Text
+				changed = true
 			}
 		}
 		model.softwareCursor = 0
+		if changed {
+			return model, model.scheduleSoftwareSearch()
+		}
 		return model, nil
 	}
 	if key.String() == "l" && (model.deploying || model.controllerApplying || model.pxePreparing) {
@@ -1093,6 +1159,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	if exitKey {
+		if model.softwareSearchCancel != nil {
+			model.softwareSearchCancel()
+		}
 		return model, tea.Quit
 	}
 	if model.busy != "" {
@@ -1173,6 +1242,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "w":
 			model.screen = dashboardSoftware
 			model.softwareResult = domain.SoftwareChangeApplyReport{}
+			model.softwareSearchID++
+			model.softwareSearchCancel = nil
 			model.busy = "Loading supported software from pinned inputs"
 			model.message = ""
 			if model.actions.LoadSoftware == nil {

@@ -191,26 +191,37 @@ deployment flow and never escalates into reinstall.
 
 ## Add or change software
 
-The catalog is evaluated from pinned inputs before the screen opens. It does
-not accept arbitrary package names or contact clients:
+The screen separates desired configuration from discovery. Suggestions and
+search results come from pinned inputs and laboratory overlays; no client is
+contacted and no input is updated:
 
 ```text
 Nixorium  /  Add or change software
 
-Supported client software
-Resolved from the laboratory's pinned package set; searching does not update inputs.
+Configured   [Search packages]   Suggested
+Configuration choices are separate from applying them to computers.
 
-› GIMP
-    Edit bitmap images · gimp
-  VLC                  ✓ all clients, including future clients
-    Play audio and video · vlc
+Search packages
+Uses this deployment's locked Nix packages and overlays; inputs are never updated.
+
+Package name  python3Packages.num_
+
+› numpy
+    Scientific tools for Python · python3Packages.numpy · 2.4.4
+  numpy_1
+    Scientific tools for Python · python3Packages.numpy_1 · 1.26.4
 
 Configuration can be prepared while every client is powered off.
-Declared does not mean committed, built, or distributed.
+Configured here does not mean applied to a computer.
 Private modules remain untouched and are managed through Advanced tools.
 
-↑/↓ select  •  enter scope  •  r remove  •  / search  •  esc back
+↑/↓ select  •  enter choose scope  •  r remove  •  / search  •  tab change view  •  esc back
 ```
+
+Search is debounced and displays activity while Nix evaluates the locked
+package set. Results from an older query are ignored. Broken, insecure, unfree,
+or platform-incompatible packages remain visible with a reason and cannot
+advance to scope selection.
 
 Selecting a package asks for configuration scope, not which machines happen to
 be powered on for today's distribution:
