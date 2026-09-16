@@ -485,6 +485,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	settingsSaveManager := app.NewSettingsSaveManager(settingsManager, gitReviewManager, gitCommitManager)
 	configurationSaveManager := app.NewManagedConfigurationSaveManager(gitReviewManager, gitCommitManager)
 	softwareManager := app.NewSoftwareManager(local)
+	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
@@ -545,8 +546,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanSoftware: func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 			return softwareManager.Plan(ctx, repository, request)
 		},
-		ApplySoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
-			return softwareManager.ApplyPlan(ctx, plan, plan.ReviewToken)
+		SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
+			return softwareSaveManager.Save(ctx, plan)
 		},
 		PlanShutdown: func(requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 			return shutdownManager.Plan(ctx, repository, requested, policy)

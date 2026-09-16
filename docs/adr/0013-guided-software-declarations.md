@@ -13,8 +13,8 @@ pinned package set, evaluation, and review boundaries.
 
 Choosing software configuration is also different from deploying it. Every
 client may be powered off while the desired configuration is edited. A saved
-declaration does not prove that it was committed, built, or activated on any
-computer.
+declaration is recorded in local configuration history, but does not prove that
+it was built or activated on any computer.
 
 ## Decision
 
@@ -46,9 +46,12 @@ replaces only `lab-software.json` through a no-follow regular-file boundary.
 
 The TUI selects catalog entries and evaluated scopes and requires the exact
 generated `SAVE SOFTWARE …` phrase. It contains no Nix or shell construction.
-After apply it promotes Git review. It does not commit, build, activate the
-controller, prepare PXE, or distribute clients. Those remain separate reviewed
-operations.
+After that single review, the application atomically writes and records only
+`lab-software.json`; Git remains an internal storage detail. A pre-existing
+change to that file blocks the operation, while a failed record after a
+successful write can be retried without applying the declaration twice. The
+flow does not build, activate the controller, prepare PXE, or distribute
+clients. Those remain separate reviewed operations.
 
 ## Consequences
 
@@ -58,8 +61,9 @@ that must be reviewed and validated; it is intentionally not a free-form
 package search. Advanced packages and per-package configuration continue to use
 private modules.
 
-Changing `lab-software.json` makes the deployment source dirty until the
-operator reviews and commits it. No client is contacted by catalog, plan, or
-apply. A later explicit distribution selects the powered-on clients for that
-intervention and retains its existing revision, build, and verification safety
-rails.
+The guided flow leaves `lab-software.json` clean in the local repository and
+does not expose history mechanics to the operator. No client is contacted by
+catalog, plan, or save. A later explicit distribution selects the powered-on
+clients for that intervention and retains its existing revision, build, and
+verification safety rails. Advanced and automation callers can still use the
+lower-level plan/apply and explicit history commands independently.

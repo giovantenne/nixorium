@@ -122,15 +122,15 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 				model.message = "Confirmation did not match; lab-software.json was not changed."
 				return model, nil
 			}
-			if model.actions.ApplySoftware == nil {
-				model.message = "Software apply is not available in this deployment."
+			if model.actions.SaveSoftware == nil {
+				model.message = "Software saving is not available in this deployment."
 				return model, nil
 			}
 			model.busy = "Saving the reviewed software declaration"
 			model.softwareApplying = true
 			model.confirmation = ""
 			plan := model.softwarePlan
-			return model, func() tea.Msg { return dashboardSoftwareApplyMsg{report: model.actions.ApplySoftware(plan)} }
+			return model, func() tea.Msg { return dashboardSoftwareApplyMsg{report: model.actions.SaveSoftware(plan)} }
 		default:
 			if key.Text != "" {
 				model.confirmation += key.Text
@@ -138,15 +138,14 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 		}
 	case dashboardSoftwareResult:
 		switch key.String() {
-		case "g":
-			if model.actions.LoadGitReview == nil {
-				model.message = "Git review is not available in this deployment."
+		case "r":
+			if !model.softwareResult.RecoveryRequired || model.actions.SaveSoftware == nil {
 				return model, nil
 			}
-			model.screen = dashboardGitReview
-			model.busy = "Reviewing the saved software declaration"
-			model.message = ""
-			return model, func() tea.Msg { return dashboardGitReviewMsg{report: model.actions.LoadGitReview()} }
+			model.busy = "Recovering the local software save"
+			model.softwareApplying = true
+			plan := model.softwarePlan
+			return model, func() tea.Msg { return dashboardSoftwareApplyMsg{report: model.actions.SaveSoftware(plan)} }
 		case "enter", "esc", "left":
 			model.screen = dashboardHome
 			model.message = ""
@@ -262,7 +261,7 @@ func (model dashboardModel) softwareReviewView() []string {
 		action = "Remove"
 	}
 	item, _ := softwareCatalogItemForView(model.softwareCatalog.Catalog, plan.Request.Package)
-	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Revision not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced atomically.", "No commit, build, activation, PXE action, or deployment is included.", "", tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark), "> " + model.confirmation + "_", "", "enter save declaration   esc cancel   F1 help"}
+	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No build, activation, PXE action, or client deployment is included.", "", tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark), "> " + model.confirmation + "_", "", "enter save declaration   esc cancel   F1 help"}
 	if model.message != "" && model.message != plan.Message {
 		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
 	}
@@ -272,12 +271,12 @@ func (model dashboardModel) softwareReviewView() []string {
 func (model dashboardModel) softwareResultView() []string {
 	result := model.softwareResult
 	switch result.State {
-	case "applied":
-		return []string{tuiResult("Software declaration saved", true, model.isDark), "", "✓ lab-software.json updated", "○ Git revision not saved", "○ System not prepared", "○ No client changed", "", "Review and commit the declaration before preparing or distributing systems.", "", "g review Git changes   enter interventions   ? help"}
+	case "saved":
+		return []string{tuiResult("Software configuration saved", true, model.isDark), "", "✓ Software selection saved locally", "○ System not prepared", "○ No client changed", "", "You can apply this configuration to selected computers now or later.", "", "enter interventions   ? help"}
 	case "unchanged":
 		return []string{tuiResult("Software declaration already current", true, model.isDark), "", "✓ The requested declaration is already present", "○ No file changed", "○ No system built or deployed", "", "enter interventions   ? help"}
 	case "partial":
-		return []string{tuiResult("Software save needs attention", false, model.isDark), result.Message, "", softwareResultIssue(result), "", "No system was built or deployed.", "Inspect the file and Git review before creating another proposal.", "", "g review Git changes   esc interventions   ? help"}
+		return []string{tuiResult("Software save needs attention", false, model.isDark), result.Message, "", softwareResultIssue(result), "", "No system was built or deployed.", "Retry completes the local save without duplicating the software change.", "", "r retry save   esc interventions   ? help"}
 	default:
 		return []string{tuiResult("Software declaration was not saved", false, model.isDark), result.Message, "", softwareResultIssue(result), "", "Create a fresh proposal; no system was built or deployed.", "", "esc interventions   ? help"}
 	}

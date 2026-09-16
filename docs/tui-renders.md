@@ -244,12 +244,12 @@ Managed file         lab-software.json
 Powered-on clients   none required
 
 ✓ Proposal validated
-○ Revision not saved
+○ Configuration not saved
 ○ System not prepared
 ○ No client changed
 
-Only lab-software.json will be replaced atomically.
-No commit, build, activation, PXE action, or deployment is included.
+Only lab-software.json will be replaced and saved locally.
+No build, activation, PXE action, or client deployment is included.
 
 Type SAVE SOFTWARE abcdef012345 to continue:
 > _
@@ -257,20 +257,19 @@ Type SAVE SOFTWARE abcdef012345 to continue:
 enter save declaration   esc cancel   F1 help
 ```
 
-After the exact confirmation, the result promotes Git review instead of
-allowing distribution from an unsaved revision:
+After the exact confirmation, the declaration and its local history are saved
+as one user-facing operation:
 
 ```text
-✓ Software declaration saved
+✓ Software configuration saved
 
-✓ lab-software.json updated
-○ Git revision not saved
+✓ Software selection saved locally
 ○ System not prepared
 ○ No client changed
 
-Review and commit the declaration before preparing or distributing systems.
+You can apply this configuration to selected computers now or later.
 
-g review Git changes   enter interventions   ? help
+enter interventions   ? help
 ```
 
 ## Shut down computers

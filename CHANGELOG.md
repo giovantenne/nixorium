@@ -21,6 +21,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   Saves use the existing isolated-path safety checks, preserve unrelated work,
   use a fixed internal identity, reject ambiguous same-file changes, and offer
   an in-place retry when writing succeeded but local recording needs recovery.
+- Applied the same transparent local-save contract to guided software changes.
+  The TUI no longer sends operators through Git review after adding or removing
+  software, rejects ambiguous pre-existing edits to the managed file, and can
+  recover a completed file write without applying the declaration twice.
 - Made interactive startup render immediately before repository inspection.
   The dashboard now shows an English opening activity while status and setup
   checks run once in the background, routes to first setup only after those
