@@ -1122,8 +1122,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		case "esc":
 			model.softwareSearching = false
-		case "enter":
+		case "up", "down", "enter":
 			model.softwareSearching = false
+			return model.updateSoftware(key)
 		case "backspace":
 			value := []rune(model.softwareQuery)
 			if len(value) > 0 {

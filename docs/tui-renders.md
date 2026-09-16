@@ -262,13 +262,12 @@ Powered-on clients   none required
 Only lab-software.json will be replaced and saved locally.
 No build, activation, PXE action, or client deployment is included.
 
-Type SAVE SOFTWARE abcdef012345 to continue:
-> _
+Enter saves this reviewed configuration; Esc cancels.
 
-enter save declaration   esc cancel   F1 help
+enter save configuration   esc cancel   F1 help
 ```
 
-After the exact confirmation, the declaration and its local history are saved
+After confirmation with Enter, the declaration and its local history are saved
 as one user-facing operation:
 
 ```text

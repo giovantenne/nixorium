@@ -28,6 +28,12 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 	switch model.screen {
 	case dashboardSoftware:
 		items := model.softwareItems()
+		if isSearchShortcut(key) {
+			model.softwareMode = softwareSearch
+			model.softwareSearching = true
+			model.softwareCursor = 0
+			return model, nil
+		}
 		switch key.String() {
 		case "esc", "left":
 			model.softwareSearchID++
@@ -37,10 +43,6 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			}
 			model.screen = dashboardHome
 			model.message = ""
-		case "/":
-			model.softwareMode = softwareSearch
-			model.softwareSearching = true
-			model.softwareCursor = 0
 		case "tab":
 			model = model.changeSoftwareMode(1)
 		case "shift+tab":
@@ -131,39 +133,21 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 	case dashboardSoftwareReview:
 		switch key.String() {
 		case "esc":
-			model.confirmation = ""
 			model.message = "Software change cancelled; no file changed."
 			if model.softwarePlan.Request.Present {
 				model.screen = dashboardSoftwareScope
 			} else {
 				model.screen = dashboardSoftware
 			}
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != model.softwarePlan.Confirmation {
-				model.confirmation = ""
-				model.message = "Confirmation did not match; lab-software.json was not changed."
-				return model, nil
-			}
 			if model.actions.SaveSoftware == nil {
 				model.message = "Software saving is not available in this deployment."
 				return model, nil
 			}
 			model.busy = "Saving the reviewed software declaration"
 			model.softwareApplying = true
-			model.confirmation = ""
 			plan := model.softwarePlan
 			return model, func() tea.Msg { return dashboardSoftwareApplyMsg{report: model.actions.SaveSoftware(plan)} }
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
-			}
 		}
 	case dashboardSoftwareResult:
 		switch key.String() {
@@ -329,7 +313,7 @@ func (model dashboardModel) softwareReviewView() []string {
 		action = "Remove"
 	}
 	item := model.softwareItem(plan.Request.Package)
-	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No build, activation, PXE action, or client deployment is included.", "", tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark), "> " + model.confirmation + "_", "", "enter save declaration   esc cancel   F1 help"}
+	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No build, activation, PXE action, or client deployment is included.", "", "Enter saves this reviewed configuration; Esc cancels.", "", "enter save configuration   esc cancel   F1 help"}
 	if model.message != "" && model.message != plan.Message {
 		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
 	}
