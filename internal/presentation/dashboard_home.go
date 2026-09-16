@@ -25,6 +25,7 @@ var dashboardTasks = []dashboardTask{
 	{id: "software", shortcut: "w", title: "Add or change software", description: "Choose supported packages and save a reviewed declaration"},
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
 	{id: "pxe", shortcut: "p", title: "Install or reinstall computers", description: "Prepare and control network installation"},
+	{id: "setup", shortcut: "f", title: "Setup and readiness", description: "Continue initial setup or review what is still required"},
 	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose from releases fetched from the configured upstream"},
 	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
 	{id: "admin", shortcut: "a", title: "Advanced tools", description: "Inventory, settings, revisions, services, logs and diagnostics"},
@@ -121,6 +122,13 @@ func (model dashboardModel) homeView() string {
 		lines = append(lines,
 			tuiStatus("Network installation is active", tuiStatusAttention, model.isDark),
 			"Press p to continue installation or restore normal controller networking.",
+			"",
+		)
+	}
+	if model.setup.State != "ready" {
+		lines = append(lines,
+			tuiStatus("Setup needs attention", tuiStatusAttention, model.isDark),
+			"Press f to continue from the first incomplete step.",
 			"",
 		)
 	}

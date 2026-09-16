@@ -144,3 +144,106 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 		t.Fatal("Settings retained a result from the previous session")
 	}
 }
+
+func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.T) {
+	setup := domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
+	model := newDashboardModel(testDashboardReport("stopped"), setup, DashboardActions{}, false)
+	if model.screen != dashboardSetup || !model.setupMode {
+		t.Fatalf("incomplete initial configuration opened screen=%d setupMode=%t", model.screen, model.setupMode)
+	}
+
+	ready := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{}, false)
+	found := false
+	for _, task := range dashboardTasks {
+		if task.id == "setup" && task.shortcut == "f" {
+			found = true
+		}
+	}
+	if !found || !strings.Contains(ready.View().Content, "Setup and readiness") {
+		t.Fatal("configured labs cannot reopen setup from the intervention menu")
+	}
+
+	maintenance := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{}, false)
+	if maintenance.screen != dashboardHome || !strings.Contains(maintenance.View().Content, "Setup needs attention") {
+		t.Fatalf("a later readiness issue hijacked navigation or became invisible: screen=%d\n%s", maintenance.screen, maintenance.View().Content)
+	}
+}
+
+func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
+	loaded := 0
+	model := experienceFixture(2)
+	model.setupMode = true
+	model.screen = dashboardSetup
+	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
+	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) {
+		loaded++
+		return wizardSettings(), nil
+	}
+
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen != dashboardSettings || model.settingsReturn != dashboardSetup {
+		t.Fatalf("setup did not open in-TUI settings: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	group, selected := model.settingsMenu.selected()
+	if loaded != 1 || model.screen != dashboardSettings || !selected || group.id != "network" {
+		t.Fatalf("setup settings did not preserve its intended section: loaded=%d screen=%d group=%q", loaded, model.screen, group.id)
+	}
+	if view := model.View().Content; !strings.Contains(view, "First setup / Laboratory settings") || strings.Contains(view, "exit and run") {
+		t.Fatalf("setup settings are not a continuous English flow:\n%s", view)
+	}
+}
+
+func TestSetupCredentialsOpenTheProtectedPasswordStep(t *testing.T) {
+	model := experienceFixture(2)
+	model.setupMode = true
+	model.screen = dashboardSetup
+	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageCredentials}
+	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return wizardSettings(), nil }
+
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettingsPasswords || !strings.Contains(model.View().Content, "Choose the account") {
+		t.Fatalf("credential stage did not open protected input:\n%s", model.View().Content)
+	}
+}
+
+func TestSetupPreparesAndInstallsKeysThroughTypedActions(t *testing.T) {
+	reconciles, installs, refreshes := 0, 0, 0
+	model := experienceFixture(2)
+	model.setupMode = true
+	model.screen = dashboardSetup
+	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}
+	model.actions.ReconcileSetupKeys = func() (domain.KeyReconcileReport, error) {
+		reconciles++
+		return domain.KeyReconcileReport{Operation: "setup-keys", State: "ready"}, nil
+	}
+	model.actions.InstallSetupSecrets = func() domain.ActionReport {
+		installs++
+		return domain.ActionReport{Operation: "setup-install-secrets", State: "completed", Message: "installed"}
+	}
+	model.actions.LoadSetup = func() domain.SetupReport {
+		refreshes++
+		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageReview}
+	}
+
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, refresh := model.Update(command())
+	model = updated.(dashboardModel)
+	if refresh == nil {
+		t.Fatal("successful key preparation did not refresh setup")
+	}
+	updated, _ = model.Update(refresh())
+	model = updated.(dashboardModel)
+	if reconciles != 1 || installs != 1 || refreshes != 1 || model.setup.CurrentStage != domain.SetupStageReview {
+		t.Fatalf("key continuation failed: reconcile=%d install=%d refresh=%d setup=%+v", reconciles, installs, refreshes, model.setup)
+	}
+	if !strings.Contains(model.message, "keys are ready") {
+		t.Fatalf("key result is unclear: %q", model.message)
+	}
+}

@@ -16,6 +16,8 @@ type DashboardActions struct {
 	LoadDoctor                func() (domain.DoctorReport, error)
 	Refresh                   func() (domain.StatusReport, error)
 	LoadSetup                 func() domain.SetupReport
+	ReconcileSetupKeys        func() (domain.KeyReconcileReport, error)
+	InstallSetupSecrets       func() domain.ActionReport
 	LoadHosts                 func() (domain.HostsReport, error)
 	LoadInstallationSession   func() domain.InstallationSessionReport
 	SelectInstallationTarget  func(string) domain.InstallationSessionReport
@@ -165,6 +167,11 @@ type dashboardModel struct {
 	settingsPlan         domain.ConfigPlanReport
 	settingsResult       domain.ConfigApplyReport
 	settingsApplying     bool
+
+	settingsReturn         dashboardScreen
+	settingsStartGroup     string
+	settingsStartPasswords bool
+
 	pxePreparing         bool
 	pxeProgress          domain.OperationProgress
 	pxeProgressStarted   time.Time
@@ -215,6 +222,12 @@ type dashboardPlanMsg struct {
 
 type dashboardSetupMsg struct {
 	report domain.SetupReport
+}
+
+type dashboardSetupKeysMsg struct {
+	keys    domain.KeyReconcileReport
+	keyErr  error
+	install domain.ActionReport
 }
 
 type dashboardOperationMsg struct {
@@ -365,8 +378,9 @@ func RunSetupDashboard(report domain.StatusReport, setup domain.SetupReport, act
 
 func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions, setupMode bool) dashboardModel {
 	screen := dashboardHome
-	if setupMode {
+	if setupMode || setupNeedsImmediateAttention(setup) {
 		screen = dashboardSetup
+		setupMode = true
 	}
 	return dashboardModel{
 		report: report, setup: setup, setupMode: setupMode, screen: screen, actions: actions,
@@ -422,6 +436,24 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.setup = message.report
 		model.screen = dashboardSetup
+		return model, nil
+	case dashboardSetupKeysMsg:
+		model.busy = ""
+		switch {
+		case message.keyErr != nil:
+			model.message = "Key preparation needs attention: " + message.keyErr.Error()
+		case message.keys.State != "ready":
+			model.message = "Key preparation did not complete. Open technical steps for details."
+		case message.install.HasErrors():
+			model.message = "Keys are ready, but protected controller installation failed: " + message.install.Message
+		default:
+			model.message = "Controller keys are ready and protected material was installed."
+		}
+		model.screen = dashboardSetup
+		if model.actions.LoadSetup != nil {
+			model.busy = "Refreshing setup progress"
+			return model, model.loadSetup()
+		}
 		return model, nil
 	case dashboardPlanMsg:
 		model.busy = ""
@@ -685,13 +717,31 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		if message.err != nil {
 			model.message = "Settings could not be loaded: " + message.err.Error()
-			model.screen = dashboardHome
+			if model.settingsReturn == dashboardSetup {
+				model.screen = dashboardSetup
+			} else {
+				model.screen = dashboardHome
+			}
 			return model, nil
 		}
 		model.settings = message.settings
 		model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
-		model.message = ""
-		model.screen = dashboardSettings
+		if model.settingsStartGroup != "" {
+			model.settingsMenu.selectGroup(model.settingsStartGroup)
+		}
+		if model.settingsReturn == dashboardSetup {
+			model.message = "Complete the required areas, including all account passwords, then return to setup."
+		} else {
+			model.message = ""
+		}
+		if model.settingsStartPasswords {
+			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+			model.screen = dashboardSettingsPasswords
+		} else {
+			model.screen = dashboardSettings
+		}
+		model.settingsStartGroup = ""
+		model.settingsStartPasswords = false
 		return model, nil
 	case dashboardSettingsPlanMsg:
 		model.busy = ""
@@ -1081,6 +1131,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, model.checkUpdates()
 		case "e":
 			model.screen = dashboardSettings
+			model.settingsReturn = dashboardHome
 			model.settingsResult = domain.ConfigApplyReport{}
 			model.settingsPlan = domain.ConfigPlanReport{}
 			model.settingsCandidate = domain.LabSettingsFile{}
@@ -1093,6 +1144,14 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "p":
 			model.screen = dashboardPXE
 			model.message = ""
+		case "f":
+			model.setupMode = true
+			model.screen = dashboardSetup
+			model.busy = "Refreshing setup progress"
+			model.message = ""
+			if model.actions.LoadSetup != nil {
+				return model, model.loadSetup()
+			}
 		default:
 			var command tea.Cmd
 			model.homeMenu, command = model.homeMenu.update(key)
@@ -1144,6 +1203,32 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 		switch model.setup.CurrentStage {
+		case domain.SetupStageInspectEnvironment:
+			model.diagnosticReturn = dashboardSetup
+			model.screen = dashboardDiagnostics
+			return model, model.startDiagnostics()
+		case domain.SetupStageNetwork:
+			return model.openSetupSettings("network", false)
+		case domain.SetupStageIdentity:
+			return model.openSetupSettings("accounts", false)
+		case domain.SetupStageCredentials:
+			return model.openSetupSettings("", true)
+		case domain.SetupStageKeys:
+			if model.actions.ReconcileSetupKeys == nil || model.actions.InstallSetupSecrets == nil {
+				model.message = "Key preparation is not available in this session."
+				return model, nil
+			}
+			model.busy = "Creating or verifying controller keys"
+			model.message = ""
+			return model, func() tea.Msg {
+				keys, err := model.actions.ReconcileSetupKeys()
+				if err != nil || keys.State != "ready" {
+					return dashboardSetupKeysMsg{keys: keys, keyErr: err}
+				}
+				return dashboardSetupKeysMsg{keys: keys, install: model.actions.InstallSetupSecrets()}
+			}
+		case domain.SetupStageValidate:
+			return model.openSetupSettings("", false)
 		case domain.SetupStageReview:
 			model.screen = dashboardGitReview
 			model.busy = "Reviewing generated setup changes"
@@ -1188,15 +1273,14 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return model, nil
 		default:
-			model.message = "Configuration input is still required; exit and run `nixorium setup` again."
+			model.message = "This setup step is not available in the current session. Refresh setup and try again."
 			return model, nil
 		}
 	case dashboardSettings:
 		if model.settingsResult.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
-				model.screen = dashboardHome
-				model.message = ""
+				return model.returnFromSettings()
 			case "g":
 				model.busy = "Reviewing Git changes without modifying the worktree"
 				model.message = ""
@@ -1211,8 +1295,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardHome
-			model.message = ""
+			return model.returnFromSettings()
 		case "enter":
 			group, selected := model.settingsMenu.selected()
 			if !selected {
@@ -2126,6 +2209,51 @@ func (model dashboardModel) runAction(operation func() string, screen dashboardS
 		report, err := model.actions.Refresh()
 		return dashboardOperationMsg{message: message, report: report, err: err, screen: screen}
 	}
+}
+
+func setupNeedsImmediateAttention(report domain.SetupReport) bool {
+	switch report.CurrentStage {
+	case domain.SetupStageNetwork, domain.SetupStageIdentity, domain.SetupStageCredentials:
+		return true
+	default:
+		return false
+	}
+}
+
+func (model dashboardModel) openSetupSettings(group string, passwords bool) (tea.Model, tea.Cmd) {
+	if model.actions.LoadSettings == nil {
+		model.message = "Laboratory settings are not available in this session."
+		return model, nil
+	}
+	model.screen = dashboardSettings
+	model.settingsReturn = dashboardSetup
+	model.settingsStartGroup = group
+	model.settingsStartPasswords = passwords
+	model.settingsResult = domain.ConfigApplyReport{}
+	model.settingsPlan = domain.ConfigPlanReport{}
+	model.settingsCandidate = domain.LabSettingsFile{}
+	model.busy = "Loading laboratory settings"
+	model.message = ""
+	return model, func() tea.Msg {
+		settings, err := model.actions.LoadSettings()
+		return dashboardSettingsMsg{settings: settings, err: err}
+	}
+}
+
+func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
+	returnTo := model.settingsReturn
+	model.settingsReturn = dashboardHome
+	model.message = ""
+	if returnTo == dashboardSetup {
+		model.screen = dashboardSetup
+		if model.actions.LoadSetup != nil {
+			model.busy = "Refreshing setup progress"
+			return model, model.loadSetup()
+		}
+		return model, nil
+	}
+	model.screen = dashboardHome
+	return model, nil
 }
 
 func startDeployment(action func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport, plan domain.DeploymentPlanReport, events chan tea.Msg) tea.Cmd {
