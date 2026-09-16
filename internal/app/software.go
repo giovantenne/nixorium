@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type SoftwareSource interface {
 	SoftwareDefinition(context.Context, string) (domain.SoftwareDefinition, error)
+	SearchSoftwarePackages(context.Context, string, string, int) ([]domain.SoftwareCatalogItem, error)
+	ResolveSoftwarePackage(context.Context, string, string) (domain.SoftwareCatalogItem, error)
 	ReadSoftware(string) ([]byte, error)
 	ValidateSoftwareCandidate(context.Context, string, domain.LabSoftwareFile) error
 	WriteSoftwareIfUnchanged(string, []byte, domain.LabSoftwareFile) error
@@ -21,6 +24,45 @@ type SoftwareManager struct{ source SoftwareSource }
 
 func NewSoftwareManager(source SoftwareSource) SoftwareManager {
 	return SoftwareManager{source: source}
+}
+
+func (m SoftwareManager) Search(ctx context.Context, repository, query string) domain.SoftwareSearchReport {
+	report := domain.SoftwareSearchReport{
+		SchemaVersion: domain.SoftwareSchemaVersion,
+		Operation:     "software-search",
+		State:         "invalid",
+		Repository:    repository,
+		Query:         query,
+		Results:       []domain.SoftwareCatalogItem{},
+		Issues:        []domain.ValidationIssue{},
+	}
+	root, err := filepath.Abs(repository)
+	if err != nil {
+		return softwareSearchIssue(report, "repository", err.Error())
+	}
+	report.Repository = root
+	query = strings.TrimSpace(query)
+	report.Query = query
+	if err := domain.ValidateSoftwareSearchQuery(query); err != nil {
+		return softwareSearchIssue(report, "query", err.Error())
+	}
+	items, err := m.source.SearchSoftwarePackages(ctx, root, query, 40)
+	if err != nil {
+		return softwareSearchIssue(report, "search", err.Error())
+	}
+	for _, item := range items {
+		if err := validateSoftwarePackageItem(item); err != nil {
+			return softwareSearchIssue(report, "results", err.Error())
+		}
+		report.Results = append(report.Results, item)
+	}
+	report.State = "ready"
+	if len(report.Results) == 0 {
+		report.Message = "No packages in the deployment's pinned package set match this name."
+	} else {
+		report.Message = fmt.Sprintf("Found %d package(s) in the deployment's pinned package set.", len(report.Results))
+	}
+	return report
 }
 
 func (m SoftwareManager) Catalog(ctx context.Context, repository string) domain.SoftwareCatalogReport {
@@ -67,9 +109,8 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 		report.Message = catalog.Message
 		return report
 	}
-	item, found := softwareCatalogItem(catalog.Catalog, request.Package)
-	if !found || item.Availability != "available" {
-		return softwarePlanIssue(report, "package", "select a package from the resolved supported catalog")
+	if !softwareIDValid(request.Package) {
+		return softwarePlanIssue(report, "package", "select a valid package attribute from the pinned package search")
 	}
 	baseData, err := m.source.ReadSoftware(catalog.Repository)
 	if err != nil {
@@ -82,6 +123,23 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 	report.BaseFingerprint = domain.SoftwareFingerprint(baseData)
 	request.Scope = normalizeSoftwareScope(request.Scope)
 	existing, exists := softwareDeclaration(base.Packages, request.Package)
+	item := domain.SoftwareCatalogItem{ID: request.Package, Label: request.Package, Summary: "Configured package", Availability: "available"}
+	if request.Present {
+		item, err = m.source.ResolveSoftwarePackage(ctx, catalog.Repository, request.Package)
+		if err != nil {
+			return softwarePlanIssue(report, "package", "resolve package from pinned inputs: "+err.Error())
+		}
+		if err := validateSoftwarePackageItem(item); err != nil {
+			return softwarePlanIssue(report, "package", err.Error())
+		}
+		if item.Availability != "available" {
+			return softwarePlanIssue(report, "package", "the selected package is "+item.Availability+" in this deployment")
+		}
+	} else if !exists {
+		report.State = "unchanged"
+		report.Message = request.Package + " is not present in the managed software configuration."
+		return report
+	}
 	if !request.Present && exists {
 		request.Scope = existing.Scope
 	}
@@ -190,6 +248,28 @@ func softwarePlanIssue(report domain.SoftwareChangePlanReport, field, message st
 	return report
 }
 
+func softwareSearchIssue(report domain.SoftwareSearchReport, field, message string) domain.SoftwareSearchReport {
+	report.State = "invalid"
+	if field != "query" {
+		report.State = "failed"
+	}
+	report.Issues = append(report.Issues, domain.ValidationIssue{Field: field, Message: message})
+	report.Message = message
+	return report
+}
+
+func validateSoftwarePackageItem(item domain.SoftwareCatalogItem) error {
+	if !softwareIDValid(item.ID) || item.Label == "" || item.Summary == "" {
+		return errors.New("package search returned an invalid item")
+	}
+	switch item.Availability {
+	case "available", "blocked-broken", "blocked-insecure", "blocked-unfree", "unavailable-platform":
+		return nil
+	default:
+		return errors.New("package search returned an unknown availability state")
+	}
+}
+
 func validateSoftwareDefinition(definition domain.SoftwareDefinition) error {
 	if definition.SchemaVersion != domain.SoftwareSchemaVersion || definition.ManagedFile != "lab-software.json" {
 		return errors.New("deployment exposes an unsupported software contract")
@@ -215,14 +295,14 @@ func validateSoftwareDefinition(definition domain.SoftwareDefinition) error {
 	}
 	seen := map[string]bool{}
 	for _, item := range definition.Catalog {
-		if !softwareIDValid(item.ID) || item.Label == "" || item.Summary == "" || item.Availability != "available" || seen[item.ID] {
+		if validateSoftwarePackageItem(item) != nil || item.Availability != "available" || seen[item.ID] {
 			return errors.New("software contract contains an invalid catalog item")
 		}
 		seen[item.ID] = true
 	}
 	managed := map[string]bool{}
 	for _, entry := range definition.Packages {
-		if entry.Origin != "managed" || !seen[entry.Package] || managed[entry.Package] {
+		if entry.Origin != "managed" || managed[entry.Package] {
 			return errors.New("software contract contains an unsupported managed package")
 		}
 		managed[entry.Package] = true

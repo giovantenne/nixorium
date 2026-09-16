@@ -3,6 +3,7 @@ package adapters
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -22,10 +23,84 @@ let
 in deployment.nixoriumValidateSoftwareCandidate candidate
 `
 
+const softwareSearchExpression = `
+let
+  deployment = builtins.getFlake (builtins.getEnv "NIXORIUM_DEPLOYMENT_FLAKE");
+  request = builtins.fromJSON (builtins.getEnv "NIXORIUM_SOFTWARE_SEARCH_REQUEST");
+in deployment.nixoriumSearchSoftwarePackages request
+`
+
+const softwareResolveExpression = `
+let
+  deployment = builtins.getFlake (builtins.getEnv "NIXORIUM_DEPLOYMENT_FLAKE");
+  package = builtins.fromJSON (builtins.getEnv "NIXORIUM_SOFTWARE_PACKAGE");
+in deployment.nixoriumResolveSoftwarePackage package
+`
+
 func (Local) SoftwareDefinition(ctx context.Context, repository string) (domain.SoftwareDefinition, error) {
 	var definition domain.SoftwareDefinition
 	err := nixJSON(ctx, repository, "nixoriumSoftware", &definition)
 	return definition, err
+}
+
+func (Local) SearchSoftwarePackages(ctx context.Context, repository, query string, limit int) ([]domain.SoftwareCatalogItem, error) {
+	request, err := json.Marshal(struct {
+		Query string `json:"query"`
+		Limit int    `json:"limit"`
+	}{Query: query, Limit: limit})
+	if err != nil {
+		return nil, fmt.Errorf("encode software search: %w", err)
+	}
+	var items []domain.SoftwareCatalogItem
+	if err := nixSoftwareExpressionJSON(ctx, repository, softwareSearchExpression, "NIXORIUM_SOFTWARE_SEARCH_REQUEST", string(request), &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (Local) ResolveSoftwarePackage(ctx context.Context, repository, packageID string) (domain.SoftwareCatalogItem, error) {
+	request, err := json.Marshal(packageID)
+	if err != nil {
+		return domain.SoftwareCatalogItem{}, fmt.Errorf("encode software package: %w", err)
+	}
+	var item *domain.SoftwareCatalogItem
+	if err := nixSoftwareExpressionJSON(ctx, repository, softwareResolveExpression, "NIXORIUM_SOFTWARE_PACKAGE", string(request), &item); err != nil {
+		return domain.SoftwareCatalogItem{}, err
+	}
+	if item == nil {
+		return domain.SoftwareCatalogItem{}, fmt.Errorf("package %q is not a derivation in the deployment's pinned package set", packageID)
+	}
+	return *item, nil
+}
+
+func nixSoftwareExpressionJSON(ctx context.Context, repository, expression, variable, value string, destination any) error {
+	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
+		return err
+	}
+	flake, err := deploymentFlakeReference(repository)
+	if err != nil {
+		return err
+	}
+	command := exec.CommandContext(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--expr", expression)
+	command.Env = append(os.Environ(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake, variable+"="+value)
+	output := &boundedCommandBuffer{limit: 1024 * 1024}
+	diagnostics := &boundedCommandBuffer{limit: 64 * 1024}
+	command.Stdout = output
+	command.Stderr = diagnostics
+	if err := command.Run(); err != nil {
+		detail := sanitizeOperationLog(diagnostics.buffer.Bytes())
+		if diagnostics.truncated {
+			detail += "\n(output truncated)"
+		}
+		if detail == "" {
+			detail = err.Error()
+		}
+		return fmt.Errorf("evaluate pinned software packages: %s", detail)
+	}
+	if err := json.Unmarshal(output.buffer.Bytes(), destination); err != nil {
+		return fmt.Errorf("decode pinned software packages: %w", err)
+	}
+	return nil
 }
 
 func (Local) ReadSoftware(repository string) ([]byte, error) {

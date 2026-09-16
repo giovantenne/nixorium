@@ -29,6 +29,7 @@ type options struct {
 	paths              string
 	target             string
 	softwarePackage    string
+	softwareQuery      string
 	softwareScope      string
 	json               bool
 	full               bool
@@ -227,6 +228,16 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				err = presentation.JSON(stdout, report)
 			} else {
 				presentation.SoftwareCatalogText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		} else if options.subcommand == "search" {
+			report := manager.Search(ctx, repository, options.softwareQuery)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.SoftwareSearchText(stdout, report)
 			}
 			if report.HasErrors() {
 				return 1
@@ -751,6 +762,12 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--package requires a catalog identifier")
 			}
 			result.softwarePackage = arguments[index]
+		case "--query":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--query requires a package-name fragment")
+			}
+			result.softwareQuery = arguments[index]
 		case "--scope":
 			index++
 			if index >= len(arguments) || arguments[index] == "" {
@@ -804,6 +821,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("catalog must follow software")
 			}
 			result.subcommand = "catalog"
+		case "search":
+			if result.command != "software" || result.subcommand != "" {
+				return options{}, errors.New("search must follow software")
+			}
+			result.subcommand = "search"
 		case "plan":
 			if result.command == "git" && result.subcommand == "commit" {
 				result.subcommand = "commit-plan"
@@ -926,8 +948,11 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "update" && (result.subcommand == "plan" || result.subcommand == "apply") && result.target == "" {
 		return options{}, fmt.Errorf("update %s requires --target", result.subcommand)
 	}
-	if result.command == "software" && result.subcommand != "catalog" && result.subcommand != "plan" && result.subcommand != "apply" {
-		return options{}, errors.New("software requires catalog, plan, or apply")
+	if result.command == "software" && result.subcommand != "catalog" && result.subcommand != "search" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("software requires catalog, search, plan, or apply")
+	}
+	if result.command == "software" && result.subcommand == "search" && result.softwareQuery == "" {
+		return options{}, errors.New("software search requires --query")
 	}
 	if result.command == "software" && (result.subcommand == "plan" || result.subcommand == "apply") && (result.softwarePackage == "" || result.softwareScope == "") {
 		return options{}, fmt.Errorf("software %s requires --package and --scope", result.subcommand)
@@ -939,6 +964,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if (result.softwarePackage != "" || result.softwareScope != "" || result.remove) && (result.command != "software" || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("software change flags are only valid with software plan or apply")
+	}
+	if result.softwareQuery != "" && (result.command != "software" || result.subcommand != "search") {
+		return options{}, errors.New("--query is only valid with software search")
 	}
 	if result.command == "software" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("software apply requires --expect from software plan")
@@ -1071,8 +1099,9 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software plan|software apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software search|software plan|software apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       software catalog")
+	fmt.Fprintln(writer, "       software search --query <package-name>")
 	fmt.Fprintln(writer, "       software plan --package <id> --scope <all-clients|group:NAME|clients:pcNN,...> [--remove]")
 	fmt.Fprintln(writer, "       software apply --package <id> --scope <scope> [--remove] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")

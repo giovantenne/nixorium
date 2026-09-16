@@ -19,6 +19,31 @@ type fakeSoftwareSource struct {
 	writes        int
 }
 
+func (f *fakeSoftwareSource) SearchSoftwarePackages(_ context.Context, _ string, query string, _ int) ([]domain.SoftwareCatalogItem, error) {
+	result := []domain.SoftwareCatalogItem{}
+	for _, item := range f.definition.Catalog {
+		if strings.Contains(strings.ToLower(item.ID), strings.ToLower(query)) {
+			result = append(result, item)
+		}
+	}
+	if strings.Contains("hello", strings.ToLower(query)) {
+		result = append(result, domain.SoftwareCatalogItem{ID: "hello", Label: "hello", Summary: "A friendly greeting program", Version: "2.12", Availability: "available"})
+	}
+	return result, nil
+}
+
+func (f *fakeSoftwareSource) ResolveSoftwarePackage(_ context.Context, _ string, packageID string) (domain.SoftwareCatalogItem, error) {
+	for _, item := range f.definition.Catalog {
+		if item.ID == packageID {
+			return item, nil
+		}
+	}
+	if packageID == "hello" {
+		return domain.SoftwareCatalogItem{ID: "hello", Label: "hello", Summary: "A friendly greeting program", Version: "2.12", Availability: "available"}, nil
+	}
+	return domain.SoftwareCatalogItem{}, errors.New("package not found")
+}
+
 func (f *fakeSoftwareSource) SoftwareDefinition(context.Context, string) (domain.SoftwareDefinition, error) {
 	return f.definition, f.definitionErr
 }
@@ -75,6 +100,47 @@ func TestSoftwarePlanUsesCatalogAndSeparatesConfigurationFromDistribution(t *tes
 	}
 	if !strings.Contains(report.Message, "no system has been built or changed") {
 		t.Fatalf("plan confused declaration with effects: %s", report.Message)
+	}
+}
+
+func TestSoftwareSearchAndPlanAcceptPackageOutsideSuggestions(t *testing.T) {
+	source, manager := softwareManagerFixture(t)
+	search := manager.Search(context.Background(), "/deployment", "hell")
+	if search.HasErrors() || search.State != "ready" || len(search.Results) != 1 || search.Results[0].ID != "hello" || search.Results[0].Version != "2.12" {
+		t.Fatalf("software search = %+v", search)
+	}
+	plan := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{
+		Package: "hello", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients},
+	})
+	if plan.HasErrors() || plan.State != "ready" || source.validations != 1 {
+		t.Fatalf("outside-suggestion plan = %+v validations=%d", plan, source.validations)
+	}
+}
+
+func TestSoftwareRemovalDoesNotRequirePackageToRemainResolvable(t *testing.T) {
+	source, manager := softwareManagerFixture(t)
+	configured, err := domain.MarshalLabSoftware(domain.LabSoftwareFile{
+		SchemaVersion: domain.SoftwareSchemaVersion,
+		Packages:      []domain.SoftwareDeclaration{{Package: "retired-package", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.data = configured
+	source.definition.Packages = []domain.SoftwareDeclaration{{Package: "retired-package", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}, Origin: "managed"}}
+	plan := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{Package: "retired-package", Present: false})
+	if plan.HasErrors() || plan.State != "ready" || len(plan.Candidate.Packages) != 0 {
+		t.Fatalf("retired package removal = %+v", plan)
+	}
+}
+
+func TestSoftwareSearchRejectsAmbiguousOrShortQueries(t *testing.T) {
+	_, manager := softwareManagerFixture(t)
+	for _, query := range []string{"", "x", "hello world", "../hello"} {
+		report := manager.Search(context.Background(), "/deployment", query)
+		if !report.HasErrors() || report.State != "invalid" {
+			t.Fatalf("query %q accepted: %+v", query, report)
+		}
 	}
 }
 

@@ -507,6 +507,24 @@ func SoftwareCatalogText(writer io.Writer, report domain.SoftwareCatalogReport) 
 	}
 }
 
+func SoftwareSearchText(writer io.Writer, report domain.SoftwareSearchReport) {
+	fmt.Fprintf(writer, "Software search: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Pinned query:    %s\n", report.Query)
+	for _, item := range report.Results {
+		version := item.Version
+		if version == "" {
+			version = "version unavailable"
+		}
+		fmt.Fprintf(writer, "  %-32s %-18s %-22s %s\n", item.ID, item.Availability, version, item.Summary)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:          %s\n", report.Message)
+	}
+}
+
 func SoftwareChangePlanText(writer io.Writer, report domain.SoftwareChangePlanReport) {
 	fmt.Fprintf(writer, "Software proposal: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Package:           %s\n", report.Request.Package)

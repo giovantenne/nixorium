@@ -1,6 +1,7 @@
-{ lib, pkgs, clientNames, clientGroups ? {}, allowedPackages }:
+{ lib, pkgs, clientNames, clientGroups ? {}, requireAvailable ? true }:
 rawSoftware:
 let
+  packageTools = import ./software-packages.nix { inherit lib pkgs; };
   fail = message: throw "lab-software.json: ${message}";
   software =
     if builtins.isAttrs rawSoftware then rawSoftware
@@ -8,7 +9,8 @@ let
   unknownKeys = builtins.attrNames (builtins.removeAttrs software [ "schemaVersion" "packages" ]);
   validPackageName = value:
     builtins.isString value
-    && builtins.match "[A-Za-z0-9][A-Za-z0-9+._-]{0,79}" value != null;
+    && builtins.stringLength value <= 80
+    && packageTools.validPath value;
   validClient = name: builtins.isString name && builtins.elem name clientNames;
   groupNames = builtins.attrNames clientGroups;
   invalidGroups = builtins.filter
@@ -55,15 +57,13 @@ let
       extras = builtins.attrNames (builtins.removeAttrs value [ "package" "scope" ]);
       package = value.package or (fail "${prefix}.package is required");
       scope = normalizeScope index (value.scope or (fail "${prefix}.scope is required"));
-      resolved =
-        if validPackageName package && builtins.elem package allowedPackages && builtins.hasAttr package pkgs
-        then builtins.getAttr package pkgs
-        else null;
+      resolved = if validPackageName package then packageTools.resolve package else null;
+      packageInfo = if validPackageName package then packageTools.describe package else null;
     in
     assert extras == [] || fail "${prefix} has unknown fields: ${builtins.concatStringsSep ", " extras}";
     assert validPackageName package || fail "${prefix}.package is invalid";
-    assert resolved != null && lib.isDerivation resolved
-      || fail "${prefix}.package is not in the supported catalog or is unavailable in the pinned package set";
+    assert !requireAvailable || (resolved != null && lib.isDerivation resolved && packageInfo != null && packageInfo.availability == "available")
+      || fail "${prefix}.package is unavailable or blocked in the pinned package set";
     { inherit package scope; };
   packages =
     if software ? packages && builtins.isList software.packages then

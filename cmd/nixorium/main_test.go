@@ -369,6 +369,10 @@ func TestParseArgumentsAcceptsReviewedSoftwareChanges(t *testing.T) {
 	if err != nil || catalog.command != "software" || catalog.subcommand != "catalog" || !catalog.json {
 		t.Fatalf("software catalog = %+v, error = %v", catalog, err)
 	}
+	search, err := parseArguments([]string{"software", "search", "--query", "python3Packages.num", "--json"})
+	if err != nil || search.subcommand != "search" || search.softwareQuery != "python3Packages.num" || !search.json {
+		t.Fatalf("software search = %+v, error = %v", search, err)
+	}
 	plan, err := parseArguments([]string{"software", "plan", "--package", "vlc", "--scope", "group:graphics", "--json"})
 	if err != nil || plan.softwarePackage != "vlc" || plan.softwareScope != "group:graphics" || plan.remove {
 		t.Fatalf("software plan = %+v, error = %v", plan, err)
@@ -379,6 +383,8 @@ func TestParseArgumentsAcceptsReviewedSoftwareChanges(t *testing.T) {
 	}
 	for _, arguments := range [][]string{
 		{"software"},
+		{"software", "search"},
+		{"status", "--query", "hello"},
 		{"software", "plan", "--package", "vlc"},
 		{"software", "plan", "--package", "vlc", "--scope", "arbitrary"},
 		{"software", "apply", "--package", "vlc", "--scope", "all-clients"},

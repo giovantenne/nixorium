@@ -25,6 +25,9 @@ let
       ];
     };
   });
+  softwareSearch = softwareLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 20; };
+  nestedSoftware = softwareLab.nixoriumResolveSoftwarePackage "python3Packages.numpy";
+  blockedSoftware = softwareLab.nixoriumResolveSoftwarePackage "hello-unfree";
   rejectsUnknownHost = !(builtins.tryEval (builtins.deepSeq
     (mkLab (baseArgs // {
       hostModules.pc00 = [ ../modules/common.nix ];
@@ -147,6 +150,10 @@ assert !(builtins.any (package: (package.pname or "") == "vlc")
   softwareLab.nixosConfigurations.pc02.config.environment.systemPackages);
 assert softwareLab.nixoriumSoftware.groups.graphics == [ "pc01" ];
 assert (builtins.head softwareLab.nixoriumSoftware.packages).origin == "managed";
+assert builtins.any (item: item.id == "hello" && item.availability == "available") softwareSearch;
+assert nestedSoftware.id == "python3Packages.numpy";
+assert nestedSoftware.availability == "available";
+assert blockedSoftware.availability == "blocked-unfree";
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 true
