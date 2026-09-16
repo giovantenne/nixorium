@@ -231,6 +231,11 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}
+	model.actions.LoadSetupKeys = func() domain.KeyReconcileReport {
+		return domain.KeyReconcileReport{Operation: "setup-keys-verify", State: "action-required", Keys: []domain.KeyMaterialState{
+			{Name: "cache", Problem: "missing"}, {Name: "ssh", Problem: "missing"}, {Name: "veyon", Problem: "missing"},
+		}}
+	}
 	model.actions.ReconcileSetupKeys = func() (domain.KeyReconcileReport, error) {
 		reconciles++
 		return domain.KeyReconcileReport{Operation: "setup-keys", State: "ready"}, nil
@@ -250,6 +255,13 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSetupKeys || !strings.Contains(model.View().Content, "import an existing private key") {
+		t.Fatalf("key choices are not explicit:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
 	updated, refresh := model.Update(command())
 	model = updated.(dashboardModel)
 	if refresh == nil {
@@ -262,6 +274,40 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	}
 	if !strings.Contains(model.message, "keys are ready") {
 		t.Fatalf("key result is unclear: %q", model.message)
+	}
+}
+
+func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
+	importedName, importedPath := "", ""
+	model := experienceFixture(2)
+	model.screen = dashboardSetupKeys
+	model.setupKeyCursor = 1
+	model.setupKeys = domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
+		{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
+		{Name: "ssh", Problem: "private and public keys are missing"},
+		{Name: "veyon", Problem: "private and public keys are missing"},
+	}}
+	model.actions.ImportSetupKey = func(name, path string) (domain.KeyImportReport, error) {
+		importedName, importedPath = name, path
+		return domain.KeyImportReport{Operation: "setup-key-import", State: "imported", Key: name, Source: path, Fingerprint: "SHA256:verified", Message: "Existing key imported and verified."}, nil
+	}
+	model.actions.LoadSetupKeys = func() domain.KeyReconcileReport {
+		return domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{{Name: "ssh", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true}}}
+	}
+
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "i"})
+	model = updated.(dashboardModel)
+	if !model.setupKeyImporting || !strings.Contains(model.View().Content, "leaves the source unchanged") {
+		t.Fatalf("import explanation missing:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "/secure/existing-admin-key"})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if importedName != "ssh" || importedPath != "/secure/existing-admin-key" || !strings.Contains(model.message, "SHA256:verified") || strings.Contains(model.View().Content, "private-material") {
+		t.Fatalf("import result is unclear or unsafe: name=%q path=%q message=%q\n%s", importedName, importedPath, model.message, model.View().Content)
 	}
 }
 

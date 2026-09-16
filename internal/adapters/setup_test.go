@@ -147,6 +147,99 @@ func TestReconcileKeyMaterialRefusesMismatchesAndPublicOnlyPairs(t *testing.T) {
 	}
 }
 
+func TestImportKeyMaterialCopiesVerifiedPrivateKeysWithoutChangingSources(t *testing.T) {
+	installKeyTestCommands(t)
+	repository := t.TempDir()
+	sourceDirectory := t.TempDir()
+	sources := map[string]string{
+		"cache": "nixorium-cache:PRIVATE\n",
+		"ssh":   "ssh-private\n",
+		"veyon": "-----BEGIN PRIVATE KEY-----\nVEYONPRIVATE\n-----END PRIVATE KEY-----\n",
+	}
+	for name, content := range sources {
+		path := filepath.Join(sourceDirectory, name)
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+		evidence, err := (Local{}).ImportKeyMaterial(context.Background(), repository, name, path)
+		if err != nil || evidence.Name != name || !strings.HasPrefix(evidence.Fingerprint, "SHA256:") {
+			t.Fatalf("%s evidence = %+v, error = %v", name, evidence, err)
+		}
+		unchanged, err := os.ReadFile(path)
+		if err != nil || string(unchanged) != content {
+			t.Fatalf("%s source changed: %q, error = %v", name, unchanged, err)
+		}
+	}
+	for _, state := range (Local{}).KeyMaterial(context.Background(), repository) {
+		if !state.Ready() || state.PrivateMode != 0600 {
+			t.Fatalf("imported key state = %+v", state)
+		}
+	}
+}
+
+func TestImportKeyMaterialRejectsUnsafeSourcesAndExistingDestinations(t *testing.T) {
+	installKeyTestCommands(t)
+	local := Local{}
+	repository := t.TempDir()
+	sourceDirectory := t.TempDir()
+	unsafe := filepath.Join(sourceDirectory, "unsafe")
+	if err := os.WriteFile(unsafe, []byte("ssh-private\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := local.ImportKeyMaterial(context.Background(), repository, "ssh", unsafe); err == nil || !strings.Contains(err.Error(), "restrict it to 0600") {
+		t.Fatalf("unsafe source error = %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(repository, "admin-ssh")); !os.IsNotExist(err) {
+		t.Fatalf("unsafe source created a destination: %v", err)
+	}
+
+	safe := filepath.Join(sourceDirectory, "safe")
+	if err := os.WriteFile(safe, []byte("ssh-private\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	linked := filepath.Join(sourceDirectory, "linked")
+	if err := os.Symlink(safe, linked); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := local.ImportKeyMaterial(context.Background(), repository, "ssh", linked); err == nil {
+		t.Fatal("symbolic-link source was accepted")
+	}
+	oversized := filepath.Join(sourceDirectory, "oversized")
+	if err := os.WriteFile(oversized, []byte(strings.Repeat("k", maximumKeyMaterialBytes+1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := local.ImportKeyMaterial(context.Background(), repository, "cache", oversized); err == nil || !strings.Contains(err.Error(), "unexpectedly large") {
+		t.Fatalf("oversized source error = %v", err)
+	}
+	if _, err := local.ImportKeyMaterial(context.Background(), repository, "ssh", safe); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(filepath.Join(repository, "admin-ssh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := local.ImportKeyMaterial(context.Background(), repository, "ssh", safe); err == nil || !strings.Contains(err.Error(), "refuse to replace existing") {
+		t.Fatalf("existing destination error = %v", err)
+	}
+	after, err := os.ReadFile(filepath.Join(repository, "admin-ssh"))
+	if err != nil || string(after) != string(before) {
+		t.Fatalf("existing key changed: error=%v", err)
+	}
+}
+
+func TestImportKeyMaterialExplainsUnsupportedEncryptedSSHKey(t *testing.T) {
+	directory := t.TempDir()
+	writeExecutable(t, filepath.Join(directory, "ssh-keygen"), "#!/bin/sh\nexit 1\n")
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+	source := filepath.Join(t.TempDir(), "encrypted-ssh")
+	if err := os.WriteFile(source, []byte("-----BEGIN OPENSSH PRIVATE KEY-----\nencrypted\n-----END OPENSSH PRIVATE KEY-----\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Local{}).ImportKeyMaterial(context.Background(), t.TempDir(), "ssh", source); err == nil || !strings.Contains(err.Error(), "unencrypted file-based keys are required") {
+		t.Fatalf("encrypted SSH explanation = %v", err)
+	}
+}
+
 func TestKeyCommandErrorsDoNotExposeCommandOutput(t *testing.T) {
 	directory := t.TempDir()
 	writeExecutable(t, filepath.Join(directory, "unsafe-command"), "#!/bin/sh\nprintf 'private-material' >&2\nexit 9\n")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
@@ -17,7 +18,9 @@ type DashboardActions struct {
 	LoadDoctor                func() (domain.DoctorReport, error)
 	Refresh                   func() (domain.StatusReport, error)
 	LoadSetup                 func() domain.SetupReport
+	LoadSetupKeys             func() domain.KeyReconcileReport
 	ReconcileSetupKeys        func() (domain.KeyReconcileReport, error)
+	ImportSetupKey            func(string, string) (domain.KeyImportReport, error)
 	SaveSetupConfiguration    func() domain.ConfigurationSaveReport
 	InstallSetupSecrets       func() domain.ActionReport
 	LoadHosts                 func() (domain.HostsReport, error)
@@ -62,6 +65,7 @@ type dashboardScreen int
 const (
 	dashboardHome dashboardScreen = iota
 	dashboardSetup
+	dashboardSetupKeys
 	dashboardRestore
 	dashboardHosts
 	dashboardDeploy
@@ -110,6 +114,11 @@ type dashboardModel struct {
 	helpOpen             bool
 	pageScroll           int
 	setupDetails         bool
+	setupKeys            domain.KeyReconcileReport
+	setupKeyCursor       int
+	setupKeyImporting    bool
+	setupKeyPath         string
+	setupKeyImportResult domain.KeyImportReport
 	progressDetails      bool
 	doctor               domain.DoctorReport
 	diagnosticCursor     int
@@ -244,6 +253,16 @@ type dashboardSetupKeysMsg struct {
 
 type dashboardSetupSaveMsg struct {
 	report domain.ConfigurationSaveReport
+}
+
+type dashboardSetupKeyStatusMsg struct {
+	report domain.KeyReconcileReport
+}
+
+type dashboardSetupKeyImportMsg struct {
+	report domain.KeyImportReport
+	err    error
+	keys   domain.KeyReconcileReport
 }
 
 type dashboardOperationMsg struct {
@@ -485,6 +504,24 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.setup = message.report
 		model.screen = dashboardSetup
+		return model, nil
+	case dashboardSetupKeyStatusMsg:
+		model.busy = ""
+		model.setupKeys = message.report
+		model.setupKeyCursor = min(model.setupKeyCursor, max(0, len(message.report.Keys)-1))
+		model.screen = dashboardSetupKeys
+		return model, nil
+	case dashboardSetupKeyImportMsg:
+		model.busy = ""
+		model.setupKeyImporting = false
+		model.setupKeyImportResult = message.report
+		model.setupKeys = message.keys
+		if message.err != nil {
+			model.message = message.report.Message + " " + firstValidationIssue(message.report.Issues)
+		} else {
+			model.message = message.report.Message + " Fingerprint: " + message.report.Fingerprint
+		}
+		model.screen = dashboardSetupKeys
 		return model, nil
 	case dashboardSetupKeysMsg:
 		model.busy = ""
@@ -1294,22 +1331,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case domain.SetupStageCredentials:
 			return model.openSetupSettings("", true)
 		case domain.SetupStageKeys:
-			if model.actions.ReconcileSetupKeys == nil || model.actions.SaveSetupConfiguration == nil || model.actions.InstallSetupSecrets == nil {
+			if model.actions.LoadSetupKeys == nil {
 				model.message = "Key preparation is not available in this session."
 				return model, nil
 			}
-			model.busy = "Creating or verifying controller keys"
+			model.screen = dashboardSetupKeys
+			model.busy = "Checking existing controller keys"
 			model.message = ""
 			return model, func() tea.Msg {
-				keys, err := model.actions.ReconcileSetupKeys()
-				if err != nil || keys.State != "ready" {
-					return dashboardSetupKeysMsg{keys: keys, keyErr: err}
-				}
-				save := model.actions.SaveSetupConfiguration()
-				if save.HasErrors() {
-					return dashboardSetupKeysMsg{keys: keys, save: save}
-				}
-				return dashboardSetupKeysMsg{keys: keys, save: save, install: model.actions.InstallSetupSecrets()}
+				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys()}
 			}
 		case domain.SetupStageValidate:
 			return model.openSetupSettings("", false)
@@ -1362,6 +1392,84 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			model.message = "This setup step is not available in the current session. Refresh setup and try again."
 			return model, nil
+		}
+	case dashboardSetupKeys:
+		if model.setupKeyImporting {
+			switch key.String() {
+			case "esc":
+				model.setupKeyImporting = false
+				model.setupKeyPath = ""
+				model.message = "Import cancelled; no key was changed."
+			case "backspace":
+				value := []rune(model.setupKeyPath)
+				if len(value) > 0 {
+					model.setupKeyPath = string(value[:len(value)-1])
+				}
+			case "enter":
+				if strings.TrimSpace(model.setupKeyPath) == "" {
+					model.message = "Enter the path to an existing private key."
+					return model, nil
+				}
+				if model.actions.ImportSetupKey == nil || model.actions.LoadSetupKeys == nil {
+					model.message = "Key import is not available in this session."
+					return model, nil
+				}
+				name := model.selectedSetupKeyName()
+				path := strings.TrimSpace(model.setupKeyPath)
+				model.busy = "Validating and importing the existing " + setupKeyShortLabel(name) + " key"
+				model.message = ""
+				return model, func() tea.Msg {
+					report, err := model.actions.ImportSetupKey(name, path)
+					return dashboardSetupKeyImportMsg{report: report, err: err, keys: model.actions.LoadSetupKeys()}
+				}
+			default:
+				if key.Text != "" && len(model.setupKeyPath) < 4096 {
+					for _, character := range key.Text {
+						if unicode.IsPrint(character) && !unicode.In(character, unicode.Cf) {
+							model.setupKeyPath += string(character)
+						}
+					}
+				}
+			}
+			return model, nil
+		}
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardSetup
+			model.message = ""
+		case "up", "k":
+			model.setupKeyCursor = max(0, model.setupKeyCursor-1)
+		case "down", "j":
+			model.setupKeyCursor = min(max(0, len(model.setupKeys.Keys)-1), model.setupKeyCursor+1)
+		case "i":
+			state, found := model.selectedSetupKey()
+			if !found || state.Ready() {
+				model.message = "This key is already ready; existing keys are never replaced here."
+				return model, nil
+			}
+			model.setupKeyImporting = true
+			model.setupKeyPath = ""
+			model.message = ""
+		case "c":
+			if !model.setupKeyActionsAvailable() {
+				model.message = "Key preparation is not available in this session."
+				return model, nil
+			}
+			model.busy = "Creating and verifying missing controller keys"
+			model.message = ""
+			return model, model.prepareSetupKeys()
+		case "enter":
+			if model.setupKeys.State != "ready" {
+				model.message = "Import an existing key or create the missing keys before continuing."
+				return model, nil
+			}
+			if !model.setupKeyActionsAvailable() {
+				model.message = "Key preparation is not available in this session."
+				return model, nil
+			}
+			model.busy = "Saving and installing verified controller keys"
+			model.message = ""
+			return model, model.prepareSetupKeys()
 		}
 	case dashboardSettings:
 		if model.settingsResult.Operation != "" {
@@ -2482,6 +2590,8 @@ func (model dashboardModel) View() tea.View {
 	switch model.screen {
 	case dashboardSetup:
 		content = model.setupView()
+	case dashboardSetupKeys:
+		content = model.setupKeysView()
 	case dashboardRestore:
 		content = model.restoreView()
 	case dashboardHosts:
@@ -2583,6 +2693,129 @@ func (model dashboardModel) setupView() string {
 		tuiHelpBinding([]string{"q"}, "q", "quit"),
 	))
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) setupKeysView() string {
+	lines := []string{
+		tuiTitle("Nixorium — First setup / Controller keys", model.isDark),
+		"",
+		"These keys authenticate the controller. Private keys stay local and are never added to configuration history.",
+		"Existing valid keys are reused and never replaced by this workflow.",
+		"",
+	}
+	if model.busy != "" {
+		return strings.Join(append(lines, model.busyView()), "\n") + "\n"
+	}
+	definitions := []struct {
+		name, label, purpose string
+	}{
+		{name: "cache", label: "Binary cache signing", purpose: "Lets client computers verify software served by this controller."},
+		{name: "ssh", label: "Administrator SSH", purpose: "Lets the controller manage enrolled computers without a password prompt."},
+		{name: "veyon", label: "Veyon classroom control", purpose: "Authenticates classroom viewing and control from the teacher station."},
+	}
+	states := map[string]domain.KeyMaterialState{}
+	for _, state := range model.setupKeys.Keys {
+		states[state.Name] = state
+	}
+	for index, definition := range definitions {
+		marker := "  "
+		if index == model.setupKeyCursor {
+			marker = "› "
+		}
+		state := states[definition.name]
+		status := "Action required"
+		if state.Ready() {
+			status = "Existing key — ready"
+		} else if state.Problem != "" {
+			status += " — " + state.Problem
+		}
+		lines = append(lines, marker+definition.label+"  ·  "+status, "    "+definition.purpose)
+	}
+	if model.setupKeyImporting {
+		name := model.selectedSetupKeyName()
+		lines = append(lines,
+			"",
+			tuiSection("Import existing "+setupKeyShortLabel(name)+" private key", model.isDark),
+			"Enter the path to a regular private-key file with mode 0600.",
+			"Nixorium validates it, derives the public key, and leaves the source unchanged.",
+			"Encrypted or hardware-backed SSH keys are not supported for unattended controller operations.",
+			"",
+			"> "+model.setupKeyPath+"_",
+			"",
+			"enter import   esc cancel",
+		)
+	} else {
+		lines = append(lines, "")
+		if model.setupKeys.State == "ready" {
+			lines = append(lines, tuiStatus("All controller keys are ready", tuiStatusSuccess, model.isDark), "", "enter save and continue   esc setup")
+		} else {
+			lines = append(lines,
+				"Choose a missing key, then import an existing private key; or create all missing keys.",
+				"",
+				"↑/↓ select   i import selected   c create all missing keys   esc setup",
+			)
+		}
+	}
+	if model.message != "" {
+		lines = append(lines, "", "Result: "+model.message)
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (model dashboardModel) selectedSetupKey() (domain.KeyMaterialState, bool) {
+	name := model.selectedSetupKeyName()
+	for _, state := range model.setupKeys.Keys {
+		if state.Name == name {
+			return state, true
+		}
+	}
+	return domain.KeyMaterialState{Name: name}, name != ""
+}
+
+func (model dashboardModel) selectedSetupKeyName() string {
+	names := []string{"cache", "ssh", "veyon"}
+	if model.setupKeyCursor < 0 || model.setupKeyCursor >= len(names) {
+		return ""
+	}
+	return names[model.setupKeyCursor]
+}
+
+func setupKeyShortLabel(name string) string {
+	switch name {
+	case "cache":
+		return "cache-signing"
+	case "ssh":
+		return "administrator SSH"
+	case "veyon":
+		return "Veyon"
+	default:
+		return "controller"
+	}
+}
+
+func (model dashboardModel) setupKeyActionsAvailable() bool {
+	return model.actions.ReconcileSetupKeys != nil && model.actions.SaveSetupConfiguration != nil && model.actions.InstallSetupSecrets != nil
+}
+
+func (model dashboardModel) prepareSetupKeys() tea.Cmd {
+	return func() tea.Msg {
+		keys, err := model.actions.ReconcileSetupKeys()
+		if err != nil || keys.State != "ready" {
+			return dashboardSetupKeysMsg{keys: keys, keyErr: err}
+		}
+		save := model.actions.SaveSetupConfiguration()
+		if save.HasErrors() {
+			return dashboardSetupKeysMsg{keys: keys, save: save}
+		}
+		return dashboardSetupKeysMsg{keys: keys, save: save, install: model.actions.InstallSetupSecrets()}
+	}
+}
+
+func firstValidationIssue(issues []domain.ValidationIssue) string {
+	if len(issues) == 0 {
+		return "Technical detail unavailable."
+	}
+	return issues[0].Message
 }
 
 type setupJourneyGroup struct {

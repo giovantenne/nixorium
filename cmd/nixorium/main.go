@@ -504,8 +504,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadSetup: func() domain.SetupReport {
 			return setupManager.Status(ctx, repository)
 		},
+		LoadSetupKeys: func() domain.KeyReconcileReport {
+			return setupManager.VerifyKeys(ctx, repository)
+		},
 		ReconcileSetupKeys: func() (domain.KeyReconcileReport, error) {
 			return setupManager.ReconcileKeys(ctx, repository)
+		},
+		ImportSetupKey: func(name, sourcePath string) (domain.KeyImportReport, error) {
+			return setupManager.ImportKey(ctx, repository, name, sourcePath)
 		},
 		SaveSetupConfiguration: func() domain.ConfigurationSaveReport {
 			return configurationSaveManager.SaveChanged(ctx, repository, []string{

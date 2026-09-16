@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Added guided import for existing cache-signing, administrator SSH, and
+  Veyon private keys during first setup. Imports reject symbolic links,
+  oversized or broadly readable files, encrypted unattended SSH keys, and any
+  existing destination; they derive and fingerprint the public key, preserve
+  the source, and never perform implicit rotation.
+
 ### Changed
 
 - Made ordinary settings and first-setup saves record their managed files
