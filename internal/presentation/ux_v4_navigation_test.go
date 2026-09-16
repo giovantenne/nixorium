@@ -2,6 +2,8 @@ package presentation
 
 import (
 	"errors"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -182,6 +184,27 @@ func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.
 	}
 }
 
+func TestOpeningCachedSetupDoesNotRefreshIt(t *testing.T) {
+	loads := 0
+	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{
+		LoadSetup: func() domain.SetupReport {
+			loads++
+			return domain.SetupReport{State: "ready"}
+		},
+	}, false)
+	for index, task := range dashboardTasks {
+		if task.id == "setup" {
+			model.homeMenu.list.Select(index)
+			break
+		}
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || loads != 0 || model.screen != dashboardSetup {
+		t.Fatalf("opening cached setup triggered a refresh: loads=%d screen=%d", loads, model.screen)
+	}
+}
+
 func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 	loaded := 0
 	model := experienceFixture(2)
@@ -209,19 +232,22 @@ func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 	}
 }
 
-func TestSetupCredentialsOpenTheProtectedPasswordStep(t *testing.T) {
+func TestSetupCredentialsOpenOneProtectedPasswordSession(t *testing.T) {
 	model := experienceFixture(2)
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageCredentials}
 	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return wizardSettings(), nil }
+	model.actions.ChangePassword = func(string, domain.LabSettingsFile, *os.File, io.Writer) (domain.LabSettingsFile, error) {
+		return domain.LabSettingsFile{}, nil
+	}
 
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(command())
+	updated, passwordCommand := model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsPasswords || !strings.Contains(model.View().Content, "Choose the account") {
-		t.Fatalf("credential stage did not open protected input:\n%s", model.View().Content)
+	if model.screen != dashboardSettingsPasswords || passwordCommand == nil {
+		t.Fatalf("credential stage did not open one protected password session: %+v", model)
 	}
 }
 

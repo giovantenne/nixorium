@@ -76,28 +76,34 @@ func TestFirstRunOmitsGitIdentityAndGroupsEssentialFields(t *testing.T) {
 	}
 }
 
-func TestRegionalFieldsUseSearchableSuggestedValues(t *testing.T) {
-	if localeChoices[0].value != "en_US.UTF-8" {
-		t.Fatalf("first locale choice = %q, want en_US.UTF-8", localeChoices[0].value)
+func TestRegionalFieldsExposeOnlyTimeZoneAndKeyboard(t *testing.T) {
+	if timeZoneChoices[0].value != "America/New_York" || keyboardChoices[0].value != "us" {
+		t.Fatalf("regional suggestions do not start with US defaults: timezone=%q keyboard=%q", timeZoneChoices[0].value, keyboardChoices[0].value)
 	}
-	if timeZoneChoices[0].value != "America/New_York" || keyboardChoices[0].value != "us" || consoleKeyMapChoices[0].value != "us" {
-		t.Fatalf("regional suggestions do not start with US defaults: timezone=%q keyboard=%q console=%q", timeZoneChoices[0].value, keyboardChoices[0].value, consoleKeyMapChoices[0].value)
+	regional := []string{}
+	for _, field := range settingsFields {
+		if field.group == "Regional settings" {
+			regional = append(regional, field.id)
+		}
+	}
+	if strings.Join(regional, ",") != "lab.timeZone,lab.keyboardLayout" {
+		t.Fatalf("first setup exposes unnecessary regional choices: %v", regional)
 	}
 	model := newSettingsWizardModel(wizardSettings())
-	model = model.moveToField(settingsFieldIndex("lab.defaultLocale"))
+	model = model.moveToField(settingsFieldIndex("lab.keyboardLayout"))
 	if !model.selector.FilteringEnabled() || !strings.Contains(model.View().Content, "press / to filter") {
-		t.Fatalf("locale selector is not searchable:\n%s", model.View().Content)
+		t.Fatalf("keyboard selector is not searchable:\n%s", model.View().Content)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	model = updated.(settingsWizardModel)
 	if model.selector.FilterState() != list.Filtering {
-		t.Fatalf("slash did not open locale filtering: %s", model.selector.FilterState())
+		t.Fatalf("slash did not open keyboard filtering: %s", model.selector.FilterState())
 	}
-	model.selector.SetFilterText("United States")
+	model.selector.SetFilterText("US English")
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(settingsWizardModel)
-	if model.settings.Lab.DefaultLocale != "en_US.UTF-8" {
-		t.Fatalf("selected locale was not applied: %+v", model.settings.Lab)
+	if model.settings.Lab.KeyboardLayout != "us" || model.settings.Lab.ConsoleKeyMap != "us" || model.settings.Lab.DefaultLocale != "en_US.UTF-8" {
+		t.Fatalf("selected keyboard did not update its internal console mapping while preserving the US locale: %+v", model.settings.Lab)
 	}
 }
 

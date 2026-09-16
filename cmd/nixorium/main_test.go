@@ -614,3 +614,31 @@ func TestReadCandidateSettingsRejectsSymlink(t *testing.T) {
 		t.Fatal("candidate symlink was accepted")
 	}
 }
+
+func TestDetectedNetworkDefaultsReplaceOnlyFreshSetupPlaceholders(t *testing.T) {
+	settings := domain.LabSettingsFile{}
+	settings.Lab.MasterDHCPIP = domain.MasterDHCPPlaceholder
+	settings.Lab.InterfaceName = "eth0"
+	detected := domain.NetworkDefaults{DHCPAddress: "192.0.2.25", InterfaceName: "enp1s0"}
+	proposed := applyDetectedNetworkDefaults(settings, detected)
+	if proposed.Lab.MasterDHCPIP != "192.0.2.25" || proposed.Lab.InterfaceName != "enp1s0" {
+		t.Fatalf("detected defaults were not proposed: %+v", proposed.Lab)
+	}
+
+	settings.Lab.MasterDHCPIP = "198.51.100.8"
+	preserved := applyDetectedNetworkDefaults(settings, detected)
+	if preserved.Lab.MasterDHCPIP != "198.51.100.8" {
+		t.Fatalf("configured DHCP address was overwritten: %+v", preserved.Lab)
+	}
+}
+
+func TestEarlySetupDoesNotRequireFullDashboardInspection(t *testing.T) {
+	for _, stage := range []string{domain.SetupStageInspectEnvironment, domain.SetupStageNetwork, domain.SetupStageIdentity, domain.SetupStageCredentials} {
+		if !setupStartsBeforeDashboardInspection(domain.SetupReport{CurrentStage: stage}) {
+			t.Fatalf("stage %q triggered full dashboard inspection", stage)
+		}
+	}
+	if setupStartsBeforeDashboardInspection(domain.SetupReport{CurrentStage: domain.SetupStageApply}) {
+		t.Fatal("controller apply was treated as an early local setup stage")
+	}
+}

@@ -141,27 +141,33 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 		facts.Credentials.Detail = "one or more account hashes are missing, invalid, or still use the public default"
 	}
 
-	keyStates := m.source.KeyMaterial(ctx, repository)
-	keyProblems := []string{}
-	for _, state := range keyStates {
-		if !state.Ready() {
-			problem := state.Name
-			if state.Problem != "" {
-				problem += ": " + state.Problem
+	settingsReady := facts.Network.Complete && facts.Identity.Complete && facts.Credentials.Complete
+	if settingsReady {
+		keyStates := m.source.KeyMaterial(ctx, repository)
+		keyProblems := []string{}
+		for _, state := range keyStates {
+			if !state.Ready() {
+				problem := state.Name
+				if state.Problem != "" {
+					problem += ": " + state.Problem
+				}
+				keyProblems = append(keyProblems, problem)
 			}
-			keyProblems = append(keyProblems, problem)
 		}
-	}
-	facts.Keys.Complete = len(keyStates) == 3 && len(keyProblems) == 0
-	if facts.Keys.Complete {
-		facts.Keys.Detail = "cache, SSH, and Veyon pairs have safe private modes and verified correspondence"
+		facts.Keys.Complete = len(keyStates) == 3 && len(keyProblems) == 0
+		if facts.Keys.Complete {
+			facts.Keys.Detail = "cache, SSH, and Veyon pairs have safe private modes and verified correspondence"
+		} else {
+			facts.Keys.Detail = "incomplete key pairs: " + strings.Join(keyProblems, ", ")
+		}
 	} else {
-		facts.Keys.Detail = "incomplete key pairs: " + strings.Join(keyProblems, ", ")
+		facts.Keys.Detail = "complete network, identity, and credentials before checking controller keys"
 	}
 
 	evaluatedMeta := domain.LabMeta{}
-	facts.Validation.Complete = len(issues) == 0
-	if facts.Validation.Complete {
+	localPrerequisitesReady := len(issues) == 0 && settingsReady && facts.Keys.Complete
+	facts.Validation.Complete = localPrerequisitesReady
+	if localPrerequisitesReady {
 		if meta, err := m.source.LabMeta(ctx, repository); err != nil {
 			facts.Validation.Complete = false
 			facts.Validation.Detail = fmt.Sprintf("Nix evaluation failed: %v", err)
@@ -169,8 +175,10 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 			evaluatedMeta = meta
 			facts.Validation.Detail = "management schema and Nix evaluation pass"
 		}
-	} else {
+	} else if len(issues) > 0 {
 		facts.Validation.Detail = firstIssue(issues, "settings validation failed")
+	} else {
+		facts.Validation.Detail = "complete settings, credentials, and keys before Nix validation"
 	}
 	if facts.Validation.Complete {
 		facts.Apply.Complete, facts.Apply.Detail = m.source.ControllerApplied(ctx, repository)
@@ -182,44 +190,52 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 	if facts.Validation.Complete {
 		preparation = m.source.PXEPreparation(ctx, repository, evaluatedMeta)
 	}
-	artifacts := []domain.ArtifactState{
-		m.source.ArtifactState(repository, "kernel", "result-kernel/bzImage"),
-		m.source.ArtifactState(repository, "initrd", "result-initrd/initrd"),
-		m.source.ArtifactState(repository, "iPXE script", "result-ipxe/netboot.ipxe"),
-		m.source.ArtifactState(repository, "iPXE firmware", "assets/ipxe/snponly.efi"),
-	}
-	if preparation.Ready {
-		artifacts = preparation.Artifacts
-	}
-	missingArtifacts := []string{}
-	for _, artifact := range artifacts {
-		if !artifact.Present {
-			missingArtifacts = append(missingArtifacts, artifact.Name)
+	if facts.Validation.Complete {
+		artifacts := []domain.ArtifactState{
+			m.source.ArtifactState(repository, "kernel", "result-kernel/bzImage"),
+			m.source.ArtifactState(repository, "initrd", "result-initrd/initrd"),
+			m.source.ArtifactState(repository, "iPXE script", "result-ipxe/netboot.ipxe"),
+			m.source.ArtifactState(repository, "iPXE firmware", "assets/ipxe/snponly.efi"),
 		}
-	}
-	facts.Artifacts.Complete = len(missingArtifacts) == 0
-	if facts.Artifacts.Complete {
 		if preparation.Ready {
-			facts.Artifacts.Detail = preparation.Detail
+			artifacts = preparation.Artifacts
+		}
+		missingArtifacts := []string{}
+		for _, artifact := range artifacts {
+			if !artifact.Present {
+				missingArtifacts = append(missingArtifacts, artifact.Name)
+			}
+		}
+		facts.Artifacts.Complete = len(missingArtifacts) == 0
+		if facts.Artifacts.Complete {
+			if preparation.Ready {
+				facts.Artifacts.Detail = preparation.Detail
+			} else {
+				facts.Artifacts.Detail = "all compatibility installation artifacts are present"
+			}
 		} else {
-			facts.Artifacts.Detail = "all compatibility installation artifacts are present"
+			facts.Artifacts.Detail = "missing: " + strings.Join(missingArtifacts, ", ")
+			if preparation.Present && preparation.Detail != "" {
+				facts.Artifacts.Detail = preparation.Detail
+			}
 		}
 	} else {
-		facts.Artifacts.Detail = "missing: " + strings.Join(missingArtifacts, ", ")
-		if preparation.Present && preparation.Detail != "" {
-			facts.Artifacts.Detail = preparation.Detail
-		}
+		facts.Artifacts.Detail = "prepare installation artifacts after configuration validation"
 	}
 
-	if readiness, err := m.source.DeploymentStatus(ctx, repository); err == nil {
-		facts.Readiness.Complete = readiness.Ready
-		if readiness.Ready {
-			facts.Readiness.Detail = "deploymentStatus.ready is true"
+	if facts.Validation.Complete {
+		if readiness, err := m.source.DeploymentStatus(ctx, repository); err == nil {
+			facts.Readiness.Complete = readiness.Ready
+			if readiness.Ready {
+				facts.Readiness.Detail = "deploymentStatus.ready is true"
+			} else {
+				facts.Readiness.Detail = strings.Join(readiness.Issues, "; ")
+			}
 		} else {
-			facts.Readiness.Detail = strings.Join(readiness.Issues, "; ")
+			facts.Readiness.Detail = fmt.Sprintf("deployment readiness evaluation failed: %v", err)
 		}
 	} else {
-		facts.Readiness.Detail = fmt.Sprintf("deployment readiness evaluation failed: %v", err)
+		facts.Readiness.Detail = "verify deployment readiness after configuration validation"
 	}
 	facts.Install.Complete = facts.Readiness.Complete && preparation.Ready
 	if facts.Install.Complete {

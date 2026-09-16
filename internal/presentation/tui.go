@@ -394,9 +394,7 @@ type dashboardSettingsPasswordMsg struct {
 }
 
 type dashboardSettingsApplyMsg struct {
-	report    domain.ConfigurationSaveReport
-	status    domain.StatusReport
-	statusErr error
+	report domain.ConfigurationSaveReport
 }
 
 type dashboardSoftwareCatalogMsg struct{ report domain.SoftwareCatalogReport }
@@ -849,8 +847,21 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 		}
 		if model.settingsStartPasswords {
-			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 			model.screen = dashboardSettingsPasswords
+			model.settingsStartGroup = ""
+			model.settingsStartPasswords = false
+			if model.actions.ChangePassword == nil {
+				model.message = "Password setup is not available in this deployment."
+				return model, nil
+			}
+			command := &settingsPasswordCommand{
+				action:   model.actions.ChangePassword,
+				account:  "all",
+				settings: model.settings,
+			}
+			return model, tea.Exec(command, func(err error) tea.Msg {
+				return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
+			})
 		} else {
 			model.screen = dashboardSettings
 		}
@@ -903,11 +914,6 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			if model.message == "" {
 				model.message = "Configuration save failed: " + settingsIssueMessage(message.report.Issues)
 			}
-		}
-		if message.statusErr != nil {
-			model.message += " Status refresh failed: " + message.statusErr.Error()
-		} else {
-			model.report = message.status
 		}
 		model.screen = dashboardSettings
 		return model, nil
@@ -1337,11 +1343,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "f":
 			model.setupMode = true
 			model.screen = dashboardSetup
-			model.busy = "Refreshing setup progress"
 			model.message = ""
-			if model.actions.LoadSetup != nil {
-				return model, model.loadSetup()
-			}
 		default:
 			var command tea.Cmd
 			model.homeMenu, command = model.homeMenu.update(key)
@@ -1560,8 +1562,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				plan := model.settingsPlan
 				return model, func() tea.Msg {
 					report := model.actions.SaveSettings(candidate, plan)
-					status, err := model.actions.Refresh()
-					return dashboardSettingsApplyMsg{report: report, status: status, statusErr: err}
+					return dashboardSettingsApplyMsg{report: report}
 				}
 			case "e":
 				model.settingsResult = domain.ConfigurationSaveReport{}
@@ -1647,8 +1648,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			plan := model.settingsPlan
 			return model, func() tea.Msg {
 				report := model.actions.SaveSettings(candidate, plan)
-				status, err := model.actions.Refresh()
-				return dashboardSettingsApplyMsg{report: report, status: status, statusErr: err}
+				return dashboardSettingsApplyMsg{report: report}
 			}
 		}
 	case dashboardHosts:
@@ -2525,7 +2525,7 @@ func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
 	model.message = ""
 	if returnTo == dashboardSetup {
 		model.screen = dashboardSetup
-		if model.actions.LoadSetup != nil {
+		if model.actions.LoadSetup != nil && (model.settingsResult.State == "saved" || model.settingsResult.State == "unchanged") {
 			model.busy = "Refreshing setup progress"
 			return model, model.loadSetup()
 		}

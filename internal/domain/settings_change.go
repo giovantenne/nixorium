@@ -17,14 +17,15 @@ type SettingChange struct {
 }
 
 type ConfigPlanReport struct {
-	SchemaVersion   int               `json:"schemaVersion"`
-	Operation       string            `json:"operation"`
-	State           string            `json:"state"`
-	Repository      string            `json:"repository"`
-	File            string            `json:"file"`
-	BaseFingerprint string            `json:"baseFingerprint,omitempty"`
-	Changes         []SettingChange   `json:"changes"`
-	Issues          []ValidationIssue `json:"issues"`
+	SchemaVersion        int               `json:"schemaVersion"`
+	Operation            string            `json:"operation"`
+	State                string            `json:"state"`
+	Repository           string            `json:"repository"`
+	File                 string            `json:"file"`
+	BaseFingerprint      string            `json:"baseFingerprint,omitempty"`
+	CandidateFingerprint string            `json:"candidateFingerprint,omitempty"`
+	Changes              []SettingChange   `json:"changes"`
+	Issues               []ValidationIssue `json:"issues"`
 }
 
 func (r ConfigPlanReport) HasErrors() bool {

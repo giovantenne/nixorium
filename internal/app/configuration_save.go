@@ -103,16 +103,20 @@ func (m SettingsSaveManager) Save(ctx context.Context, repository string, candid
 		Issues:        []domain.ValidationIssue{},
 	}
 
-	fresh := m.settings.PlanSettings(ctx, repository, candidate)
-	report.Changes = append(report.Changes, fresh.Changes...)
-	if fresh.HasErrors() {
-		report.Issues = append(report.Issues, fresh.Issues...)
-		report.Message = "The configuration is no longer valid; review the highlighted settings."
-		return report
+	if reviewed.HasErrors() || (reviewed.State != "valid" && reviewed.State != "unchanged") {
+		return configurationSaveIssue(report, "review", "the configuration does not have a successful review; review the settings again")
 	}
-	if reviewed.BaseFingerprint == "" {
+	if reviewed.BaseFingerprint == "" || reviewed.CandidateFingerprint == "" {
 		return configurationSaveIssue(report, "review", "the reviewed configuration snapshot is missing; review the settings again")
 	}
+	candidateData, err := domain.MarshalLabSettings(candidate)
+	if err != nil {
+		return configurationSaveIssue(report, "candidate", err.Error())
+	}
+	if domain.SettingsFingerprint(candidateData) != reviewed.CandidateFingerprint {
+		return configurationSaveIssue(report, "review", "the settings changed after review; review them again")
+	}
+	report.Changes = append(report.Changes, reviewed.Changes...)
 
 	repositoryReview := m.review.Review(ctx, repository)
 	if repositoryReview.HasErrors() {
@@ -128,9 +132,14 @@ func (m SettingsSaveManager) Save(ctx context.Context, repository string, candid
 		}
 	}
 
-	if len(fresh.Changes) == 0 {
+	currentData, err := m.settings.source.ReadSettings(repository)
+	if err != nil {
+		return configurationSaveIssue(report, managedPath, err.Error())
+	}
+	currentFingerprint := domain.SettingsFingerprint(currentData)
+	if currentFingerprint == reviewed.CandidateFingerprint {
 		if !targetChanged {
-			if reviewed.BaseFingerprint != fresh.BaseFingerprint {
+			if reviewed.BaseFingerprint != currentFingerprint {
 				report.State = "saved"
 				report.Message = "Configuration was already saved locally."
 			} else {
@@ -142,20 +151,20 @@ func (m SettingsSaveManager) Save(ctx context.Context, repository string, candid
 		// A prior attempt may have written the exact reviewed candidate before
 		// local recording failed. Only that fingerprint transition is eligible
 		// for recovery; arbitrary pre-existing edits remain blocked.
-		if reviewed.BaseFingerprint == fresh.BaseFingerprint {
+		if reviewed.BaseFingerprint == currentFingerprint {
 			return configurationSaveIssue(report, managedPath, "this file already contains changes outside the current save; resolve them in Advanced before continuing")
 		}
 		return m.recordSettings(ctx, repository, report)
 	}
 
-	if reviewed.BaseFingerprint != fresh.BaseFingerprint {
+	if reviewed.BaseFingerprint != currentFingerprint {
 		return configurationSaveIssue(report, "review", "the settings changed after review; review them again")
 	}
 	if targetChanged {
 		return configurationSaveIssue(report, managedPath, "this file already contains changes outside the current save; resolve them in Advanced before continuing")
 	}
 
-	applied := m.settings.ApplySettings(ctx, repository, candidate, reviewed.BaseFingerprint)
+	applied := m.settings.ApplyReviewedSettings(repository, candidate, reviewed)
 	report.Changes = append(report.Changes[:0], applied.Changes...)
 	if applied.HasErrors() || applied.State != "applied" {
 		report.State = applied.State
