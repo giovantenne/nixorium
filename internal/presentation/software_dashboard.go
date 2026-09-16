@@ -1,12 +1,22 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
+)
+
+type softwareListMode int
+
+const (
+	softwareConfigured softwareListMode = iota
+	softwareSearch
+	softwareSuggested
 )
 
 type softwareScopeOption struct {
@@ -17,18 +27,24 @@ type softwareScopeOption struct {
 func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardSoftware:
-		items := model.filteredSoftwareCatalog()
+		items := model.softwareItems()
 		switch key.String() {
 		case "esc", "left":
-			if model.softwareQuery != "" {
-				model.softwareQuery = ""
-				model.softwareCursor = 0
-				return model, nil
+			model.softwareSearchID++
+			if model.softwareSearchCancel != nil {
+				model.softwareSearchCancel()
+				model.softwareSearchCancel = nil
 			}
 			model.screen = dashboardHome
 			model.message = ""
 		case "/":
+			model.softwareMode = softwareSearch
 			model.softwareSearching = true
+			model.softwareCursor = 0
+		case "tab":
+			model = model.changeSoftwareMode(1)
+		case "shift+tab":
+			model = model.changeSoftwareMode(-1)
 		case "up", "k":
 			model.softwareCursor = max(0, model.softwareCursor-1)
 		case "down", "j":
@@ -37,7 +53,20 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			if len(items) == 0 {
 				return model, nil
 			}
-			model.softwareSelected = items[min(model.softwareCursor, len(items)-1)].ID
+			item := items[min(model.softwareCursor, len(items)-1)]
+			if model.softwareMode == softwareConfigured {
+				entry, found := model.softwareDeclaration(item.ID)
+				if !found {
+					return model, nil
+				}
+				model.softwareSelected = item.ID
+				return model.startSoftwarePlan(domain.SoftwareChangeRequest{Package: item.ID, Present: false, Scope: entry.Scope})
+			}
+			if item.Availability != "available" {
+				model.message = softwareAvailabilityMessage(item)
+				return model, nil
+			}
+			model.softwareSelected = item.ID
 			model.softwareScopeCursor = 0
 			model.softwareClientCursor = 0
 			model.softwareClients = map[string]bool{}
@@ -184,12 +213,36 @@ func (model dashboardModel) softwareView() string {
 
 func (model dashboardModel) softwareCatalogView() []string {
 	if model.softwareCatalog.HasErrors() {
-		return []string{tuiResult("Software catalog unavailable", false, model.isDark), model.softwareCatalog.Message, "", "The package name cannot be entered manually because it would bypass pinned-input validation.", "", "esc interventions   ? help"}
+		return []string{tuiResult("Software information unavailable", false, model.isDark), model.softwareCatalog.Message, "", "Retry from Interventions after the deployment inputs are available.", "", "esc interventions   ? help"}
 	}
-	items := model.filteredSoftwareCatalog()
-	lines := []string{tuiSection("Supported client software", model.isDark), tuiMuted("Resolved from the laboratory's pinned package set; searching does not update inputs.", model.isDark), ""}
-	if model.softwareSearching || model.softwareQuery != "" {
-		lines = append(lines, "Search  / "+model.softwareQuery+"_", "")
+	items := model.softwareItems()
+	lines := []string{
+		softwareModeTabs(model.softwareMode),
+		tuiMuted("Configuration choices are separate from applying them to computers.", model.isDark),
+		"",
+	}
+	switch model.softwareMode {
+	case softwareConfigured:
+		lines = append(lines, tuiSection("Configured software", model.isDark), tuiMuted("Desired software managed by this screen; this is not an observed installed inventory.", model.isDark), "")
+	case softwareSearch:
+		cursor := ""
+		if model.softwareSearching {
+			cursor = "_"
+		}
+		lines = append(lines, tuiSection("Search packages", model.isDark), tuiMuted("Uses this deployment's locked Nix packages and overlays; inputs are never updated.", model.isDark), "", "Package name  "+model.softwareQuery+cursor, "")
+		if model.softwareSearchBusy {
+			lines = append(lines, "Searching pinned packages…", "")
+		} else if model.softwareQuery == "" {
+			lines = append(lines, "Type at least two characters. Use a dotted prefix for nested sets, for example python3Packages.num.", "")
+		} else if len(model.softwareQuery) == 1 {
+			lines = append(lines, "Type one more character to start searching.", "")
+		} else if domain.ValidateSoftwareSearchQuery(strings.TrimSpace(model.softwareQuery)) != nil {
+			lines = append(lines, "Use only letters, digits, dot, plus, underscore, or hyphen in a package-name search.", "")
+		} else if model.softwareSearch.Operation != "" && len(items) == 0 && !model.softwareSearch.HasErrors() {
+			lines = append(lines, "No matching packages were found in the pinned package set.", "")
+		}
+	case softwareSuggested:
+		lines = append(lines, tuiSection("Suggested software", model.isDark), tuiMuted("A short list of common choices from the same pinned package set.", model.isDark), "")
 	}
 	start, end := listWindow(len(items), model.softwareCursor, max(4, model.height-17))
 	for index := start; index < end; index++ {
@@ -198,20 +251,35 @@ func (model dashboardModel) softwareCatalogView() []string {
 		if index == model.softwareCursor {
 			marker = "› "
 		}
-		configured := ""
-		if entry, found := model.softwareDeclaration(item.ID); found {
-			configured = "  ✓ " + softwareScopeLabel(entry.Scope)
+		status := ""
+		if model.softwareMode == softwareConfigured {
+			if entry, found := model.softwareDeclaration(item.ID); found {
+				status = "  " + softwareScopeLabel(entry.Scope)
+			}
+		} else if entry, found := model.softwareDeclaration(item.ID); found {
+			status = "  ✓ configured for " + softwareScopeLabel(entry.Scope)
+		} else if item.Availability != "available" {
+			status = "  ! " + item.Availability
 		}
-		lines = append(lines, fmt.Sprintf("%s%-20s%s", marker, item.Label, configured), tuiMuted("    "+item.Summary+" · "+item.ID, model.isDark))
+		version := ""
+		if item.Version != "" {
+			version = " · " + item.Version
+		}
+		lines = append(lines, fmt.Sprintf("%s%-20s%s", marker, item.Label, status), tuiMuted("    "+item.Summary+" · "+item.ID+version, model.isDark))
 	}
-	if len(items) == 0 {
-		lines = append(lines, "No supported software matches this search.")
+	if len(items) == 0 && model.softwareMode == softwareConfigured {
+		lines = append(lines, "No software is configured through this screen yet.", "", "Open Suggested software or Search packages to add one.")
 	}
-	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Declared does not mean committed, built, or distributed.", "Private modules remain untouched and are managed through Advanced tools.", "", tuiHelp(model.width, model.isDark,
+	primary := "choose scope"
+	if model.softwareMode == softwareConfigured {
+		primary = "review removal"
+	}
+	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Configured here does not mean applied to a computer.", "Private modules remain untouched and are managed through Advanced tools.", "", tuiHelp(model.width, model.isDark,
 		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
-		tuiHelpBinding([]string{"enter"}, "enter", "scope"),
+		tuiHelpBinding([]string{"enter"}, "enter", primary),
 		tuiHelpBinding([]string{"r"}, "r", "remove"),
 		tuiHelpBinding([]string{"/"}, "/", "search"),
+		tuiHelpBinding([]string{"tab"}, "tab", "change view"),
 		tuiHelpBinding([]string{"esc"}, "esc", "back"),
 	))
 	if model.message != "" {
@@ -221,7 +289,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 }
 
 func (model dashboardModel) softwareScopeView() []string {
-	item, _ := softwareCatalogItemForView(model.softwareCatalog.Catalog, model.softwareSelected)
+	item := model.softwareItem(model.softwareSelected)
 	lines := []string{tuiSection("Add "+item.Label, model.isDark), "Choose where this declaration applies. This is not the set of computers deployed today.", ""}
 	options := model.softwareScopeOptions()
 	for index, option := range options {
@@ -260,7 +328,7 @@ func (model dashboardModel) softwareReviewView() []string {
 	if !plan.Request.Present {
 		action = "Remove"
 	}
-	item, _ := softwareCatalogItemForView(model.softwareCatalog.Catalog, plan.Request.Package)
+	item := model.softwareItem(plan.Request.Package)
 	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No build, activation, PXE action, or client deployment is included.", "", tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark), "> " + model.confirmation + "_", "", "enter save declaration   esc cancel   F1 help"}
 	if model.message != "" && model.message != plan.Message {
 		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
@@ -289,15 +357,92 @@ func softwareResultIssue(result domain.SoftwareChangeApplyReport) string {
 	return "Technical detail: " + result.Issues[0].Message
 }
 
-func (model dashboardModel) filteredSoftwareCatalog() []domain.SoftwareCatalogItem {
-	query := strings.ToLower(model.softwareQuery)
-	result := []domain.SoftwareCatalogItem{}
-	for _, item := range model.softwareCatalog.Catalog {
-		if strings.Contains(strings.ToLower(item.ID+" "+item.Label+" "+item.Summary), query) {
-			result = append(result, item)
+func (model dashboardModel) softwareItems() []domain.SoftwareCatalogItem {
+	switch model.softwareMode {
+	case softwareConfigured:
+		result := make([]domain.SoftwareCatalogItem, 0, len(model.softwareCatalog.Packages))
+		for _, entry := range model.softwareCatalog.Packages {
+			result = append(result, model.softwareItem(entry.Package))
+		}
+		return result
+	case softwareSearch:
+		return append([]domain.SoftwareCatalogItem{}, model.softwareSearch.Results...)
+	default:
+		return append([]domain.SoftwareCatalogItem{}, model.softwareCatalog.Catalog...)
+	}
+}
+
+func (model dashboardModel) softwareItem(id string) domain.SoftwareCatalogItem {
+	for _, items := range [][]domain.SoftwareCatalogItem{model.softwareCatalog.Catalog, model.softwareSearch.Results} {
+		if item, found := softwareCatalogItemForView(items, id); found {
+			return item
 		}
 	}
-	return result
+	return domain.SoftwareCatalogItem{ID: id, Label: id, Summary: "Managed package from the pinned package set", Availability: "available"}
+}
+
+func (model dashboardModel) changeSoftwareMode(offset int) dashboardModel {
+	mode := (int(model.softwareMode) + offset + 3) % 3
+	model.softwareMode = softwareListMode(mode)
+	model.softwareCursor = 0
+	model.message = ""
+	model.softwareSearching = model.softwareMode == softwareSearch
+	if model.softwareMode != softwareSearch {
+		model.softwareSearchID++
+		model.softwareSearchBusy = false
+		if model.softwareSearchCancel != nil {
+			model.softwareSearchCancel()
+			model.softwareSearchCancel = nil
+		}
+	}
+	return model
+}
+
+func (model *dashboardModel) scheduleSoftwareSearch() tea.Cmd {
+	if model.softwareSearchCancel != nil {
+		model.softwareSearchCancel()
+		model.softwareSearchCancel = nil
+	}
+	model.softwareSearchID++
+	model.softwareSearchBusy = false
+	model.softwareSearch = domain.SoftwareSearchReport{}
+	query := strings.TrimSpace(model.softwareQuery)
+	if domain.ValidateSoftwareSearchQuery(query) != nil || model.actions.SearchSoftware == nil {
+		return nil
+	}
+	model.softwareSearchBusy = true
+	searchContext, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	model.softwareSearchCancel = cancel
+	id := model.softwareSearchID
+	return tea.Tick(300*time.Millisecond, func(time.Time) tea.Msg {
+		return dashboardSoftwareSearchStartMsg{id: id, query: query, ctx: searchContext}
+	})
+}
+
+func softwareModeTabs(mode softwareListMode) string {
+	labels := []string{"Configured", "Search packages", "Suggested"}
+	parts := make([]string, len(labels))
+	for index, label := range labels {
+		if index == int(mode) {
+			parts[index] = "[" + label + "]"
+		} else {
+			parts[index] = label
+		}
+	}
+	return strings.Join(parts, "   ")
+}
+
+func softwareAvailabilityMessage(item domain.SoftwareCatalogItem) string {
+	switch item.Availability {
+	case "blocked-broken":
+		return item.Label + " is marked broken in the pinned package set and cannot be selected."
+	case "blocked-insecure":
+		return item.Label + " is blocked by the pinned package security policy and cannot be selected."
+	case "blocked-unfree":
+		return item.Label + " is blocked by the deployment's package licensing policy and cannot be selected."
+	default:
+		return item.Label + " is not available for this deployment platform."
+	}
 }
 
 func (model dashboardModel) softwareDeclaration(id string) (domain.SoftwareDeclaration, bool) {

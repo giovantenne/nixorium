@@ -49,8 +49,9 @@ progress, recovery instructions and the next explicit action.
   inventory and diagnostics.
 - Update Nixorium: fetch bounded releases → select stable or explicitly reveal
   prerelease → validate → review → apply only the two managed Flake files.
-- Software: supported pinned catalog → configuration scope → validated proposal
-  → exact confirmation → atomic managed declaration → explicit Git review.
+- Software: configured/search/suggested views over pinned packages →
+  configuration scope → validated proposal → exact confirmation → transparent
+  local save; applying to computers remains separate.
 - Shutdown: explicit client selection → reachability/session review → exact
   confirmation → immediate recheck → honest per-target request outcomes.
 
@@ -93,7 +94,7 @@ Preserve domain/application preflights and typed callbacks for every flow:
 | Git commit | selected safe paths, exact phrase, content token, secret checks, no push |
 | Update Nixorium | service-discovered release, candidate checks, exact phrase/token, two-file scope, no implicit activation |
 | Settings/password | full validation, redacted review, source fingerprint, atomic writer, no-echo password collector |
-| Software declaration | pinned curated catalog, evaluated scope, candidate validation, fingerprint/token recheck, one-file atomic writer, no implicit Git/build/deploy |
+| Software declaration | pinned search plus suggestions, structured nested attributes, policy state, evaluated scope, all-client candidate validation, fingerprint/token recheck, one-file atomic writer and transparent local record, no implicit build/deploy |
 | Client shutdown | evaluated clients only, controller exclusion, active-session block, explicit unknown-session acknowledgement, expiring review, immediate recheck, shared deployment lock, fixed SSH commands |
 | Client disk install | local immutable inventory and exact disk/identity confirmation; not a controller-side shortcut |
 

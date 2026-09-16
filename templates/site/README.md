@@ -205,9 +205,9 @@ action does not push, rebuild, activate, or deploy implicitly.
 
 ### Add or change software
 
-Open **Add or change software** to browse common suggestions. The typed CLI
-search shown below covers the wider package set locked by this deployment.
-Choose whether the declaration
+Open **Add or change software** to review configured choices, browse common
+suggestions, or search the wider package set locked by this deployment. Choose
+whether the declaration
 applies to every client (including future generated clients), an evaluated
 group, or selected configured computers. Clients may all remain powered off.
 

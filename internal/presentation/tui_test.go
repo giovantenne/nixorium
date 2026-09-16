@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -126,8 +127,15 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Supported client software") || !strings.Contains(model.View().Content, "Resolved from the laboratory's pinned package set") {
+	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Configured software") || !strings.Contains(model.View().Content, "not an observed installed inventory") {
 		t.Fatalf("software catalog missing:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	model = updated.(dashboardModel)
+	if !strings.Contains(model.View().Content, "Suggested software") {
+		t.Fatalf("suggested software view missing:\n%s", model.View().Content)
 	}
 
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -167,6 +175,104 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	model = updated.(dashboardModel)
 	if plans != 1 || applies != 1 || model.screen != dashboardSoftwareResult || !strings.Contains(model.View().Content, "Software configuration saved") || strings.Contains(model.View().Content, "Git") || strings.Contains(model.View().Content, "distribution targets") {
 		t.Fatalf("software result is not self-contained:\n%s", model.View().Content)
+	}
+}
+
+func TestDashboardSearchesPinnedPackagesAndIgnoresStaleResults(t *testing.T) {
+	catalog := testSoftwareCatalogReport()
+	searches := 0
+	actions := DashboardActions{
+		SearchSoftware: func(_ context.Context, query string) domain.SoftwareSearchReport {
+			searches++
+			return domain.SoftwareSearchReport{
+				SchemaVersion: domain.SoftwareSchemaVersion,
+				Operation:     "software-search",
+				State:         "ready",
+				Query:         query,
+				Results: []domain.SoftwareCatalogItem{
+					{ID: "hello", Label: "hello", Summary: "A friendly greeting program", Version: "2.12", Availability: "available"},
+					{ID: "hello-unfree", Label: "example-unfree-package", Summary: "Policy test package", Version: "1.0", Availability: "blocked-unfree"},
+				},
+				Issues: []domain.ValidationIssue{},
+			}
+		},
+	}
+	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, actions: actions, softwareCatalog: catalog, softwareMode: softwareSuggested}
+
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "/"})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "hell"})
+	model = updated.(dashboardModel)
+	if command == nil || !model.softwareSearching || model.softwareMode != softwareSearch || !model.softwareSearchBusy {
+		t.Fatalf("search was not scheduled: %+v", model)
+	}
+	id := model.softwareSearchID
+	updated, command = model.Update(dashboardSoftwareSearchStartMsg{id: id, query: "hell", ctx: context.Background()})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("debounced search did not start")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if searches != 1 || model.softwareSearchBusy || !strings.Contains(model.View().Content, "hello") || !strings.Contains(model.View().Content, "2.12") || !strings.Contains(model.View().Content, "blocked-unfree") {
+		t.Fatalf("search result missing:\n%s", model.View().Content)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "x"})
+	model = updated.(dashboardModel)
+	if model.softwareSearchID == id {
+		t.Fatal("new query did not advance request identity")
+	}
+	updated, _ = model.Update(dashboardSoftwareSearchMsg{id: id, report: domain.SoftwareSearchReport{Operation: "software-search", State: "ready", Results: []domain.SoftwareCatalogItem{{ID: "stale", Label: "stale", Summary: "stale", Availability: "available"}}}})
+	model = updated.(dashboardModel)
+	if strings.Contains(model.View().Content, "stale") {
+		t.Fatal("stale package search replaced the current query")
+	}
+}
+
+func TestDashboardExplainsBlockedSearchResultBeforeScope(t *testing.T) {
+	model := dashboardModel{
+		screen: dashboardSoftware, width: 100, height: 30, softwareMode: softwareSearch,
+		softwareSearch: domain.SoftwareSearchReport{Operation: "software-search", State: "ready", Results: []domain.SoftwareCatalogItem{{ID: "hello-unfree", Label: "Example", Summary: "Policy test", Availability: "blocked-unfree"}}},
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "licensing policy") {
+		t.Fatalf("blocked package was not explained:\n%s", model.View().Content)
+	}
+}
+
+func TestDashboardCancelsSupersededPackageSearch(t *testing.T) {
+	started := make(chan struct{})
+	finished := make(chan tea.Msg, 1)
+	model := dashboardModel{
+		screen: dashboardSoftware, softwareMode: softwareSearch, softwareSearching: true,
+		softwareQuery: "he", softwareSearchID: 1, width: 100, height: 30,
+		actions: DashboardActions{SearchSoftware: func(ctx context.Context, query string) domain.SoftwareSearchReport {
+			close(started)
+			<-ctx.Done()
+			return domain.SoftwareSearchReport{Operation: "software-search", State: "failed", Query: query, Issues: []domain.ValidationIssue{{Field: "search", Message: ctx.Err().Error()}}}
+		}},
+	}
+	searchContext, cancel := context.WithTimeout(context.Background(), time.Second)
+	model.softwareSearchCancel = cancel
+	updated, command := model.Update(dashboardSoftwareSearchStartMsg{id: 1, query: "he", ctx: searchContext})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("package search did not start")
+	}
+	go func() { finished <- command() }()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("package search callback did not start")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "l"})
+	model = updated.(dashboardModel)
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("superseded package search was not cancelled")
 	}
 }
 
@@ -273,23 +379,32 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 	model := dashboardModel{
 		report: testDashboardReport("ready"), screen: dashboardSoftware, softwareCatalog: catalog,
 		softwareClients: map[string]bool{}, width: 90, height: 22,
-		actions: DashboardActions{PlanSoftware: func(candidate domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
-			request = candidate
-			return domain.SoftwareChangePlanReport{State: "ready", Request: candidate, Confirmation: "SAVE SOFTWARE token"}
-		}},
+		actions: DashboardActions{
+			SearchSoftware: func(_ context.Context, query string) domain.SoftwareSearchReport {
+				return domain.SoftwareSearchReport{Operation: "software-search", State: "ready", Query: query, Results: []domain.SoftwareCatalogItem{{ID: "vlc", Label: "VLC", Summary: "Play audio and video", Availability: "available"}}, Issues: []domain.ValidationIssue{}}
+			},
+			PlanSoftware: func(candidate domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+				request = candidate
+				return domain.SoftwareChangePlanReport{State: "ready", Request: candidate, Confirmation: "SAVE SOFTWARE token"}
+			},
+		},
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "/"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "vl"})
 	model = updated.(dashboardModel)
+	updated, command := model.Update(dashboardSoftwareSearchStartMsg{id: model.softwareSearchID, query: "vl", ctx: context.Background()})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
 	if view := model.View().Content; !strings.Contains(view, "VLC") || strings.Contains(view, "GIMP") {
-		t.Fatalf("software search did not filter catalog:\n%s", view)
+		t.Fatalf("software search did not use pinned results:\n%s", view)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	model = updated.(dashboardModel)
-	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
 	if command == nil {
 		t.Fatal("managed software removal did not request a plan")
@@ -312,7 +427,7 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 func TestDashboardSoftwareCatalogFailureBlocksManualPackageBypass(t *testing.T) {
 	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, softwareCatalog: domain.SoftwareCatalogReport{State: "failed", Message: "pinned evaluation failed", Issues: []domain.ValidationIssue{{Field: "catalog", Message: "failed"}}}}
 	view := model.View().Content
-	if !strings.Contains(view, "Software catalog unavailable") || !strings.Contains(view, "cannot be entered manually") {
+	if !strings.Contains(view, "Software information unavailable") || !strings.Contains(view, "deployment inputs are available") {
 		t.Fatalf("catalog failure does not explain the safe boundary:\n%s", view)
 	}
 }
