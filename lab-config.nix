@@ -63,11 +63,11 @@
   adminGitEmail = "admin@example.com";
 
   # ── Locale / timezone ──────────────────────────────────────────
-  timeZone = "Europe/Rome";
+  timeZone = "America/New_York";
   defaultLocale = "en_US.UTF-8";
-  extraLocale = "it_IT.UTF-8";
-  keyboardLayout = "it";
-  consoleKeyMap = "it2";
+  extraLocale = "en_US.UTF-8";
+  keyboardLayout = "us";
+  consoleKeyMap = "us";
 
   # ── Veyon Wayland pilot ───────────────────────────────────
   # Veyon 4.11 includes a native PipeWire/XDG portal backend. GNOME still

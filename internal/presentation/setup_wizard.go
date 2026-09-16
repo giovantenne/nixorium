@@ -34,6 +34,13 @@ func (item settingsChoiceItem) FilterValue() string { return item.label + " " + 
 const customSettingsChoice = "__custom__"
 
 var timeZoneChoices = []settingsChoice{
+	{value: "America/New_York", label: "America/New_York", description: "US Eastern time"},
+	{value: "America/Chicago", label: "America/Chicago", description: "US Central time"},
+	{value: "America/Denver", label: "America/Denver", description: "US Mountain time"},
+	{value: "America/Los_Angeles", label: "America/Los_Angeles", description: "US Pacific time"},
+	{value: "America/Phoenix", label: "America/Phoenix", description: "Arizona"},
+	{value: "America/Anchorage", label: "America/Anchorage", description: "Alaska"},
+	{value: "Pacific/Honolulu", label: "Pacific/Honolulu", description: "Hawaii"},
 	{value: "Europe/Rome", label: "Europe/Rome", description: "Italy"},
 	{value: "Europe/London", label: "Europe/London", description: "United Kingdom"},
 	{value: "Europe/Paris", label: "Europe/Paris", description: "France"},
@@ -52,8 +59,8 @@ var localeChoices = []settingsChoice{
 }
 
 var keyboardChoices = []settingsChoice{
-	{value: "it", label: "Italian", description: "XKB layout: it"},
 	{value: "us", label: "US English", description: "XKB layout: us"},
+	{value: "it", label: "Italian", description: "XKB layout: it"},
 	{value: "gb", label: "UK English", description: "XKB layout: gb"},
 	{value: "fr", label: "French", description: "XKB layout: fr"},
 	{value: "de", label: "German", description: "XKB layout: de"},
@@ -61,8 +68,8 @@ var keyboardChoices = []settingsChoice{
 }
 
 var consoleKeyMapChoices = []settingsChoice{
-	{value: "it2", label: "Italian", description: "Console keymap: it2"},
 	{value: "us", label: "US English", description: "Console keymap: us"},
+	{value: "it2", label: "Italian", description: "Console keymap: it2"},
 	{value: "uk", label: "UK English", description: "Console keymap: uk"},
 	{value: "fr", label: "French", description: "Console keymap: fr"},
 	{value: "de", label: "German", description: "Console keymap: de"},
