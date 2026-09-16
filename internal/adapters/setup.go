@@ -3,6 +3,8 @@ package adapters
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"unicode"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -26,6 +29,84 @@ var keyMaterialSpecs = []keyMaterialSpec{
 	{name: "cache", privatePath: "secret-key", publicPath: filepath.Join("keys", "cache-public-key")},
 	{name: "ssh", privatePath: "admin-ssh", publicPath: filepath.Join("keys", "admin-ssh.pub")},
 	{name: "veyon", privatePath: "veyon-private-key.pem", publicPath: filepath.Join("keys", "veyon-public-key.pem")},
+}
+
+func (Local) ImportKeyMaterial(ctx context.Context, repository, name, sourcePath string) (domain.KeyImportEvidence, error) {
+	spec, found := keyMaterialSpecByName(name)
+	if !found {
+		return domain.KeyImportEvidence{}, fmt.Errorf("unsupported key type %q", name)
+	}
+	if err := requireRealDirectory(repository, "deployment root"); err != nil {
+		return domain.KeyImportEvidence{}, err
+	}
+	absoluteSource, err := filepath.Abs(sourcePath)
+	if err != nil {
+		return domain.KeyImportEvidence{}, fmt.Errorf("resolve source path: %w", err)
+	}
+	for _, character := range absoluteSource {
+		if unicode.IsControl(character) || unicode.In(character, unicode.Cf) {
+			return domain.KeyImportEvidence{}, errors.New("source path contains terminal control characters")
+		}
+	}
+	privateContent, sourceMode, err := readRegularFileNoFollowLimit(absoluteSource, maximumKeyMaterialBytes)
+	if err != nil {
+		return domain.KeyImportEvidence{}, fmt.Errorf("read source private key: %w", err)
+	}
+	if len(bytes.TrimSpace(privateContent)) == 0 {
+		return domain.KeyImportEvidence{}, errors.New("source private key is empty")
+	}
+	if sourceMode&0077 != 0 {
+		return domain.KeyImportEvidence{}, fmt.Errorf("source private key mode %04o permits group or other access; restrict it to 0600 before importing", sourceMode)
+	}
+	publicContent, err := derivePublicKey(ctx, spec.name, privateContent)
+	if err != nil {
+		if spec.name == "ssh" {
+			return domain.KeyImportEvidence{}, fmt.Errorf("validate SSH private key: unencrypted file-based keys are required: %w", err)
+		}
+		return domain.KeyImportEvidence{}, fmt.Errorf("validate %s private key: %w", spec.name, err)
+	}
+
+	keysDirectory := filepath.Join(repository, "keys")
+	if err := ensureRealDirectory(keysDirectory, 0755, "public key directory"); err != nil {
+		return domain.KeyImportEvidence{}, err
+	}
+	privatePath := filepath.Join(repository, spec.privatePath)
+	publicPath := filepath.Join(repository, spec.publicPath)
+	for label, path := range map[string]string{"private": privatePath, "public": publicPath} {
+		if _, statErr := os.Lstat(path); statErr == nil {
+			return domain.KeyImportEvidence{}, fmt.Errorf("refuse to replace existing %s %s key", name, label)
+		} else if !os.IsNotExist(statErr) {
+			return domain.KeyImportEvidence{}, fmt.Errorf("inspect destination %s key: %w", label, statErr)
+		}
+	}
+	if err := writeRegularFileCreateNew(privatePath, privateContent, 0600); err != nil {
+		return domain.KeyImportEvidence{}, fmt.Errorf("store imported %s private key: %w", name, err)
+	}
+	if err := writeRegularFileCreateNew(publicPath, publicContent, 0644); err != nil {
+		_ = os.Remove(privatePath)
+		return domain.KeyImportEvidence{}, fmt.Errorf("store derived %s public key: %w", name, err)
+	}
+	if err := syncDirectory(keysDirectory); err != nil {
+		return domain.KeyImportEvidence{}, fmt.Errorf("sync public key directory: %w", err)
+	}
+	if err := syncDirectory(repository); err != nil {
+		return domain.KeyImportEvidence{}, fmt.Errorf("sync deployment root: %w", err)
+	}
+	digest := sha256.Sum256(bytes.TrimSpace(publicContent))
+	return domain.KeyImportEvidence{
+		Name:        name,
+		Source:      absoluteSource,
+		Fingerprint: "SHA256:" + base64.RawStdEncoding.EncodeToString(digest[:]),
+	}, nil
+}
+
+func keyMaterialSpecByName(name string) (keyMaterialSpec, bool) {
+	for _, spec := range keyMaterialSpecs {
+		if spec.name == name {
+			return spec, true
+		}
+	}
+	return keyMaterialSpec{}, false
 }
 
 func (Local) KeyMaterial(ctx context.Context, repository string) []domain.KeyMaterialState {
@@ -194,7 +275,7 @@ func derivePublicKey(ctx context.Context, name string, privateContent []byte) ([
 		if createErr = writeRegularFileCreateNew(privatePath, privateContent, 0600); createErr != nil {
 			return nil, createErr
 		}
-		content, err = runKeyCommand(ctx, nil, "ssh-keygen", "-y", "-f", privatePath)
+		content, err = runKeyCommand(ctx, nil, "ssh-keygen", "-y", "-P", "", "-f", privatePath)
 	case "veyon":
 		content, err = runKeyCommand(ctx, privateContent, "openssl", "pkey", "-pubout")
 	default:

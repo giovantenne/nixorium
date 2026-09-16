@@ -72,6 +72,10 @@ func (fakeSetupSource) ReconcileKeyMaterial(context.Context, string) error {
 	return nil
 }
 
+func (fakeSetupSource) ImportKeyMaterial(_ context.Context, _, name, sourcePath string) (domain.KeyImportEvidence, error) {
+	return domain.KeyImportEvidence{Name: name, Source: sourcePath, Fingerprint: "SHA256:test"}, nil
+}
+
 func TestReconcileKeysReportsVerifiedState(t *testing.T) {
 	report, err := NewSetupManager(fakeSetupSource{}).ReconcileKeys(context.Background(), "/repo")
 	if err != nil {
@@ -86,6 +90,13 @@ func TestVerifyKeysIsReadOnlyAndReportsVerifiedState(t *testing.T) {
 	report := NewSetupManager(fakeSetupSource{}).VerifyKeys(context.Background(), "/repo")
 	if report.Operation != "setup-keys-verify" || report.State != "ready" || len(report.Keys) != 3 {
 		t.Fatalf("report = %+v", report)
+	}
+}
+
+func TestImportKeyReportsVerifiedEvidenceWithoutExposingMaterial(t *testing.T) {
+	report, err := NewSetupManager(fakeSetupSource{}).ImportKey(context.Background(), "/repo", "ssh", "/secure/admin-key")
+	if err != nil || report.State != "imported" || report.Key != "ssh" || report.Fingerprint != "SHA256:test" || !strings.Contains(report.Message, "source file was left unchanged") {
+		t.Fatalf("report = %+v, error = %v", report, err)
 	}
 }
 

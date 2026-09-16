@@ -126,6 +126,28 @@ type KeyReconcileReport struct {
 	Keys          []KeyMaterialState `json:"keys"`
 }
 
+type KeyImportEvidence struct {
+	Name        string `json:"name"`
+	Source      string `json:"source"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+type KeyImportReport struct {
+	SchemaVersion int               `json:"schemaVersion"`
+	Operation     string            `json:"operation"`
+	State         string            `json:"state"`
+	Repository    string            `json:"repository"`
+	Key           string            `json:"key"`
+	Source        string            `json:"source"`
+	Fingerprint   string            `json:"fingerprint,omitempty"`
+	Message       string            `json:"message,omitempty"`
+	Issues        []ValidationIssue `json:"issues"`
+}
+
+func (r KeyImportReport) HasErrors() bool {
+	return r.State != "imported" || len(r.Issues) > 0
+}
+
 type NetworkDefaults struct {
 	InterfaceName string
 	DHCPAddress   string

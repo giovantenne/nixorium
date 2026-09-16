@@ -253,6 +253,9 @@ func (model dashboardModel) frame(content string) string {
 }
 
 func (model dashboardModel) textEntry() bool {
+	if model.screen == dashboardSetupKeys && model.setupKeyImporting {
+		return true
+	}
 	switch model.screen {
 	case dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview,
 		dashboardGitCommitReview, dashboardUpdateReview, dashboardSoftwareReview, dashboardShutdownReview,

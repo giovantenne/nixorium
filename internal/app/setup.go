@@ -19,6 +19,7 @@ type SetupSource interface {
 	CommandAvailable(name string) bool
 	KeyMaterial(ctx context.Context, repository string) []domain.KeyMaterialState
 	ReconcileKeyMaterial(ctx context.Context, repository string) error
+	ImportKeyMaterial(ctx context.Context, repository, name, sourcePath string) (domain.KeyImportEvidence, error)
 }
 
 type SetupManager struct {
@@ -36,6 +37,29 @@ func (m SetupManager) ReconcileKeys(ctx context.Context, repository string) (dom
 
 func (m SetupManager) VerifyKeys(ctx context.Context, repository string) domain.KeyReconcileReport {
 	return m.keyReport(ctx, repository, "setup-keys-verify")
+}
+
+func (m SetupManager) ImportKey(ctx context.Context, repository, name, sourcePath string) (domain.KeyImportReport, error) {
+	report := domain.KeyImportReport{
+		SchemaVersion: domain.SchemaVersion,
+		Operation:     "setup-key-import",
+		State:         "invalid",
+		Repository:    repository,
+		Key:           name,
+		Source:        sourcePath,
+		Issues:        []domain.ValidationIssue{},
+	}
+	evidence, err := m.source.ImportKeyMaterial(ctx, repository, name, sourcePath)
+	if err != nil {
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "source", Message: err.Error()})
+		report.Message = "The key was not imported; no existing key was replaced."
+		return report, err
+	}
+	report.State = "imported"
+	report.Source = evidence.Source
+	report.Fingerprint = evidence.Fingerprint
+	report.Message = "Existing key imported and verified. The source file was left unchanged."
+	return report, nil
 }
 
 func (m SetupManager) keyReport(ctx context.Context, repository, operation string) domain.KeyReconcileReport {
