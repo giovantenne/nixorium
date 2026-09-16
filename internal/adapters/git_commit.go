@@ -162,6 +162,7 @@ func (local Local) CommitGitPaths(ctx context.Context, repository string, paths 
 
 func runBoundedGitInput(ctx context.Context, repository string, input []byte, limit int, arguments ...string) (string, bool, error) {
 	command := exec.CommandContext(ctx, "git", append([]string{"-C", repository}, arguments...)...)
+	command.Env = internalCommitEnvironment()
 	command.Stdin = bytes.NewReader(input)
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: 16 * 1024}
@@ -175,6 +176,29 @@ func runBoundedGitInput(ctx context.Context, repository string, input []byte, li
 		return stdout.buffer.String(), stdout.truncated, fmt.Errorf("git: %s", sanitizeOperationLog([]byte(message)))
 	}
 	return stdout.buffer.String(), stdout.truncated, nil
+}
+
+func internalCommitEnvironment() []string {
+	blocked := []string{"GIT_AUTHOR_NAME=", "GIT_AUTHOR_EMAIL=", "GIT_COMMITTER_NAME=", "GIT_COMMITTER_EMAIL="}
+	environment := make([]string, 0, len(os.Environ())+4)
+	for _, variable := range os.Environ() {
+		keep := true
+		for _, prefix := range blocked {
+			if strings.HasPrefix(variable, prefix) {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			environment = append(environment, variable)
+		}
+	}
+	return append(environment,
+		"GIT_AUTHOR_NAME=Nixorium",
+		"GIT_AUTHOR_EMAIL=nixorium@localhost",
+		"GIT_COMMITTER_NAME=Nixorium",
+		"GIT_COMMITTER_EMAIL=nixorium@localhost",
+	)
 }
 
 func rejectGitAttributes(ctx context.Context, repository string, paths []string) error {

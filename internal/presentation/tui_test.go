@@ -341,8 +341,8 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 		screen:    dashboardSetup,
 		setupMode: true,
 		actions: DashboardActions{
-			LoadGitReview: func() domain.GitReviewReport {
-				return domain.GitReviewReport{Operation: "git-review", State: "changes"}
+			SaveSetupConfiguration: func() domain.ConfigurationSaveReport {
+				return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved", Message: "Configuration saved locally."}
 			},
 			LoadSetup: func() domain.SetupReport {
 				loads++
@@ -350,20 +350,18 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 			},
 		},
 	}
-	if view := model.View().Content; !strings.Contains(view, "Step 1 of 5") || !strings.Contains(view, "Laboratory settings") || !strings.Contains(view, "Review and commit the generated configuration") {
+	if view := model.View().Content; !strings.Contains(view, "Step 1 of 5") || !strings.Contains(view, "Laboratory settings") || !strings.Contains(view, "Save the generated configuration locally") {
 		t.Fatalf("setup progress screen is incomplete:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || model.screen != dashboardGitReview {
-		t.Fatalf("setup did not open Git review: screen=%d", model.screen)
+	if command == nil || model.busy == "" {
+		t.Fatalf("setup did not start local save: screen=%d", model.screen)
 	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	updated, command = model.Update(command())
 	model = updated.(dashboardModel)
 	if command == nil || model.screen != dashboardSetup {
-		t.Fatalf("Git review did not return to setup: screen=%d", model.screen)
+		t.Fatalf("local save did not refresh setup: screen=%d", model.screen)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -1248,15 +1246,16 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 				}},
 			}
 		},
-		ApplySettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigApplyReport {
+		SaveSettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
 			applied++
 			if candidate.Lab.StudentGitName != "Lab Student" || plan.BaseFingerprint != "sha256:reviewed" {
 				t.Fatalf("unexpected reviewed apply: candidate=%+v plan=%+v", candidate.Lab, plan)
 			}
-			return domain.ConfigApplyReport{
-				Operation: "config-apply",
-				State:     "applied",
+			return domain.ConfigurationSaveReport{
+				Operation: "configuration-save",
+				State:     "saved",
 				Changes:   plan.Changes,
+				Message:   "Configuration saved locally. No computer was changed.",
 			}
 		},
 	}
@@ -1311,7 +1310,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !model.report.Git.Dirty || !strings.Contains(model.View().Content, "Settings updated") || !strings.Contains(model.View().Content, "review Git changes") {
+	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !model.report.Git.Dirty || !strings.Contains(model.View().Content, "Configuration saved") || strings.Contains(model.View().Content, "Git") {
 		t.Fatalf("settings result missing: applied=%d model=%+v\n%s", applied, model, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "e"})

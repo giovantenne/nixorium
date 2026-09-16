@@ -18,6 +18,7 @@ type DashboardActions struct {
 	Refresh                   func() (domain.StatusReport, error)
 	LoadSetup                 func() domain.SetupReport
 	ReconcileSetupKeys        func() (domain.KeyReconcileReport, error)
+	SaveSetupConfiguration    func() domain.ConfigurationSaveReport
 	InstallSetupSecrets       func() domain.ActionReport
 	LoadHosts                 func() (domain.HostsReport, error)
 	LoadInstallationSession   func() domain.InstallationSessionReport
@@ -46,7 +47,7 @@ type DashboardActions struct {
 	ApplyUpdate               func(domain.UpdatePlanReport) domain.UpdateApplyReport
 	LoadSettings              func() (domain.LabSettingsFile, error)
 	PlanSettings              func(domain.LabSettingsFile) domain.ConfigPlanReport
-	ApplySettings             func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigApplyReport
+	SaveSettings              func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
 	ChangePassword            SettingsPasswordAction
 	PreparePXE                func() domain.ActionReport
 	LoadPXEProgress           func() (domain.OperationProgress, error)
@@ -166,7 +167,7 @@ type dashboardModel struct {
 	settingsPasswordMenu routinePasswordMenu
 	settingsEditor       settingsWizardModel
 	settingsPlan         domain.ConfigPlanReport
-	settingsResult       domain.ConfigApplyReport
+	settingsResult       domain.ConfigurationSaveReport
 	settingsApplying     bool
 
 	settingsReturn         dashboardScreen
@@ -237,7 +238,12 @@ type dashboardSetupMsg struct {
 type dashboardSetupKeysMsg struct {
 	keys    domain.KeyReconcileReport
 	keyErr  error
+	save    domain.ConfigurationSaveReport
 	install domain.ActionReport
+}
+
+type dashboardSetupSaveMsg struct {
+	report domain.ConfigurationSaveReport
 }
 
 type dashboardOperationMsg struct {
@@ -361,7 +367,7 @@ type dashboardSettingsPasswordMsg struct {
 }
 
 type dashboardSettingsApplyMsg struct {
-	report    domain.ConfigApplyReport
+	report    domain.ConfigurationSaveReport
 	status    domain.StatusReport
 	statusErr error
 }
@@ -487,11 +493,22 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = "Key preparation needs attention: " + message.keyErr.Error()
 		case message.keys.State != "ready":
 			model.message = "Key preparation did not complete. Open technical steps for details."
+		case message.save.HasErrors():
+			model.message = message.save.Message
 		case message.install.HasErrors():
 			model.message = "Keys are ready, but protected controller installation failed: " + message.install.Message
 		default:
 			model.message = "Controller keys are ready and protected material was installed."
 		}
+		model.screen = dashboardSetup
+		if model.actions.LoadSetup != nil {
+			model.busy = "Refreshing setup progress"
+			return model, model.loadSetup()
+		}
+		return model, nil
+	case dashboardSetupSaveMsg:
+		model.busy = ""
+		model.message = message.report.Message
 		model.screen = dashboardSetup
 		if model.actions.LoadSetup != nil {
 			model.busy = "Refreshing setup progress"
@@ -822,13 +839,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.settingsApplying = false
 		model.settingsResult = message.report
-		if !message.report.HasErrors() && message.report.State == "applied" {
+		if !message.report.HasErrors() && message.report.State == "saved" {
 			model.settings = model.settingsCandidate
-			model.message = "Settings applied. Review and commit lab-settings.json, then rebuild or deploy affected machines."
+			model.message = message.report.Message
 		} else if message.report.State == "unchanged" {
-			model.message = "No managed settings changed."
+			model.message = message.report.Message
 		} else {
-			model.message = "Settings apply failed: " + settingsIssueMessage(message.report.Issues)
+			model.message = message.report.Message
+			if model.message == "" {
+				model.message = "Configuration save failed: " + settingsIssueMessage(message.report.Issues)
+			}
 		}
 		if message.statusErr != nil {
 			model.message += " Status refresh failed: " + message.statusErr.Error()
@@ -1026,13 +1046,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry())) && model.report.PXE.Mode == "active" && model.screen != dashboardPXELeaveReview {
-		model.screen = dashboardPXELeaveReview
-		model.confirmation = ""
-		model.message = ""
+	exitKey := key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry())
+	if exitKey && model.report.PXE.Mode == "active" {
+		if model.screen != dashboardPXELeaveReview {
+			model.screen = dashboardPXELeaveReview
+			model.confirmation = ""
+			model.message = ""
+		}
 		return model, nil
 	}
-	if key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry()) {
+	if exitKey {
 		return model, tea.Quit
 	}
 	if model.busy != "" {
@@ -1189,7 +1212,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "e":
 			model.screen = dashboardSettings
 			model.settingsReturn = dashboardHome
-			model.settingsResult = domain.ConfigApplyReport{}
+			model.settingsResult = domain.ConfigurationSaveReport{}
 			model.settingsPlan = domain.ConfigPlanReport{}
 			model.settingsCandidate = domain.LabSettingsFile{}
 			model.busy = "Loading managed laboratory settings"
@@ -1271,7 +1294,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case domain.SetupStageCredentials:
 			return model.openSetupSettings("", true)
 		case domain.SetupStageKeys:
-			if model.actions.ReconcileSetupKeys == nil || model.actions.InstallSetupSecrets == nil {
+			if model.actions.ReconcileSetupKeys == nil || model.actions.SaveSetupConfiguration == nil || model.actions.InstallSetupSecrets == nil {
 				model.message = "Key preparation is not available in this session."
 				return model, nil
 			}
@@ -1282,16 +1305,23 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil || keys.State != "ready" {
 					return dashboardSetupKeysMsg{keys: keys, keyErr: err}
 				}
-				return dashboardSetupKeysMsg{keys: keys, install: model.actions.InstallSetupSecrets()}
+				save := model.actions.SaveSetupConfiguration()
+				if save.HasErrors() {
+					return dashboardSetupKeysMsg{keys: keys, save: save}
+				}
+				return dashboardSetupKeysMsg{keys: keys, save: save, install: model.actions.InstallSetupSecrets()}
 			}
 		case domain.SetupStageValidate:
 			return model.openSetupSettings("", false)
 		case domain.SetupStageReview:
-			model.screen = dashboardGitReview
-			model.busy = "Reviewing generated setup changes"
+			if model.actions.SaveSetupConfiguration == nil {
+				model.message = "Local configuration saving is not available in this session."
+				return model, nil
+			}
+			model.busy = "Saving the generated configuration locally"
 			model.message = ""
 			return model, func() tea.Msg {
-				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+				return dashboardSetupSaveMsg{report: model.actions.SaveSetupConfiguration()}
 			}
 		case domain.SetupStageApply:
 			model.screen = dashboardController
@@ -1338,14 +1368,22 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			switch key.String() {
 			case "enter", "esc", "left":
 				return model.returnFromSettings()
-			case "g":
-				model.busy = "Reviewing Git changes without modifying the worktree"
+			case "r":
+				if !model.settingsResult.RecoveryRequired || model.actions.SaveSettings == nil {
+					return model, nil
+				}
+				model.busy = "Recovering the local configuration save"
+				model.settingsApplying = true
 				model.message = ""
+				candidate := model.settingsCandidate
+				plan := model.settingsPlan
 				return model, func() tea.Msg {
-					return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+					report := model.actions.SaveSettings(candidate, plan)
+					status, err := model.actions.Refresh()
+					return dashboardSettingsApplyMsg{report: report, status: status, statusErr: err}
 				}
 			case "e":
-				model.settingsResult = domain.ConfigApplyReport{}
+				model.settingsResult = domain.ConfigurationSaveReport{}
 				model.message = ""
 			}
 			return model, nil
@@ -1421,13 +1459,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = "Settings apply cancelled; no file changed."
 			model.screen = dashboardSettings
 		case "y":
-			model.busy = "Applying the reviewed managed settings"
+			model.busy = "Saving the reviewed laboratory configuration"
 			model.settingsApplying = true
 			model.message = ""
 			candidate := model.settingsCandidate
 			plan := model.settingsPlan
 			return model, func() tea.Msg {
-				report := model.actions.ApplySettings(candidate, plan)
+				report := model.actions.SaveSettings(candidate, plan)
 				status, err := model.actions.Refresh()
 				return dashboardSettingsApplyMsg{report: report, status: status, statusErr: err}
 			}
@@ -2286,7 +2324,7 @@ func (model dashboardModel) openSetupSettings(group string, passwords bool) (tea
 	model.settingsReturn = dashboardSetup
 	model.settingsStartGroup = group
 	model.settingsStartPasswords = passwords
-	model.settingsResult = domain.ConfigApplyReport{}
+	model.settingsResult = domain.ConfigurationSaveReport{}
 	model.settingsPlan = domain.ConfigPlanReport{}
 	model.settingsCandidate = domain.LabSettingsFile{}
 	model.busy = "Loading laboratory settings"
@@ -2608,7 +2646,7 @@ func setupCurrentTitle(report domain.SetupReport) string {
 func setupCurrentAction(report domain.SetupReport) string {
 	switch report.CurrentStage {
 	case domain.SetupStageReview:
-		return "Review and commit the generated configuration"
+		return "Save the generated configuration locally"
 	case domain.SetupStageApply:
 		return "Review and activate the controller configuration"
 	case domain.SetupStageArtifacts:

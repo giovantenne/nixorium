@@ -482,6 +482,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	gitCommitManager := app.NewGitCommitManager(local)
 	updateManager := app.NewUpdateManager(local)
 	settingsManager := app.NewSettingsManager(local)
+	settingsSaveManager := app.NewSettingsSaveManager(settingsManager, gitReviewManager, gitCommitManager)
+	configurationSaveManager := app.NewManagedConfigurationSaveManager(gitReviewManager, gitCommitManager)
 	softwareManager := app.NewSoftwareManager(local)
 	shutdownManager := app.NewShutdownManager(local)
 	progressManager := app.NewOperationProgressManager(local)
@@ -504,6 +506,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		ReconcileSetupKeys: func() (domain.KeyReconcileReport, error) {
 			return setupManager.ReconcileKeys(ctx, repository)
+		},
+		SaveSetupConfiguration: func() domain.ConfigurationSaveReport {
+			return configurationSaveManager.SaveChanged(ctx, repository, []string{
+				"lab-settings.json",
+				"keys/cache-public-key",
+				"keys/admin-ssh.pub",
+				"keys/veyon-public-key.pem",
+			})
 		},
 		InstallSetupSecrets: func() domain.ActionReport {
 			report := app.NewSystemActions(local).InstallSecrets(ctx)
@@ -599,8 +609,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
 			return settingsManager.PlanSettings(ctx, repository, candidate)
 		},
-		ApplySettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigApplyReport {
-			return settingsManager.ApplySettings(ctx, repository, candidate, plan.BaseFingerprint)
+		SaveSettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
+			return settingsSaveManager.Save(ctx, repository, candidate, plan)
 		},
 		ChangePassword: func(account string, settings domain.LabSettingsFile, input *os.File, output io.Writer) (domain.LabSettingsFile, error) {
 			return collectSettingsPassword(ctx, local, input, output, account, settings)

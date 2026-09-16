@@ -1,12 +1,15 @@
-# ADR-0010: Reviewed local Git commits
+# ADR-0010: Reviewed local configuration history
 
-- Status: accepted
+- Status: accepted, amended for transparent application saves
 - Date: 2026-09-14
 
 ## Context
 
-Nixorium should optionally record reviewed deployment changes without hiding
-Git or absorbing unrelated administrator work. A broad `git add`/`git commit`
+Nixorium should record reviewed deployment changes without absorbing unrelated
+administrator work. Git is an implementation detail in ordinary setup and
+settings flows; software and update flows must migrate to the same contract.
+Its terminology remains available only in Advanced and automation interfaces.
+A broad `git add`/`git commit`
 can silently include existing index entries, invoke configured filters, hooks,
 or signing programs, race with a prior review, and encourage an implicit remote
 workflow. New generated public-key files also need support without first
@@ -25,19 +28,25 @@ plaintext secret additions.
 
 The proposal contains the exact tree ID, redacted diff, fixed generated commit
 message, and a SHA-256 token bound to parent revision, tree, paths, and message.
-Apply repeats the entire plan and requires both that token and an exact
-`COMMIT <token-prefix>` confirmation (or explicit automation-only `--yes`).
+Apply repeats the entire plan and requires that token. Advanced interactive Git
+commands additionally require an exact `COMMIT <token-prefix>` confirmation (or
+explicit automation-only `--yes`). An application-level `Save configuration`
+operation may consume its own just-created token without exposing Git or a
+second confirmation after the user has reviewed and accepted the configuration
+change itself.
 
 After one final proposal/tree check, use `git commit-tree` and compare-and-swap
 `git update-ref` to advance HEAD only from the reviewed parent. Then reset only
 the selected index paths to the new HEAD. This preserves unrelated staged,
 unstaged, and untracked state while supporting selected new files. No repository
-hook, signing helper, remote, or push is invoked. Report a partial non-retryable
-result if HEAD advanced but selected-index reconciliation failed.
+hook, signing helper, remote, or push is invoked. Commits created by Nixorium use
+a fixed internal author and committer identity, independent of user-level Git
+configuration. Report a partial non-retryable result if HEAD advanced but
+selected-index reconciliation failed.
 
 ## Consequences
 
-The workflow is local and optional; normal Git remains available to experts.
+The history mechanism is local; normal Git remains available to experts.
 Conservative secret and Git-attribute checks can reject a legitimate unusual
 file, which can still be committed manually after deliberate review. The
 operation does not validate or deploy the full laboratory configuration; normal

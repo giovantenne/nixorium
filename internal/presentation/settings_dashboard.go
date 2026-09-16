@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -277,10 +278,10 @@ func (model dashboardModel) settingsView() string {
 	}
 	lines := []string{tuiTitle(title, model.isDark), ""}
 	if model.settingsResult.Operation != "" {
-		success := !model.settingsResult.HasErrors() && model.settingsResult.State == "applied"
-		title := "Settings need attention"
+		success := !model.settingsResult.HasErrors() && (model.settingsResult.State == "saved" || model.settingsResult.State == "unchanged")
+		title := "Configuration needs attention"
 		if success {
-			title = "Settings updated"
+			title = "Configuration saved"
 		}
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
@@ -294,11 +295,12 @@ func (model dashboardModel) settingsView() string {
 		if model.settingsReturn == dashboardSetup {
 			returnLabel = "setup"
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"g"}, "g", "review Git changes"),
-			tuiHelpBinding([]string{"e"}, "e", "edit more"),
-			tuiHelpBinding([]string{"enter"}, "enter", returnLabel),
-		))
+		bindings := []key.Binding{tuiHelpBinding([]string{"e"}, "e", "edit more")}
+		if model.settingsResult.RecoveryRequired {
+			bindings = append(bindings, tuiHelpBinding([]string{"r"}, "r", "retry save"))
+		}
+		bindings = append(bindings, tuiHelpBinding([]string{"enter"}, "enter", returnLabel))
+		lines = append(lines, "", tuiHelp(model.width, model.isDark, bindings...))
 		return strings.Join(lines, "\n") + "\n"
 	}
 	lines = append(lines,
@@ -349,12 +351,12 @@ func (model dashboardModel) settingsReviewView() string {
 	lines = append(lines,
 		"",
 		"Only lab-settings.json will be replaced atomically.",
-		"Existing unrelated Git changes are preserved.",
-		"After apply: review and commit the file, then rebuild/deploy affected machines.",
+		"Existing unrelated files and changes are preserved.",
+		"Saving does not rebuild or change any computer.",
 		"",
-		"Apply these settings?",
+		"Save these settings?",
 		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"y"}, "y", "apply"),
+			tuiHelpBinding([]string{"y"}, "y", "save"),
 			tuiHelpBinding([]string{"n", "esc"}, "n/esc", "cancel"),
 		),
 	)

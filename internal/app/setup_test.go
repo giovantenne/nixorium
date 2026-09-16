@@ -34,7 +34,11 @@ func (f fakeSetupSource) DeploymentStatus(context.Context, string) (domain.Deplo
 }
 
 func (f fakeSetupSource) GitState(context.Context, string) (domain.GitState, error) {
-	return domain.GitState{Available: true, Dirty: f.dirty, Changes: 1}, nil
+	state := domain.GitState{Available: true, Dirty: f.dirty, Changes: 1}
+	if f.dirty {
+		state.Paths = []string{"lab-settings.json"}
+	}
+	return state, nil
 }
 
 func (f fakeSetupSource) ControllerApplied(context.Context, string) (bool, string) {
@@ -127,7 +131,7 @@ func TestSetupStatusAdvancesToReviewAfterConfiguredInputs(t *testing.T) {
 	}
 }
 
-func TestSetupStatusStopsAtGitReviewWhenWorktreeIsDirty(t *testing.T) {
+func TestSetupStatusStopsAtLocalSaveWhenManagedConfigurationIsDirty(t *testing.T) {
 	data, err := os.ReadFile("../../templates/site/lab-settings.json")
 	if err != nil {
 		t.Fatal(err)
@@ -137,6 +141,15 @@ func TestSetupStatusStopsAtGitReviewWhenWorktreeIsDirty(t *testing.T) {
 	report := NewSetupManager(fakeSetupSource{data: data, dirty: true}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageReview {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageReview, report)
+	}
+}
+
+func TestSetupStatusIgnoresUnrelatedHistoryChanges(t *testing.T) {
+	if pending := pendingManagedSetupPaths([]string{"notes.txt", "modules/private.nix"}); len(pending) != 0 {
+		t.Fatalf("unrelated paths became setup work: %v", pending)
+	}
+	if pending := pendingManagedSetupPaths([]string{"notes.txt", "keys/admin-ssh.pub"}); len(pending) != 1 || pending[0] != "keys/admin-ssh.pub" {
+		t.Fatalf("managed paths were not isolated: %v", pending)
 	}
 }
 
