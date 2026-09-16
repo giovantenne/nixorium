@@ -17,6 +17,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
 
+var nixoriumVersion = "development"
+
 type options struct {
 	command            string
 	subcommand         string
@@ -501,6 +503,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	shutdownManager := app.NewShutdownManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
+		RunningVersion: nixoriumVersion,
 		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
 			report, err := inspector.Status(ctx, repository)
 			if err != nil {

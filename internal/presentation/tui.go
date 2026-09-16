@@ -15,6 +15,7 @@ import (
 )
 
 type DashboardActions struct {
+	RunningVersion            string
 	LoadInitial               func() (domain.StatusReport, domain.SetupReport, error)
 	LoadDoctor                func() (domain.DoctorReport, error)
 	Refresh                   func() (domain.StatusReport, error)
@@ -3157,7 +3158,9 @@ func (model dashboardModel) updateView() string {
 			"",
 			fmt.Sprintf("State: %s   Configuration updated: %t", model.updateResult.State, model.updateResult.Updated),
 			"Configured release: "+model.updateResult.Target,
-			"Running controller and clients are unchanged.",
+			"Running interface: "+displayRunningVersion(model.actions.RunningVersion),
+			"The controller and clients are unchanged.",
+			"Rebuild the controller, then reopen Nixorium to run the saved release.",
 		)
 		if model.message != "" {
 			lines = append(lines, "", "Result: "+model.message)
@@ -3195,6 +3198,7 @@ func (model dashboardModel) updateView() string {
 	releases := model.availableUpdateReleases()
 	lines = append(lines,
 		fmt.Sprintf("Configured release  %s", model.updateCheck.CurrentRef),
+		"Running interface   "+displayRunningVersion(model.actions.RunningVersion),
 		tuiMuted("Source  "+model.updateCheck.Upstream, model.isDark),
 		"",
 		tuiSection("Available releases", model.isDark),
@@ -3244,6 +3248,13 @@ func (model dashboardModel) updateView() string {
 		lines = append(lines, "", "Result: "+model.message)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func displayRunningVersion(version string) string {
+	if version == "" {
+		return "unknown"
+	}
+	return version
 }
 
 func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {

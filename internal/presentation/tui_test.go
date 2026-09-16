@@ -1218,6 +1218,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: target, Updated: true, Message: "Nixorium update saved locally. Running systems were not changed."}
 		},
 	}
+	actions.RunningVersion = "2.0.0-test"
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
 	if !strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Advanced tools") {
 		t.Fatalf("home omits navigable task menu:\n%s", model.View().Content)
@@ -1229,7 +1230,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if checked != 1 || !strings.Contains(model.View().Content, target) || strings.Contains(model.View().Content, "v2.4.0-beta.1") || strings.Contains(model.View().Content, "Target: >") {
+	if checked != 1 || !strings.Contains(model.View().Content, target) || !strings.Contains(model.View().Content, "Running interface   2.0.0-test") || strings.Contains(model.View().Content, "v2.4.0-beta.1") || strings.Contains(model.View().Content, "Target: >") {
 		t.Fatalf("fetched stable release list is incorrect:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
@@ -1280,7 +1281,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium update saved") || strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "Running controller and clients are unchanged") || !strings.Contains(model.View().Content, "new update") {
+	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium update saved") || strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "Running interface: 2.0.0-test") || !strings.Contains(model.View().Content, "Rebuild the controller, then reopen Nixorium") || !strings.Contains(model.View().Content, "new update") {
 		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
