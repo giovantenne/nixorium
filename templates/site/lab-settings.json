@@ -17,11 +17,11 @@
     "studentGitEmail": "student@example.org",
     "adminGitName": "admin",
     "adminGitEmail": "admin@example.org",
-    "timeZone": "Europe/Rome",
+    "timeZone": "America/New_York",
     "defaultLocale": "en_US.UTF-8",
-    "extraLocale": "it_IT.UTF-8",
-    "keyboardLayout": "it",
-    "consoleKeyMap": "it2",
+    "extraLocale": "en_US.UTF-8",
+    "keyboardLayout": "us",
+    "consoleKeyMap": "us",
     "veyonNativeHosts": []
   }
 }

@@ -96,6 +96,24 @@ func TestSetupStatusSelectsNetworkForFreshTemplate(t *testing.T) {
 	}
 }
 
+func TestFreshTemplateUsesUSRegionalDefaults(t *testing.T) {
+	data, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, issues := domain.DecodeLabSettings(data)
+	if len(issues) > 0 {
+		t.Fatalf("fresh template is invalid: %+v", issues)
+	}
+	if settings.Lab.TimeZone != "America/New_York" ||
+		settings.Lab.DefaultLocale != "en_US.UTF-8" ||
+		settings.Lab.ExtraLocale != "en_US.UTF-8" ||
+		settings.Lab.KeyboardLayout != "us" ||
+		settings.Lab.ConsoleKeyMap != "us" {
+		t.Fatalf("fresh template regional defaults are not US defaults: %+v", settings.Lab)
+	}
+}
+
 func TestSetupStatusAdvancesToReviewAfterConfiguredInputs(t *testing.T) {
 	data, err := os.ReadFile("../../templates/site/lab-settings.json")
 	if err != nil {

@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Changed fresh deployment and standalone-example regional defaults to US
+  English for language, formats, desktop keyboard, and console keyboard, with
+  `America/New_York` as the visible, editable initial time zone. Existing
+  deployment settings remain unchanged; the setup selector now presents the
+  principal US time zones before its international suggestions.
 - Made dashboard sessions start from fresh task state: reopening Settings or
   Update no longer shows a previous result, cancelling a software removal
   returns to the selected package, and setup refreshes now render their active
