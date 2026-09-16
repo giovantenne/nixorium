@@ -47,11 +47,13 @@
       validateSoftwareCandidate = rawSoftware:
         let
           candidate = mkDeployment labConfig rawSoftware;
-          firstClient = builtins.head candidate.labMeta.clients.hosts;
+          clientNames = map (client: client.name) candidate.labMeta.clients.hosts;
         in
         builtins.deepSeq [
           candidate.nixoriumSoftware
-          candidate.nixosConfigurations.${firstClient.name}.config.system.build.toplevel.drvPath
+          (map
+            (name: candidate.nixosConfigurations.${name}.config.system.build.toplevel.drvPath)
+            clientNames)
         ] true;
     in
     deployment // {

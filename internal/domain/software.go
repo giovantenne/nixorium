@@ -20,7 +20,8 @@ const (
 	SoftwareScopeClients    = "clients"
 )
 
-var softwarePackagePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+._-]{0,79}$`)
+var softwarePackagePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_-]*(\.[A-Za-z0-9][A-Za-z0-9+_-]*)*$`)
+var softwareSearchPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+._-]{1,79}$`)
 var softwareGroupPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`)
 
 var ErrSoftwareConflict = errors.New("software declaration changed since review")
@@ -47,7 +48,23 @@ type SoftwareCatalogItem struct {
 	ID           string `json:"id"`
 	Label        string `json:"label"`
 	Summary      string `json:"summary"`
+	Version      string `json:"version,omitempty"`
 	Availability string `json:"availability"`
+}
+
+type SoftwareSearchReport struct {
+	SchemaVersion int                   `json:"schemaVersion"`
+	Operation     string                `json:"operation"`
+	State         string                `json:"state"`
+	Repository    string                `json:"repository"`
+	Query         string                `json:"query"`
+	Results       []SoftwareCatalogItem `json:"results"`
+	Issues        []ValidationIssue     `json:"issues"`
+	Message       string                `json:"message,omitempty"`
+}
+
+func (r SoftwareSearchReport) HasErrors() bool {
+	return len(r.Issues) > 0 || r.State == "failed" || r.State == "invalid"
 }
 
 type SoftwareDefinition struct {
@@ -164,7 +181,7 @@ func ValidateLabSoftware(software LabSoftwareFile) error {
 	}
 	seen := map[string]bool{}
 	for _, entry := range software.Packages {
-		if !softwarePackagePattern.MatchString(entry.Package) || seen[entry.Package] || entry.Origin != "" {
+		if len(entry.Package) > 80 || !softwarePackagePattern.MatchString(entry.Package) || seen[entry.Package] || entry.Origin != "" {
 			return errors.New("lab software contains an invalid or duplicate package")
 		}
 		seen[entry.Package] = true
@@ -198,6 +215,13 @@ func ValidateSoftwareScope(scope SoftwareScope) error {
 		}
 	default:
 		return fmt.Errorf("unknown software scope %q", scope.Kind)
+	}
+	return nil
+}
+
+func ValidateSoftwareSearchQuery(query string) error {
+	if !softwareSearchPattern.MatchString(query) {
+		return errors.New("enter at least two package-name characters; letters, digits, dot, plus, underscore, and hyphen are supported")
 	}
 	return nil
 }

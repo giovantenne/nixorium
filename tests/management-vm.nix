@@ -248,6 +248,18 @@
             packages = map (entry: entry // { origin = "managed"; })
               (builtins.fromJSON (builtins.readFile ./lab-software.json)).packages;
           };
+          nixoriumSearchSoftwarePackages = request:
+            if request.query == "hell" then [
+              { id = "hello"; label = "hello"; summary = "A friendly greeting program"; version = "2.12"; availability = "available"; }
+            ] else [];
+          nixoriumResolveSoftwarePackage = package:
+            if package == "hello" then
+              { id = "hello"; label = "hello"; summary = "A friendly greeting program"; version = "2.12"; availability = "available"; }
+            else if package == "gimp" then
+              { id = "gimp"; label = "GIMP"; summary = "Edit bitmap images"; availability = "available"; }
+            else if package == "vlc" then
+              { id = "vlc"; label = "VLC"; summary = "Play audio and video"; availability = "available"; }
+            else null;
           nixoriumValidateSoftwareCandidate = candidate: builtins.deepSeq candidate true;
         };
       }
@@ -298,6 +310,7 @@
     controller.succeed("cp /tmp/deployment/admin-ssh /tmp/existing-admin-key; chmod 0600 /tmp/existing-admin-key; sha256sum /tmp/existing-admin-key > /tmp/existing-admin-key.sha256; rm /tmp/deployment/admin-ssh /tmp/deployment/keys/admin-ssh.pub; ((sleep 8; printf '\\r'; sleep 4; printf j; printf i; sleep 1; printf '/tmp/existing-admin-key\\r'; sleep 6; printf '\\r'; sleep 6) | TERM=xterm timeout 30s script -qefc 'stty rows 40 cols 120; nixorium setup --repo /tmp/deployment' /tmp/nixorium-key-import-tui.log) || test $? = 124")
     controller.succeed("sha256sum -c /tmp/existing-admin-key.sha256; cmp /tmp/existing-admin-key /tmp/deployment/admin-ssh; test \"$(stat -c '%a' /tmp/deployment/admin-ssh)\" = 600; nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'; ! git -C /tmp/deployment status --porcelain=v1 | grep -F 'keys/admin-ssh.pub'")
     controller.succeed("nixorium software catalog --repo /tmp/deployment --json > /tmp/software-catalog.json; jq -e '.operation == \"software-catalog\" and .state == \"ready\" and .managedFile == \"lab-software.json\" and (.catalog | length) == 2 and (.packages | length) == 0 and .groups.graphics == [\"pc01\"]' /tmp/software-catalog.json")
+    controller.succeed("nixorium software search --repo /tmp/deployment --query hell --json > /tmp/software-search.json; jq -e '.operation == \"software-search\" and .state == \"ready\" and .query == \"hell\" and .results == [{\"id\":\"hello\",\"label\":\"hello\",\"summary\":\"A friendly greeting program\",\"version\":\"2.12\",\"availability\":\"available\"}]' /tmp/software-search.json")
     controller.succeed("nixorium software plan --repo /tmp/deployment --package vlc --scope group:graphics --json > /tmp/software-plan.json; jq -e '.operation == \"software-change-plan\" and .state == \"ready\" and .request.package == \"vlc\" and .request.scope.group == \"graphics\" and .affectedClients == [\"pc01\"] and (.reviewToken | startswith(\"sha256:\")) and (.confirmation | startswith(\"SAVE SOFTWARE \"))' /tmp/software-plan.json")
     controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); token=$(jq -r .reviewToken /tmp/software-plan.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect \"$token\" </dev/null >/tmp/software-noninteractive.out 2>/tmp/software-noninteractive.err || test $? = 2; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; grep -F 'requires an interactive terminal or explicit --yes' /tmp/software-noninteractive.err")
     controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect sha256:stale --yes --json > /tmp/software-stale.json || test $? = 1; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; jq -e '.operation == \"software-change-apply\" and .state == \"conflict\" and any(.issues[]; .field == \"reviewToken\")' /tmp/software-stale.json")

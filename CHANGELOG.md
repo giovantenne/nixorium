@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added typed package-name search and exact package resolution against the
+  deployment's locked nixpkgs input and overlays. The catalog is now a set of
+  suggestions rather than an allowlist, dotted attributes resolve structurally,
+  blocked/unavailable packages remain explicit, and removals do not require an
+  obsolete package to remain resolvable.
 - Added guided import for existing cache-signing, administrator SSH, and
   Veyon private keys during first setup. Imports reject symbolic links,
   oversized or broadly readable files, encrypted unattended SSH keys, and any

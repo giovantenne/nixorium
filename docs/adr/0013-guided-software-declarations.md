@@ -1,6 +1,6 @@
 # ADR-0013: Guided software declarations
 
-- Status: accepted
+- Status: accepted, amended for pinned package search
 - Date: 2026-09-15
 
 ## Context
@@ -25,10 +25,13 @@ evaluated group, or explicit evaluated client identities. Unknown fields,
 duplicate identities, unknown groups/clients, and unsupported schema versions
 fail closed.
 
-Expose a small curated catalog from `lib/software-catalog.nix`. Include only
-entries that resolve to available derivations in the deployment's pinned
-package set. The schema evaluator also checks the same allowlist, so direct
-file edits cannot use a package that merely happens to exist in nixpkgs.
+Expose a small curated catalog from `lib/software-catalog.nix` as suggestions,
+not as an allowlist. Search and exact resolution run through deployment outputs
+backed by its locked nixpkgs input and laboratory overlays. Requests cross the
+adapter as JSON data and attribute paths are split and resolved structurally;
+user input is never interpolated into Nix or shell code. Results identify
+broken, insecure, unfree, and platform-incompatible derivations instead of
+silently widening package policy.
 
 Apply declarations as an additional NixOS module on clients only. Do not add
 them to the controller. Package declarations supplied by framework or private
@@ -36,9 +39,10 @@ modules compose normally and are never rewritten or removed by this workflow.
 The offline installer bundle carries the normalized managed file and group
 definition so it evaluates the same client configurations.
 
-Use shared typed catalog/plan/apply application services for CLI and TUI. Plan
-normalizes the request, resolves affected identities, evaluates the complete
-candidate through the private deployment's
+Use shared typed catalog/search/plan/apply application services for CLI and
+TUI. Dotted attribute paths support nested package sets. Plan resolves additions
+again from the locked inputs, normalizes the request, resolves affected
+identities, evaluates the complete candidate through the private deployment's
 `nixoriumValidateSoftwareCandidate` hook, and binds the source fingerprint and
 candidate bytes to a review token. Apply repeats planning and validation,
 rechecks the token and source bytes, locks the deployment root, and atomically
@@ -56,10 +60,10 @@ clients. Those remain separate reviewed operations.
 ## Consequences
 
 The common path is usable without Nix knowledge and remains deterministic and
-offline after inputs are present. Catalog expansion is an upstream code change
-that must be reviewed and validated; it is intentionally not a free-form
-package search. Advanced packages and per-package configuration continue to use
-private modules.
+offline after inputs are present. Suggested entries remain intentionally small,
+while name search can select other derivations already available to the
+deployment. Packages requiring service configuration or module options still
+belong in private modules; adding a derivation promises only a system package.
 
 The guided flow leaves `lab-software.json` clean in the local repository and
 does not expose history mechanics to the operator. No client is contacted by

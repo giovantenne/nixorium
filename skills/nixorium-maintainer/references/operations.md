@@ -117,23 +117,27 @@ automation with the exact fresh review token.
 
 ## Guided client software
 
-Use the catalog and reviewed declaration workflow for supported packages:
+Use suggestions or search the deployment's locked package set, then use the
+reviewed declaration workflow:
 
 ```sh
 nixorium software catalog
+nixorium software search --query libreoffice
 nixorium software plan --package vlc --scope all-clients
+nixorium software plan --package python3Packages.numpy --scope all-clients
 nixorium software apply --package vlc --scope all-clients --expect REVIEW_TOKEN
 ```
 
 Scopes are `all-clients`, `group:NAME`, or comma-separated evaluated identities
 such as `clients:pc01,pc04`. Add `--remove` to both plan and apply to remove a
-managed declaration. The catalog is curated and resolved from pinned inputs;
-never substitute a raw package name if lookup fails.
+managed declaration. Search uses pinned inputs and overlays, resolves dotted
+attributes as structured data, and reports packages blocked by policy.
 
 Apply re-evaluates the candidate, rechecks the content-bound token and source
-fingerprint, and atomically changes only `lab-software.json`. It does not
-commit, build, activate, prepare PXE, or deploy. Review and commit the file,
-then run a separate deployment for the intended powered-on clients. Packages
+fingerprint, and atomically changes only `lab-software.json`. The normal TUI
+records that file locally without exposing Git. It does not push, build,
+activate, prepare PXE, or deploy. Then run a separate deployment for the
+intended powered-on clients. Packages
 and options in private NixOS modules remain outside this workflow.
 
 Review deployment changes without mutating the index or worktree:

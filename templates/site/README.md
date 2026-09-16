@@ -199,14 +199,15 @@ plaintext never enters the Bubble Tea model. Both ordinary and password edits
 return to one Nix-validated, redacted review before the fingerprint-bound atomic
 replacement of `lab-settings.json`.
 
-After apply, use **Review Git changes** to inspect and commit the managed file.
-Then rebuild the controller and deploy affected clients as appropriate. The
-Settings action does not commit, push, rebuild, activate, or deploy implicitly.
+The TUI saves the managed file and its local history as one operation. Then
+rebuild the controller and deploy affected clients as appropriate. The Settings
+action does not push, rebuild, activate, or deploy implicitly.
 
 ### Add or change software
 
-Open **Add or change software** to search the small supported catalog resolved
-from this deployment's pinned Nix package set. Choose whether the declaration
+Open **Add or change software** to browse common suggestions. The typed CLI
+search shown below covers the wider package set locked by this deployment.
+Choose whether the declaration
 applies to every client (including future generated clients), an evaluated
 group, or selected configured computers. Clients may all remain powered off.
 
@@ -214,7 +215,9 @@ The same typed workflow is available from the CLI:
 
 ```sh
 nix run .#nixorium -- software catalog
+nix run .#nixorium -- software search --query libreoffice
 nix run .#nixorium -- software plan --package vlc --scope all-clients
+nix run .#nixorium -- software plan --package python3Packages.numpy --scope all-clients
 nix run .#nixorium -- software plan --package gimp --scope group:graphics
 nix run .#nixorium -- software apply --package vlc --scope all-clients \
   --expect REVIEW_TOKEN
@@ -223,13 +226,14 @@ nix run .#nixorium -- software apply --package vlc --scope all-clients \
 Groups are declared in `flake.nix` through `clientGroups`; explicit client
 scopes accept comma-separated evaluated identities such as
 `clients:pc01,pc04`. Use `--remove` with plan and apply to remove a declaration
-owned by this workflow. Raw package names are never accepted as a fallback when
-the catalog is unavailable.
+owned by this workflow. Search and resolution use the deployment's locked input
+and overlays; dotted attributes are resolved as data rather than Nix code.
 
 Apply atomically replaces only `lab-software.json` after repeating pinned Nix
-validation and checking the review token and source fingerprint. It does not
-commit, build, activate the controller, prepare PXE, or distribute clients.
-Review and commit the file, then use **Distribute the prepared system** for the
+validation and checking the review token and source fingerprint. The ordinary
+TUI also records that one managed file locally without exposing Git. It does not
+push, build, activate the controller, prepare PXE, or distribute clients. Then
+use **Distribute the prepared system** for the
 specific powered-on clients you intend to update. Packages supplied by private
 NixOS modules remain untouched and are edited through the advanced module
 workflow.

@@ -4,7 +4,6 @@ let
     inherit lib pkgs;
     clientNames = [ "pc01" "pc02" ];
     clientGroups.graphics = [ "pc01" ];
-    allowedPackages = [ "vlc" "gimp" "inkscape" ];
   };
   valid = evaluate {
     schemaVersion = 1;
@@ -18,14 +17,14 @@ let
   rejectsGroups = clientGroups: !(builtins.tryEval (builtins.deepSeq ((import ../lib/eval-lab-software.nix {
     inherit lib pkgs clientGroups;
     clientNames = [ "pc01" ];
-    allowedPackages = [ "vlc" ];
   }) { schemaVersion = 1; packages = []; }) true)).success;
 in
 assert builtins.length valid.packages == 3;
 assert rejects { schemaVersion = 2; packages = []; };
 assert rejects { schemaVersion = 1; packages = []; unexpected = true; };
 assert rejects { schemaVersion = 1; packages = [{ package = "not-a-real-package"; scope.kind = "all-clients"; }]; };
-assert rejects { schemaVersion = 1; packages = [{ package = "bash"; scope.kind = "all-clients"; }]; };
+assert !rejects { schemaVersion = 1; packages = [{ package = "hello"; scope.kind = "all-clients"; }]; };
+assert !rejects { schemaVersion = 1; packages = [{ package = "python3Packages.pip"; scope.kind = "all-clients"; }]; };
 assert rejects { schemaVersion = 1; packages = [{ package = "vlc"; scope = { kind = "all-clients"; group = "graphics"; }; }]; };
 assert rejects { schemaVersion = 1; packages = [{ package = "vlc"; scope = { kind = "clients"; clients = [ "pc99" ]; }; }]; };
 assert rejects { schemaVersion = 1; packages = [{ package = "vlc"; scope = { kind = "group"; group = "missing"; }; }]; };

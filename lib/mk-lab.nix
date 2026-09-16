@@ -301,16 +301,24 @@ let
   bootstrapPkgs = import nixpkgs {
     inherit system;
   };
+  softwarePkgs = import nixpkgs {
+    inherit system;
+    overlays = [ labOverlay ];
+  };
+  softwarePackageTools = import ./software-packages.nix {
+    inherit lib;
+    pkgs = softwarePkgs;
+  };
   softwareCatalog = import ./software-catalog.nix {
     inherit lib;
-    pkgs = bootstrapPkgs;
+    pkgs = softwarePkgs;
   };
   labSoftwareConfig = import ./eval-lab-software.nix {
     inherit lib;
-    pkgs = bootstrapPkgs;
+    pkgs = softwarePkgs;
     clientNames = validClientNames;
     inherit clientGroups;
-    allowedPackages = map (entry: entry.id) softwareCatalog;
+    requireAvailable = false;
   } labSoftware;
   softwareAppliesTo = name: scope:
     scope.kind == "all-clients"
@@ -318,7 +326,10 @@ let
     || (scope.kind == "clients" && builtins.elem name scope.clients);
   managedSoftwareModule = { pkgs, hostName, ... }: {
     environment.systemPackages = map
-      (entry: builtins.getAttr entry.package pkgs)
+      (entry:
+        let package = lib.attrByPath (lib.splitString "." entry.package) null pkgs;
+        in if package != null && lib.isDerivation package then package
+        else throw "lab-software.json: package ${entry.package} is unavailable in the pinned package set")
       (builtins.filter (entry: softwareAppliesTo hostName entry.scope) labSoftwareConfig.packages);
   };
   installerDiskoRuntimePackages = disko.lib.packages {
@@ -564,6 +575,9 @@ assert unknownVeyonNativeHosts == []
     catalog = softwareCatalog;
     packages = map (entry: entry // { origin = "managed"; }) labSoftwareConfig.packages;
   };
+
+  nixoriumSearchSoftwarePackages = softwarePackageTools.search;
+  nixoriumResolveSoftwarePackage = softwarePackageTools.describe;
 
   deploymentStatus = {
     ready = deploymentIssues == [];
