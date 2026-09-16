@@ -37,16 +37,21 @@ func (h *setupPasswordHasher) HashPassword(context.Context, []byte) (string, err
 	return "$6$salt$hash", nil
 }
 
-func TestBareSetupSkipsCompletedConfigurationStages(t *testing.T) {
-	for _, stage := range []string{"", domain.SetupStageReview, domain.SetupStageApply, domain.SetupStageArtifacts, domain.SetupStageReadiness, domain.SetupStageInstall} {
-		if setupNeedsConfiguration(domain.SetupReport{CurrentStage: stage}) {
-			t.Fatalf("stage %q unexpectedly reruns configuration", stage)
-		}
+func TestBareSetupSelectsTheUnifiedGuidedTUI(t *testing.T) {
+	options, err := parseArguments([]string{"setup"})
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, stage := range []string{domain.SetupStageNetwork, domain.SetupStageIdentity, domain.SetupStageCredentials, domain.SetupStageKeys, domain.SetupStageValidate} {
-		if !setupNeedsConfiguration(domain.SetupReport{CurrentStage: stage}) {
-			t.Fatalf("stage %q unexpectedly skipped configuration", stage)
-		}
+	if options.command != "setup" || options.subcommand != "configure" || !options.guided {
+		t.Fatalf("bare setup does not select the unified TUI: %+v", options)
+	}
+
+	explicit, err := parseArguments([]string{"setup", "configure"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if explicit.guided {
+		t.Fatalf("advanced configure compatibility command unexpectedly changed: %+v", explicit)
 	}
 }
 

@@ -373,18 +373,6 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			if !options.guided {
 				return runSetupConfigure(ctx, repository, stdout, stderr, false)
 			}
-			setup := manager.Status(ctx, repository)
-			if setupNeedsConfiguration(setup) {
-				if code := runSetupConfigure(ctx, repository, stdout, stderr, true); code != 0 {
-					return code
-				}
-				setup = manager.Status(ctx, repository)
-				if setupNeedsConfiguration(setup) {
-					presentation.SetupText(stdout, setup)
-					fmt.Fprintln(stdout, "Setup paused before configuration was complete. Run `nixorium setup` to resume.")
-					return 0
-				}
-			}
 			report, inspectErr := inspector.Status(ctx, repository)
 			if inspectErr != nil {
 				fmt.Fprintln(stderr, "Error:", inspectErr)
@@ -485,15 +473,6 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	return 0
 }
 
-func setupNeedsConfiguration(report domain.SetupReport) bool {
-	switch report.CurrentStage {
-	case "", domain.SetupStageReview, domain.SetupStageApply, domain.SetupStageArtifacts, domain.SetupStageReadiness, domain.SetupStageInstall:
-		return false
-	default:
-		return true
-	}
-}
-
 func runDashboardProgram(ctx context.Context, repository string, report domain.StatusReport, setupMode bool, stderr io.Writer) int {
 	local := adapters.Local{}
 	inspector := app.NewInspector(local)
@@ -521,6 +500,14 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 		},
 		LoadSetup: func() domain.SetupReport {
 			return setupManager.Status(ctx, repository)
+		},
+		ReconcileSetupKeys: func() (domain.KeyReconcileReport, error) {
+			return setupManager.ReconcileKeys(ctx, repository)
+		},
+		InstallSetupSecrets: func() domain.ActionReport {
+			report := app.NewSystemActions(local).InstallSecrets(ctx)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
 		},
 		LoadHosts: func() (domain.HostsReport, error) {
 			return inspector.Hosts(ctx, repository)

@@ -171,6 +171,15 @@ func (menu routineSettingsMenu) selected() (routineSettingsGroup, bool) {
 	return routineSettingsGroups[item.index], true
 }
 
+func (menu *routineSettingsMenu) selectGroup(id string) {
+	for index, group := range routineSettingsGroups {
+		if group.id == id {
+			menu.list.Select(index)
+			return
+		}
+	}
+}
+
 func (menu routineSettingsMenu) update(message tea.Msg) (routineSettingsMenu, tea.Cmd) {
 	updated, command := menu.list.Update(message)
 	menu.list = updated
@@ -247,8 +256,16 @@ func (command *settingsPasswordCommand) Run() error {
 }
 
 func (model dashboardModel) settingsView() string {
+	title := "Nixorium — Settings"
+	intro := "Choose one area to edit. Values are validated before any file changes."
+	backLabel := "back"
+	if model.settingsReturn == dashboardSetup {
+		title = "Nixorium — First setup / Laboratory settings"
+		intro = "Complete the required laboratory settings here, then return to setup."
+		backLabel = "setup"
+	}
 	if model.busy != "" {
-		return tuiTitle("Nixorium — Settings", model.isDark) + "\n\n" + model.busyView() + "\n"
+		return tuiTitle(title, model.isDark) + "\n\n" + model.busyView() + "\n"
 	}
 	switch model.screen {
 	case dashboardSettingsEdit:
@@ -258,7 +275,7 @@ func (model dashboardModel) settingsView() string {
 	case dashboardSettingsReview:
 		return model.settingsReviewView()
 	}
-	lines := []string{tuiTitle("Nixorium — Settings", model.isDark), ""}
+	lines := []string{tuiTitle(title, model.isDark), ""}
 	if model.settingsResult.Operation != "" {
 		success := !model.settingsResult.HasErrors() && model.settingsResult.State == "applied"
 		title := "Settings need attention"
@@ -273,19 +290,23 @@ func (model dashboardModel) settingsView() string {
 		if model.message != "" {
 			lines = append(lines, "", "Result: "+model.message)
 		}
+		returnLabel := "dashboard"
+		if model.settingsReturn == dashboardSetup {
+			returnLabel = "setup"
+		}
 		lines = append(lines, "", tuiHelp(model.width, model.isDark,
 			tuiHelpBinding([]string{"g"}, "g", "review Git changes"),
 			tuiHelpBinding([]string{"e"}, "e", "edit more"),
-			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
+			tuiHelpBinding([]string{"enter"}, "enter", returnLabel),
 		))
 		return strings.Join(lines, "\n") + "\n"
 	}
 	lines = append(lines,
-		"Choose one area to edit. Values are validated before any file changes.",
+		intro,
 		"",
 		model.settingsMenu.list.View(),
 		"",
-		"enter edit   / search   p passwords   esc back   ? help",
+		"enter edit   / search   p passwords   esc "+backLabel+"   ? help",
 	)
 	if model.message != "" {
 		lines = append(lines, "", "Result: "+model.message)

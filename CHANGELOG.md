@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Unified bare `nixorium setup` and the ordinary dashboard around the same
+  first-setup screens. A fresh or incomplete laboratory opens its first pending
+  setup step, while every configured laboratory retains a visible Setup and
+  readiness intervention. Network, identity, locale, and password work now
+  opens the existing validated editors in place; missing keys can be generated,
+  verified, and installed through typed setup actions without asking the
+  operator to leave the TUI and run another command.
 - Changed fresh deployment and standalone-example regional defaults to US
   English for language, formats, desktop keyboard, and console keyboard, with
   `America/New_York` as the visible, editable initial time zone. Existing
