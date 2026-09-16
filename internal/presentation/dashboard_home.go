@@ -111,6 +111,17 @@ func (model dashboardModel) homeView() string {
 		tuiTitle("Nixorium  /  Computer laboratory", model.isDark),
 		"",
 	}
+	if model.initialError {
+		lines = append(lines,
+			tuiResult("The laboratory could not be opened", false, model.isDark),
+			model.message,
+			"",
+			"No configuration or computer was changed.",
+			"",
+			"enter try again   q quit   F1 help",
+		)
+		return strings.Join(lines, "\n") + "\n"
+	}
 	if model.report.PXE.Mode == "recovery-required" {
 		lines = append(lines,
 			tuiStatus("Controller network recovery required", tuiStatusAttention, model.isDark),

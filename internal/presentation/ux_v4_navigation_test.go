@@ -247,3 +247,56 @@ func TestSetupPreparesAndInstallsKeysThroughTypedActions(t *testing.T) {
 		t.Fatalf("key result is unclear: %q", model.message)
 	}
 }
+
+func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
+	loads := 0
+	setup := domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
+	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+			loads++
+			return testDashboardReport("stopped"), setup, nil
+		},
+	}, false)
+	model.initializing = true
+	model.busy = "Opening the laboratory and checking setup progress"
+	if view := model.View().Content; !strings.Contains(view, model.busy) {
+		t.Fatalf("startup activity is not visible before inspection:\n%s", view)
+	}
+
+	updated, command := model.Update(model.loadInitial()())
+	model = updated.(dashboardModel)
+	if command != nil || loads != 1 || model.initializing || model.screen != dashboardSetup || !model.setupMode {
+		t.Fatalf("initial result did not route to setup: loads=%d model=%+v", loads, model)
+	}
+}
+
+func TestLoadingDashboardFailureHasInPlaceRetry(t *testing.T) {
+	attempts := 0
+	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+			attempts++
+			if attempts == 1 {
+				return domain.StatusReport{}, domain.SetupReport{}, errors.New("evaluation unavailable")
+			}
+			return testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, nil
+		},
+	}, false)
+	model.initializing = true
+	model.busy = "Opening the laboratory and checking setup progress"
+
+	updated, _ := model.Update(model.loadInitial()())
+	model = updated.(dashboardModel)
+	if !model.initialError || !strings.Contains(model.View().Content, "enter try again") {
+		t.Fatalf("startup failure has no recovery:\n%s", model.View().Content)
+	}
+	updated, retry := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if retry == nil || !model.initializing {
+		t.Fatal("startup retry did not begin")
+	}
+	updated, _ = model.Update(retry())
+	model = updated.(dashboardModel)
+	if attempts != 2 || model.initialError || model.screen != dashboardHome || model.busy != "" {
+		t.Fatalf("startup retry did not recover: attempts=%d model=%+v", attempts, model)
+	}
+}

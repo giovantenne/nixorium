@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made interactive startup render immediately before repository inspection.
+  The dashboard now shows an English opening activity while status and setup
+  checks run once in the background, routes to first setup only after those
+  checks complete, and provides an in-place retry screen when initialization
+  fails. JSON and other non-interactive commands retain synchronous output.
 - Unified bare `nixorium setup` and the ordinary dashboard around the same
   first-setup screens. A fresh or incomplete laboratory opens its first pending
   setup step, while every configured laboratory retains a visible Setup and

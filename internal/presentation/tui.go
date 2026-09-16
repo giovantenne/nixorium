@@ -13,6 +13,7 @@ import (
 )
 
 type DashboardActions struct {
+	LoadInitial               func() (domain.StatusReport, domain.SetupReport, error)
 	LoadDoctor                func() (domain.DoctorReport, error)
 	Refresh                   func() (domain.StatusReport, error)
 	LoadSetup                 func() domain.SetupReport
@@ -204,10 +205,19 @@ type dashboardModel struct {
 	height               int
 	isDark               bool
 	activitySpinner      spinner.Model
+
+	initializing bool
+	initialError bool
 }
 
 type dashboardStatusMsg struct {
 	report domain.StatusReport
+	err    error
+}
+
+type dashboardInitialMsg struct {
+	report domain.StatusReport
+	setup  domain.SetupReport
 	err    error
 }
 
@@ -376,6 +386,15 @@ func RunSetupDashboard(report domain.StatusReport, setup domain.SetupReport, act
 	return err
 }
 
+func RunLoadingDashboard(actions DashboardActions, setupMode bool) error {
+	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
+	model.setupMode = setupMode
+	model.initializing = true
+	model.busy = "Opening the laboratory and checking setup progress"
+	_, err := tea.NewProgram(model).Run()
+	return err
+}
+
 func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, actions DashboardActions, setupMode bool) dashboardModel {
 	screen := dashboardHome
 	if setupMode || setupNeedsImmediateAttention(setup) {
@@ -389,7 +408,11 @@ func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, act
 }
 
 func (model dashboardModel) Init() tea.Cmd {
-	return tea.Batch(tea.RequestBackgroundColor, model.activitySpinner.Tick)
+	commands := []tea.Cmd{tea.RequestBackgroundColor, model.activitySpinner.Tick}
+	if model.initializing && model.actions.LoadInitial != nil {
+		commands = append(commands, model.loadInitial())
+	}
+	return tea.Batch(commands...)
 }
 
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
@@ -410,6 +433,26 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case dashboardInitialMsg:
+		model.busy = ""
+		model.initializing = false
+		if message.err != nil {
+			model.initialError = true
+			model.message = "The laboratory could not be opened: " + message.err.Error()
+			model.screen = dashboardHome
+			return model, nil
+		}
+		model.initialError = false
+		model.report = message.report
+		model.setup = message.setup
+		if model.setupMode || setupNeedsImmediateAttention(message.setup) {
+			model.setupMode = true
+			model.screen = dashboardSetup
+		} else {
+			model.screen = dashboardHome
+		}
+		model.message = ""
+		return model, nil
 	case dashboardStatusMsg:
 		if message.err == nil {
 			model.report = message.report
@@ -1032,6 +1075,20 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch model.screen {
 	case dashboardHome:
+		if model.initialError {
+			switch key.String() {
+			case "enter", "r":
+				if model.actions.LoadInitial == nil {
+					return model, nil
+				}
+				model.initialError = false
+				model.initializing = true
+				model.busy = "Opening the laboratory and checking setup progress"
+				model.message = ""
+				return model, model.loadInitial()
+			}
+			return model, nil
+		}
 		// Restoration context never leaks into a later intervention after a
 		// completed result or a detour through logs.
 		model.restoreMode = false
@@ -2341,6 +2398,13 @@ func (model dashboardModel) busyView() string {
 func (model dashboardModel) loadSetup() tea.Cmd {
 	return func() tea.Msg {
 		return dashboardSetupMsg{report: model.actions.LoadSetup()}
+	}
+}
+
+func (model dashboardModel) loadInitial() tea.Cmd {
+	return func() tea.Msg {
+		report, setup, err := model.actions.LoadInitial()
+		return dashboardInitialMsg{report: report, setup: setup, err: err}
 	}
 }
 
