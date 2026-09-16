@@ -70,19 +70,19 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	inspector := app.NewInspector(local)
 	switch options.command {
 	case "":
-		report, inspectErr := inspector.Status(ctx, repository)
-		if inspectErr != nil {
-			fmt.Fprintln(stderr, "Error:", inspectErr)
-			return 1
-		}
 		if options.json {
+			report, inspectErr := inspector.Status(ctx, repository)
+			if inspectErr != nil {
+				fmt.Fprintln(stderr, "Error:", inspectErr)
+				return 1
+			}
 			if jsonErr := presentation.JSON(stdout, report); jsonErr != nil {
 				fmt.Fprintln(stderr, "Error:", jsonErr)
 				return 1
 			}
 			return 0
 		}
-		return runDashboardProgram(ctx, repository, report, false, stderr)
+		return runDashboardProgram(ctx, repository, false, stderr)
 	case "status":
 		report, inspectErr := inspector.Status(ctx, repository)
 		if inspectErr != nil {
@@ -373,12 +373,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			if !options.guided {
 				return runSetupConfigure(ctx, repository, stdout, stderr, false)
 			}
-			report, inspectErr := inspector.Status(ctx, repository)
-			if inspectErr != nil {
-				fmt.Fprintln(stderr, "Error:", inspectErr)
-				return 1
-			}
-			return runDashboardProgram(ctx, repository, report, true, stderr)
+			return runDashboardProgram(ctx, repository, true, stderr)
 		} else if options.subcommand == "apply" {
 			return runSetupApply(ctx, repository, stdout, stderr, options.yes, options.json)
 		} else if options.subcommand == "install-secrets" {
@@ -473,7 +468,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	return 0
 }
 
-func runDashboardProgram(ctx context.Context, repository string, report domain.StatusReport, setupMode bool, stderr io.Writer) int {
+func runDashboardProgram(ctx context.Context, repository string, setupMode bool, stderr io.Writer) int {
 	local := adapters.Local{}
 	inspector := app.NewInspector(local)
 	installationManager := app.NewInstallationSessionManager(local, inspector)
@@ -490,8 +485,14 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 	softwareManager := app.NewSoftwareManager(local)
 	shutdownManager := app.NewShutdownManager(local)
 	progressManager := app.NewOperationProgressManager(local)
-	setup := setupManager.Status(ctx, repository)
 	actions := presentation.DashboardActions{
+		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+			report, err := inspector.Status(ctx, repository)
+			if err != nil {
+				return domain.StatusReport{}, domain.SetupReport{}, err
+			}
+			return report, setupManager.Status(ctx, repository), nil
+		},
 		LoadDoctor: func() (domain.DoctorReport, error) {
 			return inspector.Doctor(ctx, repository, app.DoctorOptions{})
 		},
@@ -631,12 +632,7 @@ func runDashboardProgram(ctx context.Context, repository string, report domain.S
 			return report
 		},
 	}
-	var tuiErr error
-	if setupMode {
-		tuiErr = presentation.RunSetupDashboard(report, setup, actions)
-	} else {
-		tuiErr = presentation.RunDashboard(report, setup, actions)
-	}
+	tuiErr := presentation.RunLoadingDashboard(actions, setupMode)
 	if tuiErr != nil {
 		fmt.Fprintln(stderr, "Error:", tuiErr)
 		return 1
