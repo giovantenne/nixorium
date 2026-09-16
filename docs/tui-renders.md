@@ -413,6 +413,7 @@ space select  •  a all  •  enter review  •  esc back  •  F1 help
 Nixorium — Update Nixorium
 
 Configured release  v2.2.0
+Running interface   2.0.0-beta.3
 Source  github:giovantenne/nixorium
 
 Available releases
@@ -431,8 +432,10 @@ editable target as a fallback.
 
 After validation, the review states that only `flake.nix` and `flake.lock` are
 saved in the local deployment configuration. The result is “Nixorium update
-saved” and explicitly says that the running controller and clients are
-unchanged. Git review, commit language, hashes, and push actions are absent from
+saved” and shows the still-running interface version separately from the saved
+release. It explains that the controller must be rebuilt and Nixorium reopened;
+the running controller and clients remain unchanged. Git review, commit
+language, hashes, and push actions are absent from
 this ordinary flow; Advanced retains the explicit repository tools.
 
 ## Destructive confirmation

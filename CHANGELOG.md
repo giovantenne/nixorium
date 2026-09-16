@@ -35,6 +35,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   TUI. The reviewed `flake.nix` and `flake.lock` proposal is recorded locally
   without exposing Git or pushing anything; an interrupted recording can be
   completed only when both files still match the reviewed proposal exactly.
+  Update screens distinguish the saved release from the version of the current
+  TUI process and explain the rebuild-and-reopen boundary.
 - Made interactive startup render immediately before repository inspection.
   The dashboard now shows an English opening activity while status and setup
   checks run once in the background, routes to first setup only after those
