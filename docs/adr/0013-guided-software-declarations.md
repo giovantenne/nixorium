@@ -48,9 +48,10 @@ candidate bytes to a review token. Apply repeats planning and validation,
 rechecks the token and source bytes, locks the deployment root, and atomically
 replaces only `lab-software.json` through a no-follow regular-file boundary.
 
-The TUI selects catalog entries and evaluated scopes and requires the exact
-generated `SAVE SOFTWARE …` phrase. It contains no Nix or shell construction.
-After that single review, the application atomically writes and records only
+The TUI selects catalog entries and evaluated scopes and saves the reversible
+declaration with Enter after one explicit review. The generated review token
+remains an internal binding; the advanced CLI retains its explicit token and
+confirmation contract. After that single review, the application atomically writes and records only
 `lab-software.json`; Git remains an internal storage detail. A pre-existing
 change to that file blocks the operation, while a failed record after a
 successful write can be retried without applying the declaration twice. The

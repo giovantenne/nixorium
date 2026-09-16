@@ -196,7 +196,11 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			if screen == dashboardShutdown && (!strings.Contains(view, "No request is queued") || !strings.Contains(view, "space")) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
-			if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview || screen == dashboardSoftwareReview || screen == dashboardShutdownReview {
+			if screen == dashboardSoftwareReview {
+				if !strings.Contains(view, "Enter saves this reviewed configuration") || !strings.Contains(view, "Esc cancels") {
+					t.Fatalf("software save action hidden screen %d size %v:\n%s", screen, size, view)
+				}
+			} else if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview || screen == dashboardShutdownReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
@@ -245,14 +249,13 @@ func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 }
 
 func TestEveryDisruptiveReviewRejectsWrongConfirmationAndCancels(t *testing.T) {
-	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview, dashboardUpdateReview, dashboardSoftwareReview} {
+	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview, dashboardUpdateReview} {
 		m := experienceFixture(2)
 		m.screen = screen
 		m.confirmation = "wrong"
 		m.controllerPlan.Confirmation = "REBUILD pc99"
 		m.gitCommitPlan.Confirmation = "COMMIT 1 PATH"
 		m.updatePlan.Confirmation = "UPDATE NIXORIUM TO v2.3.0"
-		m.softwarePlan.Confirmation = "SAVE SOFTWARE abcdef012345"
 		m.deployPlan.ColmenaSelector = "@lab"
 		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		m = updated.(dashboardModel)

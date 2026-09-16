@@ -478,8 +478,7 @@ Draft review:
    Only lab-software.json will be replaced atomically.
    No commit, build, activation, PXE action, or deployment is included.
 
-   Type SAVE SOFTWARE abcdef012345 to continue:
-   > _
+   Enter saves this reviewed configuration; Esc cancels.
 ~~~
 
 After save: Prepare system, Pilot one client, Distribute to selected clients, or

@@ -22,6 +22,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Simplified guided software interaction: a reviewed configuration is saved
+  with Enter while its hash-bound review token remains internal, package search
+  opens from both slash keys on an Italian keyboard, and arrow keys move from
+  the search field directly through the returned packages.
 - Made ordinary settings and first-setup saves record their managed files
   locally without exposing Git, commit tokens, hashes, or repository identity.
   Saves use the existing isolated-path safety checks, preserve unrelated work,

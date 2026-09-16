@@ -270,6 +270,11 @@ func (model dashboardModel) textEntry() bool {
 	}
 }
 
+func isSearchShortcut(key tea.KeyPressMsg) bool {
+	return key.Text == "/" || key.Code == '/' || key.ShiftedCode == '/' ||
+		(key.Code == '7' && key.Mod&tea.ModShift != 0)
+}
+
 func (model *dashboardModel) startDiagnostics() tea.Cmd {
 	if model.actions.LoadDoctor == nil {
 		model.message = "Diagnostics are not available in this session."

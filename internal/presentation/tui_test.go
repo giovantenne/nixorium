@@ -151,25 +151,18 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json"} {
+	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json", "Enter saves this reviewed configuration"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
 	}
-
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "save software abcdef012345"})
-	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command != nil || applies != 0 || !strings.Contains(model.View().Content, "Confirmation did not match") {
-		t.Fatal("inexact software confirmation changed the declaration")
+	if strings.Contains(view, "SAVE SOFTWARE") || strings.Contains(view, "abcdef012345") {
+		t.Fatalf("software review exposed an internal confirmation token:\n%s", view)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "SAVE SOFTWARE abcdef012345"})
-	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil {
-		t.Fatal("exact software confirmation did not start apply")
+		t.Fatal("enter did not start the reviewed software save")
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -199,8 +192,11 @@ func TestDashboardSearchesPinnedPackagesAndIgnoresStaleResults(t *testing.T) {
 	}
 	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, actions: actions, softwareCatalog: catalog, softwareMode: softwareSuggested}
 
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "/"})
+	updated, _ := model.Update(tea.KeyPressMsg{Code: '7', ShiftedCode: '/', Mod: tea.ModShift})
 	model = updated.(dashboardModel)
+	if !model.softwareSearching || model.softwareMode != softwareSearch {
+		t.Fatal("the slash above 7 did not open package search")
+	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "hell"})
 	model = updated.(dashboardModel)
 	if command == nil || !model.softwareSearching || model.softwareMode != softwareSearch || !model.softwareSearchBusy {
@@ -217,6 +213,19 @@ func TestDashboardSearchesPinnedPackagesAndIgnoresStaleResults(t *testing.T) {
 	if searches != 1 || model.softwareSearchBusy || !strings.Contains(model.View().Content, "hello") || !strings.Contains(model.View().Content, "2.12") || !strings.Contains(model.View().Content, "blocked-unfree") {
 		t.Fatalf("search result missing:\n%s", model.View().Content)
 	}
+
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = updated.(dashboardModel)
+	if model.softwareSearching || model.softwareCursor != 1 {
+		t.Fatalf("down did not leave search input and select the next result: searching=%t cursor=%d", model.softwareSearching, model.softwareCursor)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	model = updated.(dashboardModel)
+	if model.softwareCursor != 0 {
+		t.Fatalf("up did not select the previous result: cursor=%d", model.softwareCursor)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "/"})
+	model = updated.(dashboardModel)
 
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "x"})
 	model = updated.(dashboardModel)
