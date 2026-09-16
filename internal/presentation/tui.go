@@ -49,7 +49,7 @@ type DashboardActions struct {
 	ApplyGitCommit            func(domain.GitCommitPlanReport) domain.GitCommitReport
 	CheckUpdate               func() domain.UpdateCheckReport
 	PlanUpdate                func(string, bool, bool) domain.UpdatePlanReport
-	ApplyUpdate               func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	SaveUpdate                func(domain.UpdatePlanReport) domain.UpdateApplyReport
 	LoadSettings              func() (domain.LabSettingsFile, error)
 	PlanSettings              func(domain.LabSettingsFile) domain.ConfigPlanReport
 	SaveSettings              func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
@@ -2165,13 +2165,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter", "esc":
 				model.screen = dashboardHome
 				model.message = ""
-			case "g":
-				model.busy = "Reviewing Git changes without modifying the worktree"
-				model.message = ""
-				return model, func() tea.Msg {
-					return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
-				}
 			case "r":
+				if model.updateResult.RecoveryRequired {
+					model.busy = "Completing the local update save"
+					model.updating = true
+					model.message = ""
+					plan := model.updatePlan
+					return model, func() tea.Msg {
+						return dashboardUpdateResultMsg{report: model.actions.SaveUpdate(plan)}
+					}
+				}
 				model.updateResult = domain.UpdateApplyReport{}
 				model.updateCheck = domain.UpdateCheckReport{}
 				model.updateTarget = ""
@@ -2267,13 +2270,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				model.message = "Confirmation did not match; flake.nix and flake.lock were not changed."
 				return model, nil
 			}
-			model.busy = "Writing the validated Nixorium release update"
+			model.busy = "Saving the validated Nixorium release update"
 			model.updating = true
 			model.confirmation = ""
 			model.message = ""
 			plan := model.updatePlan
 			return model, func() tea.Msg {
-				return dashboardUpdateResultMsg{report: model.actions.ApplyUpdate(plan)}
+				return dashboardUpdateResultMsg{report: model.actions.SaveUpdate(plan)}
 			}
 		default:
 			if key.Text != "" {
@@ -3147,20 +3150,24 @@ func (model dashboardModel) updateView() string {
 		success := !model.updateResult.HasErrors() && model.updateResult.Updated
 		title := "Nixorium update needs attention"
 		if success {
-			title = "Nixorium files updated"
+			title = "Nixorium update saved"
 		}
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
 			"",
-			fmt.Sprintf("State: %s   Files updated: %t   Retry safe: %t", model.updateResult.State, model.updateResult.Updated, model.updateResult.RetrySafe),
-			"Target: "+model.updateResult.Target,
+			fmt.Sprintf("State: %s   Configuration updated: %t", model.updateResult.State, model.updateResult.Updated),
+			"Configured release: "+model.updateResult.Target,
+			"Running controller and clients are unchanged.",
 		)
 		if model.message != "" {
 			lines = append(lines, "", "Result: "+model.message)
 		}
+		retryLabel := "new update"
+		if model.updateResult.RecoveryRequired {
+			retryLabel = "complete save"
+		}
 		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"g"}, "g", "review Git changes"),
-			tuiHelpBinding([]string{"r"}, "r", "new update"),
+			tuiHelpBinding([]string{"r"}, "r", retryLabel),
 			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
 		))
 		return strings.Join(lines, "\n") + "\n"
@@ -3187,7 +3194,7 @@ func (model dashboardModel) updateView() string {
 
 	releases := model.availableUpdateReleases()
 	lines = append(lines,
-		fmt.Sprintf("Current release  %s", model.updateCheck.CurrentRef),
+		fmt.Sprintf("Configured release  %s", model.updateCheck.CurrentRef),
 		tuiMuted("Source  "+model.updateCheck.Upstream, model.isDark),
 		"",
 		tuiSection("Available releases", model.isDark),

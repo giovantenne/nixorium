@@ -308,7 +308,7 @@ func phaseSteps(labels []string, current int, complete bool, dark bool) []string
 }
 
 func (model dashboardModel) releaseReviewView() string {
-	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), "", tuiSection("Validated release review", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Scope: flake.nix and flake.lock only", "No commit, push, activation, PXE action, or client deployment is implicit", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
+	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), "", tuiSection("Validated release review", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Save: flake.nix and flake.lock in the local deployment configuration", "No push, controller activation, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
 	if model.updateDetails || model.height == 0 {
 		lines = append(lines, "Revision: "+model.updatePlan.Revision, fmt.Sprintf("Downgrade: %t", model.updatePlan.Downgrade))
 		for _, check := range model.updatePlan.Checks {

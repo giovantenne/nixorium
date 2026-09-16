@@ -186,6 +186,9 @@ func parseGitCommitPaths(requested string) ([]string, error) {
 }
 
 func generatedGitCommitMessage(paths []string) string {
+	if len(paths) == 2 && paths[0] == "flake.lock" && paths[1] == "flake.nix" {
+		return "chore: update Nixorium"
+	}
 	if len(paths) == 1 && paths[0] == "lab-settings.json" {
 		return "chore: update laboratory settings"
 	}

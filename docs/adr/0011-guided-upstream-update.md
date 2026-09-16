@@ -48,16 +48,24 @@ in-process second-write failure and report any two-file inconsistency as partial
 and not blindly retry-safe. A later plan detects and can repair a mismatched
 source/lock pair.
 
-Leave the two files as uncommitted changes. Reuse the separate Git review and
-optional commit workflow if the administrator wants to record them. Never
-create branches, commits, merges, pushes, controller activations, PXE
-preparations, or client deployments from update apply.
+The explicit CLI `update apply` operation leaves the two files as uncommitted
+changes so automation retains the plan/apply boundary. The ordinary TUI wraps
+that operation in a bounded application save which records exactly
+`flake.nix` and `flake.lock` in the local deployment history with Nixorium's
+fixed internal identity. Git tokens, hashes, staging, and commit terminology
+are not part of that ordinary interaction. It never creates branches, merges,
+pushes, controller activations, PXE preparations, or client deployments.
+
+If the two writes succeed but local recording does not, the TUI reports a
+recoverable partial save. Retry records the files only when they still match
+the exact reviewed proposal and no unrelated deployment path changed.
 
 CLI and TUI reuse the same typed plan and apply operations. The TUI owns only
 explicit target/policy entry, bounded patch presentation, exact confirmation,
-and result rendering; it never reconstructs commands or performs Nix,
-filesystem, or Git operations itself. It prevents accidental exit while the
-mutating apply callback is in progress.
+and result rendering; its application callback owns the transparent local
+save. Presentation code never reconstructs commands or performs Nix,
+filesystem, or repository operations itself. It prevents accidental exit while
+the mutating save callback is in progress.
 
 ## Consequences
 
