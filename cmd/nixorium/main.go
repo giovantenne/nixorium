@@ -505,11 +505,15 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	actions := presentation.DashboardActions{
 		RunningVersion: nixoriumVersion,
 		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+			setup := setupManager.Status(ctx, repository)
+			if setupMode || setupStartsBeforeDashboardInspection(setup) {
+				return domain.StatusReport{}, setup, nil
+			}
 			report, err := inspector.Status(ctx, repository)
 			if err != nil {
 				return domain.StatusReport{}, domain.SetupReport{}, err
 			}
-			return report, setupManager.Status(ctx, repository), nil
+			return report, setup, nil
 		},
 		LoadDoctor: func() (domain.DoctorReport, error) {
 			return inspector.Doctor(ctx, repository, app.DoctorOptions{})
@@ -629,7 +633,15 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return report
 		},
 		LoadSettings: func() (domain.LabSettingsFile, error) {
-			return settingsManager.Current(repository)
+			settings, err := settingsManager.Current(repository)
+			if err != nil {
+				return domain.LabSettingsFile{}, err
+			}
+			if settings.Lab.MasterDHCPIP == domain.MasterDHCPPlaceholder {
+				staticAddress, _ := domain.ControllerStaticAddress(settings.Lab)
+				settings = applyDetectedNetworkDefaults(settings, local.DetectNetworkDefaults(staticAddress))
+			}
+			return settings, nil
 		},
 		PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
 			return settingsManager.PlanSettings(ctx, repository, candidate)
@@ -638,6 +650,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return settingsSaveManager.Save(ctx, repository, candidate, plan)
 		},
 		ChangePassword: func(account string, settings domain.LabSettingsFile, input *os.File, output io.Writer) (domain.LabSettingsFile, error) {
+			if account == "all" {
+				reader := presentation.TerminalSecretReader{Input: input, Output: output}
+				if err := collectSetupCredentials(ctx, reader, local, output, &settings); err != nil {
+					return settings, err
+				}
+				return settings, nil
+			}
 			return collectSettingsPassword(ctx, local, input, output, account, settings)
 		},
 		PreparePXE: func() domain.ActionReport {
@@ -1622,13 +1641,7 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 	}
 	if settings.Lab.MasterDHCPIP == domain.MasterDHCPPlaceholder {
 		staticAddress, _ := domain.ControllerStaticAddress(settings.Lab)
-		detected := local.DetectNetworkDefaults(staticAddress)
-		if detected.DHCPAddress != "" {
-			settings.Lab.MasterDHCPIP = detected.DHCPAddress
-		}
-		if detected.InterfaceName != "" {
-			settings.Lab.InterfaceName = detected.InterfaceName
-		}
+		settings = applyDetectedNetworkDefaults(settings, local.DetectNetworkDefaults(staticAddress))
 	}
 
 	candidate, accepted, err := presentation.RunSettingsWizard(settings)
@@ -1697,6 +1710,25 @@ func runSetupConfigure(ctx context.Context, repository string, stdout, stderr io
 		fmt.Fprintln(stdout, "Configuration and keys are ready. Opening the resumable first-run guide…")
 	}
 	return 0
+}
+
+func applyDetectedNetworkDefaults(settings domain.LabSettingsFile, detected domain.NetworkDefaults) domain.LabSettingsFile {
+	if settings.Lab.MasterDHCPIP == domain.MasterDHCPPlaceholder && detected.DHCPAddress != "" {
+		settings.Lab.MasterDHCPIP = detected.DHCPAddress
+	}
+	if detected.InterfaceName != "" {
+		settings.Lab.InterfaceName = detected.InterfaceName
+	}
+	return settings
+}
+
+func setupStartsBeforeDashboardInspection(report domain.SetupReport) bool {
+	switch report.CurrentStage {
+	case domain.SetupStageInspectEnvironment, domain.SetupStageNetwork, domain.SetupStageIdentity, domain.SetupStageCredentials:
+		return true
+	default:
+		return false
+	}
 }
 
 func collectSetupCredentials(ctx context.Context, reader app.SecretReader, hasher app.PasswordHasher, output io.Writer, candidate *domain.LabSettingsFile) error {

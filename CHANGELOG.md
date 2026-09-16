@@ -26,6 +26,15 @@ The project follows [Semantic Versioning](https://semver.org/).
   with Enter while its hash-bound review token remains internal, package search
   opens from both slash keys on an Italian keyboard, and arrow keys move from
   the search field directly through the returned packages.
+- Reduced Regional setup to the two choices an operator recognizes: time zone
+  and keyboard layout. US locale defaults remain internal, and known keyboard
+  choices automatically select the corresponding console keymap.
+- Made early setup status local and progressive: it no longer evaluates Nix,
+  derives keys, checks artifacts, or loads the full dashboard before network,
+  identity, and credentials are complete. The TUI proposes the detected DHCP
+  address instead of `MASTER_DHCP_IP`, collects all pending passwords in one
+  protected session, validates once, reuses the reviewed candidate while
+  saving, and avoids unrelated dashboard refreshes.
 - Made ordinary settings and first-setup saves record their managed files
   locally without exposing Git, commit tokens, hashes, or repository identity.
   Saves use the existing isolated-path safety checks, preserve unrelated work,

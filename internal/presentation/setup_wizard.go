@@ -49,15 +49,6 @@ var timeZoneChoices = []settingsChoice{
 	{value: "UTC", label: "UTC", description: "Coordinated Universal Time"},
 }
 
-var localeChoices = []settingsChoice{
-	{value: "en_US.UTF-8", label: "English — United States", description: "en_US.UTF-8"},
-	{value: "it_IT.UTF-8", label: "Italiano — Italia", description: "it_IT.UTF-8"},
-	{value: "en_GB.UTF-8", label: "English — United Kingdom", description: "en_GB.UTF-8"},
-	{value: "fr_FR.UTF-8", label: "Français — France", description: "fr_FR.UTF-8"},
-	{value: "de_DE.UTF-8", label: "Deutsch — Deutschland", description: "de_DE.UTF-8"},
-	{value: "es_ES.UTF-8", label: "Español — España", description: "es_ES.UTF-8"},
-}
-
 var keyboardChoices = []settingsChoice{
 	{value: "us", label: "US English", description: "XKB layout: us"},
 	{value: "it", label: "Italian", description: "XKB layout: it"},
@@ -65,15 +56,6 @@ var keyboardChoices = []settingsChoice{
 	{value: "fr", label: "French", description: "XKB layout: fr"},
 	{value: "de", label: "German", description: "XKB layout: de"},
 	{value: "es", label: "Spanish", description: "XKB layout: es"},
-}
-
-var consoleKeyMapChoices = []settingsChoice{
-	{value: "us", label: "US English", description: "Console keymap: us"},
-	{value: "it2", label: "Italian", description: "Console keymap: it2"},
-	{value: "uk", label: "UK English", description: "Console keymap: uk"},
-	{value: "fr", label: "French", description: "Console keymap: fr"},
-	{value: "de", label: "German", description: "Console keymap: de"},
-	{value: "es", label: "Spanish", description: "Console keymap: es"},
 }
 
 var settingsFields = []settingsField{
@@ -86,10 +68,7 @@ var settingsFields = []settingsField{
 	{id: "lab.teacherUser", group: "Accounts", label: "Teacher user name"},
 	{id: "lab.studentUser", group: "Accounts", label: "Student user name"},
 	{id: "lab.timeZone", group: "Regional settings", label: "Time zone", choices: timeZoneChoices},
-	{id: "lab.defaultLocale", group: "Regional settings", label: "System language and locale", choices: localeChoices},
-	{id: "lab.extraLocale", group: "Regional settings", label: "Regional formats", choices: localeChoices},
-	{id: "lab.keyboardLayout", group: "Regional settings", label: "Desktop keyboard layout", choices: keyboardChoices},
-	{id: "lab.consoleKeyMap", group: "Regional settings", label: "Console keyboard layout", choices: consoleKeyMapChoices},
+	{id: "lab.keyboardLayout", group: "Regional settings", label: "Keyboard layout", choices: keyboardChoices},
 	{id: "lab.homepageUrl", group: "Preferences", label: "Browser homepage"},
 	{id: "lab.veyonNativeHosts", group: "Classroom", label: "Veyon native hosts (comma-separated, optional)"},
 }
@@ -619,6 +598,9 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		settings.Lab.ExtraLocale = value
 	case "lab.keyboardLayout":
 		settings.Lab.KeyboardLayout = value
+		if consoleKeyMap, found := consoleKeyMapForKeyboard(value); found {
+			settings.Lab.ConsoleKeyMap = consoleKeyMap
+		}
 	case "lab.consoleKeyMap":
 		settings.Lab.ConsoleKeyMap = value
 	case "lab.veyonNativeHosts":
@@ -637,4 +619,17 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		}
 	}
 	return settings, nil
+}
+
+func consoleKeyMapForKeyboard(layout string) (string, bool) {
+	keyMaps := map[string]string{
+		"us": "us",
+		"it": "it2",
+		"gb": "uk",
+		"fr": "fr",
+		"de": "de",
+		"es": "es",
+	}
+	keyMap, found := keyMaps[layout]
+	return keyMap, found
 }

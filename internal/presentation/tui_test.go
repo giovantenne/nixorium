@@ -1363,12 +1363,6 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	planned := 0
 	applied := 0
 	actions := DashboardActions{
-		Refresh: func() (domain.StatusReport, error) {
-			report := testDashboardReport("ready")
-			report.Git.Dirty = true
-			report.Git.Changes = 1
-			return report, nil
-		},
 		LoadSettings: func() (domain.LabSettingsFile, error) {
 			return current, nil
 		},
@@ -1452,7 +1446,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !model.report.Git.Dirty || !strings.Contains(model.View().Content, "Configuration saved") || strings.Contains(model.View().Content, "Git") {
+	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !strings.Contains(model.View().Content, "Configuration saved") || strings.Contains(model.View().Content, "Git") {
 		t.Fatalf("settings result missing: applied=%d model=%+v\n%s", applied, model, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "e"})

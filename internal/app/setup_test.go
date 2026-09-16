@@ -16,17 +16,26 @@ type fakeSetupSource struct {
 	applied     bool
 	ready       bool
 	preparation domain.PXEPreparationState
+	keyCalls    *int
+	metaCalls   *int
+	readyCalls  *int
 }
 
 func (f fakeSetupSource) ReadSettings(string) ([]byte, error) {
 	return f.data, nil
 }
 
-func (fakeSetupSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
+func (f fakeSetupSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
+	if f.metaCalls != nil {
+		*f.metaCalls++
+	}
 	return domain.LabMeta{}, nil
 }
 
 func (f fakeSetupSource) DeploymentStatus(context.Context, string) (domain.DeploymentStatus, error) {
+	if f.readyCalls != nil {
+		*f.readyCalls++
+	}
 	if f.ready {
 		return domain.DeploymentStatus{Ready: true}, nil
 	}
@@ -60,7 +69,10 @@ func (fakeSetupSource) CommandAvailable(string) bool {
 	return true
 }
 
-func (fakeSetupSource) KeyMaterial(context.Context, string) []domain.KeyMaterialState {
+func (f fakeSetupSource) KeyMaterial(context.Context, string) []domain.KeyMaterialState {
+	if f.keyCalls != nil {
+		*f.keyCalls++
+	}
 	return []domain.KeyMaterialState{
 		{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
 		{Name: "ssh", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
@@ -105,9 +117,13 @@ func TestSetupStatusSelectsNetworkForFreshTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	report := NewSetupManager(fakeSetupSource{data: data}).Status(context.Background(), "/repo")
+	keyCalls, metaCalls, readyCalls := 0, 0, 0
+	report := NewSetupManager(fakeSetupSource{data: data, keyCalls: &keyCalls, metaCalls: &metaCalls, readyCalls: &readyCalls}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageNetwork {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageNetwork, report)
+	}
+	if keyCalls != 0 || metaCalls != 0 || readyCalls != 0 {
+		t.Fatalf("fresh setup ran deferred checks: keys=%d meta=%d readiness=%d", keyCalls, metaCalls, readyCalls)
 	}
 }
 

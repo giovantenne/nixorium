@@ -11,8 +11,9 @@ import (
 )
 
 type mutableSettingsSource struct {
-	data   []byte
-	writes int
+	data        []byte
+	writes      int
+	validations int
 }
 
 func (source *mutableSettingsSource) ReadSettings(string) ([]byte, error) {
@@ -23,7 +24,8 @@ func (*mutableSettingsSource) LabMeta(context.Context, string) (domain.LabMeta, 
 	return domain.LabMeta{}, nil
 }
 
-func (*mutableSettingsSource) ValidateCandidate(context.Context, string, domain.LabSettingsFile) error {
+func (source *mutableSettingsSource) ValidateCandidate(context.Context, string, domain.LabSettingsFile) error {
+	source.validations++
 	return nil
 }
 
@@ -51,8 +53,9 @@ func TestSettingsSaveRecordsOnlyTheReviewedManagedFile(t *testing.T) {
 		NewGitCommitManager(commitSource),
 	)
 
-	report := manager.Save(context.Background(), ".", candidate, domain.ConfigPlanReport{BaseFingerprint: domain.SettingsFingerprint(baseData)})
-	if report.State != "saved" || report.HasErrors() || report.RecoveryRequired || settingsSource.writes != 1 || commitSource.commits != 1 {
+	reviewed := manager.settings.PlanSettings(context.Background(), ".", candidate)
+	report := manager.Save(context.Background(), ".", candidate, reviewed)
+	if report.State != "saved" || report.HasErrors() || report.RecoveryRequired || settingsSource.writes != 1 || settingsSource.validations != 1 || commitSource.commits != 1 {
 		t.Fatalf("save = %+v, writes=%d commits=%d", report, settingsSource.writes, commitSource.commits)
 	}
 	if len(report.Paths) != 1 || report.Paths[0] != "lab-settings.json" || len(report.Changes) != 1 || report.Revision == "" {
@@ -70,7 +73,7 @@ func TestSettingsSaveRefusesPreExistingChangesToTheManagedFile(t *testing.T) {
 	commitSource := settingsSaveCommitSource(candidateData)
 	manager := NewSettingsSaveManager(NewSettingsManager(settingsSource), NewGitReviewManager(reviewSource), NewGitCommitManager(commitSource))
 
-	report := manager.Save(context.Background(), ".", candidate, domain.ConfigPlanReport{BaseFingerprint: domain.SettingsFingerprint(baseData)})
+	report := manager.Save(context.Background(), ".", candidate, reviewedSettingsPlan(baseData, candidateData, candidate))
 	if report.State != "blocked" || !report.HasErrors() || settingsSource.writes != 0 || commitSource.commits != 0 || !strings.Contains(report.Message, "outside the current save") {
 		t.Fatalf("blocked save = %+v, writes=%d commits=%d", report, settingsSource.writes, commitSource.commits)
 	}
@@ -86,9 +89,20 @@ func TestSettingsSaveRecoversWriteCompletedBeforeLocalRecord(t *testing.T) {
 	commitSource := settingsSaveCommitSource(candidateData)
 	manager := NewSettingsSaveManager(NewSettingsManager(settingsSource), NewGitReviewManager(reviewSource), NewGitCommitManager(commitSource))
 
-	report := manager.Save(context.Background(), ".", candidate, domain.ConfigPlanReport{BaseFingerprint: domain.SettingsFingerprint(baseData)})
+	report := manager.Save(context.Background(), ".", candidate, reviewedSettingsPlan(baseData, candidateData, candidate))
 	if report.State != "saved" || report.HasErrors() || settingsSource.writes != 0 || commitSource.commits != 1 {
 		t.Fatalf("recovered save = %+v, writes=%d commits=%d", report, settingsSource.writes, commitSource.commits)
+	}
+}
+
+func reviewedSettingsPlan(baseData, candidateData []byte, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+	base, _ := domain.DecodeLabSettings(baseData)
+	return domain.ConfigPlanReport{
+		State:                "valid",
+		BaseFingerprint:      domain.SettingsFingerprint(baseData),
+		CandidateFingerprint: domain.SettingsFingerprint(candidateData),
+		Changes:              domain.DiffLabSettings(base, candidate),
+		Issues:               []domain.ValidationIssue{},
 	}
 }
 

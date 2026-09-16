@@ -449,11 +449,12 @@ The implemented setup slices expose read-only reconciliation through
 explicit key reconciliation through `nixorium setup keys`. The wizard proposes
 the default-route interface and a non-static IPv4 address observed on that
 interface, so an already-active declarative controller address cannot mask the
-live DHCP lease. It groups 15 essential questions into Network, Laboratory,
+live DHCP lease. It groups 12 essential questions into Network, Laboratory,
 Accounts, Regional settings, Preferences, and Classroom stages.
-Time zone, locale, regional-format locale, desktop keyboard, and console keymap
-use offline Bubbles lists with fuzzy filtering, curated common values, and a
-validated custom path. Optional Git author identity retains the deployment
+Only time zone and keyboard layout are user choices in Regional settings; the
+US locale defaults remain internal and the console keymap follows known desktop
+keyboard selections. Both visible choices use offline Bubbles lists with fuzzy
+filtering, curated common values, and a validated custom path. Optional Git author identity retains the deployment
 template defaults instead of extending first run. The wizard retains entries
 across backward navigation, collects default credentials without echo, and
 uses the same candidate-plan/apply backend as automation. After acceptance,

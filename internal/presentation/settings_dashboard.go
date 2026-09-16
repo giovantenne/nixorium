@@ -67,13 +67,10 @@ var routineSettingsGroups = []routineSettingsGroup{
 	{
 		id:          "regional",
 		label:       "Regional",
-		description: "Time zone, locales, and keyboard layouts",
+		description: "Time zone and keyboard layout",
 		fields: []settingsField{
 			{id: "lab.timeZone", group: "Regional", label: "Time zone", choices: timeZoneChoices},
-			{id: "lab.defaultLocale", group: "Regional", label: "System language and locale", choices: localeChoices},
-			{id: "lab.extraLocale", group: "Regional", label: "Regional formats", choices: localeChoices},
-			{id: "lab.keyboardLayout", group: "Regional", label: "Desktop keyboard layout", choices: keyboardChoices},
-			{id: "lab.consoleKeyMap", group: "Regional", label: "Console keyboard layout", choices: consoleKeyMapChoices},
+			{id: "lab.keyboardLayout", group: "Regional", label: "Keyboard layout", choices: keyboardChoices},
 		},
 	},
 	{
