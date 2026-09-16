@@ -102,15 +102,17 @@ func (r SoftwareChangePlanReport) HasErrors() bool {
 }
 
 type SoftwareChangeApplyReport struct {
-	SchemaVersion   int                   `json:"schemaVersion"`
-	Operation       string                `json:"operation"`
-	State           string                `json:"state"`
-	Repository      string                `json:"repository"`
-	ManagedFile     string                `json:"managedFile"`
-	Request         SoftwareChangeRequest `json:"request"`
-	AffectedClients []string              `json:"affectedClients"`
-	Issues          []ValidationIssue     `json:"issues"`
-	Message         string                `json:"message,omitempty"`
+	SchemaVersion    int                   `json:"schemaVersion"`
+	Operation        string                `json:"operation"`
+	State            string                `json:"state"`
+	Repository       string                `json:"repository"`
+	ManagedFile      string                `json:"managedFile"`
+	Request          SoftwareChangeRequest `json:"request"`
+	AffectedClients  []string              `json:"affectedClients"`
+	Revision         string                `json:"revision,omitempty"`
+	RecoveryRequired bool                  `json:"recoveryRequired,omitempty"`
+	Issues           []ValidationIssue     `json:"issues"`
+	Message          string                `json:"message,omitempty"`
 }
 
 func (r SoftwareChangeApplyReport) HasErrors() bool {

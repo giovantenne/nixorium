@@ -6,9 +6,10 @@
 ## Context
 
 Nixorium should record reviewed deployment changes without absorbing unrelated
-administrator work. Git is an implementation detail in ordinary setup and
-settings flows; software and update flows must migrate to the same contract.
-Its terminology remains available only in Advanced and automation interfaces.
+administrator work. Git is an implementation detail in ordinary setup,
+settings, and guided software flows; the update flow must migrate to the same
+contract. Its terminology remains available only in Advanced and automation
+interfaces.
 A broad `git add`/`git commit`
 can silently include existing index entries, invoke configured filters, hooks,
 or signing programs, race with a prior review, and encourage an implicit remote

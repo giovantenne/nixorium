@@ -172,7 +172,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.softwareScopeCursor = len(m.softwareScopeOptions()) - 1
 			m.softwareClientCursor = 199
 			m.softwarePlan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.softwareCatalog.Clients, Confirmation: "SAVE SOFTWARE abcdef012345"}
-			m.softwareResult = domain.SoftwareChangeApplyReport{State: "applied", ManagedFile: "lab-software.json"}
+			m.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 			m.shutdownCursor = 199
 			m.shutdownChosen = map[string]bool{"pc200": true}
 			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownRequireIdle, Confirmation: "SHUTDOWN 1 CLIENTS abcdef012345", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
@@ -337,7 +337,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			}
 		case "software-result":
 			m.screen = dashboardSoftwareResult
-			m.softwareResult = domain.SoftwareChangeApplyReport{State: "applied", ManagedFile: "lab-software.json"}
+			m.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 		case "software-partial":
 			m.screen = dashboardSoftwareResult
 			m.softwareResult = domain.SoftwareChangeApplyReport{

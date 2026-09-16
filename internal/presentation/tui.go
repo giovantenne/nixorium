@@ -30,7 +30,7 @@ type DashboardActions struct {
 	ConfirmInstallationTarget func(string) domain.InstallationSessionReport
 	LoadSoftware              func() domain.SoftwareCatalogReport
 	PlanSoftware              func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
-	ApplySoftware             func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
+	SaveSoftware              func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
 	PlanShutdown              func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
 	ApplyShutdown             func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
 	PlanDeployment            func(string) domain.DeploymentPlanReport

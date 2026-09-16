@@ -98,7 +98,6 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	catalog := testSoftwareCatalogReport()
 	plans := 0
 	applies := 0
-	gitReviews := 0
 	actions := DashboardActions{
 		LoadSoftware: func() domain.SoftwareCatalogReport { return catalog },
 		PlanSoftware: func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
@@ -112,13 +111,9 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 				AffectedClients: catalog.Clients, ReviewToken: "sha256:abcdef0123456789", Confirmation: "SAVE SOFTWARE abcdef012345",
 			}
 		},
-		ApplySoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
+		SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 			applies++
-			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-apply", State: "applied", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: plan.AffectedClients}
-		},
-		LoadGitReview: func() domain.GitReviewReport {
-			gitReviews++
-			return domain.GitReviewReport{Operation: "git-review", State: "changes", Changes: []domain.GitChange{{Path: "lab-software.json", Managed: true}}}
+			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: "saved", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: plan.AffectedClients}
 		},
 	}
 	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
@@ -148,7 +143,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Proposal validated", "Revision not saved", "System not prepared", "No client changed", "Only lab-software.json"} {
+	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
@@ -170,18 +165,8 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if plans != 1 || applies != 1 || model.screen != dashboardSoftwareResult || !strings.Contains(model.View().Content, "Git revision not saved") || strings.Contains(model.View().Content, "distribution targets") {
-		t.Fatalf("software result skipped revision boundary:\n%s", model.View().Content)
-	}
-	updated, command = model.Update(tea.KeyPressMsg{Text: "g"})
-	model = updated.(dashboardModel)
-	if command == nil || model.screen != dashboardGitReview {
-		t.Fatal("software result did not route to Git review")
-	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	if gitReviews != 1 || !strings.Contains(model.View().Content, "lab-software.json") {
-		t.Fatalf("Git review did not show the saved declaration:\n%s", model.View().Content)
+	if plans != 1 || applies != 1 || model.screen != dashboardSoftwareResult || !strings.Contains(model.View().Content, "Software configuration saved") || strings.Contains(model.View().Content, "Git") || strings.Contains(model.View().Content, "distribution targets") {
+		t.Fatalf("software result is not self-contained:\n%s", model.View().Content)
 	}
 }
 
@@ -199,7 +184,7 @@ func TestDashboardSoftwareResultDistinguishesNoChangeAndUncertainSave(t *testing
 		Issues:  []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
 	}
 	view = model.View().Content
-	for _, expected := range []string{"needs attention", "could not be confirmed", "Technical detail: directory sync failed", "Inspect the file and Git review", "No system was built or deployed"} {
+	for _, expected := range []string{"needs attention", "could not be confirmed", "Technical detail: directory sync failed", "Retry completes the local save", "No system was built or deployed"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("partial software result omits %q:\n%s", expected, view)
 		}
