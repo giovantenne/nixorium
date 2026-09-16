@@ -98,6 +98,29 @@ func TestCommitGitPathsDisablesRepositoryHooks(t *testing.T) {
 	}
 }
 
+func TestCommitGitPathsUsesInternalIdentityWithoutRepositoryConfiguration(t *testing.T) {
+	repository := newGitReviewRepository(t)
+	if _, err := run(context.Background(), "git", "-C", repository, "config", "--unset", "user.name"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "config", "--unset", "user.email"); err != nil {
+		t.Fatal(err)
+	}
+	writeGitReviewFile(t, repository, "safe", "content\n")
+	revision, _ := (Local{}).GitRevision(context.Background(), repository)
+	proposal, err := (Local{}).GitCommitProposal(context.Background(), repository, []string{"safe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Local{}).CommitGitPaths(context.Background(), repository, []string{"safe"}, "chore: save configuration", revision, proposal.TreeID); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := run(context.Background(), "git", "-C", repository, "show", "-s", "--format=%an <%ae>|%cn <%ce>", "HEAD")
+	if err != nil || strings.TrimSpace(identity) != "Nixorium <nixorium@localhost>|Nixorium <nixorium@localhost>" {
+		t.Fatalf("internal identity = %q, error = %v", identity, err)
+	}
+}
+
 func TestGitCommitProposalRejectsDirectoriesAndSymbolicLinks(t *testing.T) {
 	repository := newGitReviewRepository(t)
 	directory := filepath.Join(repository, "modules")

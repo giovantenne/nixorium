@@ -59,12 +59,12 @@ func (m SetupManager) keyReport(ctx context.Context, repository, operation strin
 func (m SetupManager) Status(ctx context.Context, repository string) domain.SetupReport {
 	facts := domain.SetupFacts{}
 	if gitState, err := m.source.GitState(ctx, repository); err != nil {
-		facts.Review.Detail = fmt.Sprintf("Git review state is unavailable: %v", err)
-	} else if gitState.Dirty {
-		facts.Review.Detail = fmt.Sprintf("review and accept %d Git worktree change(s)", gitState.Changes)
+		facts.Review.Detail = fmt.Sprintf("local configuration history is unavailable: %v", err)
+	} else if pending := pendingManagedSetupPaths(gitState.Paths); len(pending) > 0 {
+		facts.Review.Detail = fmt.Sprintf("save %d pending managed configuration file(s)", len(pending))
 	} else {
 		facts.Review.Complete = true
-		facts.Review.Detail = "deployment worktree is clean; reviewed changes are recorded"
+		facts.Review.Detail = "managed configuration is saved locally"
 	}
 
 	missingCommands := []string{}
@@ -75,7 +75,7 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 	}
 	facts.Environment.Complete = len(missingCommands) == 0
 	if facts.Environment.Complete {
-		facts.Environment.Detail = "deployment repository, Nix, and Git are available"
+		facts.Environment.Detail = "deployment repository and required local tools are available"
 	} else {
 		facts.Environment.Detail = "missing commands: " + strings.Join(missingCommands, ", ")
 	}
@@ -204,6 +204,23 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 		facts.Install.Detail = "guided installation requires deployment readiness and current prepared artifacts"
 	}
 	return domain.ReconcileSetup(repository, facts)
+}
+
+func pendingManagedSetupPaths(paths []string) []string {
+	managed := map[string]bool{
+		"lab-settings.json":         true,
+		"keys/cache-public-key":     true,
+		"keys/admin-ssh.pub":        true,
+		"keys/veyon-public-key.pem": true,
+	}
+	pending := []string{}
+	for _, path := range paths {
+		path = strings.TrimSpace(strings.Trim(path, `"`))
+		if managed[path] {
+			pending = append(pending, path)
+		}
+	}
+	return pending
 }
 
 func hasIssueFor(issues []domain.ValidationIssue, fields ...string) bool {

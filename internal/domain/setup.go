@@ -69,7 +69,7 @@ func ReconcileSetup(repository string, facts SetupFacts) SetupReport {
 		{SetupStageCredentials, "Collect and hash credentials", facts.Credentials},
 		{SetupStageKeys, "Reconcile key material", facts.Keys},
 		{SetupStageValidate, "Validate candidate configuration", facts.Validation},
-		{SetupStageReview, "Review and accept Git changes", facts.Review},
+		{SetupStageReview, "Save local configuration", facts.Review},
 		{SetupStageApply, "Apply controller configuration", facts.Apply},
 		{SetupStageArtifacts, "Prepare installation artifacts", facts.Artifacts},
 		{SetupStageReadiness, "Verify readiness", facts.Readiness},

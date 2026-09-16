@@ -48,6 +48,19 @@ func TestActivePXEExitUsesOneGlobalReview(t *testing.T) {
 	}
 }
 
+func TestActivePXELeaveReviewCannotBeBypassedWithControlC(t *testing.T) {
+	model := experienceFixture(2)
+	model.report.PXE.Mode = "active"
+	model.screen = dashboardPXELeaveReview
+	model.confirmation = "LEAVE PXE"
+
+	updated, command := model.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardPXELeaveReview || model.confirmation != "LEAVE PXE" {
+		t.Fatalf("control-c bypassed protected PXE exit: screen=%d confirmation=%q", model.screen, model.confirmation)
+	}
+}
+
 func TestActivePXECanBeStoppedAndVerifiedBeforeExit(t *testing.T) {
 	stops := 0
 	model := experienceFixture(2)
@@ -136,7 +149,7 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 
 	model.screen = dashboardHome
 	model.busy = ""
-	model.settingsResult = domain.ConfigApplyReport{Operation: "config-apply", State: "applied"}
+	model.settingsResult = domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
 	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return domain.LabSettingsFile{}, nil }
 	updated, command = model.Update(tea.KeyPressMsg{Text: "e"})
 	model = updated.(dashboardModel)
@@ -212,8 +225,8 @@ func TestSetupCredentialsOpenTheProtectedPasswordStep(t *testing.T) {
 	}
 }
 
-func TestSetupPreparesAndInstallsKeysThroughTypedActions(t *testing.T) {
-	reconciles, installs, refreshes := 0, 0, 0
+func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
+	reconciles, saves, installs, refreshes := 0, 0, 0, 0
 	model := experienceFixture(2)
 	model.setupMode = true
 	model.screen = dashboardSetup
@@ -221,6 +234,10 @@ func TestSetupPreparesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	model.actions.ReconcileSetupKeys = func() (domain.KeyReconcileReport, error) {
 		reconciles++
 		return domain.KeyReconcileReport{Operation: "setup-keys", State: "ready"}, nil
+	}
+	model.actions.SaveSetupConfiguration = func() domain.ConfigurationSaveReport {
+		saves++
+		return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
 	}
 	model.actions.InstallSetupSecrets = func() domain.ActionReport {
 		installs++
@@ -240,8 +257,8 @@ func TestSetupPreparesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	}
 	updated, _ = model.Update(refresh())
 	model = updated.(dashboardModel)
-	if reconciles != 1 || installs != 1 || refreshes != 1 || model.setup.CurrentStage != domain.SetupStageReview {
-		t.Fatalf("key continuation failed: reconcile=%d install=%d refresh=%d setup=%+v", reconciles, installs, refreshes, model.setup)
+	if reconciles != 1 || saves != 1 || installs != 1 || refreshes != 1 || model.setup.CurrentStage != domain.SetupStageReview {
+		t.Fatalf("key continuation failed: reconcile=%d save=%d install=%d refresh=%d setup=%+v", reconciles, saves, installs, refreshes, model.setup)
 	}
 	if !strings.Contains(model.message, "keys are ready") {
 		t.Fatalf("key result is unclear: %q", model.message)

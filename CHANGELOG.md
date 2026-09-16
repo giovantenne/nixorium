@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made ordinary settings and first-setup saves record their managed files
+  locally without exposing Git, commit tokens, hashes, or repository identity.
+  Saves use the existing isolated-path safety checks, preserve unrelated work,
+  use a fixed internal identity, reject ambiguous same-file changes, and offer
+  an in-place retry when writing succeeded but local recording needs recovery.
 - Made interactive startup render immediately before repository inspection.
   The dashboard now shows an English opening activity while status and setup
   checks run once in the background, routes to first setup only after those
