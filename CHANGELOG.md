@@ -14,6 +14,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   effective role/host interfaces are exposed in `labMeta`. Unknown hosts and
   invalid Linux interface names fail validation.
 
+- Added a network-free controller-bootstrap contract test covering immutable
+  revision resolution, template/installer/layout consistency, the initial lock
+  override, update-channel preservation, and fail-closed split-ref handling.
+
 - Added explicit `shared` and `controller` managed-software scopes, including
   controller-only deployments with no clients. Existing client scopes retain
   their meaning. Review identifies controller effects and both sides of scope
@@ -44,6 +48,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   the source, and never perform implicit rotation.
 
 ### Changed
+
+- The public controller bootstrap now resolves the selected branch or tag once
+  and uses that full Git revision for the site template, controller installer,
+  Disko layout, and initial Nixorium lock. The selected channel remains declared
+  in `flake.nix` for later managed updates. A separate installer ref may no
+  longer select different content.
 
 - Made guided Nixorium update validation capability-aware. Explicit
   controller-only deployments require controller readiness and build only the

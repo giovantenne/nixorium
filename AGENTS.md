@@ -200,6 +200,11 @@ Release from the matching changelog section.
 
 ## Architecture Notes
 
+- Public controller bootstrap must resolve the selected branch/tag once to a
+  full Git revision. Its template, installer, Disko layout, and initial lock
+  must use that revision; keep the human-selected channel in the generated
+  `flake.nix` for managed updates. Never restore independently moving bootstrap
+  downloads; see ADR 0018.
 - `lab.deploymentMode` is optional (`laboratory` by default). Explicit
   `controller` mode requires zero clients, leaves lab networking/cache/remote
   control inactive, and permits local controller activation without lab keys.

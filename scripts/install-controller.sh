@@ -9,13 +9,8 @@ fi
 
 INSTALL_DISK="${1:-}"
 FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixorium}"
-# Derive DISKO_LAYOUT_URL from FLAKE_REF if not explicitly set.
-# Extracts owner/repo from "github:owner/repo" (strips ?ref=... if present).
-if [[ -z "${DISKO_LAYOUT_URL:-}" ]]; then
-  OWNER_REPO="${FLAKE_REF#github:}"
-  OWNER_REPO="${OWNER_REPO%%\?*}"
-  DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${OWNER_REPO}/master/lib/disko-layout.nix"
-fi
+DISKO_LAYOUT_FILE="${DISKO_LAYOUT_FILE:-}"
+DISKO_LAYOUT_URL="${DISKO_LAYOUT_URL:-}"
 MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
 STUDENT_USER="${STUDENT_USER:-student}"
 AVAILABLE_DISKS=()
@@ -126,8 +121,24 @@ TEMP_DISKO_LAYOUT=$(mktemp)
 TEMP_DISKO_FILE=$(mktemp)
 trap 'rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"' EXIT
 
-echo "Downloading Disko layout..."
-curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
+if [[ -n "$DISKO_LAYOUT_FILE" ]]; then
+  if [[ ! -f "$DISKO_LAYOUT_FILE" || ! -r "$DISKO_LAYOUT_FILE" ]]; then
+    echo "Error: DISKO_LAYOUT_FILE must name a readable regular file." >&2
+    exit 1
+  fi
+  cp -- "$DISKO_LAYOUT_FILE" "$TEMP_DISKO_LAYOUT"
+elif [[ -n "$DISKO_LAYOUT_URL" ]]; then
+  echo "Downloading explicitly configured Disko layout..."
+  curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
+elif [[ "$FLAKE_REF" =~ ^github:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/([0-9a-f]{40})$ ]]; then
+  DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/${BASH_REMATCH[3]}/lib/disko-layout.nix"
+  echo "Downloading Disko layout from the pinned flake revision..."
+  curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
+else
+  echo "Error: provide DISKO_LAYOUT_FILE or use a full revision-pinned GitHub FLAKE_REF." >&2
+  echo "An independently moving disk layout is not safe for controller installation." >&2
+  exit 1
+fi
 
 # Generate a standalone Disko config with concrete arguments for the selected
 # disk and student user. This avoids patching the text of the NixOS module.

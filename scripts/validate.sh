@@ -67,6 +67,7 @@ echo "Reusable Nix evaluation cache: ${CACHE_DIR}"
 git diff --check
 bash -n install.sh setup.sh scripts/*.sh scripts/lib/*.sh
 bash tests/client-installer.sh
+bash tests/controller-bootstrap.sh
 diff -qr skills/nixorium-maintainer templates/site/skills/nixorium-maintainer
 diff -u docs/troubleshooting.md templates/site/TROUBLESHOOTING.md
 test -e .agents/skills/nixorium-developer/SKILL.md
