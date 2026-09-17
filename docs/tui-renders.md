@@ -46,19 +46,20 @@ observed PXE recovery condition exists, it appears above the question.
 Nixorium — First setup
 
 Step 2 of 5
-You can leave safely and resume later with `nixorium setup`.
+You can leave safely and resume this setup later.
 
   ✓ Laboratory settings · Complete
-› ● Controller · In progress
+  ● Controller · In progress
   ○ Client system · To prepare
   ○ First computer · To install
   ○ Other computers · Whenever you are ready
 
-! Next step
+Continue setup
   Apply controller configuration
   Review and activate the controller configuration
+  Press Enter to continue.
 
-enter continue  •  t technical steps  •  esc interventions  •  q quit  •  F1 help
+enter continue  •  t technical steps  •  esc pause setup  •  q quit  •  F1 help
 ```
 
 The five steps are operator-facing groups. `t` reveals the existing eleven

@@ -182,9 +182,8 @@ type dashboardModel struct {
 	settingsResult       domain.ConfigurationSaveReport
 	settingsApplying     bool
 
-	settingsReturn         dashboardScreen
-	settingsStartGroup     string
-	settingsStartPasswords bool
+	settingsReturn           dashboardScreen
+	settingsCollectPasswords bool
 
 	pxePreparing         bool
 	pxeProgress          domain.OperationProgress
@@ -838,35 +837,18 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.settings = message.settings
 		model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
-		if model.settingsStartGroup != "" {
-			model.settingsMenu.selectGroup(model.settingsStartGroup)
-		}
 		if model.settingsReturn == dashboardSetup {
-			model.message = "Complete the required areas, including all account passwords, then return to setup."
-		} else {
+			model.settingsEditor = newSettingsEditorModel(model.settings, settingsFields, "Nixorium — First setup / Laboratory settings")
+			model.settingsEditor.width = model.width
+			model.settingsEditor.height = model.height
+			model.settingsEditor.isDark = model.isDark
+			model.settingsEditor.prepareCurrentField()
 			model.message = ""
+			model.screen = dashboardSettingsEdit
+			return model, nil
 		}
-		if model.settingsStartPasswords {
-			model.screen = dashboardSettingsPasswords
-			model.settingsStartGroup = ""
-			model.settingsStartPasswords = false
-			if model.actions.ChangePassword == nil {
-				model.message = "Password setup is not available in this deployment."
-				return model, nil
-			}
-			command := &settingsPasswordCommand{
-				action:   model.actions.ChangePassword,
-				account:  "all",
-				settings: model.settings,
-			}
-			return model, tea.Exec(command, func(err error) tea.Msg {
-				return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
-			})
-		} else {
-			model.screen = dashboardSettings
-		}
-		model.settingsStartGroup = ""
-		model.settingsStartPasswords = false
+		model.message = ""
+		model.screen = dashboardSettings
 		return model, nil
 	case dashboardSettingsPlanMsg:
 		model.busy = ""
@@ -874,7 +856,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.settingsPlan = message.report
 		if message.report.HasErrors() {
 			model.message = "Candidate validation failed: " + settingsIssueMessage(message.report.Issues)
-			model.screen = dashboardSettings
+			if model.settingsReturn == dashboardSetup {
+				model.settingsEditor = newSettingsEditorModel(model.settingsCandidate, settingsFields, "Nixorium — First setup / Laboratory settings")
+				model.settingsEditor.index = len(model.settingsEditor.fields) - 1
+				model.settingsEditor.accepted = false
+				model.settingsEditor.err = model.message
+				model.settingsEditor.prepareCurrentField()
+				model.screen = dashboardSettingsEdit
+			} else {
+				model.screen = dashboardSettings
+			}
 			return model, nil
 		}
 		if len(message.report.Changes) == 0 {
@@ -889,10 +880,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		if message.err != nil {
 			model.message = "Password change failed: " + message.err.Error()
+			if model.settingsReturn == dashboardSetup && message.candidate.SchemaVersion != 0 {
+				model.settingsCandidate = message.candidate
+			}
+			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 			model.screen = dashboardSettingsPasswords
 			return model, nil
 		}
 		model.settingsCandidate = message.candidate
+		model.settingsCollectPasswords = false
 		model.busy = "Validating the password change through Nix"
 		model.message = ""
 		candidate := model.settingsCandidate
@@ -914,6 +910,18 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			if model.message == "" {
 				model.message = "Configuration save failed: " + settingsIssueMessage(message.report.Issues)
 			}
+		}
+		if model.settingsReturn == dashboardSetup && !message.report.HasErrors() && (message.report.State == "saved" || message.report.State == "unchanged") {
+			model.settingsReturn = dashboardHome
+			model.settingsCollectPasswords = false
+			model.screen = dashboardSetup
+			model.busy = "Continuing first setup"
+			model.message = ""
+			if model.actions.LoadSetup != nil {
+				return model, model.loadSetup()
+			}
+			model.busy = ""
+			return model, nil
 		}
 		model.screen = dashboardSettings
 		return model, nil
@@ -1400,11 +1408,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.screen = dashboardDiagnostics
 			return model, model.startDiagnostics()
 		case domain.SetupStageNetwork:
-			return model.openSetupSettings("network", false)
+			return model.openSetupSettings()
 		case domain.SetupStageIdentity:
-			return model.openSetupSettings("accounts", false)
+			return model.openSetupSettings()
 		case domain.SetupStageCredentials:
-			return model.openSetupSettings("", true)
+			return model.openSetupSettings()
 		case domain.SetupStageKeys:
 			if model.actions.LoadSetupKeys == nil {
 				model.message = "Key preparation is not available in this session."
@@ -1417,7 +1425,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys()}
 			}
 		case domain.SetupStageValidate:
-			return model.openSetupSettings("", false)
+			return model.openSetupSettings()
 		case domain.SetupStageReview:
 			if model.actions.SaveSetupConfiguration == nil {
 				model.message = "Local configuration saving is not available in this session."
@@ -1604,6 +1612,19 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if model.settingsEditor.accepted {
 			model.settingsCandidate = model.settingsEditor.settings
+			if model.settingsReturn == dashboardSetup && model.settingsCollectPasswords {
+				if model.actions.ChangePassword == nil {
+					model.message = "Password setup is not available in this deployment."
+					return model, nil
+				}
+				model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+				model.screen = dashboardSettingsPasswords
+				candidate := model.settingsCandidate
+				command := &settingsPasswordCommand{action: model.actions.ChangePassword, account: "all", settings: candidate}
+				return model, tea.Exec(command, func(err error) tea.Msg {
+					return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
+				})
+			}
 			model.busy = "Validating the complete settings candidate through Nix"
 			model.message = ""
 			candidate := model.settingsCandidate
@@ -1613,6 +1634,29 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return model, command
 	case dashboardSettingsPasswords:
+		if model.settingsReturn == dashboardSetup {
+			switch key.String() {
+			case "esc", "left":
+				model.settingsEditor = settingsWizardModel{}
+				model.settingsCandidate = domain.LabSettingsFile{}
+				model.screen = dashboardSetup
+				model.settingsReturn = dashboardHome
+				model.settingsCollectPasswords = false
+				model.message = "Setup configuration cancelled; no file changed."
+			case "enter":
+				if model.actions.ChangePassword == nil {
+					model.message = "Password setup is not available in this deployment."
+					return model, nil
+				}
+				candidate := model.settingsCandidate
+				command := &settingsPasswordCommand{action: model.actions.ChangePassword, account: "all", settings: candidate}
+				model.message = ""
+				return model, tea.Exec(command, func(err error) tea.Msg {
+					return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
+				})
+			}
+			return model, nil
+		}
 		switch key.String() {
 		case "esc", "left":
 			model.message = ""
@@ -2499,15 +2543,14 @@ func setupNeedsImmediateAttention(report domain.SetupReport) bool {
 	}
 }
 
-func (model dashboardModel) openSetupSettings(group string, passwords bool) (tea.Model, tea.Cmd) {
+func (model dashboardModel) openSetupSettings() (tea.Model, tea.Cmd) {
 	if model.actions.LoadSettings == nil {
 		model.message = "Laboratory settings are not available in this session."
 		return model, nil
 	}
 	model.screen = dashboardSettings
 	model.settingsReturn = dashboardSetup
-	model.settingsStartGroup = group
-	model.settingsStartPasswords = passwords
+	model.settingsCollectPasswords = model.setup.CurrentStage != domain.SetupStageValidate
 	model.settingsResult = domain.ConfigurationSaveReport{}
 	model.settingsPlan = domain.ConfigPlanReport{}
 	model.settingsCandidate = domain.LabSettingsFile{}
@@ -2522,6 +2565,7 @@ func (model dashboardModel) openSetupSettings(group string, passwords bool) (tea
 func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
 	returnTo := model.settingsReturn
 	model.settingsReturn = dashboardHome
+	model.settingsCollectPasswords = false
 	model.message = ""
 	if returnTo == dashboardSetup {
 		model.screen = dashboardSetup

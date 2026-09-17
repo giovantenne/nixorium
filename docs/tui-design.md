@@ -15,7 +15,7 @@ revision hashes and log paths before explaining the outcome. Progress repeats
 phase, fraction, gradient bar and recent activity. Help is inconsistent and
 there is no application-wide help surface.
 
-Existing flows: first-run fields → password collector → redacted config review
+Existing flows: continuous first-run fields → one password session → one redacted config review
 → key reconciliation → secret installation → observed setup; setup → Git
 review → path selection → exact commit confirmation → setup; controller
 plan → confirmation → progress → verified result; preparation → PXE start
@@ -35,6 +35,10 @@ progress, recovery instructions and the next explicit action.
 
 - First setup: five operator stages over the existing observed technical checks:
   laboratory settings → controller → client system → pilot computer → other computers.
+  Laboratory settings are one uninterrupted question sequence followed by all
+  account passwords and one complete candidate validation/save; the setup does
+  not return to category menus between network, identity, regional, or account
+  inputs.
 - Interventions: restore, software, distribute, install/reinstall, Update
   Nixorium, and Advanced tools. Opening this screen performs no fleet scan.
 - Restore: explicit choice between non-destructive reapply and disk-erasing

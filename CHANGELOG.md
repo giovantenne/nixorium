@@ -22,6 +22,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made first-run configuration one continuous sequence: all ordinary settings
+  are collected in one wizard, all three passwords follow in one protected
+  session, and the complete candidate is validated, reviewed, and saved once.
+  Resume events after terminal password entry can no longer reach an
+  uninitialized Bubble Tea password list.
 - Added the configured upstream's `master` branch as an explicit Development
   target in Update Nixorium. It uses the same candidate lock, representative
   builds, reviewed two-file proposal, and transparent local save as tagged

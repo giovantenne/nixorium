@@ -32,15 +32,17 @@ nix run .#nixorium -- setup
 The configuration wizard collects the required network, laboratory, account,
 regional, browser, Veyon, and password settings. It proposes detected network
 values, retries recoverable password mistakes without losing earlier answers,
-validates the complete candidate, creates the three key pairs, and installs
-their private portions through the fixed privileged action.
+then collects all three passwords in one protected session. The complete
+candidate is validated, reviewed, and saved once before setup continues. It
+then creates the three key pairs and installs their private portions through
+the fixed privileged action.
 
 It then opens a resumable first-run checklist. Follow the highlighted next
 step with `Enter`:
 
-1. **Review and save configuration.** Inspect the Git review, press `c`, select
-   the generated managed files (`a` selects all safe changes), press `Enter`,
-   and type the displayed commit confirmation. Private keys are excluded.
+1. **Review and save configuration.** Review the complete redacted settings
+   proposal and save it. Nixorium records the managed configuration locally;
+   repository mechanics and private keys are not exposed in this flow.
 2. **Activate the controller.** Review the exact revision, type its displayed
    confirmation, and wait for the verified result. Press `Enter` to return to
    the setup checklist.
