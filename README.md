@@ -102,7 +102,9 @@ curl -fsSL https://nixorium.org/install.sh | bash
 
 Choose the release and controller disk when prompted. The installer creates a
 private deployment repository and installs the controller from its pinned
-inputs.
+inputs. The selected channel or tag is resolved once: template, installer,
+Disko layout, and initial lock all use that immutable revision. See
+[ADR 0018](docs/adr/0018-revision-bound-controller-bootstrap.md).
 
 ### 3. Reboot
 

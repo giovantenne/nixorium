@@ -178,19 +178,43 @@ if [[ -z "$INSTALLER_REF" ]]; then
   INSTALLER_REF="$RELEASE"
 fi
 
+if [[ "$INSTALLER_REF" != "$RELEASE" ]]; then
+  echo "Error: NIXORIUM_INSTALLER_REF must match the selected release." >&2
+  echo "Installer, template, lock, and disk layout must come from one revision." >&2
+  exit 1
+fi
+
 if [[ "$TARGET_ROOT" != /* || "$TARGET_ROOT" == "/" ]]; then
   echo "Error: NIXORIUM_TARGET_ROOT must be an absolute mount path other than /." >&2
   exit 1
 fi
 
-UPSTREAM_REF="github:${REPOSITORY}/${RELEASE}"
-INSTALLER_URL="https://raw.githubusercontent.com/${REPOSITORY}/${INSTALLER_REF}/scripts/install-controller.sh"
-DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${REPOSITORY}/${RELEASE}/lib/disko-layout.nix"
+COMMIT_API_URL="https://api.github.com/repos/${REPOSITORY}/commits/${RELEASE}"
+echo "Resolving ${RELEASE} to one immutable revision..."
+if ! COMMIT_RESPONSE="$(curl -fsSL "$COMMIT_API_URL")"; then
+  echo "Error: could not resolve ${RELEASE} to an immutable GitHub revision." >&2
+  exit 1
+fi
+UPSTREAM_REV="$(
+  printf '%s\n' "$COMMIT_RESPONSE" |
+    sed -n 's/^[[:space:]]*"sha":[[:space:]]*"\([0-9a-f]\{40\}\)",\{0,1\}[[:space:]]*$/\1/p' |
+    sed -n '1p'
+)"
+if [[ ! "$UPSTREAM_REV" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Error: GitHub returned no valid immutable revision for ${RELEASE}." >&2
+  exit 1
+fi
+
+UPSTREAM_REF="github:${REPOSITORY}/${UPSTREAM_REV}"
+DECLARED_UPSTREAM_REF="github:${REPOSITORY}/${RELEASE}"
+INSTALLER_URL="https://raw.githubusercontent.com/${REPOSITORY}/${UPSTREAM_REV}/scripts/install-controller.sh"
+DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${REPOSITORY}/${UPSTREAM_REV}/lib/disko-layout.nix"
 TEMP_INSTALLER="$(mktemp)"
+TEMP_DISKO_LAYOUT="$(mktemp)"
 TEMP_DEPLOYMENT="$(mktemp -d)"
 
 cleanup() {
-  rm -f "$TEMP_INSTALLER"
+  rm -f "$TEMP_INSTALLER" "$TEMP_DISKO_LAYOUT"
   rm -rf "$TEMP_DEPLOYMENT"
 }
 trap cleanup EXIT
@@ -209,23 +233,25 @@ else
   )
 fi
 
-echo "Preparing Nixorium ${RELEASE}..."
+echo "Preparing Nixorium ${RELEASE} at ${UPSTREAM_REV}..."
 curl -fsSL "$INSTALLER_URL" -o "$TEMP_INSTALLER"
+curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
 
 (
   cd "$TEMP_DEPLOYMENT"
   nix --extra-experimental-features "nix-command flakes" \
     flake init -t "${UPSTREAM_REF}#site"
   sed -i \
-    's|inputs\.nixorium\.url = "github:giovantenne/nixorium/[^"]*";|inputs.nixorium.url = "'"${UPSTREAM_REF}"'";|' \
+    's|inputs\.nixorium\.url = "github:giovantenne/nixorium/[^"]*";|inputs.nixorium.url = "'"${DECLARED_UPSTREAM_REF}"'";|' \
     flake.nix
-  if ! grep -Fxq "  inputs.nixorium.url = \"${UPSTREAM_REF}\";" flake.nix; then
-    echo "Error: could not pin the generated deployment to ${UPSTREAM_REF}." >&2
+  if ! grep -Fxq "  inputs.nixorium.url = \"${DECLARED_UPSTREAM_REF}\";" flake.nix; then
+    echo "Error: could not configure the generated deployment for ${DECLARED_UPSTREAM_REF}." >&2
     exit 1
   fi
   "${GIT_COMMAND[@]}" init -b master
   "${GIT_COMMAND[@]}" add .
-  nix --extra-experimental-features "nix-command flakes" flake lock
+  nix --extra-experimental-features "nix-command flakes" \
+    flake lock --override-input nixorium "${UPSTREAM_REF}"
   "${GIT_COMMAND[@]}" add flake.lock
   "${GIT_COMMAND[@]}" \
     -c user.name="Nixorium Installer" \
@@ -249,6 +275,7 @@ fi
 echo "Installing the controller from the generated private deployment..."
 echo "Wait for the final bootstrap completion message before rebooting."
 FLAKE_REF="path:${TEMP_DEPLOYMENT}" \
+  DISKO_LAYOUT_FILE="$TEMP_DISKO_LAYOUT" \
   DISKO_LAYOUT_URL="$DISKO_LAYOUT_URL" \
   MASTER_HOST_NUMBER="$MASTER_HOST_NUMBER" \
   STUDENT_USER="$STUDENT_USER" \

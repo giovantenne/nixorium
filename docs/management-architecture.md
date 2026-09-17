@@ -63,8 +63,10 @@ Important constraints in the current implementation are:
   inventory, revalidates and exactly confirms the target disk, and reports
   progress/result; duplicate probing is intentionally best-effort and does not
   coordinate simultaneous installers;
-- the controller bootstrap installs an evaluable placeholder deployment and
-  the resumable first-run application reconciles configuration after reboot;
+- the controller bootstrap resolves one immutable upstream revision for its
+  template, installer, layout and initial lock, installs an evaluable
+  placeholder deployment, and the resumable first-run application reconciles
+  configuration after reboot;
 - the firewall admits product ports only on the configured laboratory
   interface, with controller-only rules for Harmonia and PXE;
 
