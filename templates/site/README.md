@@ -588,8 +588,12 @@ offline.
 
 Planning keeps the configured upstream identity, accepts exactly `master` or a
 SemVer release, generates the candidate lock outside the checkout, evaluates
-readiness, and builds representative controller/client/netboot/firmware/
-installer outputs.
+readiness, and builds outputs for the configured capability. An explicit
+controller-only deployment validates controller readiness and builds only the
+controller candidate. A laboratory deployment, including legacy metadata,
+retains the representative controller/client/netboot/firmware/installer set.
+Unknown modes, a client inventory in controller mode, or missing explicit
+controller readiness are rejected.
 Prereleases require `--allow-prerelease`; known downgrades require
 `--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
 `flake.lock`; review and optionally commit them separately. It never branches,

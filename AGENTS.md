@@ -252,7 +252,12 @@ Release from the matching changelog section.
 - Upstream update planning must preserve the configured source identity, accept
   only the exact `master` branch or an explicit SemVer tag, generate the
   candidate lock outside the checkout,
-  and validate representative outputs against that exact lock. Apply only the
+  and validate representative outputs against that exact lock. Explicit
+  controller mode requires zero clients, explicit controller readiness, and a
+  candidate controller build; it must not require or build client/PXE outputs.
+  Laboratory mode and legacy metadata retain strict fleet readiness plus the
+  controller/client/netboot/firmware/installer build set. Reject unknown modes
+  and inconsistent inventories. Apply only the
   token-bound `flake.nix`/`flake.lock` proposal under the deployment-root lock;
   never imply a branch, commit, push, activation, PXE action, or deployment.
   Remote enumeration belongs only to explicit `update check`, must use the
