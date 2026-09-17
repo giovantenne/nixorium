@@ -66,14 +66,7 @@ set -euo pipefail
 printf 'nix %s\n' "$*" >> "$BOOTSTRAP_CALL_LOG"
 case "$*" in
   *"flake init -t github:giovantenne/nixorium/${BOOTSTRAP_REVISION}#site")
-    cat > flake.nix <<'FLAKE'
-{
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-  inputs.nixorium.url = "github:giovantenne/nixorium/master";
-  inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";
-  outputs = { self, nixorium }: {};
-}
-FLAKE
+    cp "$BOOTSTRAP_TEMPLATE" flake.nix
     ;;
   *"flake lock --override-input nixorium github:giovantenne/nixorium/${BOOTSTRAP_REVISION}")
     printf '{"nodes":{},"root":"root","version":7}\n' > flake.lock
@@ -111,6 +104,7 @@ export PATH="${MOCK_BIN}:$PATH"
 export BOOTSTRAP_CALL_LOG="$CALL_LOG"
 export BOOTSTRAP_INSTALLER_LOG="$INSTALLER_LOG"
 export BOOTSTRAP_REVISION="$REVISION"
+export BOOTSTRAP_TEMPLATE="${REPO_ROOT}/templates/site/flake.nix"
 
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_INSTALLER_REF="v2.0.0" \
@@ -140,11 +134,11 @@ grep -F "layout_url=https://raw.githubusercontent.com/giovantenne/nixorium/${REV
 grep -F "master=99" "$INSTALLER_LOG" >/dev/null
 grep -F "student=student" "$INSTALLER_LOG" >/dev/null
 grep -F "disk=/dev/vda" "$INSTALLER_LOG" >/dev/null
-grep -Fx '  inputs.nixorium.url = "github:giovantenne/nixorium/master";' \
+grep -Fx '    nixorium.url = "github:giovantenne/nixorium/master";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
-grep -Fx '  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";' \
+grep -Fx '    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
-grep -Fx '  inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";' \
+grep -Fx '    nixorium.inputs.nixpkgs.follows = "nixpkgs";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
 test -f "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.lock"
 

@@ -243,9 +243,9 @@ curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
   nix --extra-experimental-features "nix-command flakes" \
     flake init -t "${UPSTREAM_REF}#site"
   sed -i \
-    's|inputs\.nixorium\.url = "github:giovantenne/nixorium/[^"]*";|inputs.nixorium.url = "'"${DECLARED_UPSTREAM_REF}"'";|' \
+    's|nixorium\.url = "github:giovantenne/nixorium/[^"]*";|nixorium.url = "'"${DECLARED_UPSTREAM_REF}"'";|' \
     flake.nix
-  if ! grep -Fxq "  inputs.nixorium.url = \"${DECLARED_UPSTREAM_REF}\";" flake.nix; then
+  if ! grep -Fxq "    nixorium.url = \"${DECLARED_UPSTREAM_REF}\";" flake.nix; then
     echo "Error: could not configure the generated deployment for ${DECLARED_UPSTREAM_REF}." >&2
     exit 1
   fi
