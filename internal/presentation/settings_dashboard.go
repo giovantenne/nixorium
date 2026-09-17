@@ -38,9 +38,11 @@ var routineSettingsGroups = []routineSettingsGroup{
 	{
 		id:          "network",
 		label:       "Network",
-		description: "Interface, controller address, and laboratory subnet",
+		description: "Controller/client interfaces, address, and laboratory subnet",
 		fields: []settingsField{
-			{id: "lab.ifaceName", group: "Network", label: "Laboratory network interface"},
+			{id: "lab.controllerIfaceName", group: "Network", label: "Controller network interface (optional override)"},
+			{id: "lab.clientIfaceName", group: "Network", label: "Default client network interface (optional override)"},
+			{id: "lab.ifaceName", group: "Network", label: "Fallback network interface"},
 			{id: "lab.masterDhcpIp", group: "Network", label: "Current controller DHCP address"},
 			{id: "lab.networkBase", group: "Network", label: "Static laboratory network address"},
 			{id: "lab.networkPrefixLength", group: "Network", label: "Network prefix length"},

@@ -36,8 +36,12 @@
   pcCount = 20;
   # Controller host number within the configured static network
   masterHostNumber = 99;
-  # Shared network interface name on lab PCs
+  # Fallback network interface. Optional controllerIfaceName,
+  # clientIfaceName, and hostIfaceNames overrides allow heterogeneous hardware.
   ifaceName = "enp0s3";
+  # controllerIfaceName = "eno1";
+  # clientIfaceName = "enp2s0";
+  # hostIfaceNames.pc05 = "enp3s0";
 
   # ── User accounts ─────────────────────────────────────────────
   # Teacher account (gets Veyon Master access + no home reset)

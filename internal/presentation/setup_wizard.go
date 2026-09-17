@@ -514,6 +514,10 @@ func settingFieldValue(settings domain.LabSettingsFile, field string) string {
 		return strconv.Itoa(settings.Lab.MasterHostNumber)
 	case "lab.ifaceName":
 		return settings.Lab.InterfaceName
+	case "lab.controllerIfaceName":
+		return settings.Lab.ControllerInterfaceName
+	case "lab.clientIfaceName":
+		return settings.Lab.ClientInterfaceName
 	case "lab.teacherUser":
 		return settings.Lab.TeacherUser
 	case "lab.studentUser":
@@ -579,6 +583,10 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		settings.Lab.MasterHostNumber = parsed
 	case "lab.ifaceName":
 		settings.Lab.InterfaceName = value
+	case "lab.controllerIfaceName":
+		settings.Lab.ControllerInterfaceName = value
+	case "lab.clientIfaceName":
+		settings.Lab.ClientInterfaceName = value
 	case "lab.teacherUser":
 		settings.Lab.TeacherUser = value
 	case "lab.studentUser":

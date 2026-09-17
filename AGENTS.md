@@ -216,7 +216,13 @@ Release from the matching changelog section.
   Keep it bound to the evaluated client identity, full Git revision and
   authenticated Nix store path; it is historical evidence, not desired
   configuration, current reachability or disk-erasure authority.
-- Hostname + static IP are centralized in `lib/mk-lab.nix`. `networkBase` is a full IPv4 network address and `networkPrefixLength` its CIDR prefix; host numbers are validated offsets. Each PC gets both a DHCP address and a static address on the same interface.
+- Hostname, static IP, and effective network interface are centralized in
+  `lib/mk-lab.nix`. `ifaceName` is the compatibility fallback;
+  `controllerIfaceName`, `clientIfaceName`, and `hostIfaceNames` resolve in
+  host/role/fallback order. Reject overrides for unknown hosts. `networkBase`
+  is a full IPv4 network address and `networkPrefixLength` its CIDR prefix;
+  host numbers are validated offsets. Each PC gets DHCP plus its static address
+  on its resolved interface.
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.

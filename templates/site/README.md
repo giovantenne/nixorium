@@ -428,8 +428,9 @@ nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- setup apply
 ```
 
-`setup` proposes the interface carrying the default route and its live DHCP
-address (not the controller's declarative static address), groups its essential
+`setup` records the interface carrying the controller's default route as a
+controller-specific override and proposes its live DHCP address (not the
+controller's declarative static address), groups its essential
 questions by task, and provides searchable offline selectors for time zone,
 locale, and keyboard values while retaining validated custom entry. Optional
 Git identity is not requested during first run. The wizard supports backward
@@ -440,6 +441,12 @@ acceptance, and reconciles all three key pairs. It never overwrites existing
 key material. Bare `setup` then opens the stage-aware first-run checklist;
 explicit `setup configure` stops after configuration. `setup status` observes
 the first incomplete stage without trusting a hidden completion flag.
+
+`lab.ifaceName` remains the backward-compatible fallback. Optional
+`controllerIfaceName` and `clientIfaceName` select role defaults, while
+`hostIfaceNames` can override a configured host. Precedence is host, role, then
+fallback. This permits different predictable interface names on controller and
+client hardware without changing existing deployments.
 
 `setup install-secrets` starts a fixed sandboxed action that installs only
 verified key material to fixed destinations. After reviewed settings and public

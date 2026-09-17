@@ -113,9 +113,9 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 		settings, issues = domain.DecodeLabSettings(data)
 	}
 	invalidJSON := hasIssueFor(issues, "$", "schemaVersion")
-	facts.Network.Complete = !invalidJSON && !hasIssuePrefix(issues, "lab.masterDhcpIp", "lab.network", "lab.pcCount", "lab.masterHostNumber", "lab.ifaceName") && settings.Lab.MasterDHCPIP != domain.MasterDHCPPlaceholder
+	facts.Network.Complete = !invalidJSON && !hasIssuePrefix(issues, "lab.masterDhcpIp", "lab.network", "lab.pcCount", "lab.masterHostNumber", "lab.ifaceName", "lab.controllerIfaceName", "lab.clientIfaceName", "lab.hostIfaceNames") && settings.Lab.MasterDHCPIP != domain.MasterDHCPPlaceholder
 	if facts.Network.Complete {
-		facts.Network.Detail = fmt.Sprintf("%s/%d on %s; controller DHCP %s", settings.Lab.NetworkBase, settings.Lab.NetworkPrefix, settings.Lab.InterfaceName, settings.Lab.MasterDHCPIP)
+		facts.Network.Detail = fmt.Sprintf("%s/%d on %s; controller DHCP %s", settings.Lab.NetworkBase, settings.Lab.NetworkPrefix, settings.Lab.ControllerInterface(), settings.Lab.MasterDHCPIP)
 	} else if settings.Lab.MasterDHCPIP == domain.MasterDHCPPlaceholder {
 		facts.Network.Detail = "controller DHCP address still uses MASTER_DHCP_IP"
 	} else {

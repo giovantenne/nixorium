@@ -8,6 +8,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added optional controller, client-role, and per-host network-interface
+  overrides with a compatibility fallback to `ifaceName`. The detected
+  controller interface no longer becomes the implicit client interface, and
+  effective role/host interfaces are exposed in `labMeta`. Unknown hosts and
+  invalid Linux interface names fail validation.
+
 - Added explicit `shared` and `controller` managed-software scopes, including
   controller-only deployments with no clients. Existing client scopes retain
   their meaning. Review identifies controller effects and both sides of scope

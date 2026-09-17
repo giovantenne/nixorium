@@ -97,8 +97,30 @@ func TestLegacySettingsDoNotAcquireDeploymentModeOnSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Contains(data, []byte(`"deploymentMode"`)) {
-		t.Fatal("legacy settings were silently migrated")
+	for _, field := range [][]byte{[]byte(`"deploymentMode"`), []byte(`"controllerIfaceName"`), []byte(`"clientIfaceName"`), []byte(`"hostIfaceNames"`)} {
+		if bytes.Contains(data, field) {
+			t.Fatalf("legacy settings silently acquired %s", field)
+		}
+	}
+}
+
+func TestRoleAndHostInterfaceOverridesRoundTrip(t *testing.T) {
+	settings := validSettings()
+	settings.Lab.ControllerInterfaceName = "eno1"
+	settings.Lab.ClientInterfaceName = "enp2s0"
+	settings.Lab.HostInterfaceNames = map[string]string{"pc01": "enp3s0", "pc99": "eno2"}
+	data, err := MarshalLabSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, issues := DecodeLabSettings(data)
+	if len(issues) != 0 || decoded.Lab.ControllerInterfaceName != "eno1" || decoded.Lab.ClientInterfaceName != "enp2s0" || decoded.Lab.HostInterfaceNames["pc01"] != "enp3s0" {
+		t.Fatalf("round trip = %+v, issues = %+v", decoded, issues)
+	}
+	settings.Lab.HostInterfaceNames["pc00"] = "eth0"
+	settings.Lab.ClientInterfaceName = "interface-name-is-too-long"
+	if issues := settings.Validate(); len(issues) != 2 {
+		t.Fatalf("invalid interface overrides issues = %+v", issues)
 	}
 }
 
