@@ -32,8 +32,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   pauses the resumable setup before opening Interventions.
 - Simplified guided software interaction: a reviewed configuration is saved
   with Enter while its hash-bound review token remains internal, package search
-  opens from both slash keys on an Italian keyboard, and arrow keys move from
-  the search field directly through the returned packages.
+  opens with the standard slash shortcut, and arrow keys move from the search
+  field directly through the returned packages.
 - Reduced Regional setup to the two choices an operator recognizes: time zone
   and keyboard layout. US locale defaults remain internal, and known keyboard
   choices automatically select the corresponding console keymap.
