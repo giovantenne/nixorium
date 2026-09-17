@@ -1,10 +1,18 @@
 {
   description = "Private Nixorium deployment";
 
-  inputs.nixorium.url = "github:giovantenne/nixorium/master";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    nixorium.url = "github:giovantenne/nixorium/master";
+    nixorium.inputs.nixpkgs.follows = "nixpkgs";
+  };
 
-  outputs = { self, nixorium }:
+  outputs = { self, nixpkgs, nixorium }:
     let
+      packageBase = nixorium.lib.packageBase;
+      packageBaseCompatible =
+        packageBase.source == "github:NixOS/nixpkgs"
+        && packageBase.channel == "nixos-26.05";
       # deploymentMode is optional: existing deployments remain laboratories.
       # Explicit controller mode requires pcCount = 0 (see README).
       labConfig = nixorium.lib.evalLabSettings
@@ -13,28 +21,31 @@
       clientGroups = {
         # graphics = [ "pc01" "pc02" ];
       };
-      mkDeployment = candidateLabConfig: candidateLabSoftware: nixorium.lib.mkLab {
-        deploymentSelf = self;
-        labConfig = candidateLabConfig;
-        labSoftware = candidateLabSoftware;
-        inherit clientGroups;
+      mkDeployment = candidateLabConfig: candidateLabSoftware:
+        assert packageBaseCompatible
+          || throw "The configured nixpkgs pin is not compatible with this Nixorium release";
+        nixorium.lib.mkLab {
+          deploymentSelf = self;
+          labConfig = candidateLabConfig;
+          labSoftware = candidateLabSoftware;
+          inherit clientGroups;
 
-        publicKeys = {
-          cache = ./keys/cache-public-key;
-          ssh = ./keys/admin-ssh.pub;
-          veyon = ./keys/veyon-public-key.pem;
+          publicKeys = {
+            cache = ./keys/cache-public-key;
+            ssh = ./keys/admin-ssh.pub;
+            veyon = ./keys/veyon-public-key.pem;
+          };
+
+          assets.logo = ./assets/logo.txt;
+
+          sharedModules = [ ./modules/shared.nix ];
+          controllerModules = [ ./modules/controller.nix ];
+          clientModules = [ ./modules/clients.nix ];
+
+          hostModules = {
+            # pc05 = [ ./modules/pc05.nix ];
+          };
         };
-
-        assets.logo = ./assets/logo.txt;
-
-        sharedModules = [ ./modules/shared.nix ];
-        controllerModules = [ ./modules/controller.nix ];
-        clientModules = [ ./modules/clients.nix ];
-
-        hostModules = {
-          # pc05 = [ ./modules/pc05.nix ];
-        };
-      };
       deployment = mkDeployment labConfig labSoftware;
       validateCandidate = rawSettings:
         let
@@ -59,6 +70,11 @@
         ] true;
     in
     deployment // {
+      nixoriumPackageBase = {
+        schemaVersion = 1;
+        inherit (packageBase) source channel;
+        revision = nixpkgs.rev or "";
+      };
       # Machine-facing validation hook used before lab-settings.json is written.
       nixoriumValidateCandidate = validateCandidate;
       # Client validation before saving software. The management application

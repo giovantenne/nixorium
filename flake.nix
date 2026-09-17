@@ -80,6 +80,10 @@
         configSchemaVersion = 2;
         settingsSchemaVersion = 1;
         softwareSchemaVersion = 1;
+        packageBase = {
+          source = "github:NixOS/nixpkgs";
+          channel = "nixos-26.05";
+        };
         evalLabSettings = import ./lib/eval-lab-settings.nix {
           inherit (nixpkgs) lib;
         };

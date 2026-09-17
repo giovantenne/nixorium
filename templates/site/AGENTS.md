@@ -14,6 +14,10 @@ customization, validation, upstream-update, and offline-installer work.
   or request the smallest reusable `lib.mkLab` extension point upstream.
 - Pin released upstream versions in `flake.nix` and `flake.lock`; never merge
   the upstream Git history into this repository.
+- Keep the direct `nixpkgs` input and
+  `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together. Framework
+  updates must preserve this deployment-owned package-base lock node; do not
+  change its channel without an explicitly compatible Nixorium release.
 - Keep referenced modules, keys, and assets inside this source tree so they
   are included in the offline installer.
 - Never commit `secret-key`, `admin-ssh`, or `veyon-private-key.pem`.

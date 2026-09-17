@@ -68,7 +68,9 @@ case "$*" in
   *"flake init -t github:giovantenne/nixorium/${BOOTSTRAP_REVISION}#site")
     cat > flake.nix <<'FLAKE'
 {
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
   inputs.nixorium.url = "github:giovantenne/nixorium/master";
+  inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";
   outputs = { self, nixorium }: {};
 }
 FLAKE
@@ -131,6 +133,10 @@ grep -F "master=99" "$INSTALLER_LOG" >/dev/null
 grep -F "student=student" "$INSTALLER_LOG" >/dev/null
 grep -F "disk=/dev/vda" "$INSTALLER_LOG" >/dev/null
 grep -Fx '  inputs.nixorium.url = "github:giovantenne/nixorium/master";' \
+  "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
+grep -Fx '  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";' \
+  "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
+grep -Fx '  inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
 test -f "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.lock"
 

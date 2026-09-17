@@ -18,15 +18,35 @@ func TestInspectUpdateInputAndRenderTarget(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("flake.nix", "{\n  inputs.nixorium.url = \"github:giovantenne/nixorium/v1.2.3\";\n}\n")
-	write("flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"0123456789012345678901234567890123456789"}}}}`)
+	write("flake.nix", "{\n  inputs.nixpkgs.url = \"github:NixOS/nixpkgs/nixos-26.05\";\n  inputs.nixorium.url = \"github:giovantenne/nixorium/v1.2.3\";\n  inputs.nixorium.inputs.nixpkgs.follows = \"nixpkgs\";\n}\n")
+	write("flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixpkgs":"nixpkgs","nixorium":"nixorium"}},"nixpkgs":{"locked":{"owner":"NixOS","repo":"nixpkgs","rev":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},"nixorium":{"locked":{"rev":"0123456789012345678901234567890123456789"}}}}`)
 	snapshot, err := (Local{}).InspectUpdateInput(repository)
 	if err != nil || snapshot.SourcePrefix != "giovantenne/nixorium" || snapshot.CurrentRef != "v1.2.3" || len(snapshot.CurrentRev) != 40 {
 		t.Fatalf("snapshot = %+v, error = %v", snapshot, err)
 	}
 	proposed, err := ProposedUpdateFlake(snapshot, "v1.3.0")
-	if err != nil || !strings.Contains(string(proposed), "github:giovantenne/nixorium/v1.3.0") || strings.Contains(string(proposed), "v1.2.3") {
+	if err != nil || !strings.Contains(string(proposed), "github:giovantenne/nixorium/v1.3.0") || strings.Contains(string(proposed), "v1.2.3") || !strings.Contains(string(proposed), "github:NixOS/nixpkgs/nixos-26.05") || !strings.Contains(string(proposed), `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"`) {
 		t.Fatalf("proposed flake = %q, error = %v", proposed, err)
+	}
+}
+
+func TestFrameworkUpdatePreservesDeploymentOwnedPackageBaseNode(t *testing.T) {
+	before := []byte(`{"root":"root","nodes":{"root":{"inputs":{"nixpkgs":"nixpkgs","nixorium":"nixorium"}},"nixpkgs":{"locked":{"owner":"NixOS","repo":"nixpkgs","rev":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`)
+	after := []byte(`{"nodes":{"nixorium":{"locked":{"rev":"2222222222222222222222222222222222222222"}},"nixpkgs":{"locked":{"rev":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","repo":"nixpkgs","owner":"NixOS"}},"root":{"inputs":{"nixorium":"nixorium","nixpkgs":"nixpkgs"}}},"root":"root"}`)
+	if err := preserveDeploymentInputNode(before, after, "nixpkgs"); err != nil {
+		t.Fatalf("framework-only lock change rejected: %v", err)
+	}
+	changed := []byte(strings.Replace(string(after), strings.Repeat("a", 40), strings.Repeat("b", 40), 1))
+	if err := preserveDeploymentInputNode(before, changed, "nixpkgs"); err == nil || !strings.Contains(err.Error(), "deployment-owned nixpkgs") {
+		t.Fatalf("changed package-base node error = %v", err)
+	}
+	removed := []byte(`{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"2222222222222222222222222222222222222222"}}}}`)
+	if err := preserveDeploymentInputNode(before, removed, "nixpkgs"); err == nil {
+		t.Fatal("removed package-base node was accepted")
+	}
+	legacy := []byte(`{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`)
+	if err := preserveDeploymentInputNode(legacy, removed, "nixpkgs"); err != nil {
+		t.Fatalf("legacy lock without direct package base rejected: %v", err)
 	}
 }
 

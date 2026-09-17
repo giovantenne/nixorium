@@ -18,6 +18,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   revision resolution, template/installer/layout consistency, the initial lock
   override, update-channel preservation, and fail-closed split-ref handling.
 
+- Added a deployment-owned package-base contract for new templates. Nixorium,
+  Disko, Veyon, controller, and clients follow one direct `nixpkgs` pin, exposed
+  through machine-readable compatibility metadata. Framework updates reject
+  candidate locks that alter or remove that pin; legacy deployments remain
+  supported without implicit migration.
+
 - Added explicit `shared` and `controller` managed-software scopes, including
   controller-only deployments with no clients. Existing client scopes retain
   their meaning. Review identifies controller effects and both sides of scope

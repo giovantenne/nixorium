@@ -39,6 +39,15 @@ template, installer, local Disko layout, and initial lock use that full Git
 revision, while `flake.nix` retains the selected channel for later managed
 updates. Resolution failure stops before the installer is invoked.
 
+## Package-base ownership
+
+New deployments own a direct `nixpkgs` pin on the channel advertised by
+`nixorium.lib.packageBase`. Nixorium's transitive consumers follow it, and the
+deployment exposes `nixoriumPackageBase` with its locked revision. Framework
+updates fail if their candidate lock changes that root node. Legacy deployments
+without the direct input remain supported; migration and package-base update
+are separate reviewed operations.
+
 ## Network interfaces
 
 `lab.ifaceName` is the compatibility fallback for every host. Deployments may
