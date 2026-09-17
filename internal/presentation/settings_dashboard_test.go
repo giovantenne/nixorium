@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -66,5 +67,69 @@ func TestSettingsPasswordReviewIsRedacted(t *testing.T) {
 	view := model.View().Content
 	if model.screen != dashboardSettingsReview || !strings.Contains(view, "lab.teacherPassword: configured → updated") || strings.Contains(view, "$6$") {
 		t.Fatalf("password review was not redacted:\n%s", view)
+	}
+}
+
+func TestUninitializedPasswordMenuIgnoresResumeEvents(t *testing.T) {
+	model := dashboardModel{screen: dashboardSettingsPasswords}
+	updated, command := model.Update(struct{}{})
+	if command != nil || updated.(dashboardModel).screen != dashboardSettingsPasswords {
+		t.Fatalf("unexpected resume handling: command=%v screen=%d", command, updated.(dashboardModel).screen)
+	}
+}
+
+func TestFirstSetupValidatesAndSavesTheCompleteCandidateOnce(t *testing.T) {
+	plans, saves, refreshes := 0, 0, 0
+	candidate := wizardSettings()
+	candidate.Lab.AdminPassword = "$6$new$admin"
+	candidate.Lab.TeacherPassword = "$6$new$teacher"
+	candidate.Lab.StudentPassword = "$6$new$student"
+	model := dashboardModel{
+		screen:            dashboardSettingsPasswords,
+		settingsReturn:    dashboardSetup,
+		settingsCandidate: candidate,
+		actions: DashboardActions{
+			PlanSettings: func(received domain.LabSettingsFile) domain.ConfigPlanReport {
+				plans++
+				if received.Lab.StudentPassword != candidate.Lab.StudentPassword {
+					t.Fatal("complete password candidate was not preserved")
+				}
+				return domain.ConfigPlanReport{Operation: "config-plan", State: "valid", Changes: []domain.SettingChange{{Field: "lab.studentPassword", Sensitive: true}}}
+			},
+			SaveSettings: func(received domain.LabSettingsFile, _ domain.ConfigPlanReport) domain.ConfigurationSaveReport {
+				saves++
+				return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
+			},
+			LoadSetup: func() domain.SetupReport {
+				refreshes++
+				return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}
+			},
+		},
+	}
+
+	updated, command := model.Update(dashboardSettingsPasswordMsg{candidate: candidate})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("complete candidate validation did not start")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if plans != 1 || model.screen != dashboardSettingsReview {
+		t.Fatalf("complete candidate was not reviewed once: plans=%d screen=%d", plans, model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "y"})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("reviewed setup configuration did not start saving")
+	}
+	updated, command = model.Update(command())
+	model = updated.(dashboardModel)
+	if saves != 1 || command == nil || model.screen != dashboardSetup {
+		t.Fatalf("setup save did not continue automatically: saves=%d screen=%d", saves, model.screen)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if refreshes != 1 || model.setup.CurrentStage != domain.SetupStageKeys {
+		t.Fatalf("setup did not resume after one save: refreshes=%d setup=%+v", refreshes, model.setup)
 	}
 }

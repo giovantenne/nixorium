@@ -363,6 +363,9 @@ func (model settingsWizardModel) View() tea.View {
 		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(model.fields), field.group),
 		field.label,
 	}
+	if strings.Contains(model.title, "First setup") {
+		lines = append(lines, "All settings are collected first; passwords and one complete validation follow.")
+	}
 	if len(field.choices) > 0 && !model.custom {
 		lines = append(lines, "", "Choose a suggested value, or press / to filter.", "", model.selector.View())
 		lines = append(lines, "", "↑/↓ choose   enter continue   / search   esc cancel   F1 help")

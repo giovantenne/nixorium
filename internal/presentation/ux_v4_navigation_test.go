@@ -223,16 +223,15 @@ func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	group, selected := model.settingsMenu.selected()
-	if loaded != 1 || model.screen != dashboardSettings || !selected || group.id != "network" {
-		t.Fatalf("setup settings did not preserve its intended section: loaded=%d screen=%d group=%q", loaded, model.screen, group.id)
+	if loaded != 1 || model.screen != dashboardSettingsEdit || len(model.settingsEditor.fields) != len(settingsFields) {
+		t.Fatalf("setup did not open one complete settings sequence: loaded=%d screen=%d fields=%d", loaded, model.screen, len(model.settingsEditor.fields))
 	}
-	if view := model.View().Content; !strings.Contains(view, "First setup / Laboratory settings") || strings.Contains(view, "exit and run") {
+	if view := model.View().Content; !strings.Contains(view, "First setup / Laboratory settings") || !strings.Contains(view, "one complete validation") || strings.Contains(view, "exit and run") {
 		t.Fatalf("setup settings are not a continuous English flow:\n%s", view)
 	}
 }
 
-func TestSetupCredentialsOpenOneProtectedPasswordSession(t *testing.T) {
+func TestSetupCredentialsFollowTheSameSettingsAndPasswordSequence(t *testing.T) {
 	model := experienceFixture(2)
 	model.setupMode = true
 	model.screen = dashboardSetup
@@ -244,10 +243,55 @@ func TestSetupCredentialsOpenOneProtectedPasswordSession(t *testing.T) {
 
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	updated, passwordCommand := model.Update(command())
+	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsPasswords || passwordCommand == nil {
-		t.Fatalf("credential stage did not open one protected password session: %+v", model)
+	if model.screen != dashboardSettingsEdit || len(model.settingsEditor.fields) != len(settingsFields) {
+		t.Fatalf("credential stage did not start the unified settings sequence: screen=%d fields=%d", model.screen, len(model.settingsEditor.fields))
+	}
+
+	model.settingsEditor.index = len(model.settingsEditor.fields) - 1
+	model.settingsEditor.prepareCurrentField()
+	updated, passwordCommand := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettingsPasswords || passwordCommand == nil || !model.settingsPasswordMenu.initialized {
+		t.Fatalf("completed settings did not open one protected password session: screen=%d initialized=%t", model.screen, model.settingsPasswordMenu.initialized)
+	}
+	updated, _ = model.Update(struct{}{})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettingsPasswords {
+		t.Fatalf("resume event left the protected password step: screen=%d", model.screen)
+	}
+}
+
+func TestSetupValidationRetryKeepsAcceptedPasswords(t *testing.T) {
+	plans := 0
+	model := experienceFixture(2)
+	model.setupMode = true
+	model.screen = dashboardSetup
+	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}
+	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return wizardSettings(), nil }
+	model.actions.PlanSettings = func(domain.LabSettingsFile) domain.ConfigPlanReport {
+		plans++
+		return domain.ConfigPlanReport{Operation: "config-plan", State: "unchanged"}
+	}
+
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.settingsCollectPasswords {
+		t.Fatal("validation retry would collect already accepted passwords again")
+	}
+	model.settingsEditor.index = len(model.settingsEditor.fields) - 1
+	model.settingsEditor.prepareCurrentField()
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen == dashboardSettingsPasswords || model.busy == "" {
+		t.Fatalf("validation retry did not proceed directly to one plan: screen=%d busy=%q", model.screen, model.busy)
+	}
+	updated, _ = model.Update(command())
+	if plans != 1 {
+		t.Fatalf("validation plans = %d, want 1", plans)
 	}
 }
 

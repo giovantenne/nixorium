@@ -55,8 +55,11 @@ evidence must distinguish initial provisioning from pending later work.
 
 ### 3. Required data and credentials
 
-Group network → identity/inventory → users → locale/keyboard → essential desktop
-choices. Suggest only safely inferred values and explain why each is needed.
+Collect network → identity/inventory → users → locale/keyboard → essential
+desktop choices in one ordered sequence. Follow with all account passwords,
+then validate, review, and save the complete candidate once. Do not return to a
+category menu or run a full Nix validation between these inputs. Suggest only
+safely inferred values and explain why each is needed.
 
 - Ambiguous interface/address: require a choice; do not guess a network.
 - Input error: preserve valid prior answers and focus the relevant field.

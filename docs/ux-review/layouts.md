@@ -94,9 +94,10 @@ This five-step view is a UX grouping, not a replacement for the domain's
 observed setup facts. `t` reveals technical checks inside the current group.
 “Other computers” does not prevent completing a session.
 
-## L03 — Settings grouped by subject
+## L03 — Continuous settings sequence
 
-Flow F01. Network example: one decision and why it is needed.
+Flow F01. Every required setting follows the previous one in a single sequence.
+Network example: one decision and why it is needed.
 
 ~~~text
    First setup / Laboratory settings             Network
@@ -129,8 +130,10 @@ Inventory example:
 ~~~
 
 Locale, keyboard, and time zone use searchable offline choices. Validation
-errors stay beside the field without discarding valid answers. Passwords retain
-the protected collector; no secret or hash appears in review or logs.
+errors stay beside the field without discarding valid answers. After the last
+ordinary setting, one protected session collects all account passwords. Only
+then does Nixorium validate and review the complete candidate; no secret or hash
+appears in review or logs.
 
 ## L04 — Review laboratory settings
 
@@ -157,8 +160,9 @@ Flow F01. Secrets are redacted; saving and machine changes remain separate.
    ↑↓ move   Enter review action   Esc back   F1 help
 ~~~
 
-The next screen preserves complete validation, redaction, fingerprint, and the
-existing exact local-commit confirmation. Repository drift requires a new review.
+The review preserves complete validation, redaction, and the source fingerprint.
+Saving records the managed configuration locally without exposing repository
+mechanics. Repository drift requires a new review.
 
 ## L05 — Build and apply the controller
 

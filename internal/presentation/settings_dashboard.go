@@ -123,7 +123,8 @@ var routinePasswordChoices = []routinePasswordChoice{
 }
 
 type routinePasswordMenu struct {
-	list list.Model
+	list        list.Model
+	initialized bool
 }
 
 func newRoutineSettingsMenu(isDark bool, width, height int) routineSettingsMenu {
@@ -198,19 +199,28 @@ func newRoutinePasswordMenu(isDark bool, width, height int) routinePasswordMenu 
 	menu.SetFilteringEnabled(false)
 	menu.Styles = list.DefaultStyles(isDark)
 	menu.Help.Styles = help.DefaultStyles(isDark)
-	return routinePasswordMenu{list: menu}
+	return routinePasswordMenu{list: menu, initialized: true}
 }
 
 func (menu *routinePasswordMenu) setSize(width, height int) {
+	if !menu.initialized {
+		return
+	}
 	menu.list.SetSize(settingsMenuWidth(width), settingsMenuHeight(height))
 }
 
 func (menu routinePasswordMenu) selected() (routinePasswordChoice, bool) {
+	if !menu.initialized {
+		return routinePasswordChoice{}, false
+	}
 	item, ok := menu.list.SelectedItem().(routinePasswordChoice)
 	return item, ok
 }
 
 func (menu routinePasswordMenu) update(message tea.Msg) (routinePasswordMenu, tea.Cmd) {
+	if !menu.initialized {
+		return menu, nil
+	}
 	updated, command := menu.list.Update(message)
 	menu.list = updated
 	return menu, command
@@ -246,10 +256,10 @@ func (command *settingsPasswordCommand) Run() error {
 		return errors.New("password terminal input and output are required")
 	}
 	candidate, err := command.action(command.account, command.settings, command.input, command.output)
+	command.candidate = candidate
 	if err != nil {
 		return err
 	}
-	command.candidate = candidate
 	return nil
 }
 
@@ -314,6 +324,20 @@ func (model dashboardModel) settingsView() string {
 }
 
 func (model dashboardModel) settingsPasswordsView() string {
+	if model.settingsReturn == dashboardSetup {
+		lines := []string{
+			tuiTitle("Nixorium — First setup / Account passwords", model.isDark),
+			"",
+			"Enter the administrator, teacher, and student passwords in one protected session.",
+			"After all three are accepted, Nixorium validates the complete laboratory configuration once.",
+			"",
+			"Enter: collect all passwords   Esc: cancel setup configuration",
+		}
+		if model.message != "" {
+			lines = append(lines, "", "Result: "+model.message)
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
 	lines := []string{
 		tuiTitle("Nixorium — Change password", model.isDark),
 		"",
