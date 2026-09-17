@@ -232,9 +232,6 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 	if err := json.Unmarshal([]byte(metaOutput), &meta); err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("decode candidate labMeta: %w", err)
 	}
-	if meta.Controller.Name == "" || len(meta.Clients.Hosts) == 0 || meta.Clients.Hosts[0].Name == "" {
-		return domain.UpdateProposal{}, errors.New("candidate labMeta does not contain a controller and at least one client")
-	}
 	statusOutput, err := runBoundedNix(ctx, 1024*1024, append([]string{"eval", flake + "#deploymentStatus", "--json"}, common...)...)
 	if err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("evaluate candidate deploymentStatus: %w", err)
@@ -243,22 +240,9 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 	if err := json.Unmarshal([]byte(statusOutput), &status); err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("decode candidate deploymentStatus: %w", err)
 	}
-	if !status.Ready {
-		return domain.UpdateProposal{}, fmt.Errorf("candidate deployment is not ready: %s", strings.Join(status.Issues, "; "))
-	}
-	builds := []struct {
-		id        string
-		attribute string
-	}{
-		{"client", "nixosConfigurations." + meta.Clients.Hosts[0].Name + ".config.system.build.toplevel"},
-		{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel"},
-		{"netboot", "nixosConfigurations.netboot.config.system.build.netbootRamdisk"},
-		{"pxe-firmware", "pxeFirmware"},
-		{"installer-bundle", "installerBundle"},
-	}
-	checks := []domain.UpdateCheck{
-		{ID: "lab-meta", State: "passed", Message: "candidate laboratory metadata evaluated"},
-		{ID: "deployment-status", State: "passed", Message: "candidate deployment is ready"},
+	builds, checks, err := updateCandidateChecks(meta, status)
+	if err != nil {
+		return domain.UpdateProposal{}, err
 	}
 	for _, build := range builds {
 		arguments := append([]string{"build", flake + "#" + build.attribute, "--no-link"}, common...)
@@ -277,6 +261,62 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 		Diff:         domain.GitDiff{Scope: "nixorium-update", Content: diff},
 		Checks:       checks,
 	}, nil
+}
+
+type updateCandidateBuild struct {
+	id        string
+	attribute string
+}
+
+func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) ([]updateCandidateBuild, []domain.UpdateCheck, error) {
+	if meta.Controller.Name == "" {
+		return nil, nil, errors.New("candidate labMeta does not contain a controller")
+	}
+	switch meta.DeploymentMode {
+	case "controller":
+		if meta.Clients.Count != 0 || len(meta.Clients.Hosts) != 0 {
+			return nil, nil, errors.New("candidate controller mode contains client inventory")
+		}
+		if status.Controller == nil {
+			return nil, nil, errors.New("candidate controller mode does not advertise controller readiness")
+		}
+		if !status.Controller.Ready {
+			detail := strings.Join(status.Controller.Issues, "; ")
+			if detail == "" {
+				detail = "controller configuration is not ready"
+			}
+			return nil, nil, fmt.Errorf("candidate controller is not ready: %s", detail)
+		}
+		return []updateCandidateBuild{
+				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel"},
+			}, []domain.UpdateCheck{
+				{ID: "lab-meta", State: "passed", Message: "candidate controller metadata evaluated"},
+				{ID: "deployment-status", State: "passed", Message: "candidate controller is ready"},
+			}, nil
+	case "", "laboratory":
+		if len(meta.Clients.Hosts) == 0 || meta.Clients.Hosts[0].Name == "" {
+			return nil, nil, errors.New("candidate labMeta does not contain at least one client")
+		}
+		if !status.Ready {
+			detail := strings.Join(status.Issues, "; ")
+			if detail == "" {
+				detail = "laboratory configuration is not ready"
+			}
+			return nil, nil, fmt.Errorf("candidate deployment is not ready: %s", detail)
+		}
+		return []updateCandidateBuild{
+				{"client", "nixosConfigurations." + meta.Clients.Hosts[0].Name + ".config.system.build.toplevel"},
+				{"controller", "nixosConfigurations." + meta.Controller.Name + ".config.system.build.toplevel"},
+				{"netboot", "nixosConfigurations.netboot.config.system.build.netbootRamdisk"},
+				{"pxe-firmware", "pxeFirmware"},
+				{"installer-bundle", "installerBundle"},
+			}, []domain.UpdateCheck{
+				{ID: "lab-meta", State: "passed", Message: "candidate laboratory metadata evaluated"},
+				{ID: "deployment-status", State: "passed", Message: "candidate deployment is ready"},
+			}, nil
+	default:
+		return nil, nil, fmt.Errorf("candidate labMeta has unsupported deployment mode %q", meta.DeploymentMode)
+	}
 }
 
 func runBoundedNix(ctx context.Context, limit int, arguments ...string) (string, error) {

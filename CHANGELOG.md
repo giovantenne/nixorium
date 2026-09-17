@@ -39,6 +39,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Made guided Nixorium update validation capability-aware. Explicit
+  controller-only deployments require controller readiness and build only the
+  candidate controller system; they no longer require a fabricated client or
+  unrelated netboot, PXE firmware, and installer outputs. Laboratory and
+  legacy deployments retain the full representative build set, while unknown
+  modes, client inventory in controller mode, and missing controller readiness
+  fail closed.
 - Made first-run configuration one continuous sequence: all ordinary settings
   are collected in one wizard, all three passwords follow in one protected
   session, and the complete candidate is validated, reviewed, and saved once.

@@ -192,6 +192,105 @@ esac
 	}
 }
 
+func TestPrepareUpdateBuildsOnlyControllerForControllerMode(t *testing.T) {
+	repository := newGitReviewRepository(t)
+	writeGitReviewFile(t, repository, "flake.nix", "{\n  inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n}\n")
+	writeGitReviewFile(t, repository, "flake.lock", `{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`+"\n")
+	if _, err := run(context.Background(), "git", "-C", repository, "add", "flake.nix", "flake.lock"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(context.Background(), "git", "-C", repository, "commit", "-qm", "deployment"); err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "nix.log")
+	script := `#!/bin/sh
+set -eu
+printf '%s\n' "$*" >> "$NIXORIUM_TEST_NIX_LOG"
+case " $* " in
+  *" flake lock "*)
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = --output-lock-file ]; then
+        printf '%s\n' '{"root":"root","nodes":{"root":{"inputs":{"nixorium":"nixorium"}},"nixorium":{"locked":{"rev":"2222222222222222222222222222222222222222"}}}}' > "$2"
+        exit 0
+      fi
+      shift
+    done
+    exit 2
+    ;;
+  *"#labMeta "*)
+    printf '%s\n' '{"schemaVersion":2,"deploymentMode":"controller","controller":{"name":"pc99"},"clients":{"count":0,"hosts":[]}}'
+    ;;
+  *"#deploymentStatus "*)
+    printf '%s\n' '{"ready":false,"issues":["Client installation is not configured"],"controller":{"ready":true,"issues":[],"requiresKeys":false}}'
+    ;;
+  *" build "*) exit 0 ;;
+  *) exit 3 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "nix"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
+	proposal, err := (Local{}).PrepareUpdate(context.Background(), repository, "v1.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposal.Checks) != 3 || proposal.Checks[1].Message != "candidate controller is ready" || proposal.Checks[2].ID != "controller" {
+		t.Fatalf("proposal checks = %+v", proposal.Checks)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
+	if len(lines) != 4 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
+		t.Fatalf("unexpected controller-only Nix invocations (%d):\n%s", len(lines), log)
+	}
+	for _, excluded := range []string{"nixosConfigurations.pc01", "nixosConfigurations.netboot", "#pxeFirmware", "#installerBundle"} {
+		if strings.Contains(string(log), excluded) {
+			t.Fatalf("controller-only update built %q:\n%s", excluded, log)
+		}
+	}
+}
+
+func TestUpdateCandidateChecksFailClosedAcrossDeploymentModes(t *testing.T) {
+	controllerMeta := domain.LabMeta{DeploymentMode: "controller"}
+	controllerMeta.Controller.Name = "pc99"
+	controllerReady := domain.DeploymentStatus{Controller: &domain.ControllerReadiness{Ready: true}}
+
+	withClient := controllerMeta
+	withClient.Clients.Count = 1
+	withClient.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}}
+	for _, test := range []struct {
+		name   string
+		meta   domain.LabMeta
+		status domain.DeploymentStatus
+		want   string
+	}{
+		{"controller inventory", withClient, controllerReady, "contains client inventory"},
+		{"missing controller readiness", controllerMeta, domain.DeploymentStatus{Ready: true}, "does not advertise controller readiness"},
+		{"unready controller", controllerMeta, domain.DeploymentStatus{Controller: &domain.ControllerReadiness{Issues: []string{"passwords are not configured"}}}, "passwords are not configured"},
+		{"unknown mode", func() domain.LabMeta { meta := controllerMeta; meta.DeploymentMode = "future"; return meta }(), controllerReady, "unsupported deployment mode"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, _, err := updateCandidateChecks(test.meta, test.status); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want %q", err, test.want)
+			}
+		})
+	}
+
+	legacy := domain.LabMeta{}
+	legacy.Controller.Name = "pc99"
+	legacy.Clients.Count = 1
+	legacy.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}}
+	builds, checks, err := updateCandidateChecks(legacy, domain.DeploymentStatus{Ready: true})
+	if err != nil || len(builds) != 5 || len(checks) != 2 {
+		t.Fatalf("legacy laboratory builds = %+v, checks = %+v, error = %v", builds, checks, err)
+	}
+}
+
 func TestApplyPreparedUpdateWritesOnlyReviewedFiles(t *testing.T) {
 	repository := newGitReviewRepository(t)
 	writeGitReviewFile(t, repository, "flake.nix", "{\n  inputs.nixorium.url = \"github:owner/project/v1.0.0\";\n}\n")

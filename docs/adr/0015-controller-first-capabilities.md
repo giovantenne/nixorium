@@ -37,6 +37,16 @@ success evidence remain mandatory. False readiness with no explanatory issues
 still blocks activation. PXE and client deployment never use the controller
 capability as authority.
 
+Guided Nixorium update planning also consumes the explicit mode. Controller
+mode requires zero client inventory and explicit controller readiness, then
+builds only the candidate controller system. It does not evaluate client,
+netboot, firmware, or installer outputs that cannot be used in that mode.
+Laboratory mode and legacy metadata retain strict fleet readiness and the full
+representative build set. Unknown modes, inconsistent inventory, and a target
+that omits controller readiness fail closed. This changes validation scope only:
+update apply still writes the reviewed `flake.nix` and `flake.lock` proposal
+without activating the controller.
+
 ## Subsequent contracts
 
 The initial increment is a foundation, not a completed installer/UI redesign.
@@ -63,5 +73,6 @@ Nix/Go tests cover mode/count invariants and legacy defaults; host evaluation
 covers inventory, networking, services, firewall and credential readiness.
 Application tests cover independent readiness and strict legacy fallback.
 Management VM coverage exercises the privileged helper without lab keys while
-fleet operations stay blocked. Representative system builds and offline
-equivalence remain required for this foundation.
+fleet operations stay blocked. Update adapter and VM coverage verify both the
+legacy laboratory build set and the controller-only build set. Representative
+system builds and offline equivalence remain required for this foundation.

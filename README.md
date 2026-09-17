@@ -210,7 +210,7 @@ their current plain-language action, so a remote terminal never looks frozen.
 | **View operation logs** | Shows private, bounded deployment logs and typed action history |
 | **Review Git changes** | Displays redacted deployment changes and optionally creates a local reviewed commit |
 | **Change settings** | Edits one grouped area, including Git identity or one securely entered account password, then validates and reviews the complete candidate |
-| **Update Nixorium** | Fetches upstream `master` and releases, then validates and applies the selected target |
+| **Update Nixorium** | Fetches upstream `master` and releases, then validates and saves the selected target; a controller-only system builds only its controller candidate |
 | **Shut down computers** | Checks selected clients and sessions, then sends reviewed power-off requests without targeting the controller |
 | **Install or reinstall computers** | Prepares, starts, stops, or recovers PXE installation mode |
 
