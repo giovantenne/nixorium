@@ -573,23 +573,25 @@ Partial result:
 No automatic retry or rollback claim. Leaving does not erase evidence or start
 work on other targets.
 
-## L15 — Select a discovered Nixorium release
+## L15 — Select a discovered Nixorium update
 
 Flow F05. Uses `UpdateCheckReport`; no editable target field.
 
 ~~~text
    Update Nixorium
 
-   Current release     v2.1.0
+   Configured target   v2.1.0
    Source              github:giovantenne/nixorium
 
-   Available stable releases
-   › v2.3.0             Latest
+   Available updates
+   › master             Development branch
+     v2.3.0             Latest stable
      v2.2.1
      v2.2.0
      v2.1.0             Current
 
-   Selecting a release only starts validation.
+   Select master for the latest development revision, or a tagged release.
+   Selection only starts validation.
    No file, controller, or client has changed.
 
    Enter validate   p show prereleases   r fetch again   Esc back
@@ -598,7 +600,7 @@ Flow F05. Uses `UpdateCheckReport`; no editable target field.
 Discovery failure:
 
 ~~~text
-   ! Releases could not be fetched
+   ! Updates could not be fetched
 
    Nixorium could not contact the configured public upstream.
    No candidate can be selected and no file changed.

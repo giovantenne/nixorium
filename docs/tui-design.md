@@ -47,8 +47,9 @@ progress, recovery instructions and the next explicit action.
   handoff, stop and recovery.
 - Administration: settings, controller, services, changes/revisions, history,
   inventory and diagnostics.
-- Update Nixorium: fetch bounded releases → select stable or explicitly reveal
-  prerelease → validate → review → apply only the two managed Flake files.
+- Update Nixorium: fetch bounded targets → select the clearly labelled
+  Development `master`, a stable release, or an explicitly revealed prerelease
+  → validate → review → apply only the two managed Flake files.
 - Software: configured/search/suggested views over pinned packages →
   configuration scope → validated proposal → exact confirmation → transparent
   local save; applying to computers remains separate.
@@ -92,7 +93,7 @@ Preserve domain/application preflights and typed callbacks for every flow:
 | PXE start | exact START PXE, interface/address impact, readiness recheck, transactional cleanup and recovery |
 | Cache restart | exact RESTART CACHE, fixed action unit, post-action verification |
 | Git commit | selected safe paths, exact phrase, content token, secret checks, no push |
-| Update Nixorium | service-discovered release, candidate checks, exact phrase/token, two-file scope, no implicit activation |
+| Update Nixorium | service-discovered `master` or release, candidate checks, exact phrase/token, two-file scope, no implicit activation |
 | Settings/password | full validation, redacted review, source fingerprint, atomic writer, no-echo password collector |
 | Software declaration | pinned search plus suggestions, structured nested attributes, policy state, evaluated scope, all-client candidate validation, fingerprint/token recheck, one-file atomic writer and transparent local record, no implicit build/deploy |
 | Client shutdown | evaluated clients only, controller exclusion, active-session block, explicit unknown-session acknowledgement, expiring review, immediate recheck, shared deployment lock, fixed SSH commands |
@@ -169,7 +170,7 @@ power remains planned application work, not an implemented TUI action.
   `settings_dashboard.go`, `setup_wizard.go`.
 - Read model: `internal/domain/computer_condition.go`.
 - Application wiring: `cmd/nixorium/main.go` adds existing Doctor and
-  UpdateManager release discovery plus the single-inventory-identity observer
+  UpdateManager update discovery plus the single-inventory-identity observer
   and installation-session manager to the typed TUI callbacks; existing CLI
   command handlers are unchanged.
 - Installation session: `internal/domain/installation_session.go`,

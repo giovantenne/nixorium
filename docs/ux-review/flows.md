@@ -250,14 +250,14 @@ Choose system/revision → select targets → check only relevant clients
 **Acceptance:** updating four selected clients while twenty are off may finish
 as “4/4 selected clients verified”, never “24/24 updated”.
 
-## F05 — Update Nixorium from available releases
+## F05 — Update Nixorium from available upstream targets
 
 Layouts L15–L16. Priority P4. This flow uses the existing typed
 `UpdateManager.Check`, `Plan`, and `ApplyPlan` boundary.
 
 ~~~text
-Choose Update Nixorium → fetch bounded releases from configured upstream
-  → select stable release, or explicitly reveal prereleases
+Choose Update Nixorium → fetch bounded targets from configured upstream
+  → select Development master, a stable release, or explicitly reveal prereleases
   → validate candidate and representative builds → review exact two-file diff
   → type service-generated confirmation → atomically update flake files
   → review Git changes → explicitly commit/apply/distribute in later operations
@@ -265,11 +265,11 @@ Choose Update Nixorium → fetch bounded releases from configured upstream
 
 Final contract:
 
-- `UpdateCheckReport` owns upstream identity, current ref, stable/prerelease
-  candidates, truncation, and discovery issues;
+- `UpdateCheckReport` owns upstream identity, current ref, Development master,
+  stable/prerelease candidates, truncation, and discovery issues;
 - presentation never accepts a free-form target and never constructs a remote;
-- stable releases are the default list; prereleases require an explicit UI
-  choice that is passed as `allowPrerelease` to planning;
+- Development master and stable releases are the default list; prereleases
+  require an explicit UI choice that is passed as `allowPrerelease` to planning;
 - downgrades are not offered by the TUI. If an older discovered tag is selected,
   application planning rejects it before effects;
 - refresh performs another explicit bounded discovery; failure keeps no stale

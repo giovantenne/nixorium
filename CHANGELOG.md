@@ -22,6 +22,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added the configured upstream's `master` branch as an explicit Development
+  target in Update Nixorium. It uses the same candidate lock, representative
+  builds, reviewed two-file proposal, and transparent local save as tagged
+  releases; arbitrary branches and free-form references remain unavailable.
+- Simplified setup orientation: startup now shows only its non-interactive
+  loading state, the setup timeline no longer resembles a selectable list,
+  the next action is presented as descriptive guidance, and Esc explicitly
+  pauses the resumable setup before opening Interventions.
 - Simplified guided software interaction: a reviewed configuration is saved
   with Enter while its hash-bound review token remains internal, package search
   opens from both slash keys on an Italian keyboard, and arrow keys move from

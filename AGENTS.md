@@ -235,7 +235,8 @@ Release from the matching changelog section.
   compare-and-update of HEAD, path-only index reconciliation, unrelated index/
   worktree state, disabled hooks/signing, and the no-remote/no-push boundary.
 - Upstream update planning must preserve the configured source identity, accept
-  only an explicit SemVer tag, generate the candidate lock outside the checkout,
+  only the exact `master` branch or an explicit SemVer tag, generate the
+  candidate lock outside the checkout,
   and validate representative outputs against that exact lock. Apply only the
   token-bound `flake.nix`/`flake.lock` proposal under the deployment-root lock;
   never imply a branch, commit, push, activation, PXE action, or deployment.

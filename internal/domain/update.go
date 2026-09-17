@@ -31,6 +31,7 @@ type UpdateCheckReport struct {
 	CurrentRef     string            `json:"currentRef,omitempty"`
 	CurrentRev     string            `json:"currentRevision,omitempty"`
 	CurrentChannel UpdateChannel     `json:"currentChannel,omitempty"`
+	Development    []UpdateRelease   `json:"development"`
 	Stable         []UpdateRelease   `json:"stable"`
 	Prerelease     []UpdateRelease   `json:"prerelease"`
 	Truncated      bool              `json:"truncated"`

@@ -63,9 +63,10 @@ management VM drives the packaged application through a real PTY. Command
 execution and privilege decisions remain in the shared application and adapter
 layers.
 
-Update Nixorium injects the existing typed release-discovery callback. Bubble
-Tea renders only the bounded stable/prerelease candidates returned by
-`UpdateManager.Check`; there is no free-form target or TUI downgrade policy.
+Update Nixorium injects the existing typed update-discovery callback. Bubble
+Tea renders only the bounded `master`, stable, and prerelease candidates
+returned by `UpdateManager.Check`; there is no free-form target or TUI downgrade
+policy. `master` is explicitly identified as the Development branch.
 Planning and apply retain their exact application-owned diff, build checks,
 review token, confirmation, and two-file boundary.
 
@@ -136,7 +137,7 @@ sanitization; neither CLI nor TUI accepts an arbitrary path.
 Git review/commit and upstream update screens preserve the same rule. Bubble
 Tea selects typed reviewed paths or release policy, renders bounded patches,
 collects the exact generated confirmation, and displays typed results. Git,
-filesystem, Nix, release discovery, operation recording, and every follow-up
+filesystem, Nix, update discovery, operation recording, and every follow-up
 action remain in application/adapters. Only explicit `update check` enumerates
 the public remote; opening the dashboard never does.
 

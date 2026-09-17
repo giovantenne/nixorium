@@ -26,6 +26,7 @@ type fakeUpdateSource struct {
 	review      domain.GitReviewSnapshot
 	commitPlan  domain.GitCommitProposal
 	commits     int
+	lastTarget  string
 }
 
 func (source *fakeUpdateSource) DiscoverUpdateReleases(context.Context, string) ([]domain.UpdateReleaseRef, error) {
@@ -45,8 +46,9 @@ func (source *fakeUpdateSource) InspectUpdateInput(string) (domain.UpdateInputSn
 	return source.snapshot, nil
 }
 
-func (source *fakeUpdateSource) PrepareUpdate(context.Context, string, string) (domain.UpdateProposal, error) {
+func (source *fakeUpdateSource) PrepareUpdate(_ context.Context, _, target string) (domain.UpdateProposal, error) {
 	source.prepared++
+	source.lastTarget = target
 	return source.proposal, nil
 }
 
@@ -120,6 +122,7 @@ func TestUpdateCheckSeparatesSortsAndBoundsReleaseChannels(t *testing.T) {
 			CurrentRev:   strings.Repeat("a", 40),
 		},
 		releases: []domain.UpdateReleaseRef{
+			{Tag: "master", ObjectID: strings.Repeat("a", 40)},
 			{Tag: "documentation", ObjectID: strings.Repeat("d", 40)},
 			{Tag: "v1.9.0", ObjectID: strings.Repeat("1", 40)},
 			{Tag: "v2.1.0-beta.2", ObjectID: strings.Repeat("2", 40)},
@@ -139,6 +142,24 @@ func TestUpdateCheckSeparatesSortsAndBoundsReleaseChannels(t *testing.T) {
 	}
 	if len(report.Prerelease) != 2 || report.Prerelease[0].Tag != "v2.1.0-beta.10" || report.Prerelease[1].Tag != "v2.1.0-beta.2" {
 		t.Fatalf("prerelease releases = %+v", report.Prerelease)
+	}
+	if len(report.Development) != 1 || report.Development[0].Tag != "master" || report.Development[0].Channel != domain.UpdateChannelMoving {
+		t.Fatalf("development releases = %+v", report.Development)
+	}
+}
+
+func TestUpdatePlanAcceptsReviewedMasterTarget(t *testing.T) {
+	source := &fakeUpdateSource{
+		revision: strings.Repeat("a", 40),
+		snapshot: domain.UpdateInputSnapshot{
+			SourceURL: "github:owner/repo/v2.0.0", CurrentRef: "v2.0.0",
+			FlakeContent: []byte("old flake"), LockContent: []byte("old lock"), HasLock: true,
+		},
+		proposal: domain.UpdateProposal{FlakeContent: []byte("master flake"), LockContent: []byte("master lock"), Checks: []domain.UpdateCheck{{ID: "controller", State: "passed"}}},
+	}
+	plan := NewUpdateManager(source).Plan(context.Background(), ".", "master", false, false)
+	if plan.State != "ready" || plan.TargetChannel != domain.UpdateChannelMoving || plan.Downgrade || plan.Confirmation != "UPDATE NIXORIUM TO master" || source.lastTarget != "master" {
+		t.Fatalf("master plan = %+v, prepared target = %q", plan, source.lastTarget)
 	}
 }
 

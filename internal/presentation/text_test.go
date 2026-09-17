@@ -253,13 +253,14 @@ func TestUpdateCheckTextSeparatesReleaseChannels(t *testing.T) {
 	report := domain.UpdateCheckReport{
 		State: "available", Repository: "/deployment", Upstream: "github:owner/repo",
 		CurrentRef: "v2.0.0", CurrentRev: strings.Repeat("a", 40), CurrentChannel: domain.UpdateChannelStable,
-		Stable:     []domain.UpdateRelease{{Tag: "v2.1.0", ObjectID: strings.Repeat("b", 40), Channel: domain.UpdateChannelStable}},
-		Prerelease: []domain.UpdateRelease{{Tag: "v2.2.0-beta.1", ObjectID: strings.Repeat("c", 40), Channel: domain.UpdateChannelPrerelease}},
-		Truncated:  true,
+		Development: []domain.UpdateRelease{{Tag: "master", ObjectID: strings.Repeat("d", 40), Channel: domain.UpdateChannelMoving}},
+		Stable:      []domain.UpdateRelease{{Tag: "v2.1.0", ObjectID: strings.Repeat("b", 40), Channel: domain.UpdateChannelStable}},
+		Prerelease:  []domain.UpdateRelease{{Tag: "v2.2.0-beta.1", ObjectID: strings.Repeat("c", 40), Channel: domain.UpdateChannelPrerelease}},
+		Truncated:   true,
 	}
 	var output bytes.Buffer
 	UpdateCheckText(&output, report)
-	for _, expected := range []string{"release check: AVAILABLE", "github:owner/repo", "Stable releases", "v2.1.0", "Prereleases", "v2.2.0-beta.1", "newest 20", "only update operation"} {
+	for _, expected := range []string{"release check: AVAILABLE", "github:owner/repo", "Development branch", "master", "Stable releases", "v2.1.0", "Prereleases", "v2.2.0-beta.1", "newest 20", "only update operation"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("update check output omits %q:\n%s", expected, output.String())
 		}

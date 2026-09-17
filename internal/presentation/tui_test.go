@@ -459,7 +459,7 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 			},
 		},
 	}
-	if view := model.View().Content; !strings.Contains(view, "Step 1 of 5") || !strings.Contains(view, "Laboratory settings") || !strings.Contains(view, "Save the generated configuration locally") {
+	if view := model.View().Content; !strings.Contains(view, "Step 1 of 5") || !strings.Contains(view, "Laboratory settings") || !strings.Contains(view, "Save the generated configuration locally") || strings.Contains(view, "› ●") || strings.Contains(view, "! Next step") || !strings.Contains(view, "Continue setup") {
 		t.Fatalf("setup progress screen is incomplete:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1192,6 +1192,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 				State:         "available",
 				Upstream:      "github:giovantenne/nixorium",
 				CurrentRef:    "v2.2.0",
+				Development:   []domain.UpdateRelease{{Tag: "master", Channel: domain.UpdateChannelMoving}},
 				Stable: []domain.UpdateRelease{
 					{Tag: target, Channel: domain.UpdateChannelStable},
 					{Tag: "v2.2.0", Channel: domain.UpdateChannelStable},
@@ -1234,12 +1235,12 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
-	if command == nil || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Fetching available Nixorium releases") {
+	if command == nil || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Fetching available Nixorium updates") {
 		t.Fatalf("release discovery did not start:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if checked != 1 || !strings.Contains(model.View().Content, target) || !strings.Contains(model.View().Content, "Running interface   2.0.0-test") || strings.Contains(model.View().Content, "v2.4.0-beta.1") || strings.Contains(model.View().Content, "Target: >") {
+	if checked != 1 || !strings.Contains(model.View().Content, target) || !strings.Contains(model.View().Content, "master") || !strings.Contains(model.View().Content, "Development branch") || !strings.Contains(model.View().Content, "Running interface   2.0.0-test") || strings.Contains(model.View().Content, "v2.4.0-beta.1") || strings.Contains(model.View().Content, "Target: >") {
 		t.Fatalf("fetched stable release list is incorrect:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
@@ -1247,6 +1248,8 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	if !strings.Contains(model.View().Content, "v2.4.0-beta.1") {
 		t.Fatalf("prerelease disclosure missing:\n%s", model.View().Content)
 	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
@@ -1316,7 +1319,7 @@ func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if !strings.Contains(view, "Releases could not be fetched") || !strings.Contains(view, "No candidate can be selected") || strings.Contains(view, "Target: >") {
+	if !strings.Contains(view, "Updates could not be fetched") || !strings.Contains(view, "No candidate can be selected") || strings.Contains(view, "Target: >") {
 		t.Fatalf("failed discovery exposed an unsafe fallback:\n%s", view)
 	}
 	updated, planCommand := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

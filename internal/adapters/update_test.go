@@ -64,6 +64,7 @@ func TestDiscoverUpdateReleasesIsBoundedAndNonInteractive(t *testing.T) {
 set -eu
 printf '%s\n' "$*" > "$NIXORIUM_TEST_GIT_LOG"
 printf 'prompt=%s askpass=%s sshaskpass=%s interactive=%s global=%s nosystem=%s count=%s\n' "${GIT_TERMINAL_PROMPT-}" "${GIT_ASKPASS-}" "${SSH_ASKPASS-}" "${GCM_INTERACTIVE-}" "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_NOSYSTEM-}" "${GIT_CONFIG_COUNT-}" >> "$NIXORIUM_TEST_GIT_LOG"
+printf '%s\t%s\n' 0000000000000000000000000000000000000000 refs/heads/master
 printf '%s\t%s\n' 1111111111111111111111111111111111111111 refs/tags/v1.0.0
 printf '%s\t%s\n' 2222222222222222222222222222222222222222 refs/tags/v1.1.0-beta.1
 `
@@ -80,7 +81,7 @@ printf '%s\t%s\n' 2222222222222222222222222222222222222222 refs/tags/v1.1.0-beta
 	t.Setenv("GIT_CONFIG_KEY_0", "url.https://attacker.invalid/.insteadOf")
 	t.Setenv("GIT_CONFIG_VALUE_0", "https://github.com/")
 	refs, err := (Local{}).DiscoverUpdateReleases(context.Background(), "owner/repository")
-	if err != nil || len(refs) != 2 || refs[0].Tag != "v1.0.0" || refs[1].Tag != "v1.1.0-beta.1" {
+	if err != nil || len(refs) != 3 || refs[0].Tag != "master" || refs[1].Tag != "v1.0.0" || refs[2].Tag != "v1.1.0-beta.1" {
 		t.Fatalf("release refs = %+v, error = %v", refs, err)
 	}
 	log, err := os.ReadFile(logPath)
@@ -88,7 +89,7 @@ printf '%s\t%s\n' 2222222222222222222222222222222222222222 refs/tags/v1.1.0-beta
 		t.Fatal(err)
 	}
 	for _, expected := range []string{
-		"-c credential.helper= -c core.askPass= ls-remote --refs --tags --exit-code https://github.com/owner/repository.git refs/tags/v*",
+		"-c credential.helper= -c core.askPass= ls-remote --refs --exit-code https://github.com/owner/repository.git refs/heads/master refs/tags/v*",
 		"prompt=0 askpass= sshaskpass= interactive=Never global=/dev/null nosystem=1 count=",
 	} {
 		if !strings.Contains(string(log), expected) {

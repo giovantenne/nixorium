@@ -173,7 +173,7 @@ spinner and the current plain-language action.
 | **View operation logs** | Browse private deployment logs and action history |
 | **Review Git changes** | Review and optionally commit selected safe paths |
 | **Change settings** | Edit and validate one grouped configuration area or one account password |
-| **Update Nixorium** | Fetch available releases, then validate and apply one selected release |
+| **Update Nixorium** | Fetch upstream `master` and releases, then validate and apply one selected target |
 | **Shut down computers** | Check sessions and send reviewed power-off requests to selected clients only |
 | **Install or reinstall computers** | Prepare, start, stop, or recover PXE mode |
 
@@ -520,6 +520,7 @@ nix run .#nixorium -- git review
 nix run .#nixorium -- git commit plan --paths PATHS
 nix run .#nixorium -- git commit apply --paths PATHS --expect REVIEW_TOKEN
 nix run .#nixorium -- update check
+nix run .#nixorium -- update plan --target master
 nix run .#nixorium -- update plan --target v2.0.0
 nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 nix run .#nixorium -- setup
@@ -552,22 +553,25 @@ nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 
 `update check` is the only command that enumerates the configured public
 upstream. It disables Git credential prompting and helpers, stops after 15
-seconds, bounds remote output, and lists at most the newest 20 stable and 20
-prerelease tags separately. It does not change the repository. Skip it and use
-an explicit target when the controller is offline.
+seconds, bounds remote output, and lists the `master` development branch plus at
+most the newest 20 stable and 20 prerelease tags separately. It does not change
+the repository. Skip it and use an explicit target when the controller is
+offline.
 
-Planning keeps the configured upstream identity, accepts only a SemVer release,
-generates the candidate lock outside the checkout, evaluates readiness, and
-builds representative controller/client/netboot/firmware/installer outputs.
+Planning keeps the configured upstream identity, accepts exactly `master` or a
+SemVer release, generates the candidate lock outside the checkout, evaluates
+readiness, and builds representative controller/client/netboot/firmware/
+installer outputs.
 Prereleases require `--allow-prerelease`; known downgrades require
 `--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
 `flake.lock`; review and optionally commit them separately. It never branches,
 commits, pushes, activates, starts PXE, or deploys clients.
 The TUI's **Update Nixorium** intervention first fetches this bounded release
-list. Stable releases are shown by default; prereleases require explicit
-disclosure. The TUI has no editable target and does not offer downgrades. After
-selection, review the scrollable two-file patch (`F4` expands candidate checks),
-then type the exact confirmation shown.
+list. `master` is clearly marked as the Development branch, stable releases are
+shown by default, and prereleases require explicit disclosure. The TUI has no
+editable target and does not offer downgrades. After selection, review the
+scrollable two-file patch (`F4` expands candidate checks), then type the exact
+confirmation shown.
 
 > [!IMPORTANT]
 > Updating these files does not activate the controller or deploy clients.
