@@ -22,7 +22,9 @@ in
 {
   networking.firewall = {
     enable = true;
-    interfaces.${labSettings.ifaceName} = interfaceRules;
+    interfaces = lib.mkIf ((labSettings.deploymentMode or "laboratory") == "laboratory") {
+      ${labSettings.ifaceName} = interfaceRules;
+    };
   };
 
   # Avoid the OpenSSH module adding port 22 on every controller interface.

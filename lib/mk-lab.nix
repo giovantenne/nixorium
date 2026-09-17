@@ -57,6 +57,8 @@ let
   };
 
   inherit (config) masterDhcpIp;
+  inherit (config) deploymentMode;
+  laboratoryEnabled = deploymentMode == "laboratory";
   inherit (config) networkBase;
   inherit (config) networkPrefixLength;
   inherit (config) pcCount;
@@ -129,6 +131,7 @@ let
   ];
 
   labSettings = {
+    inherit deploymentMode;
     inherit masterIp;
     inherit masterDhcpIp;
     inherit masterHostName;
@@ -165,10 +168,10 @@ let
     { nixpkgs.overlays = [ labOverlay ]; }
     ({ lib, ... }:
       {
-        warnings =
+        warnings = lib.optionals laboratoryEnabled (
           lib.optional (cachePublicKeyFile == null) "Missing cache public key"
           ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key"
-          ++ lib.optional (veyonPublicKeyFile == null) "Missing Veyon public key";
+          ++ lib.optional (veyonPublicKeyFile == null) "Missing Veyon public key");
         environment.systemPackages = [ hostState hostSessionState ];
       }
       // lib.optionalAttrs (effectiveDeploymentRevision != null) {
@@ -211,10 +214,11 @@ let
   labMeta = {
     schemaVersion = 2;
     inherit version;
+    inherit deploymentMode;
     controller = {
       name = masterHostName;
       number = masterHostNumber;
-      staticIp = masterIp;
+      staticIp = if laboratoryEnabled then masterIp else "";
       dhcpIp = masterDhcpIp;
     };
     clients = {
@@ -277,14 +281,18 @@ let
   unknownHostModuleNames = builtins.attrNames (builtins.removeAttrs hostModules validHostNames);
   unknownVeyonNativeHosts = builtins.filter (name: !builtins.elem name validHostNames) veyonNativeHosts;
   defaultPasswordHash = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
+  credentialIssues =
+    lib.optional (teacherPassword == defaultPasswordHash) "teacherPassword still uses the public default"
+    ++ lib.optional (studentPassword == defaultPasswordHash) "studentPassword still uses the public default"
+    ++ lib.optional (adminPassword == defaultPasswordHash) "adminPassword still uses the public default";
   deploymentIssues =
-    lib.optional (masterDhcpIp == "MASTER_DHCP_IP") "masterDhcpIp still uses the template placeholder"
+    lib.optional (!laboratoryEnabled) "Client installation is not configured"
+    ++ lib.optional (masterDhcpIp == "MASTER_DHCP_IP") "masterDhcpIp still uses the template placeholder"
     ++ lib.optional (cachePublicKeyFile == null) "cache public key is missing"
     ++ lib.optional (adminSshKeyFile == null) "admin SSH public key is missing"
     ++ lib.optional (veyonPublicKeyFile == null) "Veyon public key is missing"
-    ++ lib.optional (teacherPassword == defaultPasswordHash) "teacherPassword still uses the public default"
-    ++ lib.optional (studentPassword == defaultPasswordHash) "studentPassword still uses the public default"
-    ++ lib.optional (adminPassword == defaultPasswordHash) "adminPassword still uses the public default";
+    ++ credentialIssues;
+  controllerIssues = if laboratoryEnabled then deploymentIssues else credentialIssues;
   sourceNixosVersionMetadata =
     if nixpkgs ? rev && nixpkgs ? lastModifiedDate then
       {
@@ -582,6 +590,11 @@ assert unknownVeyonNativeHosts == []
   deploymentStatus = {
     ready = deploymentIssues == [];
     issues = deploymentIssues;
+    controller = {
+      ready = controllerIssues == [];
+      issues = controllerIssues;
+      requiresKeys = laboratoryEnabled;
+    };
   };
 
   colmena = {

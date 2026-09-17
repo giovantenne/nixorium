@@ -20,6 +20,13 @@ LAN. Clients do not need Internet access during installation or deployment.
 
 ## Why this exists
 
+Development note: the controller-first foundation supports explicit
+`lab.deploymentMode = "controller"` with `pcCount = 0`. Such a controller can be
+rebuilt without client networking or lab keys, with lab services and firewall
+openings inactive. Omission preserves laboratory behavior. Installer prompts
+and the five-task TUI are not integrated yet; use the current flow below.
+See [ADR 0015](docs/adr/0015-controller-first-capabilities.md).
+
 PC laboratories drift: machines are reinstalled at different times, manual
 fixes accumulate, and repeating the same update across a room is slow and hard
 to verify. NixOS makes each machine declarative and reproducible; Nixorium adds

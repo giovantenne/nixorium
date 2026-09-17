@@ -6,6 +6,11 @@ let
     (builtins.tryEval (builtins.deepSeq (evalLabConfig config) true)).success;
 in
 assert evaluates valid;
+assert (evalLabConfig valid).deploymentMode == "laboratory";
+assert evaluates (valid // { deploymentMode = "controller"; pcCount = 0; });
+assert !(evaluates (valid // { deploymentMode = "controller"; }));
+assert !(evaluates (valid // { pcCount = 0; }));
+assert !(evaluates (valid // { deploymentMode = "unknown"; }));
 assert !(evaluates (valid // { networkBase = "10.0.0"; }));
 assert !(evaluates (valid // { networkBase = "10.0.0.1"; }));
 assert !(evaluates (valid // { networkPrefixLength = 30; }));

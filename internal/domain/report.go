@@ -13,9 +13,10 @@ const (
 )
 
 type LabMeta struct {
-	SchemaVersion int    `json:"schemaVersion"`
-	Version       string `json:"version"`
-	Controller    struct {
+	DeploymentMode string `json:"deploymentMode,omitempty"`
+	SchemaVersion  int    `json:"schemaVersion"`
+	Version        string `json:"version"`
+	Controller     struct {
 		Name     string `json:"name"`
 		Number   int    `json:"number"`
 		StaticIP string `json:"staticIp"`
@@ -109,8 +110,23 @@ type HostsReport struct {
 }
 
 type DeploymentStatus struct {
-	Ready  bool     `json:"ready"`
-	Issues []string `json:"issues"`
+	Ready      bool                 `json:"ready"`
+	Issues     []string             `json:"issues"`
+	Controller *ControllerReadiness `json:"controller,omitempty"`
+}
+
+type ControllerReadiness struct {
+	Ready        bool     `json:"ready"`
+	Issues       []string `json:"issues"`
+	RequiresKeys bool     `json:"requiresKeys"`
+}
+
+// Older upstreams have only fleet readiness. Preserve that strict fallback.
+func (s DeploymentStatus) ControllerReadiness() ControllerReadiness {
+	if s.Controller != nil {
+		return *s.Controller
+	}
+	return ControllerReadiness{Ready: s.Ready, Issues: s.Issues, RequiresKeys: true}
 }
 
 type GitState struct {

@@ -86,6 +86,35 @@ func TestControllerPlanBlocksDirtyOrUnreadyDeployment(t *testing.T) {
 	}
 }
 
+func TestControllerApplyWithoutLaboratoryReadiness(t *testing.T) {
+	source := readyControllerSource()
+	source.deployment = domain.DeploymentStatus{
+		Issues:     []string{"Client installation is not configured"},
+		Controller: &domain.ControllerReadiness{Ready: true},
+	}
+	report := NewControllerManager(source).Apply(context.Background(), "/deployment", source.revision)
+	if report.HasErrors() || !report.Verified {
+		t.Fatalf("controller-only apply = %+v", report)
+	}
+	if source.deployment.Ready {
+		t.Fatal("controller apply promoted fleet readiness")
+	}
+}
+
+func TestControllerPlanFailsClosedWithoutReadinessIssues(t *testing.T) {
+	for _, status := range []domain.DeploymentStatus{
+		{},
+		{Ready: true, Controller: &domain.ControllerReadiness{}},
+	} {
+		source := readyControllerSource()
+		source.deployment = status
+		report := NewControllerManager(source).Apply(context.Background(), "/deployment", source.revision)
+		if !report.HasErrors() || source.unit != "" {
+			t.Fatalf("unready status accepted: %+v", report)
+		}
+	}
+}
+
 func TestControllerApplyUsesRevisionInstanceAndVerifiesActiveSystem(t *testing.T) {
 	source := readyControllerSource()
 	report := NewControllerManager(source).Apply(context.Background(), "/deployment", source.revision)

@@ -30,6 +30,7 @@ type LabSettingsFile struct {
 }
 
 type LabSettings struct {
+	DeploymentMode   string   `json:"deploymentMode,omitempty"`
 	MasterDHCPIP     string   `json:"masterDhcpIp"`
 	NetworkBase      string   `json:"networkBase"`
 	NetworkPrefix    int      `json:"networkPrefixLength"`
@@ -122,8 +123,15 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	} else if prefix.Masked() != prefix {
 		add("lab.networkBase", fmt.Sprintf("must be aligned to /%d", lab.NetworkPrefix))
 	}
-	if lab.PCCount < 1 || lab.PCCount > 253 {
-		add("lab.pcCount", "must be between 1 and 253")
+	if lab.DeploymentMode != "" && lab.DeploymentMode != "laboratory" && lab.DeploymentMode != "controller" {
+		add("lab.deploymentMode", "must be laboratory or controller")
+	}
+	if lab.DeploymentMode == "controller" {
+		if lab.PCCount != 0 {
+			add("lab.pcCount", "must be zero in controller mode")
+		}
+	} else if lab.PCCount < 1 || lab.PCCount > 253 {
+		add("lab.pcCount", "must be between 1 and 253 in laboratory mode")
 	}
 	if lab.MasterHostNumber < 1 || lab.MasterHostNumber > 254 {
 		add("lab.masterHostNumber", "must be between 1 and 254")

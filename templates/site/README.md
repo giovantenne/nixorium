@@ -22,6 +22,16 @@ for lab configuration, validation and upstream-update work.
 
 ## First setup
 
+Development compatibility: `lab-settings.json` accepts optional
+`lab.deploymentMode` (`laboratory` by default, or `controller`). Controller-only
+mode requires `pcCount: 0`; it permits local controller activation with secure
+account credentials, without lab keys or the client DHCP hint. Lab networking,
+cache and remote-control services are inactive; fleet readiness remains false.
+Existing deployments are not migrated automatically. The current template,
+installer and setup TUI still use the laboratory flow below. Do not use this
+mode to disable an existing fleet; guided migration is not implemented yet.
+Older upstreams reject the new setting, so upgrade before opting in.
+
 After the controller's first reboot, sign in as `admin` and run:
 
 ```sh

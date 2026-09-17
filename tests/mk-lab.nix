@@ -5,6 +5,20 @@ let
     inherit labConfig;
     deploymentRevision = "0123456789abcdef0123456789abcdef01234567";
   };
+  controllerOnlyLab = mkLab (baseArgs // {
+    labConfig = labConfig // {
+      deploymentMode = "controller";
+      pcCount = 0;
+      teacherPassword = "$6$test$teacher";
+      studentPassword = "$6$test$student";
+      adminPassword = "$6$test$admin";
+    };
+    publicKeys = { cache = null; ssh = null; veyon = null; };
+  });
+  controllerOnly = controllerOnlyLab.nixosConfigurations.pc99.config;
+  insecureController = mkLab (baseArgs // {
+    labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
+  });
   subnetLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       networkBase = "10.23.4.128";
@@ -53,7 +67,28 @@ let
   clientTCP = clientFirewall.interfaces.enp0s3.allowedTCPPorts;
   nativeClientTCP = nativeVeyonLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
 in
+assert controllerOnlyLab.labMeta.deploymentMode == "controller";
+assert controllerOnlyLab.labMeta.controller.staticIp == "";
+assert controllerOnlyLab.labMeta.clients.count == 0;
+assert controllerOnlyLab.labMeta.clients.hosts == [];
+assert !(controllerOnlyLab.nixosConfigurations ? pc01);
+assert !(controllerOnlyLab.colmena ? pc01);
+assert !controllerOnlyLab.deploymentStatus.ready;
+assert controllerOnlyLab.deploymentStatus.controller.ready;
+assert !controllerOnlyLab.deploymentStatus.controller.requiresKeys;
+assert !insecureController.deploymentStatus.controller.ready;
+assert builtins.length insecureController.deploymentStatus.controller.issues == 3;
+assert !(controllerOnly.networking.interfaces ? enp0s3);
+assert controllerOnly.networking.networkmanager.enable;
+assert controllerOnly.networking.firewall.enable;
+assert controllerOnly.networking.firewall.interfaces == {};
+assert !controllerOnly.services.harmonia.cache.enable;
+assert !(controllerOnly.systemd.user.services ? veyon-server);
+assert controllerOnly.system.build.toplevel.drvPath != "";
 assert subnetLab.labMeta.controller.staticIp == "10.23.4.227";
+assert subnetLab.labMeta.deploymentMode == "laboratory";
+assert subnetLab.deploymentStatus.controller.ready == subnetLab.deploymentStatus.ready;
+assert subnetLab.deploymentStatus.controller.requiresKeys;
 assert subnetLab.labMeta.network.prefixLength == 25;
 assert subnetLab.labMeta.clients.hosts == [
   { name = "pc01"; ip = "10.23.4.129"; }

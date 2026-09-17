@@ -162,6 +162,9 @@
     };
 
     networking.hostName = "pc99";
+    # This test applies systems after power-loss recovery. Keep fetched Flake
+    # sources across reboot rather than losing the writable store's tmpfs.
+    virtualisation.writableStoreUseTmpfs = false;
     environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit ];
     users.groups.veyon-master = {};
     users.users.admin = {
@@ -185,6 +188,27 @@
       '';
     };
     services.openssh.enable = true;
+    environment.etc."nixorium-test/controller-only.nix".text = ''
+      {
+        inputs.fakeSystem = {
+          url = "path:${fakeControllerSystem}";
+          flake = false;
+        };
+        outputs = inputs:
+          let original = (import ./laboratory-flake.nix).outputs inputs; in original // {
+            labMeta = original.labMeta // {
+              deploymentMode = "controller";
+              clients = { count = 0; hosts = []; };
+              controller = original.labMeta.controller // { staticIp = ""; };
+            };
+            deploymentStatus = {
+              ready = false;
+              issues = [ "Client installation is not configured" ];
+              controller = { ready = true; issues = []; requiresKeys = false; };
+            };
+          };
+      }
+    '';
     environment.etc."nixorium-test/flake.nix".text = ''
       {
         inputs.fakeSystem = {
@@ -498,8 +522,22 @@
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.operation == \"setup-status\" and .state == \"ready\" and (.currentStage | not) and (.stages[] | select(.id == \"offer-client-installation\").detail | contains(\"Install computers over network\"))'")
     controller.succeed("nixorium doctor --repo /tmp/deployment --json | jq -e '.state == \"warnings\" and any(.findings[]; .id == \"PXE-PREPARATION\" and .level == \"OK\") and any(.findings[]; .id == \"PXE-LIFECYCLE\" and .level == \"OK\") and any(.findings[]; .id == \"SERVICE-HARMONIA\" and .level == \"OK\") and any(.findings[]; .id == \"CACHE-HEALTH\" and .level == \"OK\") and any(.findings[]; .id == \"COMMAND-COLMENA\" and .level == \"OK\") and any(.findings[]; .id == \"NETWORK-INTERFACE\" and .level == \"OK\") and any(.findings[]; .id == \"CLIENT-SSH\" and .level == \"OK\") and any(.findings[]; .id == \"DISK-FREE\" and .level == \"WARNING\")'")
     controller.succeed("systemctl start nixorium-pxe-network.service; test -e /var/lib/nixorium/pxe/session.json")
+    controller.succeed("sync")
     controller.crash()
     controller.wait_for_unit("multi-user.target")
     controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'; test ! -e /var/lib/nixorium/pxe/session.json; jq -e '.state == \"recovered\" and .stopReason == \"boot-or-explicit-recovery\"' /var/lib/nixorium/pxe/last-session.json")
+    with subtest("controller-only activation without laboratory keys"):
+      controller.succeed("install -d -m 0700 /tmp/controller-only-secrets; mv /home/admin/nixorium-deployment/admin-ssh /tmp/controller-only-secrets/repository-ssh")
+      controller.fail("systemctl start nixorium-apply-controller.service")
+      controller.succeed("journalctl -u nixorium-apply-controller.service --no-pager | grep -F 'deployment key correspondence verification failed'; systemctl reset-failed nixorium-apply-controller.service")
+      controller.succeed("mv /home/admin/nixorium-deployment/secret-key /tmp/controller-only-secrets/repository-cache; mv /home/admin/nixorium-deployment/veyon-private-key.pem /tmp/controller-only-secrets/repository-veyon; mv /home/admin/.ssh/id_ed25519 /tmp/controller-only-secrets/installed-ssh; mv /var/lib/nixorium/keys/harmonia-secret-key /tmp/controller-only-secrets/installed-cache; mv /etc/veyon/keys/private/teacher/key /tmp/controller-only-secrets/installed-veyon")
+      controller.succeed("cp /home/admin/nixorium-deployment/flake.nix /home/admin/nixorium-deployment/laboratory-flake.nix; cp /etc/nixorium-test/controller-only.nix /home/admin/nixorium-deployment/flake.nix; jq '.lab.deploymentMode = \"controller\" | .lab.pcCount = 0 | .lab.masterDhcpIp = \"MASTER_DHCP_IP\"' /home/admin/nixorium-deployment/lab-settings.json > /tmp/controller-only-settings.json; cp /tmp/controller-only-settings.json /home/admin/nixorium-deployment/lab-settings.json; chown admin:users /home/admin/nixorium-deployment/laboratory-flake.nix /home/admin/nixorium-deployment/flake.nix /home/admin/nixorium-deployment/lab-settings.json")
+      controller.succeed("su - admin -c 'cd ~/nixorium-deployment; git add flake.nix laboratory-flake.nix lab-settings.json; git -c user.name=Test -c user.email=test@example.invalid commit -qm controller-only; nixorium config validate --json'")
+      controller.succeed("su - admin -c 'nixorium controller plan --repo ~/nixorium-deployment --json' | jq -e '.state == \"ready\" and (.issues | length) == 0'")
+      controller.succeed("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium controller apply --repo ~/nixorium-deployment --expect \"$revision\" --yes --json' | jq -e '.state == \"completed\" and .verified'")
+      controller.succeed("su - admin -c 'nix --extra-experimental-features \"nix-command flakes\" eval ~/nixorium-deployment#deploymentStatus --json --no-write-lock-file' | jq -e '(.ready | not) and .controller.ready and (.controller.requiresKeys | not)'")
+      controller.fail("su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --yes --json'")
+      controller.fail("su - admin -c 'nixorium deploy plan --repo ~/nixorium-deployment --on @lab --json'")
+      controller.succeed("test ! -e /var/lib/nixorium/pxe/session.json; ! systemctl is-active --quiet nixorium-pxe.service")
   '';
 }

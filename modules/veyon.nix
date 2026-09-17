@@ -14,6 +14,7 @@
 { pkgs, lib, hostName, labSettings, ... }:
 
 let
+  laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   veyonLocationName = "Lab";
 
   # Veyon authentication key base directories.
@@ -134,7 +135,7 @@ in
   };
 
   # The user session supplies the Wayland, PipeWire and portal environment.
-  systemd.user.services.veyon-server = {
+  systemd.user.services.veyon-server = lib.mkIf laboratoryEnabled {
     description = "Veyon Service";
     wantedBy = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ]
@@ -155,7 +156,7 @@ in
   };
 
   # Fallback VNC configuration for hosts outside the native Wayland pilot.
-  services.desktopManager.gnome.extraGSettingsOverrides = lib.mkIf (!useNativeWayland) ''
+  services.desktopManager.gnome.extraGSettingsOverrides = lib.mkIf (laboratoryEnabled && !useNativeWayland) ''
     [org.gnome.desktop.remote-desktop.vnc]
     enable=true
     view-only=true
@@ -171,12 +172,12 @@ in
 
   # Ensure the remote-desktop schemas are visible to gsettings.
   services.desktopManager.gnome.extraGSettingsOverridePackages =
-    lib.optionals (!useNativeWayland) [ pkgs.gnome-remote-desktop ];
+    lib.optionals (laboratoryEnabled && !useNativeWayland) [ pkgs.gnome-remote-desktop ];
 
   # gnome-remote-desktop user service: set the VNC password via environment
   # variable (GNOME Keyring is disabled in common.nix), and ensure it's enabled
   # at session start.
-  systemd.user.services.gnome-remote-desktop = lib.mkIf (!useNativeWayland) {
+  systemd.user.services.gnome-remote-desktop = lib.mkIf (laboratoryEnabled && !useNativeWayland) {
     wantedBy = [ "gnome-session.target" ];
     serviceConfig.Environment = [
       "GNOME_REMOTE_DESKTOP_TEST_VNC_PASSWORD=${vncPassword}"
