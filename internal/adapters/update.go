@@ -37,6 +37,11 @@ type flakeLockDocument struct {
 	} `json:"nodes"`
 }
 
+type rawFlakeLockDocument struct {
+	Root  string                     `json:"root"`
+	Nodes map[string]json.RawMessage `json:"nodes"`
+}
+
 func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, error) {
 	flake, flakeMode, err := readRegularFileNoFollowLimit(filepath.Join(repository, "flake.nix"), 1024*1024)
 	if err != nil {
@@ -223,6 +228,9 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 	if err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("read candidate flake.lock: %w", err)
 	}
+	if err := preserveDeploymentInputNode(snapshot.LockContent, proposedLock, "nixpkgs"); err != nil {
+		return domain.UpdateProposal{}, fmt.Errorf("validate candidate package-base pin: %w", err)
+	}
 	common := []string{"--override-input", "nixorium", targetURL, "--reference-lock-file", lockPath, "--no-write-lock-file"}
 	metaOutput, err := runBoundedNix(ctx, 1024*1024, append([]string{"eval", flake + "#labMeta", "--json"}, common...)...)
 	if err != nil {
@@ -261,6 +269,65 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 		Diff:         domain.GitDiff{Scope: "nixorium-update", Content: diff},
 		Checks:       checks,
 	}, nil
+}
+
+func preserveDeploymentInputNode(before, after []byte, inputName string) error {
+	beforeNode, present, err := directRootInputNode(before, inputName)
+	if err != nil {
+		return fmt.Errorf("inspect current %s input: %w", inputName, err)
+	}
+	if !present {
+		return nil
+	}
+	afterNode, afterPresent, err := directRootInputNode(after, inputName)
+	if err != nil {
+		return fmt.Errorf("inspect candidate %s input: %w", inputName, err)
+	}
+	if !afterPresent || !bytes.Equal(beforeNode, afterNode) {
+		return fmt.Errorf("framework update changed the deployment-owned %s lock node", inputName)
+	}
+	return nil
+}
+
+func directRootInputNode(content []byte, inputName string) ([]byte, bool, error) {
+	if len(content) == 0 {
+		return nil, false, nil
+	}
+	var document rawFlakeLockDocument
+	if err := json.Unmarshal(content, &document); err != nil {
+		return nil, false, fmt.Errorf("decode flake.lock: %w", err)
+	}
+	rootContent, ok := document.Nodes[document.Root]
+	if !ok {
+		return nil, false, errors.New("flake.lock root node is missing")
+	}
+	var root struct {
+		Inputs map[string]json.RawMessage `json:"inputs"`
+	}
+	if err := json.Unmarshal(rootContent, &root); err != nil {
+		return nil, false, fmt.Errorf("decode flake.lock root node: %w", err)
+	}
+	input, ok := root.Inputs[inputName]
+	if !ok {
+		return nil, false, nil
+	}
+	var nodeName string
+	if err := json.Unmarshal(input, &nodeName); err != nil || nodeName == "" {
+		return nil, false, fmt.Errorf("root %s input is not a direct node", inputName)
+	}
+	nodeContent, ok := document.Nodes[nodeName]
+	if !ok {
+		return nil, false, fmt.Errorf("%s lock node is missing", inputName)
+	}
+	var node any
+	if err := json.Unmarshal(nodeContent, &node); err != nil {
+		return nil, false, fmt.Errorf("decode %s lock node: %w", inputName, err)
+	}
+	canonical, err := json.Marshal(node)
+	if err != nil {
+		return nil, false, fmt.Errorf("normalize %s lock node: %w", inputName, err)
+	}
+	return canonical, true, nil
 }
 
 type updateCandidateBuild struct {

@@ -86,6 +86,13 @@ commit the initial template first because Flakes include only tracked files.
 Before production, pin the Nixorium input to a released tag. Optional branding
 and NixOS policy can be added later under `assets/` and `modules/`.
 
+This template owns its `nixpkgs` pin directly. Nixorium and its Disko/Veyon
+inputs follow that same package base, so controller and client systems cannot
+drift onto a second implicit pin. `Update Nixorium` preserves the package-base
+lock node. Do not change `nixos-26.05` to another channel without an explicitly
+compatible Nixorium release and complete validation; a guided package-base
+update is not implemented yet.
+
 ## Local customization
 
 - `modules/shared.nix`: every machine

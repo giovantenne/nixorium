@@ -205,6 +205,11 @@ Release from the matching changelog section.
   must use that revision; keep the human-selected channel in the generated
   `flake.nix` for managed updates. Never restore independently moving bootstrap
   downloads; see ADR 0018.
+- New deployment templates own the direct `nixpkgs` input and make Nixorium's
+  input follow it. `lib.packageBase` declares the compatible source/channel;
+  `Update Nixorium` must preserve the complete deployment-owned lock node.
+  Legacy deployments remain readable and are never migrated implicitly; see
+  ADR 0019.
 - `lab.deploymentMode` is optional (`laboratory` by default). Explicit
   `controller` mode requires zero clients, leaves lab networking/cache/remote
   control inactive, and permits local controller activation without lab keys.

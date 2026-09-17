@@ -38,6 +38,11 @@ per-host overrides while preserving `ifaceName` as the fallback. Controller
 detection no longer rewrites the client fallback. See
 [ADR 0017](docs/adr/0017-role-aware-network-interfaces.md).
 
+New deployments own one explicit package-base pin shared by Nixorium, Disko,
+Veyon, controller, and clients. Framework updates must preserve it; package-base
+updates remain a separate future operation. See
+[ADR 0019](docs/adr/0019-deployment-owned-package-base.md).
+
 PC laboratories drift: machines are reinstalled at different times, manual
 fixes accumulate, and repeating the same update across a room is slow and hard
 to verify. NixOS makes each machine declarative and reproducible; Nixorium adds
