@@ -184,6 +184,7 @@ type dashboardModel struct {
 
 	settingsReturn           dashboardScreen
 	settingsCollectPasswords bool
+	startingLabSetup         bool
 
 	pxePreparing         bool
 	pxeProgress          domain.OperationProgress
@@ -377,6 +378,10 @@ type dashboardUpdateCheckMsg struct {
 type dashboardUpdateResultMsg struct {
 	report domain.UpdateApplyReport
 }
+type dashboardUpdateControllerMsg struct {
+	plan   domain.ControllerRebuildPlanReport
+	report domain.ControllerRebuildExecutionReport
+}
 
 type dashboardSettingsMsg struct {
 	settings domain.LabSettingsFile
@@ -411,6 +416,10 @@ type dashboardSoftwarePlanMsg struct {
 }
 type dashboardSoftwareApplyMsg struct {
 	report domain.SoftwareChangeApplyReport
+}
+type dashboardSoftwareControllerMsg struct {
+	plan   domain.ControllerRebuildPlanReport
+	report domain.ControllerRebuildExecutionReport
 }
 type dashboardShutdownPlanMsg struct{ report domain.ShutdownPlanReport }
 type dashboardShutdownApplyMsg struct{ report domain.ShutdownApplyReport }
@@ -823,6 +832,21 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.confirmation = ""
 		model.message = message.report.Message
 		model.screen = dashboardUpdate
+		if !message.report.HasErrors() && message.report.Updated {
+			return model.startUpdateControllerApply()
+		}
+		return model, nil
+	case dashboardUpdateControllerMsg:
+		model.busy = ""
+		model.updating = false
+		model.controllerPlan = message.plan
+		model.controllerResult = message.report
+		if message.plan.HasErrors() {
+			model.message = controllerPlanIssues(message.plan)
+		} else {
+			model.message = message.report.Message
+		}
+		model.screen = dashboardUpdate
 		return model, nil
 	case dashboardSettingsMsg:
 		model.busy = ""
@@ -837,6 +861,26 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.settings = message.settings
 		model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+		if model.startingLabSetup {
+			model.startingLabSetup = false
+			if model.settings.Lab.DeploymentMode != "controller" {
+				model.screen = dashboardSetup
+				model.message = "Continuing the existing computer installation setup."
+				return model, nil
+			}
+			model.settings.Lab.DeploymentMode = "laboratory"
+			if model.settings.Lab.PCCount == 0 {
+				model.settings.Lab.PCCount = 20
+			}
+			model.settingsEditor = newSettingsEditorModel(model.settings, clientSetupFields, "Nixorium — Install new computers / Laboratory network")
+			model.settingsEditor.width = model.width
+			model.settingsEditor.height = model.height
+			model.settingsEditor.isDark = model.isDark
+			model.settingsEditor.prepareCurrentField()
+			model.message = ""
+			model.screen = dashboardSettingsEdit
+			return model, nil
+		}
 		if model.settingsReturn == dashboardSetup {
 			model.settingsEditor = newSettingsEditorModel(model.settings, settingsFields, "Nixorium — First setup / Laboratory settings")
 			model.settingsEditor.width = model.width
@@ -993,6 +1037,21 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.softwareApplying = false
 		model.softwareResult = message.report
 		model.message = message.report.Message
+		model.screen = dashboardSoftwareResult
+		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
+			return model.startSoftwareControllerApply()
+		}
+		return model, nil
+	case dashboardSoftwareControllerMsg:
+		model.busy = ""
+		model.softwareApplying = false
+		model.controllerPlan = message.plan
+		model.controllerResult = message.report
+		if message.plan.HasErrors() {
+			model.message = controllerPlanIssues(message.plan)
+		} else {
+			model.message = message.report.Message
+		}
 		model.screen = dashboardSoftwareResult
 		return model, nil
 	case dashboardShutdownPlanMsg:
@@ -1258,6 +1317,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "w":
 			model.screen = dashboardSoftware
 			model.softwareResult = domain.SoftwareChangeApplyReport{}
+			model.controllerPlan = domain.ControllerRebuildPlanReport{}
+			model.controllerResult = domain.ControllerRebuildExecutionReport{}
 			model.softwareSearchID++
 			model.softwareSearchCancel = nil
 			model.busy = "Loading supported software from pinned inputs"
@@ -1321,6 +1382,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "u":
 			model.screen = dashboardUpdate
 			model.updateResult = domain.UpdateApplyReport{}
+			model.controllerPlan = domain.ControllerRebuildPlanReport{}
+			model.controllerResult = domain.ControllerRebuildExecutionReport{}
 			model.updatePlan = domain.UpdatePlanReport{}
 			model.updatePrerelease = false
 			model.updateCheck = domain.UpdateCheckReport{}
@@ -1348,6 +1411,25 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "p":
 			model.screen = dashboardPXE
 			model.message = ""
+		case "n":
+			model.message = ""
+			if model.setup.State == "ready" {
+				model.screen = dashboardPXE
+			} else {
+				if model.actions.LoadSettings == nil {
+					model.setupMode = true
+					model.screen = dashboardSetup
+					return model, nil
+				}
+				model.setupMode = true
+				model.startingLabSetup = true
+				model.settingsReturn = dashboardSetup
+				model.busy = "Opening computer installation settings"
+				return model, func() tea.Msg {
+					settings, err := model.actions.LoadSettings()
+					return dashboardSettingsMsg{settings: settings, err: err}
+				}
+			}
 		case "f":
 			model.setupMode = true
 			model.screen = dashboardSetup
@@ -2228,6 +2310,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				if model.actions.CheckUpdate != nil {
 					model.busy = "Fetching available Nixorium updates"
 					return model, model.checkUpdates()
+				}
+			case "a":
+				if model.updateResult.Updated {
+					return model.startUpdateControllerApply()
 				}
 			}
 			return model, nil
@@ -3189,10 +3275,10 @@ func (model dashboardModel) updateView() string {
 		return strings.Join(lines, "\n") + "\n"
 	}
 	if model.updateResult.Operation != "" {
-		success := !model.updateResult.HasErrors() && model.updateResult.Updated
+		success := !model.updateResult.HasErrors() && model.updateResult.Updated && model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified
 		title := "Nixorium update needs attention"
 		if success {
-			title = "Nixorium update saved"
+			title = "Nixorium and this controller are updated"
 		}
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
@@ -3200,9 +3286,14 @@ func (model dashboardModel) updateView() string {
 			fmt.Sprintf("State: %s   Configuration updated: %t", model.updateResult.State, model.updateResult.Updated),
 			"Configured target: "+model.updateResult.Target,
 			"Running interface: "+displayRunningVersion(model.actions.RunningVersion),
-			"The controller and clients are unchanged.",
-			"Rebuild the controller, then reopen Nixorium to run the saved target.",
+			fmt.Sprintf("Controller activated and verified: %t", success),
+			"Client computers are unchanged until you distribute the prepared system.",
 		)
+		if success {
+			lines = append(lines, "Reopen Nixorium to use the updated interface.")
+		} else if model.updateResult.Updated {
+			lines = append(lines, "The update is saved safely. Retry controller activation after resolving the detail below.")
+		}
 		if model.message != "" {
 			lines = append(lines, "", "Result: "+model.message)
 		}
@@ -3211,6 +3302,7 @@ func (model dashboardModel) updateView() string {
 			retryLabel = "complete save"
 		}
 		lines = append(lines, "", tuiHelp(model.width, model.isDark,
+			tuiHelpBinding([]string{"a"}, "a", "retry controller apply"),
 			tuiHelpBinding([]string{"r"}, "r", retryLabel),
 			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
 		))
@@ -3282,7 +3374,7 @@ func (model dashboardModel) updateView() string {
 		"",
 		"Select master for the latest development revision, or choose a tagged release.",
 		"Selection starts validation; it does not change files.",
-		"Controller activation and client distribution remain separate operations.",
+		"A confirmed update activates this controller; client distribution remains separate.",
 		"",
 		tuiHelp(model.width, model.isDark,
 			tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
@@ -3317,6 +3409,24 @@ func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
 func (model dashboardModel) checkUpdates() tea.Cmd {
 	return func() tea.Msg {
 		return dashboardUpdateCheckMsg{report: model.actions.CheckUpdate()}
+	}
+}
+
+func (model dashboardModel) startUpdateControllerApply() (tea.Model, tea.Cmd) {
+	if model.actions.PlanController == nil || model.actions.ApplyController == nil {
+		model.message = "Controller activation is not available. The validated update remains saved."
+		return model, nil
+	}
+	model.busy = "Building, activating, and verifying the updated controller"
+	model.updating = true
+	model.controllerPlan = domain.ControllerRebuildPlanReport{}
+	model.controllerResult = domain.ControllerRebuildExecutionReport{}
+	return model, func() tea.Msg {
+		plan := model.actions.PlanController()
+		if plan.HasErrors() {
+			return dashboardUpdateControllerMsg{plan: plan}
+		}
+		return dashboardUpdateControllerMsg{plan: plan, report: model.actions.ApplyController(plan)}
 	}
 }
 

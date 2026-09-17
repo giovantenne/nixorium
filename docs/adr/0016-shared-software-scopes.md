@@ -39,11 +39,12 @@ an inventory/group change requires fresh review even if candidate bytes match.
 
 ## Workflow boundary
 
-This increment provides the declaration and validation foundation. CLI apply
-only saves the declaration. TUI saving also records that file locally, with
-clear pending-controller copy. Neither builds, activates or distributes systems.
-The combined save/build/activate/verify flow remains subsequent work, as do
-batch changes, optional built-in package removal and real package-base updates.
+CLI apply only saves the declaration. The ordinary TUI records that file
+locally, then uses the existing typed controller plan/apply boundary for
+`shared` or `controller` changes. It reports save and activation separately so
+a failed build never loses the reviewed declaration. Clients are never deployed
+implicitly. Batch changes, optional built-in package removal and real
+package-base updates remain separate work.
 There is no automatic client deployment, input update, data removal or garbage
 collection. A changed declaration is not proof of an installed application.
 

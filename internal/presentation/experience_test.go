@@ -22,7 +22,7 @@ func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 			t.Fatal(err)
 		}
 		text := output.String()
-		if !strings.Contains(text, "What do you want to do?") || !strings.Contains(text, "› Restore computers") {
+		if !strings.Contains(text, "What do you want to do?") || !strings.Contains(text, "› Add or change software") {
 			t.Fatalf("meaning lost with %v", profile)
 		}
 		if strings.Contains(text, "38;2;") {
@@ -197,7 +197,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
 			if screen == dashboardSoftwareReview {
-				if !strings.Contains(view, "Enter saves this reviewed configuration") || !strings.Contains(view, "Esc cancels") {
+				if !strings.Contains(view, "Enter continues with this reviewed configuration") || !strings.Contains(view, "Esc cancels") {
 					t.Fatalf("software save action hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview || screen == dashboardShutdownReview {

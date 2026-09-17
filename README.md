@@ -20,17 +20,17 @@ LAN. Clients do not need Internet access during installation or deployment.
 
 ## Why this exists
 
-Development note: the controller-first foundation supports explicit
+The controller-first installer uses explicit
 `lab.deploymentMode = "controller"` with `pcCount = 0`. Such a controller can be
 rebuilt without client networking or lab keys, with lab services and firewall
-openings inactive. Omission preserves laboratory behavior. Installer prompts
-and the five-task TUI are not integrated yet; use the current flow below.
+openings inactive. Omission preserves legacy laboratory behavior. Client
+networking and keys are configured later from **Install new computers**.
 See [ADR 0015](docs/adr/0015-controller-first-capabilities.md).
 
 Managed software now supports `shared` (controller and current/future clients)
 and `controller` (only this controller). Existing client-only declarations keep
-their scope. Saving still changes configuration only: controller activation and
-client deployment remain separate until the integrated software workflow lands.
+their scope. The TUI saves and activates controller-affecting choices in one
+reviewed operation; client deployment remains an explicit separate task.
 See [ADR 0016](docs/adr/0016-shared-software-scopes.md).
 
 Network interface configuration now supports controller, client-role, and
@@ -105,58 +105,32 @@ Start the official NixOS installer with temporary Internet access.
 curl -fsSL https://nixorium.org/install.sh | bash
 ```
 
-Choose the release and controller disk when prompted. The installer creates a
-private deployment repository and installs the controller from its pinned
+Choose the release, account names, time zone, keyboard, three passwords, and
+controller disk when prompted. Keyboard selection happens before password
+entry. The installer keeps the internal locale at `en_US.UTF-8`, creates a
+private deployment repository, and installs a usable controller from its pinned
 inputs. The selected channel or tag is resolved once: template, installer,
 Disko layout, and initial lock all use that immutable revision. See
 [ADR 0018](docs/adr/0018-revision-bound-controller-bootstrap.md).
 
 ### 3. Reboot
 
-Remove the USB and sign in as `admin`. A fresh installation initially uses the
-password `nixos`; the setup wizard replaces it with the password you choose.
+Remove the USB and sign in as `admin` with the password chosen before
+installation. No public default password remains.
 
-### 4. Start first-run setup
+### 4. Open Nixorium
 
 ```sh
 cd ~/nixorium-deployment
-nix run .#nixorium -- setup
+nixorium
 ```
 
-The wizard records the interface carrying the controller's default route
-separately from the client fallback and proposes its live DHCP address. It
-groups essential network, laboratory, account, regional, browser, and
-Veyon settings, and offers searchable offline choices for locale, time zone,
-and keyboards. It leaves optional Git author identity at the template defaults
-during first run, hashes passwords without echoing them, retries a short or
-mismatched password without discarding earlier answers, creates the required
-key pairs, and presents a redacted review.
-
-After configuration, the same command opens a resumable setup checklist. Press
-`Enter` on its highlighted next step to review and commit the generated public
-configuration, activate the controller, prepare installation files, and open
-the first network installation. Choose a pilot identity from the saved
-inventory, complete identity and disk confirmation locally on that computer,
-then ask the controller to check its authenticated active revision. The
-technical check remains separate from the practical login, desktop, software,
-network, and peripheral check. Each disruptive action still has its own review
-and confirmation. You may quit at any safe point and rerun the command; it
-continues from observed system and Git state. Keep the deployment repository
-**private**.
-
-### 5. Open Nixorium
-
-```sh
-nix run .#nixorium
-```
-
-Nixorium asks what intervention you want to perform; it does not scan the room
-or turn powered-off computers into an alarm. Restore, guided software changes,
-distribution, network installation, Nixorium updates, and advanced tools are
-separate choices. `?` opens help; `F1` also works during text entry. Computers
-is an explicit advanced check with search, selection, technical details, and a
-deployment route for the focused computer. Setup groups its observed checks into
-five operator stages, with `t` for the technical checklist.
+Nixorium opens on five operator tasks: add or change software, install new
+computers, distribute the prepared system, shut down computers, and advanced
+tools. It does not scan the room at startup. Choose **Install new computers**
+when you are ready to provide DHCP/network values, create or import keys,
+prepare PXE, and install a pilot client. This setup is resumable and never
+blocks ordinary controller use. Keep the deployment repository **private**.
 Long operations show meaningful progress; `l` expands bounded activity details.
 See the [TUI tour and renders](docs/tui-renders.md).
 120×30 is a comfortable terminal size; larger windows keep a bounded reading
@@ -214,18 +188,11 @@ their current plain-language action, so a remote terminal never looks frozen.
 
 | Task | What it does |
 |---|---|
-| **Restore computers** | Chooses explicitly between reapplying the intended system and selecting one evaluated identity for a locally confirmed disk-erasing reinstall |
-| **Add or change software** | Chooses a supported pinned package and configuration scope, validates it, and saves only the reviewed declaration |
+| **Add or change software** | Searches pinned Nix packages, saves the reviewed scope, and builds/activates controller-affecting choices |
+| **Install new computers** | Collects missing laboratory settings, prepares PXE, and guides locally confirmed client installation |
 | **Distribute the prepared system** | Reviews and applies one, selected, or all client configurations with live phase, elapsed-time, verification, and recent-activity feedback |
-| **Computer inventory** | Explicitly authenticates reachable hosts and compares their active revision with the desired Git revision |
-| **Rebuild controller** | Builds and activates an exact reviewed revision, refreshes status, and offers dashboard, detail, log, or retry actions |
-| **Manage services** | Inspects PXE and the signed cache; performs a bounded cache restart |
-| **View operation logs** | Shows private, bounded deployment logs and typed action history |
-| **Review Git changes** | Displays redacted deployment changes and optionally creates a local reviewed commit |
-| **Change settings** | Edits one grouped area, including Git identity or one securely entered account password, then validates and reviews the complete candidate |
-| **Update Nixorium** | Fetches upstream `master` and releases, then validates and saves the selected target; a controller-only system builds only its controller candidate |
 | **Shut down computers** | Checks selected clients and sessions, then sends reviewed power-off requests without targeting the controller |
-| **Install or reinstall computers** | Prepares, starts, stops, or recovers PXE installation mode |
+| **Advanced tools** | Opens restore, Update Nixorium, inventory, settings, controller rebuild, services, logs, changes, and diagnostics |
 
 Operational commands, JSON output, customization examples, update procedure,
 and recovery semantics live in the

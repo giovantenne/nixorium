@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_RELEASE="v2.0.0-beta.3"
+DEFAULT_RELEASE="master"
 RELEASE="${NIXORIUM_RELEASE:-}"
 INSTALL_DISK=""
 REPOSITORY="giovantenne/nixorium"
@@ -10,6 +10,7 @@ TARGET_ROOT="${NIXORIUM_TARGET_ROOT:-/mnt}"
 ADMIN_USER="admin"
 DEPLOYMENT_NAME="nixorium-deployment"
 INSTALLER_REF="${NIXORIUM_INSTALLER_REF:-}"
+BOOTSTRAP_TTY="${NIXORIUM_BOOTSTRAP_TTY:-/dev/tty}"
 INSTALLER_ARGS=()
 
 # Keep bootstrap downloads independent from any cache configured in the live environment.
@@ -17,7 +18,7 @@ export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = h
 
 usage() {
   echo "Usage: install.sh [--release <tag|master>] [--disk <device>]" >&2
-  echo "Example: install.sh --release v2.0.0-beta.3 --disk /dev/sda" >&2
+  echo "Example: install.sh --release master --disk /dev/sda" >&2
 }
 
 choose_release() {
@@ -258,6 +259,26 @@ curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
     -c user.email="installer@nixorium.local" \
     commit -m "chore: initialize lab deployment"
 )
+
+BOOTSTRAP_VERSION="$({
+  nix --extra-experimental-features "nix-command flakes" \
+    eval "${UPSTREAM_REF}#lib.controllerBootstrapVersion" --json
+} 2>/dev/null || printf '0')"
+if [[ "$BOOTSTRAP_VERSION" == "1" ]]; then
+  if [[ ! -r "$BOOTSTRAP_TTY" || ! -w "$BOOTSTRAP_TTY" ]]; then
+    echo "Error: controller account and regional setup requires an interactive terminal." >&2
+    exit 1
+  fi
+  echo "Configuring controller accounts, passwords, time zone, and keyboard..."
+  echo "The client installation network can be configured later from Nixorium."
+  nix --extra-experimental-features "nix-command flakes" \
+    run "${UPSTREAM_REF}#nixorium" -- \
+    bootstrap configure --repo "$TEMP_DEPLOYMENT" \
+    <"$BOOTSTRAP_TTY" >"$BOOTSTRAP_TTY"
+else
+  echo "Warning: ${RELEASE} uses the legacy post-install setup flow." >&2
+  echo "Choose master or a newer release for a controller that is ready at first boot." >&2
+fi
 
 MASTER_HOST_NUMBER="$(
   nix --extra-experimental-features "nix-command flakes" \

@@ -51,13 +51,52 @@ func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 		AffectedController: "pc99",
 	}
 	review := strings.Join(model.softwareReviewView(), "\n")
-	if !strings.Contains(review, "pc99 (not activated by saving)") || !strings.Contains(review, "this controller and all current or future clients") {
+	if !strings.Contains(review, "pc99 (build and activate now)") || !strings.Contains(review, "this controller and all current or future clients") {
 		t.Fatalf("unclear review: %s", review)
 	}
 	model.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", AffectedController: "pc99"}
 	result := strings.Join(model.softwareResultView(), "\n")
-	if !strings.Contains(result, "Controller changes not yet applied") {
-		t.Fatalf("save implied activation: %s", result)
+	if !strings.Contains(result, "controller needs attention") || !strings.Contains(result, "retry controller apply") {
+		t.Fatalf("pending activation lacks recovery: %s", result)
+	}
+}
+
+func TestSoftwareSaveAutomaticallyAppliesAffectedController(t *testing.T) {
+	planCalls, applyCalls := 0, 0
+	model := dashboardModel{
+		screen: dashboardSoftwareReview,
+		softwarePlan: domain.SoftwareChangePlanReport{
+			State: "ready", Repository: "/deployment", AffectedController: "pc99",
+			Request: domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
+		},
+		actions: DashboardActions{
+			SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
+				return domain.SoftwareChangeApplyReport{State: "saved", Repository: plan.Repository, AffectedController: plan.AffectedController}
+			},
+			PlanController: func() domain.ControllerRebuildPlanReport {
+				planCalls++
+				return domain.ControllerRebuildPlanReport{State: "ready", Repository: "/deployment", Controller: "pc99", Revision: strings.Repeat("a", 40)}
+			},
+			ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+				applyCalls++
+				return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
+			},
+		},
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("software save did not start")
+	}
+	updated, command = model.Update(command())
+	model = updated.(dashboardModel)
+	if command == nil || !model.softwareApplying {
+		t.Fatal("controller apply did not follow the save")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if planCalls != 1 || applyCalls != 1 || model.softwareApplying || !strings.Contains(model.View().Content, "Software is ready on this controller") {
+		t.Fatalf("plan=%d apply=%d view=%s", planCalls, applyCalls, model.View().Content)
 	}
 }
 
@@ -181,7 +220,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json", "Enter saves this reviewed configuration"} {
+	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json", "Enter continues with this reviewed configuration"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
@@ -729,7 +768,7 @@ func TestDashboardTaskMenuUsesSelectionAndKeepsShortcuts(t *testing.T) {
 	model.height = 30
 	model.homeMenu.setSize(model.width, model.height)
 	view := model.View().Content
-	if !strings.Contains(view, "Restore computers") || !strings.Contains(view, "Advanced tools") || !strings.Contains(view, "\x1b[") {
+	if !strings.Contains(view, "Install new computers") || !strings.Contains(view, "Advanced tools") || strings.Contains(view, "Update Nixorium") || !strings.Contains(view, "\x1b[") {
 		t.Fatalf("home task menu lacks hierarchy or color:\n%s", view)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
@@ -831,7 +870,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	view := model.View().Content
-	if !strings.Contains(view, "Install or reinstall computers") || !strings.Contains(view, "What do you want to do?") {
+	if !strings.Contains(view, "Install new computers") || !strings.Contains(view, "What do you want to do?") {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 
@@ -1257,10 +1296,16 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 			}
 			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: target, Updated: true, Message: "Nixorium update saved locally. Running systems were not changed."}
 		},
+		PlanController: func() domain.ControllerRebuildPlanReport {
+			return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("b", 40)}
+		},
+		ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
+		},
 	}
 	actions.RunningVersion = "2.0.0-test"
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if !strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Advanced tools") {
+	if strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Advanced tools") {
 		t.Fatalf("home omits navigable task menu:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
@@ -1287,7 +1332,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release review") || !strings.Contains(model.View().Content, "candidate controller built") || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No push, controller activation") {
+	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release review") || !strings.Contains(model.View().Content, "candidate controller built") || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No push, PXE action") {
 		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View().Content)
 	}
 	updated, _ = model.Update(tea.WindowSizeMsg{Height: 40})
@@ -1321,9 +1366,14 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
 		t.Fatal("dashboard allowed quit while update apply was running")
 	}
+	updated, command = model.Update(command())
+	model = updated.(dashboardModel)
+	if command == nil || !model.updating {
+		t.Fatal("saved update did not start controller activation")
+	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium update saved") || strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "Running interface: 2.0.0-test") || !strings.Contains(model.View().Content, "Rebuild the controller, then reopen Nixorium") || !strings.Contains(model.View().Content, "new update") {
+	if applied != 1 || model.updating || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium and this controller are updated") || strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "Running interface: 2.0.0-test") || !strings.Contains(model.View().Content, "Reopen Nixorium") || !strings.Contains(model.View().Content, "new update") {
 		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1374,6 +1424,10 @@ func TestNixoriumUpdatePartialSaveOffersInPlaceRecovery(t *testing.T) {
 		actions: DashboardActions{SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
 			calls++
 			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: plan.Target, Updated: true, Message: "Nixorium update saved locally."}
+		}, PlanController: func() domain.ControllerRebuildPlanReport {
+			return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("c", 40)}
+		}, ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
 		}},
 	}
 	if !strings.Contains(model.View().Content, "complete save") || strings.Contains(model.View().Content, "review Git changes") {
@@ -1384,9 +1438,14 @@ func TestNixoriumUpdatePartialSaveOffersInPlaceRecovery(t *testing.T) {
 	if command == nil || !model.updating || !strings.Contains(model.View().Content, "Completing the local update save") {
 		t.Fatalf("recovery did not start in place: %+v", model)
 	}
+	updated, command = model.Update(command())
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("recovered update did not start controller activation")
+	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if calls != 1 || model.updating || model.updateResult.State != "saved" || !strings.Contains(model.View().Content, "Nixorium update saved") {
+	if calls != 1 || model.updating || model.updateResult.State != "saved" || !strings.Contains(model.View().Content, "Nixorium and this controller are updated") {
 		t.Fatalf("recovery result missing: calls=%d\n%s", calls, model.View().Content)
 	}
 }

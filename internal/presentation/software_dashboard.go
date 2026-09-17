@@ -157,12 +157,35 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			model.softwareApplying = true
 			plan := model.softwarePlan
 			return model, func() tea.Msg { return dashboardSoftwareApplyMsg{report: model.actions.SaveSoftware(plan)} }
+		case "a":
+			if model.softwareResult.AffectedController == "" || model.actions.PlanController == nil || model.actions.ApplyController == nil {
+				return model, nil
+			}
+			return model.startSoftwareControllerApply()
 		case "enter", "esc", "left":
 			model.screen = dashboardHome
 			model.message = ""
 		}
 	}
 	return model, nil
+}
+
+func (model dashboardModel) startSoftwareControllerApply() (tea.Model, tea.Cmd) {
+	if model.actions.PlanController == nil || model.actions.ApplyController == nil {
+		model.message = "Controller activation is not available in this deployment. The software selection remains saved."
+		return model, nil
+	}
+	model.busy = "Building and activating the reviewed software on this controller"
+	model.softwareApplying = true
+	model.controllerPlan = domain.ControllerRebuildPlanReport{}
+	model.controllerResult = domain.ControllerRebuildExecutionReport{}
+	return model, func() tea.Msg {
+		plan := model.actions.PlanController()
+		if plan.HasErrors() {
+			return dashboardSoftwareControllerMsg{plan: plan}
+		}
+		return dashboardSoftwareControllerMsg{plan: plan, report: model.actions.ApplyController(plan)}
+	}
 }
 
 func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeRequest) (tea.Model, tea.Cmd) {
@@ -200,7 +223,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 	items := model.softwareItems()
 	lines := []string{
 		softwareModeTabs(model.softwareMode),
-		tuiMuted("Configuration choices are separate from applying them to computers.", model.isDark),
+		tuiMuted("Controller choices are applied here; client distribution remains a separate task.", model.isDark),
 		"",
 	}
 	switch model.softwareMode {
@@ -256,7 +279,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 	if model.softwareMode == softwareConfigured {
 		primary = "review removal"
 	}
-	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Configured here does not mean applied to a computer.", "Private modules remain untouched and are managed through Advanced tools.", "", tuiHelp(model.width, model.isDark,
+	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Clients change only through Distribute the prepared system.", "Private modules remain untouched and are managed through Advanced tools.", "", tuiHelp(model.width, model.isDark,
 		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
 		tuiHelpBinding([]string{"enter"}, "enter", primary),
 		tuiHelpBinding([]string{"r"}, "r", "remove"),
@@ -311,9 +334,9 @@ func (model dashboardModel) softwareReviewView() []string {
 		action = "Remove"
 	}
 	item := model.softwareItem(plan.Request.Package)
-	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No build, activation, PXE action, or client deployment is included.", "", "Enter saves this reviewed configuration; Esc cancels.", "", "enter save configuration   esc cancel   F1 help"}
+	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No PXE action or client deployment is included.", "", "Enter continues with this reviewed configuration; Esc cancels.", "", "enter continue   esc cancel   F1 help"}
 	if plan.AffectedController != "" {
-		lines = append(lines[:5], append([]string{"Controller configuration   " + plan.AffectedController + " (not activated by saving)"}, lines[5:]...)...)
+		lines = append(lines[:5], append([]string{"Controller                  " + plan.AffectedController + " (build and activate now)"}, lines[5:]...)...)
 	}
 	if model.message != "" && model.message != plan.Message {
 		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
@@ -326,7 +349,14 @@ func (model dashboardModel) softwareResultView() []string {
 	switch result.State {
 	case "saved":
 		if result.AffectedController != "" {
-			return []string{tuiResult("Software configuration saved", true, model.isDark), "", "✓ Software selection saved locally", "○ Controller changes not yet applied", "○ No client changed", "", "Apply controller configuration to build and activate these changes.", "Client computers require a separate deployment.", "", "enter interventions   ? help"}
+			if model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified {
+				return []string{tuiResult("Software is ready on this controller", true, model.isDark), "", "✓ Software selection saved locally", "✓ Controller built, activated, and verified", "○ No client changed", "", "Use Distribute the prepared system when you want clients to receive it.", "", "enter interventions   ? help"}
+			}
+			detail := model.message
+			if detail == "" {
+				detail = "Controller activation did not complete."
+			}
+			return []string{tuiResult("Software saved; controller needs attention", false, model.isDark), "", "✓ Software selection saved locally", "! Controller build or activation did not complete", "○ No client changed", "", detail, "The saved selection is safe; retrying does not duplicate it.", "", "a retry controller apply   enter interventions   ? help"}
 		}
 		return []string{tuiResult("Software configuration saved", true, model.isDark), "", "✓ Software selection saved locally", "○ System not prepared", "○ No client changed", "", "You can apply this configuration to selected computers now or later.", "", "enter interventions   ? help"}
 	case "unchanged":

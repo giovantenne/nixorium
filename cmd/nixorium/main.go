@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -428,6 +430,8 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				presentation.SetupText(stdout, report)
 			}
 		}
+	case "bootstrap":
+		return runBootstrapConfigure(ctx, repository, stdout, stderr)
 	case "pxe":
 		switch options.subcommand {
 		case "prepare":
@@ -827,7 +831,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update", "software", "shutdown":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "software", "shutdown":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -867,8 +871,8 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "keys"
 		case "configure":
-			if result.command != "setup" || result.subcommand != "" {
-				return options{}, errors.New("configure must follow setup")
+			if (result.command != "setup" && result.command != "bootstrap") || result.subcommand != "" {
+				return options{}, errors.New("configure must follow setup or bootstrap")
 			}
 			result.subcommand = "configure"
 		case "install-secrets":
@@ -943,6 +947,9 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
+	}
+	if result.command == "bootstrap" && result.subcommand != "configure" {
+		return options{}, errors.New("bootstrap requires the configure subcommand")
 	}
 	if result.file != "" && (result.command != "config" || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--file is only valid with config plan or config apply")
@@ -1125,7 +1132,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software search|software plan|software apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software search|software plan|software apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       software catalog")
 	fmt.Fprintln(writer, "       software search --query <package-name>")
 	fmt.Fprintln(writer, "       software plan --package <id> --scope <shared|controller|all-clients|group:NAME|clients:pcNN,...> [--remove]")
@@ -1720,6 +1727,177 @@ func applyDetectedNetworkDefaults(settings domain.LabSettingsFile, detected doma
 		settings.Lab.ControllerInterfaceName = detected.InterfaceName
 	}
 	return settings
+}
+
+var bootstrapUserNamePattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
+
+func runBootstrapConfigure(ctx context.Context, repository string, stdout, stderr io.Writer) int {
+	local := adapters.Local{}
+	settingsManager := app.NewSettingsManager(local)
+	candidate, err := settingsManager.Current(repository)
+	if err != nil {
+		fmt.Fprintln(stderr, "Error: load controller settings:", err)
+		return 1
+	}
+	lineReader := bufio.NewReader(os.Stdin)
+	secretReader := presentation.TerminalSecretReader{Input: os.Stdin, Output: stdout}
+	if err := collectBootstrapConfiguration(ctx, lineReader, secretReader, local, stdout, &candidate); err != nil {
+		fmt.Fprintln(stderr, "Error:", err)
+		return 1
+	}
+
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "Controller installation review")
+	fmt.Fprintln(stdout, "  Administrator: admin")
+	fmt.Fprintf(stdout, "  Teacher:       %s\n", candidate.Lab.TeacherUser)
+	fmt.Fprintf(stdout, "  Student:       %s\n", candidate.Lab.StudentUser)
+	fmt.Fprintf(stdout, "  Time zone:     %s\n", candidate.Lab.TimeZone)
+	fmt.Fprintf(stdout, "  Keyboard:      %s\n", candidate.Lab.KeyboardLayout)
+	fmt.Fprintln(stdout, "  Passwords:     set locally and hidden")
+	fmt.Fprintln(stdout, "  Client setup:  available later from Nixorium")
+	confirmed, err := promptBootstrapConfirmation(lineReader, stdout)
+	if err != nil {
+		fmt.Fprintln(stderr, "Error: read controller installation confirmation:", err)
+		return 1
+	}
+	if !confirmed {
+		fmt.Fprintln(stderr, "Controller installation cancelled; no settings were changed.")
+		return 1
+	}
+
+	fmt.Fprintln(stdout, "Validating controller settings...")
+	plan := settingsManager.PlanSettings(ctx, repository, candidate)
+	if plan.HasErrors() {
+		presentation.ConfigPlanText(stderr, plan)
+		return 1
+	}
+	reviewManager := app.NewGitReviewManager(local)
+	commitManager := app.NewGitCommitManager(local)
+	saveManager := app.NewSettingsSaveManager(settingsManager, reviewManager, commitManager)
+	report := saveManager.Save(ctx, repository, candidate, plan)
+	if report.HasErrors() || (report.State != "saved" && report.State != "unchanged") {
+		fmt.Fprintln(stderr, "Error:", report.Message)
+		for _, issue := range report.Issues {
+			fmt.Fprintf(stderr, "  %s: %s\n", issue.Field, issue.Message)
+		}
+		return 1
+	}
+	fmt.Fprintln(stdout, "Controller settings saved. Installation can now start.")
+	return 0
+}
+
+func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, secrets app.SecretReader, hasher app.PasswordHasher, output io.Writer, candidate *domain.LabSettingsFile) error {
+	fmt.Fprintln(output, "Nixorium controller setup")
+	fmt.Fprintln(output, "Choose the accounts and regional settings used after the first reboot.")
+	fmt.Fprintln(output, "The administrator account name is fixed as 'admin'.")
+
+	teacher, err := promptBootstrapUser(reader, output, "Teacher username", candidate.Lab.TeacherUser, "")
+	if err != nil {
+		return err
+	}
+	student, err := promptBootstrapUser(reader, output, "Student username", candidate.Lab.StudentUser, teacher)
+	if err != nil {
+		return err
+	}
+	timeZone, err := promptBootstrapValue(reader, output, "Time zone", candidate.Lab.TimeZone)
+	if err != nil {
+		return err
+	}
+	keyboard, consoleKeyMap, err := promptBootstrapKeyboard(reader, output, candidate.Lab.KeyboardLayout)
+	if err != nil {
+		return err
+	}
+
+	candidate.Lab.DeploymentMode = "controller"
+	candidate.Lab.PCCount = 0
+	candidate.Lab.MasterDHCPIP = domain.MasterDHCPPlaceholder
+	candidate.Lab.TeacherUser = teacher
+	candidate.Lab.StudentUser = student
+	candidate.Lab.StudentGitName = student
+	candidate.Lab.TimeZone = timeZone
+	candidate.Lab.KeyboardLayout = keyboard
+	candidate.Lab.ConsoleKeyMap = consoleKeyMap
+	candidate.Lab.DefaultLocale = "en_US.UTF-8"
+	candidate.Lab.ExtraLocale = "en_US.UTF-8"
+	candidate.Lab.VeyonNativeHosts = []string{}
+	if err := collectSetupCredentials(ctx, secrets, hasher, output, candidate); err != nil {
+		return err
+	}
+	if issues := candidate.Validate(); len(issues) > 0 {
+		return fmt.Errorf("%s: %s", issues[0].Field, issues[0].Message)
+	}
+	return nil
+}
+
+func promptBootstrapUser(reader *bufio.Reader, output io.Writer, label, current, differentFrom string) (string, error) {
+	for {
+		value, err := promptBootstrapValue(reader, output, label, current)
+		if err != nil {
+			return "", err
+		}
+		if !bootstrapUserNamePattern.MatchString(value) {
+			fmt.Fprintln(output, "Use a lowercase Unix username (letters, numbers, '_' or '-').")
+			continue
+		}
+		if value == "root" || value == "admin" {
+			fmt.Fprintln(output, "That username is reserved by the controller.")
+			continue
+		}
+		if value == differentFrom {
+			fmt.Fprintln(output, "Teacher and student usernames must be different.")
+			continue
+		}
+		return value, nil
+	}
+}
+
+func promptBootstrapValue(reader *bufio.Reader, output io.Writer, label, current string) (string, error) {
+	fmt.Fprintf(output, "%s [%s]: ", label, current)
+	value, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = current
+	}
+	if value == "" {
+		return "", fmt.Errorf("%s cannot be empty", strings.ToLower(label))
+	}
+	return value, nil
+}
+
+func promptBootstrapKeyboard(reader *bufio.Reader, output io.Writer, current string) (string, string, error) {
+	keyMaps := map[string]string{"us": "us", "it": "it2", "gb": "uk", "fr": "fr", "de": "de", "es": "es"}
+	for {
+		fmt.Fprintln(output, "Keyboard choices: us, it, gb, fr, de, es")
+		value, err := promptBootstrapValue(reader, output, "Keyboard layout", current)
+		if err != nil {
+			return "", "", err
+		}
+		if keyMap, ok := keyMaps[value]; ok {
+			return value, keyMap, nil
+		}
+		fmt.Fprintln(output, "Choose one of the listed keyboard layouts.")
+	}
+}
+
+func promptBootstrapConfirmation(reader *bufio.Reader, output io.Writer) (bool, error) {
+	for {
+		fmt.Fprint(output, "Continue with these settings? [Y/n]: ")
+		value, err := reader.ReadString('\n')
+		if err != nil {
+			return false, err
+		}
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "", "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		default:
+			fmt.Fprintln(output, "Enter y or n.")
+		}
+	}
 }
 
 func setupStartsBeforeDashboardInspection(report domain.SetupReport) bool {

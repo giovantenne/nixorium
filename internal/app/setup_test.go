@@ -127,6 +127,23 @@ func TestSetupStatusSelectsNetworkForFreshTemplate(t *testing.T) {
 	}
 }
 
+func TestControllerBootstrapDefersClientNetworkAndOpensAtControllerReview(t *testing.T) {
+	data, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.Replace(data, []byte(`"masterDhcpIp": "MASTER_DHCP_IP",`), []byte(`"deploymentMode": "controller", "masterDhcpIp": "MASTER_DHCP_IP",`), 1)
+	data = bytes.Replace(data, []byte(`"pcCount": 20`), []byte(`"pcCount": 0`), 1)
+	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	report := NewSetupManager(fakeSetupSource{data: data}).Status(context.Background(), "/repo")
+	if report.CurrentStage != domain.SetupStageApply {
+		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageApply, report)
+	}
+	if len(report.Stages) < 2 || report.Stages[1].State != domain.SetupStageComplete || !strings.Contains(report.Stages[1].Detail, "deferred") {
+		t.Fatalf("network stage = %+v", report.Stages)
+	}
+}
+
 func TestFreshTemplateUsesUSRegionalDefaults(t *testing.T) {
 	data, err := os.ReadFile("../../templates/site/lab-settings.json")
 	if err != nil {

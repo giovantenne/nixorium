@@ -170,30 +170,30 @@ func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.
 	ready := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{}, false)
 	found := false
 	for _, task := range dashboardTasks {
-		if task.id == "setup" && task.shortcut == "f" {
+		if task.id == "install" && task.shortcut == "n" {
 			found = true
 		}
 	}
-	if !found || !strings.Contains(ready.View().Content, "Setup and readiness") {
-		t.Fatal("configured labs cannot reopen setup from the intervention menu")
+	if !found || !strings.Contains(ready.View().Content, "Install new computers") {
+		t.Fatal("configured labs cannot reopen computer installation from the intervention menu")
 	}
 
 	maintenance := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{}, false)
-	if maintenance.screen != dashboardHome || !strings.Contains(maintenance.View().Content, "Setup needs attention") {
+	if maintenance.screen != dashboardHome || !strings.Contains(maintenance.View().Content, "Computer installation is not configured yet") {
 		t.Fatalf("a later readiness issue hijacked navigation or became invisible: screen=%d\n%s", maintenance.screen, maintenance.View().Content)
 	}
 }
 
 func TestOpeningCachedSetupDoesNotRefreshIt(t *testing.T) {
 	loads := 0
-	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{
+	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{
 		LoadSetup: func() domain.SetupReport {
 			loads++
 			return domain.SetupReport{State: "ready"}
 		},
 	}, false)
 	for index, task := range dashboardTasks {
-		if task.id == "setup" {
+		if task.id == "install" {
 			model.homeMenu.list.Select(index)
 			break
 		}
@@ -202,6 +202,35 @@ func TestOpeningCachedSetupDoesNotRefreshIt(t *testing.T) {
 	model = updated.(dashboardModel)
 	if command != nil || loads != 0 || model.screen != dashboardSetup {
 		t.Fatalf("opening cached setup triggered a refresh: loads=%d screen=%d", loads, model.screen)
+	}
+}
+
+func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testing.T) {
+	settings := wizardSettings()
+	settings.Lab.DeploymentMode = "controller"
+	settings.Lab.PCCount = 0
+	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{
+		LoadSettings: func() (domain.LabSettingsFile, error) { return settings, nil },
+	}, false)
+	for index, task := range dashboardTasks {
+		if task.id == "install" {
+			model.homeMenu.list.Select(index)
+			break
+		}
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || !model.startingLabSetup {
+		t.Fatal("computer installation settings did not start")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettingsEdit || model.settingsEditor.settings.Lab.DeploymentMode != "laboratory" || model.settingsEditor.settings.Lab.PCCount != 20 || len(model.settingsEditor.fields) != len(clientSetupFields) {
+		t.Fatalf("client setup editor = %+v", model.settingsEditor)
+	}
+	view := model.View().Content
+	if !strings.Contains(view, "Install new computers / Laboratory network") || strings.Contains(view, "Teacher user name") || strings.Contains(view, "Time zone") {
+		t.Fatalf("client setup repeats controller choices:\n%s", view)
 	}
 }
 

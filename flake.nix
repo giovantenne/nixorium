@@ -77,6 +77,7 @@
     defaultLab // {
       lib = {
         inherit mkLab;
+        controllerBootstrapVersion = 1;
         configSchemaVersion = 2;
         settingsSchemaVersion = 1;
         softwareSchemaVersion = 1;

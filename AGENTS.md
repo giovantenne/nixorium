@@ -215,8 +215,9 @@ Release from the matching changelog section.
   control inactive, and permits local controller activation without lab keys.
   `deploymentStatus.controller` is the controller-specific capability; older
   upstreams fall back to strict fleet readiness. Never use this capability to
-  authorize PXE or client deployment. Preserve existing template defaults until
-  the controller-first installer is integrated; see ADR 0015.
+  authorize PXE or client deployment. Bootstrap capability version 1 collects
+  controller identity, US-internal regional settings, and password hashes before
+  disk installation, then defers lab networking; see ADR 0015.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
@@ -248,8 +249,11 @@ Release from the matching changelog section.
   token binds that impact. Always compose the existing deployment validation
   with the upstream controller-candidate hook when old/new declarations include
   the controller, including removal. Apply may atomically replace only `lab-software.json`
-  after token and fingerprint rechecks. It must not commit, build, activate,
-  prepare PXE, deploy, or rewrite packages supplied by private modules.
+  after token and fingerprint rechecks. CLI apply remains declaration-only; the
+  ordinary TUI records it transparently and immediately invokes the typed
+  controller plan/apply boundary when the reviewed scope affects the controller.
+  It must not push, prepare PXE, deploy clients, or rewrite packages supplied by
+  private modules.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.
@@ -273,9 +277,10 @@ Release from the matching changelog section.
   candidate controller build; it must not require or build client/PXE outputs.
   Laboratory mode and legacy metadata retain strict fleet readiness plus the
   controller/client/netboot/firmware/installer build set. Reject unknown modes
-  and inconsistent inventories. Apply only the
+  and inconsistent inventories. The CLI applies only the
   token-bound `flake.nix`/`flake.lock` proposal under the deployment-root lock;
-  never imply a branch, commit, push, activation, PXE action, or deployment.
+  the TUI records it transparently and then invokes typed controller plan/apply.
+  Never imply a branch, push, PXE action, or client deployment.
   Remote enumeration belongs only to explicit `update check`, must use the
   configured public upstream with bounded time/output/results and no Git
   prompting, credential helpers, or user/system Git configuration.
