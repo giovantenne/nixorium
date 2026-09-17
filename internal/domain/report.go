@@ -17,27 +17,30 @@ type LabMeta struct {
 	SchemaVersion  int    `json:"schemaVersion"`
 	Version        string `json:"version"`
 	Controller     struct {
-		Name     string `json:"name"`
-		Number   int    `json:"number"`
-		StaticIP string `json:"staticIp"`
-		DHCPIP   string `json:"dhcpIp"`
+		Name      string `json:"name"`
+		Number    int    `json:"number"`
+		StaticIP  string `json:"staticIp"`
+		DHCPIP    string `json:"dhcpIp"`
+		Interface string `json:"ifaceName,omitempty"`
 	} `json:"controller"`
 	Clients struct {
 		Count int        `json:"count"`
 		Hosts []HostMeta `json:"hosts"`
 	} `json:"clients"`
 	Network struct {
-		Base         string `json:"base"`
-		PrefixLength int    `json:"prefixLength"`
-		Interface    string `json:"ifaceName"`
-		CachePort    int    `json:"cachePort"`
-		PXEHTTPPort  int    `json:"pxeHttpPort"`
+		Base            string `json:"base"`
+		PrefixLength    int    `json:"prefixLength"`
+		Interface       string `json:"ifaceName"`
+		ClientInterface string `json:"clientIfaceName,omitempty"`
+		CachePort       int    `json:"cachePort"`
+		PXEHTTPPort     int    `json:"pxeHttpPort"`
 	} `json:"network"`
 }
 
 type HostMeta struct {
-	Name string `json:"name"`
-	IP   string `json:"ip"`
+	Name      string `json:"name"`
+	IP        string `json:"ip"`
+	Interface string `json:"ifaceName,omitempty"`
 }
 
 type Reachability string

@@ -64,6 +64,9 @@ let
   inherit (config) pcCount;
   inherit (config) masterHostNumber;
   inherit (config) ifaceName;
+  inherit (config) controllerIfaceName;
+  inherit (config) clientIfaceName;
+  inherit (config) hostIfaceNames;
   inherit (config) teacherUser;
   inherit (config) studentUser;
   inherit (config) teacherPassword;
@@ -98,6 +101,11 @@ let
   padNumber = n: if n < 10 then "0${toString n}" else toString n;
   masterHostName = "pc${padNumber masterHostNumber}";
   masterIp = mkHostIp masterHostNumber;
+  ifaceForHost = name:
+    hostIfaceNames.${name} or (
+      if name == masterHostName then
+        if controllerIfaceName == null then ifaceName else controllerIfaceName
+      else if clientIfaceName == null then ifaceName else clientIfaceName);
   cachePort = 5000;
   pxeHttpPort = 8080;
   system = "x86_64-linux";
@@ -141,6 +149,9 @@ let
     inherit clientIps;
     inherit pcCount;
     inherit ifaceName;
+    inherit controllerIfaceName;
+    inherit clientIfaceName;
+    inherit hostIfaceNames;
     inherit teacherUser;
     inherit studentUser;
     inherit teacherPassword;
@@ -204,7 +215,7 @@ let
     ++ (hostModules.${name} or []);
 
   specialArgsForHost = name: hostIp: {
-    inherit labSettings;
+    labSettings = labSettings // { ifaceName = ifaceForHost name; };
     inherit labAssets;
     inherit nixoriumPackage;
     inherit hostIp;
@@ -220,19 +231,22 @@ let
       number = masterHostNumber;
       staticIp = if laboratoryEnabled then masterIp else "";
       dhcpIp = masterDhcpIp;
+      ifaceName = ifaceForHost masterHostName;
     };
     clients = {
       count = pcCount;
       hosts = map (n: {
         name = "pc${padNumber n}";
         ip = mkHostIp n;
+        ifaceName = ifaceForHost "pc${padNumber n}";
       }) clientNumbers;
       groups = clientGroups;
     };
     network = {
       base = networkBase;
       prefixLength = networkPrefixLength;
-      inherit ifaceName;
+      ifaceName = ifaceForHost masterHostName;
+      clientIfaceName = if clientIfaceName == null then ifaceName else clientIfaceName;
       inherit cachePort;
       inherit pxeHttpPort;
     };
@@ -544,7 +558,7 @@ assert unknownVeyonNativeHosts == []
     netboot = nixpkgs.lib.nixosSystem {
       inherit system;
       specialArgs = {
-        inherit labSettings;
+        labSettings = labSettings // { ifaceName = ifaceForHost masterHostName; };
         inherit labAssets;
         hostName = "netboot";
         hostIp = masterDhcpIp;

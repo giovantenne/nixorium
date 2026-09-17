@@ -25,6 +25,8 @@ let
     builtins.match "[a-z_][a-z0-9_-]{0,30}" value != null;
   isPasswordHash = value:
     builtins.match "\\$6\\$[^$]+\\$[^$]+" value != null;
+  isIfaceName = value:
+    builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" value != null;
   evaluated = lib.evalModules {
     modules = [
       {
@@ -56,7 +58,22 @@ let
           };
           ifaceName = lib.mkOption {
             type = lib.types.str;
-            description = "Network interface shared by all lab PCs";
+            description = "Fallback network interface for laboratory hosts";
+          };
+          controllerIfaceName = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Optional controller-specific laboratory interface";
+          };
+          clientIfaceName = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Optional default interface for client hosts";
+          };
+          hostIfaceNames = lib.mkOption {
+            type = lib.types.attrsOf lib.types.str;
+            default = {};
+            description = "Optional per-host laboratory interface overrides";
           };
           teacherUser = lib.mkOption {
             type = lib.types.str;
@@ -132,6 +149,12 @@ let
   };
   config = evaluated.config.lab;
   networkSize = pow2 (32 - config.networkPrefixLength);
+  padNumber = number: if number < 10 then "0${toString number}" else toString number;
+  validHostNames = [ "pc${padNumber config.masterHostNumber}" ]
+    ++ builtins.genList (index: "pc${padNumber (index + 1)}") config.pcCount;
+  unknownInterfaceHosts = builtins.filter
+    (name: !(builtins.elem name validHostNames))
+    (builtins.attrNames config.hostIfaceNames);
 in
 assert (config.deploymentMode == "controller" && config.pcCount == 0)
   || (config.deploymentMode == "laboratory" && config.pcCount > 0)
@@ -146,8 +169,16 @@ assert lib.mod (ipv4ToInt config.networkBase) networkSize == 0
   || throw "networkBase (${config.networkBase}) is not aligned to /${toString config.networkPrefixLength}";
 assert config.masterHostNumber < networkSize - 1
   || throw "masterHostNumber (${toString config.masterHostNumber}) does not fit in ${config.networkBase}/${toString config.networkPrefixLength}";
-assert builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" config.ifaceName != null
+assert isIfaceName config.ifaceName
   || throw "ifaceName must be a valid Linux interface name of at most 15 characters";
+assert config.controllerIfaceName == null || isIfaceName config.controllerIfaceName
+  || throw "controllerIfaceName must be null or a valid Linux interface name of at most 15 characters";
+assert config.clientIfaceName == null || isIfaceName config.clientIfaceName
+  || throw "clientIfaceName must be null or a valid Linux interface name of at most 15 characters";
+assert builtins.all isIfaceName (builtins.attrValues config.hostIfaceNames)
+  || throw "hostIfaceNames values must be valid Linux interface names of at most 15 characters";
+assert unknownInterfaceHosts == []
+  || throw "hostIfaceNames contains unknown hosts: ${builtins.concatStringsSep ", " unknownInterfaceHosts}";
 assert isUserName config.teacherUser
   || throw "teacherUser must be a valid Unix user name";
 assert isUserName config.studentUser

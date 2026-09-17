@@ -1717,7 +1717,7 @@ func applyDetectedNetworkDefaults(settings domain.LabSettingsFile, detected doma
 		settings.Lab.MasterDHCPIP = detected.DHCPAddress
 	}
 	if detected.InterfaceName != "" {
-		settings.Lab.InterfaceName = detected.InterfaceName
+		settings.Lab.ControllerInterfaceName = detected.InterfaceName
 	}
 	return settings
 }

@@ -25,6 +25,13 @@ let
       networkPrefixLength = 25;
     };
   });
+  roleInterfaceLab = mkLab (baseArgs // {
+    labConfig = labConfig // {
+      controllerIfaceName = "eno1";
+      clientIfaceName = "enp2s0";
+      hostIfaceNames.pc02 = "enp3s0";
+    };
+  });
   nativeVeyonLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       veyonNativeHosts = [ "pc01" ];
@@ -106,7 +113,7 @@ assert subnetLab.labMeta.deploymentMode == "laboratory";
 assert subnetLab.deploymentStatus.controller.ready == subnetLab.deploymentStatus.ready;
 assert subnetLab.deploymentStatus.controller.requiresKeys;
 assert subnetLab.labMeta.network.prefixLength == 25;
-assert subnetLab.labMeta.clients.hosts == [
+assert map (host: builtins.removeAttrs host [ "ifaceName" ]) subnetLab.labMeta.clients.hosts == [
   { name = "pc01"; ip = "10.23.4.129"; }
   { name = "pc02"; ip = "10.23.4.130"; }
   { name = "pc03"; ip = "10.23.4.131"; }
@@ -128,6 +135,21 @@ assert subnetLab.labMeta.clients.hosts == [
   { name = "pc19"; ip = "10.23.4.147"; }
   { name = "pc20"; ip = "10.23.4.148"; }
 ];
+assert subnetLab.labMeta.controller.ifaceName == "enp0s3";
+assert subnetLab.labMeta.network.ifaceName == "enp0s3";
+assert subnetLab.labMeta.network.clientIfaceName == "enp0s3";
+assert (builtins.elemAt subnetLab.labMeta.clients.hosts 0).ifaceName == "enp0s3";
+assert roleInterfaceLab.labMeta.controller.ifaceName == "eno1";
+assert roleInterfaceLab.labMeta.network.ifaceName == "eno1";
+assert roleInterfaceLab.labMeta.network.clientIfaceName == "enp2s0";
+assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 0).ifaceName == "enp2s0";
+assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 1).ifaceName == "enp3s0";
+assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.interfaces ? eno1;
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces ? enp2s0;
+assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
+assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.firewall.interfaces ? eno1;
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.interfaces ? enp2s0;
+assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.firewall.interfaces ? enp3s0;
 assert subnetLab.colmena.pc01.deployment.targetHost == "10.23.4.129";
 assert subnetLab.apps.x86_64-linux.nixorium.type == "app";
 assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";

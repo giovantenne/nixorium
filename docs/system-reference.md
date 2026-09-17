@@ -34,6 +34,15 @@ The same pure Disko layout is used by controller bootstrap and guided client
 installation, so destructive tooling comes from the deployment's locked inputs
 instead of being downloaded at installation time.
 
+## Network interfaces
+
+`lab.ifaceName` is the compatibility fallback for every host. Deployments may
+set `controllerIfaceName` and `clientIfaceName` as role defaults and use
+`hostIfaceNames.<hostname>` for exceptional hardware. Resolution order is host
+override, role override, then fallback. `labMeta.network.ifaceName` remains the
+effective controller interface for older management consumers; controller and
+client records also expose their effective interface explicitly.
+
 ## Student home reset
 
 At boot, the previous student home becomes one of five rotating snapshots and

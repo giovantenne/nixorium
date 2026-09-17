@@ -635,7 +635,7 @@ func TestDetectedNetworkDefaultsReplaceOnlyFreshSetupPlaceholders(t *testing.T) 
 	settings.Lab.InterfaceName = "eth0"
 	detected := domain.NetworkDefaults{DHCPAddress: "192.0.2.25", InterfaceName: "enp1s0"}
 	proposed := applyDetectedNetworkDefaults(settings, detected)
-	if proposed.Lab.MasterDHCPIP != "192.0.2.25" || proposed.Lab.InterfaceName != "enp1s0" {
+	if proposed.Lab.MasterDHCPIP != "192.0.2.25" || proposed.Lab.ControllerInterfaceName != "enp1s0" || proposed.Lab.InterfaceName != "eth0" {
 		t.Fatalf("detected defaults were not proposed: %+v", proposed.Lab)
 	}
 

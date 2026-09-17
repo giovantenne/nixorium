@@ -30,29 +30,39 @@ type LabSettingsFile struct {
 }
 
 type LabSettings struct {
-	DeploymentMode   string   `json:"deploymentMode,omitempty"`
-	MasterDHCPIP     string   `json:"masterDhcpIp"`
-	NetworkBase      string   `json:"networkBase"`
-	NetworkPrefix    int      `json:"networkPrefixLength"`
-	PCCount          int      `json:"pcCount"`
-	MasterHostNumber int      `json:"masterHostNumber"`
-	InterfaceName    string   `json:"ifaceName"`
-	TeacherUser      string   `json:"teacherUser"`
-	StudentUser      string   `json:"studentUser"`
-	TeacherPassword  string   `json:"teacherPassword"`
-	StudentPassword  string   `json:"studentPassword"`
-	AdminPassword    string   `json:"adminPassword"`
-	HomepageURL      string   `json:"homepageUrl"`
-	StudentGitName   string   `json:"studentGitName"`
-	StudentGitEmail  string   `json:"studentGitEmail"`
-	AdminGitName     string   `json:"adminGitName"`
-	AdminGitEmail    string   `json:"adminGitEmail"`
-	TimeZone         string   `json:"timeZone"`
-	DefaultLocale    string   `json:"defaultLocale"`
-	ExtraLocale      string   `json:"extraLocale"`
-	KeyboardLayout   string   `json:"keyboardLayout"`
-	ConsoleKeyMap    string   `json:"consoleKeyMap"`
-	VeyonNativeHosts []string `json:"veyonNativeHosts"`
+	DeploymentMode          string            `json:"deploymentMode,omitempty"`
+	MasterDHCPIP            string            `json:"masterDhcpIp"`
+	NetworkBase             string            `json:"networkBase"`
+	NetworkPrefix           int               `json:"networkPrefixLength"`
+	PCCount                 int               `json:"pcCount"`
+	MasterHostNumber        int               `json:"masterHostNumber"`
+	InterfaceName           string            `json:"ifaceName"`
+	ControllerInterfaceName string            `json:"controllerIfaceName,omitempty"`
+	ClientInterfaceName     string            `json:"clientIfaceName,omitempty"`
+	HostInterfaceNames      map[string]string `json:"hostIfaceNames,omitempty"`
+	TeacherUser             string            `json:"teacherUser"`
+	StudentUser             string            `json:"studentUser"`
+	TeacherPassword         string            `json:"teacherPassword"`
+	StudentPassword         string            `json:"studentPassword"`
+	AdminPassword           string            `json:"adminPassword"`
+	HomepageURL             string            `json:"homepageUrl"`
+	StudentGitName          string            `json:"studentGitName"`
+	StudentGitEmail         string            `json:"studentGitEmail"`
+	AdminGitName            string            `json:"adminGitName"`
+	AdminGitEmail           string            `json:"adminGitEmail"`
+	TimeZone                string            `json:"timeZone"`
+	DefaultLocale           string            `json:"defaultLocale"`
+	ExtraLocale             string            `json:"extraLocale"`
+	KeyboardLayout          string            `json:"keyboardLayout"`
+	ConsoleKeyMap           string            `json:"consoleKeyMap"`
+	VeyonNativeHosts        []string          `json:"veyonNativeHosts"`
+}
+
+func (l LabSettings) ControllerInterface() string {
+	if l.ControllerInterfaceName != "" {
+		return l.ControllerInterfaceName
+	}
+	return l.InterfaceName
 }
 
 func ControllerStaticAddress(lab LabSettings) (string, error) {
@@ -149,6 +159,17 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	if !interfaceNamePattern.MatchString(lab.InterfaceName) {
 		add("lab.ifaceName", "must be a valid Linux interface name of at most 15 characters")
 	}
+	for _, networkInterface := range []struct {
+		field string
+		value string
+	}{
+		{"lab.controllerIfaceName", lab.ControllerInterfaceName},
+		{"lab.clientIfaceName", lab.ClientInterfaceName},
+	} {
+		if networkInterface.value != "" && !interfaceNamePattern.MatchString(networkInterface.value) {
+			add(networkInterface.field, "must be a valid Linux interface name of at most 15 characters")
+		}
+	}
 	validateUser := func(field, value string) {
 		if !userNamePattern.MatchString(value) {
 			add(field, "must be a valid Unix user name")
@@ -198,6 +219,13 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	validHosts := map[string]bool{fmt.Sprintf("pc%02d", lab.MasterHostNumber): true}
 	for number := 1; number <= lab.PCCount; number++ {
 		validHosts[fmt.Sprintf("pc%02d", number)] = true
+	}
+	for host, interfaceName := range lab.HostInterfaceNames {
+		if !validHosts[host] {
+			add("lab.hostIfaceNames."+host, "must name a configured client or controller")
+		} else if !interfaceNamePattern.MatchString(interfaceName) {
+			add("lab.hostIfaceNames."+host, "must be a valid Linux interface name of at most 15 characters")
+		}
 	}
 	for index, host := range lab.VeyonNativeHosts {
 		if !validHosts[host] {

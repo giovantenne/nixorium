@@ -15,6 +15,15 @@ assert !(evaluates (valid // { networkBase = "10.0.0"; }));
 assert !(evaluates (valid // { networkBase = "10.0.0.1"; }));
 assert !(evaluates (valid // { networkPrefixLength = 30; }));
 assert !(evaluates (valid // { ifaceName = "interface-name-is-too-long"; }));
+assert evaluates (valid // {
+  controllerIfaceName = "eno1";
+  clientIfaceName = "enp2s0";
+  hostIfaceNames.pc01 = "enp3s0";
+});
+assert !(evaluates (valid // { controllerIfaceName = "interface-name-is-too-long"; }));
+assert !(evaluates (valid // { clientIfaceName = "interface-name-is-too-long"; }));
+assert !(evaluates (valid // { hostIfaceNames.pc00 = "enp3s0"; }));
+assert !(evaluates (valid // { hostIfaceNames.pc01 = "interface-name-is-too-long"; }));
 assert !(evaluates (valid // { studentUser = "Bad User"; }));
 assert !(evaluates (valid // { studentUser = valid.teacherUser; }));
 assert !(evaluates (valid // { adminPassword = "plaintext"; }));

@@ -33,6 +33,11 @@ their scope. Saving still changes configuration only: controller activation and
 client deployment remain separate until the integrated software workflow lands.
 See [ADR 0016](docs/adr/0016-shared-software-scopes.md).
 
+Network interface configuration now supports controller, client-role, and
+per-host overrides while preserving `ifaceName` as the fallback. Controller
+detection no longer rewrites the client fallback. See
+[ADR 0017](docs/adr/0017-role-aware-network-interfaces.md).
+
 PC laboratories drift: machines are reinstalled at different times, manual
 fixes accumulate, and repeating the same update across a room is slow and hard
 to verify. NixOS makes each machine declarative and reproducible; Nixorium adds
@@ -111,8 +116,9 @@ cd ~/nixorium-deployment
 nix run .#nixorium -- setup
 ```
 
-The wizard proposes the interface carrying the default route and its live DHCP
-address, groups essential network, laboratory, account, regional, browser, and
+The wizard records the interface carrying the controller's default route
+separately from the client fallback and proposes its live DHCP address. It
+groups essential network, laboratory, account, regional, browser, and
 Veyon settings, and offers searchable offline choices for locale, time zone,
 and keyboards. It leaves optional Git author identity at the template defaults
 during first run, hashes passwords without echoing them, retries a short or
