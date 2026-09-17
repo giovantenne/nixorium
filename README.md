@@ -112,6 +112,10 @@ private deployment repository, and installs a usable controller from its pinned
 inputs. The selected channel or tag is resolved once: template, installer,
 Disko layout, and initial lock all use that immutable revision. See
 [ADR 0018](docs/adr/0018-revision-bound-controller-bootstrap.md).
+Before asking to erase the selected disk, the installer evaluates the pinned
+installation plan without downloading the full controller into live-ISO memory.
+The actual controller closure is downloaded into the mounted target disk with
+serialized Nix jobs, which keeps peak memory bounded on smaller machines.
 
 ### 3. Reboot
 

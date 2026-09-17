@@ -13,18 +13,19 @@ DISKO_LAYOUT_FILE="${DISKO_LAYOUT_FILE:-}"
 DISKO_LAYOUT_URL="${DISKO_LAYOUT_URL:-}"
 MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
 STUDENT_USER="${STUDENT_USER:-student}"
+INSTALLER_TTY="${NIXORIUM_INSTALLER_TTY:-/dev/tty}"
 AVAILABLE_DISKS=()
 
 # Force the bootstrap install to use the official NixOS cache only.
 # This avoids inheriting substituters from a preconfigured live/netboot
 # environment, which may point at an unavailable or unsigned local cache.
-export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo='
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo=\nmax-jobs = 1\ncores = 1'
 
 prompt_input() {
   local PROMPT_TEXT="$1"
   local TARGET_VAR="$2"
-  if [[ -r /dev/tty ]]; then
-    read -r -p "$PROMPT_TEXT" "$TARGET_VAR" < /dev/tty
+  if [[ -r "$INSTALLER_TTY" ]]; then
+    read -r -p "$PROMPT_TEXT" "$TARGET_VAR" < "$INSTALLER_TTY"
   else
     read -r -p "$PROMPT_TEXT" "$TARGET_VAR"
   fi
@@ -143,12 +144,12 @@ cat > "$TEMP_DISKO_FILE" <<EOF
 }
 EOF
 
-echo "Checking the pinned installer and preparing the controller system..."
+echo "Checking the pinned installer without downloading the full controller system..."
 nix --extra-experimental-features "nix-command flakes" \
-  build "${FLAKE_REF}#disko" --no-link --no-write-lock-file
+  build "${FLAKE_REF}#disko" --dry-run --no-link --no-write-lock-file
 nix --extra-experimental-features "nix-command flakes" \
   build "${FLAKE_REF}#nixosConfigurations.pc${MASTER_HOST_NUMBER}.config.system.build.toplevel" \
-  --no-link --no-write-lock-file
+  --dry-run --no-link --no-write-lock-file
 
 echo "Selected disk: $INSTALL_DISK"
 prompt_input "This will erase all data on $INSTALL_DISK. Type YES to continue: " CONFIRMATION
@@ -162,6 +163,7 @@ sudo nix --extra-experimental-features "nix-command flakes" \
   run "${FLAKE_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE"
 
 echo "Installing NixOS for the controller..."
+echo "The controller system is downloaded into the installed disk, not the live ISO memory."
 sudo nixos-install --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" --no-write-lock-file --no-root-passwd
 
 echo "Controller system installed. Returning to bootstrap to save the deployment."
