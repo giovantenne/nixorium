@@ -57,9 +57,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Controller bootstrap now collects teacher/student usernames, time zone,
   keyboard, and three hidden passwords before disk installation. It persists a
   controller-only deployment with US internal locales, excludes mounted live
-  disks, prebuilds before destructive confirmation, and defers all client
-  network/key work to the TUI. `master` is the bootstrap default while older
-  releases retain their compatible legacy flow.
+  disks, evaluates pinned Disko/controller derivations before destructive
+  confirmation, and defers all client network/key work to the TUI. The full
+  controller closure is downloaded into the mounted target store instead of the
+  RAM-backed live store, with serialized Nix jobs to avoid live-ISO memory
+  exhaustion. `master` is the bootstrap default while older releases retain
+  their compatible legacy flow.
 
 - Reduced the home screen to five operator tasks. Restore and Update Nixorium
   moved under Advanced tools; Install new computers owns the resumable
