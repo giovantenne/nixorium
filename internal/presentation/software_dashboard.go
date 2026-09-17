@@ -28,12 +28,6 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 	switch model.screen {
 	case dashboardSoftware:
 		items := model.softwareItems()
-		if isSearchShortcut(key) {
-			model.softwareMode = softwareSearch
-			model.softwareSearching = true
-			model.softwareCursor = 0
-			return model, nil
-		}
 		switch key.String() {
 		case "esc", "left":
 			model.softwareSearchID++
@@ -43,6 +37,10 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			}
 			model.screen = dashboardHome
 			model.message = ""
+		case "/":
+			model.softwareMode = softwareSearch
+			model.softwareSearching = true
+			model.softwareCursor = 0
 		case "tab":
 			model = model.changeSoftwareMode(1)
 		case "shift+tab":

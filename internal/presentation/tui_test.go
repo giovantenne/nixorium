@@ -192,10 +192,10 @@ func TestDashboardSearchesPinnedPackagesAndIgnoresStaleResults(t *testing.T) {
 	}
 	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, actions: actions, softwareCatalog: catalog, softwareMode: softwareSuggested}
 
-	updated, _ := model.Update(tea.KeyPressMsg{Code: '7', ShiftedCode: '/', Mod: tea.ModShift})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "/"})
 	model = updated.(dashboardModel)
 	if !model.softwareSearching || model.softwareMode != softwareSearch {
-		t.Fatal("the slash above 7 did not open package search")
+		t.Fatal("the slash shortcut did not open package search")
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "hell"})
 	model = updated.(dashboardModel)
