@@ -49,9 +49,12 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 	deployment, err := m.source.DeploymentStatus(ctx, root)
 	if err != nil {
 		report = controllerIssue(report, "readiness", fmt.Sprintf("evaluate deploymentStatus: %v", err))
-	} else if !deployment.Ready {
-		for _, issue := range deployment.Issues {
+	} else if readiness := deployment.ControllerReadiness(); !readiness.Ready {
+		for _, issue := range readiness.Issues {
 			report = controllerIssue(report, "readiness", issue)
+		}
+		if len(readiness.Issues) == 0 {
+			report = controllerIssue(report, "readiness", "controller configuration is not ready")
 		}
 	}
 	gitState, err := m.source.GitState(ctx, root)

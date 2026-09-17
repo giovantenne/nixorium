@@ -5,6 +5,8 @@
 
   outputs = { self, nixorium }:
     let
+      # deploymentMode is optional: existing deployments remain laboratories.
+      # Explicit controller mode requires pcCount = 0 (see README).
       labConfig = nixorium.lib.evalLabSettings
         (builtins.fromJSON (builtins.readFile ./lab-settings.json));
       labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);

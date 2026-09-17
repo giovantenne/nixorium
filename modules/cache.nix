@@ -1,6 +1,7 @@
 { config, labSettings, lib, ... }:
 let
   isMaster = config.networking.hostName == labSettings.masterHostName;
+  laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   signingKeyPath = "/var/lib/nixorium/keys/harmonia-secret-key";
 in
 {
@@ -10,7 +11,7 @@ in
     trusted-public-keys = if labSettings.cachePublicKey == null then [] else [ labSettings.cachePublicKey ];
   };
 
-  services.harmonia.cache = lib.mkIf isMaster {
+  services.harmonia.cache = lib.mkIf (isMaster && laboratoryEnabled) {
     enable = true;
     signKeyPaths = [ signingKeyPath ];
     settings.bind = "[::]:${toString labSettings.cachePort}";
@@ -18,7 +19,7 @@ in
 
   # Keep the native Harmonia unit while exposing a stable product-level name
   # to the management application and operators.
-  systemd.services.harmonia = lib.mkIf isMaster {
+  systemd.services.harmonia = lib.mkIf (isMaster && laboratoryEnabled) {
     aliases = [ "nixorium-harmonia.service" ];
     wantedBy = [ "multi-user.target" ];
   };

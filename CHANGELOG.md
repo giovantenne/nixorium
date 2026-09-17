@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added an explicit controller-only configuration mode with zero clients,
+  local networking, inactive lab services and independent controller readiness.
+  Reviewed controller activation can run without lab keys in this mode;
+  client operations remain blocked and existing laboratory defaults are
+  unchanged. This is the foundation for the upcoming installer/TUI flow,
+  not a change to the current bootstrap prompts.
+
 - Added typed package-name search and exact package resolution against the
   deployment's locked nixpkgs input and overlays. The catalog is now a set of
   suggestions rather than an allowlist, dotted attributes resolve structurally,

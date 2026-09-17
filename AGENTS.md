@@ -200,6 +200,14 @@ Release from the matching changelog section.
 
 ## Architecture Notes
 
+- `lab.deploymentMode` is optional (`laboratory` by default). Explicit
+  `controller` mode requires zero clients, leaves lab networking/cache/remote
+  control inactive, and permits local controller activation without lab keys.
+  `deploymentStatus.controller` is the controller-specific capability; older
+  upstreams fall back to strict fleet readiness. Never use this capability to
+  authorize PXE or client deployment. Preserve existing template defaults until
+  the controller-first installer is integrated; see ADR 0015.
+
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
 - Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.

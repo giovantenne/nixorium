@@ -178,19 +178,25 @@ let
 
       as_admin nixorium config validate --repo "$REPOSITORY" --json \
         || fail "deployment configuration validation failed"
-      as_admin nixorium setup keys --verify-only --repo "$REPOSITORY" --json \
-        || fail "deployment key correspondence verification failed"
-      [[ "$(as_admin nix eval "$FLAKE_URL#deploymentStatus.ready" --json --no-write-lock-file)" == true ]] \
-        || fail "deploymentStatus.ready must be true before controller apply"
+      CONTROLLER_READINESS="$(as_admin nix eval "$FLAKE_URL#deploymentStatus" --json --no-write-lock-file \
+        | jq -ce '.controller // {ready: .ready, issues: .issues, requiresKeys: true}')"
+      jq -e '.ready == true' <<<"$CONTROLLER_READINESS" >/dev/null \
+        || fail "controller readiness must be true before controller apply"
 
-      cmp -s "$REPOSITORY/admin-ssh" /home/admin/.ssh/id_ed25519 \
-        || fail "installed admin SSH key is absent or differs"
-      cmp -s "$REPOSITORY/veyon-private-key.pem" /etc/veyon/keys/private/teacher/key \
-        || fail "installed Veyon private key is absent or differs"
-      cmp -s "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key \
-        || fail "installed Harmonia signing key is absent or differs"
+      # Only an explicit capability from the pinned configuration can omit lab
+      # keys. Old deployments continue to require all three installed pairs.
+      if ! jq -e '.requiresKeys == false' <<<"$CONTROLLER_READINESS" >/dev/null; then
+        as_admin nixorium setup keys --verify-only --repo "$REPOSITORY" --json \
+          || fail "deployment key correspondence verification failed"
+        cmp -s "$REPOSITORY/admin-ssh" /home/admin/.ssh/id_ed25519 \
+          || fail "installed admin SSH key is absent or differs"
+        cmp -s "$REPOSITORY/veyon-private-key.pem" /etc/veyon/keys/private/teacher/key \
+          || fail "installed Veyon private key is absent or differs"
+        cmp -s "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key \
+          || fail "installed Harmonia signing key is absent or differs"
+      fi
 
-      publish_progress running build "Validated configuration and installed keys" 1
+      publish_progress running build "Validated controller prerequisites" 1
       publish_progress running build "Building the reviewed controller system" 1
 
       CONTROLLER_NAME="$(as_admin nix eval "$FLAKE_URL#labMeta.controller.name" --raw --no-write-lock-file)"

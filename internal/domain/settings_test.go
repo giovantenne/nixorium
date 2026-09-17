@@ -65,6 +65,43 @@ func TestLabSettingsValidation(t *testing.T) {
 	}
 }
 
+func TestControllerOnlySettingsAreExplicitAndRoundTrip(t *testing.T) {
+	settings := validSettings()
+	settings.Lab.PCCount = 0
+	settings.Lab.VeyonNativeHosts = nil
+	if issues := settings.Validate(); len(issues) == 0 {
+		t.Fatal("legacy laboratory accepted zero clients")
+	}
+	settings.Lab.DeploymentMode = "controller"
+	settings.Lab.MasterDHCPIP = MasterDHCPPlaceholder
+	data, err := MarshalLabSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, issues := DecodeLabSettings(data)
+	if len(issues) != 0 || decoded.Lab.DeploymentMode != "controller" || decoded.Lab.PCCount != 0 {
+		t.Fatalf("round trip = %+v, issues = %+v", decoded, issues)
+	}
+	settings.Lab.PCCount = 1
+	if issues := settings.Validate(); len(issues) == 0 {
+		t.Fatal("controller-only mode accepted a client inventory")
+	}
+	settings.Lab.DeploymentMode = "unknown"
+	if issues := settings.Validate(); len(issues) == 0 {
+		t.Fatal("unknown deployment mode accepted")
+	}
+}
+
+func TestLegacySettingsDoNotAcquireDeploymentModeOnSave(t *testing.T) {
+	data, err := MarshalLabSettings(validSettings())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte(`"deploymentMode"`)) {
+		t.Fatal("legacy settings were silently migrated")
+	}
+}
+
 func TestDecodeRejectsUnknownAndTrailingValues(t *testing.T) {
 	data, err := MarshalLabSettings(validSettings())
 	if err != nil {

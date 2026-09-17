@@ -29,6 +29,11 @@ let
     modules = [
       {
         options.lab = {
+          deploymentMode = lib.mkOption {
+            type = lib.types.enum [ "laboratory" "controller" ];
+            default = "laboratory";
+            description = "Explicit controller-only bootstrap or configured laboratory";
+          };
           masterDhcpIp = lib.mkOption {
             type = lib.types.str;
             description = "DHCP address of the controller during PXE installation";
@@ -42,7 +47,7 @@ let
             description = "CIDR prefix length of the static lab network";
           };
           pcCount = lib.mkOption {
-            type = lib.types.ints.between 1 253;
+            type = lib.types.ints.between 0 253;
             description = "Number of client PCs";
           };
           masterHostNumber = lib.mkOption {
@@ -128,6 +133,9 @@ let
   config = evaluated.config.lab;
   networkSize = pow2 (32 - config.networkPrefixLength);
 in
+assert (config.deploymentMode == "controller" && config.pcCount == 0)
+  || (config.deploymentMode == "laboratory" && config.pcCount > 0)
+  || throw "pcCount must be zero in controller mode and positive in laboratory mode";
 assert config.masterHostNumber > config.pcCount
   || throw "masterHostNumber (${toString config.masterHostNumber}) must be greater than pcCount (${toString config.pcCount})";
 assert config.masterDhcpIp == "MASTER_DHCP_IP" || isIpv4 config.masterDhcpIp
