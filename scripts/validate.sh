@@ -86,6 +86,19 @@ run_quick_checks() {
     --no-link
 }
 
+run_full_checks() {
+  nix build \
+    "path:${REPO_ROOT}#checks.x86_64-linux.config-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.software-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.client-installer" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.management-vm" \
+    --no-write-lock-file \
+    --no-link
+}
+
 case "$MODE" in
   --quick)
     run_quick_checks
@@ -119,7 +132,7 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.management-vm.drvPath" --raw --no-write-lock-file >/dev/null
 else
-  nix flake check "path:${REPO_ROOT}" --no-write-lock-file
+  run_full_checks
 fi
 
 nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file >/dev/null
@@ -171,6 +184,23 @@ if [[ "$(nix eval "path:${SITE_DIR}#deploymentStatus.ready" --json --no-write-lo
   exit 1
 fi
 
+if [[ "${MODE}" == "--ci" ]]; then
+  nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
+    --raw \
+    --no-write-lock-file >/dev/null
+  nix eval "path:${SITE_DIR}#packages.x86_64-linux.pxeFirmware.drvPath" \
+    --raw \
+    --no-write-lock-file >/dev/null
+  nix eval "path:${SITE_DIR}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" \
+    --raw \
+    --no-write-lock-file >/dev/null
+  nix eval "path:${SITE_DIR}#installerBundle.drvPath" \
+    --raw \
+    --no-write-lock-file >/dev/null
+  echo "CI evaluation completed successfully."
+  exit 0
+fi
+
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   config validate --repo "$SITE_DIR" --json >/dev/null
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
@@ -213,14 +243,6 @@ DIRECT_CLIENT_DRV=$(
     --raw \
     --no-write-lock-file
 )
-
-if [[ "${MODE}" == "--ci" ]]; then
-  nix eval "path:${SITE_DIR}#installerBundle.drvPath" \
-    --raw \
-    --no-write-lock-file >/dev/null
-  echo "CI evaluation completed successfully."
-  exit 0
-fi
 
 nix build "path:${SITE_DIR}#installerBundle" \
   --no-write-lock-file \

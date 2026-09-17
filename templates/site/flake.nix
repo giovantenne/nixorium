@@ -60,14 +60,19 @@
       validateSoftwareCandidate = rawSoftware:
         let
           candidate = mkDeployment labConfig rawSoftware;
-          clientNames = map (client: client.name) candidate.labMeta.clients.hosts;
+          representativeClient =
+            if candidate.labMeta.clients.hosts == [] then null
+            else (builtins.head candidate.labMeta.clients.hosts).name;
+          representativeClientSystem =
+            if representativeClient == null then []
+            else [
+              candidate.nixosConfigurations.${representativeClient}.config.system.build.toplevel.drvPath
+            ];
         in
-        builtins.deepSeq [
-          candidate.nixoriumSoftware
-          (map
-            (name: candidate.nixosConfigurations.${name}.config.system.build.toplevel.drvPath)
-            clientNames)
-        ] true;
+        # Every generated client shares the managed-software module graph.
+        # Validate its declarations and one representative system instead of
+        # forcing the complete laboratory inventory for each plan and save.
+        builtins.deepSeq ([ candidate.nixoriumSoftware ] ++ representativeClientSystem) true;
     in
     deployment // {
       nixoriumPackageBase = {

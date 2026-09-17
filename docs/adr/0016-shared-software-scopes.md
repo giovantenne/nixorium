@@ -32,6 +32,14 @@ controller toplevel while preserving private modules, assets and host policy.
 This also protects old site templates whose own hook evaluates only clients.
 Removal must run the same checks; a missing required hook is an error.
 
+The site validator checks every declaration, scope, group and pinned package,
+then evaluates one representative client system. Generated clients share the
+same managed-software module graph, so forcing every configured client adds no
+software-validation coverage and makes an ordinary plan scale with laboratory
+size. A shared change therefore evaluates at most that representative client
+and the separately checked controller; a controller-only deployment evaluates
+only the controller. Actual distribution still builds each selected client.
+
 Review reports `affectedController` separately from `affectedClients`. A scope
 change affects the union of old and new destinations, including computers that
 lose the package. The content-bound review token includes those destinations;
@@ -50,8 +58,8 @@ collection. A changed declaration is not proof of an installed application.
 
 ## Verification
 
-Nix tests cover both roles, zero clients, legacy scopes, invalid fields and
-controller-candidate rejection. Go tests cover capability fallback, old/new
+Nix tests cover both roles, zero clients, legacy scopes, invalid fields,
+representative-client validation and controller-candidate rejection. Go tests cover capability fallback, old/new
 target review, removal, stale inventories, CLI parsing and pending-state copy.
 The management VM exercises shared software with no clients, a rejecting
 controller-specific validator and declaration-only saves. Full validation

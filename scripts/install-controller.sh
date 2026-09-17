@@ -9,12 +9,16 @@ fi
 
 INSTALL_DISK="${1:-}"
 FLAKE_REF="${FLAKE_REF:-github:giovantenne/nixorium}"
+UPSTREAM_REF="${NIXORIUM_UPSTREAM_REF:-}"
+DEPLOYMENT_PATH="${NIXORIUM_DEPLOYMENT_PATH:-}"
+TARGET_ROOT="${NIXORIUM_TARGET_ROOT:-/mnt}"
 DISKO_LAYOUT_FILE="${DISKO_LAYOUT_FILE:-}"
 DISKO_LAYOUT_URL="${DISKO_LAYOUT_URL:-}"
 MASTER_HOST_NUMBER="${MASTER_HOST_NUMBER:-99}"
 STUDENT_USER="${STUDENT_USER:-student}"
 INSTALLER_TTY="${NIXORIUM_INSTALLER_TTY:-/dev/tty}"
 AVAILABLE_DISKS=()
+BOOTSTRAP_SWAP=""
 
 # Force the bootstrap install to use the official NixOS cache only.
 # This avoids inheriting substituters from a preconfigured live/netboot
@@ -67,7 +71,14 @@ disk_has_mounted_filesystem() {
 
 TEMP_DISKO_LAYOUT=$(mktemp)
 TEMP_DISKO_FILE=$(mktemp)
-trap 'rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"' EXIT
+cleanup() {
+  if [[ -n "$BOOTSTRAP_SWAP" ]]; then
+    sudo swapoff "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
+    sudo rm -f -- "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
+  fi
+  rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"
+}
+trap cleanup EXIT
 
 if [[ -n "$DISKO_LAYOUT_FILE" ]]; then
   if [[ ! -f "$DISKO_LAYOUT_FILE" || ! -r "$DISKO_LAYOUT_FILE" ]]; then
@@ -144,12 +155,10 @@ cat > "$TEMP_DISKO_FILE" <<EOF
 }
 EOF
 
-echo "Checking the pinned installer without downloading the full controller system..."
-nix --extra-experimental-features "nix-command flakes" \
-  build "${FLAKE_REF}#disko" --dry-run --no-link --no-write-lock-file
-nix --extra-experimental-features "nix-command flakes" \
-  build "${FLAKE_REF}#nixosConfigurations.pc${MASTER_HOST_NUMBER}.config.system.build.toplevel" \
-  --dry-run --no-link --no-write-lock-file
+if [[ -z "$UPSTREAM_REF" || -z "$DEPLOYMENT_PATH" || ! -d "$DEPLOYMENT_PATH" ]]; then
+  echo "Error: the bootstrap did not provide its pinned source and private deployment." >&2
+  exit 1
+fi
 
 echo "Selected disk: $INSTALL_DISK"
 prompt_input "This will erase all data on $INSTALL_DISK. Type YES to continue: " CONFIRMATION
@@ -158,12 +167,45 @@ if [[ "$CONFIRMATION" != "YES" ]]; then
   exit 1
 fi
 
+echo "Downloading the pinned partitioning tool. The disk remains unchanged until it is ready..."
 echo "Partitioning disk with the Disko revision pinned by the deployment..."
-sudo nix --extra-experimental-features "nix-command flakes" \
-  run "${FLAKE_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE"
+sudo env NIX_CONFIG="$NIX_CONFIG" \
+  nix --extra-experimental-features "nix-command flakes" \
+  run "${UPSTREAM_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE"
+
+BOOTSTRAP_CACHE="${TARGET_ROOT}/var/cache/nixorium-bootstrap"
+sudo install -d -o "$(id -u)" -g "$(id -g)" "$BOOTSTRAP_CACHE"
+BOOTSTRAP_SWAP="${TARGET_ROOT}/.nixorium-bootstrap.swap"
+if command -v btrfs >/dev/null 2>&1 && \
+  sudo btrfs filesystem mkswapfile --size 4G "$BOOTSTRAP_SWAP" && \
+  sudo swapon "$BOOTSTRAP_SWAP"; then
+  echo "Enabled temporary target-disk swap for the installation."
+else
+  sudo rm -f -- "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
+  BOOTSTRAP_SWAP=""
+  echo "Warning: temporary installation swap is unavailable; continuing with bounded Nix jobs." >&2
+fi
+export XDG_CACHE_HOME="$BOOTSTRAP_CACHE"
+echo "Locking the private deployment on the installed disk..."
+(
+  cd "$DEPLOYMENT_PATH"
+  nix --extra-experimental-features "nix-command flakes" \
+    flake lock --override-input nixorium "$UPSTREAM_REF"
+)
+if [[ ! -f "${DEPLOYMENT_PATH}/flake.lock" ]]; then
+  echo "Error: the private deployment lock was not created." >&2
+  exit 1
+fi
 
 echo "Installing NixOS for the controller..."
 echo "The controller system is downloaded into the installed disk, not the live ISO memory."
-sudo nixos-install --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" --no-write-lock-file --no-root-passwd
+sudo env \
+  NIX_CONFIG="$NIX_CONFIG" \
+  XDG_CACHE_HOME="$BOOTSTRAP_CACHE" \
+  nixos-install \
+  --root "$TARGET_ROOT" \
+  --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" \
+  --no-write-lock-file \
+  --no-root-passwd
 
 echo "Controller system installed. Returning to bootstrap to save the deployment."

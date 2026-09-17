@@ -34,13 +34,16 @@ Run the complete local matrix with:
 ./scripts/validate.sh --full
 ```
 
-It additionally runs all Flake checks, builds a representative client, the
-controller, netboot ramdisk, Disko package, PXE firmware, command package, and
-installer bundle, generates a fresh site deployment, and verifies offline
-derivation equivalence. Run it after public API, template, built-in module,
-installer bundle, asset-plumbing, input, Disko, or netboot changes, and before
-a milestone or release is declared complete. A successful evaluation does not
-prove that source patches compile, so affected host roles require real builds.
+It additionally builds every declared `checks` derivation, a representative
+client, the controller, netboot ramdisk, Disko package, PXE firmware, command
+package, and installer bundle, generates a fresh site deployment, and verifies
+offline derivation equivalence. It does not ask `nix flake check` to enumerate
+all generated clients: address/hostname generation is covered by `mk-lab`, and
+one client exercises their shared module graph. Run it after public API,
+template, built-in module, installer bundle, asset-plumbing, input, Disko, or
+netboot changes, and before a milestone or release is declared complete. A
+successful evaluation does not prove that source patches compile, so affected
+host roles require real builds.
 
 GitHub Actions must use the evaluation-only mode:
 
