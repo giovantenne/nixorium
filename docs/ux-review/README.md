@@ -236,7 +236,7 @@ Tests must reflect real usage rather than a permanently powered-on room:
 - prepare software with every client powered off;
 - distribute to four selected clients while the others are off;
 - selected unreachable targets: explicit power-on/defer choice and per-target result;
-- Nixorium release discovery failure with no editable fallback target;
+- Nixorium update discovery failure with no editable fallback target;
 - Nixorium candidate blocked before effects by dirty Git or failed builds;
 - shutdown excludes controller and does not infer physical state from network loss.
 
@@ -247,7 +247,7 @@ a separate requirement. This plan claims no new product validation.
 
 Exploratory review: ask a non-Nix technician to install the first client, then
 return a week later to reinstall pc07, add software, update only selected powered-on
-clients, and update Nixorium from the fetched release list. Measure understanding of roles,
+clients, and update Nixorium from the fetched target list. Measure understanding of roles,
 targets, disk effects, and physical handoffs. Powered-on client count is not a
 UX success metric.
 
@@ -260,7 +260,7 @@ UX success metric.
 | D03 | Restore has two explicit paths: reapply configuration or reinstall and erase a locally confirmed disk | Implemented direction |
 | D04 | Use a pilot client and support partial installation sessions | Implemented with private, revision-bound cross-process evidence |
 | D05 | Guided software is limited to supported packages/configuration while preserving private modules | Implemented |
-| D06 | No NixOS-upgrade action; Update Nixorium selects only releases discovered by the typed service | Owner direction accepted |
+| D06 | No NixOS-upgrade action; Update Nixorium selects only `master` or releases discovered by the typed service | Owner direction accepted |
 | D07 | Shutdown targets clients only; session conflicts block by default and unknown sessions require explicit acknowledgement | Implemented |
 | D08 | Keep Bubble Tea; defer Web UI; approve final language and palette separately | Bubble Tea direction implemented |
 

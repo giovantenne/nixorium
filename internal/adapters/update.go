@@ -90,7 +90,7 @@ func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, 
 
 func (Local) DiscoverUpdateReleases(ctx context.Context, sourcePrefix string) ([]domain.UpdateReleaseRef, error) {
 	if !safeGitHubSourcePrefix.MatchString(sourcePrefix) {
-		return nil, errors.New("configured GitHub upstream owner/repository is not safe for release discovery")
+		return nil, errors.New("configured GitHub upstream owner/repository is not safe for update discovery")
 	}
 	discoveryContext, cancel := context.WithTimeout(ctx, updateDiscoveryTimeout)
 	defer cancel()
@@ -98,7 +98,7 @@ func (Local) DiscoverUpdateReleases(ctx context.Context, sourcePrefix string) ([
 	command := exec.CommandContext(discoveryContext, "git",
 		"-c", "credential.helper=",
 		"-c", "core.askPass=",
-		"ls-remote", "--refs", "--tags", "--exit-code", upstream, "refs/tags/v*",
+		"ls-remote", "--refs", "--exit-code", upstream, "refs/heads/master", "refs/tags/v*",
 	)
 	command.Env = updateDiscoveryEnvironment()
 	stdout := &boundedCommandBuffer{limit: updateDiscoveryBytes}
@@ -107,7 +107,7 @@ func (Local) DiscoverUpdateReleases(ctx context.Context, sourcePrefix string) ([
 	command.Stderr = stderr
 	if err := command.Run(); err != nil {
 		if errors.Is(discoveryContext.Err(), context.DeadlineExceeded) {
-			return nil, fmt.Errorf("release discovery exceeded the %s time limit", updateDiscoveryTimeout)
+			return nil, fmt.Errorf("update discovery exceeded the %s time limit", updateDiscoveryTimeout)
 		}
 		message := strings.TrimSpace(stderr.buffer.String())
 		if stderr.truncated {
@@ -119,16 +119,24 @@ func (Local) DiscoverUpdateReleases(ctx context.Context, sourcePrefix string) ([
 		return nil, fmt.Errorf("query configured public upstream: git: %s", sanitizeOperationLog([]byte(message)))
 	}
 	if stdout.truncated {
-		return nil, fmt.Errorf("release discovery output exceeds the %d KiB safety limit", updateDiscoveryBytes/1024)
+		return nil, fmt.Errorf("update discovery output exceeds the %d KiB safety limit", updateDiscoveryBytes/1024)
 	}
 	refs := make([]domain.UpdateReleaseRef, 0)
 	seen := map[string]bool{}
 	for _, line := range strings.Split(strings.TrimSpace(stdout.buffer.String()), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) != 2 || !remoteGitObjectID.MatchString(fields[0]) || !strings.HasPrefix(fields[1], "refs/tags/") {
+		if len(fields) != 2 || !remoteGitObjectID.MatchString(fields[0]) {
 			return nil, errors.New("configured upstream returned a malformed release reference")
 		}
-		tag := strings.TrimPrefix(fields[1], "refs/tags/")
+		tag := ""
+		switch {
+		case fields[1] == "refs/heads/master":
+			tag = "master"
+		case strings.HasPrefix(fields[1], "refs/tags/"):
+			tag = strings.TrimPrefix(fields[1], "refs/tags/")
+		default:
+			return nil, errors.New("configured upstream returned a malformed update reference")
+		}
 		if seen[tag] {
 			continue
 		}

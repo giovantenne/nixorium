@@ -10,8 +10,9 @@ that pin can change the input declaration, lock graph, configuration schema,
 controller and client systems, netboot artifacts, and offline installer bundle.
 A direct `nix flake update` mutates the checkout before compatibility is known,
 while copying the worktree for a proposal risks including ignored private key
-material. Tracking a moving branch is also unsuitable as the normal production
-upgrade policy.
+material. Tracking a moving branch is unsuitable as the default production
+upgrade policy, but maintainers need an explicit way to validate and adopt the
+latest development revision.
 
 The controller may use the internet for an explicitly requested update, but
 routine management and every client must remain independent of it. Updating a
@@ -21,7 +22,9 @@ repository must not imply committing, pushing, activating, or deploying.
 
 Use a typed check/plan/apply workflow. Preserve the upstream source identity
 already present in one simple `inputs.nixorium.url` string assignment, and
-accept only a `v`-prefixed Semantic Version tag as the target reference.
+accept only the exact `master` branch or a `v`-prefixed Semantic Version tag as
+the target reference. Label `master` as a moving Development target rather than
+presenting it as a release.
 Distinguish stable, prerelease, moving-current-reference, and downgrade states;
 require explicit opt-ins for prerelease and downgrade targets. Refuse computed
 or ambiguous input declarations instead of rewriting arbitrary Nix syntax.
@@ -29,9 +32,10 @@ or ambiguous input declarations instead of rewriting arbitrary Nix syntax.
 Release discovery is optional and bounded. It disables Git credential helpers
 and prompting plus user/system Git configuration, and is the only update
 command that enumerates the remote. It queries the configured GitHub identity
-over HTTPS, stops after 15 seconds, accepts at most 256 KiB of references, and
-returns at most the newest 20 stable and 20 prerelease SemVer tags. An explicit
-target can proceed directly and lets Nix resolve that exact release.
+over HTTPS, stops after 15 seconds, accepts at most 256 KiB of references,
+queries only `refs/heads/master` and `refs/tags/v*`, and returns `master` plus at
+most the newest 20 stable and 20 prerelease SemVer tags. An explicit target can
+proceed directly and lets Nix resolve that exact branch or release.
 
 During planning, generate the candidate lock outside the checkout with Nix's
 `--output-lock-file`. Evaluate and build against that candidate using an exact
@@ -72,7 +76,9 @@ the mutating save callback is in progress.
 Planning is intentionally expensive, may need controller internet access, and
 may populate the shared Nix store. Repeating it during apply normally reuses
 cached outputs. The main management interface remains offline-capable, and the
-client runtime/network boundary does not change.
+client runtime/network boundary does not change. Selecting `master` deliberately
+trades release immutability for the newest upstream development revision, while
+retaining the same validation and review boundary.
 
 The managed path initially supports the generated deployment's simple input
 assignment. Advanced computed inputs retain the documented manual update

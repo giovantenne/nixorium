@@ -26,7 +26,7 @@ var dashboardTasks = []dashboardTask{
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
 	{id: "pxe", shortcut: "p", title: "Install or reinstall computers", description: "Prepare and control network installation"},
 	{id: "setup", shortcut: "f", title: "Setup and readiness", description: "Continue initial setup or review what is still required"},
-	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose from releases fetched from the configured upstream"},
+	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
 	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
 	{id: "admin", shortcut: "a", title: "Advanced tools", description: "Inventory, settings, revisions, services, logs and diagnostics"},
 }
@@ -122,6 +122,14 @@ func (model dashboardModel) homeView() string {
 		)
 		return strings.Join(lines, "\n") + "\n"
 	}
+	if model.initializing {
+		lines = append(lines,
+			model.busyView(),
+			"",
+			tuiMuted("Reading the saved laboratory configuration and setup state…", model.isDark),
+		)
+		return strings.Join(lines, "\n") + "\n"
+	}
 	if model.report.PXE.Mode == "recovery-required" {
 		lines = append(lines,
 			tuiStatus("Controller network recovery required", tuiStatusAttention, model.isDark),
@@ -139,7 +147,7 @@ func (model dashboardModel) homeView() string {
 	if model.setup.State != "ready" {
 		lines = append(lines,
 			tuiStatus("Setup needs attention", tuiStatusAttention, model.isDark),
-			"Press f to continue from the first incomplete step.",
+			"Setup is paused. Choose Setup and readiness to resume from the first incomplete step.",
 			"",
 		)
 	}

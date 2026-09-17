@@ -1320,10 +1320,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.updateTarget = ""
 			model.message = ""
 			if model.actions.CheckUpdate == nil {
-				model.message = "Release discovery is not available in this session."
+				model.message = "Update discovery is not available in this session."
 				return model, nil
 			}
-			model.busy = "Fetching available Nixorium releases"
+			model.busy = "Fetching available Nixorium updates"
 			return model, model.checkUpdates()
 		case "e":
 			model.screen = dashboardSettings
@@ -1388,7 +1388,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if key.String() == "esc" || key.String() == "left" {
 			model.setupMode = false
 			model.screen = dashboardHome
-			model.message = ""
+			model.message = "Setup paused; completed work is saved and you can resume at any time."
 			return model, nil
 		}
 		if key.String() != "enter" {
@@ -2182,7 +2182,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				model.updateTarget = ""
 				model.message = ""
 				if model.actions.CheckUpdate != nil {
-					model.busy = "Fetching available Nixorium releases"
+					model.busy = "Fetching available Nixorium updates"
 					return model, model.checkUpdates()
 				}
 			}
@@ -2198,13 +2198,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 		case "r":
 			if model.actions.CheckUpdate == nil {
-				model.message = "Release discovery is not available in this session."
+				model.message = "Update discovery is not available in this session."
 				return model, nil
 			}
 			model.updateCheck = domain.UpdateCheckReport{}
 			model.updateTarget = ""
 			model.message = ""
-			model.busy = "Fetching available Nixorium releases"
+			model.busy = "Fetching available Nixorium updates"
 			return model, model.checkUpdates()
 		case "up", "k":
 			model.updateCursor = max(0, model.updateCursor-1)
@@ -2216,7 +2216,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			releases := model.availableUpdateReleases()
 			if model.updateCheck.HasErrors() || len(releases) == 0 {
-				model.message = "Fetch available releases before selecting an update."
+				model.message = "Fetch available updates before selecting a target."
 				return model, nil
 			}
 			target := releases[min(model.updateCursor, len(releases)-1)].Tag
@@ -2718,7 +2718,7 @@ func (model dashboardModel) setupView() string {
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
 	}
-	for index, group := range groups {
+	for _, group := range groups {
 		label := "○ " + group.title + " · " + group.pending
 		switch group.state {
 		case domain.SetupStageComplete:
@@ -2726,12 +2726,7 @@ func (model dashboardModel) setupView() string {
 		case domain.SetupStageCurrent:
 			label = "● " + group.title + " · In progress"
 		}
-		if index == current {
-			label = "› " + label
-		} else {
-			label = "  " + label
-		}
-		lines = append(lines, label)
+		lines = append(lines, "  "+label)
 	}
 	if model.setupDetails {
 		lines = append(lines, "", tuiSection("Technical steps", model.isDark))
@@ -2754,9 +2749,10 @@ func (model dashboardModel) setupView() string {
 		)
 	} else {
 		lines = append(lines,
-			tuiResult("Next step", false, model.isDark),
+			tuiSection("Continue setup", model.isDark),
 			"  "+setupCurrentTitle(model.setup),
 			"  "+setupCurrentAction(model.setup),
+			"  Press Enter to continue.",
 		)
 	}
 	if model.message != "" {
@@ -2765,7 +2761,7 @@ func (model dashboardModel) setupView() string {
 	lines = append(lines, "", tuiHelp(model.width, model.isDark,
 		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
 		tuiHelpBinding([]string{"t"}, "t", "technical steps"),
-		tuiHelpBinding([]string{"esc"}, "esc", "interventions"),
+		tuiHelpBinding([]string{"esc"}, "esc", "pause setup"),
 		tuiHelpBinding([]string{"q"}, "q", "quit"),
 	))
 	return strings.Join(lines, "\n") + "\n"
@@ -3158,10 +3154,10 @@ func (model dashboardModel) updateView() string {
 			tuiResult(title, success, model.isDark),
 			"",
 			fmt.Sprintf("State: %s   Configuration updated: %t", model.updateResult.State, model.updateResult.Updated),
-			"Configured release: "+model.updateResult.Target,
+			"Configured target: "+model.updateResult.Target,
 			"Running interface: "+displayRunningVersion(model.actions.RunningVersion),
 			"The controller and clients are unchanged.",
-			"Rebuild the controller, then reopen Nixorium to run the saved release.",
+			"Rebuild the controller, then reopen Nixorium to run the saved target.",
 		)
 		if model.message != "" {
 			lines = append(lines, "", "Result: "+model.message)
@@ -3181,9 +3177,9 @@ func (model dashboardModel) updateView() string {
 	}
 	if model.updateCheck.HasErrors() {
 		lines = append(lines,
-			tuiResult("Releases could not be fetched", false, model.isDark),
+			tuiResult("Updates could not be fetched", false, model.isDark),
 			"",
-			"Nixorium could not obtain a usable release list from the configured upstream.",
+			"Nixorium could not obtain a usable update list from the configured upstream.",
 			"No candidate can be selected and no file changed.",
 		)
 		if model.message != "" {
@@ -3198,13 +3194,17 @@ func (model dashboardModel) updateView() string {
 
 	releases := model.availableUpdateReleases()
 	lines = append(lines,
-		fmt.Sprintf("Configured release  %s", model.updateCheck.CurrentRef),
+		fmt.Sprintf("Configured target   %s", model.updateCheck.CurrentRef),
 		"Running interface   "+displayRunningVersion(model.actions.RunningVersion),
 		tuiMuted("Source  "+model.updateCheck.Upstream, model.isDark),
 		"",
-		tuiSection("Available releases", model.isDark),
+		tuiSection("Available updates", model.isDark),
 	)
 	start, end := listWindow(len(releases), model.updateCursor, max(4, model.height-15))
+	latestStable := ""
+	if len(model.updateCheck.Stable) > 0 {
+		latestStable = model.updateCheck.Stable[0].Tag
+	}
 	for index := start; index < end; index++ {
 		release := releases[index]
 		marker := "  "
@@ -3214,16 +3214,18 @@ func (model dashboardModel) updateView() string {
 		note := ""
 		if release.Tag == model.updateCheck.CurrentRef {
 			note = "  Current"
-		} else if index == 0 && release.Channel == domain.UpdateChannelStable {
+		} else if release.Tag == latestStable {
 			note = "  Latest stable"
 		}
 		if release.Channel == domain.UpdateChannelPrerelease {
 			note += "  Prerelease"
+		} else if release.Channel == domain.UpdateChannelMoving {
+			note += "  Development branch"
 		}
 		lines = append(lines, marker+release.Tag+tuiMuted(note, model.isDark))
 	}
 	if len(releases) == 0 {
-		lines = append(lines, "No releases are available in the selected channel.")
+		lines = append(lines, "No updates are available in the selected channel.")
 	}
 	if model.updateCheck.Truncated {
 		lines = append(lines, "", tuiMuted("The upstream result was safely limited to the newest releases.", model.isDark))
@@ -3234,7 +3236,8 @@ func (model dashboardModel) updateView() string {
 	}
 	lines = append(lines,
 		"",
-		"Selecting a release starts validation; it does not change files.",
+		"Select master for the latest development revision, or choose a tagged release.",
+		"Selection starts validation; it does not change files.",
 		"Controller activation and client distribution remain separate operations.",
 		"",
 		tuiHelp(model.width, model.isDark,
@@ -3259,7 +3262,8 @@ func displayRunningVersion(version string) string {
 }
 
 func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
-	releases := append([]domain.UpdateRelease{}, model.updateCheck.Stable...)
+	releases := append([]domain.UpdateRelease{}, model.updateCheck.Development...)
+	releases = append(releases, model.updateCheck.Stable...)
 	if model.updatePrerelease {
 		releases = append(releases, model.updateCheck.Prerelease...)
 	}

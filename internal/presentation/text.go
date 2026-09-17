@@ -253,6 +253,7 @@ func UpdateCheckText(writer io.Writer, report domain.UpdateCheckReport) {
 	if report.CurrentRef != "" {
 		fmt.Fprintf(writer, "Current upstream: %s (%s; %s)\n", report.CurrentRef, report.CurrentChannel, report.CurrentRev)
 	}
+	printUpdateReleases(writer, "Development branch", report.Development)
 	printUpdateReleases(writer, "Stable releases", report.Stable)
 	printUpdateReleases(writer, "Prereleases", report.Prerelease)
 	if report.Truncated {

@@ -26,7 +26,7 @@ Choose an intervention. Computers are checked only when the selected task needs 
     Prepare and control network installation
 
   Update Nixorium
-    Choose from releases fetched from the configured upstream
+    Choose master or a release fetched from the configured upstream
 
   Shut down computers
     Send reviewed power-off requests to selected clients only
@@ -406,21 +406,23 @@ Select → Review → Deploy → Verify
 space select  •  a all  •  enter review  •  esc back  •  F1 help
 ```
 
-## Available Nixorium releases
+## Available Nixorium updates
 
 ```text
 Nixorium — Update Nixorium
 
-Configured release  v2.2.0
+Configured target   v2.2.0
 Running interface   2.0.0-beta.3
 Source  github:giovantenne/nixorium
 
-Available releases
-› v2.3.0  Latest stable
+Available updates
+› master  Development branch
+  v2.3.0  Latest stable
   v2.2.1
   v2.2.0  Current
 
-Selecting a release starts validation; it does not change files.
+Select master for the latest development revision, or choose a tagged release.
+Selection starts validation; it does not change files.
 Controller activation and client distribution remain separate operations.
 
 ↑/↓ select  •  enter validate  •  p show prereleases  •  r fetch again  •  esc back
@@ -432,7 +434,7 @@ editable target as a fallback.
 After validation, the review states that only `flake.nix` and `flake.lock` are
 saved in the local deployment configuration. The result is “Nixorium update
 saved” and shows the still-running interface version separately from the saved
-release. It explains that the controller must be rebuilt and Nixorium reopened;
+target. It explains that the controller must be rebuilt and Nixorium reopened;
 the running controller and clients remain unchanged. Git review, commit
 language, hashes, and push actions are absent from
 this ordinary flow; Advanced retains the explicit repository tools.

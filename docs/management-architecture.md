@@ -37,7 +37,7 @@ guided client enrollment now consumes immutable inventory and enforces reviewed
 disk installation. Revision-bound client deployment now has CLI and TUI
 plan/apply workflows with mandatory build-first ordering, streamed/private
 logs, explicit retry state, and bounded typed log browsing. Updates and richer
-recovery are now implemented through bounded release discovery, reviewed
+recovery are now implemented through bounded update discovery, reviewed
 plan/apply, fail-visible two-file recovery, and the shared CLI/TUI operations.
 Guided software changes now use a curated pinned catalog, evaluated client
 scopes, candidate validation, and a token-bound atomic `lab-software.json`
@@ -766,29 +766,32 @@ The normal upgrade surface is a separate typed workflow:
 
 ```text
 nixorium update check
+nixorium update plan --target master
 nixorium update plan --target vMAJOR.MINOR.PATCH[-PRERELEASE]
 nixorium update apply --target vMAJOR.MINOR.PATCH[-PRERELEASE] --expect TOKEN
 ```
 
-`check` is the only release-discovery operation and may contact the configured
+`check` is the only update-discovery operation and may contact the configured
 public upstream when the controller has internet access. It is bounded,
 non-interactive, disables Git credential prompting/helpers, and reports stable
-and prerelease tags separately. The concrete adapter derives one HTTPS GitHub
-URL from the managed input identity, ignores user/system Git configuration,
-stops after 15 seconds and 256 KiB, and returns at most the newest 20 tags per
-channel with an explicit truncation flag. An explicit target remains usable
-without discovery. Dashboard/status/doctor and all client operations remain
-independent of this external request.
+and prerelease tags separately alongside the Development `master` branch. The
+concrete adapter derives one HTTPS GitHub URL from the managed input identity,
+ignores user/system Git configuration, stops after 15 seconds and 256 KiB,
+queries only `refs/heads/master` and `refs/tags/v*`, and returns at most the
+newest 20 tags per release channel with an explicit truncation flag. An explicit
+target remains usable without discovery. Dashboard/status/doctor and all client
+operations remain independent of this external request.
 
 Planning requires a clean private deployment at a stable full Git revision and
 reads exactly one simple `inputs.nixorium.url` string assignment. The command
-preserves the configured upstream identity and accepts only a `v`-prefixed
-Semantic Version tag as the new reference; it never accepts an arbitrary source
-URL from the command line. Moving references such as `master` are reported as
-unpinned. Selecting a prerelease requires an explicit prerelease opt-in, and a
-known semantic-version downgrade requires a distinct downgrade opt-in and
-stronger confirmation. Complex computed input declarations remain a documented
-manual-operation case instead of being rewritten heuristically.
+preserves the configured upstream identity and accepts only the exact `master`
+branch or a `v`-prefixed Semantic Version tag as the new reference; it never
+accepts an arbitrary source URL or arbitrary branch from the command line.
+`master` is reported as a moving Development target. Selecting a prerelease
+requires an explicit prerelease opt-in, and a known semantic-version downgrade
+requires a distinct downgrade opt-in and stronger confirmation. Complex
+computed input declarations remain a documented manual-operation case instead
+of being rewritten heuristically.
 
 The plan renders candidate `flake.nix` bytes in memory and asks Nix to write a
 candidate lock outside the checkout with `flake lock --override-input nixorium
@@ -824,11 +827,11 @@ repository mechanics remain available only under Advanced. Deployment remains
 a separate explicit operation. Update never creates or switches branches,
 merges, pushes, activates the controller, prepares PXE artifacts, or deploys
 clients. The TUI reuses these typed operations and does not own Nix, network,
-filesystem, or repository mutation logic. Its **Update Nixorium** task collects
-the explicit target and separate prerelease/downgrade opt-ins, renders all typed
-candidate checks plus a bounded scrollable patch, requires the exact plan
-confirmation, and prevents exit only during the short save callback. Candidate
-planning remains safe to cancel.
+filesystem, or repository mutation logic. Its **Update Nixorium** task selects
+only a discovered Development master or release, renders all typed candidate
+checks plus a bounded scrollable patch, requires the exact plan confirmation,
+and prevents exit only during the short save callback. Candidate planning
+remains safe to cancel; the TUI does not offer downgrade targets.
 
 Privileged/systemd operations retain detailed output in journald. Foreground
 deployments stream output to private mode-0600 files under the administrator's

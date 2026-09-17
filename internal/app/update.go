@@ -43,6 +43,7 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 		Operation:     "update-check",
 		GeneratedAt:   time.Now().UTC(),
 		State:         "failed",
+		Development:   []domain.UpdateRelease{},
 		Stable:        []domain.UpdateRelease{},
 		Prerelease:    []domain.UpdateRelease{},
 		Issues:        []domain.ValidationIssue{},
@@ -69,6 +70,10 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 		return updateCheckIssue(report, "network", err.Error())
 	}
 	for _, ref := range refs {
+		if ref.Tag == "master" {
+			report.Development = append(report.Development, domain.UpdateRelease{Tag: ref.Tag, ObjectID: ref.ObjectID, Channel: domain.UpdateChannelMoving})
+			continue
+		}
 		release, parseErr := parseUpdateRelease(ref.Tag)
 		if parseErr != nil {
 			continue
@@ -90,8 +95,8 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 		report.Prerelease = report.Prerelease[:maximumUpdateReleasesPerChannel]
 		report.Truncated = true
 	}
-	if len(report.Stable) == 0 && len(report.Prerelease) == 0 {
-		return updateCheckIssue(report, "releases", "the configured upstream did not advertise any v-prefixed Semantic Version release tags")
+	if len(report.Development) == 0 && len(report.Stable) == 0 && len(report.Prerelease) == 0 {
+		return updateCheckIssue(report, "releases", "the configured upstream did not advertise master or any v-prefixed Semantic Version release tags")
 	}
 	report.State = "available"
 	return report
@@ -130,11 +135,16 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 		return updatePlanIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
 	}
 	report.Repository = root
-	targetRelease, err := parseUpdateRelease(target)
-	if err != nil {
-		return updatePlanIssue(report, "target", err.Error())
+	targetRelease := updateRelease{}
+	if target == "master" {
+		report.TargetChannel = domain.UpdateChannelMoving
+	} else {
+		targetRelease, err = parseUpdateRelease(target)
+		if err != nil {
+			return updatePlanIssue(report, "target", err.Error())
+		}
+		report.TargetChannel = targetRelease.Channel()
 	}
-	report.TargetChannel = targetRelease.Channel()
 	if report.TargetChannel == domain.UpdateChannelPrerelease && !allowPrerelease {
 		report = updatePlanIssue(report, "target", "prerelease targets require explicit --allow-prerelease")
 	}
@@ -158,13 +168,15 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 	report.CurrentRev = snapshot.CurrentRev
 	if current, parseErr := parseUpdateRelease(snapshot.CurrentRef); parseErr == nil {
 		report.CurrentChannel = current.Channel()
-		comparison := compareUpdateReleases(targetRelease, current)
-		if comparison == 0 {
-			report = updatePlanIssue(report, "target", "target release is already configured")
-		} else if comparison < 0 {
-			report.Downgrade = true
-			if !allowDowngrade {
-				report = updatePlanIssue(report, "target", "downgrade targets require explicit --allow-downgrade")
+		if report.TargetChannel != domain.UpdateChannelMoving {
+			comparison := compareUpdateReleases(targetRelease, current)
+			if comparison == 0 {
+				report = updatePlanIssue(report, "target", "target release is already configured")
+			} else if comparison < 0 {
+				report.Downgrade = true
+				if !allowDowngrade {
+					report = updatePlanIssue(report, "target", "downgrade targets require explicit --allow-downgrade")
+				}
 			}
 		}
 	} else {
