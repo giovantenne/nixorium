@@ -103,6 +103,105 @@ func TestSoftwarePlanUsesCatalogAndSeparatesConfigurationFromDistribution(t *tes
 	}
 }
 
+func TestSoftwareControllerScopesRequireCapability(t *testing.T) {
+	for _, kind := range []string{domain.SoftwareScopeShared, domain.SoftwareScopeController} {
+		source, manager := softwareManagerFixture(t)
+		request := domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: domain.SoftwareScope{Kind: kind}}
+		if plan := manager.Plan(context.Background(), "/deployment", request); !plan.HasErrors() || source.validations != 0 {
+			t.Fatalf("legacy contract accepted controller scope: %+v", plan)
+		}
+		source.definition.Controller = "pc99"
+		source.definition.Clients = nil
+		source.definition.Groups = nil
+		plan := manager.Plan(context.Background(), "/deployment", request)
+		if plan.HasErrors() || plan.AffectedController != "pc99" || len(plan.AffectedClients) != 0 {
+			t.Fatalf("controller-only plan: %+v", plan)
+		}
+		result := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+		if result.HasErrors() || result.AffectedController != "pc99" || source.writes != 1 {
+			t.Fatalf("controller-only save: %+v", result)
+		}
+	}
+}
+
+func TestSoftwareScopeChangesReviewOldAndNewTargets(t *testing.T) {
+	for _, kinds := range [][2]string{
+		{domain.SoftwareScopeShared, domain.SoftwareScopeClients},
+		{domain.SoftwareScopeClients, domain.SoftwareScopeController},
+		{domain.SoftwareScopeController, domain.SoftwareScopeAllClients},
+	} {
+		source, manager := softwareManagerFixture(t)
+		source.definition.Controller = "pc99"
+		oldScope := domain.SoftwareScope{Kind: kinds[0]}
+		if oldScope.Kind == domain.SoftwareScopeClients {
+			oldScope.Clients = []string{"pc02"}
+		}
+		entry := domain.SoftwareDeclaration{Package: "vlc", Scope: oldScope}
+		source.data, _ = domain.MarshalLabSoftware(domain.LabSoftwareFile{SchemaVersion: 1, Packages: []domain.SoftwareDeclaration{entry}})
+		entry.Origin = "managed"
+		source.definition.Packages = []domain.SoftwareDeclaration{entry}
+		newScope := domain.SoftwareScope{Kind: kinds[1]}
+		if newScope.Kind == domain.SoftwareScopeClients {
+			newScope.Clients = []string{"pc01"}
+		}
+		plan := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: newScope})
+		if plan.HasErrors() || plan.AffectedController != "pc99" || !containsSoftwareClient(plan.AffectedClients, "pc02") {
+			t.Fatalf("missing old/new targets for %v: %+v", kinds, plan)
+		}
+		removed := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{Package: "vlc"})
+		if removed.HasErrors() || (softwareScopeIncludesController(oldScope) && removed.AffectedController != "pc99") {
+			t.Fatalf("removal lost controller: %+v", removed)
+		}
+	}
+}
+
+func TestSoftwareReviewRejectsChangedInventory(t *testing.T) {
+	source, manager := softwareManagerFixture(t)
+	source.definition.Controller = "pc99"
+	plan := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}})
+	source.definition.Clients = append(source.definition.Clients, "pc03")
+	result := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+	if result.State != "conflict" || source.writes != 0 {
+		t.Fatalf("accepted changed targets: %+v", result)
+	}
+}
+
+func TestSoftwareReviewBindsBothSidesWhenTargetUnionIsUnchanged(t *testing.T) {
+	for _, groupWasOld := range []bool{false, true} {
+		source, manager := softwareManagerFixture(t)
+		source.definition.Controller = "pc99"
+		oldScope := domain.SoftwareScope{Kind: domain.SoftwareScopeShared}
+		newScope := domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "graphics"}
+		if groupWasOld {
+			oldScope, newScope = newScope, oldScope
+		}
+		entry := domain.SoftwareDeclaration{Package: "vlc", Scope: oldScope}
+		source.data, _ = domain.MarshalLabSoftware(domain.LabSoftwareFile{SchemaVersion: 1, Packages: []domain.SoftwareDeclaration{entry}})
+		entry.Origin = "managed"
+		source.definition.Packages = []domain.SoftwareDeclaration{entry}
+		plan := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: newScope})
+		source.definition.Groups["graphics"] = []string{"pc01"}
+		fresh := manager.Plan(context.Background(), "/deployment", plan.Request)
+		if plan.HasErrors() || fresh.HasErrors() || strings.Join(plan.AffectedClients, ",") != strings.Join(fresh.AffectedClients, ",") {
+			t.Fatal("invalid equal-union fixture")
+		}
+		result := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+		if result.State != "conflict" || source.writes != 0 {
+			t.Fatalf("accepted changed scope membership: %+v", result)
+		}
+	}
+}
+
+func TestSoftwareRejectsInvalidControllerIdentity(t *testing.T) {
+	for _, name := range []string{"pc01", "controller;invalid"} {
+		source, manager := softwareManagerFixture(t)
+		source.definition.Controller = name
+		if !manager.Catalog(context.Background(), "/deployment").HasErrors() {
+			t.Fatalf("accepted controller %q", name)
+		}
+	}
+}
+
 func TestSoftwareSearchAndPlanAcceptPackageOutsideSuggestions(t *testing.T) {
 	source, manager := softwareManagerFixture(t)
 	search := manager.Search(context.Background(), "/deployment", "hell")

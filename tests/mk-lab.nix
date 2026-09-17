@@ -40,6 +40,22 @@ let
     };
   });
   softwareSearch = softwareLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 20; };
+  scopedSoftware = {
+    schemaVersion = 1;
+    packages = [
+      { package = "hello"; scope.kind = "shared"; }
+      { package = "cowsay"; scope.kind = "controller"; }
+      { package = "figlet"; scope.kind = "all-clients"; }
+    ];
+  };
+  scopedLab = mkLab (baseArgs // { labSoftware = scopedSoftware; });
+  scopedController = mkLab (baseArgs // {
+    labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
+    labSoftware = scopedSoftware;
+  });
+  hasPackage = lab: host: pname:
+    builtins.any (package: (package.pname or "") == pname)
+      lab.nixosConfigurations.${host}.config.environment.systemPackages;
   nestedSoftware = softwareLab.nixoriumResolveSoftwarePackage "python3Packages.numpy";
   blockedSoftware = softwareLab.nixoriumResolveSoftwarePackage "hello-unfree";
   rejectsUnknownHost = !(builtins.tryEval (builtins.deepSeq
@@ -184,6 +200,23 @@ assert builtins.any (package: (package.pname or "") == "vlc")
 assert !(builtins.any (package: (package.pname or "") == "vlc")
   softwareLab.nixosConfigurations.pc02.config.environment.systemPackages);
 assert softwareLab.nixoriumSoftware.groups.graphics == [ "pc01" ];
+assert scopedLab.nixoriumSoftware.controller == "pc99";
+assert hasPackage scopedLab "pc99" "hello";
+assert hasPackage scopedLab "pc01" "hello";
+assert hasPackage scopedLab "pc02" "hello";
+assert hasPackage scopedLab "pc99" "cowsay";
+assert !(hasPackage scopedLab "pc01" "cowsay");
+assert hasPackage scopedLab "pc01" "figlet";
+assert !(hasPackage scopedLab "pc99" "figlet");
+assert !(hasPackage softwareLab "pc99" "vlc");
+assert hasPackage scopedController "pc99" "hello";
+assert hasPackage scopedController "pc99" "cowsay";
+assert !(hasPackage scopedController "pc99" "figlet");
+assert scopedController.nixoriumValidateControllerSoftwareCandidate scopedSoftware;
+assert !(builtins.tryEval (scopedController.nixoriumValidateControllerSoftwareCandidate {
+  schemaVersion = 1;
+  packages = [{ package = "not-a-real-package"; scope.kind = "controller"; }];
+})).success;
 assert (builtins.head softwareLab.nixoriumSoftware.packages).origin == "managed";
 assert builtins.any (item: item.id == "hello" && item.availability == "available") softwareSearch;
 assert nestedSoftware.id == "python3Packages.numpy";

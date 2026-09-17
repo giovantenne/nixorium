@@ -8,6 +8,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added explicit `shared` and `controller` managed-software scopes, including
+  controller-only deployments with no clients. Existing client scopes retain
+  their meaning. Review identifies controller effects and both sides of scope
+  changes, and stale target inventories invalidate the review. Controller
+  candidate validation also works with older client-only template hooks.
+  Saving is still declaration-only; integrated controller activation follows
+  in the controller-first software workflow. Removing the final managed
+  package now preserves an empty JSON list instead of producing `null`, which
+  the Nix schema rejects.
+
 - Added an explicit controller-only configuration mode with zero clients,
   local networking, inactive lab services and independent controller readiness.
   Reviewed controller activation can run without lab keys in this mode;

@@ -20,7 +20,13 @@ const softwareCandidateValidationExpression = `
 let
   deployment = builtins.getFlake (builtins.getEnv "NIXORIUM_DEPLOYMENT_FLAKE");
   candidate = builtins.fromJSON (builtins.readFile (builtins.getEnv "NIXORIUM_SOFTWARE_CANDIDATE_FILE"));
-in deployment.nixoriumValidateSoftwareCandidate candidate
+  includesController = entry: builtins.elem entry.scope.kind [ "shared" "controller" ];
+  controllerAffected = builtins.any includesController
+    (candidate.packages ++ deployment.nixoriumSoftware.packages);
+in builtins.deepSeq [
+  (deployment.nixoriumValidateSoftwareCandidate candidate)
+  (if controllerAffected then deployment.nixoriumValidateControllerSoftwareCandidate candidate else true)
+] true
 `
 
 const softwareSearchExpression = `

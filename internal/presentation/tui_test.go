@@ -31,6 +31,36 @@ func testDashboardReport(mode string) domain.StatusReport {
 	return report
 }
 
+func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
+	model := dashboardModel{}
+	if first := model.softwareScopeOptions()[0].scope.Kind; first != domain.SoftwareScopeAllClients {
+		t.Fatalf("legacy default changed: %s", first)
+	}
+	model.softwareCatalog.Controller = "pc99"
+	options := model.softwareScopeOptions()
+	if options[0].scope.Kind != domain.SoftwareScopeShared || options[1].scope.Kind != domain.SoftwareScopeController {
+		t.Fatalf("controller scopes missing: %+v", options)
+	}
+	for _, option := range options {
+		if option.scope.Kind == domain.SoftwareScopeClients {
+			t.Fatal("offered empty client selection")
+		}
+	}
+	model.softwarePlan = domain.SoftwareChangePlanReport{
+		Request:            domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: options[0].scope},
+		AffectedController: "pc99",
+	}
+	review := strings.Join(model.softwareReviewView(), "\n")
+	if !strings.Contains(review, "pc99 (not activated by saving)") || !strings.Contains(review, "this controller and all current or future clients") {
+		t.Fatalf("unclear review: %s", review)
+	}
+	model.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", AffectedController: "pc99"}
+	result := strings.Join(model.softwareResultView(), "\n")
+	if !strings.Contains(result, "Controller changes not yet applied") {
+		t.Fatalf("save implied activation: %s", result)
+	}
+}
+
 func testSetupReport(reviewed, applied, artifacts, ready bool) domain.SetupReport {
 	complete := domain.SetupObservation{Complete: true}
 	return domain.ReconcileSetup("/deployment", domain.SetupFacts{

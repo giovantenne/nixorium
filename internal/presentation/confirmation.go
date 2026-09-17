@@ -124,6 +124,9 @@ func ConfirmSoftwareChange(input io.Reader, output io.Writer, report domain.Soft
 	fmt.Fprintln(output, "Software declaration review")
 	fmt.Fprintf(output, "Package: %s\n", report.Request.Package)
 	fmt.Fprintf(output, "Configuration scope: %s (%d client(s))\n", report.Request.Scope.Kind, len(report.AffectedClients))
+	if report.AffectedController != "" {
+		fmt.Fprintf(output, "Controller configuration: %s (not activated by saving)\n", report.AffectedController)
+	}
 	fmt.Fprintln(output, "Action: atomically update only lab-software.json")
 	fmt.Fprintln(output, "Safety: no commit, build, controller activation, PXE action, or client deployment is performed")
 	fmt.Fprintln(output, "Afterward: review and commit the managed file, then prepare or distribute the system separately")

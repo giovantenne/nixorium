@@ -15,6 +15,8 @@ import (
 const SoftwareSchemaVersion = 1
 
 const (
+	SoftwareScopeShared     = "shared"
+	SoftwareScopeController = "controller"
 	SoftwareScopeAllClients = "all-clients"
 	SoftwareScopeGroup      = "group"
 	SoftwareScopeClients    = "clients"
@@ -68,6 +70,7 @@ func (r SoftwareSearchReport) HasErrors() bool {
 }
 
 type SoftwareDefinition struct {
+	Controller    string                `json:"controller,omitempty"`
 	SchemaVersion int                   `json:"schemaVersion"`
 	ManagedFile   string                `json:"managedFile"`
 	Clients       []string              `json:"clients"`
@@ -77,6 +80,7 @@ type SoftwareDefinition struct {
 }
 
 type SoftwareCatalogReport struct {
+	Controller    string                `json:"controller,omitempty"`
 	SchemaVersion int                   `json:"schemaVersion"`
 	Operation     string                `json:"operation"`
 	State         string                `json:"state"`
@@ -99,19 +103,20 @@ type SoftwareChangeRequest struct {
 }
 
 type SoftwareChangePlanReport struct {
-	SchemaVersion   int                   `json:"schemaVersion"`
-	Operation       string                `json:"operation"`
-	State           string                `json:"state"`
-	Repository      string                `json:"repository"`
-	ManagedFile     string                `json:"managedFile"`
-	Request         SoftwareChangeRequest `json:"request"`
-	Candidate       LabSoftwareFile       `json:"candidate"`
-	BaseFingerprint string                `json:"baseFingerprint,omitempty"`
-	ReviewToken     string                `json:"reviewToken,omitempty"`
-	Confirmation    string                `json:"confirmation,omitempty"`
-	AffectedClients []string              `json:"affectedClients"`
-	Issues          []ValidationIssue     `json:"issues"`
-	Message         string                `json:"message,omitempty"`
+	AffectedController string                `json:"affectedController,omitempty"`
+	SchemaVersion      int                   `json:"schemaVersion"`
+	Operation          string                `json:"operation"`
+	State              string                `json:"state"`
+	Repository         string                `json:"repository"`
+	ManagedFile        string                `json:"managedFile"`
+	Request            SoftwareChangeRequest `json:"request"`
+	Candidate          LabSoftwareFile       `json:"candidate"`
+	BaseFingerprint    string                `json:"baseFingerprint,omitempty"`
+	ReviewToken        string                `json:"reviewToken,omitempty"`
+	Confirmation       string                `json:"confirmation,omitempty"`
+	AffectedClients    []string              `json:"affectedClients"`
+	Issues             []ValidationIssue     `json:"issues"`
+	Message            string                `json:"message,omitempty"`
 }
 
 func (r SoftwareChangePlanReport) HasErrors() bool {
@@ -119,17 +124,18 @@ func (r SoftwareChangePlanReport) HasErrors() bool {
 }
 
 type SoftwareChangeApplyReport struct {
-	SchemaVersion    int                   `json:"schemaVersion"`
-	Operation        string                `json:"operation"`
-	State            string                `json:"state"`
-	Repository       string                `json:"repository"`
-	ManagedFile      string                `json:"managedFile"`
-	Request          SoftwareChangeRequest `json:"request"`
-	AffectedClients  []string              `json:"affectedClients"`
-	Revision         string                `json:"revision,omitempty"`
-	RecoveryRequired bool                  `json:"recoveryRequired,omitempty"`
-	Issues           []ValidationIssue     `json:"issues"`
-	Message          string                `json:"message,omitempty"`
+	AffectedController string                `json:"affectedController,omitempty"`
+	SchemaVersion      int                   `json:"schemaVersion"`
+	Operation          string                `json:"operation"`
+	State              string                `json:"state"`
+	Repository         string                `json:"repository"`
+	ManagedFile        string                `json:"managedFile"`
+	Request            SoftwareChangeRequest `json:"request"`
+	AffectedClients    []string              `json:"affectedClients"`
+	Revision           string                `json:"revision,omitempty"`
+	RecoveryRequired   bool                  `json:"recoveryRequired,omitempty"`
+	Issues             []ValidationIssue     `json:"issues"`
+	Message            string                `json:"message,omitempty"`
 }
 
 func (r SoftwareChangeApplyReport) HasErrors() bool {
@@ -165,7 +171,7 @@ func MarshalLabSoftware(software LabSoftwareFile) ([]byte, error) {
 }
 
 func NormalizeLabSoftware(software LabSoftwareFile) LabSoftwareFile {
-	result := LabSoftwareFile{SchemaVersion: software.SchemaVersion, Packages: append([]SoftwareDeclaration(nil), software.Packages...)}
+	result := LabSoftwareFile{SchemaVersion: software.SchemaVersion, Packages: append([]SoftwareDeclaration{}, software.Packages...)}
 	for index := range result.Packages {
 		result.Packages[index].Origin = ""
 		result.Packages[index].Scope.Clients = append([]string(nil), result.Packages[index].Scope.Clients...)
@@ -194,9 +200,9 @@ func ValidateLabSoftware(software LabSoftwareFile) error {
 
 func ValidateSoftwareScope(scope SoftwareScope) error {
 	switch scope.Kind {
-	case SoftwareScopeAllClients:
+	case SoftwareScopeShared, SoftwareScopeController, SoftwareScopeAllClients:
 		if scope.Group != "" || len(scope.Clients) != 0 {
-			return errors.New("all-clients scope contains unrelated fields")
+			return fmt.Errorf("%s scope contains unrelated fields", scope.Kind)
 		}
 	case SoftwareScopeGroup:
 		if !softwareGroupPattern.MatchString(scope.Group) || len(scope.Clients) != 0 {

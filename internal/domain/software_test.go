@@ -52,3 +52,31 @@ func TestLabSoftwareDecoderRejectsUnknownAndTrailingJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestControllerSoftwareScopesRoundTripWithoutMigratingClients(t *testing.T) {
+	for _, kind := range []string{SoftwareScopeShared, SoftwareScopeController, SoftwareScopeAllClients} {
+		software := LabSoftwareFile{SchemaVersion: 1, Packages: []SoftwareDeclaration{{Package: "hello", Scope: SoftwareScope{Kind: kind}}}}
+		data, err := MarshalLabSoftware(software)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := DecodeLabSoftware(data)
+		if err != nil || decoded.Packages[0].Scope.Kind != kind {
+			t.Fatalf("scope changed: %s %v", data, err)
+		}
+		for _, scope := range []SoftwareScope{{Kind: kind, Group: "graphics"}, {Kind: kind, Clients: []string{"pc01"}}} {
+			if ValidateSoftwareScope(scope) == nil {
+				t.Fatalf("accepted unrelated fields: %+v", scope)
+			}
+		}
+	}
+}
+
+func TestEmptySoftwarePackagesEncodeAsList(t *testing.T) {
+	for _, packages := range [][]SoftwareDeclaration{nil, {}} {
+		data, err := MarshalLabSoftware(LabSoftwareFile{SchemaVersion: 1, Packages: packages})
+		if err != nil || !bytes.Contains(data, []byte(`"packages": []`)) {
+			t.Fatalf("empty declaration must stay a JSON list: %s %v", data, err)
+		}
+	}
+}

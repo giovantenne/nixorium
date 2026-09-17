@@ -10,10 +10,11 @@ import (
 
 func TestSoftwareSaveRecordsOnlyTheReviewedManagedFile(t *testing.T) {
 	softwareSource, software := softwareManagerFixture(t)
+	softwareSource.definition.Controller = "pc99"
 	plan := software.Plan(context.Background(), ".", domain.SoftwareChangeRequest{
 		Package: "gimp",
 		Present: true,
-		Scope:   domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients},
+		Scope:   domain.SoftwareScope{Kind: domain.SoftwareScopeShared},
 	})
 	commitSource := softwareSaveCommitSource(t, plan.Candidate)
 	manager := NewSoftwareSaveManager(
@@ -26,7 +27,7 @@ func TestSoftwareSaveRecordsOnlyTheReviewedManagedFile(t *testing.T) {
 	if report.State != "saved" || report.HasErrors() || report.RecoveryRequired || softwareSource.writes != 1 || commitSource.commits != 1 {
 		t.Fatalf("save = %+v, writes=%d commits=%d", report, softwareSource.writes, commitSource.commits)
 	}
-	if report.ManagedFile != "lab-software.json" || report.Revision == "" {
+	if report.ManagedFile != "lab-software.json" || report.Revision == "" || report.AffectedController != "pc99" {
 		t.Fatalf("save evidence = %+v", report)
 	}
 }

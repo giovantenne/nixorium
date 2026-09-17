@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -83,6 +84,7 @@ func (m SoftwareManager) Catalog(ctx context.Context, repository string) domain.
 		State:         "ready",
 		Repository:    root,
 		ManagedFile:   definition.ManagedFile,
+		Controller:    definition.Controller,
 		Clients:       append([]string(nil), definition.Clients...),
 		Groups:        cloneSoftwareGroups(definition.Groups),
 		Catalog:       append([]domain.SoftwareCatalogItem(nil), definition.Catalog...),
@@ -146,8 +148,29 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 	if err := validateSoftwareRequestScope(request.Scope, catalog.Clients, catalog.Groups); err != nil {
 		return softwarePlanIssue(report, "scope", err.Error())
 	}
+	if softwareScopeIncludesController(request.Scope) && catalog.Controller == "" {
+		return softwarePlanIssue(report, "scope", "this deployment does not support controller software; update Nixorium before using this scope")
+	}
 	report.Request = request
 	report.AffectedClients = softwareScopeClients(request.Scope, catalog.Clients, catalog.Groups)
+	if softwareScopeIncludesController(request.Scope) {
+		report.AffectedController = catalog.Controller
+	}
+	previousClients := []string{}
+	// Changing scope can remove software from old targets as well as add it to
+	// new ones. Review the union, not just the requested destinations.
+	if exists {
+		previousClients = softwareScopeClients(existing.Scope, catalog.Clients, catalog.Groups)
+		for _, name := range previousClients {
+			if !containsSoftwareClient(report.AffectedClients, name) {
+				report.AffectedClients = append(report.AffectedClients, name)
+			}
+		}
+		sort.Strings(report.AffectedClients)
+		if softwareScopeIncludesController(existing.Scope) {
+			report.AffectedController = catalog.Controller
+		}
+	}
 	candidate := domain.NormalizeLabSoftware(changeSoftwareDeclaration(base, request))
 	report.Candidate = candidate
 	candidateData, err := domain.MarshalLabSoftware(candidate)
@@ -167,7 +190,18 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 		return softwarePlanIssue(report, "validation", "Nix evaluation rejected the software proposal: "+err.Error())
 	}
 	report.State = "ready"
-	report.ReviewToken = domain.SoftwareReviewToken(report.BaseFingerprint, candidateData)
+	// Bind review to the evaluated destinations too: a group/inventory change
+	// can alter the impact even when the declaration bytes are identical.
+	reviewData, err := json.Marshal(struct {
+		Candidate        json.RawMessage `json:"candidate"`
+		Controller       string          `json:"controller"`
+		PreviousClients  []string        `json:"previousClients"`
+		RequestedClients []string        `json:"requestedClients"`
+	}{candidateData, report.AffectedController, previousClients, softwareScopeClients(request.Scope, catalog.Clients, catalog.Groups)})
+	if err != nil {
+		return softwarePlanIssue(report, "review", err.Error())
+	}
+	report.ReviewToken = domain.SoftwareReviewToken(report.BaseFingerprint, reviewData)
 	report.Confirmation = "SAVE SOFTWARE " + report.ReviewToken[len("sha256:"):len("sha256:")+12]
 	action := "Add "
 	if !request.Present {
@@ -179,14 +213,15 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 
 func (m SoftwareManager) ApplyPlan(ctx context.Context, plan domain.SoftwareChangePlanReport, expectedToken string) domain.SoftwareChangeApplyReport {
 	report := domain.SoftwareChangeApplyReport{
-		SchemaVersion:   domain.SoftwareSchemaVersion,
-		Operation:       "software-change-apply",
-		State:           "invalid",
-		Repository:      plan.Repository,
-		ManagedFile:     plan.ManagedFile,
-		Request:         plan.Request,
-		AffectedClients: append([]string(nil), plan.AffectedClients...),
-		Issues:          []domain.ValidationIssue{},
+		SchemaVersion:      domain.SoftwareSchemaVersion,
+		Operation:          "software-change-apply",
+		State:              "invalid",
+		Repository:         plan.Repository,
+		ManagedFile:        plan.ManagedFile,
+		Request:            plan.Request,
+		AffectedController: plan.AffectedController,
+		AffectedClients:    append([]string(nil), plan.AffectedClients...),
+		Issues:             []domain.ValidationIssue{},
 	}
 	fresh := m.Plan(ctx, plan.Repository, plan.Request)
 	if fresh.HasErrors() {
@@ -232,6 +267,7 @@ func (m SoftwareManager) ApplyPlan(ctx context.Context, plan domain.SoftwareChan
 	report.Repository = fresh.Repository
 	report.ManagedFile = fresh.ManagedFile
 	report.Request = fresh.Request
+	report.AffectedController = fresh.AffectedController
 	report.AffectedClients = append([]string(nil), fresh.AffectedClients...)
 	report.Message = "Software declaration saved. Review and commit lab-software.json before preparing or distributing systems."
 	return report
@@ -281,6 +317,9 @@ func validateSoftwareDefinition(definition domain.SoftwareDefinition) error {
 		}
 		clients[name] = true
 	}
+	if definition.Controller != "" && (!isClientName(definition.Controller) || clients[definition.Controller]) {
+		return errors.New("software contract contains an invalid controller identity")
+	}
 	for group, names := range definition.Groups {
 		if err := domain.ValidateSoftwareScope(domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: group}); err != nil || len(names) == 0 {
 			return errors.New("software contract contains an invalid client group")
@@ -307,6 +346,9 @@ func validateSoftwareDefinition(definition domain.SoftwareDefinition) error {
 		}
 		managed[entry.Package] = true
 		entry.Origin = ""
+		if softwareScopeIncludesController(entry.Scope) && definition.Controller == "" {
+			return errors.New("software contract does not advertise controller software support")
+		}
 		if err := domain.ValidateLabSoftware(domain.LabSoftwareFile{SchemaVersion: domain.SoftwareSchemaVersion, Packages: []domain.SoftwareDeclaration{entry}}); err != nil {
 			return errors.New("software contract contains an invalid managed declaration")
 		}
@@ -388,7 +430,7 @@ func validateSoftwareRequestScope(scope domain.SoftwareScope, clients []string, 
 func softwareScopeClients(scope domain.SoftwareScope, clients []string, groups map[string][]string) []string {
 	var result []string
 	switch scope.Kind {
-	case domain.SoftwareScopeAllClients:
+	case domain.SoftwareScopeShared, domain.SoftwareScopeAllClients:
 		result = append(result, clients...)
 	case domain.SoftwareScopeGroup:
 		result = append(result, groups[scope.Group]...)
@@ -410,6 +452,19 @@ func changeSoftwareDeclaration(base domain.LabSoftwareFile, request domain.Softw
 		result.Packages = append(result.Packages, domain.SoftwareDeclaration{Package: request.Package, Scope: request.Scope})
 	}
 	return result
+}
+
+func softwareScopeIncludesController(scope domain.SoftwareScope) bool {
+	return scope.Kind == domain.SoftwareScopeShared || scope.Kind == domain.SoftwareScopeController
+}
+
+func containsSoftwareClient(clients []string, name string) bool {
+	for _, client := range clients {
+		if client == name {
+			return true
+		}
+	}
+	return false
 }
 
 func cloneSoftwareGroups(groups map[string][]string) map[string][]string {

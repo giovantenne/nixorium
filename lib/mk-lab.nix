@@ -1,5 +1,5 @@
 { upstreamSelf, nixpkgs, disko, veyon }:
-{
+args@{
   deploymentSelf,
   labConfig,
   publicKeys ? {},
@@ -199,7 +199,7 @@ let
   modulesForHost = name: isController:
     baseHostModules
     ++ sharedModules
-    ++ lib.optionals isController controllerModules
+    ++ lib.optionals isController ([ managedSoftwareModule ] ++ controllerModules)
     ++ lib.optionals (!isController) ([ managedSoftwareModule ] ++ clientModules)
     ++ (hostModules.${name} or []);
 
@@ -329,7 +329,9 @@ let
     requireAvailable = false;
   } labSoftware;
   softwareAppliesTo = name: scope:
-    scope.kind == "all-clients"
+    scope.kind == "shared"
+    || (scope.kind == "controller" && name == masterHostName)
+    || (scope.kind == "all-clients" && builtins.elem name validClientNames)
     || (scope.kind == "group" && builtins.elem name clientGroups.${scope.group})
     || (scope.kind == "clients" && builtins.elem name scope.clients);
   managedSoftwareModule = { pkgs, hostName, ... }: {
@@ -578,6 +580,7 @@ assert unknownVeyonNativeHosts == []
   nixoriumSoftware = {
     schemaVersion = 1;
     managedFile = "lab-software.json";
+    controller = masterHostName;
     clients = validClientNames;
     groups = clientGroups;
     catalog = softwareCatalog;
@@ -586,6 +589,15 @@ assert unknownVeyonNativeHosts == []
 
   nixoriumSearchSoftwarePackages = softwarePackageTools.search;
   nixoriumResolveSoftwarePackage = softwarePackageTools.describe;
+  # Keep controller validation upstream: older site templates validate only
+  # clients in their software hook. Reuse every downstream extension unchanged.
+  nixoriumValidateControllerSoftwareCandidate = rawSoftware:
+    let
+      candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko veyon; }
+        (args // { labSoftware = rawSoftware; });
+    in builtins.deepSeq
+      candidate.nixosConfigurations.${masterHostName}.config.system.build.toplevel.drvPath
+      true;
 
   deploymentStatus = {
     ready = deploymentIssues == [];

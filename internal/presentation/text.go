@@ -531,6 +531,9 @@ func SoftwareChangePlanText(writer io.Writer, report domain.SoftwareChangePlanRe
 	fmt.Fprintf(writer, "Package:           %s\n", report.Request.Package)
 	fmt.Fprintf(writer, "Managed file:      %s\n", report.ManagedFile)
 	fmt.Fprintf(writer, "Scope:             %s\n", softwareScopeText(report.Request.Scope))
+	if report.AffectedController != "" {
+		fmt.Fprintf(writer, "Controller:        %s (configuration only; not activated)\n", report.AffectedController)
+	}
 	if len(report.AffectedClients) > 0 {
 		fmt.Fprintf(writer, "Configuration:     %s\n", strings.Join(report.AffectedClients, ", "))
 	}

@@ -20,6 +20,10 @@ let
   }) { schemaVersion = 1; packages = []; }) true)).success;
 in
 assert builtins.length valid.packages == 3;
+assert !rejects { schemaVersion = 1; packages = [{ package = "hello"; scope.kind = "shared"; }]; };
+assert !rejects { schemaVersion = 1; packages = [{ package = "hello"; scope.kind = "controller"; }]; };
+assert rejects { schemaVersion = 1; packages = [{ package = "hello"; scope = { kind = "shared"; clients = [ "pc01" ]; }; }]; };
+assert rejects { schemaVersion = 1; packages = [{ package = "hello"; scope = { kind = "controller"; group = "graphics"; }; }]; };
 assert rejects { schemaVersion = 2; packages = []; };
 assert rejects { schemaVersion = 1; packages = []; unexpected = true; };
 assert rejects { schemaVersion = 1; packages = [{ package = "not-a-real-package"; scope.kind = "all-clients"; }]; };

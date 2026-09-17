@@ -88,7 +88,7 @@ and NixOS policy can be added later under `assets/` and `modules/`.
 - `modules/shared.nix`: every machine
 - `modules/controller.nix`: controller only
 - `modules/clients.nix`: client PCs only
-- `lab-software.json`: guided supported packages and their client scopes
+- `lab-software.json`: guided packages with explicit shared, controller or client scopes
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `hostModules` in `flake.nix`: individual hosts
 - `assets/logo.txt`: screensaver logo
@@ -219,15 +219,21 @@ action does not push, rebuild, activate, or deploy implicitly.
 
 Open **Add or change software** to review configured choices, browse common
 suggestions, or search the wider package set locked by this deployment. Choose
-whether the declaration
-applies to every client (including future generated clients), an evaluated
-group, or selected configured computers. Clients may all remain powered off.
+whether the declaration applies to this controller and all current/future
+clients (`shared`), only this controller (`controller`), every client without
+the controller (`all-clients`), an evaluated group, or selected clients.
+The first two choices require an upstream exposing controller-software support;
+older upstreams retain their client-only choices. Existing declarations are not
+migrated or expanded automatically. Clients may all remain powered off, and
+shared/controller declarations work before any clients are configured.
 
 The same typed workflow is available from the CLI:
 
 ```sh
 nix run .#nixorium -- software catalog
 nix run .#nixorium -- software search --query libreoffice
+nix run .#nixorium -- software plan --package hello --scope shared
+nix run .#nixorium -- software plan --package hello --scope controller
 nix run .#nixorium -- software plan --package vlc --scope all-clients
 nix run .#nixorium -- software plan --package python3Packages.numpy --scope all-clients
 nix run .#nixorium -- software plan --package gimp --scope group:graphics
@@ -244,11 +250,21 @@ and overlays; dotted attributes are resolved as data rather than Nix code.
 Apply atomically replaces only `lab-software.json` after repeating pinned Nix
 validation and checking the review token and source fingerprint. The ordinary
 TUI also records that one managed file locally without exposing Git. It does not
-push, build, activate the controller, prepare PXE, or distribute clients. Then
-use **Distribute the prepared system** for the
+push, build, activate the controller, prepare PXE, or distribute clients.
+For shared/controller changes, use **Apply controller configuration** after
+saving; this manual step remains until the integrated controller-first software
+workflow is implemented. Use **Distribute the prepared system** for the
 specific powered-on clients you intend to update. Packages supplied by private
 NixOS modules remain untouched and are edited through the advanced module
 workflow.
+
+The software schema remains version 1 with two new explicit scope kinds; older
+upstreams reject them. Before downgrading, review and remove or deliberately
+replace those declarations. A scope change reviews both old and new targets.
+The upstream controller-validation hook is composed with the existing site
+validator, including on removal, so older site Flakes cannot silently skip the
+controller check. One package still has one scope; arbitrary per-host exclusions
+and removal of built-in/private-module packages are not added by this change.
 
 ### Computers
 

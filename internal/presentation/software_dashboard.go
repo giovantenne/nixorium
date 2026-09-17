@@ -281,7 +281,7 @@ func (model dashboardModel) softwareScopeView() []string {
 		}
 		lines = append(lines, marker+option.label)
 	}
-	if model.softwareScopeCursor == len(options)-1 {
+	if options[model.softwareScopeCursor].scope.Kind == domain.SoftwareScopeClients {
 		lines = append(lines, "")
 		start, end := listWindow(len(model.softwareCatalog.Clients), model.softwareClientCursor, max(4, model.height-len(lines)-9))
 		for index := start; index < end; index++ {
@@ -312,6 +312,9 @@ func (model dashboardModel) softwareReviewView() []string {
 	}
 	item := model.softwareItem(plan.Request.Package)
 	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No build, activation, PXE action, or client deployment is included.", "", "Enter saves this reviewed configuration; Esc cancels.", "", "enter save configuration   esc cancel   F1 help"}
+	if plan.AffectedController != "" {
+		lines = append(lines[:5], append([]string{"Controller configuration   " + plan.AffectedController + " (not activated by saving)"}, lines[5:]...)...)
+	}
 	if model.message != "" && model.message != plan.Message {
 		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
 	}
@@ -322,6 +325,9 @@ func (model dashboardModel) softwareResultView() []string {
 	result := model.softwareResult
 	switch result.State {
 	case "saved":
+		if result.AffectedController != "" {
+			return []string{tuiResult("Software configuration saved", true, model.isDark), "", "✓ Software selection saved locally", "○ Controller changes not yet applied", "○ No client changed", "", "Apply controller configuration to build and activate these changes.", "Client computers require a separate deployment.", "", "enter interventions   ? help"}
+		}
 		return []string{tuiResult("Software configuration saved", true, model.isDark), "", "✓ Software selection saved locally", "○ System not prepared", "○ No client changed", "", "You can apply this configuration to selected computers now or later.", "", "enter interventions   ? help"}
 	case "unchanged":
 		return []string{tuiResult("Software declaration already current", true, model.isDark), "", "✓ The requested declaration is already present", "○ No file changed", "○ No system built or deployed", "", "enter interventions   ? help"}
@@ -438,6 +444,12 @@ func (model dashboardModel) softwareDeclaration(id string) (domain.SoftwareDecla
 
 func (model dashboardModel) softwareScopeOptions() []softwareScopeOption {
 	result := []softwareScopeOption{{label: "All clients, including future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}}
+	if model.softwareCatalog.Controller != "" {
+		result = append([]softwareScopeOption{
+			{label: "This controller and all current or future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
+			{label: "Only this controller", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeController}},
+		}, result...)
+	}
 	names := make([]string, 0, len(model.softwareCatalog.Groups))
 	for name := range model.softwareCatalog.Groups {
 		names = append(names, name)
@@ -446,11 +458,18 @@ func (model dashboardModel) softwareScopeOptions() []softwareScopeOption {
 	for _, name := range names {
 		result = append(result, softwareScopeOption{label: "Group " + name + fmt.Sprintf(" (%d clients)", len(model.softwareCatalog.Groups[name])), scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: name}})
 	}
-	return append(result, softwareScopeOption{label: "Selected configured computers", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeClients}})
+	if len(model.softwareCatalog.Clients) > 0 {
+		result = append(result, softwareScopeOption{label: "Selected configured computers", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeClients}})
+	}
+	return result
 }
 
 func softwareScopeLabel(scope domain.SoftwareScope) string {
 	switch scope.Kind {
+	case domain.SoftwareScopeShared:
+		return "this controller and all current or future clients"
+	case domain.SoftwareScopeController:
+		return "only this controller"
 	case domain.SoftwareScopeAllClients:
 		return "all clients, including future clients"
 	case domain.SoftwareScopeGroup:

@@ -206,6 +206,15 @@
               issues = [ "Client installation is not configured" ];
               controller = { ready = true; issues = []; requiresKeys = false; };
             };
+            nixoriumSoftware = original.nixoriumSoftware // {
+              controller = "pc99";
+              clients = [];
+              groups = {};
+            };
+            nixoriumValidateControllerSoftwareCandidate = candidate:
+              assert builtins.all (entry: entry.package != "vlc" || !builtins.elem entry.scope.kind [ "shared" "controller" ]) candidate.packages
+                || throw "controller-specific package policy rejected vlc";
+              builtins.deepSeq candidate true;
           };
       }
     '';
@@ -532,12 +541,18 @@
       controller.succeed("journalctl -u nixorium-apply-controller.service --no-pager | grep -F 'deployment key correspondence verification failed'; systemctl reset-failed nixorium-apply-controller.service")
       controller.succeed("mv /home/admin/nixorium-deployment/secret-key /tmp/controller-only-secrets/repository-cache; mv /home/admin/nixorium-deployment/veyon-private-key.pem /tmp/controller-only-secrets/repository-veyon; mv /home/admin/.ssh/id_ed25519 /tmp/controller-only-secrets/installed-ssh; mv /var/lib/nixorium/keys/harmonia-secret-key /tmp/controller-only-secrets/installed-cache; mv /etc/veyon/keys/private/teacher/key /tmp/controller-only-secrets/installed-veyon")
       controller.succeed("cp /home/admin/nixorium-deployment/flake.nix /home/admin/nixorium-deployment/laboratory-flake.nix; cp /etc/nixorium-test/controller-only.nix /home/admin/nixorium-deployment/flake.nix; jq '.lab.deploymentMode = \"controller\" | .lab.pcCount = 0 | .lab.masterDhcpIp = \"MASTER_DHCP_IP\"' /home/admin/nixorium-deployment/lab-settings.json > /tmp/controller-only-settings.json; cp /tmp/controller-only-settings.json /home/admin/nixorium-deployment/lab-settings.json; chown admin:users /home/admin/nixorium-deployment/laboratory-flake.nix /home/admin/nixorium-deployment/flake.nix /home/admin/nixorium-deployment/lab-settings.json")
-      controller.succeed("su - admin -c 'cd ~/nixorium-deployment; git add flake.nix laboratory-flake.nix lab-settings.json; git -c user.name=Test -c user.email=test@example.invalid commit -qm controller-only; nixorium config validate --json'")
+      controller.succeed("su - admin -c 'cd ~/nixorium-deployment; cp /etc/nixorium-test/lab-software.json lab-software.json; git add flake.nix laboratory-flake.nix lab-settings.json lab-software.json; git -c user.name=Test -c user.email=test@example.invalid commit -qm controller-only; nixorium config validate --json'")
       controller.succeed("su - admin -c 'nixorium controller plan --repo ~/nixorium-deployment --json' | jq -e '.state == \"ready\" and (.issues | length) == 0'")
       controller.succeed("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium controller apply --repo ~/nixorium-deployment --expect \"$revision\" --yes --json' | jq -e '.state == \"completed\" and .verified'")
       controller.succeed("su - admin -c 'nix --extra-experimental-features \"nix-command flakes\" eval ~/nixorium-deployment#deploymentStatus --json --no-write-lock-file' | jq -e '(.ready | not) and .controller.ready and (.controller.requiresKeys | not)'")
       controller.fail("su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --yes --json'")
       controller.fail("su - admin -c 'nixorium deploy plan --repo ~/nixorium-deployment --on @lab --json'")
       controller.succeed("test ! -e /var/lib/nixorium/pxe/session.json; ! systemctl is-active --quiet nixorium-pxe.service")
+    with subtest("shared software on a controller without configured clients"):
+      controller.succeed("su - admin -c 'nixorium software plan --repo ~/nixorium-deployment --package vlc --scope shared --json' > /tmp/shared-rejected.json || test $? = 1; jq -e '.state == \"invalid\" and any(.issues[]; .message | contains(\"controller-specific package policy\"))' /tmp/shared-rejected.json")
+      controller.succeed("su - admin -c 'nixorium software plan --repo ~/nixorium-deployment --package hello --scope shared --json' > /tmp/shared-plan.json; jq -e '.state == \"ready\" and .affectedController == \"pc99\" and (.affectedClients | length) == 0' /tmp/shared-plan.json")
+      controller.succeed("token=$(jq -r .reviewToken /tmp/shared-plan.json); su - admin -c \"nixorium software apply --repo ~/nixorium-deployment --package hello --scope shared --expect $token --yes --json\" | jq -e '.state == \"applied\" and .affectedController == \"pc99\"'; jq -e 'any(.packages[]; .package == \"hello\" and .scope.kind == \"shared\")' /home/admin/nixorium-deployment/lab-software.json")
+      controller.succeed("su - admin -c 'nixorium software plan --repo ~/nixorium-deployment --package hello --scope shared --remove --json' > /tmp/shared-remove.json; jq -e '.state == \"ready\" and .affectedController == \"pc99\" and .candidate.packages == []' /tmp/shared-remove.json")
+      controller.succeed("token=$(jq -r .reviewToken /tmp/shared-remove.json); su - admin -c \"nixorium software apply --repo ~/nixorium-deployment --package hello --scope shared --remove --expect $token --yes --json\" | jq -e '.state == \"applied\"'; jq -e '.packages == []' /home/admin/nixorium-deployment/lab-software.json")
   '';
 }

@@ -19,6 +19,20 @@ type setupSecretReader struct {
 	values [][]byte
 }
 
+func TestParseControllerSoftwareScopes(t *testing.T) {
+	for _, kind := range []string{domain.SoftwareScopeShared, domain.SoftwareScopeController, domain.SoftwareScopeAllClients} {
+		scope, err := parseSoftwareScope(kind)
+		if err != nil || scope.Kind != kind {
+			t.Fatalf("scope %q: %+v %v", kind, scope, err)
+		}
+	}
+	for _, value := range []string{"controller:pc99", "shared:pc01", "all"} {
+		if _, err := parseSoftwareScope(value); err == nil {
+			t.Fatalf("accepted %q", value)
+		}
+	}
+}
+
 func (r *setupSecretReader) ReadSecret(string) ([]byte, error) {
 	if len(r.values) == 0 {
 		return nil, errors.New("terminal unavailable")
