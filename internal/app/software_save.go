@@ -31,7 +31,7 @@ func (m SoftwareSaveManager) Save(ctx context.Context, plan domain.SoftwareChang
 	}
 	if fresh.State == "unchanged" {
 		if !targetChanged {
-			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: "unchanged", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: append([]string{}, plan.AffectedClients...), Issues: []domain.ValidationIssue{}, Message: "Software configuration is already saved locally."}
+			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: "unchanged", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedController: plan.AffectedController, AffectedClients: append([]string{}, plan.AffectedClients...), Issues: []domain.ValidationIssue{}, Message: "Software configuration is already saved locally."}
 		}
 		if plan.BaseFingerprint == "" || plan.BaseFingerprint == fresh.BaseFingerprint {
 			return softwareSaveFailure(plan, "conflict", "lab-software.json", "This file already contains changes outside the current save; resolve them in Advanced before continuing.", nil)
@@ -55,23 +55,24 @@ func (m SoftwareSaveManager) Save(ctx context.Context, plan domain.SoftwareChang
 func (m SoftwareSaveManager) recordSoftware(ctx context.Context, plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 	saved := m.record.SaveChanged(ctx, plan.Repository, []string{"lab-software.json"})
 	report := domain.SoftwareChangeApplyReport{
-		SchemaVersion:    domain.SoftwareSchemaVersion,
-		Operation:        "software-change-save",
-		State:            saved.State,
-		Repository:       plan.Repository,
-		ManagedFile:      plan.ManagedFile,
-		Request:          plan.Request,
-		AffectedClients:  append([]string{}, plan.AffectedClients...),
-		Revision:         saved.Revision,
-		RecoveryRequired: saved.RecoveryRequired,
-		Issues:           append([]domain.ValidationIssue{}, saved.Issues...),
-		Message:          saved.Message,
+		SchemaVersion:      domain.SoftwareSchemaVersion,
+		Operation:          "software-change-save",
+		State:              saved.State,
+		Repository:         plan.Repository,
+		ManagedFile:        plan.ManagedFile,
+		Request:            plan.Request,
+		AffectedController: plan.AffectedController,
+		AffectedClients:    append([]string{}, plan.AffectedClients...),
+		Revision:           saved.Revision,
+		RecoveryRequired:   saved.RecoveryRequired,
+		Issues:             append([]domain.ValidationIssue{}, saved.Issues...),
+		Message:            saved.Message,
 	}
 	return report
 }
 
 func softwareSaveFailure(plan domain.SoftwareChangePlanReport, state, field, message string, issues []domain.ValidationIssue) domain.SoftwareChangeApplyReport {
-	result := domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: state, Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: append([]string{}, plan.AffectedClients...), Issues: append([]domain.ValidationIssue{}, issues...), Message: message}
+	result := domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: state, Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedController: plan.AffectedController, AffectedClients: append([]string{}, plan.AffectedClients...), Issues: append([]domain.ValidationIssue{}, issues...), Message: message}
 	if len(result.Issues) == 0 {
 		result.Issues = append(result.Issues, domain.ValidationIssue{Field: field, Message: message})
 	}

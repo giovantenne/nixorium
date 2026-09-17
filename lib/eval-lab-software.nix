@@ -32,10 +32,10 @@ let
       value = if builtins.isAttrs scope then scope else fail "${prefix} must be an object";
       kind = value.kind or (fail "${prefix}.kind is required");
       allowedKeys =
-        if kind == "all-clients" then [ "kind" ]
+        if builtins.elem kind [ "shared" "controller" "all-clients" ] then [ "kind" ]
         else if kind == "group" then [ "kind" "group" ]
         else if kind == "clients" then [ "kind" "clients" ]
-        else fail "${prefix}.kind must be all-clients, group, or clients";
+        else fail "${prefix}.kind must be shared, controller, all-clients, group, or clients";
       extras = builtins.attrNames (builtins.removeAttrs value allowedKeys);
       group = value.group or null;
       clients = value.clients or [];
@@ -47,7 +47,7 @@ let
       || fail "${prefix}.clients must contain configured client identities";
     assert kind != "clients" || builtins.length clients == builtins.length (lib.unique clients)
       || fail "${prefix}.clients contains duplicate identities";
-    if kind == "all-clients" then { inherit kind; }
+    if builtins.elem kind [ "shared" "controller" "all-clients" ] then { inherit kind; }
     else if kind == "group" then { inherit kind group; }
     else { inherit kind; clients = lib.sort builtins.lessThan clients; };
   normalizePackage = index: entry:

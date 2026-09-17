@@ -61,7 +61,8 @@
     deployment // {
       # Machine-facing validation hook used before lab-settings.json is written.
       nixoriumValidateCandidate = validateCandidate;
-      # Machine-facing validation hook used before lab-software.json is written.
+      # Client validation before saving software. The management application
+      # also uses mkLab's controller validation hook for shared/controller scopes.
       nixoriumValidateSoftwareCandidate = validateSoftwareCandidate;
     };
 }

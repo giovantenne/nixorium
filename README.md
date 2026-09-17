@@ -27,6 +27,12 @@ openings inactive. Omission preserves laboratory behavior. Installer prompts
 and the five-task TUI are not integrated yet; use the current flow below.
 See [ADR 0015](docs/adr/0015-controller-first-capabilities.md).
 
+Managed software now supports `shared` (controller and current/future clients)
+and `controller` (only this controller). Existing client-only declarations keep
+their scope. Saving still changes configuration only: controller activation and
+client deployment remain separate until the integrated software workflow lands.
+See [ADR 0016](docs/adr/0016-shared-software-scopes.md).
+
 PC laboratories drift: machines are reinstalled at different times, manual
 fixes accumulate, and repeating the same update across a room is slow and hard
 to verify. NixOS makes each machine declarative and reproducible; Nixorium adds

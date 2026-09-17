@@ -183,6 +183,22 @@ nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
 nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
   setup status --repo "$SITE_DIR" --json >/dev/null
 
+# Exercise the actual save/validation boundary and carry shared declarations
+# through the offline-equivalence check below. This temporary site has no keys.
+nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
+  software plan --repo "$SITE_DIR" --package hello --scope shared --json \
+  >"${TEMP_DIR}/shared-software-plan.json"
+jq -e '.state == "ready" and .affectedController != null and (.affectedClients | length) > 0' \
+  "${TEMP_DIR}/shared-software-plan.json" >/dev/null
+SOFTWARE_REVIEW_TOKEN=$(jq -r .reviewToken "${TEMP_DIR}/shared-software-plan.json")
+nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
+  software apply --repo "$SITE_DIR" --package hello --scope shared \
+  --expect "$SOFTWARE_REVIEW_TOKEN" --yes --json \
+  >"${TEMP_DIR}/shared-software-apply.json"
+jq -e '.state == "applied" and .affectedController != null' \
+  "${TEMP_DIR}/shared-software-apply.json" >/dev/null
+git -C "$SITE_DIR" add lab-software.json
+
 nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
   --raw \
   --no-write-lock-file >/dev/null

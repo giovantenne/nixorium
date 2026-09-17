@@ -14,7 +14,7 @@ installation or system updates, but may have internet during user sessions.
 The repository exports `lib.mkLab` for private per-lab deployment Flakes. The
 root `lab-config.nix` keeps the standalone example compatible, while new
 private deployments store managed site values in `lab-settings.json` and
-guided client packages in `lab-software.json`. Public
+guided packages and their explicit scopes in `lab-software.json`. Public
 keys, assets and local modules also belong in the private repository generated
 from `templates/site`.
 
@@ -222,9 +222,16 @@ Release from the matching changelog section.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - Guided software changes use `software catalog`, `software plan`, and
-  `software apply`. Keep package IDs restricted by both the curated pinned Nix
-  catalog and the deployment validator; scopes come only from evaluated client
-  identities/groups. Apply may atomically replace only `lab-software.json`
+  `software apply`. Resolve package IDs from the pinned package set and
+  deployment validators; the curated catalog is suggestions, not an allowlist.
+  `shared` applies to the controller and present/future clients; `controller`
+  applies only to the controller. Existing `all-clients`, groups and explicit
+  client scopes never gain controller effects. `nixoriumSoftware.controller`
+  advertises the new capability; absent metadata keeps the legacy UI/scopes.
+  Review includes both old and new destinations when changing scope, and the
+  token binds that impact. Always compose the existing deployment validation
+  with the upstream controller-candidate hook when old/new declarations include
+  the controller, including removal. Apply may atomically replace only `lab-software.json`
   after token and fingerprint rechecks. It must not commit, build, activate,
   prepare PXE, deploy, or rewrite packages supplied by private modules.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.

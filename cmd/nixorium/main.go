@@ -797,7 +797,7 @@ func parseArguments(arguments []string) (options, error) {
 		case "--scope":
 			index++
 			if index >= len(arguments) || arguments[index] == "" {
-				return options{}, errors.New("--scope requires all-clients, group:NAME, or clients:pcNN,...")
+				return options{}, errors.New("--scope requires shared, controller, all-clients, group:NAME, or clients:pcNN,...")
 			}
 			result.softwareScope = arguments[index]
 		case "--remove":
@@ -1128,7 +1128,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software search|software plan|software apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       software catalog")
 	fmt.Fprintln(writer, "       software search --query <package-name>")
-	fmt.Fprintln(writer, "       software plan --package <id> --scope <all-clients|group:NAME|clients:pcNN,...> [--remove]")
+	fmt.Fprintln(writer, "       software plan --package <id> --scope <shared|controller|all-clients|group:NAME|clients:pcNN,...> [--remove]")
 	fmt.Fprintln(writer, "       software apply --package <id> --scope <scope> [--remove] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")
 	fmt.Fprintln(writer, "       shutdown apply --on <targets> [--acknowledge-unknown-sessions] --expect <review-token> [--yes]")
@@ -1198,14 +1198,14 @@ func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, reposit
 
 func parseSoftwareScope(value string) (domain.SoftwareScope, error) {
 	var scope domain.SoftwareScope
-	if value == domain.SoftwareScopeAllClients {
-		scope = domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}
+	if value == domain.SoftwareScopeAllClients || value == domain.SoftwareScopeShared || value == domain.SoftwareScopeController {
+		scope = domain.SoftwareScope{Kind: value}
 	} else if group, found := strings.CutPrefix(value, "group:"); found && group != "" {
 		scope = domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: group}
 	} else if clients, found := strings.CutPrefix(value, "clients:"); found && clients != "" {
 		scope = domain.SoftwareScope{Kind: domain.SoftwareScopeClients, Clients: strings.Split(clients, ",")}
 	} else {
-		return domain.SoftwareScope{}, errors.New("software scope must be all-clients, group:NAME, or clients:pcNN,...")
+		return domain.SoftwareScope{}, errors.New("software scope must be shared, controller, all-clients, group:NAME, or clients:pcNN,...")
 	}
 	if err := domain.ValidateSoftwareScope(scope); err != nil {
 		return domain.SoftwareScope{}, fmt.Errorf("invalid software scope: %w", err)
