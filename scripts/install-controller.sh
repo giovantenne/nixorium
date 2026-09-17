@@ -31,18 +31,10 @@ prompt_input() {
 }
 
 list_disks() {
-  lsblk -dn -o PATH,SIZE,TYPE,MODEL -P | awk '
-    /TYPE="disk"/ {
-      match($0, /PATH="([^"]*)"/, path)
-      match($0, /SIZE="([^"]*)"/, size)
-      match($0, /MODEL="([^"]*)"/, model)
-      modelValue = model[1]
-      if (modelValue == "") {
-        modelValue = "-"
-      }
-      printf "  %s  %s  %s\n", path[1], size[1], modelValue
-    }
-  '
+  local DISK
+  for DISK in "${AVAILABLE_DISKS[@]}"; do
+    lsblk -dn -o PATH,SIZE,MODEL "$DISK" | sed 's/^/  /'
+  done
 }
 
 canonicalize_disk() {
@@ -67,6 +59,34 @@ is_available_disk() {
   return 1
 }
 
+disk_has_mounted_filesystem() {
+  local CANDIDATE="$1"
+  lsblk -nrpo MOUNTPOINT "$CANDIDATE" | awk 'NF { found = 1 } END { exit(found ? 0 : 1) }'
+}
+
+TEMP_DISKO_LAYOUT=$(mktemp)
+TEMP_DISKO_FILE=$(mktemp)
+trap 'rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"' EXIT
+
+if [[ -n "$DISKO_LAYOUT_FILE" ]]; then
+  if [[ ! -f "$DISKO_LAYOUT_FILE" || ! -r "$DISKO_LAYOUT_FILE" ]]; then
+    echo "Error: DISKO_LAYOUT_FILE must name a readable regular file." >&2
+    exit 1
+  fi
+  cp -- "$DISKO_LAYOUT_FILE" "$TEMP_DISKO_LAYOUT"
+elif [[ -n "$DISKO_LAYOUT_URL" ]]; then
+  echo "Downloading explicitly configured Disko layout..."
+  curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
+elif [[ "$FLAKE_REF" =~ ^github:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/([0-9a-f]{40})$ ]]; then
+  DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/${BASH_REMATCH[3]}/lib/disko-layout.nix"
+  echo "Downloading Disko layout from the pinned flake revision..."
+  curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
+else
+  echo "Error: provide DISKO_LAYOUT_FILE or use a full revision-pinned GitHub FLAKE_REF." >&2
+  echo "An independently moving disk layout is not safe for controller installation." >&2
+  exit 1
+fi
+
 # Detect UEFI
 if [ -d /sys/firmware/efi ]; then
   echo "Detected UEFI boot"
@@ -75,9 +95,11 @@ else
   exit 1
 fi
 
-mapfile -t AVAILABLE_DISKS < <(
-  lsblk -dn -o PATH,TYPE -P | sed -n 's/^PATH="\([^"]*\)" TYPE="disk"$/\1/p'
-)
+while IFS= read -r CANDIDATE_DISK; do
+  if ! disk_has_mounted_filesystem "$CANDIDATE_DISK"; then
+    AVAILABLE_DISKS+=("$CANDIDATE_DISK")
+  fi
+done < <(lsblk -dn -o PATH,TYPE -P | sed -n 's/^PATH="\([^"]*\)" TYPE="disk"$/\1/p')
 
 if [[ ${#AVAILABLE_DISKS[@]} -eq 0 ]]; then
   echo "Error: no installable disks detected." >&2
@@ -110,36 +132,6 @@ else
   fi
 fi
 
-echo "Selected disk: $INSTALL_DISK"
-prompt_input "This will erase all data on $INSTALL_DISK. Type YES to continue: " CONFIRMATION
-if [[ "$CONFIRMATION" != "YES" ]]; then
-  echo "Installation cancelled."
-  exit 1
-fi
-
-TEMP_DISKO_LAYOUT=$(mktemp)
-TEMP_DISKO_FILE=$(mktemp)
-trap 'rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"' EXIT
-
-if [[ -n "$DISKO_LAYOUT_FILE" ]]; then
-  if [[ ! -f "$DISKO_LAYOUT_FILE" || ! -r "$DISKO_LAYOUT_FILE" ]]; then
-    echo "Error: DISKO_LAYOUT_FILE must name a readable regular file." >&2
-    exit 1
-  fi
-  cp -- "$DISKO_LAYOUT_FILE" "$TEMP_DISKO_LAYOUT"
-elif [[ -n "$DISKO_LAYOUT_URL" ]]; then
-  echo "Downloading explicitly configured Disko layout..."
-  curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
-elif [[ "$FLAKE_REF" =~ ^github:([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/([0-9a-f]{40})$ ]]; then
-  DISKO_LAYOUT_URL="https://raw.githubusercontent.com/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/${BASH_REMATCH[3]}/lib/disko-layout.nix"
-  echo "Downloading Disko layout from the pinned flake revision..."
-  curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
-else
-  echo "Error: provide DISKO_LAYOUT_FILE or use a full revision-pinned GitHub FLAKE_REF." >&2
-  echo "An independently moving disk layout is not safe for controller installation." >&2
-  exit 1
-fi
-
 # Generate a standalone Disko config with concrete arguments for the selected
 # disk and student user. This avoids patching the text of the NixOS module.
 cat > "$TEMP_DISKO_FILE" <<EOF
@@ -151,6 +143,20 @@ cat > "$TEMP_DISKO_FILE" <<EOF
 }
 EOF
 
+echo "Checking the pinned installer and preparing the controller system..."
+nix --extra-experimental-features "nix-command flakes" \
+  build "${FLAKE_REF}#disko" --no-link --no-write-lock-file
+nix --extra-experimental-features "nix-command flakes" \
+  build "${FLAKE_REF}#nixosConfigurations.pc${MASTER_HOST_NUMBER}.config.system.build.toplevel" \
+  --no-link --no-write-lock-file
+
+echo "Selected disk: $INSTALL_DISK"
+prompt_input "This will erase all data on $INSTALL_DISK. Type YES to continue: " CONFIRMATION
+if [[ "$CONFIRMATION" != "YES" ]]; then
+  echo "Installation cancelled; the disk was not changed."
+  exit 1
+fi
+
 echo "Partitioning disk with the Disko revision pinned by the deployment..."
 sudo nix --extra-experimental-features "nix-command flakes" \
   run "${FLAKE_REF}#disko" -- --mode disko "$TEMP_DISKO_FILE"
@@ -158,4 +164,4 @@ sudo nix --extra-experimental-features "nix-command flakes" \
 echo "Installing NixOS for the controller..."
 sudo nixos-install --flake "${FLAKE_REF}#pc${MASTER_HOST_NUMBER}" --no-write-lock-file --no-root-passwd
 
-echo "Installation complete. Reboot with: reboot"
+echo "Controller system installed. Returning to bootstrap to save the deployment."

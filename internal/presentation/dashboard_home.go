@@ -21,17 +21,16 @@ func (task dashboardTask) Description() string { return task.description }
 func (task dashboardTask) FilterValue() string { return task.title + " " + task.description }
 
 var dashboardTasks = []dashboardTask{
-	{id: "restore", shortcut: "r", title: "Restore computers", description: "Reapply the intended system or reinstall from scratch"},
 	{id: "software", shortcut: "w", title: "Add or change software", description: "Review configured choices or search this lab's pinned packages"},
+	{id: "install", shortcut: "n", title: "Install new computers", description: "Configure the laboratory when needed, then prepare and start network installation"},
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
-	{id: "pxe", shortcut: "p", title: "Install or reinstall computers", description: "Prepare and control network installation"},
-	{id: "setup", shortcut: "f", title: "Setup and readiness", description: "Continue initial setup or review what is still required"},
-	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
 	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
 	{id: "admin", shortcut: "a", title: "Advanced tools", description: "Inventory, settings, revisions, services, logs and diagnostics"},
 }
 
 var administrationTasks = []dashboardTask{
+	{id: "restore", shortcut: "r", title: "Restore computers", description: "Reapply the intended system or reinstall from scratch"},
+	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
 	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Explicitly check reachability and deployed configuration"},
 	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git, and Veyon"},
 	{id: "controller", shortcut: "c", title: "Rebuild controller", description: "Review and activate the committed controller revision"},
@@ -146,8 +145,8 @@ func (model dashboardModel) homeView() string {
 	}
 	if model.setup.State != "ready" {
 		lines = append(lines,
-			tuiStatus("Setup needs attention", tuiStatusAttention, model.isDark),
-			"Setup is paused. Choose Setup and readiness to resume from the first incomplete step.",
+			tuiStatus("Computer installation is not configured yet", tuiStatusAttention, model.isDark),
+			"Choose Install new computers when you are ready to configure the laboratory.",
 			"",
 		)
 	}

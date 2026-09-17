@@ -22,30 +22,28 @@ for lab configuration, validation and upstream-update work.
 
 ## First setup
 
-Development compatibility: `lab-settings.json` accepts optional
+`lab-settings.json` accepts optional
 `lab.deploymentMode` (`laboratory` by default, or `controller`). Controller-only
 mode requires `pcCount: 0`; it permits local controller activation with secure
 account credentials, without lab keys or the client DHCP hint. Lab networking,
 cache and remote-control services are inactive; fleet readiness remains false.
-Existing deployments are not migrated automatically. The current template,
-installer and setup TUI still use the laboratory flow below. Do not use this
-mode to disable an existing fleet; guided migration is not implemented yet.
+Existing deployments are not migrated automatically. New controller bootstrap
+sets this mode after collecting accounts, passwords, time zone, and keyboard.
+Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
 
 After the controller's first reboot, sign in as `admin` and run:
 
 ```sh
 cd ~/nixorium-deployment
-nix run .#nixorium -- setup
+nixorium
 ```
 
-The configuration wizard collects the required network, laboratory, account,
-regional, browser, Veyon, and password settings. It proposes detected network
-values, retries recoverable password mistakes without losing earlier answers,
-then collects all three passwords in one protected session. The complete
-candidate is validated, reviewed, and saved once before setup continues. It
-then creates the three key pairs and installs their private portions through
-the fixed privileged action.
+The controller is already usable. Choose **Install new computers** when the lab
+network is ready. That resumable path collects the client network and inventory,
+creates or imports key pairs, applies the controller, prepares installation
+artifacts, and opens guided PXE installation. Repository commits remain an
+internal storage detail.
 
 It then opens a resumable first-run checklist. Follow the highlighted next
 step with `Enter`:
@@ -157,13 +155,13 @@ checkout is needed while installing clients without internet access.
 Run the task-oriented dashboard from the repository root:
 
 ```sh
-nix run .#nixorium
+nixorium
 ```
 
 The opening screen asks which intervention you intend to perform. It does not
 scan clients or treat powered-off computers as unhealthy. `Up`/`Down` selects
-Restore, guided software changes, distribution, network installation, Update
-Nixorium, reviewed client shutdown, or Advanced tools. `?` opens help; `F1`
+software, new-computer installation, distribution, reviewed client shutdown,
+or Advanced tools. Restore and Update Nixorium live under Advanced. `?` opens help; `F1`
 also works in text fields.
 Advanced Computer inventory performs the explicit client check and supports `/`
 search, Enter for detail, `t` for technical evidence, `d` for a focused
@@ -186,18 +184,11 @@ spinner and the current plain-language action.
 
 | Dashboard task | Purpose |
 |---|---|
-| **Restore computers** | Choose non-destructive reapply or select an evaluated identity for a locally confirmed disk-erasing reinstall |
-| **Add or change software** | Select a supported pinned package and save its reviewed client scope |
+| **Add or change software** | Search pinned packages, save the reviewed scope, and apply controller-affecting changes |
+| **Install new computers** | Configure missing lab prerequisites, prepare PXE, and guide installation |
 | **Distribute the prepared system** | Plan and apply one or more client configurations |
-| **Computer inventory** | Explicitly inspect authenticated client state |
-| **Rebuild controller** | Review and activate the controller configuration |
-| **Manage services** | Inspect PXE and restart the signed cache |
-| **View operation logs** | Browse private deployment logs and action history |
-| **Review Git changes** | Review and optionally commit selected safe paths |
-| **Change settings** | Edit and validate one grouped configuration area or one account password |
-| **Update Nixorium** | Fetch upstream `master` and releases, then validate and apply one selected target |
 | **Shut down computers** | Check sessions and send reviewed power-off requests to selected clients only |
-| **Install or reinstall computers** | Prepare, start, stop, or recover PXE mode |
+| **Advanced tools** | Restore, update Nixorium, inspect inventory/settings, rebuild, inspect services/logs, and diagnose |
 
 The initial dashboard and `status` are local and do not probe clients. Add
 `--json` to supported CLI commands for structured output. Use `doctor` for
@@ -259,11 +250,10 @@ and overlays; dotted attributes are resolved as data rather than Nix code.
 
 Apply atomically replaces only `lab-software.json` after repeating pinned Nix
 validation and checking the review token and source fingerprint. The ordinary
-TUI also records that one managed file locally without exposing Git. It does not
-push, build, activate the controller, prepare PXE, or distribute clients.
-For shared/controller changes, use **Apply controller configuration** after
-saving; this manual step remains until the integrated controller-first software
-workflow is implemented. Use **Distribute the prepared system** for the
+TUI also records that one managed file locally without exposing Git. For
+`shared` and `controller` scopes, the same reviewed action then builds,
+activates, and verifies this controller. It never pushes, starts PXE, or
+distributes clients. Use **Distribute the prepared system** for the
 specific powered-on clients you intend to update. Packages supplied by private
 NixOS modules remain untouched and are edited through the advanced module
 workflow.
@@ -615,7 +605,7 @@ Prereleases require `--allow-prerelease`; known downgrades require
 `--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
 `flake.lock`; review and optionally commit them separately. It never branches,
 commits, pushes, activates, starts PXE, or deploys clients.
-The TUI's **Update Nixorium** intervention first fetches this bounded release
+The TUI's **Update Nixorium** advanced tool first fetches this bounded release
 list. `master` is clearly marked as the Development branch, stable releases are
 shown by default, and prereleases require explicit disclosure. The TUI has no
 editable target and does not offer downgrades. After selection, review the
@@ -623,8 +613,8 @@ scrollable two-file patch (`F4` expands candidate checks), then type the exact
 confirmation shown.
 
 > [!IMPORTANT]
-> Updating these files does not activate the controller or deploy clients.
-> Review and commit the result, then run those operations separately.
+> The TUI saves these files transparently, then builds, activates, and verifies
+> the controller. Clients remain unchanged until an explicit distribution.
 
 <details>
 <summary>Advanced manual fallback for unsupported input declarations</summary>

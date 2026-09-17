@@ -73,6 +73,15 @@ var settingsFields = []settingsField{
 	{id: "lab.veyonNativeHosts", group: "Classroom", label: "Veyon native hosts (comma-separated, optional)"},
 }
 
+var clientSetupFields = []settingsField{
+	{id: "lab.ifaceName", group: "Network", label: "Client network interface"},
+	{id: "lab.masterDhcpIp", group: "Network", label: "Current controller DHCP address"},
+	{id: "lab.networkBase", group: "Network", label: "Static laboratory network address"},
+	{id: "lab.networkPrefixLength", group: "Network", label: "Network prefix length"},
+	{id: "lab.pcCount", group: "Laboratory", label: "Number of client computers"},
+	{id: "lab.masterHostNumber", group: "Laboratory", label: "Controller host number"},
+}
+
 type settingsWizardModel struct {
 	helpOpen  bool
 	settings  domain.LabSettingsFile

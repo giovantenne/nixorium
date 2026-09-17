@@ -44,18 +44,24 @@ netboot, firmware, or installer outputs that cannot be used in that mode.
 Laboratory mode and legacy metadata retain strict fleet readiness and the full
 representative build set. Unknown modes, inconsistent inventory, and a target
 that omits controller readiness fail closed. This changes validation scope only:
-update apply still writes the reviewed `flake.nix` and `flake.lock` proposal
-without activating the controller.
+CLI update apply still writes only the reviewed `flake.nix` and `flake.lock`
+proposal. The ordinary TUI follows its transparent save with the existing
+typed controller plan/apply boundary.
 
-## Subsequent contracts
+## Bootstrap and workflow contracts
 
-The initial increment is a foundation, not a completed installer/UI redesign.
-The default template and installer retain the existing laboratory workflow.
-The remaining controller-first implementation must:
+Bootstrap capability `lib.controllerBootstrapVersion = 1` collects teacher and
+student identities, timezone, keyboard, and all three passwords before disk
+installation. It persists controller mode with US internal locales and defers
+client networking and keys. Installers for older revisions remain on their
+legacy workflow rather than invoking an unsupported command.
 
-- Collect keyboard, timezone and all three credentials before controller
-  installation; persist explicit controller mode and real installation evidence,
-  never a fabricated controller-service receipt.
+The operator TUI exposes five top-level tasks. Client installation owns the
+resumable laboratory configuration and never blocks using the controller.
+The remaining long-lived constraints are:
+
+- Persist real installation evidence, never a fabricated controller-service
+  receipt.
 - Introduce shared software while preserving old client-only scopes. Compose
   save/build/activate/verify in an application workflow; keep the low-level
   software file writer narrow rather than adding hidden activation to it.
@@ -64,8 +70,8 @@ The remaining controller-first implementation must:
 - Configure the client network on demand, resolving interface differences
   between host roles. A mode change does not authorize PXE or disk erasure.
 - Reuse/import keys without implicit overwriting or rotation.
-- Offer software, client installation, client updates, shutdown and advanced
-  tools without an obligatory lab wizard or GNOME notification.
+- Keep software, client installation, client updates, shutdown and advanced
+  tools usable without an obligatory lab wizard or GNOME notification.
 
 ## Verification
 

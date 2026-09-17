@@ -78,6 +78,11 @@ FLAKE
   *"flake lock --override-input nixorium github:giovantenne/nixorium/${BOOTSTRAP_REVISION}")
     printf '{"nodes":{},"root":"root","version":7}\n' > flake.lock
     ;;
+  *"eval github:giovantenne/nixorium/${BOOTSTRAP_REVISION}#lib.controllerBootstrapVersion --json")
+    printf '1\n'
+    ;;
+  *"run github:giovantenne/nixorium/${BOOTSTRAP_REVISION}#nixorium -- bootstrap configure --repo "*)
+    ;;
   *"#labMeta.controller.number --json")
     printf '99\n'
     ;;
@@ -117,6 +122,7 @@ grep -F "must match the selected release" "${TEST_ROOT}/mismatch.out" >/dev/null
 test ! -e "$CALL_LOG"
 
 NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+  NIXORIUM_BOOTSTRAP_TTY=/dev/null \
   "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
   >"${TEST_ROOT}/install.out" 2>&1
 
@@ -127,6 +133,8 @@ grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/inst
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$CALL_LOG" >/dev/null
 grep -F "flake init -t github:giovantenne/nixorium/${REVISION}#site" "$CALL_LOG" >/dev/null
 grep -F "flake lock --override-input nixorium github:giovantenne/nixorium/${REVISION}" "$CALL_LOG" >/dev/null
+grep -F "eval github:giovantenne/nixorium/${REVISION}#lib.controllerBootstrapVersion --json" "$CALL_LOG" >/dev/null
+grep -F "run github:giovantenne/nixorium/${REVISION}#nixorium -- bootstrap configure --repo" "$CALL_LOG" >/dev/null
 grep -F "flake=path:" "$INSTALLER_LOG" >/dev/null
 grep -F "layout_url=https://raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$INSTALLER_LOG" >/dev/null
 grep -F "master=99" "$INSTALLER_LOG" >/dev/null

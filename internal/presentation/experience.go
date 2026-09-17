@@ -129,11 +129,11 @@ func (model dashboardModel) helpView() string {
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
 	case dashboardHome:
-		lines = append(lines, "r restore   w software   d distribute   p install", "u update Nixorium   x shut down clients   a advanced tools")
+		lines = append(lines, "w software   n install computers   d distribute", "x shut down clients   a advanced tools")
 	case dashboardRestore:
 		lines = append(lines, "Choose reapply to keep the disk, or reinstall to erase", "the disk confirmed locally on each selected computer.")
 	case dashboardAdministration:
-		lines = append(lines, "h inventory   e settings   c controller   s services", "g changes   l operation history   i diagnostics")
+		lines = append(lines, "r restore   u update Nixorium   h inventory   e settings", "c controller   s services   g changes   l history   i diagnostics")
 	case dashboardHosts:
 		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail   i diagnostics", "d review a deployment for the focused computer", "Search owns all text keys until Enter or Esc.")
 	case dashboardDeploy:
@@ -308,7 +308,7 @@ func phaseSteps(labels []string, current int, complete bool, dark bool) []string
 }
 
 func (model dashboardModel) releaseReviewView() string {
-	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), "", tuiSection("Validated release review", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Save: flake.nix and flake.lock in the local deployment configuration", "No push, controller activation, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
+	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), "", tuiSection("Validated release review", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
 	if model.updateDetails || model.height == 0 {
 		lines = append(lines, "Revision: "+model.updatePlan.Revision, fmt.Sprintf("Downgrade: %t", model.updatePlan.Downgrade))
 		for _, check := range model.updatePlan.Checks {

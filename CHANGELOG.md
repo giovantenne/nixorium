@@ -29,8 +29,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   their meaning. Review identifies controller effects and both sides of scope
   changes, and stale target inventories invalidate the review. Controller
   candidate validation also works with older client-only template hooks.
-  Saving is still declaration-only; integrated controller activation follows
-  in the controller-first software workflow. Removing the final managed
+  CLI saving remains declaration-only; the TUI now follows its transparent
+  local save with verified controller activation when applicable. Removing the final managed
   package now preserves an empty JSON list instead of producing `null`, which
   the Nix schema rejects.
 
@@ -38,8 +38,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   local networking, inactive lab services and independent controller readiness.
   Reviewed controller activation can run without lab keys in this mode;
   client operations remain blocked and existing laboratory defaults are
-  unchanged. This is the foundation for the upcoming installer/TUI flow,
-  not a change to the current bootstrap prompts.
+  unchanged. The bootstrap now selects this mode before controller installation.
 
 - Added typed package-name search and exact package resolution against the
   deployment's locked nixpkgs input and overlays. The catalog is now a set of
@@ -54,6 +53,19 @@ The project follows [Semantic Versioning](https://semver.org/).
   the source, and never perform implicit rotation.
 
 ### Changed
+
+- Controller bootstrap now collects teacher/student usernames, time zone,
+  keyboard, and three hidden passwords before disk installation. It persists a
+  controller-only deployment with US internal locales, excludes mounted live
+  disks, prebuilds before destructive confirmation, and defers all client
+  network/key work to the TUI. `master` is the bootstrap default while older
+  releases retain their compatible legacy flow.
+
+- Reduced the home screen to five operator tasks. Restore and Update Nixorium
+  moved under Advanced tools; Install new computers owns the resumable
+  laboratory/PXE setup. Controller-affecting software changes and TUI framework
+  updates now save transparently, build, activate, and verify the controller in
+  the same reviewed flow. Client deployment remains separate.
 
 - The public controller bootstrap now resolves the selected branch or tag once
   and uses that full Git revision for the site template, controller installer,
