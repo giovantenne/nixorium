@@ -38,19 +38,18 @@ revision-pinned GitHub flake reference, never from an implicit `master`.
 ## Consequences
 
 Bootstrap now requires the commits API in addition to raw GitHub and Nix cache
-access. Resolution or malformed API output fails before disk installation. A
-tag owner could still move a tag before resolution, but every artifact used
-after resolution remains bound to the one returned object ID.
-
-This ADR does not complete the controller-first installer. Disk/live-medium
-exclusion, credentials, keyboard/timezone collection, prebuilding before the
-destructive confirmation, deployment-copy ownership, and first-boot recovery
-remain M2 work.
+access. Resolution, capability inspection, or malformed API output fails before
+disk installation. A tag owner could still move a tag before resolution, but
+every artifact used after resolution remains bound to the one returned object
+ID. Current capability-aware installers collect credentials and regional
+settings before Nix work; legacy releases retain their published post-install
+flow.
 
 ## Verification
 
 The controller bootstrap contract test uses no network. It supplies a mocked
-GitHub response, verifies both raw downloads use the same object ID, verifies
-the template and lock override use that object ID, checks the declared channel
-remains `master`, and proves a mismatched installer ref fails before any network
-call. Tiered validation runs this test in every mode.
+GitHub response, verifies every raw download and the site template use the same
+object ID, verifies the lower-level installer receives that revision for its
+lock override, checks the declared channel remains `master`, and proves a
+mismatched installer ref fails before any network call. Tiered validation runs
+this test in every mode.

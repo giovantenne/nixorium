@@ -55,14 +55,27 @@ The project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Controller bootstrap now collects teacher/student usernames, time zone,
-  keyboard, and three hidden passwords before disk installation. It persists a
-  controller-only deployment with US internal locales, excludes mounted live
-  disks, evaluates pinned Disko/controller derivations before destructive
-  confirmation, and defers all client network/key work to the TUI. The full
-  controller closure is downloaded into the mounted target store instead of the
-  RAM-backed live store, with serialized Nix jobs to avoid live-ISO memory
-  exhaustion. `master` is the bootstrap default while older releases retain
-  their compatible legacy flow.
+  keyboard, and three hidden passwords immediately after version resolution,
+  before any Nix evaluation or build. It persists a controller-only deployment
+  with US internal locales, excludes mounted live disks, and defers all client
+  network/key work to the TUI. After explicit disk confirmation, the pinned
+  partitioning tool is prepared before it can touch the disk; the deployment
+  lock, evaluation cache, temporary 4 GiB swap, and full controller closure then
+  use the mounted target disk. Serialized Nix jobs are passed explicitly across
+  `sudo`, avoiding live-ISO memory exhaustion and silent terminal termination.
+  `master` is the bootstrap default while older releases retain their compatible
+  legacy flow.
+
+- GitHub validation now stops after its documented evaluation-only source and
+  fresh-template coverage. It no longer runs the generated deployment command,
+  which built the Go package on cold runners and could exceed the 15-minute job
+  limit. Full local validation builds the declared checks and one representative
+  client instead of making `nix flake check` enumerate all 20 generated clients.
+
+- Managed-software proposals now validate every declaration and pinned package
+  against one representative client, plus the controller when its software is
+  affected. Planning and saving no longer evaluate every configured client;
+  deployment still builds each explicitly selected machine.
 
 - Reduced the home screen to five operator tasks. Restore and Update Nixorium
   moved under Advanced tools; Install new computers owns the resumable

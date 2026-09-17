@@ -38,6 +38,12 @@ The public controller bootstrap resolves its selected branch or tag once. The
 template, installer, local Disko layout, and initial lock use that full Git
 revision, while `flake.nix` retains the selected channel for later managed
 updates. Resolution failure stops before the installer is invoked.
+For bootstrap-capability version 1, account and regional input is collected by
+the small shell launcher before it invokes Nix. The destructive confirmation
+precedes partitioning, locking, or controller-system transfer. Once Disko has
+mounted the target, the bootstrap places its evaluation cache and temporary
+swap there; `nixos-install` builds directly into the target store with one Nix
+job and one core per build.
 
 ## Package-base ownership
 

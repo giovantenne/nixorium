@@ -107,15 +107,18 @@ curl -fsSL https://nixorium.org/install.sh | bash
 
 Choose the release, account names, time zone, keyboard, three passwords, and
 controller disk when prompted. Keyboard selection happens before password
-entry. The installer keeps the internal locale at `en_US.UTF-8`, creates a
-private deployment repository, and installs a usable controller from its pinned
-inputs. The selected channel or tag is resolved once: template, installer,
-Disko layout, and initial lock all use that immutable revision. See
-[ADR 0018](docs/adr/0018-revision-bound-controller-bootstrap.md).
-Before asking to erase the selected disk, the installer evaluates the pinned
-installation plan without downloading the full controller into live-ISO memory.
-The actual controller closure is downloaded into the mounted target disk with
-serialized Nix jobs, which keeps peak memory bounded on smaller machines.
+entry. After the version is resolved, the account and regional questions appear
+before any Nix evaluation or build; the installer labels the later download and
+installation phases explicitly. It keeps the internal locale at
+`en_US.UTF-8`, creates a private deployment repository, and installs a usable
+controller from pinned inputs. The selected channel or tag is resolved once:
+template, installer, Disko layout, and initial lock all use that immutable
+revision. See [ADR 0018](docs/adr/0018-revision-bound-controller-bootstrap.md).
+After the exact `YES` disk confirmation, the pinned partitioning tool is made
+ready before it touches the disk. The deployment lock, evaluation cache,
+temporary 4 GiB swap, and controller closure then use the mounted target disk.
+Nix jobs remain serialized even across `sudo`, bounding live-ISO memory use on
+smaller machines. The temporary swap is removed before the installer exits.
 
 ### 3. Reboot
 
