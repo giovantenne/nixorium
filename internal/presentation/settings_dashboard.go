@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/help"
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -266,16 +265,18 @@ func (command *settingsPasswordCommand) Run() error {
 }
 
 func (model dashboardModel) settingsView() string {
-	title := "Nixorium — Settings"
+	path := []string{"Maintenance", "Settings"}
+	title := "Laboratory settings"
 	intro := "Choose one area to edit. Values are validated before any file changes."
-	backLabel := "back"
+	backLabel := "Maintenance"
 	if model.settingsReturn == dashboardSetup {
-		title = "Nixorium — First setup / Laboratory settings"
+		path = []string{"Installation", "Setup", "Settings"}
+		title = "Laboratory settings"
 		intro = "Complete the required laboratory settings here, then return to setup."
-		backLabel = "setup"
+		backLabel = "Setup"
 	}
 	if model.busy != "" {
-		return tuiTitle(title, model.isDark) + "\n\n" + model.busyView() + "\n"
+		return renderTUIShell(tuiShell{path: path, body: tuiTitle(title, model.isDark) + "\n\n" + model.busyView(), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	switch model.screen {
 	case dashboardSettingsEdit:
@@ -286,6 +287,7 @@ func (model dashboardModel) settingsView() string {
 		return model.settingsReviewView()
 	}
 	lines := []string{tuiTitle(title, model.isDark), ""}
+	notices := []tuiNotice{}
 	if model.settingsResult.Operation != "" {
 		success := !model.settingsResult.HasErrors() && (model.settingsResult.State == "saved" || model.settingsResult.State == "unchanged")
 		title := "Configuration needs attention"
@@ -298,68 +300,60 @@ func (model dashboardModel) settingsView() string {
 			fmt.Sprintf("State: %s   Changed fields: %d", model.settingsResult.State, len(model.settingsResult.Changes)),
 		)
 		if model.message != "" {
-			lines = append(lines, "", "Result: "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		returnLabel := "dashboard"
+		returnLabel := "Maintenance"
 		if model.settingsReturn == dashboardSetup {
-			returnLabel = "setup"
+			returnLabel = "Setup"
 		}
-		bindings := []key.Binding{tuiHelpBinding([]string{"e"}, "e", "edit more")}
+		actions := []tuiAction{{key: "e", label: "Edit more"}}
 		if model.settingsResult.RecoveryRequired {
-			bindings = append(bindings, tuiHelpBinding([]string{"r"}, "r", "retry save"))
+			actions = append(actions, tuiAction{key: "r", label: "Retry save"})
 		}
-		bindings = append(bindings, tuiHelpBinding([]string{"enter"}, "enter", returnLabel))
-		lines = append(lines, "", tuiHelp(model.width, model.isDark, bindings...))
-		return strings.Join(lines, "\n") + "\n"
+		actions = append(actions, tuiAction{key: "Enter", label: returnLabel}, tuiAction{key: "F1", label: "Help"})
+		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
 	}
 	lines = append(lines,
 		intro,
 		"",
 		model.settingsMenu.list.View(),
-		"",
-		"enter edit   / search   p passwords   esc "+backLabel+"   ? help",
 	)
 	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func (model dashboardModel) settingsPasswordsView() string {
 	if model.settingsReturn == dashboardSetup {
 		lines := []string{
-			tuiTitle("Nixorium — First setup / Account passwords", model.isDark),
-			"",
+			tuiTitle("Account passwords", model.isDark),
 			"Enter the administrator, teacher, and student passwords in one protected session.",
 			"After all three are accepted, Nixorium validates the complete laboratory configuration once.",
-			"",
-			"Enter: collect all passwords   Esc: cancel setup configuration",
 		}
+		notices := []tuiNotice{}
 		if model.message != "" {
-			lines = append(lines, "", "Result: "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: []string{"Installation", "Setup", "Settings", "Passwords"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Collect passwords"}, {key: "Esc", label: "Cancel setup settings"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	lines := []string{
-		tuiTitle("Nixorium — Change password", model.isDark),
-		"",
+		tuiTitle("Change password", model.isDark),
 		"Choose the account whose password you want to change.",
 		"Your password stays hidden while you type.",
 		"",
 		model.settingsPasswordMenu.list.View(),
-		"",
-		"Enter: change selected password   Esc: back",
 	}
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{path: []string{"Maintenance", "Settings", "Passwords"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Change password"}, {key: "Esc", label: "Settings"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func (model dashboardModel) settingsReviewView() string {
 	lines := []string{
-		tuiTitle("Nixorium — Settings review", model.isDark),
-		"",
+		tuiTitle("Review settings", model.isDark),
 		"Validated managed-setting changes",
 	}
 	for _, change := range model.settingsPlan.Changes {
@@ -377,16 +371,17 @@ func (model dashboardModel) settingsReviewView() string {
 		"Existing unrelated files and changes are preserved.",
 		"Saving does not rebuild or change any computer.",
 		"",
-		"Save these settings?",
-		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"y"}, "y", "save"),
-			tuiHelpBinding([]string{"n", "esc"}, "n/esc", "cancel"),
-		),
+		tuiSection("Save these settings?", model.isDark),
 	)
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	path := []string{"Maintenance", "Settings", "Review"}
+	if model.settingsReturn == dashboardSetup {
+		path = []string{"Installation", "Setup", "Settings", "Review"}
+	}
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Save"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func settingsIssueMessage(issues []domain.ValidationIssue) string {
