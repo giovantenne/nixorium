@@ -43,7 +43,6 @@
     { "package": "python3Packages.terminaltexteffects", "scope": { "kind": "shared" } },
     { "package": "python3Packages.virtualenv", "scope": { "kind": "shared" } },
     { "package": "ripgrep", "scope": { "kind": "shared" } },
-    { "package": "starship", "scope": { "kind": "shared" } },
     { "package": "tectonic", "scope": { "kind": "shared" } },
     { "package": "tig", "scope": { "kind": "shared" } },
     { "package": "tmux", "scope": { "kind": "shared" } },
