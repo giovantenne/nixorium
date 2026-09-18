@@ -1445,6 +1445,70 @@ func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 	}
 }
 
+func TestNixoriumMovingMasterCanAdvanceToNewRevision(t *testing.T) {
+	currentRevision := strings.Repeat("a", 40)
+	remoteRevision := strings.Repeat("b", 40)
+	planned := 0
+	model := dashboardModel{
+		screen: dashboardUpdate,
+		report: testDashboardReport("ready"),
+		updateCheck: domain.UpdateCheckReport{
+			Operation:  "update-check",
+			State:      "available",
+			CurrentRef: "master",
+			CurrentRev: currentRevision,
+			Development: []domain.UpdateRelease{{
+				Tag: "master", ObjectID: remoteRevision, Channel: domain.UpdateChannelMoving,
+			}},
+		},
+		actions: DashboardActions{PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+			planned++
+			if target != "master" || allowPrerelease || allowDowngrade {
+				t.Fatalf("moving update input = %q, prerelease=%t, downgrade=%t", target, allowPrerelease, allowDowngrade)
+			}
+			return domain.UpdatePlanReport{Operation: "update-plan", State: "ready", Target: target, TargetChannel: domain.UpdateChannelMoving}
+		}},
+	}
+	if view := model.View().Content; !strings.Contains(view, "New revision available") {
+		t.Fatalf("moving update is not visible:\n%s", view)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("new master revision did not start validation: %+v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if planned != 1 || model.screen != dashboardUpdateReview {
+		t.Fatalf("new master revision was not planned: calls=%d screen=%d", planned, model.screen)
+	}
+}
+
+func TestNixoriumMovingMasterBlocksSameRevision(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	model := dashboardModel{
+		screen: dashboardUpdate,
+		report: testDashboardReport("ready"),
+		updateCheck: domain.UpdateCheckReport{
+			Operation:  "update-check",
+			State:      "available",
+			CurrentRef: "master",
+			CurrentRev: revision,
+			Development: []domain.UpdateRelease{{
+				Tag: "master", ObjectID: revision, Channel: domain.UpdateChannelMoving,
+			}},
+		},
+	}
+	if view := model.View().Content; !strings.Contains(view, "Current revision") {
+		t.Fatalf("current master revision is not identified:\n%s", view)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || !strings.Contains(model.message, "current upstream revision") {
+		t.Fatalf("current master revision was not blocked clearly: command=%v message=%q", command, model.message)
+	}
+}
+
 func TestNixoriumUpdateInputFailureIsNotPresentedAsNetworkFailure(t *testing.T) {
 	model := dashboardModel{
 		report: testDashboardReport("ready"),

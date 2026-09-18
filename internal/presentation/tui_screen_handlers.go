@@ -1151,15 +1151,20 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				model.message = "Fetch available updates before selecting a target."
 				return model, nil
 			}
-			target := releases[min(model.updateCursor, len(releases)-1)].Tag
-			if target == model.updateCheck.CurrentRef {
-				model.message = target + " is already the configured Nixorium release."
+			selected := releases[min(model.updateCursor, len(releases)-1)]
+			target := selected.Tag
+			if updateReleaseAlreadyCurrent(model.updateCheck, selected) {
+				if selected.Channel == domain.UpdateChannelMoving {
+					model.message = target + " already points to the current upstream revision."
+				} else {
+					model.message = target + " is already the configured Nixorium release."
+				}
 				return model, nil
 			}
 			model.updateTarget = target
 			model.busy = "Validating the candidate release and representative builds"
 			model.message = ""
-			allowPrerelease := releases[min(model.updateCursor, len(releases)-1)].Channel == domain.UpdateChannelPrerelease
+			allowPrerelease := selected.Channel == domain.UpdateChannelPrerelease
 			return model, func() tea.Msg {
 				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(target, allowPrerelease, false)}
 			}
