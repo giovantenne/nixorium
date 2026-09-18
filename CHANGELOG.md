@@ -54,6 +54,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Corrected the official `cache.nixos.org` public key used by both controller
+  bootstrap stages. Signed substitutes are accepted again instead of being
+  rejected and rebuilt locally, while signature verification remains enabled.
+
 - Controller bootstrap now collects teacher/student usernames, time zone,
   keyboard, and three hidden passwords immediately after version resolution,
   before any Nix evaluation or build. It persists a controller-only deployment

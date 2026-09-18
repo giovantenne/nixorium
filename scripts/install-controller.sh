@@ -23,7 +23,7 @@ BOOTSTRAP_SWAP=""
 # Force the bootstrap install to use the official NixOS cache only.
 # This avoids inheriting substituters from a preconfigured live/netboot
 # environment, which may point at an unavailable or unsigned local cache.
-export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo=\nmax-jobs = 1\ncores = 1'
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\nmax-jobs = 1\ncores = 1'
 
 prompt_input() {
   local PROMPT_TEXT="$1"
