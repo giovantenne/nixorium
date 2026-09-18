@@ -49,6 +49,9 @@ func settingsFieldIndex(id string) int {
 
 func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
 	model := newSettingsWizardModel(wizardSettings())
+	if !strings.Contains(model.View().Content, "All settings are collected first; passwords and one complete validation follow.") {
+		t.Fatalf("first-run guidance is missing:\n%s", model.View().Content)
+	}
 	for range settingsFields {
 		updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model = updated.(settingsWizardModel)

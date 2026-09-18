@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.4] - 2026-09-18
+
 ### Added
 
 - Added one shared invalid-settings regression corpus for the public Nix
@@ -490,6 +492,19 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Serialized template-owned catalog, client-group, and home-reset policy as
+  JSON files in the standalone offline installer instead of embedding JSON
+  objects as invalid Nix expressions.
+
+- Ensured a live controller activation reconciles and verifies the configured
+  static laboratory address before reporting success. The first computer
+  installation can now proceed directly to PXE after controller bootstrap,
+  without requiring an extra reboot.
+
+- Restored the first-run guidance in the compatibility settings command and
+  aligned the management VM with the current installation flow and advanced
+  key-import navigation.
+
 - Allowed the fixed controller activation units to update declared user homes
   and `/run/user`, while retaining the reviewed private deployment as an
   explicit read-only mount. This prevents valid NixOS activation scripts from
@@ -598,7 +613,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.3...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.4...HEAD
+[2.0.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.3...v2.0.0-beta.4
 [2.0.0-beta.3]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.2...v2.0.0-beta.3
 [2.0.0-beta.2]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.1...v2.0.0-beta.2
 [2.0.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v1.0.0...v2.0.0-beta.1
