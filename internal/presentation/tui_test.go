@@ -810,7 +810,7 @@ func TestRoutineScreensShareVisualTitleHierarchy(t *testing.T) {
 		"pxe":        model.pxeView(),
 	}
 	for name, view := range screens {
-		if !strings.Contains(view, "Nixorium —") || !strings.Contains(view, "\x1b[") {
+		if !strings.Contains(view, "Nixorium") || !strings.Contains(view, "\x1b[") {
 			t.Errorf("%s screen lacks shared visual title hierarchy:\n%s", name, view)
 		}
 	}

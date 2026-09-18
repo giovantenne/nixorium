@@ -149,6 +149,24 @@ func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
 	}
 }
 
+func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		m := experienceFixture(200)
+		m.width = size[0]
+		m.height = size[1]
+		m.screen = dashboardHosts
+		view := m.View().Content
+		for _, expected := range []string{"Computers", "Inventory", "pc01", "Refresh", "Esc", "Help"} {
+			if !strings.Contains(view, expected) {
+				t.Fatalf("inventory %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
+			}
+		}
+		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+			t.Fatalf("inventory overflow at %dx%d: %dx%d", size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+		}
+	}
+}
+
 func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
 	m := experienceFixture(2)
 	updated, command := m.Update(tea.KeyPressMsg{Text: "r"})
