@@ -559,6 +559,12 @@ controller, active symlink, current Git revision, and durable receipt to agree.
 This prevents a late activation-script failure from being mistaken for success
 when NixOS has already advanced `/run/current-system`.
 
+Both controller-apply units set `restartIfChanged = false`. Their own
+`switch-to-configuration` may install a newer management command and therefore
+change the unit's `ExecStart` store path; NixOS must not stop the in-flight job
+that is responsible for verifying the switch and writing the success receipt.
+The systemd daemon still loads the new unit definition for the next invocation.
+
 Routine administration reuses that implementation through `controller plan`
 and `controller apply --expect <revision>`. The latter starts only
 `nixorium-apply-controller@<40-hex-revision>.service`; the adapter and polkit

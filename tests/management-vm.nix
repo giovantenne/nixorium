@@ -322,6 +322,7 @@
     controller.succeed("iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 5000'; iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 8080'; iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 67'")
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
+    controller.succeed("grep -Fx 'X-RestartIfChanged=false' /etc/systemd/system/nixorium-apply-controller.service; grep -Fx 'X-RestartIfChanged=false' /etc/systemd/system/nixorium-apply-controller@.service")
     controller.succeed("mkdir /tmp/fake-colmena-bin; ln -s /run/current-system/sw/bin/nixorium-test-colmena /tmp/fake-colmena-bin/colmena")
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
     controller.wait_until_fails("systemctl is-active --quiet nixorium-harmonia.service")

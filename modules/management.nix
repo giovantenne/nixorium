@@ -596,6 +596,10 @@ in
     systemd.services.nixorium-apply-controller = {
       description = "Build and activate the reviewed Nixorium controller configuration";
       after = [ "nixorium-install-secrets.service" ];
+      # This unit executes switch-to-configuration itself. Never let that
+      # switch terminate the running job before it can verify and record the
+      # newly active controller system.
+      restartIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${applyController}/bin/nixorium-apply-controller";
@@ -624,6 +628,10 @@ in
     systemd.services."nixorium-apply-controller@" = {
       description = "Build and activate reviewed Nixorium controller revision %i";
       after = [ "nixorium-install-secrets.service" ];
+      # The target configuration may contain a newer management command and
+      # therefore a different ExecStart store path. The active reviewed job
+      # must survive that unit-file change and finish its receipt.
+      restartIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${applyController}/bin/nixorium-apply-controller %i";
