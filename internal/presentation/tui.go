@@ -1383,23 +1383,38 @@ func maximumGitReviewScroll(report domain.GitReviewReport, height int) int {
 }
 
 func (model dashboardModel) controllerView() string {
-	lines := []string{tuiTitle("Nixorium — Rebuild controller", model.isDark), ""}
+	path := []string{"Maintenance", "Controller"}
+	lines := []string{tuiTitle("Controller configuration", model.isDark)}
+	notices := []tuiNotice{}
 	if model.controllerApplying {
 		elapsed := time.Since(model.controllerStarted).Truncate(time.Second)
 		if elapsed < 0 {
 			elapsed = 0
 		}
-		lines = append(lines, fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
+		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.operationProgressView(model.controllerProgress, "Current progress")...)
-		lines = append(lines, "", "q: close this view; systemd-owned work continues")
-		return strings.Join(lines, "\n") + "\n"
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller update is running", detail: "Wait for the verified result before closing Nixorium."})
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.busy != "" {
-		lines = append(lines, model.busyView(), "", "This systemd-owned action continues if the dashboard closes.")
-		return strings.Join(lines, "\n") + "\n"
+		lines = append(lines, "", model.busyView())
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.screen == dashboardControllerReview {
-		return model.confirmationView("Update this controller?", model.controllerPlan.Controller+" (this controller only)", "Services and networking may restart; this connection may be interrupted.", "Build, activate and verify the reviewed configuration. A reboot is not normally required.", model.controllerPlan.Revision, model.controllerPlan.Confirmation)
+		body := strings.Join([]string{
+			tuiTitle("Update this controller?", model.isDark),
+			"",
+			"Affects   " + model.controllerPlan.Controller + " (this controller only)",
+			"Revision  " + model.controllerPlan.Revision,
+			"",
+			tuiSection("Type "+model.controllerPlan.Confirmation+" to continue:", model.isDark),
+			"> " + model.confirmation + "_",
+		}, "\n")
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Services and networking may restart", detail: "This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot is not normally required."})
+		if model.message != "" {
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+		}
+		return renderTUIShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Update controller"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.controllerResult.Operation != "" {
 		resultTitle := "Controller action needs attention"
@@ -1417,44 +1432,36 @@ func (model dashboardModel) controllerView() string {
 			lines = append(lines, model.operationProgressView(model.controllerProgress, "Last controller apply")...)
 		}
 		if model.message != "" {
-			lines = append(lines, "", "Result: "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		detailsLabel := "show details"
+		detailsLabel := "Show details"
 		if model.controllerDetails {
-			detailsLabel = "hide details"
+			detailsLabel = "Hide details"
 		}
-		returnLabel := "dashboard"
+		returnLabel := "Maintenance"
 		if model.setupMode {
-			returnLabel = "setup"
+			returnLabel = "Setup"
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", returnLabel),
-			tuiHelpBinding([]string{"d"}, "d", detailsLabel),
-			tuiHelpBinding([]string{"l"}, "l", "logs"),
-			tuiHelpBinding([]string{"r"}, "r", "new review"),
-		))
-		return strings.Join(lines, "\n") + "\n"
+		actions := []tuiAction{{key: "Enter", label: returnLabel}, {key: "d", label: detailsLabel}, {key: "l", label: "Logs"}, {key: "r", label: "New review"}, {key: "F1", label: "Help"}}
+		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
 	}
 	lines = append(lines,
-		"Review the current committed controller configuration before rebuilding.",
 		"",
-		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"r"}, "r", "create review"),
-			tuiHelpBinding([]string{"esc"}, "esc", "back"),
-			tuiHelpBinding([]string{"q"}, "q", "quit"),
-		),
+		"Review the current committed controller configuration before rebuilding.",
 	)
 	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "r", label: "Create review"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func (model dashboardModel) servicesView() string {
-	lines := []string{tuiTitle("Nixorium — Managed services", model.isDark), ""}
+	path := []string{"Maintenance", "Services"}
+	lines := []string{tuiTitle("Managed services", model.isDark)}
+	notices := []tuiNotice{}
 	if model.busy != "" {
-		lines = append(lines, model.busyView())
-		return strings.Join(lines, "\n") + "\n"
+		lines = append(lines, "", model.busyView())
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.serviceResult.Operation != "" {
 		success := !model.serviceResult.HasErrors() && model.serviceResult.Verified
@@ -1468,17 +1475,24 @@ func (model dashboardModel) servicesView() string {
 			fmt.Sprintf("State: %s   Verified: %t   Retry safe: %t", model.serviceResult.State, model.serviceResult.Verified, model.serviceResult.RetrySafe),
 		)
 		if model.message != "" {
-			lines = append(lines, "", "Result: "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
-			tuiHelpBinding([]string{"l"}, "l", "logs"),
-			tuiHelpBinding([]string{"r"}, "r", "restart again"),
-		))
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "l", label: "Logs"}, {key: "r", label: "Restart again"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.screen == dashboardServicesRestartReview {
-		return model.confirmationView("Restart the software cache?", "Controller cache; active installations may be affected", "The signed cache will be briefly unavailable. Active PXE clients may retry downloads.", "PXE networking and listeners are not controlled by this action. The cache is verified afterward.", "", "RESTART CACHE")
+		body := strings.Join([]string{
+			tuiTitle("Restart the software cache?", model.isDark),
+			"",
+			"Affects  Controller cache; active installations may be affected",
+			"",
+			tuiSection("Type RESTART CACHE to continue:", model.isDark),
+			"> " + model.confirmation + "_",
+		}, "\n")
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The signed cache will be briefly unavailable", detail: "Active installers may retry downloads. PXE networking and listeners are unchanged; the cache is verified afterward."})
+		if model.message != "" {
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+		}
+		return renderTUIShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Restart cache"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	for _, service := range model.services.Services {
 		kind := tuiStatusAttention
@@ -1499,16 +1513,19 @@ func (model dashboardModel) servicesView() string {
 		}
 		lines = append(lines, "")
 	}
-	lines = append(lines, tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"r"}, "r", "restart cache"),
-		tuiHelpBinding([]string{"f"}, "f", "refresh"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-		tuiHelpBinding([]string{"q"}, "q", "quit"),
-	))
 	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	actions := []tuiAction{}
+	if model.serviceRestartAvailable() {
+		actions = append(actions, tuiAction{key: "r", label: "Review cache restart"})
+	}
+	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+}
+
+func (model dashboardModel) serviceRestartAvailable() bool {
+	return len(model.services.Services) > 0 && model.services.Services[0].ID == "cache" && len(model.services.Services[0].Units) > 0 && model.services.Services[0].Units[0].Loaded
 }
 
 func (model dashboardModel) logsView() string {

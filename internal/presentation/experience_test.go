@@ -197,6 +197,69 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 	}
 }
 
+func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
+	services := domain.ServicesReport{Services: []domain.ManagedService{{
+		ID: "cache", Name: "Binary cache", State: "healthy", Detail: "HTTP-ready",
+		Units: []domain.ServiceState{{Name: "nixorium-harmonia.service", Loaded: true, Active: true, State: "active"}},
+	}}}
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		states := []struct {
+			name     string
+			model    dashboardModel
+			expected []string
+		}{
+			{
+				name:     "controller idle",
+				model:    dashboardModel{screen: dashboardController},
+				expected: []string{"Maintenance  /  Controller", "Create review", "Esc", "Maintenance", "Help"},
+			},
+			{
+				name: "controller progress",
+				model: dashboardModel{
+					screen: dashboardController, controllerApplying: true, busy: "Activating controller", controllerStarted: time.Now(),
+					controllerProgress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4},
+				},
+				expected: []string{"Controller update is running", "Progress details", "Help"},
+			},
+			{
+				name: "controller result",
+				model: dashboardModel{
+					screen:           dashboardController,
+					controllerResult: domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true},
+				},
+				expected: []string{"Controller updated and verified", "Enter", "Maintenance", "Show details", "Logs", "New review", "Help"},
+			},
+			{
+				name:     "services",
+				model:    dashboardModel{screen: dashboardServices, services: services},
+				expected: []string{"Maintenance  /  Services", "Binary cache", "Review cache restart", "Refresh", "Esc", "Maintenance", "Help"},
+			},
+			{
+				name: "service result",
+				model: dashboardModel{
+					screen:        dashboardServices,
+					serviceResult: domain.ServiceActionReport{Operation: "service-restart", State: "completed", Service: "cache", Verified: true},
+				},
+				expected: []string{"Binary cache restarted and verified", "Enter", "Maintenance", "Logs", "Restart again", "Help"},
+			},
+		}
+
+		for _, state := range states {
+			state.model.width = size[0]
+			state.model.height = size[1]
+			view := state.model.View().Content
+			for _, expected := range state.expected {
+				if !strings.Contains(view, expected) {
+					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
+				}
+			}
+			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+				t.Fatalf("%s overflows at %dx%d: %dx%d", state.name, size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+			}
+		}
+	}
+}
+
 func TestConfigurationReviewHelpCannotApply(t *testing.T) {
 	m := configReviewModel{}
 	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
@@ -397,7 +460,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 					t.Fatalf("PXE confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardServicesRestartReview || screen == dashboardControllerReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
+				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			}
