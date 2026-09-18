@@ -1203,7 +1203,7 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 	updated, _ = model.Update(batch[0]())
 	model = updated.(dashboardModel)
-	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Controller updated and verified") || !strings.Contains(model.View().Content, "enter") || !strings.Contains(model.View().Content, "dashboard") {
+	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Controller updated and verified") || !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("controller result missing: applied=%d refreshed=%d\n%s", applied, refreshed, model.View().Content)
 	}
 	model.controllerProgress = domain.OperationProgress{
@@ -1215,7 +1215,7 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "d"})
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View().Content, "Recent activity") || !strings.Contains(model.View().Content, "hide details") {
+	if !strings.Contains(model.View().Content, "Recent activity") || !strings.Contains(model.View().Content, "Hide details") {
 		t.Fatalf("controller details did not expand:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1609,7 +1609,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View().Content, "Binary cache restarted and verified") || !strings.Contains(model.View().Content, "cache healthy") || !strings.Contains(model.View().Content, "restart again") {
+	if restarts != 1 || model.screen != dashboardServices || !strings.Contains(model.View().Content, "Binary cache restarted and verified") || !strings.Contains(model.View().Content, "cache healthy") || !strings.Contains(model.View().Content, "Restart again") {
 		t.Fatalf("verified restart result missing: restarts=%d\n%s", restarts, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
