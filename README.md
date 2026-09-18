@@ -24,7 +24,7 @@ The controller-first installer uses explicit
 `lab.deploymentMode = "controller"` with `pcCount = 0`. Such a controller can be
 rebuilt without client networking or lab keys, with lab services and firewall
 openings inactive. Omission preserves legacy laboratory behavior. Client
-networking and keys are configured later from **Install new computers**.
+networking and keys are configured later from **Install computers**.
 See [ADR 0015](docs/adr/0015-controller-first-capabilities.md).
 
 Managed software now supports `shared` (controller and current/future clients)
@@ -139,25 +139,26 @@ cd ~/nixorium-deployment
 nixorium
 ```
 
-Nixorium opens on five operator tasks: add or change software, install new
-computers, distribute the prepared system, shut down computers, and advanced
-tools. It does not scan the room at startup. Choose **Install new computers**
-when you are ready to provide DHCP/network values, create or import keys,
-prepare PXE, and install a pilot client. This setup is resumable and never
-blocks ordinary controller use. Keep the deployment repository **private**.
+Nixorium opens on four operator areas: Computers, Installation, Software, and
+Maintenance. It does not scan the room at startup. Choose **Installation →
+Install computers** when the lab network is ready. Complete the Laboratory
+settings form; Nixorium validates and saves it, prepares required controller
+state and all configured clients, then asks for confirmation immediately before
+starting PXE. `Esc` from the form returns to the overview without changing the
+file. Keep the deployment repository **private**.
 Long operations show meaningful progress; `l` expands bounded activity details.
 See the [TUI tour and renders](docs/tui-renders.md).
 120×30 is a comfortable terminal size; larger windows keep a bounded reading
-width. The installation screen highlights one next step from observed state: prepare,
-start PXE, boot and install a computer, or recover normal networking.
+width. Network recovery remains a separate advanced control for an interrupted
+PXE transition.
 
-### 6. Prepare and start installation mode
+### 5. Prepare and start installation mode
 
-In that screen, prepare the immutable artifacts and client closures, review the
-network transition, and type the displayed confirmation to start PXE. Existing
-DHCP continues assigning leases.
+The installation flow prepares the immutable artifacts and client closures
+automatically. Review the network transition and type the displayed
+confirmation to start PXE. Existing DHCP continues assigning leases.
 
-### 7. Boot and install the clients
+### 6. Boot and install the clients
 
 Enable UEFI network boot on a client. In the downloaded installer environment,
 run:
@@ -166,27 +167,21 @@ run:
 /installer/setup.sh
 ```
 
-Choose the same configured pilot identity and a target disk. Installation
-begins only after you type a confirmation containing both values. Boot the
-installed disk, return to the controller, and press `v` to check authenticated
-system state. After that succeeds, perform the short practical checklist at
-the client. You may install another computer or press `x` to stop installation
-mode and finish with the remaining clients deferred. `q` reviews the
-consequences and requires `LEAVE PXE ACTIVE` before closing while PXE remains
-active. The selected identity and completed checks are stored in private
-operator state, so reopening the TUI resumes the partial session. Evidence is
-bound to the deployment revision and installed system path; changing the
-laboratory revision requires a new selection and verification.
+Choose that computer's configured identity and its target disk locally.
+Installation begins only after the installer confirms both values and receives
+the exact destructive confirmation. Repeat on any other configured computer.
+When installation is finished, stop PXE from **Installation → PXE mode and
+network recovery** so the controller restores its normal static address.
 
 ## Occasional interventions
 
 Run `nix run .#nixorium` from the private deployment repository. The dashboard
 provides the normal workflows:
 
-- `nixorium setup` resumes the observed first-installation stage and any
-  compatible per-computer installation evidence;
-- on later openings, `Up`/`Down` selects an intervention and `Enter` opens it; the displayed
-  one-letter shortcuts remain available;
+- `nixorium setup` reports the first incomplete setup stage for scripts and
+  troubleshooting; the dashboard owns the interactive installation flow;
+- `Up`/`Down` selects an area and `Enter` opens it; task-local shortcuts are
+  shown only inside their owning area;
 - each workflow shows its available keys; `Esc` returns, and `q` quits outside
   text-entry fields;
 - titles, sections, and ready/attention/failure colors form a consistent visual
@@ -200,13 +195,12 @@ Long builds use phase progress, elapsed time, and bounded recent activity.
 Shorter waits whose work has no honest percentage use an animated spinner plus
 their current plain-language action, so a remote terminal never looks frozen.
 
-| Task | What it does |
+| Area | What it contains |
 |---|---|
-| **Add or change software** | Searches pinned Nix packages, saves the reviewed scope, and builds/activates controller-affecting choices |
-| **Install new computers** | Collects missing laboratory settings, prepares PXE, and guides locally confirmed client installation |
-| **Distribute the prepared system** | Reviews and applies one, selected, or all client configurations with live phase, elapsed-time, verification, and recent-activity feedback |
-| **Shut down computers** | Checks selected clients and sessions, then sends reviewed power-off requests without targeting the controller |
-| **Advanced tools** | Opens restore, Update Nixorium, inventory, settings, controller rebuild, services, logs, changes, and diagnostics |
+| **Computers** | Inventory, distribution, restore/reinstall, and reviewed client shutdown |
+| **Installation** | The continuous Install computers flow plus advanced PXE mode and network recovery |
+| **Software** | Configured packages, pinned package search, scope selection, and reviewed save/apply |
+| **Maintenance** | Settings, controller rebuild/update, services, Git changes, logs, and diagnostics |
 
 Operational commands, JSON output, customization examples, update procedure,
 and recovery semantics live in the

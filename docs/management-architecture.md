@@ -116,17 +116,19 @@ help. Bubbles list/input/progress/viewport primitives may manage interaction
 state, but operational state continues to arrive only through typed
 application callbacks.
 
-The dashboard home presents typed local status above a paginated Bubbles task
-list. Arrow keys plus Enter are the discoverable primary navigation; stable
-one-letter shortcuts remain direct alternatives. Shared semantic styles make
+The dashboard home presents typed local status above four operator areas.
+Arrow keys plus Enter are the discoverable primary navigation; task-local
+shortcuts appear only in their owning area. Shared semantic styles make
 title, sections, descriptions, and ready/attention/failure states visually
 distinct on light and dark terminals while preserving explicit textual labels.
 All routine screens reuse this hierarchy and the official width-adaptive help
 component instead of defining independent color or key-hint conventions.
 Mutating workflows terminate in compact typed result states. Presentation maps
 each result only to existing typed navigation callbacks—for example Git review,
-bounded logs, retry/review, further editing, dashboard, or the observed setup
-checklist—and never performs a follow-up mutation implicitly.
+bounded logs, retry/review, further editing, or dashboard. The computer
+installation flow is the explicit orchestration exception: presentation chains
+only the typed settings, key, controller, artifact and PXE-plan callbacks, and
+stops before the network mutation for exact confirmation.
 All non-terminal dashboard wait states reuse one background-aware official
 Bubbles spinner. It provides liveness only: the accompanying authored activity
 label describes the work, while spinner state is never treated as operational
@@ -419,23 +421,21 @@ No legacy migration workflow is in product scope because managed deployments
 are new; setup optimizes for `lab-settings.json` while preserving upstream
 standalone compatibility.
 
-## First-run state machine
+## Computer-installation state machine
 
-Setup is a resumable reconciliation, not a linear script or a single
-`configured` flag. Its stages are:
+Installation is a resumable reconciliation, not a single `configured` flag.
+The ordinary TUI presents it as one continuous operation:
 
 ```text
 inspect environment
-  -> collect network settings
-  -> collect lab identity and locale
-  -> collect and hash credentials
-  -> reconcile key material
-  -> validate candidate configuration
-  -> review and accept Git changes
+  -> collect complete laboratory settings and credentials
+  -> validate and save managed configuration
+  -> create, verify and install missing key material
   -> apply controller configuration
   -> prepare installation artifacts
-  -> verify readiness
-  -> offer first client installation
+  -> verify PXE readiness
+  -> confirm the network transition
+  -> start PXE
 ```
 
 The private deployment records only non-secret intent and completed review
@@ -443,12 +443,13 @@ decisions. Runtime completion is inferred from configuration, public/private
 key correspondence, system generations, service state, and artifact metadata.
 Per-host deployment history is observed operational evidence stored outside the
 private Git repository, not declarative configuration or a setup stage marker.
-On restart, setup re-runs safe inspections and selects the earliest unmet
-stage. Going backward changes draft values without undoing applied operations.
+On restart, the flow re-runs safe inspections and selects the earliest unmet
+stage. `Esc` while editing settings returns to the overview without writing.
 
 The implemented setup slices expose read-only reconciliation through
-`nixorium setup status`, guided configuration through `nixorium setup`, and
-explicit key reconciliation through `nixorium setup keys`. The wizard proposes
+`nixorium setup` and `nixorium setup status`, standalone guided configuration
+through `nixorium setup configure`, and explicit key reconciliation through
+`nixorium setup keys`. The wizard proposes
 the default-route interface and a non-static IPv4 address observed on that
 interface, so an already-active declarative controller address cannot mask the
 live DHCP lease. It groups 12 essential questions into Network, Laboratory,
@@ -459,21 +460,21 @@ keyboard selections. Both visible choices use offline Bubbles lists with fuzzy
 filtering, curated common values, and a validated custom path. Optional Git author identity retains the deployment
 template defaults instead of extending first run. The wizard retains entries
 across backward navigation, collects default credentials without echo, and
-uses the same candidate-plan/apply backend as automation. After acceptance,
-bare `setup` continues into idempotent key reconciliation and opens a
-stage-aware Bubble Tea progress screen. Its primary action routes from the
-observed current stage into the existing bounded Git review/commit, controller
-review/apply, PXE preparation, and first network-installation screens.
-Reopening bare setup skips completed configuration stages; `setup configure`
-limits the run to settings.
+uses the same candidate-plan/apply backend as automation. The dashboard's
+**Installation → Install computers** action validates and saves the complete
+form without a second review, creates missing keys, activates the controller,
+and prepares every configured client. Existing valid keys are reused; importing
+an existing private key is available only under Maintenance settings. The flow
+shows each phase and stops only at the exact PXE-start confirmation, immediately
+before the controller's static address is removed. Reopening it skips
+prerequisites already observed as current.
 Status derives stage state from the managed settings,
 required commands, password-hash readiness, verified key correspondence and
 private modes, clean Git review state, Nix evaluation, artifacts, and
 `deploymentStatus`; it never advances a stage by writing a global completion
-flag. The final offer stage becomes complete only when deployment readiness and
-the current revision-bound PXE preparation are both observed; its detail routes
-the administrator to **Install computers over network** without recording or
-implying that any client installation has completed.
+flag. Readiness never records or implies that any client installation has
+completed. Client identity and destructive disk confirmation remain local to
+the downloaded installer; the controller does not require a pilot selection.
 
 Key creation uses create-new semantics. Existing keys are verified and reused;
 they are never overwritten. Regeneration is a separately named recovery action
@@ -518,7 +519,8 @@ authentication design.
 
 The first implemented privileged action is
 `nixorium-install-secrets.service`, reached only through `nixorium setup
-install-secrets` (or bare guided setup). It reads the declaratively fixed,
+install-secrets` or the typed continuous installation flow. It reads the
+declaratively fixed,
 administrator-owned deployment, re-verifies all three pairs, and copies them
 only to fixed SSH, Veyon, and Harmonia destinations. Its polkit rule permits
 wheel members to start that exact unit only. The systemd sandbox makes the

@@ -51,41 +51,27 @@ cd ~/nixorium-deployment
 nixorium
 ```
 
-The controller is already usable. Choose **Install new computers** when the lab
-network is ready. That resumable path collects the client network and inventory,
-creates or imports key pairs, applies the controller, prepares installation
-artifacts, and opens guided PXE installation. Repository commits remain an
-internal storage detail.
+The controller is already usable. Choose **Installation → Install computers**
+when the lab network is ready. Complete the single **Laboratory settings** form;
+`Esc` returns directly to the overview without changing the file. On completion
+Nixorium validates and saves the managed settings without a separate save
+review, creates missing controller keys automatically, activates the saved
+controller configuration, and prepares the netboot artifacts plus every
+configured client closure. Importing an existing key is an advanced action
+under **Maintenance → Change settings → Advanced keys**.
 
-It then opens a resumable first-run checklist. Follow the highlighted next
-step with `Enter`:
-
-1. **Review and save configuration.** Review the complete redacted settings
-   proposal and save it. Nixorium records the managed configuration locally;
-   repository mechanics and private keys are not exposed in this flow.
-2. **Activate the controller.** Review the exact revision, type its displayed
-   confirmation, and wait for the verified result. Press `Enter` to return to
-   the setup checklist.
-3. **Prepare installation files.** Press `Enter`; progress and recent activity
-   remain visible while Nix builds the netboot artifacts and client systems.
-4. **Install the first computer.** Open network installation, start PXE after
-   its explicit network review, choose a pilot identity from the saved
-   inventory, and boot that client from UEFI network boot. After the local
-   identity-and-disk confirmation and installed-disk boot, press `v` on the
-   controller to verify authenticated active-revision evidence. Complete the
-   separate practical desktop check, then install another client or stop PXE
-   and defer the rest. Reopening the TUI restores the selected identity and
-   completed checks from private operator state when they still match the
-   current deployment revision and evaluated inventory.
+The same screen shows progress through configuration, controller activation,
+and client preparation. The only confirmation in this path appears immediately
+before PXE starts, because that operation temporarily removes the controller's
+static laboratory address. After confirmation, boot any configured client from
+UEFI network boot. The downloaded installer asks for that computer's identity
+and confirms the target disk locally before erasing it; no pilot computer or
+controller-side client selection is required.
 
 You can press `q` at any safe point. While PXE is active, leaving it active is a
 separate exact-confirmation choice; stopping PXE restores normal controller
-networking. Running the setup command again observes
-Git, keys, the active controller, and prepared artifacts, then resumes at the
-first incomplete stage instead of repeating completed work. Installation
-evidence is stored outside Git under the administrator's private state
-directory; it records a past authenticated check, not current reachability or
-permission to erase a disk.
+networking. Running the installation flow again revalidates the settings and
+skips already current prerequisites before preparing the clients.
 
 The bootstrap installer already created and committed this private deployment.
 It preserved the selected update channel in `flake.nix` while binding the
@@ -181,12 +167,11 @@ Run the task-oriented dashboard from the repository root:
 nixorium
 ```
 
-The opening screen asks which intervention you intend to perform. It does not
-scan clients or treat powered-off computers as unhealthy. `Up`/`Down` selects
-software, new-computer installation, distribution, reviewed client shutdown,
-or Advanced tools. Restore and Update Nixorium live under Advanced. `?` opens help; `F1`
-also works in text fields.
-Advanced Computer inventory performs the explicit client check and supports `/`
+The opening screen offers Computers, Installation, Software, and Maintenance.
+It does not scan clients or treat powered-off computers as unhealthy.
+`Up`/`Down` selects an area and task-local shortcuts appear only inside their
+owning area. `?` opens help; `F1` also works in text fields. Computer inventory
+performs the explicit client check and supports `/`
 search, Enter for detail, `t` for technical evidence, `d` for a focused
 deployment, and `i` for diagnostics.
 Every state has a symbol and text as well as semantic color. Each workflow displays its
@@ -205,13 +190,12 @@ Operations without a meaningful percentage—such as host checks, settings
 validation, Git/service loading, or update planning—display a shared animated
 spinner and the current plain-language action.
 
-| Dashboard task | Purpose |
+| Area | Purpose |
 |---|---|
-| **Add or change software** | Search pinned packages, save the reviewed scope, and apply controller-affecting changes |
-| **Install new computers** | Configure missing lab prerequisites, prepare PXE, and guide installation |
-| **Distribute the prepared system** | Plan and apply one or more client configurations |
-| **Shut down computers** | Check sessions and send reviewed power-off requests to selected clients only |
-| **Advanced tools** | Restore, update Nixorium, inspect inventory/settings, rebuild, inspect services/logs, and diagnose |
+| **Computers** | Inspect, distribute, restore/reinstall, or shut down selected clients |
+| **Installation** | Run the continuous Install computers flow or use advanced PXE recovery controls |
+| **Software** | Review configured packages, search the pin, choose scope, and save/apply changes |
+| **Maintenance** | Change settings, update/rebuild the controller, inspect services, Git, logs, and diagnostics |
 
 The initial dashboard and `status` are local and do not probe clients. Add
 `--json` to supported CLI commands for structured output. Use `doctor` for
@@ -456,9 +440,9 @@ nix run .#nixorium -- setup install-secrets
 nix run .#nixorium -- setup apply
 ```
 
-`setup` records the interface carrying the controller's default route as a
-controller-specific override and proposes its live DHCP address (not the
-controller's declarative static address), groups its essential
+`setup configure` records the interface carrying the controller's default
+route as a controller-specific override and proposes its live DHCP address
+(not the controller's declarative static address), groups its essential
 questions by task, and provides searchable offline selectors for time zone,
 locale, and keyboard values while retaining validated custom entry. Optional
 Git identity is not requested during first run. The wizard supports backward
@@ -466,9 +450,12 @@ navigation, collects passwords without echo, retries recoverable password
 mistakes in the current account without restarting configuration, validates
 the complete candidate, shows a redacted review, writes atomically after
 acceptance, and reconciles all three key pairs. It never overwrites existing
-key material. Bare `setup` then opens the stage-aware first-run checklist;
-explicit `setup configure` stops after configuration. `setup status` observes
-the first incomplete stage without trusting a hidden completion flag.
+key material. Bare `setup` and `setup status` report the first incomplete stage
+without trusting a hidden completion flag; run `nixorium` and choose
+**Installation → Install computers** for the continuous interactive flow. The
+ordinary TUI flow creates missing keys
+automatically; import of existing private keys is available only from
+**Maintenance → Change settings → Advanced keys**.
 
 `lab.ifaceName` remains the backward-compatible fallback. Optional
 `controllerIfaceName` and `clientIfaceName` select role defaults, while

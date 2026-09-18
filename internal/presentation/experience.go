@@ -159,7 +159,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardComputersArea:
 		lines = append(lines, "Choose inventory, distribute, restore or shut down.", "Observed state is loaded only by the task that needs it.")
 	case dashboardInstallationArea:
-		lines = append(lines, "Install a computer guides one physical machine from identity selection to verification.", "PXE mode and network recovery is the advanced controller-side view.")
+		lines = append(lines, "Install computers validates and saves laboratory settings, prepares every configured client, then asks once before starting PXE.", "PXE mode and network recovery is the advanced controller-side view.")
 	case dashboardRestore:
 		lines = append(lines, "Choose reapply to keep the disk, or reinstall to erase", "the disk confirmed locally on each selected computer.")
 	case dashboardAdministration:

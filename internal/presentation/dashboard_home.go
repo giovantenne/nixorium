@@ -35,7 +35,7 @@ var computersAreaTasks = []dashboardTask{
 }
 
 var installationAreaTasks = []dashboardTask{
-	{id: "install", shortcut: "n", title: "Install a computer", description: "Guided workflow: choose its configured identity, start PXE and verify the installation"},
+	{id: "install", shortcut: "n", title: "Install computers", description: "Validate laboratory settings, prepare every configured client and start network installation"},
 	{id: "pxe", shortcut: "p", title: "PXE mode and network recovery", description: "Advanced controls for network boot and interrupted controller networking"},
 }
 

@@ -275,6 +275,12 @@ func (model dashboardModel) settingsView() string {
 		intro = "Complete the required laboratory settings here, then return to setup."
 		backLabel = "Setup"
 	}
+	if model.installationFlow {
+		path = []string{"Installation", "Laboratory settings"}
+		title = "Laboratory settings"
+		intro = "Review the laboratory values. Nixorium validates and saves them when the form is complete."
+		backLabel = "Overview"
+	}
 	if model.busy != "" {
 		return renderTUIShell(tuiShell{path: path, body: tuiTitle(title, model.isDark) + "\n\n" + model.busyView(), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
@@ -321,11 +327,11 @@ func (model dashboardModel) settingsView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "k", label: "Advanced keys"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func (model dashboardModel) settingsPasswordsView() string {
-	if model.settingsReturn == dashboardSetup {
+	if model.settingsReturn == dashboardSetup || model.installationFlow {
 		lines := []string{
 			tuiTitle("Account passwords", model.isDark),
 			"Enter the administrator, teacher, and student passwords in one protected session.",
@@ -335,7 +341,13 @@ func (model dashboardModel) settingsPasswordsView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: []string{"Installation", "Setup", "Settings", "Passwords"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Collect passwords"}, {key: "Esc", label: "Cancel setup settings"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		path := []string{"Installation", "Setup", "Settings", "Passwords"}
+		cancelLabel := "Cancel setup settings"
+		if model.installationFlow {
+			path = []string{"Installation", "Laboratory settings", "Passwords"}
+			cancelLabel = "Cancel installation"
+		}
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Collect passwords"}, {key: "Esc", label: cancelLabel}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	lines := []string{
 		tuiTitle("Change password", model.isDark),

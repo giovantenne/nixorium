@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/spinner"
@@ -25,8 +26,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.report = message.report
 		model.setup = message.setup
 		if model.setupMode || setupNeedsImmediateAttention(message.setup) {
-			model.setupMode = true
-			model.screen = dashboardSetup
+			return model.startComputerInstallation()
 		} else {
 			model.screen = dashboardHome
 		}
@@ -57,6 +57,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardSetupMsg:
 		model.busy = ""
 		model.setup = message.report
+		if model.installationFlow {
+			return model.continueComputerInstallation(message.report)
+		}
 		model.screen = dashboardSetup
 		return model, nil
 	case dashboardSetupKeyStatusMsg:
@@ -79,6 +82,37 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardSetupKeysMsg:
 		model.busy = ""
+		if model.installationFlow {
+			switch {
+			case message.keyErr != nil:
+				return model.failComputerInstallation("Controller key preparation failed: " + message.keyErr.Error())
+			case message.keys.State != "ready":
+				return model.failComputerInstallation("Controller key preparation did not complete.")
+			case message.save.HasErrors():
+				return model.failComputerInstallation(message.save.Message)
+			case message.install.HasErrors():
+				return model.failComputerInstallation("Controller keys are ready, but protected installation failed: " + message.install.Message)
+			}
+			model.busy = "Checking saved laboratory configuration"
+			return model, model.loadSetup()
+		}
+		if model.setupKeysReturn == dashboardSettings {
+			switch {
+			case message.keyErr != nil:
+				model.message = "Key preparation needs attention: " + message.keyErr.Error()
+			case message.keys.State != "ready":
+				model.message = "Key preparation did not complete."
+			case message.save.HasErrors():
+				model.message = message.save.Message
+			case message.install.HasErrors():
+				model.message = "Keys are ready, but protected installation failed: " + message.install.Message
+			default:
+				model.message = "Controller keys are ready and installed."
+			}
+			model.setupKeys = message.keys
+			model.screen = dashboardSettings
+			return model, nil
+		}
 		switch {
 		case message.keyErr != nil:
 			model.message = "Key preparation needs attention: " + message.keyErr.Error()
@@ -99,6 +133,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardSetupSaveMsg:
 		model.busy = ""
+		if model.installationFlow {
+			if message.report.HasErrors() || (message.report.State != "saved" && message.report.State != "unchanged") {
+				return model.failComputerInstallation(message.report.Message)
+			}
+			model.busy = "Checking saved laboratory configuration"
+			return model, model.loadSetup()
+		}
 		model.message = message.report.Message
 		model.screen = dashboardSetup
 		if model.actions.LoadSetup != nil {
@@ -110,6 +151,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.startPlan = message.report
 		if message.report.HasErrors() {
+			if model.installationFlow {
+				return model.failComputerInstallation(message.report.Message)
+			}
 			model.message = message.report.Message
 			model.screen = dashboardPXE
 			return model, nil
@@ -117,12 +161,35 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.report.Mode == "active" {
 			model.message = "PXE installation mode is already active."
 			model.screen = dashboardPXE
+			model.installationFlow = false
 			return model, nil
 		}
 		model.confirmation = ""
 		model.message = ""
 		model.screen = dashboardPXEStartReview
 		return model, nil
+	case dashboardInstallationPrepareMsg:
+		model.busy = ""
+		model.pxePreparing = false
+		if message.statusErr == nil {
+			model.report = message.status
+		}
+		if message.report.HasErrors() {
+			return model.failComputerInstallation("Client preparation failed: " + message.report.Message)
+		}
+		model.message = message.report.Message
+		model.installationStage = 5
+		if model.actions.PlanPXEStart == nil {
+			return model.failComputerInstallation("PXE start validation is not available in this session.")
+		}
+		model.busy = "Checking PXE readiness"
+		plan := func() tea.Msg {
+			return dashboardPlanMsg{report: model.actions.PlanPXEStart()}
+		}
+		if model.actions.LoadPXEProgress != nil {
+			return model, tea.Batch(model.loadPXEProgress(model.pxeProgressID), plan)
+		}
+		return model, plan
 	case dashboardOperationMsg:
 		preparationFinished := model.pxePreparing && message.screen == dashboardPXE
 		model.busy = ""
@@ -136,6 +203,12 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.report = message.report
 		}
 		model.screen = message.screen
+		if model.installationFlow && message.screen == dashboardPXE && model.report.PXE.Mode == "active" {
+			model.installationFlow = false
+			model.installationFailed = false
+			model.setupMode = false
+			model.areaReturn = dashboardHome
+		}
 		if message.screen == dashboardPXE && model.guidedInstallation() && model.pilotPractical && model.report.PXE.Mode != "active" {
 			model.pilotName = ""
 			model.pilotPractical = false
@@ -230,6 +303,31 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardControllerPlanMsg:
 		model.busy = ""
 		model.controllerPlan = message.report
+		if model.installationFlow {
+			if message.report.HasErrors() {
+				return model.failComputerInstallation(controllerPlanIssues(message.report))
+			}
+			if message.report.Current {
+				model.busy = "Checking installation prerequisites"
+				return model, model.loadSetup()
+			}
+			model.busy = "Building and activating the laboratory controller"
+			model.controllerApplying = true
+			model.controllerProgress = domain.OperationProgress{}
+			model.controllerStarted = time.Now().UTC()
+			model.controllerProgressID++
+			plan := message.report
+			operation := func() tea.Msg {
+				report := model.actions.ApplyController(plan)
+				status := domain.StatusReport{}
+				var err error
+				if model.actions.Refresh != nil {
+					status, err = model.actions.Refresh()
+				}
+				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
+			}
+			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controllerProgressID))
+		}
 		if message.report.HasErrors() {
 			model.message = controllerPlanIssues(message.report)
 			model.screen = dashboardController
@@ -250,6 +348,17 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message += "; dashboard refresh failed: " + message.statusErr.Error()
 		} else {
 			model.report = message.status
+		}
+		if model.installationFlow {
+			model.screen = dashboardPXE
+			if message.report.HasErrors() || !message.report.Applied || !message.report.Verified {
+				return model.failComputerInstallation("Controller activation failed: " + message.report.Message)
+			}
+			model.busy = "Checking installation prerequisites"
+			if model.actions.LoadControllerProgress != nil {
+				return model, tea.Batch(model.loadControllerProgress(model.controllerProgressID), model.loadSetup())
+			}
+			return model, model.loadSetup()
 		}
 		model.screen = dashboardController
 		if model.actions.LoadControllerProgress != nil {
@@ -390,6 +499,10 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = ""
 		if message.err != nil {
 			model.message = "Settings could not be loaded: " + message.err.Error()
+			if model.installationFlow {
+				model.installationFlow = false
+				model.installationFailed = false
+			}
 			if model.settingsReturn == dashboardSetup {
 				model.screen = dashboardSetup
 			} else {
@@ -401,16 +514,12 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		if model.startingLabSetup {
 			model.startingLabSetup = false
-			if model.settings.Lab.DeploymentMode != "controller" {
-				model.screen = dashboardSetup
-				model.message = "Continuing the existing computer installation setup."
-				return model, nil
-			}
 			model.settings.Lab.DeploymentMode = "laboratory"
 			if model.settings.Lab.PCCount == 0 {
 				model.settings.Lab.PCCount = 20
 			}
-			model.settingsEditor = newSettingsEditorModel(model.settings, clientSetupFields, "Nixorium — Install new computers / Laboratory network")
+			model.settingsCollectPasswords = model.settings.Lab.AdminPassword == domain.DefaultPasswordHash || model.settings.Lab.TeacherPassword == domain.DefaultPasswordHash || model.settings.Lab.StudentPassword == domain.DefaultPasswordHash
+			model.settingsEditor = newSettingsEditorModel(model.settings, settingsFields, "Nixorium — Install computers / Laboratory settings")
 			model.settingsEditor.width = model.width
 			model.settingsEditor.height = model.height
 			model.settingsEditor.isDark = model.isDark
@@ -438,8 +547,12 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settingsPlan = message.report
 		if message.report.HasErrors() {
 			model.message = "Candidate validation failed: " + settingsIssueMessage(message.report.Issues)
-			if model.settingsReturn == dashboardSetup {
-				model.settingsEditor = newSettingsEditorModel(model.settingsCandidate, settingsFields, "Nixorium — First setup / Laboratory settings")
+			if model.settingsReturn == dashboardSetup || model.installationFlow {
+				title := "Nixorium — First setup / Laboratory settings"
+				if model.installationFlow {
+					title = "Nixorium — Install computers / Laboratory settings"
+				}
+				model.settingsEditor = newSettingsEditorModel(model.settingsCandidate, settingsFields, title)
 				model.settingsEditor.index = len(model.settingsEditor.fields) - 1
 				model.settingsEditor.accepted = false
 				model.settingsEditor.err = model.message
@@ -449,6 +562,20 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				model.screen = dashboardSettings
 			}
 			return model, nil
+		}
+		if model.installationFlow {
+			if model.actions.SaveSettings == nil {
+				return model.failComputerInstallation("Laboratory settings cannot be saved in this session.")
+			}
+			model.installationStage = 1
+			model.busy = "Saving the validated laboratory settings"
+			model.settingsApplying = true
+			model.message = ""
+			candidate := model.settingsCandidate
+			plan := model.settingsPlan
+			return model, func() tea.Msg {
+				return dashboardSettingsApplyMsg{report: model.actions.SaveSettings(candidate, plan)}
+			}
 		}
 		if len(message.report.Changes) == 0 {
 			model.message = "No managed settings changed."
@@ -462,7 +589,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = ""
 		if message.err != nil {
 			model.message = "Password change failed: " + message.err.Error()
-			if model.settingsReturn == dashboardSetup && message.candidate.SchemaVersion != 0 {
+			if (model.settingsReturn == dashboardSetup || model.installationFlow) && message.candidate.SchemaVersion != 0 {
 				model.settingsCandidate = message.candidate
 			}
 			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
@@ -492,6 +619,20 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			if model.message == "" {
 				model.message = "Configuration save failed: " + settingsIssueMessage(message.report.Issues)
 			}
+		}
+		if model.installationFlow {
+			if message.report.HasErrors() || (message.report.State != "saved" && message.report.State != "unchanged") {
+				return model.failComputerInstallation(message.report.Message)
+			}
+			model.settings = model.settingsCandidate
+			model.settingsReturn = dashboardHome
+			model.screen = dashboardPXE
+			model.busy = "Checking installation prerequisites"
+			model.message = ""
+			if model.actions.LoadSetup == nil {
+				return model.failComputerInstallation("Installation prerequisite checks are not available in this session.")
+			}
+			return model, model.loadSetup()
 		}
 		if model.settingsReturn == dashboardSetup && !message.report.HasErrors() && (message.report.State == "saved" || message.report.State == "unchanged") {
 			model.settingsReturn = dashboardHome
