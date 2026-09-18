@@ -1198,10 +1198,11 @@ func (model dashboardModel) updateView() string {
 		return model.releaseReviewView()
 	}
 	if model.updateCheck.HasErrors() {
+		failureTitle, failureDetail := updateCheckFailureSummary(model.updateCheck)
 		lines = append(lines,
-			tuiResult("Updates could not be fetched", false, model.isDark),
+			tuiResult(failureTitle, false, model.isDark),
 			"",
-			"Nixorium could not obtain a usable update list from the configured upstream.",
+			failureDetail,
 			"No candidate can be selected and no file changed.",
 		)
 		notices := []tuiNotice{}
@@ -1276,6 +1277,18 @@ func displayRunningVersion(version string) string {
 		return "unknown"
 	}
 	return version
+}
+
+func updateCheckFailureSummary(report domain.UpdateCheckReport) (string, string) {
+	if len(report.Issues) > 0 {
+		switch report.Issues[0].Field {
+		case "input", "repository":
+			return "Update setup needs attention", "Nixorium could not read a supported update source from this deployment."
+		case "releases":
+			return "No supported updates found", "The configured upstream responded but did not advertise a supported branch or release."
+		}
+	}
+	return "Updates could not be fetched", "Nixorium could not obtain an update list from the configured upstream."
 }
 
 func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
