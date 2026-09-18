@@ -58,6 +58,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Added live, typed progress to Nixorium update validation: the TUI now names
+  candidate-lock generation, evaluation, each representative output build,
+  review preparation, and the final unchanged-deployment check, with elapsed
+  time and an output counter. Controller rebuild and Nixorium update reviews
+  now use Enter after the visible review instead of requiring `REBUILD ...` or
+  `UPDATE NIXORIUM TO ...` phrases; CLI confirmations remain unchanged.
+
 - Simplified the ordinary computer-installation TUI into one continuous flow:
   Laboratory settings are validated and saved without a separate review,
   missing controller keys, controller prerequisites, and all client closures
@@ -65,6 +72,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   settings, and the only confirmation is the network-impact review immediately
   before PXE starts. The former pilot-computer selection is no longer part of
   this path; PXE recovery remains available through the advanced control.
+  Time zone and keyboard are inherited from the installed controller instead
+  of being asked again. Switching a controller-only system to laboratory mode
+  now also applies its static address during live activation, before the
+  confirmed PXE transition removes it.
 
 - Prevented first-run and routine controller activation from terminating their
   own systemd job when a Nixorium update changes the management command's store

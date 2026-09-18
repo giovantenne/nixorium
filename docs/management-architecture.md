@@ -319,9 +319,10 @@ screens follow this structure. Presentation callbacks invoke typed PXE
 lifecycle, host-inspection, deployment, shutdown, and upstream-update services; the TUI
 itself contains no command execution, log creation, locking, systemd policy,
 network/filesystem mutation, or CLI-output parsing. It renders reconciled state,
-runs host probes only when the inventory is opened/refreshed, shows exact
-PXE/deployment/update reviews, and requires the operation-specific confirmation
-phrase. Long-lived PXE services remain under systemd when the view exits;
+runs host probes only when the inventory is opened/refreshed, and shows exact
+PXE/deployment/update reviews. Typed phrases remain reserved for destructive or
+especially easy-to-mistarget actions; controller and framework update reviews
+use Enter after a separate visible review. Long-lived PXE services remain under systemd when the view exits;
 foreground Colmena deployment and update apply instead block accidental TUI
 exit until their typed final result is available.
 Colmena intentionally remains an unprivileged child of the administrator
@@ -335,8 +336,9 @@ state and a new revision-bound plan. A user-systemd executor is deferred because
 logout survival would also require linger policy and a durable job/result
 protocol; it is not introduced merely to move the same process out of view.
 The controller screen follows the same boundary: Bubble Tea renders the typed
-revision/current-state plan, collects exact `REBUILD <controller>` confirmation,
-and invokes the application callback. The systemd-owned rebuild may outlive the
+revision/current-state plan and invokes the application callback only after a
+second Enter on the review. The CLI retains its exact `REBUILD <controller>`
+confirmation. The systemd-owned rebuild may outlive the
 dashboard and retains its build/activation journal. Completion refreshes the
 ordinary typed dashboard status, presents a compact result, and leaves bounded
 activity available on demand with explicit dashboard, log, and review routes.
@@ -449,7 +451,7 @@ stage. `Esc` while editing settings returns to the overview without writing.
 The implemented setup slices expose read-only reconciliation through
 `nixorium setup` and `nixorium setup status`, standalone guided configuration
 through `nixorium setup configure`, and explicit key reconciliation through
-`nixorium setup keys`. The wizard proposes
+`nixorium setup keys`. The first-run wizard proposes
 the default-route interface and a non-static IPv4 address observed on that
 interface, so an already-active declarative controller address cannot mask the
 live DHCP lease. It groups 12 essential questions into Network, Laboratory,
@@ -462,9 +464,11 @@ template defaults instead of extending first run. The wizard retains entries
 across backward navigation, collects default credentials without echo, and
 uses the same candidate-plan/apply backend as automation. The dashboard's
 **Installation → Install computers** action validates and saves the complete
-form without a second review, creates missing keys, activates the controller,
-and prepares every configured client. Existing valid keys are reused; importing
-an existing private key is available only under Maintenance settings. The flow
+form without a second review, while omitting time zone and keyboard because the
+installed controller values are retained. It creates missing keys, activates
+the controller, and prepares every configured client. Existing valid keys are
+reused; importing an existing private key is available only under Maintenance
+settings. The flow
 shows each phase and stops only at the exact PXE-start confirmation, immediately
 before the controller's static address is removed. Reopening it skips
 prerequisites already observed as current.
@@ -824,9 +828,9 @@ the controller and populate the shared Nix store, but it does not deploy or
 introduce client internet access. The report contains current reference and
 revision, target/channel, bounded redacted `flake.nix`/`flake.lock` patch,
 validation results, a token bound to HEAD plus both original/candidate file
-digests, and exact confirmation.
+digests, and an exact confirmation phrase for CLI apply.
 
-Apply takes the same target and opt-ins, repeats the complete plan so cached
+CLI apply takes the same target and opt-ins, repeats the complete plan so cached
 builds are normally reused, and requires the exact token and confirmation. It
 then takes the same deployment-root lock used by managed configuration writes,
 rechecks HEAD, clean Git state, and both original file digests, writes sibling
@@ -840,13 +844,19 @@ The explicit CLI apply result is deliberately an uncommitted, reviewable change
 to only `flake.nix` and `flake.lock`. The ordinary TUI records that exact pair
 locally through the bounded managed-configuration save after the update review;
 repository mechanics remain available only under Advanced. Deployment remains
-a separate explicit operation. Update never creates or switches branches,
-merges, pushes, activates the controller, prepares PXE artifacts, or deploys
-clients. The TUI reuses these typed operations and does not own Nix, network,
+a separate explicit operation. The update plan/apply primitives never create
+or switch branches, merge, push, activate the controller, prepare PXE artifacts,
+or deploy clients. After a successful managed save, the ordinary TUI invokes
+the separate typed controller plan/apply boundary. It does not own Nix, network,
 filesystem, or repository mutation logic. Its **Update Nixorium** task selects
 only a discovered Development master or release, renders all typed candidate
-checks plus a bounded scrollable patch, requires the exact plan confirmation,
-and prevents exit only during the short save callback. Candidate planning
+checks plus a bounded scrollable patch, and accepts Enter on that review while
+retaining the token-bound apply boundary. Candidate planning emits authored
+phase events for lock generation, metadata/readiness evaluation, every
+representative build, review preparation, and the final repository recheck;
+the TUI renders those events with elapsed time and never parses Nix output.
+It prevents exit during the save and subsequent controller activation.
+Candidate planning
 remains safe to cancel; the TUI does not offer downgrade targets.
 
 Privileged/systemd operations retain detailed output in journald. Foreground

@@ -196,6 +196,10 @@ func ProposedUpdateFlake(snapshot domain.UpdateInputSnapshot, target string) ([]
 }
 
 func (Local) PrepareUpdate(ctx context.Context, repository, target string) (domain.UpdateProposal, error) {
+	return (Local{}).PrepareUpdateWithProgress(ctx, repository, target, nil)
+}
+
+func (Local) PrepareUpdateWithProgress(ctx context.Context, repository, target string, progress func(domain.UpdatePlanProgress)) (domain.UpdateProposal, error) {
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return domain.UpdateProposal{}, err
 	}
@@ -224,6 +228,7 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseLock, "Resolving the selected release and generating its candidate lock", 0, 0)
 	if _, err := runBoundedNix(ctx, 256*1024, "flake", "lock", flake, "--override-input", "nixorium", targetURL, "--output-lock-file", lockPath); err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("generate candidate flake.lock: %w", err)
 	}
@@ -235,6 +240,7 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 		return domain.UpdateProposal{}, fmt.Errorf("validate candidate package-base pin: %w", err)
 	}
 	common := []string{"--override-input", "nixorium", targetURL, "--reference-lock-file", lockPath, "--no-write-lock-file"}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Evaluating candidate laboratory metadata", 0, 0)
 	metaOutput, err := runBoundedNix(ctx, 1024*1024, append([]string{"eval", flake + "#labMeta", "--json"}, common...)...)
 	if err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("evaluate candidate labMeta: %w", err)
@@ -243,6 +249,7 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 	if err := json.Unmarshal([]byte(metaOutput), &meta); err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("decode candidate labMeta: %w", err)
 	}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Evaluating candidate deployment readiness", 0, 0)
 	statusOutput, err := runBoundedNix(ctx, 1024*1024, append([]string{"eval", flake + "#deploymentStatus", "--json"}, common...)...)
 	if err != nil {
 		return domain.UpdateProposal{}, fmt.Errorf("evaluate candidate deploymentStatus: %w", err)
@@ -255,13 +262,15 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
-	for _, build := range builds {
+	for index, build := range builds {
+		emitUpdateProgress(progress, domain.UpdatePlanPhaseBuild, "Building "+updateBuildLabel(build.id), index+1, len(builds))
 		arguments := append([]string{"build", flake + "#" + build.attribute, "--no-link"}, common...)
 		if _, err := runBoundedNix(ctx, 256*1024, arguments...); err != nil {
 			return domain.UpdateProposal{}, fmt.Errorf("build candidate %s: %w", build.id, err)
 		}
 		checks = append(checks, domain.UpdateCheck{ID: build.id, State: "passed", Message: "candidate output built without a result link"})
 	}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseReview, "Preparing the bounded flake.nix and flake.lock review", 0, 0)
 	diff, err := updateProposalDiff(ctx, snapshot.FlakeContent, proposedFlake, snapshot.LockContent, proposedLock)
 	if err != nil {
 		return domain.UpdateProposal{}, err
@@ -272,6 +281,30 @@ func (Local) PrepareUpdate(ctx context.Context, repository, target string) (doma
 		Diff:         domain.GitDiff{Scope: "nixorium-update", Content: diff},
 		Checks:       checks,
 	}, nil
+}
+
+func emitUpdateProgress(progress func(domain.UpdatePlanProgress), phase domain.UpdatePlanPhase, detail string, current, total int) {
+	if progress == nil {
+		return
+	}
+	progress(domain.UpdatePlanProgress{Phase: phase, Detail: detail, Current: current, Total: total})
+}
+
+func updateBuildLabel(id string) string {
+	switch id {
+	case "client":
+		return "the representative client"
+	case "controller":
+		return "the controller"
+	case "netboot":
+		return "the netboot environment"
+	case "pxe-firmware":
+		return "the PXE firmware"
+	case "installer-bundle":
+		return "the offline installer bundle"
+	default:
+		return "candidate output " + id
+	}
 }
 
 func preserveDeploymentInputNode(before, after []byte, inputName string) error {

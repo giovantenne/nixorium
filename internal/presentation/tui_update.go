@@ -451,7 +451,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.screen = dashboardUpdate
 		return model, nil
+	case dashboardUpdatePlanProgressMsg:
+		if !model.updatePlanning || model.updatePlanEvents == nil {
+			return model, nil
+		}
+		model.updatePlanProgress = message.progress
+		model.busy = message.progress.Detail
+		return model, waitForUpdatePlanEvent(model.updatePlanEvents)
 	case dashboardUpdatePlanMsg:
+		model.updatePlanning = false
+		model.updatePlanEvents = nil
 		model.busy = ""
 		model.updatePlan = message.report
 		if message.report.HasErrors() {
@@ -519,7 +528,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				model.settings.Lab.PCCount = 20
 			}
 			model.settingsCollectPasswords = model.settings.Lab.AdminPassword == domain.DefaultPasswordHash || model.settings.Lab.TeacherPassword == domain.DefaultPasswordHash || model.settings.Lab.StudentPassword == domain.DefaultPasswordHash
-			model.settingsEditor = newSettingsEditorModel(model.settings, settingsFields, "Nixorium — Install computers / Laboratory settings")
+			model.settingsEditor = newSettingsEditorModel(model.settings, installationSettingsFields, "Nixorium — Install computers / Laboratory settings")
 			model.settingsEditor.width = model.width
 			model.settingsEditor.height = model.height
 			model.settingsEditor.isDark = model.isDark
@@ -552,7 +561,11 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				if model.installationFlow {
 					title = "Nixorium — Install computers / Laboratory settings"
 				}
-				model.settingsEditor = newSettingsEditorModel(model.settingsCandidate, settingsFields, title)
+				fields := settingsFields
+				if model.installationFlow {
+					fields = installationSettingsFields
+				}
+				model.settingsEditor = newSettingsEditorModel(model.settingsCandidate, fields, title)
 				model.settingsEditor.index = len(model.settingsEditor.fields) - 1
 				model.settingsEditor.accepted = false
 				model.settingsEditor.err = model.message

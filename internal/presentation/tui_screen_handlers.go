@@ -759,27 +759,13 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		switch key.String() {
 		case "esc":
 			model.screen = dashboardController
-			model.confirmation = ""
 			model.message = "Controller rebuild cancelled; no action was started."
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != model.controllerPlan.Confirmation {
-				model.confirmation = ""
-				model.message = "Confirmation did not match; no controller action was started."
-				return model, nil
-			}
 			model.busy = "Building and activating the reviewed controller revision"
 			model.controllerApplying = true
 			model.controllerProgress = domain.OperationProgress{}
 			model.controllerStarted = time.Now().UTC()
 			model.controllerProgressID++
-			model.confirmation = ""
 			model.message = ""
 			plan := model.controllerPlan
 			operation := func() tea.Msg {
@@ -791,10 +777,6 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
 			}
 			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controllerProgressID))
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
-			}
 		}
 	case dashboardServices:
 		if model.serviceResult.Operation != "" {
@@ -1174,9 +1156,17 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				return model, nil
 			}
 			model.updateTarget = target
-			model.busy = "Validating the candidate release and representative builds"
+			model.busy = "Starting candidate validation"
 			model.message = ""
 			allowPrerelease := selected.Channel == domain.UpdateChannelPrerelease
+			if model.actions.PlanUpdateWithProgress != nil {
+				model.updatePlanning = true
+				model.updatePlanProgress = domain.UpdatePlanProgress{}
+				model.updatePlanStarted = time.Now().UTC()
+				events := make(chan tea.Msg)
+				model.updatePlanEvents = events
+				return model, startUpdatePlan(model.actions.PlanUpdateWithProgress, target, allowPrerelease, false, events)
+			}
 			return model, func() tea.Msg {
 				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(target, allowPrerelease, false)}
 			}
@@ -1188,7 +1178,6 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.updateDetails = !model.updateDetails
 		case "esc":
 			model.screen = dashboardUpdate
-			model.confirmation = ""
 			model.message = "Update cancelled; flake.nix and flake.lock were not changed."
 		case "up":
 			if model.updateScroll > 0 {
@@ -1208,30 +1197,13 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			if model.updateScroll > maximum {
 				model.updateScroll = maximum
 			}
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
-			if model.confirmation != model.updatePlan.Confirmation {
-				model.confirmation = ""
-				model.message = "Confirmation did not match; flake.nix and flake.lock were not changed."
-				return model, nil
-			}
 			model.busy = "Saving the validated Nixorium release update"
 			model.updating = true
-			model.confirmation = ""
 			model.message = ""
 			plan := model.updatePlan
 			return model, func() tea.Msg {
 				return dashboardUpdateResultMsg{report: model.actions.SaveUpdate(plan)}
-			}
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
 			}
 		}
 	default:

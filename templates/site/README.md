@@ -57,8 +57,9 @@ when the lab network is ready. Complete the single **Laboratory settings** form;
 Nixorium validates and saves the managed settings without a separate save
 review, creates missing controller keys automatically, activates the saved
 controller configuration, and prepares the netboot artifacts plus every
-configured client closure. Importing an existing key is an advanced action
-under **Maintenance → Change settings → Advanced keys**.
+configured client closure. The existing controller time zone and keyboard are
+reused rather than requested again. Importing an existing key is an advanced
+action under **Maintenance → Change settings → Advanced keys**.
 
 The same screen shows progress through configuration, controller activation,
 and client preparation. The only confirmation in this path appears immediately
@@ -411,6 +412,8 @@ time, four typed phases, recent activity, and a progress bar; CLI text/JSON
 flows write the same safe activity to stderr. When the job ends, the dashboard
 refreshes reconciled state and shows a compact result with explicit actions to
 return home, reveal the activity detail, inspect logs, or create a new review.
+The `REBUILD <controller>` phrase belongs to the CLI command above; the TUI
+uses Enter after showing the reviewed revision and restart impact.
 Use `setup apply` for the equivalent first-run action with identical progress
 feedback.
 
@@ -623,9 +626,11 @@ commits, pushes, activates, starts PXE, or deploys clients.
 The TUI's **Update Nixorium** advanced tool first fetches this bounded release
 list. `master` is clearly marked as the Development branch, stable releases are
 shown by default, and prereleases require explicit disclosure. The TUI has no
-editable target and does not offer downgrades. After selection, review the
-scrollable two-file patch (`F4` expands candidate checks), then type the exact
-confirmation shown.
+editable target and does not offer downgrades. During validation it shows the
+candidate-lock, evaluation, representative-build, review, and final verification
+phases, including the current output and elapsed time. After validation, review
+the scrollable two-file patch (`F4` expands candidate checks), then press Enter.
+The longer exact phrase remains part of the explicit CLI apply workflow.
 
 > [!IMPORTANT]
 > The TUI saves these files transparently, then builds, activates, and verifies

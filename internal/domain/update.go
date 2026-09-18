@@ -67,6 +67,24 @@ type UpdateCheck struct {
 	Message string `json:"message"`
 }
 
+type UpdatePlanPhase string
+
+const (
+	UpdatePlanPhaseInspect  UpdatePlanPhase = "inspect"
+	UpdatePlanPhaseLock     UpdatePlanPhase = "lock"
+	UpdatePlanPhaseEvaluate UpdatePlanPhase = "evaluate"
+	UpdatePlanPhaseBuild    UpdatePlanPhase = "build"
+	UpdatePlanPhaseReview   UpdatePlanPhase = "review"
+	UpdatePlanPhaseVerify   UpdatePlanPhase = "verify"
+)
+
+type UpdatePlanProgress struct {
+	Phase   UpdatePlanPhase
+	Detail  string
+	Current int
+	Total   int
+}
+
 type UpdatePlanReport struct {
 	SchemaVersion  int                 `json:"schemaVersion"`
 	Operation      string              `json:"operation"`

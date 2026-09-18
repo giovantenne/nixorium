@@ -73,6 +73,16 @@ var settingsFields = []settingsField{
 	{id: "lab.veyonNativeHosts", group: "Classroom", label: "Veyon native hosts (comma-separated, optional)"},
 }
 
+var installationSettingsFields = func() []settingsField {
+	fields := make([]settingsField, 0, len(settingsFields)-2)
+	for _, field := range settingsFields {
+		if field.id != "lab.timeZone" && field.id != "lab.keyboardLayout" {
+			fields = append(fields, field)
+		}
+	}
+	return fields
+}()
+
 type settingsWizardModel struct {
 	helpOpen  bool
 	settings  domain.LabSettingsFile

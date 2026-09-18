@@ -29,6 +29,10 @@ type UpdateSource interface {
 	ApplyPreparedUpdate(context.Context, string, string, domain.UpdateInputSnapshot, domain.UpdateProposal) (bool, error)
 }
 
+type UpdateProgressSource interface {
+	PrepareUpdateWithProgress(context.Context, string, string, func(domain.UpdatePlanProgress)) (domain.UpdateProposal, error)
+}
+
 type UpdateManager struct {
 	source UpdateSource
 }
@@ -121,6 +125,11 @@ func updateCheckIssue(report domain.UpdateCheckReport, field, message string) do
 }
 
 func (m *UpdateManager) Plan(ctx context.Context, repository, target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+	return m.PlanWithProgress(ctx, repository, target, allowPrerelease, allowDowngrade, nil)
+}
+
+func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+	emitUpdatePlanProgress(progress, domain.UpdatePlanPhaseInspect, "Checking the deployment repository and selected release", 0, 0)
 	report := domain.UpdatePlanReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "update-plan",
@@ -185,10 +194,17 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 	if len(report.Issues) > 0 {
 		return report
 	}
-	proposal, err := m.source.PrepareUpdate(ctx, root, target)
+	proposal := domain.UpdateProposal{}
+	if progressSource, ok := m.source.(UpdateProgressSource); ok {
+		proposal, err = progressSource.PrepareUpdateWithProgress(ctx, root, target, progress)
+	} else {
+		emitUpdatePlanProgress(progress, domain.UpdatePlanPhaseLock, "Preparing the candidate release", 0, 0)
+		proposal, err = m.source.PrepareUpdate(ctx, root, target)
+	}
 	if err != nil {
 		return updatePlanIssue(report, "proposal", err.Error())
 	}
+	emitUpdatePlanProgress(progress, domain.UpdatePlanPhaseVerify, "Confirming the deployment did not change during validation", 0, 0)
 	after, err := m.source.InspectUpdateInput(root)
 	if err != nil || !bytes.Equal(after.FlakeContent, snapshot.FlakeContent) || !bytes.Equal(after.LockContent, snapshot.LockContent) || after.HasLock != snapshot.HasLock {
 		return updatePlanIssue(report, "repository", "flake.nix or flake.lock changed while the update was being planned")
@@ -211,6 +227,13 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 	report.Confirmation = verb + " NIXORIUM TO " + target
 	report.State = "ready"
 	return report
+}
+
+func emitUpdatePlanProgress(progress func(domain.UpdatePlanProgress), phase domain.UpdatePlanPhase, detail string, current, total int) {
+	if progress == nil {
+		return
+	}
+	progress(domain.UpdatePlanProgress{Phase: phase, Detail: detail, Current: current, Total: total})
 }
 
 func (m *UpdateManager) Apply(ctx context.Context, repository, target, expectedToken string, allowPrerelease, allowDowngrade bool) domain.UpdateApplyReport {

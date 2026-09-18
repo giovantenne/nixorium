@@ -165,6 +165,10 @@ assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 1).ifaceName == "
 assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.interfaces ? eno1;
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces ? enp2s0;
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
+assert builtins.elem "network.target"
+  roleInterfaceLab.nixosConfigurations.pc99.config.systemd.services."network-addresses-eno1".wantedBy;
+assert !(builtins.elem "network.target"
+  roleInterfaceLab.nixosConfigurations.pc01.config.systemd.services."network-addresses-enp2s0".wantedBy);
 assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.firewall.interfaces ? eno1;
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.interfaces ? enp2s0;
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.firewall.interfaces ? enp3s0;

@@ -80,12 +80,17 @@ baseline failures before any destructive scenario.
 2. Reboot without the installation medium and sign in as `admin`.
 3. Confirm `nixorium` and the private deployment are available.
 4. Open **Installation → Install computers**, complete Laboratory settings,
-   and let the flow create missing keys and activate the controller.
-5. Reboot once more and run `nixorium setup status` and `nixorium doctor`.
+   verify that time zone and keyboard are not requested again, and let the flow
+   create missing keys and activate the controller.
+5. Before starting PXE or rebooting, verify that the configured static
+   laboratory address is present on the selected interface.
+6. Reboot once more and run `nixorium setup status` and `nixorium doctor`.
 
 Pass when setup is complete, the active controller and durable receipt match
-the reviewed revision, Harmonia is HTTP-ready, and no manual Nix/systemd edit
-was needed. Record failures and retry behavior rather than reinstalling first.
+the reviewed revision, the configured static laboratory address is present
+after live activation, Harmonia is HTTP-ready, and no reboot or manual
+Nix/systemd edit was needed to make that address appear. Record failures and
+retry behavior rather than reinstalling first.
 
 ## Scenario 2: PXE preparation and listener lifecycle
 

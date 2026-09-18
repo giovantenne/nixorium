@@ -183,7 +183,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
 		lines = append(lines, "c select commit paths   Space select   a all safe paths", "f refresh review   ↑/↓/pg scroll patch", "Exact confirmation creates a local commit; nothing is pushed.")
 	case dashboardUpdate, dashboardUpdateReview:
-		lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "r fetch releases again   Esc cancel", "After result: g review changes   r new update")
+		lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation shows candidate-lock, evaluation and representative-build phases.", "On the review, Enter saves and activates; Esc cancels.", "After result: r new update")
 	case dashboardDiagnostics:
 		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")
 	default:
@@ -426,7 +426,7 @@ func (model dashboardModel) releaseReviewView() string {
 	end := min(len(patch), start+model.updateReviewHeight())
 	lines = append(lines, "", fmt.Sprintf("Diff lines %d-%d of %d", start+1, end, len(patch)))
 	lines = append(lines, patch[start:end]...)
-	lines = append(lines, "", tuiSection("Type "+model.updatePlan.Confirmation+" to continue:", model.isDark), "> "+model.confirmation+"_")
+	lines = append(lines, "", "Press Enter to save this validated update and activate the controller.")
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})

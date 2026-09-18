@@ -76,6 +76,23 @@ func TestFirstRunOmitsGitIdentityAndGroupsEssentialFields(t *testing.T) {
 	}
 }
 
+func TestInstallationSettingsReuseControllerRegionalSettings(t *testing.T) {
+	settings := wizardSettings()
+	model := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
+	for _, field := range model.fields {
+		if field.id == "lab.timeZone" || field.id == "lab.keyboardLayout" {
+			t.Fatalf("installation asks for existing controller setting %q", field.id)
+		}
+	}
+	for range model.fields {
+		updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		model = updated.(settingsWizardModel)
+	}
+	if !model.accepted || model.settings.Lab.TimeZone != settings.Lab.TimeZone || model.settings.Lab.KeyboardLayout != settings.Lab.KeyboardLayout || model.settings.Lab.ConsoleKeyMap != settings.Lab.ConsoleKeyMap {
+		t.Fatalf("installation did not preserve controller regional settings: %+v", model.settings.Lab)
+	}
+}
+
 func TestRegionalFieldsExposeOnlyTimeZoneAndKeyboard(t *testing.T) {
 	if timeZoneChoices[0].value != "America/New_York" || keyboardChoices[0].value != "us" {
 		t.Fatalf("regional suggestions do not start with US defaults: timezone=%q keyboard=%q", timeZoneChoices[0].value, keyboardChoices[0].value)

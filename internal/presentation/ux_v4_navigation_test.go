@@ -248,11 +248,19 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsEdit || model.settingsEditor.settings.Lab.DeploymentMode != "laboratory" || model.settingsEditor.settings.Lab.PCCount != 20 || len(model.settingsEditor.fields) != len(settingsFields) {
+	if model.screen != dashboardSettingsEdit || model.settingsEditor.settings.Lab.DeploymentMode != "laboratory" || model.settingsEditor.settings.Lab.PCCount != 20 || len(model.settingsEditor.fields) != len(installationSettingsFields) {
 		t.Fatalf("client setup editor = %+v", model.settingsEditor)
 	}
 	if model.settingsEditor.title != "Nixorium — Install computers / Laboratory settings" || model.settingsEditor.fields[6].label != "Teacher user name" {
 		t.Fatalf("complete laboratory settings are not shown: title=%q fields=%+v", model.settingsEditor.title, model.settingsEditor.fields)
+	}
+	for _, field := range model.settingsEditor.fields {
+		if field.id == "lab.timeZone" || field.id == "lab.keyboardLayout" {
+			t.Fatalf("installation asks for controller regional setting %q", field.id)
+		}
+	}
+	if model.settingsEditor.settings.Lab.TimeZone != settings.Lab.TimeZone || model.settingsEditor.settings.Lab.KeyboardLayout != settings.Lab.KeyboardLayout {
+		t.Fatalf("installation changed controller regional settings: %+v", model.settingsEditor.settings.Lab)
 	}
 }
 

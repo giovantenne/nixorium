@@ -157,9 +157,15 @@ func TestUpdatePlanAcceptsReviewedMasterTarget(t *testing.T) {
 		},
 		proposal: domain.UpdateProposal{FlakeContent: []byte("master flake"), LockContent: []byte("master lock"), Checks: []domain.UpdateCheck{{ID: "controller", State: "passed"}}},
 	}
-	plan := NewUpdateManager(source).Plan(context.Background(), ".", "master", false, false)
+	progress := []domain.UpdatePlanProgress{}
+	plan := NewUpdateManager(source).PlanWithProgress(context.Background(), ".", "master", false, false, func(item domain.UpdatePlanProgress) {
+		progress = append(progress, item)
+	})
 	if plan.State != "ready" || plan.TargetChannel != domain.UpdateChannelMoving || plan.Downgrade || plan.Confirmation != "UPDATE NIXORIUM TO master" || source.lastTarget != "master" {
 		t.Fatalf("master plan = %+v, prepared target = %q", plan, source.lastTarget)
+	}
+	if len(progress) != 3 || progress[0].Phase != domain.UpdatePlanPhaseInspect || progress[1].Phase != domain.UpdatePlanPhaseLock || progress[2].Phase != domain.UpdatePlanPhaseVerify {
+		t.Fatalf("plan progress = %+v", progress)
 	}
 }
 
