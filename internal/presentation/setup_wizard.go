@@ -373,7 +373,7 @@ func (model settingsWizardModel) View() tea.View {
 		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(model.fields), field.group),
 		field.label,
 	}
-	if strings.Contains(model.title, "First setup") {
+	if strings.Contains(model.title, "First setup") || strings.Contains(model.title, "first-run") {
 		lines = append(lines, "All settings are collected first; passwords and one complete validation follow.")
 	}
 	if len(field.choices) > 0 && !model.custom {

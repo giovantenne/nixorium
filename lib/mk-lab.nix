@@ -281,6 +281,10 @@ let
     hostModules)}\n  }";
   labConfigJson = builtins.toFile "lab-config.json" (builtins.toJSON config);
   labSoftwareJson = builtins.toFile "lab-software.json" (builtins.toJSON labSoftwareConfig);
+  softwareCatalogJson = builtins.toFile "software-catalog.json" (builtins.toJSON softwareCatalog);
+  homeResetEphemeralPathsJson = builtins.toFile "home-reset-ephemeral-paths.json"
+    (builtins.toJSON homeResetEphemeralPaths);
+  clientGroupsJson = builtins.toFile "client-groups.json" (builtins.toJSON clientGroups);
   extensionModules = sharedModules
     ++ controllerModules
     ++ clientModules
@@ -467,9 +471,9 @@ let
           deploymentSelf = site;
           labConfig = builtins.fromJSON (builtins.readFile ./lab-config.json);
           labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
-          softwareCatalog = ${builtins.toJSON softwareCatalog};
-          homeResetEphemeralPaths = ${builtins.toJSON homeResetEphemeralPaths};
-          clientGroups = ${builtins.toJSON clientGroups};
+          softwareCatalog = builtins.fromJSON (builtins.readFile ./software-catalog.json);
+          homeResetEphemeralPaths = builtins.fromJSON (builtins.readFile ./home-reset-ephemeral-paths.json);
+          clientGroups = builtins.fromJSON (builtins.readFile ./client-groups.json);
           publicKeys = {
             cache = ${renderPath cachePublicKeyFile};
             ssh = ${renderPath adminSshKeyFile};
@@ -502,6 +506,9 @@ let
     install -m 0644 ${labConfigJson} "$out/lab-config.json"
     install -m 0644 ${labSoftwareJson} "$out/lab-software.json"
     install -m 0644 ${labMetaJson} "$out/lab-meta.json"
+    install -m 0644 ${softwareCatalogJson} "$out/software-catalog.json"
+    install -m 0644 ${homeResetEphemeralPathsJson} "$out/home-reset-ephemeral-paths.json"
+    install -m 0644 ${clientGroupsJson} "$out/client-groups.json"
     install -m 0755 ${upstreamRoot}/setup.sh "$out/setup.sh"
     install -m 0755 ${installerDiskoScript}/bin/disko-destroy-format-mount "$out/disko-install"
     install -m 0644 ${upstreamRoot}/lib/disko-layout.nix "$out/lib/disko-layout.nix"

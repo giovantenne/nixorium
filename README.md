@@ -15,33 +15,10 @@ LAN. Clients do not need Internet access during installation or deployment.
 [Troubleshooting](docs/troubleshooting.md)
 
 > The stable release is **v1.0.0**. NixOS 26.05 and the new management workflow
-> are available for hardware testing in **v2.0.0-beta.3**. Use a tagged release
+> are available for hardware testing in **v2.0.0-beta.4**. Use a tagged release
 > for production; `master` is the development branch.
 
 ## Why this exists
-
-The controller-first installer uses explicit
-`lab.deploymentMode = "controller"` with `pcCount = 0`. Such a controller can be
-rebuilt without client networking or lab keys, with lab services and firewall
-openings inactive. Omission preserves legacy laboratory behavior. Client
-networking and keys are configured later from **Install computers**.
-See [ADR 0015](docs/adr/0015-controller-first-capabilities.md).
-
-Managed software now supports `shared` (controller and current/future clients)
-and `controller` (only this controller). Existing client-only declarations keep
-their scope. The TUI saves and activates controller-affecting choices in one
-reviewed operation; client deployment remains an explicit separate task.
-See [ADR 0016](docs/adr/0016-shared-software-scopes.md).
-
-Network interface configuration now supports controller, client-role, and
-per-host overrides while preserving `ifaceName` as the fallback. Controller
-detection no longer rewrites the client fallback. See
-[ADR 0017](docs/adr/0017-role-aware-network-interfaces.md).
-
-New deployments own one explicit package-base pin shared by Nixorium, Disko,
-Veyon, controller, and clients. Framework updates must preserve it; package-base
-updates remain a separate future operation. See
-[ADR 0019](docs/adr/0019-deployment-owned-package-base.md).
 
 PC laboratories drift: machines are reinstalled at different times, manual
 fixes accumulate, and repeating the same update across a room is slow and hard
@@ -76,7 +53,9 @@ keys, assets, and policy stay in a small private deployment repository.
                                   ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Controller                                                  │
-│ Nix builds · Nixorium TUI · Harmonia · PXE · Colmena       │
+│ Nix builds · Nixorium TUI                                  │
+│ Harmonia (persistent cache)                                │
+│ PXE services (on demand) · Colmena command (on demand)     │
 └──────────────────────────────┬──────────────────────────────┘
                                │ LAN
                   ┌────────────┼────────────┐
@@ -135,9 +114,12 @@ installation. No public default password remains.
 ### 4. Open Nixorium
 
 ```sh
-cd ~/nixorium-deployment
 nixorium
 ```
+
+The installed command can be started from any directory. It first honors
+`--repo` or `NIXORIUM_REPO`, then the current directory when it is a deployment
+root, and finally the standard `~/nixorium-deployment` path.
 
 Nixorium opens on four operator areas: Computers, Installation, Software, and
 Maintenance. It does not scan the room at startup. Choose **Installation →
@@ -176,8 +158,8 @@ network recovery** so the controller restores its normal static address.
 
 ## Occasional interventions
 
-Run `nix run .#nixorium` from the private deployment repository. The dashboard
-provides the normal workflows:
+Run `nixorium` from any directory (`--repo <path>` selects a non-standard
+deployment). The dashboard provides the normal workflows:
 
 - `nixorium setup` reports the first incomplete setup stage for scripts and
   troubleshooting; the dashboard owns the interactive installation flow;

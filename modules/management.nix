@@ -58,7 +58,9 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.diffutils
+      pkgs.gawk
       pkgs.git
+      pkgs.iproute2
       pkgs.jq
       pkgs.nix
       pkgs.util-linux
@@ -199,9 +201,35 @@ let
       publish_progress running build "Validated controller prerequisites" 1
       publish_progress running build "Building the reviewed controller system" 1
 
-      CONTROLLER_NAME="$(as_admin nix eval "$FLAKE_URL#labMeta.controller.name" --raw --no-write-lock-file)"
+      LAB_META="$(as_admin nix eval "$FLAKE_URL#labMeta" --json --no-write-lock-file)" \
+        || fail "could not evaluate controller network metadata"
+      CONTROLLER_NAME="$(jq -er '.controller.name' <<<"$LAB_META")" \
+        || fail "evaluated controller name is missing"
       [[ "$CONTROLLER_NAME" =~ ^pc[0-9]+$ ]] \
         || fail "evaluated controller name is invalid"
+      DEPLOYMENT_MODE="$(jq -er '.deploymentMode // "laboratory"' <<<"$LAB_META")" \
+        || fail "evaluated deployment mode is missing"
+      [[ "$DEPLOYMENT_MODE" == controller || "$DEPLOYMENT_MODE" == laboratory ]] \
+        || fail "evaluated deployment mode is invalid"
+      if [[ "$DEPLOYMENT_MODE" == laboratory ]]; then
+        [[ ! -e /var/lib/nixorium/pxe/session.json \
+            && ! -L /var/lib/nixorium/pxe/session.json ]] \
+          || fail "PXE networking is transitioning or active; stop or recover installation mode before controller apply"
+        CONTROLLER_IFACE="$(jq -er '.controller.ifaceName // .network.ifaceName' <<<"$LAB_META")" \
+          || fail "evaluated controller interface is missing"
+        CONTROLLER_STATIC_IP="$(jq -er '.controller.staticIp' <<<"$LAB_META")" \
+          || fail "evaluated controller static address is missing"
+        CONTROLLER_PREFIX_LENGTH="$(jq -er '.network.prefixLength' <<<"$LAB_META")" \
+          || fail "evaluated network prefix is missing"
+        [[ "$CONTROLLER_IFACE" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,14}$ ]] \
+          || fail "evaluated controller interface is invalid"
+        [[ "$CONTROLLER_STATIC_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] \
+          || fail "evaluated controller static address is invalid"
+        [[ "$CONTROLLER_PREFIX_LENGTH" =~ ^[0-9]+$ \
+            && "$CONTROLLER_PREFIX_LENGTH" -ge 1 \
+            && "$CONTROLLER_PREFIX_LENGTH" -le 30 ]] \
+          || fail "evaluated network prefix is invalid"
+      fi
 
       SYSTEM_PATH="$(as_admin nix build "$FLAKE_URL#nixosConfigurations.$CONTROLLER_NAME.config.system.build.toplevel" \
         --no-write-lock-file --no-link --print-out-paths)"
@@ -230,7 +258,28 @@ let
       [[ "$ACTIVE_SYSTEM" == "$SYSTEM_PATH" ]] \
         || fail "active system differs after controller activation"
 
-      publish_progress running verify "Activated controller system; recording verification" 3
+      # A controller-only installation already has a live interface when the
+      # first laboratory configuration is activated. The generated NixOS
+      # address unit is persistent across reboot, but it is not guaranteed to
+      # receive a fresh device event during a live switch. Reconcile the one
+      # reviewed static address before PXE preparation is allowed to continue.
+      if [[ "$DEPLOYMENT_MODE" == laboratory ]]; then
+        CONTROLLER_STATIC_CIDR="$CONTROLLER_STATIC_IP/$CONTROLLER_PREFIX_LENGTH"
+        ip link show dev "$CONTROLLER_IFACE" >/dev/null \
+          || fail "configured controller interface is not present after activation"
+        if ! ip -4 -o address show dev "$CONTROLLER_IFACE" scope global \
+            | awk -v cidr="$CONTROLLER_STATIC_CIDR" \
+              '$3 == "inet" && $4 == cidr { found = 1 } END { exit !found }'; then
+          ip address replace "$CONTROLLER_STATIC_CIDR" dev "$CONTROLLER_IFACE" \
+            || fail "could not apply the controller static address after activation"
+        fi
+        ip -4 -o address show dev "$CONTROLLER_IFACE" scope global \
+          | awk -v cidr="$CONTROLLER_STATIC_CIDR" \
+            '$3 == "inet" && $4 == cidr { found = 1 } END { exit !found }' \
+          || fail "controller static address is absent after activation"
+      fi
+
+      publish_progress running verify "Activated controller system and verified networking" 3
 
       TEMPORARY_RECORD="$(mktemp --tmpdir="$STATE_DIRECTORY" .applied.json.XXXXXX)"
       keep_temporary=true
