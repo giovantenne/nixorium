@@ -47,6 +47,7 @@ type DashboardActions struct {
 	ApplyGitCommit            func(domain.GitCommitPlanReport) domain.GitCommitReport
 	CheckUpdate               func() domain.UpdateCheckReport
 	PlanUpdate                func(string, bool, bool) domain.UpdatePlanReport
+	PlanUpdateWithProgress    func(string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
 	SaveUpdate                func(domain.UpdatePlanReport) domain.UpdateApplyReport
 	LoadSettings              func() (domain.LabSettingsFile, error)
 	PlanSettings              func(domain.LabSettingsFile) domain.ConfigPlanReport
@@ -175,6 +176,10 @@ type dashboardModel struct {
 	updatePlan             domain.UpdatePlanReport
 	updateResult           domain.UpdateApplyReport
 	updateScroll           int
+	updatePlanning         bool
+	updatePlanProgress     domain.UpdatePlanProgress
+	updatePlanStarted      time.Time
+	updatePlanEvents       <-chan tea.Msg
 	updating               bool
 	settings               domain.LabSettingsFile
 	settingsCandidate      domain.LabSettingsFile
@@ -290,6 +295,10 @@ type dashboardInstallationPrepareMsg struct {
 	report    domain.ActionReport
 	status    domain.StatusReport
 	statusErr error
+}
+
+type dashboardUpdatePlanProgressMsg struct {
+	progress domain.UpdatePlanProgress
 }
 
 type dashboardPXEProgressTickMsg struct {
@@ -668,6 +677,29 @@ func startDeployment(action func(domain.DeploymentPlanReport, func(domain.Deploy
 }
 
 func waitForDeploymentEvent(events <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		message, ok := <-events
+		if !ok {
+			return nil
+		}
+		return message
+	}
+}
+
+func startUpdatePlan(action func(string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport, target string, allowPrerelease, allowDowngrade bool, events chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		go func() {
+			report := action(target, allowPrerelease, allowDowngrade, func(progress domain.UpdatePlanProgress) {
+				events <- dashboardUpdatePlanProgressMsg{progress: progress}
+			})
+			events <- dashboardUpdatePlanMsg{report: report}
+			close(events)
+		}()
+		return <-events
+	}
+}
+
+func waitForUpdatePlanEvent(events <-chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		message, ok := <-events
 		if !ok {
@@ -1275,12 +1307,31 @@ func (model dashboardModel) updateView() string {
 	path := []string{"Maintenance", "Update Nixorium"}
 	lines := []string{tuiTitle("Update Nixorium", model.isDark), ""}
 	if model.busy != "" {
-		lines = append(lines, model.busyView())
+		if model.updatePlanning {
+			lines = append(lines, "Target: "+model.updateTarget)
+			phaseLabels := updatePlanPhaseLabels()
+			phaseIndex := updatePlanPhaseIndex(model.updatePlanProgress.Phase)
+			if model.height > 0 && model.height < 28 {
+				lines = append(lines, "", fmt.Sprintf("Phase %d/%d · %s", phaseIndex+1, len(phaseLabels), phaseLabels[phaseIndex]))
+			} else {
+				lines = append(lines, phaseSteps(phaseLabels, phaseIndex, false, model.isDark)...)
+			}
+			elapsed := time.Since(model.updatePlanStarted).Truncate(time.Second)
+			if elapsed < 0 {
+				elapsed = 0
+			}
+			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
+			if model.updatePlanProgress.Total > 0 {
+				lines = append(lines, fmt.Sprintf("Representative output %d/%d", model.updatePlanProgress.Current, model.updatePlanProgress.Total))
+			}
+		} else {
+			lines = append(lines, model.busyView())
+		}
 		notices := []tuiNotice{}
 		if model.updating {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Update save is running", detail: "Wait for the atomic two-file result before closing Nixorium."})
 		} else {
-			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Validation does not modify the deployment", detail: "Candidate evaluation and representative builds are read-only."})
+			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Deployment files and running systems remain unchanged", detail: "Nix may download and build candidate outputs in the local store. This can take several minutes; flake.nix and flake.lock are not written."})
 		}
 		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
@@ -1393,6 +1444,34 @@ func (model dashboardModel) updateView() string {
 	}
 	actions = append(actions, tuiAction{key: "p", label: prereleaseLabel}, tuiAction{key: "r", label: "Fetch again"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
 	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+}
+
+func updatePlanPhaseLabels() []string {
+	return []string{
+		"Inspect deployment",
+		"Resolve candidate release",
+		"Evaluate configuration",
+		"Build representative outputs",
+		"Prepare review",
+		"Verify unchanged deployment",
+	}
+}
+
+func updatePlanPhaseIndex(phase domain.UpdatePlanPhase) int {
+	switch phase {
+	case domain.UpdatePlanPhaseLock:
+		return 1
+	case domain.UpdatePlanPhaseEvaluate:
+		return 2
+	case domain.UpdatePlanPhaseBuild:
+		return 3
+	case domain.UpdatePlanPhaseReview:
+		return 4
+	case domain.UpdatePlanPhaseVerify:
+		return 5
+	default:
+		return 0
+	}
 }
 
 func displayRunningVersion(version string) string {
@@ -1560,8 +1639,7 @@ func (model dashboardModel) controllerView() string {
 			"Affects   " + model.controllerPlan.Controller + " (this controller only)",
 			"Revision  " + model.controllerPlan.Revision,
 			"",
-			tuiSection("Type "+model.controllerPlan.Confirmation+" to continue:", model.isDark),
-			"> " + model.confirmation + "_",
+			"Press Enter to build, activate, and verify this controller.",
 		}, "\n")
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Services and networking may restart", detail: "This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot is not normally required."})
 		if model.message != "" {

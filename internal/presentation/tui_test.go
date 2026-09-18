@@ -1201,12 +1201,8 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardControllerReview || !strings.Contains(model.View().Content, revision) || !strings.Contains(model.View().Content, "REBUILD pc99") {
+	if model.screen != dashboardControllerReview || !strings.Contains(model.View().Content, revision) || strings.Contains(model.View().Content, "REBUILD pc99") || !strings.Contains(model.View().Content, "Press Enter") {
 		t.Fatalf("controller review missing:\n%s", model.View().Content)
-	}
-	for _, character := range "REBUILD pc99" {
-		updated, _ = model.Update(tea.KeyPressMsg{Code: character, Text: string(character)})
-		model = updated.(dashboardModel)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
@@ -1366,7 +1362,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release") || !strings.Contains(model.View().Content, "candidate controller built") || !strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "No push, PXE action") {
+	if planned != 1 || model.screen != dashboardUpdateReview || !strings.Contains(model.View().Content, "Validated release") || !strings.Contains(model.View().Content, "candidate controller built") || strings.Contains(model.View().Content, confirmation) || !strings.Contains(model.View().Content, "Press Enter") || !strings.Contains(model.View().Content, "No push, PXE action") {
 		t.Fatalf("update review missing: planned=%d\n%s", planned, model.View().Content)
 	}
 	updated, _ = model.Update(tea.WindowSizeMsg{Height: 40})
@@ -1381,15 +1377,6 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	if model.updateScroll == 0 {
 		t.Fatal("update diff did not scroll")
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "wrong"})
-	model = updated.(dashboardModel)
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command != nil || applied != 0 || !strings.Contains(model.View().Content, "did not match") {
-		t.Fatalf("inexact update confirmation applied: %d", applied)
-	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: confirmation})
-	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || !model.updating || !strings.Contains(model.View().Content, "Wait for the atomic two-file result") {
@@ -1414,6 +1401,50 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	model = updated.(dashboardModel)
 	if model.screen != dashboardAdministration {
 		t.Fatalf("update result did not return to Maintenance: screen=%d", model.screen)
+	}
+}
+
+func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
+	target := "v2.3.0"
+	model := dashboardModel{
+		screen: dashboardUpdate,
+		updateCheck: domain.UpdateCheckReport{
+			Operation:  "update-check",
+			State:      "available",
+			CurrentRef: "v2.2.0",
+			Stable:     []domain.UpdateRelease{{Tag: target, Channel: domain.UpdateChannelStable}},
+		},
+		actions: DashboardActions{
+			PlanUpdateWithProgress: func(received string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+				if received != target || allowPrerelease || allowDowngrade {
+					t.Fatalf("update plan input = %q, prerelease=%t, downgrade=%t", received, allowPrerelease, allowDowngrade)
+				}
+				progress(domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseInspect, Detail: "Checking the deployment repository and selected release"})
+				progress(domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseLock, Detail: "Resolving the selected release and generating its candidate lock"})
+				progress(domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseEvaluate, Detail: "Evaluating candidate deployment readiness"})
+				progress(domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5})
+				return domain.UpdatePlanReport{Operation: "update-plan", State: "ready", Target: target, TargetChannel: domain.UpdateChannelStable}
+			},
+		},
+	}
+
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || !model.updatePlanning || !strings.Contains(model.View().Content, "Target: "+target) {
+		t.Fatalf("update planning did not start with visible context:\n%s", model.View().Content)
+	}
+	foundBuild := false
+	for command != nil && model.screen != dashboardUpdateReview {
+		message := command()
+		updated, command = model.Update(message)
+		model = updated.(dashboardModel)
+		if progress, ok := message.(dashboardUpdatePlanProgressMsg); ok && progress.progress.Phase == domain.UpdatePlanPhaseBuild {
+			view := model.View().Content
+			foundBuild = strings.Contains(view, "Build representative outputs") && strings.Contains(view, "Building the controller") && strings.Contains(view, "Representative output 2/5") && strings.Contains(view, "elapsed") && strings.Contains(view, "local store") && strings.Contains(view, "remain unchanged")
+		}
+	}
+	if !foundBuild || model.updatePlanning || model.screen != dashboardUpdateReview {
+		t.Fatalf("update progress did not reach a visible representative build: found=%t planning=%t screen=%d\n%s", foundBuild, model.updatePlanning, model.screen, model.View().Content)
 	}
 }
 

@@ -510,11 +510,38 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("PXE confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
-			} else if screen == dashboardServicesRestartReview || screen == dashboardControllerReview {
+			} else if screen == dashboardServicesRestartReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
+			} else if screen == dashboardControllerReview {
+				if !strings.Contains(view, "Press Enter") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") || strings.Contains(view, "REBUILD pc99") {
+					t.Fatalf("controller review actions hidden screen %d size %v:\n%s", screen, size, view)
+				}
 			}
+		}
+	}
+}
+
+func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		model := experienceFixture(2)
+		model.width = size[0]
+		model.height = size[1]
+		model.screen = dashboardUpdate
+		model.busy = "Building the controller"
+		model.updateTarget = "master"
+		model.updatePlanning = true
+		model.updatePlanStarted = time.Now().Add(-2 * time.Minute)
+		model.updatePlanProgress = domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5}
+		view := model.View().Content
+		for _, expected := range []string{"Target: master", "Build representative outputs", "Building the controller", "Representative output 2/5", "elapsed", "local store", "remain unchanged", "Help"} {
+			if !strings.Contains(view, expected) {
+				t.Fatalf("update progress %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
+			}
+		}
+		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+			t.Fatalf("update progress overflow at %dx%d: %dx%d\n%s", size[0], size[1], lipgloss.Width(view), lipgloss.Height(view), view)
 		}
 	}
 }
@@ -626,8 +653,8 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 	}
 }
 
-func TestEveryDisruptiveReviewRejectsWrongConfirmationAndCancels(t *testing.T) {
-	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview, dashboardUpdateReview} {
+func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
+	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview} {
 		m := experienceFixture(2)
 		m.screen = screen
 		m.confirmation = "wrong"

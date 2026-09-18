@@ -227,7 +227,10 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("NIXORIUM_TEST_NIX_LOG", logPath)
-	proposal, err := (Local{}).PrepareUpdate(context.Background(), repository, "v1.1.0")
+	progress := []domain.UpdatePlanProgress{}
+	proposal, err := (Local{}).PrepareUpdateWithProgress(context.Background(), repository, "v1.1.0", func(item domain.UpdatePlanProgress) {
+		progress = append(progress, item)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,6 +247,9 @@ esac
 	}
 	if strings.Contains(string(log), repository+"/secret-key") {
 		t.Fatalf("private path entered Nix arguments:\n%s", log)
+	}
+	if len(progress) != 9 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Phase != domain.UpdatePlanPhaseEvaluate || progress[2].Detail != "Evaluating candidate deployment readiness" || progress[3].Phase != domain.UpdatePlanPhaseBuild || progress[3].Current != 1 || progress[3].Total != 5 || progress[7].Current != 5 || progress[8].Phase != domain.UpdatePlanPhaseReview {
+		t.Fatalf("candidate progress = %+v", progress)
 	}
 }
 

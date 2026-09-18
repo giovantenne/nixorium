@@ -34,9 +34,10 @@ observed PXE recovery condition exists, it appears above the question.
 ## Install computers
 
 Selecting **Installation → Install computers** opens the complete Laboratory
-settings form directly. `Esc` returns to the overview. Completing the form
-validates and saves it without a second review screen, then shows one continuous
-progress view:
+settings form directly, reusing the controller's existing time zone and
+keyboard rather than asking for them again. `Esc` returns to the overview.
+Completing the form validates and saves it without a second review screen, then
+shows one continuous progress view:
 
 ```text
 Nixorium  /  Installation  /  Install computers
@@ -353,7 +354,7 @@ Available updates
 
 Select master for the latest development revision, or choose a tagged release.
 Selection starts validation; it does not change files.
-Controller activation and client distribution remain separate operations.
+A confirmed update activates this controller; client distribution remains separate.
 
 ↑/↓ select  •  enter validate  •  p show prereleases  •  r fetch again  •  esc back
 ```
@@ -361,13 +362,39 @@ Controller activation and client distribution remain separate operations.
 If discovery fails, the screen offers retry and back. It never exposes an
 editable target as a fallback.
 
+While validation runs, the generic spinner is replaced by authored phases from
+the update planner:
+
+```text
+Nixorium  /  Maintenance  /  Update Nixorium
+
+Update Nixorium
+
+Target: master
+
+  ✓ Inspect deployment
+  ✓ Resolve candidate release
+  ✓ Evaluate configuration
+  ● Build representative outputs · Running
+  ○ Prepare review · Waiting
+  ○ Verify unchanged deployment · Waiting
+
+⣾ Building the controller  elapsed 2m11s
+Representative output 2/5
+
+NOTICE
+○ Deployment files and running systems remain unchanged
+  Nix may download and build candidate outputs in the local store. This can
+  take several minutes; flake.nix and flake.lock are not written.
+```
+
 After validation, the review states that only `flake.nix` and `flake.lock` are
-saved in the local deployment configuration. The result is “Nixorium update
-saved” and shows the still-running interface version separately from the saved
-target. It explains that the controller must be rebuilt and Nixorium reopened;
-the running controller and clients remain unchanged. Git review, commit
-language, hashes, and push actions are absent from
-this ordinary flow; Advanced retains the explicit repository tools.
+saved before this controller is built, activated, and verified. Enter accepts
+the visible review; the TUI no longer asks the administrator to retype
+`UPDATE NIXORIUM TO …`. The result shows the original interface version and
+asks the administrator to reopen Nixorium; clients remain unchanged. Git review,
+commit language, hashes, and push actions are absent from this ordinary flow;
+Maintenance retains the explicit repository tools.
 
 ## Destructive confirmation
 

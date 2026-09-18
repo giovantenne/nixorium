@@ -631,6 +631,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
 			return updateManager.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
 		},
+		PlanUpdateWithProgress: func(target string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+			return updateManager.PlanWithProgress(ctx, repository, target, allowPrerelease, allowDowngrade, progress)
+		},
 		SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
 			report := updateSaveManager.Save(ctx, plan)
 			report.Message = operationRecordMessage(report.Message, report)

@@ -142,10 +142,11 @@ nixorium
 Nixorium opens on four operator areas: Computers, Installation, Software, and
 Maintenance. It does not scan the room at startup. Choose **Installation →
 Install computers** when the lab network is ready. Complete the Laboratory
-settings form; Nixorium validates and saves it, prepares required controller
-state and all configured clients, then asks for confirmation immediately before
-starting PXE. `Esc` from the form returns to the overview without changing the
-file. Keep the deployment repository **private**.
+settings form; the installed controller's time zone and keyboard are retained.
+Nixorium validates and saves the form, prepares required controller state and
+all configured clients, then asks for confirmation immediately before starting
+PXE. `Esc` from the form returns to the overview without changing the file.
+Keep the deployment repository **private**.
 Long operations show meaningful progress; `l` expands bounded activity details.
 See the [TUI tour and renders](docs/tui-renders.md).
 120×30 is a comfortable terminal size; larger windows keep a bounded reading
@@ -186,7 +187,9 @@ provides the normal workflows:
   text-entry fields;
 - titles, sections, and ready/attention/failure colors form a consistent visual
   hierarchy, while the same state always remains written in text;
-- reviews describe impact before mutation and require the displayed phrase;
+- reviews describe impact before mutation; destructive or easily mistargeted
+  actions retain typed phrases, while controller and Nixorium update reviews
+  use Enter;
 - terminal results state what happened and expose relevant dashboard, Git
   review, log, retry, or further-editing actions instead of returning silently
   to the previous input screen.
@@ -194,6 +197,9 @@ provides the normal workflows:
 Long builds use phase progress, elapsed time, and bounded recent activity.
 Shorter waits whose work has no honest percentage use an animated spinner plus
 their current plain-language action, so a remote terminal never looks frozen.
+Nixorium update validation names its lock, evaluation, representative-build,
+review, and final verification phases; controller/update reviews use Enter
+after the visible impact review instead of asking for a typed phrase.
 
 | Area | What it contains |
 |---|---|
