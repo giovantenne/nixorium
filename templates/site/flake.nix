@@ -18,6 +18,7 @@
       labConfig = nixorium.lib.evalLabSettings
         (builtins.fromJSON (builtins.readFile ./lab-settings.json));
       labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
+      softwareCatalog = import ./software-catalog.nix;
       clientGroups = {
         # graphics = [ "pc01" "pc02" ];
       };
@@ -28,6 +29,7 @@
           deploymentSelf = self;
           labConfig = candidateLabConfig;
           labSoftware = candidateLabSoftware;
+          inherit softwareCatalog;
           inherit clientGroups;
 
           publicKeys = {

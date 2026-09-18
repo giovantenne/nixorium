@@ -25,13 +25,15 @@ evaluated group, or explicit evaluated client identities. Unknown fields,
 duplicate identities, unknown groups/clients, and unsupported schema versions
 fail closed.
 
-Expose a small curated catalog from `lib/software-catalog.nix` as suggestions,
-not as an allowlist. Search and exact resolution run through deployment outputs
-backed by its locked nixpkgs input and laboratory overlays. Requests cross the
-adapter as JSON data and attribute paths are split and resolved structurally;
-user input is never interpolated into Nix or shell code. Results identify
-broken, insecure, unfree, and platform-incompatible derivations instead of
-silently widening package policy.
+Accept an optional deployment-owned catalog as suggestions, not as an
+allowlist. The generated private template keeps it in `software-catalog.nix` so
+administrators can evolve local recommendations without an upstream release.
+Search and exact resolution run through deployment outputs backed by its locked
+nixpkgs input and laboratory overlays. Requests cross the adapter as JSON data
+and attribute paths are split and resolved structurally; user input is never
+interpolated into Nix or shell code. Results identify broken, insecure, unfree,
+and platform-incompatible derivations instead of silently widening package
+policy.
 
 Apply declarations as an additional NixOS module on clients only. Do not add
 them to the controller. Package declarations supplied by framework or private
