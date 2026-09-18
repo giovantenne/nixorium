@@ -75,3 +75,33 @@ private policy and a documented invocation-token lifecycle.
 Keep firewall policy in the focused built-in module: no implicit global
 OpenSSH/Avahi openings, common desktop services only on the configured
 interface, and Harmonia/PXE ports only for the controller role.
+
+## Workstation profile ownership
+
+The public framework owns mechanisms and invariants. The generated private
+deployment owns the workstation profile: user-facing package selections,
+browser and editor policy, IDE extensions, development toolchains, AI agents,
+desktop favorites and shortcuts, MIME defaults, and branding.
+
+Built-in modules may install a package only when an upstream mechanism requires
+that executable at runtime. Prefer service-local `path`, `runtimeInputs`, or an
+explicit package reference over adding implementation dependencies to every
+host's global package list. GNOME, classroom control, home reset, and similar
+product capabilities may remain upstream while their site-specific content and
+application choices remain downstream.
+
+Use `lab-software.json` for package declarations that operators should manage
+through the application. Use deployment modules for application configuration
+or other structured NixOS policy. Suggested software is deployment policy, not
+an upstream allowlist. Core packages required for Nixorium itself are not
+ordinary software choices and should not appear as removable TUI entries.
+
+When moving an application out of upstream, inventory all coupled behavior,
+including desktop launchers, favorites, keybindings, MIME associations, home
+template files, extensions, activation scripts, assets, and offline-installer
+serialization. Moving only `environment.systemPackages` leaves a misleading
+and often broken boundary.
+
+Preserve existing deployments unless a deliberate breaking change is in scope
+and its impact is explicitly established. Never infer that compatibility can
+be discarded merely because the current checkout has no private deployment.

@@ -49,7 +49,7 @@ as room health. Commands, permissions and safety checks remain in the existing
 application/adapters. Computers has filtered cursor navigation and wide list/detail composition;
 short layouts open details separately. Page overflow is scrollable, and typed
 confirmation/input stays visible beneath scrollable impact or patch content.
-See [the UX audit and navigation design](../tui-design.md).
+See [the current TUI render gallery](../tui-renders.md).
 
 Dashboard waits without an honest completion fraction use one shared official
 Bubbles spinner and an explicit authored activity label. The spinner is only a
