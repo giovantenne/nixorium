@@ -35,17 +35,15 @@ var computersAreaTasks = []dashboardTask{
 }
 
 var installationAreaTasks = []dashboardTask{
-	{id: "install", shortcut: "n", title: "Install computers", description: "Continue setup if needed, then prepare and start network installation"},
-	{id: "pxe", shortcut: "p", title: "Installation mode and recovery", description: "Inspect prepared artifacts, PXE state and controller network recovery"},
+	{id: "install", shortcut: "n", title: "Install a computer", description: "Guided workflow: choose its configured identity, start PXE and verify the installation"},
+	{id: "pxe", shortcut: "p", title: "PXE mode and network recovery", description: "Advanced controls for network boot and interrupted controller networking"},
 }
 
 var administrationTasks = []dashboardTask{
-	{id: "restore", shortcut: "r", title: "Restore computers", description: "Reapply the intended system or reinstall from scratch"},
 	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
-	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Explicitly check reachability and deployed configuration"},
 	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git, and Veyon"},
 	{id: "controller", shortcut: "c", title: "Rebuild controller", description: "Review and activate the committed controller revision"},
-	{id: "services", shortcut: "s", title: "Manage services", description: "Inspect services or restart the signed cache"},
+	{id: "services", shortcut: "s", title: "Controller services", description: "Check software delivery services or restart the signed cache when troubleshooting"},
 	{id: "git", shortcut: "g", title: "Review Git changes", description: "Inspect and commit selected safe deployment files"},
 	{id: "logs", shortcut: "l", title: "View operation logs", description: "Recent outcomes and bounded deployment log tails"},
 	{id: "diagnostics", shortcut: "i", title: "Diagnostics", description: "Check the lab and see recovery instructions"},

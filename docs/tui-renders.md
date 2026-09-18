@@ -197,10 +197,10 @@ search results come from pinned inputs and laboratory overlays; no client is
 contacted and no input is updated:
 
 ```text
-Nixorium  /  Add or change software
+Nixorium  /  Software
 
-Configured   [Search packages]   Suggested
-Configuration choices are separate from applying them to computers.
+Selected   [Search packages]   Suggestions
+Choose desired software here. Running clients change only when you deploy them.
 
 Search packages
 Uses this deployment's locked Nix packages and overlays; inputs are never updated.
@@ -212,23 +212,23 @@ Package name  python3Packages.num_
   numpy_1
     Scientific tools for Python · python3Packages.numpy_1 · 1.26.4
 
-Configuration can be prepared while every client is powered off.
-Configured here does not mean applied to a computer.
-Private modules remain untouched and are managed through Advanced tools.
+This list is desired configuration, not a live installed-software inventory.
+Deploy from Computers when you want clients to receive the change.
 
 ↑/↓ select  •  enter choose scope  •  r remove  •  / search  •  tab change view  •  esc back
 ```
 
 Search is debounced and displays activity while Nix evaluates the locked
-package set. Results from an older query are ignored. Broken, insecure, unfree,
-or platform-incompatible packages remain visible with a reason and cannot
+package set. Results from an older query are ignored. Packages excluded by the
+deployment's licensing policy, as well as broken, insecure or
+platform-incompatible packages, remain visible with a reason and cannot
 advance to scope selection.
 
 Selecting a package asks for configuration scope, not which machines happen to
 be powered on for today's distribution:
 
 ```text
-Nixorium  /  Add or change software
+Nixorium  /  Software  /  Scope
 
 Add GIMP
 Choose where this declaration applies. This is not the set of computers deployed today.
@@ -243,27 +243,20 @@ Managed file: lab-software.json
 ↑/↓ move   space select computer   enter review   esc catalog   ? help
 ```
 
-The review is explicit about both its effect and everything it does not do:
+The review keeps only the information needed for the decision:
 
 ```text
-Nixorium  /  Add or change software
+Nixorium  /  Software  /  Review
 
 Add gimp?
+gimp
 
-Configuration scope  all clients, including future clients
-Affected identities  24
-Managed file         lab-software.json
-Powered-on clients   none required
+Destination  all clients, including future clients
+Clients      24 affected by this declaration
 
-✓ Proposal validated
-○ Configuration not saved
-○ System not prepared
-○ No client changed
-
-Only lab-software.json will be replaced and saved locally.
-No build, activation, PXE action, or client deployment is included.
-
-Enter saves this reviewed configuration; Esc cancels.
+✓ Validated against the pinned package set
+Save now     Update lab-software.json locally
+Later        Deploy clients to install this change
 
 enter save configuration   esc cancel   F1 help
 ```

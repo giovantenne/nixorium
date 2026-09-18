@@ -83,7 +83,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 					}(),
 					screen: dashboardPXE,
 				},
-				expected: []string{"Network installation", "Prepare", "Start PXE", "Recover", "Esc", "Help"},
+				expected: []string{"Network installation", "Prepare", "Start PXE", "Esc", "Help"},
 			},
 			{
 				name:     "pilot selection",
@@ -138,7 +138,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 			{
 				name:     "configured",
 				model:    dashboardModel{screen: dashboardSoftware, softwareCatalog: catalog},
-				expected: []string{"Software", "Configured", "Review removal", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
+				expected: []string{"Software", "Selected", "Review removal", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
 			},
 			{
 				name: "search input",
@@ -166,7 +166,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						ManagedFile: "lab-software.json", AffectedClients: catalog.Clients,
 					},
 				},
-				expected: []string{"Software  /  Review", "Proposal validated", "Enter", "Save", "Esc", "Scope", "Help"},
+				expected: []string{"Software  /  Review", "Validated against the pinned package set", "Enter", "Save", "Esc", "Scope", "Help"},
 			},
 			{
 				name: "partial result",

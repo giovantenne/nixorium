@@ -159,11 +159,11 @@ func (model dashboardModel) helpView() string {
 	case dashboardComputersArea:
 		lines = append(lines, "Choose inventory, distribute, restore or shut down.", "Observed state is loaded only by the task that needs it.")
 	case dashboardInstallationArea:
-		lines = append(lines, "Install computers continues setup when required.", "Installation mode and recovery opens PXE state directly.")
+		lines = append(lines, "Install a computer guides one physical machine from identity selection to verification.", "PXE mode and network recovery is the advanced controller-side view.")
 	case dashboardRestore:
 		lines = append(lines, "Choose reapply to keep the disk, or reinstall to erase", "the disk confirmed locally on each selected computer.")
 	case dashboardAdministration:
-		lines = append(lines, "r restore   u update Nixorium   h inventory   e settings", "c controller   s services   g changes   l history   i diagnostics")
+		lines = append(lines, "u update Nixorium   e settings   c controller", "s controller services   g changes   l history   i diagnostics")
 	case dashboardHosts:
 		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail   i diagnostics", "d review a deployment for the focused computer", "Search owns all text keys until Enter or Esc.")
 	case dashboardDeploy:
@@ -243,7 +243,7 @@ func (model dashboardModel) restoreView() string {
 		description string
 	}{
 		{"Reapply the intended system", "Keeps the disk and deploys the declared configuration again."},
-		{"Reinstall from scratch", "Opens network installation; the disk confirmed on the computer is erased."},
+		{"Reinstall from scratch", "Choose this physical computer's configured identity, then start PXE. Its disk is erased only after local confirmation."},
 	}
 	lines := []string{tuiTitle("Restore computers", model.isDark), tuiMuted("Choose whether to keep or replace the installed system.", model.isDark), ""}
 	for index, option := range options {
@@ -258,8 +258,8 @@ func (model dashboardModel) restoreView() string {
 		body: strings.Join(lines, "\n"),
 		notices: []tuiNotice{{
 			kind:   tuiStatusNeutral,
-			title:  "Reapply and reinstall remain separate",
-			detail: "A failed reapply never becomes a reinstall automatically.",
+			title:  "Why reinstall asks for a computer",
+			detail: "The choice binds the checklist to one configured identity; it does not remotely erase or reserve that machine. Disk erasure is confirmed locally in the installer.",
 		}},
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}},
 	}, model.width, model.isDark)
