@@ -170,11 +170,11 @@ func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.
 	ready := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{}, false)
 	found := false
 	for _, task := range dashboardTasks {
-		if task.id == "install" && task.shortcut == "n" {
+		if task.id == "installation" && task.shortcut == "n" {
 			found = true
 		}
 	}
-	if !found || !strings.Contains(ready.View().Content, "Install new computers") {
+	if !found || !strings.Contains(ready.View().Content, "Installation") {
 		t.Fatal("configured labs cannot reopen computer installation from the intervention menu")
 	}
 
@@ -193,12 +193,17 @@ func TestOpeningCachedSetupDoesNotRefreshIt(t *testing.T) {
 		},
 	}, false)
 	for index, task := range dashboardTasks {
-		if task.id == "install" {
+		if task.id == "installation" {
 			model.homeMenu.list.Select(index)
 			break
 		}
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardInstallationArea {
+		t.Fatalf("installation area did not open: screen=%d", model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command != nil || loads != 0 || model.screen != dashboardSetup {
 		t.Fatalf("opening cached setup triggered a refresh: loads=%d screen=%d", loads, model.screen)
@@ -213,12 +218,17 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 		LoadSettings: func() (domain.LabSettingsFile, error) { return settings, nil },
 	}, false)
 	for index, task := range dashboardTasks {
-		if task.id == "install" {
+		if task.id == "installation" {
 			model.homeMenu.list.Select(index)
 			break
 		}
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardInstallationArea {
+		t.Fatalf("installation area did not open: screen=%d", model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || !model.startingLabSetup {
 		t.Fatal("computer installation settings did not start")
@@ -421,7 +431,7 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 	}, false)
 	model.initializing = true
 	model.busy = "Opening the laboratory and checking setup progress"
-	if view := model.View().Content; !strings.Contains(view, model.busy) || strings.Contains(view, "Restore computers") || strings.Contains(view, "What do you want to do?") {
+	if view := model.View().Content; !strings.Contains(view, model.busy) || strings.Contains(view, "Restore computers") || strings.Contains(view, "Laboratory overview") {
 		t.Fatalf("startup activity is not visible before inspection:\n%s", view)
 	}
 

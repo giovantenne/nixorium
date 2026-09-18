@@ -21,11 +21,22 @@ func (task dashboardTask) Description() string { return task.description }
 func (task dashboardTask) FilterValue() string { return task.title + " " + task.description }
 
 var dashboardTasks = []dashboardTask{
-	{id: "software", shortcut: "w", title: "Add or change software", description: "Review configured choices or search this lab's pinned packages"},
-	{id: "install", shortcut: "n", title: "Install new computers", description: "Configure the laboratory when needed, then prepare and start network installation"},
-	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
-	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
+	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, distribute, restore or shut down client computers"},
+	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab, prepare netboot and guide computer installation"},
+	{id: "software", shortcut: "w", title: "Software", description: "Review configured choices or search this lab's pinned packages"},
 	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
+}
+
+var computersAreaTasks = []dashboardTask{
+	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Check reachability and compare observed systems with the intended revision"},
+	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
+	{id: "restore", shortcut: "r", title: "Restore computers", description: "Reapply the intended system or reinstall from scratch"},
+	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
+}
+
+var installationAreaTasks = []dashboardTask{
+	{id: "install", shortcut: "n", title: "Install computers", description: "Continue setup if needed, then prepare and start network installation"},
+	{id: "pxe", shortcut: "p", title: "Installation mode and recovery", description: "Inspect prepared artifacts, PXE state and controller network recovery"},
 }
 
 var administrationTasks = []dashboardTask{
@@ -126,8 +137,8 @@ func (model dashboardModel) homeView() string {
 		}, model.width, model.isDark)
 	}
 	lines := []string{
-		tuiTitle("What do you want to do?", model.isDark),
-		tuiMuted("Choose one task. Computers are checked only when that task needs them.", model.isDark),
+		tuiTitle("Laboratory overview", model.isDark),
+		tuiMuted("Choose an area. Observed state is loaded only when the selected task needs it.", model.isDark),
 		"",
 	}
 	notices := []tuiNotice{}
@@ -135,20 +146,20 @@ func (model dashboardModel) homeView() string {
 		notices = append(notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Controller network recovery required",
-			detail: "Open Install new computers to reconcile the previous session before trusting normal networking.",
+			detail: "Open Installation to reconcile the previous session before trusting normal networking.",
 		})
 	} else if model.report.PXE.Mode == "active" {
 		notices = append(notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Network installation is active",
-			detail: "Open Install new computers to continue or restore normal controller networking.",
+			detail: "Open Installation to continue or restore normal controller networking.",
 		})
 	}
 	if model.setup.State != "ready" {
 		notices = append(notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Computer installation is not configured yet",
-			detail: "Choose Install new computers when you are ready to configure the laboratory.",
+			detail: "Choose Installation when you are ready to configure the laboratory.",
 		})
 	}
 	if model.busy != "" {
@@ -174,4 +185,49 @@ func (model dashboardModel) homeView() string {
 		notices: notices,
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "?", label: "Help"}, {key: "q", label: "Quit"}},
 	}, model.width, model.isDark)
+}
+
+func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
+	lines := []string{tuiTitle(title, model.isDark), tuiMuted(description, model.isDark), ""}
+	for index, task := range tasks {
+		marker := "  "
+		if index == cursor {
+			marker = "› "
+		}
+		label := marker + task.title
+		if index == cursor {
+			label = tuiTitle(label, model.isDark)
+		}
+		lines = append(lines, label, tuiMuted("    "+task.description, model.isDark))
+	}
+	notices := []tuiNotice{}
+	if model.message != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
+	}
+	return renderTUIShell(tuiShell{
+		path:    []string{path},
+		body:    strings.Join(lines, "\n"),
+		notices: notices,
+		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "?", label: "Help"}},
+	}, model.width, model.isDark)
+}
+
+func (model dashboardModel) computersAreaView() string {
+	return model.areaView(
+		"Computers",
+		"Manage client computers",
+		"Observed state is loaded only by Computer inventory or an operation that needs it.",
+		computersAreaTasks,
+		model.computersAreaCursor,
+	)
+}
+
+func (model dashboardModel) installationAreaView() string {
+	return model.areaView(
+		"Installation",
+		"Install client computers",
+		"Prepare and control network installation without mixing it with routine distribution.",
+		installationAreaTasks,
+		model.installationAreaCursor,
+	)
 }

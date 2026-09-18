@@ -9,6 +9,36 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+func (model dashboardModel) openComputerInstallation() (tea.Model, tea.Cmd) {
+	model.message = ""
+	if model.setup.State == "ready" {
+		model.screen = dashboardPXE
+		return model, nil
+	}
+	if model.actions.LoadSettings == nil {
+		model.setupMode = true
+		model.screen = dashboardSetup
+		return model, nil
+	}
+	model.setupMode = true
+	model.startingLabSetup = true
+	model.settingsReturn = dashboardSetup
+	model.busy = "Opening computer installation settings"
+	return model, func() tea.Msg {
+		settings, err := model.actions.LoadSettings()
+		return dashboardSettingsMsg{settings: settings, err: err}
+	}
+}
+
+func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
+	model.screen = dashboardController
+	model.busy = "Reviewing controller revision and active system"
+	model.message = ""
+	return model, func() tea.Msg {
+		return dashboardControllerPlanMsg{report: model.actions.PlanController()}
+	}
+}
+
 func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardHome:
@@ -39,6 +69,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		switch action {
 		case "a":
 			model.screen = dashboardAdministration
+		case "c":
+			model.screen = dashboardComputersArea
+			model.message = ""
 		case "r":
 			model.screen = dashboardRestore
 			model.restoreCursor = 0
@@ -77,13 +110,6 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.message = ""
 			model.deployChosen = map[string]bool{}
 			model.deployCursor = 0
-		case "c":
-			model.screen = dashboardController
-			model.busy = "Reviewing controller revision and active system"
-			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardControllerPlanMsg{report: model.actions.PlanController()}
-			}
 		case "h":
 			model.hostDetail = false
 			model.hostTechnical = false
@@ -145,24 +171,8 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.screen = dashboardPXE
 			model.message = ""
 		case "n":
+			model.screen = dashboardInstallationArea
 			model.message = ""
-			if model.setup.State == "ready" {
-				model.screen = dashboardPXE
-			} else {
-				if model.actions.LoadSettings == nil {
-					model.setupMode = true
-					model.screen = dashboardSetup
-					return model, nil
-				}
-				model.setupMode = true
-				model.startingLabSetup = true
-				model.settingsReturn = dashboardSetup
-				model.busy = "Opening computer installation settings"
-				return model, func() tea.Msg {
-					settings, err := model.actions.LoadSettings()
-					return dashboardSettingsMsg{settings: settings, err: err}
-				}
-			}
 		case "f":
 			model.setupMode = true
 			model.screen = dashboardSetup
@@ -171,6 +181,45 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			var command tea.Cmd
 			model.homeMenu, command = model.homeMenu.update(key)
 			return model, command
+		}
+	case dashboardComputersArea:
+		action := key.String()
+		if action == "enter" {
+			action = computersAreaTasks[model.computersAreaCursor].shortcut
+		}
+		switch action {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "up", "k":
+			model.computersAreaCursor = max(0, model.computersAreaCursor-1)
+		case "down", "j":
+			model.computersAreaCursor = min(len(computersAreaTasks)-1, model.computersAreaCursor+1)
+		case "h", "d", "r", "x":
+			model.areaReturn = dashboardComputersArea
+			model.screen = dashboardHome
+			return model.updatePrimaryScreenKey(tea.KeyPressMsg{Code: []rune(action)[0], Text: action})
+		}
+	case dashboardInstallationArea:
+		action := key.String()
+		if action == "enter" {
+			action = installationAreaTasks[model.installationAreaCursor].shortcut
+		}
+		switch action {
+		case "esc", "left":
+			model.screen = dashboardHome
+			model.message = ""
+		case "up", "k":
+			model.installationAreaCursor = max(0, model.installationAreaCursor-1)
+		case "down", "j":
+			model.installationAreaCursor = min(len(installationAreaTasks)-1, model.installationAreaCursor+1)
+		case "n":
+			model.areaReturn = dashboardInstallationArea
+			return model.openComputerInstallation()
+		case "p":
+			model.areaReturn = dashboardInstallationArea
+			model.screen = dashboardPXE
+			model.message = ""
 		}
 	case dashboardRestore:
 		switch key.String() {

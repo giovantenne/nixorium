@@ -142,7 +142,11 @@ func (model dashboardModel) helpView() string {
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
 	case dashboardHome:
-		lines = append(lines, "w software   n install computers   d distribute", "x shut down clients   a maintenance")
+		lines = append(lines, "Choose Computers, Installation, Software or Maintenance.", "Use the visible list with arrows and Enter; direct routes are not required.")
+	case dashboardComputersArea:
+		lines = append(lines, "Choose inventory, distribute, restore or shut down.", "Observed state is loaded only by the task that needs it.")
+	case dashboardInstallationArea:
+		lines = append(lines, "Install computers continues setup when required.", "Installation mode and recovery opens PXE state directly.")
 	case dashboardRestore:
 		lines = append(lines, "Choose reapply to keep the disk, or reinstall to erase", "the disk confirmed locally on each selected computer.")
 	case dashboardAdministration:

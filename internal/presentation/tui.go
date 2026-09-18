@@ -65,6 +65,8 @@ type dashboardScreen int
 
 const (
 	dashboardHome dashboardScreen = iota
+	dashboardComputersArea
+	dashboardInstallationArea
 	dashboardSetup
 	dashboardSetupKeys
 	dashboardRestore
@@ -101,84 +103,87 @@ const (
 )
 
 type dashboardModel struct {
-	updateDetails        bool
-	returnAdmin          bool
-	restoreMode          bool
-	restoreCursor        int
-	diagnosticReturn     dashboardScreen
-	adminCursor          int
-	hostCursor           int
-	hostQuery            string
-	hostSearching        bool
-	hostDetail           bool
-	hostTechnical        bool
-	helpOpen             bool
-	pageScroll           int
-	setupDetails         bool
-	setupKeys            domain.KeyReconcileReport
-	setupKeyCursor       int
-	setupKeyImporting    bool
-	setupKeyPath         string
-	setupKeyImportResult domain.KeyImportReport
-	progressDetails      bool
-	doctor               domain.DoctorReport
-	diagnosticCursor     int
-	diagnosticDetails    bool
-	report               domain.StatusReport
-	setup                domain.SetupReport
-	setupMode            bool
-	homeMenu             dashboardTaskMenu
-	actions              DashboardActions
-	screen               dashboardScreen
-	busy                 string
-	message              string
-	confirmation         string
-	startPlan            domain.PXELifecycleReport
-	hosts                domain.HostsReport
-	deployCursor         int
-	deployChosen         map[string]bool
-	deployPlan           domain.DeploymentPlanReport
-	deployResult         domain.DeploymentExecutionReport
-	deploying            bool
-	deployProgress       domain.DeploymentProgress
-	deployRecent         []string
-	deployStarted        time.Time
-	deployEvents         <-chan tea.Msg
-	controllerPlan       domain.ControllerRebuildPlanReport
-	controllerResult     domain.ControllerRebuildExecutionReport
-	controllerApplying   bool
-	controllerProgress   domain.OperationProgress
-	controllerStarted    time.Time
-	controllerProgressID uint64
-	controllerDetails    bool
-	services             domain.ServicesReport
-	serviceResult        domain.ServiceActionReport
-	logs                 domain.OperationLogsReport
-	logDetail            domain.OperationLogReport
-	logCursor            int
-	logScroll            int
-	gitReview            domain.GitReviewReport
-	gitScroll            int
-	gitCommitCursor      int
-	gitCommitChosen      map[string]bool
-	gitCommitPlan        domain.GitCommitPlanReport
-	gitCommitResult      domain.GitCommitReport
-	updateCheck          domain.UpdateCheckReport
-	updateCursor         int
-	updateTarget         string
-	updatePrerelease     bool
-	updatePlan           domain.UpdatePlanReport
-	updateResult         domain.UpdateApplyReport
-	updateScroll         int
-	updating             bool
-	settings             domain.LabSettingsFile
-	settingsCandidate    domain.LabSettingsFile
-	settingsMenu         routineSettingsMenu
-	settingsPasswordMenu routinePasswordMenu
-	settingsEditor       settingsWizardModel
-	settingsPlan         domain.ConfigPlanReport
-	settingsResult       domain.ConfigurationSaveReport
-	settingsApplying     bool
+	updateDetails          bool
+	returnAdmin            bool
+	restoreMode            bool
+	restoreCursor          int
+	computersAreaCursor    int
+	installationAreaCursor int
+	areaReturn             dashboardScreen
+	diagnosticReturn       dashboardScreen
+	adminCursor            int
+	hostCursor             int
+	hostQuery              string
+	hostSearching          bool
+	hostDetail             bool
+	hostTechnical          bool
+	helpOpen               bool
+	pageScroll             int
+	setupDetails           bool
+	setupKeys              domain.KeyReconcileReport
+	setupKeyCursor         int
+	setupKeyImporting      bool
+	setupKeyPath           string
+	setupKeyImportResult   domain.KeyImportReport
+	progressDetails        bool
+	doctor                 domain.DoctorReport
+	diagnosticCursor       int
+	diagnosticDetails      bool
+	report                 domain.StatusReport
+	setup                  domain.SetupReport
+	setupMode              bool
+	homeMenu               dashboardTaskMenu
+	actions                DashboardActions
+	screen                 dashboardScreen
+	busy                   string
+	message                string
+	confirmation           string
+	startPlan              domain.PXELifecycleReport
+	hosts                  domain.HostsReport
+	deployCursor           int
+	deployChosen           map[string]bool
+	deployPlan             domain.DeploymentPlanReport
+	deployResult           domain.DeploymentExecutionReport
+	deploying              bool
+	deployProgress         domain.DeploymentProgress
+	deployRecent           []string
+	deployStarted          time.Time
+	deployEvents           <-chan tea.Msg
+	controllerPlan         domain.ControllerRebuildPlanReport
+	controllerResult       domain.ControllerRebuildExecutionReport
+	controllerApplying     bool
+	controllerProgress     domain.OperationProgress
+	controllerStarted      time.Time
+	controllerProgressID   uint64
+	controllerDetails      bool
+	services               domain.ServicesReport
+	serviceResult          domain.ServiceActionReport
+	logs                   domain.OperationLogsReport
+	logDetail              domain.OperationLogReport
+	logCursor              int
+	logScroll              int
+	gitReview              domain.GitReviewReport
+	gitScroll              int
+	gitCommitCursor        int
+	gitCommitChosen        map[string]bool
+	gitCommitPlan          domain.GitCommitPlanReport
+	gitCommitResult        domain.GitCommitReport
+	updateCheck            domain.UpdateCheckReport
+	updateCursor           int
+	updateTarget           string
+	updatePrerelease       bool
+	updatePlan             domain.UpdatePlanReport
+	updateResult           domain.UpdateApplyReport
+	updateScroll           int
+	updating               bool
+	settings               domain.LabSettingsFile
+	settingsCandidate      domain.LabSettingsFile
+	settingsMenu           routineSettingsMenu
+	settingsPasswordMenu   routinePasswordMenu
+	settingsEditor         settingsWizardModel
+	settingsPlan           domain.ConfigPlanReport
+	settingsResult         domain.ConfigurationSaveReport
+	settingsApplying       bool
 
 	settingsReturn           dashboardScreen
 	settingsCollectPasswords bool
@@ -464,6 +469,9 @@ func (model dashboardModel) Init() tea.Cmd {
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	updated, command := model.updateState(message)
 	next := updated.(dashboardModel)
+	if model.areaReturn != dashboardHome && model.screen != model.areaReturn && next.screen == dashboardHome {
+		next.screen = model.areaReturn
+	}
 	if k, ok := message.(tea.KeyPressMsg); ok && (k.String() == "esc" || k.String() == "left") && model.returnAdmin && model.screen != dashboardAdministration && next.screen == dashboardHome {
 		next.screen = dashboardAdministration
 	}
@@ -472,6 +480,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if next.screen == dashboardHome {
 		next.returnAdmin = false
+		next.areaReturn = dashboardHome
 	}
 	return next, command
 }
@@ -658,6 +667,10 @@ func (model dashboardModel) View() tea.View {
 	}
 	content := ""
 	switch model.screen {
+	case dashboardComputersArea:
+		content = model.computersAreaView()
+	case dashboardInstallationArea:
+		content = model.installationAreaView()
 	case dashboardSetup:
 		content = model.setupView()
 	case dashboardSetupKeys:
