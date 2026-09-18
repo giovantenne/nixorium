@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -20,6 +21,7 @@ type fakePXELifecycleSource struct {
 	cacheCalls  []string
 	controlErr  map[string]error
 	controls    []string
+	skipRestore bool
 }
 
 func readyPXESource() *fakePXELifecycleSource {
@@ -99,7 +101,9 @@ func (f *fakePXELifecycleSource) ControlSystemUnit(_ context.Context, verb, unit
 		network.Active = false
 		network.State = "inactive"
 		f.services[PXENetworkUnit] = network
-		f.addresses = []string{f.preparation.DHCPAddress, f.meta.Controller.StaticIP}
+		if !f.skipRestore {
+			f.addresses = []string{f.preparation.DHCPAddress, f.meta.Controller.StaticIP}
+		}
 	}
 	return nil
 }
@@ -182,6 +186,15 @@ func TestPXEStartRejectsUnsafePreflight(t *testing.T) {
 	}
 }
 
+func TestPXEStartMissingStaticAddressPointsToControllerApply(t *testing.T) {
+	source := readyPXESource()
+	source.addresses = []string{source.preparation.DHCPAddress}
+	report := NewPXELifecycle(source).Start(context.Background(), "/deployment")
+	if !report.HasErrors() || !strings.Contains(report.Message, "Maintenance > Rebuild controller") || strings.Contains(report.Message, "pxe recover") {
+		t.Fatalf("report = %+v", report)
+	}
+}
+
 func TestPXEStartFailureRunsSynchronousCleanup(t *testing.T) {
 	source := readyPXESource()
 	source.controlErr["start "+PXEListenerUnit] = errors.New("port conflict")
@@ -209,5 +222,15 @@ func TestPXEStopAndRecoverUseOnlyFixedOrder(t *testing.T) {
 	wantRecover := []string{"stop " + PXEListenerUnit, "stop " + PXENetworkUnit, "start " + PXERecoverUnit}
 	if !reflect.DeepEqual(source.controls, wantRecover) {
 		t.Fatalf("recover controls = %v", source.controls)
+	}
+}
+
+func TestPXERecoverDoesNotClaimItCanCreateMissingControllerAddress(t *testing.T) {
+	source := readyPXESource()
+	source.addresses = []string{source.preparation.DHCPAddress}
+	source.skipRestore = true
+	report := NewPXELifecycle(source).Recover(context.Background(), "/deployment")
+	if !report.HasErrors() || !strings.Contains(report.Message, "apply the current controller configuration") {
+		t.Fatalf("report = %+v", report)
 	}
 }
