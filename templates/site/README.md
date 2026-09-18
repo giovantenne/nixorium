@@ -31,6 +31,8 @@ Existing deployments are not migrated automatically. New controller bootstrap
 sets this mode after collecting accounts, passwords, time zone, and keyboard.
 Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
+The public Nix evaluator and the management command both reject empty required
+regional/Git values, malformed homepage URLs, and unknown Veyon host names.
 
 After the controller's first reboot, sign in as `admin` and run:
 

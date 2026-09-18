@@ -1,0 +1,72 @@
+{
+  "invalid": [
+    {
+      "name": "homepage URL without a host",
+      "overrides": {
+        "homepageUrl": "http:///missing-host"
+      }
+    },
+    {
+      "name": "empty student Git name",
+      "overrides": {
+        "studentGitName": ""
+      }
+    },
+    {
+      "name": "blank student Git email",
+      "overrides": {
+        "studentGitEmail": "   "
+      }
+    },
+    {
+      "name": "empty administrator Git name",
+      "overrides": {
+        "adminGitName": ""
+      }
+    },
+    {
+      "name": "empty administrator Git email",
+      "overrides": {
+        "adminGitEmail": ""
+      }
+    },
+    {
+      "name": "empty time zone",
+      "overrides": {
+        "timeZone": ""
+      }
+    },
+    {
+      "name": "empty default locale",
+      "overrides": {
+        "defaultLocale": ""
+      }
+    },
+    {
+      "name": "empty extra locale",
+      "overrides": {
+        "extraLocale": ""
+      }
+    },
+    {
+      "name": "empty keyboard layout",
+      "overrides": {
+        "keyboardLayout": ""
+      }
+    },
+    {
+      "name": "empty console keymap",
+      "overrides": {
+        "consoleKeyMap": ""
+      }
+    },
+    {
+      "name": "unknown Veyon native host",
+      "overrides": {
+        "veyonNativeHosts": [
+          "pc00"
+        ]
+      }
+    }
+  ]
+}

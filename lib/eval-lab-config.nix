@@ -27,6 +27,10 @@ let
     builtins.match "\\$6\\$[^$]+\\$[^$]+" value != null;
   isIfaceName = value:
     builtins.match "[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}" value != null;
+  isNonEmpty = value:
+    builtins.match ".*[^[:space:]].*" value != null;
+  isAbsoluteHttpUrl = value:
+    builtins.match "https?://[^/[:space:]]+(/.*)?" value != null;
   evaluated = lib.evalModules {
     modules = [
       {
@@ -155,6 +159,23 @@ let
   unknownInterfaceHosts = builtins.filter
     (name: !(builtins.elem name validHostNames))
     (builtins.attrNames config.hostIfaceNames);
+  requiredNonEmptyFields = [
+    "studentGitName"
+    "studentGitEmail"
+    "adminGitName"
+    "adminGitEmail"
+    "timeZone"
+    "defaultLocale"
+    "extraLocale"
+    "keyboardLayout"
+    "consoleKeyMap"
+  ];
+  emptyRequiredFields = builtins.filter
+    (name: !isNonEmpty config.${name})
+    requiredNonEmptyFields;
+  unknownVeyonNativeHosts = builtins.filter
+    (name: !(builtins.elem name validHostNames))
+    config.veyonNativeHosts;
 in
 assert (config.deploymentMode == "controller" && config.pcCount == 0)
   || (config.deploymentMode == "laboratory" && config.pcCount > 0)
@@ -179,6 +200,10 @@ assert builtins.all isIfaceName (builtins.attrValues config.hostIfaceNames)
   || throw "hostIfaceNames values must be valid Linux interface names of at most 15 characters";
 assert unknownInterfaceHosts == []
   || throw "hostIfaceNames contains unknown hosts: ${builtins.concatStringsSep ", " unknownInterfaceHosts}";
+assert emptyRequiredFields == []
+  || throw "settings must not be empty: ${builtins.concatStringsSep ", " emptyRequiredFields}";
+assert unknownVeyonNativeHosts == []
+  || throw "veyonNativeHosts contains unknown hosts: ${builtins.concatStringsSep ", " unknownVeyonNativeHosts}";
 assert isUserName config.teacherUser
   || throw "teacherUser must be a valid Unix user name";
 assert isUserName config.studentUser
@@ -195,6 +220,6 @@ assert isPasswordHash config.studentPassword
   || throw "studentPassword must be a SHA-512 crypt hash beginning with $6$";
 assert isPasswordHash config.adminPassword
   || throw "adminPassword must be a SHA-512 crypt hash beginning with $6$";
-assert builtins.match "https?://.+" config.homepageUrl != null
-  || throw "homepageUrl must use http:// or https://";
+assert isAbsoluteHttpUrl config.homepageUrl
+  || throw "homepageUrl must be an absolute http:// or https:// URL";
 config
