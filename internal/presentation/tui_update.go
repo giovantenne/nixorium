@@ -800,6 +800,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		case "enter":
 			key = tea.KeyPressMsg{Code: []rune(administrationTasks[model.adminCursor].shortcut)[0], Text: administrationTasks[model.adminCursor].shortcut}
 		}
+		if key.String() == "c" {
+			return model.openControllerReview()
+		}
 		known := false
 		for _, task := range administrationTasks {
 			if key.String() == task.shortcut {

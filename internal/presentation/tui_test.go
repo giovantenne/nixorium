@@ -762,17 +762,25 @@ func TestFirstSetupStaleSessionRequiresNewSelection(t *testing.T) {
 	}
 }
 
-func TestDashboardTaskMenuUsesSelectionAndKeepsShortcuts(t *testing.T) {
+func TestDashboardAreaNavigationUsesVisibleSelection(t *testing.T) {
 	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
 	model.width = 90
 	model.height = 30
 	model.homeMenu.setSize(model.width, model.height)
 	view := model.View().Content
-	if !strings.Contains(view, "Install new computers") || !strings.Contains(view, "Maintenance") || strings.Contains(view, "Update Nixorium") || !strings.Contains(view, "\x1b[") {
-		t.Fatalf("home task menu lacks hierarchy or color:\n%s", view)
+	for _, area := range []string{"Computers", "Installation", "Software", "Maintenance"} {
+		if !strings.Contains(view, area) {
+			t.Fatalf("home area menu lacks %q:\n%s", area, view)
+		}
 	}
-	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	if strings.Contains(view, "Update Nixorium") || !strings.Contains(view, "\x1b[") {
+		t.Fatalf("home area menu lacks hierarchy or color:\n%s", view)
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
+	if model.screen != dashboardComputersArea || !strings.Contains(model.View().Content, "Computer inventory") {
+		t.Fatalf("computers area did not open: screen=%d", model.screen)
+	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -870,7 +878,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	view := model.View().Content
-	if !strings.Contains(view, "Install new computers") || !strings.Contains(view, "What do you want to do?") {
+	if !strings.Contains(view, "Installation") || !strings.Contains(view, "Laboratory overview") {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 
@@ -1162,7 +1170,12 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 		},
 	}
 	model := dashboardModel{actions: actions}
-	updated, command := model.Update(tea.KeyPressMsg{Text: "c"})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardAdministration {
+		t.Fatalf("maintenance did not open: screen=%d", model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
 		t.Fatalf("controller plan did not start: %+v", model)

@@ -22,7 +22,7 @@ func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 			t.Fatal(err)
 		}
 		text := output.String()
-		if !strings.Contains(text, "Nixorium") || !strings.Contains(text, "Overview") || !strings.Contains(text, "What do you want to do?") || !strings.Contains(text, "Add or change software") {
+		if !strings.Contains(text, "Nixorium") || !strings.Contains(text, "Overview") || !strings.Contains(text, "Laboratory overview") || !strings.Contains(text, "Computers") || !strings.Contains(text, "Installation") || !strings.Contains(text, "Software") || !strings.Contains(text, "Maintenance") {
 			t.Fatalf("meaning lost with %v", profile)
 		}
 		if strings.Contains(text, "38;2;") {
@@ -37,7 +37,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 		m.width = size[0]
 		m.height = size[1]
 		view := m.View().Content
-		for _, expected := range []string{"Nixorium", "Overview", "What do you want to do?", "Enter", "Open", "Help"} {
+		for _, expected := range []string{"Nixorium", "Overview", "Laboratory overview", "Enter", "Open", "Help"} {
 			if !strings.Contains(view, expected) {
 				t.Fatalf("overview %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
@@ -190,7 +190,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		for _, screen := range []dashboardScreen{dashboardHome, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
+		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
 			m := experienceFixture(200)
 			m.width = size[0]
 			m.height = size[1]
@@ -270,7 +270,7 @@ func TestAdministrationBackAndDiagnosticsUseTypedCallback(t *testing.T) {
 func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 	m := experienceFixture(2)
 	m.setup.State = "incomplete"
-	m = press(m, "down")
+	m = press(m, "enter")
 	m = press(m, "down")
 	m = press(m, "enter")
 	if m.screen != dashboardDeploy {
@@ -280,6 +280,41 @@ func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 	m = press(m, "z")
 	if m.screen != dashboardAdministration {
 		t.Fatal("unbound key navigated away")
+	}
+}
+
+func TestPrimaryAreasPreserveContext(t *testing.T) {
+	m := experienceFixture(2)
+	m = press(m, "enter")
+	if m.screen != dashboardComputersArea {
+		t.Fatalf("computers area did not open: screen=%d", m.screen)
+	}
+	m = press(m, "down")
+	m = press(m, "enter")
+	if m.screen != dashboardDeploy || m.areaReturn != dashboardComputersArea {
+		t.Fatalf("computer task lost its area: screen=%d return=%d", m.screen, m.areaReturn)
+	}
+	m = press(m, "esc")
+	if m.screen != dashboardComputersArea {
+		t.Fatalf("computer task returned to %d", m.screen)
+	}
+	m = press(m, "esc")
+	if m.screen != dashboardHome || m.areaReturn != dashboardHome {
+		t.Fatalf("computers area did not return to overview: screen=%d return=%d", m.screen, m.areaReturn)
+	}
+
+	m = press(m, "down")
+	m = press(m, "enter")
+	if m.screen != dashboardInstallationArea {
+		t.Fatalf("installation area did not open: screen=%d", m.screen)
+	}
+	m = press(m, "enter")
+	if m.screen != dashboardPXE || m.areaReturn != dashboardInstallationArea {
+		t.Fatalf("installation task lost its area: screen=%d return=%d", m.screen, m.areaReturn)
+	}
+	m = press(m, "esc")
+	if m.screen != dashboardInstallationArea {
+		t.Fatalf("installation task returned to %d", m.screen)
 	}
 }
 
@@ -307,7 +342,7 @@ func TestEveryDisruptiveReviewRejectsWrongConfirmationAndCancels(t *testing.T) {
 
 func TestExperienceStatesAndDisclosure(t *testing.T) {
 	m := experienceFixture(24)
-	if !strings.Contains(m.View().Content, "What do you want to do?") || strings.Contains(m.View().Content, "24 computers") {
+	if !strings.Contains(m.View().Content, "Laboratory overview") || !strings.Contains(m.View().Content, "Computers") || strings.Contains(m.View().Content, "24 computers") {
 		t.Fatal("entry is not intervention-oriented")
 	}
 	m.busy = "Checking laboratory and computers"
