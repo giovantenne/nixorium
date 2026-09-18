@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 4 ]]; then
-  echo "Usage: home-reset.sh <snapshots-dir> <home-dir> <template-dir> <owner>" >&2
+if [[ $# -ne 5 ]]; then
+  echo "Usage: home-reset.sh <snapshots-dir> <home-dir> <template-dir> <owner> <ephemeral-paths-file>" >&2
   exit 1
 fi
 
@@ -10,6 +10,7 @@ SNAPSHOTS_DIR="$1"
 HOME_DIR="$2"
 TEMPLATE_DIR="$3"
 OWNER="$4"
+EPHEMERAL_PATHS_FILE="$5"
 KEYFILE_DIR=""
 
 cleanup() {
@@ -39,15 +40,16 @@ echo "Starting home reset..."
 # Ensure snapshots directory exists
 mkdir -p "$SNAPSHOTS_DIR"
 
-# Runtime caches and installed tools are reproducible/replaceable and can be
-# very large. Exclude them from the recoverable work snapshots.
-EPHEMERAL_PATHS=(
-  ".local/share/docker"
-  ".local/npm"
-  ".npm"
-)
+mapfile -t EPHEMERAL_PATHS < "$EPHEMERAL_PATHS_FILE"
 
 for EPHEMERAL_PATH in "${EPHEMERAL_PATHS[@]}"; do
+  if [[ -z "$EPHEMERAL_PATH" ]]; then
+    continue
+  fi
+  if [[ "$EPHEMERAL_PATH" == /* || "/$EPHEMERAL_PATH/" == *"/../"* ]]; then
+    echo "Error: unsafe ephemeral home path '$EPHEMERAL_PATH'" >&2
+    exit 1
+  fi
   if [ -e "$HOME_DIR/$EPHEMERAL_PATH" ]; then
     rm -rf "$HOME_DIR/$EPHEMERAL_PATH"
   fi

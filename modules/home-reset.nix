@@ -1,4 +1,4 @@
-{ pkgs, labSettings, labAssets, ... }:
+{ pkgs, labSettings, homeResetEphemeralPaths, ... }:
 
 let
   # Git configuration
@@ -17,39 +17,8 @@ let
   snapshotsDir = "/var/lib/home-snapshots";
   homeDirStudent = "/home/${labSettings.studentUser}";
   homeDirAdmin = "/home/admin";
-  # VSCode extensions to pre-install in the template
-  vscodeExtensions = [
-    {
-      pkg = pkgs.vscode-extensions.ritwickdey.liveserver;
-      dir = "ritwickdey.liveserver";
-    }
-    # Microsoft Extension Pack for Java (meta-pack + all individual extensions)
-    {
-      pkg = pkgs.vscode-extensions.vscjava.vscode-java-pack;
-      dir = "vscjava.vscode-java-pack";
-    }
-    {
-      pkg = pkgs.vscode-extensions.redhat.java;
-      dir = "redhat.java";
-    }
-    {
-      pkg = pkgs.vscode-extensions.vscjava.vscode-java-debug;
-      dir = "vscjava.vscode-java-debug";
-    }
-    {
-      pkg = pkgs.vscode-extensions.vscjava.vscode-java-test;
-      dir = "vscjava.vscode-java-test";
-    }
-    {
-      pkg = pkgs.vscode-extensions.vscjava.vscode-maven;
-      dir = "vscjava.vscode-maven";
-    }
-    {
-      pkg = pkgs.vscode-extensions.vscjava.vscode-java-dependency;
-      dir = "vscjava.vscode-java-dependency";
-    }
-  ];
-
+  ephemeralPathsFile = pkgs.writeText "nixorium-home-reset-ephemeral-paths"
+    (builtins.concatStringsSep "\n" homeResetEphemeralPaths + "\n");
   # External scripts
   createTemplateScript = ../scripts/create-home-template.sh;
   homeResetScript = ../scripts/home-reset.sh;
@@ -59,23 +28,11 @@ in
   system.activationScripts.createHomeTemplates = {
     text = ''
       # Create student template
-      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${labAssets.mimeApps}" "${labAssets.vscodeSettings}"
-      mkdir -p "${templateDirStudent}/.vscode/extensions"
-      ${builtins.concatStringsSep "\n      " (map (ext:
-        ''cp -a "${ext.pkg}/share/vscode/extensions/${ext.dir}" "${templateDirStudent}/.vscode/extensions/"''
-      ) vscodeExtensions)}
-      # Fix Nix store read-only permissions so extensions can write temp files
-      chmod -R u+w "${templateDirStudent}/.vscode/extensions"
-      # Remove LiveServer announcement to suppress the "NEW" toast notification
-      ${pkgs.jq}/bin/jq 'del(.announcement)' \
-        "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json" \
-        > "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp"
-      mv "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp" \
-        "${templateDirStudent}/.vscode/extensions/ritwickdey.liveserver/package.json"
+      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
       chown -R ${labSettings.studentUser}:users "${templateDirStudent}"
 
       # Create admin template
-      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update" "${labAssets.mimeApps}" "${labAssets.vscodeSettings}"
+      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
       chown -R admin:users "${templateDirAdmin}"
 
       # Setup admin home (once, not reset at boot)
@@ -105,7 +62,7 @@ in
     path = [ pkgs.btrfs-progs pkgs.dconf pkgs.findutils pkgs.coreutils ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${pkgs.bash}/bin/bash ${homeResetScript} ${snapshotsDir} ${homeDirStudent} ${templateDirStudent} ${labSettings.studentUser}:users";
+      ExecStart = "${pkgs.bash}/bin/bash ${homeResetScript} ${snapshotsDir} ${homeDirStudent} ${templateDirStudent} ${labSettings.studentUser}:users ${ephemeralPathsFile}";
       RemainAfterExit = true;
     };
   };

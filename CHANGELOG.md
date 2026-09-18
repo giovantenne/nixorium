@@ -62,6 +62,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   declarations into the private deployment template. `mkLab` now resolves an
   optional deployment-owned `softwareCatalog`; the pinned package search
   remains available independently of suggestions.
+- Moved shell, Docker/npm, screensaver, application desktop policy, branding,
+  MIME defaults, and VS Code settings/extensions into focused site-template
+  modules. Downstream modules receive each host's effective managed package IDs
+  so removing or narrowing an application declaration also removes its coupled
+  policy; template validation covers both the enabled and removed states.
 
 - Reworked validation into a fast direct-source gate, an explicit full `mkLab`
   evaluation tier, targeted VM gates, and a batched release checkpoint; added a

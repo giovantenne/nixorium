@@ -60,8 +60,8 @@ keys, assets, and policy stay in a small private deployment repository.
 - Offline-first client installation through ProxyDHCP, iPXE, and a signed local
   Harmonia binary cache.
 - Declarative deployment to one, selected, or all clients with Colmena.
-- GNOME workstations with Veyon classroom management, rootless Docker, and
-  user-managed npm tools.
+- GNOME workstations with Veyon classroom management, a template-owned
+  rootless Docker/development profile, and user-managed npm tools.
 - Student homes restored from a clean template at boot, with five recoverable
   Btrfs snapshots.
 - A reusable public framework plus a separate private repository containing

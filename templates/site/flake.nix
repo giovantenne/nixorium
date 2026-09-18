@@ -31,6 +31,11 @@
           labSoftware = candidateLabSoftware;
           inherit softwareCatalog;
           inherit clientGroups;
+          homeResetEphemeralPaths = [
+            ".local/share/docker"
+            ".local/npm"
+            ".npm"
+          ];
 
           publicKeys = {
             cache = ./keys/cache-public-key;
@@ -38,7 +43,16 @@
             veyon = ./keys/veyon-public-key.pem;
           };
 
-          assets.logo = ./assets/logo.txt;
+          assets = {
+            logo = ./assets/logo.txt;
+            backgrounds = [
+              ./assets/backgrounds/1-ristretto.jpg
+              ./assets/backgrounds/2-ristretto.jpg
+              ./assets/backgrounds/3-ristretto.jpg
+            ];
+            mimeApps = ./assets/mimeapps.list;
+            vscodeSettings = ./assets/vscode-settings.json;
+          };
 
           sharedModules = [ ./modules/shared.nix ];
           controllerModules = [ ./modules/controller.nix ];

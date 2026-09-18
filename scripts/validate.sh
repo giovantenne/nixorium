@@ -200,6 +200,36 @@ if [[ "$(nix eval "path:${SITE_DIR}#deploymentStatus.ready" --json --no-write-lo
   exit 1
 fi
 
+profile_state() {
+  NIXORIUM_PROFILE_SITE="$SITE_DIR" nix eval --impure --json --expr '
+    let
+      deployment = builtins.getFlake ("path:" + builtins.getEnv "NIXORIUM_PROFILE_SITE");
+      config = deployment.nixosConfigurations.pc01.config;
+    in {
+      chromiumPolicy = config.environment.etc ? "chromium/policies/managed/homepage.json";
+      docker = config.virtualisation.docker.rootless.enable;
+      screensaver = config.systemd.user.services ? lab-screensaver;
+      vscodeHome = builtins.match ".*vscjava[.]vscode-java-pack.*"
+        config.system.activationScripts.siteHomeProfile.text != null;
+    }
+  '
+}
+
+PROFILE_STATE=$(profile_state)
+jq -e '.chromiumPolicy and .docker and .screensaver and .vscodeHome' <<<"$PROFILE_STATE" >/dev/null
+cp "$SITE_DIR/lab-software.json" "$TEMP_DIR/lab-software-profile.json"
+jq '.packages |= map(select(.package as $package | [
+  "chromium",
+  "docker",
+  "ghostty",
+  "nodejs",
+  "python3Packages.terminaltexteffects",
+  "vscode"
+] | index($package) | not))' "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
+PROFILE_STATE=$(profile_state)
+jq -e '(.chromiumPolicy or .docker or .screensaver or .vscodeHome) | not' <<<"$PROFILE_STATE" >/dev/null
+cp "$TEMP_DIR/lab-software-profile.json" "$SITE_DIR/lab-software.json"
+
 if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
     --raw \
