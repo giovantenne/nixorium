@@ -1988,7 +1988,7 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	if model.guidedInstallation() {
 		recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
 		if recovery {
-			return []tuiAction{{key: "r", label: "Recover"}, {key: "Esc", label: "Back"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "r", label: "Recover network"}, {key: "Esc", label: "Back"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
 		}
 		if model.pilotName == "" {
 			if model.installationSummary {
@@ -2029,8 +2029,10 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	if model.restoreMode {
 		backLabel = "Computers"
 	}
+	if recovery {
+		actions = append(actions, tuiAction{key: "r", label: "Recover network"})
+	}
 	return append(actions,
-		tuiAction{key: "r", label: "Recover"},
 		tuiAction{key: "Esc", label: backLabel},
 		tuiAction{key: "q", label: "Quit"},
 		tuiAction{key: "F1", label: "Help"},
@@ -2292,7 +2294,8 @@ func (model dashboardModel) pxeNextStepView() []string {
 	case "degraded", "recovery-required":
 		return []string{
 			tuiResult("Next: recover normal controller networking", false, model.isDark),
-			"  Press r to reconcile the recorded address and managed PXE state.",
+			"  A previous PXE transition was interrupted.",
+			"  Press r to restore its recorded network state and stop managed PXE services.",
 		}
 	}
 	if !model.report.PXEPreparation.Ready {

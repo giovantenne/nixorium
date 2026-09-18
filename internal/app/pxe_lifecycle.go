@@ -70,7 +70,7 @@ func (m PXELifecycle) PlanStart(ctx context.Context, repository string) domain.P
 		return report
 	}
 	if !containsIP(addresses, meta.Controller.StaticIP) {
-		return failPXEReport(report, fmt.Sprintf("expected static address %s is not assigned to %s; run `nixorium pxe recover`", meta.Controller.StaticIP, meta.Network.Interface))
+		return failPXEReport(report, missingControllerAddressMessage(meta))
 	}
 	report.Message = fmt.Sprintf("will remove %s temporarily and serve PXE from %s", report.StaticCIDR, report.DHCPAddress)
 	return report
@@ -88,7 +88,7 @@ func (m PXELifecycle) Start(ctx context.Context, repository string) domain.PXELi
 		return report
 	}
 	if !containsIP(addresses, meta.Controller.StaticIP) {
-		return failPXEReport(report, fmt.Sprintf("expected static address %s is not assigned to %s; run `nixorium pxe recover`", meta.Controller.StaticIP, meta.Network.Interface))
+		return failPXEReport(report, missingControllerAddressMessage(meta))
 	}
 	if err := m.source.ControlSystemUnit(ctx, "start", PXEListenerUnit); err != nil {
 		cleanupErrors := m.stopUnits(ctx)
@@ -268,7 +268,7 @@ func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository stri
 		return
 	}
 	if !containsIP(addresses, meta.Controller.StaticIP) {
-		*errors = append(*errors, fmt.Sprintf("static address %s was not restored on %s", meta.Controller.StaticIP, meta.Network.Interface))
+		*errors = append(*errors, fmt.Sprintf("normal controller address %s is still missing on %s; apply the current controller configuration (Maintenance > Rebuild controller), then run Diagnostics", meta.Controller.StaticIP, meta.Network.Interface))
 	}
 	report.Interface = meta.Network.Interface
 	if report.Preparation.DHCPAddress != "" {
@@ -277,6 +277,10 @@ func (m PXELifecycle) verifyRestoredAddress(ctx context.Context, repository stri
 		report.DHCPAddress = meta.Controller.DHCPIP
 	}
 	report.StaticCIDR = fmt.Sprintf("%s/%d", meta.Controller.StaticIP, meta.Network.PrefixLength)
+}
+
+func missingControllerAddressMessage(meta domain.LabMeta) string {
+	return fmt.Sprintf("normal controller address %s is not assigned to %s; apply the current controller configuration (Maintenance > Rebuild controller), then run Diagnostics. Recovery is only for an interrupted PXE transition", meta.Controller.StaticIP, meta.Network.Interface)
 }
 
 func containsIP(addresses []string, expected string) bool {

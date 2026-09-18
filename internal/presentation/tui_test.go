@@ -1932,7 +1932,11 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 	}
 	for key, expected := range map[string]string{"p": "prepare", "x": "stop", "r": "recover"} {
 		called = ""
-		model := dashboardModel{report: testDashboardReport("active"), actions: actions, screen: dashboardPXE}
+		mode := "active"
+		if key == "r" {
+			mode = "recovery-required"
+		}
+		model := dashboardModel{report: testDashboardReport(mode), actions: actions, screen: dashboardPXE}
 		updated, command := model.Update(tea.KeyPressMsg{Text: key})
 		model = updated.(dashboardModel)
 		if command == nil {
@@ -1953,6 +1957,26 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 		if called != expected {
 			t.Errorf("%s called %q, want %q", key, called, expected)
 		}
+	}
+}
+
+func TestDashboardPXEHidesAndIgnoresRecoveryInNormalStates(t *testing.T) {
+	called := false
+	model := dashboardModel{
+		report: testDashboardReport("ready"),
+		screen: dashboardPXE,
+		actions: DashboardActions{RecoverPXE: func() domain.PXELifecycleReport {
+			called = true
+			return domain.PXELifecycleReport{}
+		}},
+	}
+	if strings.Contains(model.View().Content, "Recover") {
+		t.Fatalf("normal PXE state offers recovery:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
+	model = updated.(dashboardModel)
+	if command != nil || called || model.busy != "" {
+		t.Fatalf("hidden recovery shortcut ran in a normal state")
 	}
 }
 

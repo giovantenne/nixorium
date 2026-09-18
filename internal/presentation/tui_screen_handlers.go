@@ -1325,6 +1325,9 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 				return model.actions.StopPXE().Message
 			}, dashboardPXE)
 		case "r":
+			if model.report.PXE.Mode != "degraded" && model.report.PXE.Mode != "recovery-required" {
+				return model, nil
+			}
 			model.busy = "Recovering normal controller networking"
 			model.message = ""
 			return model, model.runAction(func() string {
