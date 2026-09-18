@@ -120,6 +120,13 @@ temporary 4 GiB swap, and controller closure then use the mounted target disk.
 Nix jobs remain serialized even across `sudo`, bounding live-ISO memory use on
 smaller machines. The temporary swap is removed before the installer exits.
 
+New deployments use controller host number `99`, so the default controller
+hostname is `pc99` and its static laboratory address is host number `99` in the
+configured subnet (`10.0.0.99` with the default network). This is configurable,
+not hard-coded: use **Maintenance → Change settings → Computers → Controller
+host number** and rebuild the controller after saving. The chosen number must
+be greater than the client count and fit inside the subnet.
+
 ### 3. Reboot
 
 Remove the USB and sign in as `admin` with the password chosen before

@@ -34,6 +34,16 @@ Older upstreams reject the new setting, so upgrade before opting in.
 The public Nix evaluator and the management command both reject empty required
 regional/Git values, malformed homepage URLs, and unknown Veyon host names.
 
+The controller is named `pc99` by default because
+`lab.masterHostNumber` starts at `99`. This setting is not a fixed controller
+identity: changing it to `42`, for example, produces the hostname `pc42` and
+also moves the controller's static laboratory address to host number `42` in
+the configured subnet. Change it from **Maintenance → Change settings →
+Computers → Controller host number**, then save and rebuild the controller.
+The number must be greater than `pcCount` and must fit inside the subnet; choose
+it before rolling out clients when possible to avoid an unnecessary controller
+rename later.
+
 After the controller's first reboot, sign in as `admin` and run:
 
 ```sh
