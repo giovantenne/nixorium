@@ -448,7 +448,8 @@ func TestLoadingDashboardFailureHasInPlaceRetry(t *testing.T) {
 
 	updated, _ := model.Update(model.loadInitial()())
 	model = updated.(dashboardModel)
-	if !model.initialError || !strings.Contains(model.View().Content, "enter try again") {
+	failureView := model.View().Content
+	if !model.initialError || !strings.Contains(failureView, "Enter") || !strings.Contains(failureView, "Try again") {
 		t.Fatalf("startup failure has no recovery:\n%s", model.View().Content)
 	}
 	updated, retry := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

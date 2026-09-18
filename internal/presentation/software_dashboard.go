@@ -279,7 +279,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 	if model.softwareMode == softwareConfigured {
 		primary = "review removal"
 	}
-	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Clients change only through Distribute the prepared system.", "Private modules remain untouched and are managed through Advanced tools.", "", tuiHelp(model.width, model.isDark,
+	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Clients change only through Distribute the prepared system.", "Private modules remain untouched and are managed through Maintenance.", "", tuiHelp(model.width, model.isDark,
 		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
 		tuiHelpBinding([]string{"enter"}, "enter", primary),
 		tuiHelpBinding([]string{"r"}, "r", "remove"),
