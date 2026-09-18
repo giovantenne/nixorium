@@ -349,7 +349,8 @@ func (model dashboardModel) usesTUIShell() bool {
 		dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult,
 		dashboardController, dashboardControllerReview, dashboardServices,
 		dashboardServicesRestartReview, dashboardDiagnostics, dashboardLogs,
-		dashboardLogDetail:
+		dashboardLogDetail, dashboardSettings, dashboardSettingsPasswords,
+		dashboardSettingsReview:
 		return true
 	default:
 		return false

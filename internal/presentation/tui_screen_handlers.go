@@ -548,7 +548,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "n", "esc":
 			model.message = "Settings apply cancelled; no file changed."
 			model.screen = dashboardSettings
-		case "y":
+		case "y", "enter":
 			model.busy = "Saving the reviewed laboratory configuration"
 			model.settingsApplying = true
 			model.message = ""
