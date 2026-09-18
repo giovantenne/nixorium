@@ -12,12 +12,12 @@ let
     ++ lib.optional (has "git") ''
       source /run/current-system/sw/share/bash-completion/completions/git
     ''
-    ++ lib.optional (has "starship") ''
-      eval "$(starship init bash)"
-    ''
     ++ lib.optional (has "zoxide") ''
       eval "$(zoxide init bash)"
     ''
+    ++ [ ''
+      PS1='\w \$ '
+    '' ]
   );
 in
 {
