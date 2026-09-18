@@ -292,13 +292,28 @@ func (model dashboardModel) frame(content string) string {
 			}
 			if footerStart > 2 && footerStart < len(lines) {
 				footer := lines[footerStart:]
-				body := lines[2 : footerStart-1]
-				bodyHeight := height - 2 - len(footer) - 2
+				bodyEnd := footerStart - 1
+				fixed := []string{}
+				for index := 2; index < bodyEnd; index++ {
+					if strings.Contains(lines[index], "NOTICE") {
+						fixedStart := index
+						if index > 2 && strings.TrimSpace(lines[index-1]) == "" {
+							fixedStart--
+						}
+						fixed = append(fixed, lines[fixedStart:bodyEnd]...)
+						bodyEnd = fixedStart
+						break
+					}
+				}
+				body := lines[2:bodyEnd]
+				bodyHeight := height - 2 - len(fixed) - len(footer) - 2
 				if bodyHeight >= 2 {
 					start := min(model.pageScroll, max(0, len(body)-bodyHeight))
 					visible := append([]string{}, lines[:2]...)
 					visible = append(visible, body[start:min(len(body), start+bodyHeight)]...)
-					visible = append(visible, tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark), "")
+					visible = append(visible, tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark))
+					visible = append(visible, fixed...)
+					visible = append(visible, "")
 					visible = append(visible, footer...)
 					return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(visible, "\n"))
 				}
@@ -316,7 +331,8 @@ func (model dashboardModel) usesTUIShell() bool {
 		dashboardSetup, dashboardSetupKeys, dashboardRestore, dashboardHosts,
 		dashboardDeploy, dashboardDeployReview, dashboardPXE, dashboardPXEStartReview,
 		dashboardPXELeaveReview, dashboardAdministration, dashboardShutdown,
-		dashboardShutdownReview, dashboardShutdownResult:
+		dashboardShutdownReview, dashboardShutdownResult, dashboardSoftware,
+		dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult:
 		return true
 	default:
 		return false

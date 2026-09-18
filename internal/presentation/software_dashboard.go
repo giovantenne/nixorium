@@ -199,9 +199,22 @@ func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeReque
 }
 
 func (model dashboardModel) softwareView() string {
-	lines := []string{tuiTitle("Nixorium  /  Add or change software", model.isDark), ""}
+	path := []string{"Software"}
+	if model.screen == dashboardSoftwareScope {
+		path = append(path, "Scope")
+	} else if model.screen == dashboardSoftwareReview {
+		path = append(path, "Review")
+	} else if model.screen == dashboardSoftwareResult {
+		path = append(path, "Result")
+	}
+	lines := []string{}
 	if model.busy != "" {
-		return strings.Join(append(lines, model.busyView()), "\n")
+		lines = append(lines, tuiTitle("Applying software configuration", model.isDark), "", model.busyView())
+		return renderTUIShell(tuiShell{
+			path:    path,
+			body:    strings.Join(lines, "\n"),
+			actions: []tuiAction{{key: "F1", label: "Help"}},
+		}, model.width, model.isDark)
 	}
 	switch model.screen {
 	case dashboardSoftwareScope:
@@ -213,15 +226,91 @@ func (model dashboardModel) softwareView() string {
 	default:
 		lines = append(lines, model.softwareCatalogView()...)
 	}
-	return strings.Join(lines, "\n")
+	notices := model.softwareNotices()
+	return renderTUIShell(tuiShell{
+		path:    path,
+		body:    strings.Join(lines, "\n"),
+		notices: notices,
+		actions: model.softwareActions(),
+	}, model.width, model.isDark)
+}
+
+func (model dashboardModel) softwareActions() []tuiAction {
+	if model.screen == dashboardSoftwareScope {
+		actions := []tuiAction{{key: "↑/↓", label: "Select"}}
+		options := model.softwareScopeOptions()
+		if len(options) > 0 && options[min(model.softwareScopeCursor, len(options)-1)].scope.Kind == domain.SoftwareScopeClients {
+			actions = append(actions, tuiAction{key: "Space", label: "Toggle"})
+		}
+		return append(actions,
+			tuiAction{key: "Enter", label: "Review"},
+			tuiAction{key: "Esc", label: "Catalog"},
+			tuiAction{key: "F1", label: "Help"},
+		)
+	}
+	if model.screen == dashboardSoftwareReview {
+		back := "Catalog"
+		if model.softwarePlan.Request.Present {
+			back = "Scope"
+		}
+		return []tuiAction{{key: "Enter", label: "Save"}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
+	}
+	if model.screen == dashboardSoftwareResult {
+		if model.softwareResult.State == "partial" {
+			return []tuiAction{{key: "r", label: "Retry save"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+		}
+		if model.softwareResult.State == "saved" && model.softwareResult.AffectedController != "" && (model.controllerResult.Operation == "" || model.controllerResult.HasErrors() || !model.controllerResult.Applied || !model.controllerResult.Verified) {
+			return []tuiAction{{key: "a", label: "Retry controller"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
+		}
+		return []tuiAction{{key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
+	}
+	if model.softwareCatalog.HasErrors() {
+		return []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+	}
+	if model.softwareSearching {
+		return []tuiAction{{key: "Type", label: "Search"}, {key: "↑/↓", label: "Results"}, {key: "Tab", label: "Change view"}, {key: "Esc", label: "Stop typing"}, {key: "F1", label: "Help"}}
+	}
+	actions := []tuiAction{
+		{key: "↑/↓", label: "Select"},
+	}
+	if len(model.softwareItems()) > 0 {
+		primary := "Choose scope"
+		if model.softwareMode == softwareConfigured {
+			primary = "Review removal"
+		} else {
+			items := model.softwareItems()
+			if items[min(model.softwareCursor, len(items)-1)].Availability != "available" {
+				primary = "Explain unavailable"
+			}
+		}
+		actions = append(actions, tuiAction{key: "Enter", label: primary})
+	}
+	return append(actions,
+		tuiAction{key: "Tab", label: "Change view"},
+		tuiAction{key: "/", label: "Search"},
+		tuiAction{key: "Esc", label: "Overview"},
+		tuiAction{key: "F1", label: "Help"},
+	)
+}
+
+func (model dashboardModel) softwareNotices() []tuiNotice {
+	if model.message == "" {
+		return nil
+	}
+	if model.screen == dashboardSoftwareReview && model.message == model.softwarePlan.Message {
+		return nil
+	}
+	return []tuiNotice{{kind: tuiStatusAttention, title: model.message}}
 }
 
 func (model dashboardModel) softwareCatalogView() []string {
 	if model.softwareCatalog.HasErrors() {
-		return []string{tuiResult("Software information unavailable", false, model.isDark), model.softwareCatalog.Message, "", "Retry from Interventions after the deployment inputs are available.", "", "esc interventions   ? help"}
+		return []string{tuiTitle("Software", model.isDark), "", tuiResult("Software information unavailable", false, model.isDark), model.softwareCatalog.Message, "", "Return after the deployment inputs are available."}
 	}
 	items := model.softwareItems()
 	lines := []string{
+		tuiTitle("Software", model.isDark),
+		"",
 		softwareModeTabs(model.softwareMode),
 		tuiMuted("Controller choices are applied here; client distribution remains a separate task.", model.isDark),
 		"",
@@ -275,27 +364,13 @@ func (model dashboardModel) softwareCatalogView() []string {
 	if len(items) == 0 && model.softwareMode == softwareConfigured {
 		lines = append(lines, "No software is configured through this screen yet.", "", "Open Suggested software or Search packages to add one.")
 	}
-	primary := "choose scope"
-	if model.softwareMode == softwareConfigured {
-		primary = "review removal"
-	}
-	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Clients change only through Distribute the prepared system.", "Private modules remain untouched and are managed through Maintenance.", "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
-		tuiHelpBinding([]string{"enter"}, "enter", primary),
-		tuiHelpBinding([]string{"r"}, "r", "remove"),
-		tuiHelpBinding([]string{"/"}, "/", "search"),
-		tuiHelpBinding([]string{"tab"}, "tab", "change view"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-	))
-	if model.message != "" {
-		lines = append(lines, "", tuiMuted(model.message, model.isDark))
-	}
+	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Clients change only through Distribute the prepared system.", "Private modules remain untouched and are managed through Maintenance.")
 	return lines
 }
 
 func (model dashboardModel) softwareScopeView() []string {
 	item := model.softwareItem(model.softwareSelected)
-	lines := []string{tuiSection("Add "+item.Label, model.isDark), "Choose where this declaration applies. This is not the set of computers deployed today.", ""}
+	lines := []string{tuiTitle("Add "+item.Label, model.isDark), "Choose where this declaration applies. This is not the set of computers deployed today.", ""}
 	options := model.softwareScopeOptions()
 	for index, option := range options {
 		marker := "  "
@@ -306,7 +381,7 @@ func (model dashboardModel) softwareScopeView() []string {
 	}
 	if options[model.softwareScopeCursor].scope.Kind == domain.SoftwareScopeClients {
 		lines = append(lines, "")
-		start, end := listWindow(len(model.softwareCatalog.Clients), model.softwareClientCursor, max(4, model.height-len(lines)-9))
+		start, end := listWindow(len(model.softwareCatalog.Clients), model.softwareClientCursor, max(2, model.height-len(lines)-16))
 		for index := start; index < end; index++ {
 			name := model.softwareCatalog.Clients[index]
 			marker := "  "
@@ -320,10 +395,7 @@ func (model dashboardModel) softwareScopeView() []string {
 			lines = append(lines, fmt.Sprintf("%s%s %s", marker, checked, name))
 		}
 	}
-	lines = append(lines, "", "Powered-on clients required: none", "Managed file: "+model.softwareCatalog.ManagedFile, "", "↑/↓ move   space select computer   enter review   esc catalog   ? help")
-	if model.message != "" {
-		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
-	}
+	lines = append(lines, "", "Powered-on clients required: none", "Managed file: "+model.softwareCatalog.ManagedFile)
 	return lines
 }
 
@@ -334,12 +406,9 @@ func (model dashboardModel) softwareReviewView() []string {
 		action = "Remove"
 	}
 	item := model.softwareItem(plan.Request.Package)
-	lines := []string{tuiSection(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No PXE action or client deployment is included.", "", "Enter continues with this reviewed configuration; Esc cancels.", "", "enter continue   esc cancel   F1 help"}
+	lines := []string{tuiTitle(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No PXE action or client deployment is included.", "", "Enter saves this reviewed configuration; Esc cancels."}
 	if plan.AffectedController != "" {
 		lines = append(lines[:5], append([]string{"Controller                  " + plan.AffectedController + " (build and activate now)"}, lines[5:]...)...)
-	}
-	if model.message != "" && model.message != plan.Message {
-		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
 	}
 	return lines
 }
@@ -350,21 +419,21 @@ func (model dashboardModel) softwareResultView() []string {
 	case "saved":
 		if result.AffectedController != "" {
 			if model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified {
-				return []string{tuiResult("Software is ready on this controller", true, model.isDark), "", "✓ Software selection saved locally", "✓ Controller built, activated, and verified", "○ No client changed", "", "Use Distribute the prepared system when you want clients to receive it.", "", "enter interventions   ? help"}
+				return []string{tuiResult("Software is ready on this controller", true, model.isDark), "", "✓ Software selection saved locally", "✓ Controller built, activated, and verified", "○ No client changed", "", "Use Distribute the prepared system when you want clients to receive it."}
 			}
 			detail := model.message
 			if detail == "" {
 				detail = "Controller activation did not complete."
 			}
-			return []string{tuiResult("Software saved; controller needs attention", false, model.isDark), "", "✓ Software selection saved locally", "! Controller build or activation did not complete", "○ No client changed", "", detail, "The saved selection is safe; retrying does not duplicate it.", "", "a retry controller apply   enter interventions   ? help"}
+			return []string{tuiResult("Software saved; controller needs attention", false, model.isDark), "", "✓ Software selection saved locally", "! Controller build or activation did not complete", "○ No client changed", "", detail, "The saved selection is safe; retrying the controller does not duplicate it."}
 		}
-		return []string{tuiResult("Software configuration saved", true, model.isDark), "", "✓ Software selection saved locally", "○ System not prepared", "○ No client changed", "", "You can apply this configuration to selected computers now or later.", "", "enter interventions   ? help"}
+		return []string{tuiResult("Software configuration saved", true, model.isDark), "", "✓ Software selection saved locally", "○ System not prepared", "○ No client changed", "", "You can apply this configuration to selected computers now or later."}
 	case "unchanged":
-		return []string{tuiResult("Software declaration already current", true, model.isDark), "", "✓ The requested declaration is already present", "○ No file changed", "○ No system built or deployed", "", "enter interventions   ? help"}
+		return []string{tuiResult("Software declaration already current", true, model.isDark), "", "✓ The requested declaration is already present", "○ No file changed", "○ No system built or deployed"}
 	case "partial":
-		return []string{tuiResult("Software save needs attention", false, model.isDark), result.Message, "", softwareResultIssue(result), "", "No system was built or deployed.", "Retry completes the local save without duplicating the software change.", "", "r retry save   esc interventions   ? help"}
+		return []string{tuiResult("Software save needs attention", false, model.isDark), result.Message, "", softwareResultIssue(result), "", "No system was built or deployed.", "Retry completes the local save without duplicating the software change."}
 	default:
-		return []string{tuiResult("Software declaration was not saved", false, model.isDark), result.Message, "", softwareResultIssue(result), "", "Create a fresh proposal; no system was built or deployed.", "", "esc interventions   ? help"}
+		return []string{tuiResult("Software declaration was not saved", false, model.isDark), result.Message, "", softwareResultIssue(result), "", "Create a fresh proposal; no system was built or deployed."}
 	}
 }
 
