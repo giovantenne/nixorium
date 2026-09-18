@@ -1445,6 +1445,30 @@ func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 	}
 }
 
+func TestNixoriumUpdateInputFailureIsNotPresentedAsNetworkFailure(t *testing.T) {
+	model := dashboardModel{
+		report: testDashboardReport("ready"),
+		actions: DashboardActions{CheckUpdate: func() domain.UpdateCheckReport {
+			return domain.UpdateCheckReport{
+				Operation: "update-check",
+				State:     "failed",
+				Issues:    []domain.ValidationIssue{{Field: "input", Message: "unsupported flake input"}},
+			}
+		}},
+	}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	view := updated.(dashboardModel).View().Content
+	if !strings.Contains(view, "Update setup needs attention") ||
+		!strings.Contains(view, "supported update source from this deployment") ||
+		strings.Contains(view, "could not be fetched") {
+		t.Fatalf("input failure was presented as a network error:\n%s", view)
+	}
+}
+
 func TestNixoriumUpdatePartialSaveOffersInPlaceRecovery(t *testing.T) {
 	calls := 0
 	model := dashboardModel{
