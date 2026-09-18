@@ -134,23 +134,38 @@ func (model dashboardModel) startShutdownPlan(requested string) (tea.Model, tea.
 }
 
 func (model dashboardModel) shutdownView() string {
-	lines := []string{tuiTitle("Nixorium  /  Shut down computers", model.isDark), ""}
+	shell := tuiShell{path: []string{"Computers", "Shut down"}}
 	if model.busy != "" {
-		lines = append(lines, model.busyView())
+		shell.body = model.busyView()
 		if model.shutdownApplying {
-			lines = append(lines, "", "Closing is disabled while reviewed power requests are being dispatched.")
+			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Power-off requests are being dispatched", detail: "Closing is disabled until the reviewed operation returns."}}
 		}
-		return strings.Join(lines, "\n")
+		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
+		return renderTUIShell(shell, model.width, model.isDark)
 	}
 	switch model.screen {
 	case dashboardShutdownReview:
-		lines = append(lines, model.shutdownReviewView()...)
+		shell.body = strings.Join(model.shutdownReviewView(), "\n")
+		if model.shutdownPlan.State == "ready" {
+			shell.actions = []tuiAction{{key: "Enter", label: "Send requests"}, {key: "u", label: "Session policy"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+		} else {
+			shell.actions = []tuiAction{{key: "u", label: "Session policy"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+		}
 	case dashboardShutdownResult:
-		lines = append(lines, model.shutdownResultView()...)
+		shell.body = strings.Join(model.shutdownResultView(), "\n")
+		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "History"}}
+		if shutdownHasTechnicalDetail(model.shutdownResult) {
+			shell.actions = append(shell.actions, tuiAction{key: "t", label: "Technical"})
+		}
+		shell.actions = append(shell.actions, tuiAction{key: "Enter", label: "Computers"}, tuiAction{key: "?", label: "Help"})
 	default:
-		lines = append(lines, model.shutdownSelectionView()...)
+		shell.body = strings.Join(model.shutdownSelectionView(), "\n")
+		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Check"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}}
 	}
-	return strings.Join(lines, "\n")
+	if model.message != "" && model.message != model.shutdownPlan.Message {
+		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+	}
+	return renderTUIShell(shell, model.width, model.isDark)
 }
 
 func (model dashboardModel) shutdownSelectionView() []string {
@@ -162,7 +177,7 @@ func (model dashboardModel) shutdownSelectionView() []string {
 		}
 	}
 	lines := []string{tuiSection("Which client computers should receive the request?", model.isDark), tuiMuted("Computers are checked only after you continue. The controller is never included.", model.isDark), "", fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
-	start, end := listWindow(len(hosts), model.shutdownCursor, max(3, model.height-17))
+	start, end := listWindow(len(hosts), model.shutdownCursor, max(3, model.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
 		cursor := " "
@@ -181,15 +196,7 @@ func (model dashboardModel) shutdownSelectionView() []string {
 	if len(hosts) == 0 {
 		lines = append(lines, "No configured client computers.")
 	}
-	lines = append(lines, "", "No request is queued for a computer that is off or unreachable.", "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"space"}, "space", "select"),
-		tuiHelpBinding([]string{"a"}, "a", "all clients"),
-		tuiHelpBinding([]string{"enter"}, "enter", "check"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-	))
-	if model.message != "" {
-		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
-	}
+	lines = append(lines, "", "No request is queued for a computer that is off or unreachable.")
 	return lines
 }
 
@@ -212,12 +219,9 @@ func (model dashboardModel) shutdownReviewView() []string {
 		}
 	}
 	if plan.State == "ready" {
-		lines = append(lines, "", tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark), "> "+model.confirmation+"_", "", "enter send requests   u unknown-session policy   esc cancel   F1 help")
+		lines = append(lines, "", tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark), "> "+model.confirmation+"_")
 	} else {
-		lines = append(lines, "", tuiStatus("No request can be sent from this plan", tuiStatusAttention, model.isDark), plan.Message, "", "u unknown-session policy   esc change selection   F1 help")
-	}
-	if model.message != "" && model.message != plan.Message {
-		lines = append(lines, "", tuiMuted(model.message, model.isDark))
+		lines = append(lines, "", tuiStatus("No request can be sent from this plan", tuiStatusAttention, model.isDark), plan.Message)
 	}
 	return lines
 }
@@ -244,11 +248,7 @@ func (model dashboardModel) shutdownResultView() []string {
 			lines = append(lines, tuiMuted("  Technical: "+target.TechnicalDetail, model.isDark))
 		}
 	}
-	footer := "r new review   l operation history   enter interventions   ? help"
-	if shutdownHasTechnicalDetail(report) {
-		footer = "r new review   l operation history   t technical details   enter interventions   ? help"
-	}
-	lines = append(lines, "", report.Message, "", "Network loss alone is not evidence of physical power state.", "", footer)
+	lines = append(lines, "", report.Message, "", "Network loss alone is not evidence of physical power state.")
 	return lines
 }
 

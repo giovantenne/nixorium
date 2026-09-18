@@ -246,14 +246,18 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 					t.Fatalf("focused row hidden screen %d size %v", screen, size)
 				}
 			}
-			if screen == dashboardShutdown && (!strings.Contains(view, "No request is queued") || !strings.Contains(view, "space")) {
+			if screen == dashboardShutdown && (!strings.Contains(view, "No request is queued") || !strings.Contains(view, "Space") || !strings.Contains(view, "Select")) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
 			if screen == dashboardSoftwareReview {
 				if !strings.Contains(view, "Enter continues with this reviewed configuration") || !strings.Contains(view, "Esc cancels") {
 					t.Fatalf("software save action hidden screen %d size %v:\n%s", screen, size, view)
 				}
-			} else if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview || screen == dashboardShutdownReview {
+			} else if screen == dashboardShutdownReview {
+				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+					t.Fatalf("shutdown confirmation hidden screen %d size %v:\n%s", screen, size, view)
+				}
+			} else if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
