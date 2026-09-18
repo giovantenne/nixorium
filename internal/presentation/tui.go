@@ -716,8 +716,7 @@ func (model dashboardModel) View() tea.View {
 func (model dashboardModel) setupView() string {
 	groups, current := setupJourney(model.setup)
 	lines := []string{
-		tuiTitle("Nixorium — First setup", model.isDark),
-		"",
+		tuiTitle("Laboratory setup", model.isDark),
 		fmt.Sprintf("Step %d of %d", current+1, len(groups)),
 		"You can leave safely and resume this setup later.",
 		"",
@@ -762,28 +761,34 @@ func (model dashboardModel) setupView() string {
 			"  Press Enter to continue.",
 		)
 	}
-	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+	backLabel := "Overview"
+	if model.areaReturn == dashboardInstallationArea {
+		backLabel = "Installation"
 	}
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"enter"}, "enter", "continue"),
-		tuiHelpBinding([]string{"t"}, "t", "technical steps"),
-		tuiHelpBinding([]string{"esc"}, "esc", "pause setup"),
-		tuiHelpBinding([]string{"q"}, "q", "quit"),
-	))
-	return strings.Join(lines, "\n") + "\n"
+	shell := tuiShell{
+		path:    []string{"Installation", "Setup"},
+		body:    strings.Join(lines, "\n"),
+		actions: []tuiAction{{key: "Enter", label: "Continue"}, {key: "t", label: "Technical steps"}, {key: "Esc", label: backLabel}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
+	}
+	if model.message != "" {
+		shell.notices = []tuiNotice{{kind: tuiStatusNeutral, title: model.message}}
+	}
+	return renderTUIShell(shell, model.width, model.isDark)
 }
 
 func (model dashboardModel) setupKeysView() string {
 	lines := []string{
-		tuiTitle("Nixorium — First setup / Controller keys", model.isDark),
-		"",
+		tuiTitle("Controller keys", model.isDark),
 		"These keys authenticate the controller. Private keys stay local and are never added to configuration history.",
 		"Existing valid keys are reused and never replaced by this workflow.",
 		"",
 	}
 	if model.busy != "" {
-		return strings.Join(append(lines, model.busyView()), "\n") + "\n"
+		return renderTUIShell(tuiShell{
+			path:    []string{"Installation", "Setup", "Controller keys"},
+			body:    strings.Join(append(lines, model.busyView()), "\n"),
+			actions: []tuiAction{{key: "F1", label: "Help"}},
+		}, model.width, model.isDark)
 	}
 	definitions := []struct {
 		name, label, purpose string
@@ -820,25 +825,34 @@ func (model dashboardModel) setupKeysView() string {
 			"Encrypted or hardware-backed SSH keys are not supported for unattended controller operations.",
 			"",
 			"> "+model.setupKeyPath+"_",
-			"",
-			"enter import   esc cancel",
 		)
 	} else {
 		lines = append(lines, "")
 		if model.setupKeys.State == "ready" {
-			lines = append(lines, tuiStatus("All controller keys are ready", tuiStatusSuccess, model.isDark), "", "enter save and continue   esc setup")
+			lines = append(lines, tuiStatus("All controller keys are ready", tuiStatusSuccess, model.isDark))
 		} else {
 			lines = append(lines,
 				"Choose a missing key, then import an existing private key; or create all missing keys.",
-				"",
-				"↑/↓ select   i import selected   c create all missing keys   esc setup",
 			)
 		}
 	}
-	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+	actions := []tuiAction{}
+	if model.setupKeyImporting {
+		actions = []tuiAction{{key: "Enter", label: "Import"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+	} else if model.setupKeys.State == "ready" {
+		actions = []tuiAction{{key: "Enter", label: "Save and continue"}, {key: "Esc", label: "Setup"}, {key: "F1", label: "Help"}}
+	} else {
+		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "i", label: "Import"}, {key: "c", label: "Create missing"}, {key: "Esc", label: "Setup"}, {key: "F1", label: "Help"}}
 	}
-	return strings.Join(lines, "\n") + "\n"
+	shell := tuiShell{
+		path:    []string{"Installation", "Setup", "Controller keys"},
+		body:    strings.Join(lines, "\n"),
+		actions: actions,
+	}
+	if model.message != "" {
+		shell.notices = []tuiNotice{{kind: tuiStatusNeutral, title: model.message}}
+	}
+	return renderTUIShell(shell, model.width, model.isDark)
 }
 
 func (model dashboardModel) selectedSetupKey() (domain.KeyMaterialState, bool) {
