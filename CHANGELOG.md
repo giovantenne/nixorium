@@ -58,6 +58,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Prevented first-run and routine controller activation from terminating their
+  own systemd job when a Nixorium update changes the management command's store
+  path. The reviewed switch now survives through active-system verification and
+  durable receipt creation.
+
 - Moved the guided software suggestions and the initial workstation package
   declarations into the private deployment template. `mkLab` now resolves an
   optional deployment-owned `softwareCatalog`; the pinned package search
