@@ -1,11 +1,9 @@
 {
   description = "Private Nixorium deployment";
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-    nixorium.url = "github:giovantenne/nixorium/master";
-    nixorium.inputs.nixpkgs.follows = "nixpkgs";
-  };
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+  inputs.nixorium.url = "github:giovantenne/nixorium/master";
+  inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { self, nixpkgs, nixorium }:
     let

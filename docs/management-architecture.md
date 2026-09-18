@@ -795,6 +795,12 @@ requires a distinct downgrade opt-in and stronger confirmation. Complex
 computed input declarations remain a documented manual-operation case instead
 of being rewritten heuristically.
 
+For compatibility, the reader also accepts the equivalent `nixorium.url`
+assignment inside the explicit `inputs = { ... };` form emitted briefly by the
+site template. New templates use the canonical fully qualified assignment, so
+the compatibility path can update those deployments without requiring a
+manual bootstrap edit.
+
 The plan renders candidate `flake.nix` bytes in memory and asks Nix to write a
 candidate lock outside the checkout with `flake lock --override-input nixorium
 ... --output-lock-file ...`. It validates that other top-level inputs remain
