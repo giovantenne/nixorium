@@ -150,7 +150,7 @@ func tuiActionBar(width int, darkBackground bool, actions ...tuiAction) string {
 	separator := tuiMuted("  ·  ", darkBackground)
 	bar := strings.Join(items, separator)
 	if width > 0 {
-		return lipgloss.NewStyle().MaxWidth(max(20, width-6)).Render(bar)
+		return lipgloss.NewStyle().Width(max(20, width-6)).Render(bar)
 	}
 	return bar
 }

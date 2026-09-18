@@ -62,13 +62,19 @@ func (model dashboardModel) computerDetail(h domain.HostStatus) string {
 }
 
 func (model dashboardModel) computersView() string {
-	lines := []string{tuiTitle("Nixorium — Computers", model.isDark), ""}
+	lines := []string{tuiTitle("Computer inventory", model.isDark), ""}
 	if model.busy != "" {
-		return strings.Join(append(lines, model.busyView()), "\n")
+		return renderTUIShell(tuiShell{
+			path:    []string{"Computers", "Inventory"},
+			body:    model.busyView(),
+			actions: []tuiAction{{key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}},
+		}, model.width, model.isDark)
 	}
 	hosts := model.filteredHosts()
+	actions := []tuiAction{}
 	if model.hostDetail && len(hosts) > 0 {
-		lines = append(lines, model.computerDetail(hosts[min(model.hostCursor, len(hosts)-1)]), "", "d deploy this computer   t technical details   i diagnostics   esc back   ? help")
+		lines = append(lines, model.computerDetail(hosts[min(model.hostCursor, len(hosts)-1)]))
+		actions = []tuiAction{{key: "d", label: "Deploy"}, {key: "t", label: "Technical"}, {key: "i", label: "Diagnostics"}, {key: "Esc", label: "Back"}, {key: "?", label: "Help"}}
 	} else {
 		available, total := hostAvailability(model.hosts.Hosts)
 		lines = append(lines, fmt.Sprintf("%d / %d reachable · %d up to date · %d update ready", available, total, model.hosts.Deployment.Current, model.hosts.Deployment.Outdated))
@@ -79,7 +85,7 @@ func (model dashboardModel) computersView() string {
 		if model.hostSearching || model.hostQuery != "" {
 			lines = append(lines, "Search  / "+model.hostQuery+"_")
 		}
-		start, end := listWindow(len(hosts), model.hostCursor, model.rowCapacity())
+		start, end := listWindow(len(hosts), model.hostCursor, max(3, model.height-18))
 		rows := []string{}
 		for index := start; index < end; index++ {
 			h := hosts[index]
@@ -103,12 +109,19 @@ func (model dashboardModel) computersView() string {
 			right := lipgloss.NewStyle().Width(min(62, model.width-52)).Render(model.computerDetail(hosts[min(model.hostCursor, len(hosts)-1)]))
 			body = lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", right)
 		}
-		lines = append(lines, body, "", tuiMuted(fmt.Sprintf("%d–%d of %d computers", displayedLineStart(start, len(hosts)), end, len(hosts)), model.isDark), "", "↑/↓ move   enter details   / search   esc back   ? help")
+		lines = append(lines, body, "", tuiMuted(fmt.Sprintf("%d–%d of %d computers", displayedLineStart(start, len(hosts)), end, len(hosts)), model.isDark))
+		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Details"}, {key: "/", label: "Search"}, {key: "r", label: "Refresh"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}}
 	}
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n")
+	return renderTUIShell(tuiShell{
+		path:    []string{"Computers", "Inventory"},
+		body:    strings.Join(lines, "\n"),
+		notices: notices,
+		actions: actions,
+	}, model.width, model.isDark)
 }
 
 func (model dashboardModel) administrationView() string {
@@ -218,7 +231,7 @@ func (model dashboardModel) restoreView() string {
 		{"Reapply the intended system", "Keeps the disk and deploys the declared configuration again."},
 		{"Reinstall from scratch", "Opens network installation; the disk confirmed on the computer is erased."},
 	}
-	lines := []string{tuiTitle("Nixorium  /  Restore computers", model.isDark), "", tuiTitle("What kind of restoration is needed?", model.isDark), ""}
+	lines := []string{tuiTitle("Restore computers", model.isDark), tuiMuted("Choose whether to keep or replace the installed system.", model.isDark), ""}
 	for index, option := range options {
 		marker := "  "
 		if index == model.restoreCursor {
@@ -226,12 +239,16 @@ func (model dashboardModel) restoreView() string {
 		}
 		lines = append(lines, tuiSection(marker+option.title, model.isDark), tuiMuted("  "+option.description, model.isDark), "")
 	}
-	lines = append(lines,
-		tuiMuted("A failed reapply never becomes a reinstall automatically.", model.isDark),
-		"",
-		"↑/↓ move   enter continue   esc interventions   ? help",
-	)
-	return strings.Join(lines, "\n")
+	return renderTUIShell(tuiShell{
+		path: []string{"Computers", "Restore"},
+		body: strings.Join(lines, "\n"),
+		notices: []tuiNotice{{
+			kind:   tuiStatusNeutral,
+			title:  "Reapply and reinstall remain separate",
+			detail: "A failed reapply never becomes a reinstall automatically.",
+		}},
+		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}},
+	}, model.width, model.isDark)
 }
 
 // frame bounds reading width and provides an explicit scroll surface. It never
