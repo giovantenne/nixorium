@@ -2,6 +2,8 @@ package domain
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
 	"testing"
 )
 
@@ -62,6 +64,55 @@ func TestLabSettingsValidation(t *testing.T) {
 	issues := settings.Validate()
 	if len(issues) != 3 {
 		t.Fatalf("got %d issues, want 3: %#v", len(issues), issues)
+	}
+}
+
+func TestSharedLabSettingsValidationCases(t *testing.T) {
+	type validationCase struct {
+		Name      string         `json:"name"`
+		Overrides map[string]any `json:"overrides"`
+	}
+	type validationCases struct {
+		Invalid []validationCase `json:"invalid"`
+	}
+
+	data, err := os.ReadFile("../../tests/lab-settings-validation-cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases validationCases
+	if err := json.Unmarshal(data, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases.Invalid) == 0 {
+		t.Fatal("shared validation corpus has no invalid cases")
+	}
+
+	for _, testCase := range cases.Invalid {
+		t.Run(testCase.Name, func(t *testing.T) {
+			base, err := json.Marshal(validSettings())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var candidate map[string]any
+			if err := json.Unmarshal(base, &candidate); err != nil {
+				t.Fatal(err)
+			}
+			lab, ok := candidate["lab"].(map[string]any)
+			if !ok {
+				t.Fatal("valid settings did not encode a lab object")
+			}
+			for field, value := range testCase.Overrides {
+				lab[field] = value
+			}
+			candidateData, err := json.Marshal(candidate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, issues := DecodeLabSettings(candidateData); len(issues) == 0 {
+				t.Fatalf("shared invalid case was accepted: %s", candidateData)
+			}
+		})
 	}
 }
 

@@ -4,6 +4,7 @@ let
   valid = import ../lab-config.nix;
   evaluates = config:
     (builtins.tryEval (builtins.deepSeq (evalLabConfig config) true)).success;
+  sharedCases = builtins.fromJSON (builtins.readFile ./lab-settings-validation-cases.json);
 in
 assert evaluates valid;
 assert (evalLabConfig valid).deploymentMode == "laboratory";
@@ -28,5 +29,6 @@ assert !(evaluates (valid // { studentUser = "Bad User"; }));
 assert !(evaluates (valid // { studentUser = valid.teacherUser; }));
 assert !(evaluates (valid // { adminPassword = "plaintext"; }));
 assert !(evaluates (valid // { homepageUrl = "example.org"; }));
+assert builtins.all (case: !(evaluates (valid // case.overrides))) sharedCases.invalid;
 assert !(evaluates (valid // { unknownSetting = true; }));
 true
