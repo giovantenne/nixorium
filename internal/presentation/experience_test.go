@@ -127,6 +127,76 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 	}
 }
 
+func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		catalog := testSoftwareCatalogReport()
+		states := []struct {
+			name     string
+			model    dashboardModel
+			expected []string
+		}{
+			{
+				name:     "configured",
+				model:    dashboardModel{screen: dashboardSoftware, softwareCatalog: catalog},
+				expected: []string{"Software", "Configured", "Review removal", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
+			},
+			{
+				name: "search input",
+				model: dashboardModel{
+					screen: dashboardSoftware, softwareCatalog: catalog, softwareMode: softwareSearch,
+					softwareSearching: true, softwareQuery: "gi",
+				},
+				expected: []string{"Search packages", "Package name  gi_", "Type", "Search", "Results", "Stop typing", "Help"},
+			},
+			{
+				name: "scope",
+				model: dashboardModel{
+					screen: dashboardSoftwareScope, softwareCatalog: catalog, softwareSelected: "gimp",
+					softwareScopeCursor:  len((dashboardModel{softwareCatalog: catalog}).softwareScopeOptions()) - 1,
+					softwareClientCursor: len(catalog.Clients) - 1, softwareClients: map[string]bool{"pc03": true},
+				},
+				expected: []string{"Software  /  Scope", "pc03", "Space", "Toggle", "Enter", "Review", "Esc", "Catalog", "Help"},
+			},
+			{
+				name: "review",
+				model: dashboardModel{
+					screen: dashboardSoftwareReview, softwareCatalog: catalog,
+					softwarePlan: domain.SoftwareChangePlanReport{
+						Request:     domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
+						ManagedFile: "lab-software.json", AffectedClients: catalog.Clients,
+					},
+				},
+				expected: []string{"Software  /  Review", "Proposal validated", "Enter", "Save", "Esc", "Scope", "Help"},
+			},
+			{
+				name: "partial result",
+				model: dashboardModel{
+					screen: dashboardSoftwareResult,
+					softwareResult: domain.SoftwareChangeApplyReport{
+						State: "partial", Message: "Durability could not be confirmed.",
+						Issues: []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
+					},
+				},
+				expected: []string{"Software  /  Result", "needs attention", "Retry save", "Esc", "Overview", "Help"},
+			},
+		}
+
+		for _, state := range states {
+			state.model.width = size[0]
+			state.model.height = size[1]
+			view := state.model.View().Content
+			for _, expected := range state.expected {
+				if !strings.Contains(view, expected) {
+					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
+				}
+			}
+			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+				t.Fatalf("%s overflows at %dx%d: %dx%d", state.name, size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+			}
+		}
+	}
+}
+
 func TestConfigurationReviewHelpCannotApply(t *testing.T) {
 	m := configReviewModel{}
 	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
@@ -311,7 +381,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
 			if screen == dashboardSoftwareReview {
-				if !strings.Contains(view, "Enter continues with this reviewed configuration") || !strings.Contains(view, "Esc cancels") {
+				if !strings.Contains(view, "Enter") || !strings.Contains(view, "Save") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Scope") {
 					t.Fatalf("software save action hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardDeployReview {

@@ -56,7 +56,7 @@ func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 	}
 	model.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", AffectedController: "pc99"}
 	result := strings.Join(model.softwareResultView(), "\n")
-	if !strings.Contains(result, "controller needs attention") || !strings.Contains(result, "retry controller apply") {
+	if !strings.Contains(result, "controller needs attention") || !strings.Contains(result, "retrying the controller") {
 		t.Fatalf("pending activation lacks recovery: %s", result)
 	}
 }
@@ -220,7 +220,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json", "Enter continues with this reviewed configuration"} {
+	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json", "Enter saves this reviewed configuration"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
