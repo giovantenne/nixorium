@@ -260,6 +260,56 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 	}
 }
 
+func TestEvidenceScreensKeepNavigationVisible(t *testing.T) {
+	entry := domain.OperationLogEntry{ID: "deploy-example.log", Kind: "deployment", State: "completed", Available: true}
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		states := []struct {
+			name     string
+			model    dashboardModel
+			expected []string
+		}{
+			{
+				name: "diagnostics",
+				model: dashboardModel{
+					screen: dashboardDiagnostics,
+					doctor: domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}},
+				},
+				expected: []string{"Maintenance  /  Diagnostics", "Check connection", "Enter", "Evidence", "Check again", "Esc", "Maintenance", "Help"},
+			},
+			{
+				name: "history",
+				model: dashboardModel{
+					screen: dashboardLogs,
+					logs:   domain.OperationLogsReport{Logs: []domain.OperationLogEntry{entry}},
+				},
+				expected: []string{"Maintenance  /  History", "deploy-example.log", "Enter", "View tail", "Refresh", "Esc", "Maintenance", "Help"},
+			},
+			{
+				name: "log detail",
+				model: dashboardModel{
+					screen:    dashboardLogDetail,
+					logDetail: domain.OperationLogReport{Log: &entry, Content: "first\nsecond\nthird\n"},
+				},
+				expected: []string{"History  /  Log", "deploy-example.log", "Scroll", "Esc", "History", "Help"},
+			},
+		}
+
+		for _, state := range states {
+			state.model.width = size[0]
+			state.model.height = size[1]
+			view := state.model.View().Content
+			for _, expected := range state.expected {
+				if !strings.Contains(view, expected) {
+					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
+				}
+			}
+			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+				t.Fatalf("%s overflows at %dx%d: %dx%d", state.name, size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+			}
+		}
+	}
+}
+
 func TestConfigurationReviewHelpCannotApply(t *testing.T) {
 	m := configReviewModel{}
 	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
