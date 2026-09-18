@@ -17,7 +17,10 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-var managedNixoriumInput = regexp.MustCompile(`(?m)^([ \t]*inputs\.nixorium\.url[ \t]*=[ \t]*")([^"\r\n]+)("[ \t]*;[ \t]*)$`)
+// The exact four-space compatibility alternative keeps deployments generated
+// by the short-lived nested-inputs template updateable. The canonical template
+// uses the explicit top-level inputs.nixorium.url assignment.
+var managedNixoriumInput = regexp.MustCompile(`(?m)^((?:[ \t]*inputs\.nixorium| {4}nixorium)\.url[ \t]*=[ \t]*")([^"\r\n]+)("[ \t]*;[ \t]*)$`)
 var githubNixoriumSource = regexp.MustCompile(`^github:([^/]+)/([^/]+)/([^/]+)$`)
 var safeGitHubSourcePrefix = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$`)
 var remoteGitObjectID = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
@@ -49,7 +52,7 @@ func (Local) InspectUpdateInput(repository string) (domain.UpdateInputSnapshot, 
 	}
 	matches := managedNixoriumInput.FindAllSubmatch(flake, -1)
 	if len(matches) != 1 {
-		return domain.UpdateInputSnapshot{}, errors.New("flake.nix must contain exactly one simple inputs.nixorium.url string assignment")
+		return domain.UpdateInputSnapshot{}, errors.New("flake.nix must contain exactly one simple nixorium input URL string assignment")
 	}
 	sourceURL := string(matches[0][2])
 	source := githubNixoriumSource.FindStringSubmatch(sourceURL)

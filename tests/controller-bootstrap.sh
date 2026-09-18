@@ -168,11 +168,11 @@ if grep -F "6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo=" "$INSTALLER_LOG"; then
   echo "bootstrap exported the obsolete cache.nixos.org signing key" >&2
   exit 1
 fi
-grep -Fx '    nixorium.url = "github:giovantenne/nixorium/master";' \
+grep -Fx '  inputs.nixorium.url = "github:giovantenne/nixorium/master";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
-grep -Fx '    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";' \
+grep -Fx '  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
-grep -Fx '    nixorium.inputs.nixpkgs.follows = "nixpkgs";' \
+grep -Fx '  inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
 grep -F '"deploymentMode": "controller"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null

@@ -30,6 +30,40 @@ func TestInspectUpdateInputAndRenderTarget(t *testing.T) {
 	}
 }
 
+func TestInspectUpdateInputAcceptsNestedTemplateCompatibilityForm(t *testing.T) {
+	repository := t.TempDir()
+	flake := "{\n  inputs = {\n    nixpkgs.url = \"github:NixOS/nixpkgs/nixos-26.05\";\n    nixorium.url = \"github:giovantenne/nixorium/master\";\n    nixorium.inputs.nixpkgs.follows = \"nixpkgs\";\n  };\n}\n"
+	if err := os.WriteFile(filepath.Join(repository, "flake.nix"), []byte(flake), 0600); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := (Local{}).InspectUpdateInput(repository)
+	if err != nil || snapshot.SourcePrefix != "giovantenne/nixorium" || snapshot.CurrentRef != "master" {
+		t.Fatalf("snapshot = %+v, error = %v", snapshot, err)
+	}
+	proposed, err := ProposedUpdateFlake(snapshot, "v2.0.0")
+	if err != nil || !strings.Contains(string(proposed), `    nixorium.url = "github:giovantenne/nixorium/v2.0.0";`) {
+		t.Fatalf("proposed flake = %q, error = %v", proposed, err)
+	}
+}
+
+func TestSiteTemplateExposesCanonicalManagedUpdateInput(t *testing.T) {
+	template, err := os.ReadFile("../../templates/site/flake.nix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repository, "flake.nix"), template, 0600); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := (Local{}).InspectUpdateInput(repository)
+	if err != nil || snapshot.SourcePrefix != "giovantenne/nixorium" || snapshot.CurrentRef != "master" {
+		t.Fatalf("template snapshot = %+v, error = %v", snapshot, err)
+	}
+	if !strings.Contains(string(template), `inputs.nixorium.url = "github:giovantenne/nixorium/master";`) {
+		t.Fatal("site template does not use the canonical managed input assignment")
+	}
+}
+
 func TestFrameworkUpdatePreservesDeploymentOwnedPackageBaseNode(t *testing.T) {
 	before := []byte(`{"root":"root","nodes":{"root":{"inputs":{"nixpkgs":"nixpkgs","nixorium":"nixorium"}},"nixpkgs":{"locked":{"owner":"NixOS","repo":"nixpkgs","rev":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},"nixorium":{"locked":{"rev":"1111111111111111111111111111111111111111"}}}}`)
 	after := []byte(`{"nodes":{"nixorium":{"locked":{"rev":"2222222222222222222222222222222222222222"}},"nixpkgs":{"locked":{"rev":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","repo":"nixpkgs","owner":"NixOS"}},"root":{"inputs":{"nixorium":"nixorium","nixpkgs":"nixpkgs"}}},"root":"root"}`)
@@ -54,6 +88,7 @@ func TestInspectUpdateInputRefusesAmbiguousComputedAndSymlinkSources(t *testing.
 	for _, content := range []string{
 		"{ inputs.nixorium.url = target; }\n",
 		"inputs.nixorium.url = \"github:one/nixorium/v1.0.0\";\ninputs.nixorium.url = \"github:two/nixorium/v1.0.0\";\n",
+		"inputs.nixorium.url = \"github:one/nixorium/v1.0.0\";\n    nixorium.url = \"github:two/nixorium/v1.0.0\";\n",
 		"inputs.nixorium.url = \"path:../nixorium\";\n",
 	} {
 		repository := t.TempDir()

@@ -28,6 +28,9 @@ presenting it as a release.
 Distinguish stable, prerelease, moving-current-reference, and downgrade states;
 require explicit opt-ins for prerelease and downgrade targets. Refuse computed
 or ambiguous input declarations instead of rewriting arbitrary Nix syntax.
+The reader also accepts the equivalent simple `nixorium.url` assignment from
+the previously emitted explicit `inputs = { ... };` template form; new
+templates retain the fully qualified assignment as the canonical form.
 
 Release discovery is optional and bounded. It disables Git credential helpers
 and prompting plus user/system Git configuration, and is the only update

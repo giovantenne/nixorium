@@ -14,6 +14,7 @@ buildGoModule {
       ../go.sum
       ../cmd
       ../internal
+      ../templates/site/flake.nix
       ../templates/site/lab-settings.json
       ../tests/lab-settings-validation-cases.json
     ];
