@@ -46,6 +46,11 @@ let
       ];
     };
   });
+  catalogLab = mkLab (baseArgs // {
+    softwareCatalog = [
+      { id = "vlc"; label = "Video"; summary = "Play classroom media"; }
+    ];
+  });
   softwareSearch = softwareLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 20; };
   scopedSoftware = {
     schemaVersion = 1;
@@ -76,6 +81,13 @@ let
         veyonNativeHosts = [ "pc00" ];
       };
     })).labMeta
+    true)).success;
+  rejectsInvalidSoftwareCatalog = !(builtins.tryEval (builtins.deepSeq
+    (mkLab (baseArgs // {
+      softwareCatalog = [
+        { id = "vlc"; label = ""; summary = "Invalid empty label"; }
+      ];
+    })).nixoriumSoftware
     true)).success;
   hasNixorium = packages:
     builtins.any (package: (package.pname or "") == "nixorium") packages;
@@ -240,10 +252,14 @@ assert !(builtins.tryEval (scopedController.nixoriumValidateControllerSoftwareCa
   packages = [{ package = "not-a-real-package"; scope.kind = "controller"; }];
 })).success;
 assert (builtins.head softwareLab.nixoriumSoftware.packages).origin == "managed";
+assert softwareLab.nixoriumSoftware.catalog == [];
+assert (builtins.head catalogLab.nixoriumSoftware.catalog).label == "Video";
+assert (builtins.head catalogLab.nixoriumSoftware.catalog).id == "vlc";
 assert builtins.any (item: item.id == "hello" && item.availability == "available") softwareSearch;
 assert nestedSoftware.id == "python3Packages.numpy";
 assert nestedSoftware.availability == "available";
 assert blockedSoftware.availability == "blocked-unfree";
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
+assert rejectsInvalidSoftwareCatalog;
 true

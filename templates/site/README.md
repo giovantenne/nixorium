@@ -99,6 +99,7 @@ update is not implemented yet.
 - `modules/controller.nix`: controller only
 - `modules/clients.nix`: client PCs only
 - `lab-software.json`: guided packages with explicit shared, controller or client scopes
+- `software-catalog.nix`: optional deployment-owned suggestions shown before package search
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `hostModules` in `flake.nix`: individual hosts
 - `assets/logo.txt`: screensaver logo
@@ -229,6 +230,11 @@ The first two choices require an upstream exposing controller-software support;
 older upstreams retain their client-only choices. Existing declarations are not
 migrated or expanded automatically. Clients may all remain powered off, and
 shared/controller declarations work before any clients are configured.
+
+Both the initial package preset and the suggestion list belong to this private
+repository. Edit `lab-software.json` or `software-catalog.nix` to evolve them
+without waiting for a Nixorium release. The catalog is convenience only: package
+search and pinned-package validation remain available for entries not listed.
 
 The same typed workflow is available from the CLI:
 

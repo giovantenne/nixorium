@@ -58,6 +58,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Moved the guided software suggestions and the initial workstation package
+  declarations into the private deployment template. `mkLab` now resolves an
+  optional deployment-owned `softwareCatalog`; the pinned package search
+  remains available independently of suggestions.
+
 - Reworked validation into a fast direct-source gate, an explicit full `mkLab`
   evaluation tier, targeted VM gates, and a batched release checkpoint; added a
   contributor guide describing how to select and maintain those levels. The Go

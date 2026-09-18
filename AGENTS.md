@@ -36,7 +36,6 @@ lib/
   eval-lab-config.nix      # Typed schema and validation for lab-config.nix
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
-  software-catalog.nix     # Curated catalog resolved against pinned nixpkgs
   mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 pkgs/
@@ -82,6 +81,7 @@ assets/
   mimeapps.list            # Default browser = Chromium
   vscode-settings.json     # VS Code defaults
 templates/site/            # Private deployment repository template
+  software-catalog.nix     # Deployment-owned suggestions for the software UI
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 docs/management-architecture.md # Accepted management-system target design

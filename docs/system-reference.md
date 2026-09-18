@@ -191,6 +191,7 @@ installer so client installation needs no second checkout.
 | `deploymentSelf` | Downstream Flake `self`, used when packaging deployment files for offline installation |
 | `labConfig` | Required typed site settings, normally decoded from `lab-settings.json` |
 | `labSoftware` | Strict versioned supported client-package declarations, normally decoded from `lab-software.json` |
+| `softwareCatalog` | Deployment-owned suggested packages shown before free search; each entry has `id`, `label`, and `summary` |
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |

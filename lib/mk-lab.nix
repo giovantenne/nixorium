@@ -9,6 +9,7 @@ args@{
   clientModules ? [],
   hostModules ? {},
   labSoftware ? { schemaVersion = 1; packages = []; },
+  softwareCatalog ? [],
   clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
@@ -331,10 +332,33 @@ let
     inherit lib;
     pkgs = softwarePkgs;
   };
-  softwareCatalog = import ./software-catalog.nix {
-    inherit lib;
-    pkgs = softwarePkgs;
-  };
+  normalizeSoftwareCatalogItem = index: definition:
+    let
+      prefix = "softwareCatalog[${toString index}]";
+      extras = if builtins.isAttrs definition then
+        builtins.attrNames (builtins.removeAttrs definition [ "id" "label" "summary" ])
+      else
+        [];
+      id = definition.id or (throw "${prefix}.id is required");
+      label = definition.label or (throw "${prefix}.label is required");
+      summary = definition.summary or (throw "${prefix}.summary is required");
+      resolved = if softwarePackageTools.validPath id then softwarePackageTools.describe id else null;
+    in
+    assert builtins.isAttrs definition || throw "${prefix} must be an attribute set";
+    assert extras == [] || throw "${prefix} contains unknown fields: ${builtins.concatStringsSep ", " extras}";
+    assert softwarePackageTools.validPath id || throw "${prefix}.id is invalid";
+    assert builtins.isString label && label != "" || throw "${prefix}.label must be a non-empty string";
+    assert builtins.isString summary && summary != "" || throw "${prefix}.summary must be a non-empty string";
+    if resolved == null || resolved.availability != "available" then null else
+    resolved // {
+      inherit label;
+      inherit summary;
+    };
+  softwareCatalogIds = map
+    (definition: definition.id or (throw "softwareCatalog entries require id"))
+    softwareCatalog;
+  resolvedSoftwareCatalog = builtins.filter (item: item != null)
+    (lib.imap0 normalizeSoftwareCatalogItem softwareCatalog);
   labSoftwareConfig = import ./eval-lab-software.nix {
     inherit lib;
     pkgs = softwarePkgs;
@@ -437,6 +461,7 @@ let
           deploymentSelf = site;
           labConfig = builtins.fromJSON (builtins.readFile ./lab-config.json);
           labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
+          softwareCatalog = ${builtins.toJSON softwareCatalog};
           clientGroups = ${builtins.toJSON clientGroups};
           publicKeys = {
             cache = ${renderPath cachePublicKeyFile};
@@ -544,6 +569,10 @@ assert unknownPublicKeyNames == []
   || throw "Unknown publicKeys entries: ${builtins.concatStringsSep ", " unknownPublicKeyNames}";
 assert unknownAssetNames == []
   || throw "Unknown assets entries: ${builtins.concatStringsSep ", " unknownAssetNames}";
+assert builtins.isList softwareCatalog
+  || throw "mkLab softwareCatalog must be a list";
+assert builtins.length softwareCatalogIds == builtins.length (lib.unique softwareCatalogIds)
+  || throw "mkLab softwareCatalog contains duplicate ids";
 assert unknownHostModuleNames == []
   || throw "hostModules contains unknown hosts: ${builtins.concatStringsSep ", " unknownHostModuleNames}";
 assert unknownVeyonNativeHosts == []
@@ -597,7 +626,7 @@ assert unknownVeyonNativeHosts == []
     controller = masterHostName;
     clients = validClientNames;
     groups = clientGroups;
-    catalog = softwareCatalog;
+    catalog = resolvedSoftwareCatalog;
     packages = map (entry: entry // { origin = "managed"; }) labSoftwareConfig.packages;
   };
 
