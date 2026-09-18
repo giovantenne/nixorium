@@ -10,24 +10,7 @@ import (
 )
 
 func (model dashboardModel) openComputerInstallation() (tea.Model, tea.Cmd) {
-	model.message = ""
-	if model.setup.State == "ready" {
-		model.screen = dashboardPXE
-		return model, nil
-	}
-	if model.actions.LoadSettings == nil {
-		model.setupMode = true
-		model.screen = dashboardSetup
-		return model, nil
-	}
-	model.setupMode = true
-	model.startingLabSetup = true
-	model.settingsReturn = dashboardSetup
-	model.busy = "Opening computer installation settings"
-	return model, func() tea.Msg {
-		settings, err := model.actions.LoadSettings()
-		return dashboardSettingsMsg{settings: settings, err: err}
-	}
+	return model.startComputerInstallation()
 }
 
 func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
@@ -218,7 +201,6 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "down", "j":
 			model.installationAreaCursor = min(len(installationAreaTasks)-1, model.installationAreaCursor+1)
 		case "n":
-			model.areaReturn = dashboardInstallationArea
 			return model.openComputerInstallation()
 		case "p":
 			model.areaReturn = dashboardInstallationArea
@@ -287,6 +269,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				return model, nil
 			}
 			model.screen = dashboardSetupKeys
+			model.setupKeysReturn = dashboardSetup
 			model.busy = "Checking existing controller keys"
 			model.message = ""
 			return model, func() tea.Msg {
@@ -386,7 +369,10 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		}
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardSetup
+			model.screen = model.setupKeysReturn
+			if model.screen == dashboardHome {
+				model.screen = dashboardSetup
+			}
 			model.message = ""
 		case "up", "k":
 			model.setupKeyCursor = max(0, model.setupKeyCursor-1)
@@ -466,6 +452,18 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 			model.message = ""
 			model.screen = dashboardSettingsPasswords
+		case "k":
+			if model.actions.LoadSetupKeys == nil {
+				model.message = "Controller key management is not available in this session."
+				return model, nil
+			}
+			model.setupKeysReturn = dashboardSettings
+			model.screen = dashboardSetupKeys
+			model.busy = "Checking existing controller keys"
+			model.message = ""
+			return model, func() tea.Msg {
+				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys()}
+			}
 		default:
 			model.settingsMenu, _ = model.settingsMenu.update(key)
 		}
@@ -474,13 +472,21 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		model.settingsEditor = updated.(settingsWizardModel)
 		if model.settingsEditor.cancelled {
 			model.settingsEditor = settingsWizardModel{}
-			model.message = "Settings edit cancelled; no file changed."
-			model.screen = dashboardSettings
+			if model.installationFlow {
+				model.installationFlow = false
+				model.installationFailed = false
+				model.settingsReturn = dashboardHome
+				model.screen = dashboardHome
+				model.message = "Computer installation cancelled; no setting was changed."
+			} else {
+				model.message = "Settings edit cancelled; no file changed."
+				model.screen = dashboardSettings
+			}
 			return model, nil
 		}
 		if model.settingsEditor.accepted {
 			model.settingsCandidate = model.settingsEditor.settings
-			if model.settingsReturn == dashboardSetup && model.settingsCollectPasswords {
+			if (model.settingsReturn == dashboardSetup || model.installationFlow) && model.settingsCollectPasswords {
 				if model.actions.ChangePassword == nil {
 					model.message = "Password setup is not available in this deployment."
 					return model, nil
@@ -502,15 +508,21 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		}
 		return model, command
 	case dashboardSettingsPasswords:
-		if model.settingsReturn == dashboardSetup {
+		if model.settingsReturn == dashboardSetup || model.installationFlow {
 			switch key.String() {
 			case "esc", "left":
 				model.settingsEditor = settingsWizardModel{}
 				model.settingsCandidate = domain.LabSettingsFile{}
-				model.screen = dashboardSetup
+				if model.installationFlow {
+					model.installationFlow = false
+					model.installationFailed = false
+					model.screen = dashboardHome
+				} else {
+					model.screen = dashboardSetup
+				}
 				model.settingsReturn = dashboardHome
 				model.settingsCollectPasswords = false
-				model.message = "Setup configuration cancelled; no file changed."
+				model.message = "Computer installation cancelled; no setting was changed."
 			case "enter":
 				if model.actions.ChangePassword == nil {
 					model.message = "Password setup is not available in this deployment."
@@ -1233,6 +1245,13 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
+			if model.installationFlow && model.installationFailed {
+				model.installationFlow = false
+				model.installationFailed = false
+				model.screen = dashboardHome
+				model.message = ""
+				return model, nil
+			}
 			if model.guidedInstallation() && model.pilotName != "" {
 				model.pilotName = ""
 				model.pilotPractical = false

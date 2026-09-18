@@ -560,6 +560,7 @@ func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 
 func TestPrimaryAreasPreserveContext(t *testing.T) {
 	m := experienceFixture(2)
+	m.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return wizardSettings(), nil }
 	m = press(m, "enter")
 	if m.screen != dashboardComputersArea {
 		t.Fatalf("computers area did not open: screen=%d", m.screen)
@@ -584,12 +585,17 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 		t.Fatalf("installation area did not open: screen=%d", m.screen)
 	}
 	m = press(m, "enter")
-	if m.screen != dashboardPXE || m.areaReturn != dashboardInstallationArea {
-		t.Fatalf("installation task lost its area: screen=%d return=%d", m.screen, m.areaReturn)
+	if m.screen != dashboardSettings || m.areaReturn != dashboardHome || !m.installationFlow {
+		t.Fatalf("installation task did not start the direct flow: screen=%d return=%d", m.screen, m.areaReturn)
+	}
+	updated, command := m.Update(dashboardSettingsMsg{settings: wizardSettings()})
+	m = updated.(dashboardModel)
+	if command != nil || m.screen != dashboardSettingsEdit {
+		t.Fatalf("installation settings did not open: screen=%d", m.screen)
 	}
 	m = press(m, "esc")
-	if m.screen != dashboardInstallationArea {
-		t.Fatalf("installation task returned to %d", m.screen)
+	if m.screen != dashboardHome || m.installationFlow {
+		t.Fatalf("cancelled installation returned to %d", m.screen)
 	}
 }
 

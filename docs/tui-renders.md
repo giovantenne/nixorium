@@ -5,149 +5,85 @@ The core screens come from deterministic presentation fixtures; release data is
 synthetic. No real computer was contacted or changed. ANSI styling and trailing
 whitespace are removed here.
 
-## Intervention entry
+## Overview
 
 ```text
-Nixorium  /  Computer laboratory
+Nixorium  /  Overview
 
-What do you want to do?
-Choose an intervention. Computers are checked only when the selected task needs them.
+Laboratory overview
+Choose an area. Observed state is loaded only when the selected task needs it.
 
-› Restore computers
-    Reapply the intended system or reinstall from scratch
+› Computers
+    Inventory, distribute, restore or shut down client computers
 
-  Add or change software
-    Choose supported packages and save a reviewed declaration
+  Installation
+    Configure the lab, prepare netboot and guide computer installation
 
-  Distribute the prepared system
-    Update only the computers selected for this intervention
+  Software
+    Review configured choices or search this lab's pinned packages
 
-  Install or reinstall computers
-    Prepare and control network installation
+  Maintenance
+    Settings, controller updates, services, revisions, logs and diagnostics
 
-  Update Nixorium
-    Choose master or a release fetched from the configured upstream
-
-  Shut down computers
-    Send reviewed power-off requests to selected clients only
-
-  Advanced tools
-    Inventory, settings, revisions, services, logs and diagnostics
-
-↑/↓ select  •  enter open  •  ? help  •  q quit
+↑/↓ Select  ·  Enter Open  ·  q Quit  ·  F1 Help
 ```
 
 No client count or reachability state is loaded at startup. If an already
 observed PXE recovery condition exists, it appears above the question.
 
-## First setup
+## Install computers
+
+Selecting **Installation → Install computers** opens the complete Laboratory
+settings form directly. `Esc` returns to the overview. Completing the form
+validates and saves it without a second review screen, then shows one continuous
+progress view:
 
 ```text
-Nixorium — First setup
+Nixorium  /  Installation  /  Install computers
 
-Step 2 of 5
-You can leave safely and resume this setup later.
+Install computers
 
-  ✓ Laboratory settings · Complete
-  ● Controller · In progress
-  ○ Client system · To prepare
-  ○ First computer · To install
-  ○ Other computers · Whenever you are ready
+  ✓ Laboratory settings
+  ✓ Save configuration
+  ✓ Controller keys
+  ● Activate controller
+  ○ Prepare clients
+  ○ Start PXE
 
-Continue setup
-  Apply controller configuration
-  Review and activate the controller configuration
-  Press Enter to continue.
+⣾ Building and activating the laboratory controller  elapsed 1m12s
 
-enter continue  •  t technical steps  •  esc pause setup  •  q quit  •  F1 help
+l progress details  •  F1 help
 ```
 
-The five steps are operator-facing groups. `t` reveals the existing eleven
-observed technical stages without making them compete for primary attention.
+Missing controller keys are generated, verified, saved, and installed
+automatically. Importing an existing key is deliberately outside this ordinary
+flow under **Maintenance → Change settings → Advanced keys**.
 
-## Choose and install the pilot computer
+After every configured client closure and the immutable netboot artifacts are
+prepared, the flow stops at its only confirmation:
 
 ```text
-Nixorium — First setup / First computer
+Nixorium  /  Installation  /  Install computers
 
-Installation mode:  ! active
-Prepared artifacts: ready
-Interface:          enp1s0
-Service address:    192.0.2.10
+Start network installation?
 
-Pilot computer
-  pc01
+Affects  enp1s0 · controller network
 
-! Continue at pc01
-  1. Power it on and choose UEFI network boot.
-  2. In the downloaded installer, run /installer/setup.sh.
-  3. Choose pc01 and inspect the target disk.
-  4. Confirm installation locally, then boot from the installed disk.
+NOTICE
+! Temporarily remove 10.0.0.99/24; remote connections may be interrupted
+  Serve ProxyDHCP, TFTP, HTTP and cache via 192.0.2.10.
 
-! The disk selected on the computer will be erased.
-Nixorium has not yet verified an authenticated installed system.
-No remote progress is shown because the installer does not provide telemetry.
+Type START PXE to continue:
+> _
 
-v check pilot  •  x stop installation  •  esc change pilot  •  q leave PXE active
+Enter Start PXE  •  Esc Cancel  •  F1 Help
 ```
 
-The pilot comes from the evaluated inventory. The application validates and
-probes only this identity; powered-off computers outside the selected operation
-are not contacted or labelled. Selecting the pilot on the controller does not
-select a disk and does not authorise installation on the client.
-
-## Verify the pilot and finish a partial session
-
-```text
-Nixorium — First setup / First computer
-
-Pilot computer
-  pc01
-
-✓ Up to date
-✓ Technical verification succeeded
-Authenticated management reports the saved revision as active.
-
-Check at the computer
-  • Log in and open the expected desktop session.
-  • Check required software, network and classroom peripherals.
-  • Confirm that the computer started from its installed disk.
-
-enter practical check passed  •  v check again  •  x stop installation
-```
-
-After the practical check, the operator may install another computer or stop
-PXE. The completion summary says which identities were verified **in this
-session** and counts the rest as unverified, not failed. Attempting to quit while
-PXE is active first reviews the consequences and requires the exact phrase
-`LEAVE PXE ACTIVE`.
-
-If the TUI is closed and reopened after technical verification, it restores
-the checkpoint without claiming a new observation:
-
-```text
-Nixorium — First setup / First computer
-
-Pilot computer
-  pc01
-
-✓ Technical verification succeeded
-Authenticated technical evidence was restored from this session.
-Press v to check current state again.
-
-Check at the computer
-  • Log in and open the expected desktop session.
-  • Check required software, network and classroom peripherals.
-  • Confirm that the computer started from its installed disk.
-
-enter practical check passed  •  v check again  •  x stop installation
-```
-
-The checkpoint lives in private per-repository operator state and is bound to
-the exact Git revision and authenticated system path. A changed revision or
-inventory produces “Saved session is out of date” and returns to explicit
-computer selection; a fresh failed check is shown instead of the historical
-success.
+There is no controller-side pilot selection. After PXE starts, any configured
+computer may boot the installer; identity selection and destructive disk
+confirmation happen locally on that computer. Attempting to quit while PXE is
+active still requires stopping it or explicitly confirming that it should stay
+active.
 
 ## Restore choice
 

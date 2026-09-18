@@ -58,6 +58,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Simplified the ordinary computer-installation TUI into one continuous flow:
+  Laboratory settings are validated and saved without a separate review,
+  missing controller keys, controller prerequisites, and all client closures
+  are prepared automatically. Existing-key import now lives under advanced
+  settings, and the only confirmation is the network-impact review immediately
+  before PXE starts. The former pilot-computer selection is no longer part of
+  this path; PXE recovery remains available through the advanced control.
+
 - Prevented first-run and routine controller activation from terminating their
   own systemd job when a Nixorium update changes the management command's store
   path. The reviewed switch now survives through active-system verification and

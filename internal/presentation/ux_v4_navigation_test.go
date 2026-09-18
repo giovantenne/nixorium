@@ -188,12 +188,16 @@ func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.
 	}
 }
 
-func TestOpeningCachedSetupDoesNotRefreshIt(t *testing.T) {
-	loads := 0
+func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
+	setupLoads, settingsLoads := 0, 0
 	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{
 		LoadSetup: func() domain.SetupReport {
-			loads++
+			setupLoads++
 			return domain.SetupReport{State: "ready"}
+		},
+		LoadSettings: func() (domain.LabSettingsFile, error) {
+			settingsLoads++
+			return wizardSettings(), nil
 		},
 	}, false)
 	for index, task := range dashboardTasks {
@@ -209,8 +213,13 @@ func TestOpeningCachedSetupDoesNotRefreshIt(t *testing.T) {
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command != nil || loads != 0 || model.screen != dashboardSetup {
-		t.Fatalf("opening cached setup triggered a refresh: loads=%d screen=%d", loads, model.screen)
+	if command == nil || setupLoads != 0 || model.screen != dashboardSettings || !model.installationFlow {
+		t.Fatalf("install did not open settings directly: setupLoads=%d screen=%d", setupLoads, model.screen)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if settingsLoads != 1 || model.screen != dashboardSettingsEdit || strings.Contains(model.View().Content, "Step 1 of 5") {
+		t.Fatalf("install exposed the old setup menu: settingsLoads=%d screen=%d\n%s", settingsLoads, model.screen, model.View().Content)
 	}
 }
 
@@ -239,12 +248,136 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsEdit || model.settingsEditor.settings.Lab.DeploymentMode != "laboratory" || model.settingsEditor.settings.Lab.PCCount != 20 || len(model.settingsEditor.fields) != len(clientSetupFields) {
+	if model.screen != dashboardSettingsEdit || model.settingsEditor.settings.Lab.DeploymentMode != "laboratory" || model.settingsEditor.settings.Lab.PCCount != 20 || len(model.settingsEditor.fields) != len(settingsFields) {
 		t.Fatalf("client setup editor = %+v", model.settingsEditor)
 	}
+	if model.settingsEditor.title != "Nixorium — Install computers / Laboratory settings" || model.settingsEditor.fields[6].label != "Teacher user name" {
+		t.Fatalf("complete laboratory settings are not shown: title=%q fields=%+v", model.settingsEditor.title, model.settingsEditor.fields)
+	}
+}
+
+func TestInstallComputersSavesValidatedSettingsWithoutReviewScreen(t *testing.T) {
+	saves, setupLoads := 0, 0
+	candidate := wizardSettings()
+	model := dashboardModel{
+		screen:            dashboardSettingsEdit,
+		installationFlow:  true,
+		settingsCandidate: candidate,
+		actions: DashboardActions{
+			SaveSettings: func(received domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
+				saves++
+				if received.Lab.PCCount != candidate.Lab.PCCount || plan.State != "valid" {
+					t.Fatalf("save received candidate=%+v plan=%+v", received, plan)
+				}
+				return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
+			},
+			LoadSetup: func() domain.SetupReport {
+				setupLoads++
+				return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply}
+			},
+		},
+	}
+	plan := domain.ConfigPlanReport{Operation: "config-plan", State: "valid", Changes: []domain.SettingChange{{Field: "lab.pcCount"}}}
+	updated, command := model.Update(dashboardSettingsPlanMsg{report: plan})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen == dashboardSettingsReview || !model.settingsApplying {
+		t.Fatalf("installation settings stopped for a save review: screen=%d", model.screen)
+	}
+	updated, command = model.Update(command())
+	model = updated.(dashboardModel)
+	if saves != 1 || command == nil || model.screen != dashboardPXE {
+		t.Fatalf("validated settings did not save and continue: saves=%d screen=%d", saves, model.screen)
+	}
+	_ = command()
+	if setupLoads != 1 {
+		t.Fatalf("setup checks=%d, want 1", setupLoads)
+	}
+}
+
+func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation(t *testing.T) {
+	plans, applies, preparations, starts := 0, 0, 0, 0
+	revision := strings.Repeat("a", 40)
+	model := dashboardModel{
+		report:           testDashboardReport("stopped"),
+		screen:           dashboardPXE,
+		installationFlow: true,
+		actions: DashboardActions{
+			PlanController: func() domain.ControllerRebuildPlanReport {
+				plans++
+				return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision}
+			},
+			ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+				applies++
+				return domain.ControllerRebuildExecutionReport{State: "completed", Applied: true, Verified: true, Revision: plan.Revision}
+			},
+			Refresh: func() (domain.StatusReport, error) {
+				status := testDashboardReport("stopped")
+				status.PXEPreparation.Ready = true
+				return status, nil
+			},
+			LoadSetup: func() domain.SetupReport {
+				return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageArtifacts}
+			},
+			PreparePXE: func() domain.ActionReport {
+				preparations++
+				return domain.ActionReport{Operation: "pxe-prepare", State: "completed", Message: "prepared"}
+			},
+			LoadPXEProgress: func() (domain.OperationProgress, error) {
+				return domain.OperationProgress{Operation: "pxe-prepare", State: "completed"}, nil
+			},
+			PlanPXEStart: func() domain.PXELifecycleReport {
+				return domain.PXELifecycleReport{State: "ready", Mode: "stopped", Interface: "enp1s0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.0.2.10"}
+			},
+			StartPXE: func() domain.PXELifecycleReport {
+				starts++
+				return domain.PXELifecycleReport{State: "active", Mode: "active"}
+			},
+		},
+	}
+
+	updated, command := model.continueComputerInstallation(domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply})
+	model = updated.(dashboardModel)
+	updated, command = model.Update(command())
+	model = updated.(dashboardModel)
+	batch, ok := command().(tea.BatchMsg)
+	if !ok || len(batch) != 2 || !model.controllerApplying {
+		t.Fatalf("controller activation was not started automatically")
+	}
+	updated, command = model.Update(batch[0]())
+	model = updated.(dashboardModel)
+	if command == nil || plans != 1 || applies != 1 {
+		t.Fatalf("controller activation did not finish: plans=%d applies=%d", plans, applies)
+	}
+	updated, command = model.Update(command())
+	model = updated.(dashboardModel)
+	prepareBatch, ok := command().(tea.BatchMsg)
+	if !ok || len(prepareBatch) != 2 || !model.pxePreparing {
+		t.Fatalf("client preparation was not started automatically")
+	}
+	updated, command = model.Update(prepareBatch[0]())
+	model = updated.(dashboardModel)
+	if preparations != 1 || command == nil {
+		t.Fatalf("client preparation did not finish: preparations=%d", preparations)
+	}
+	planBatch, ok := command().(tea.BatchMsg)
+	if !ok || len(planBatch) != 2 {
+		t.Fatalf("PXE validation was not scheduled after preparation")
+	}
+	var planMessage tea.Msg
+	for _, next := range planBatch {
+		message := next()
+		if _, matches := message.(dashboardPlanMsg); matches {
+			planMessage = message
+		}
+	}
+	if planMessage == nil {
+		t.Fatal("PXE plan message is missing")
+	}
+	updated, _ = model.Update(planMessage)
+	model = updated.(dashboardModel)
 	view := model.View().Content
-	if !strings.Contains(view, "Install new computers / Laboratory network") || strings.Contains(view, "Teacher user name") || strings.Contains(view, "Time zone") {
-		t.Fatalf("client setup repeats controller choices:\n%s", view)
+	if model.screen != dashboardPXEStartReview || starts != 0 || !strings.Contains(view, "Temporarily remove 10.0.0.99/24") || !strings.Contains(view, "START PXE") || strings.Contains(view, "pilot") {
+		t.Fatalf("flow did not stop at the sole PXE confirmation: screen=%d starts=%d\n%s", model.screen, starts, view)
 	}
 }
 
@@ -390,6 +523,84 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	}
 }
 
+func TestInstallComputersCreatesMissingKeysWithoutOpeningKeyChoices(t *testing.T) {
+	reconciles, saves, installs, setupLoads := 0, 0, 0, 0
+	model := experienceFixture(2)
+	model.installationFlow = true
+	model.screen = dashboardPXE
+	model.actions.ReconcileSetupKeys = func() (domain.KeyReconcileReport, error) {
+		reconciles++
+		return domain.KeyReconcileReport{Operation: "setup-keys", State: "ready"}, nil
+	}
+	model.actions.SaveSetupConfiguration = func() domain.ConfigurationSaveReport {
+		saves++
+		return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
+	}
+	model.actions.InstallSetupSecrets = func() domain.ActionReport {
+		installs++
+		return domain.ActionReport{Operation: "setup-install-secrets", State: "completed"}
+	}
+	model.actions.LoadSetup = func() domain.SetupReport {
+		setupLoads++
+		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply}
+	}
+
+	updated, command := model.continueComputerInstallation(domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen == dashboardSetupKeys || !strings.Contains(model.busy, "Preparing and installing controller keys") {
+		t.Fatalf("installation exposed key choices instead of preparing automatically: screen=%d busy=%q", model.screen, model.busy)
+	}
+	updated, refresh := model.Update(command())
+	model = updated.(dashboardModel)
+	if reconciles != 1 || saves != 1 || installs != 1 || refresh == nil || model.screen == dashboardSetupKeys {
+		t.Fatalf("automatic key preparation failed: reconcile=%d save=%d install=%d screen=%d", reconciles, saves, installs, model.screen)
+	}
+	_ = refresh()
+	if setupLoads != 1 {
+		t.Fatalf("setup refreshes=%d, want 1", setupLoads)
+	}
+}
+
+func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
+	loads := 0
+	model := experienceFixture(2)
+	model.screen = dashboardSettings
+	model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+	model.actions.LoadSetupKeys = func() domain.KeyReconcileReport {
+		loads++
+		return domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
+			{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
+			{Name: "ssh", Problem: "private and public keys are missing"},
+			{Name: "veyon", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
+		}}
+	}
+
+	updated, command := model.Update(tea.KeyPressMsg{Text: "k"})
+	model = updated.(dashboardModel)
+	if command == nil || model.setupKeysReturn != dashboardSettings {
+		t.Fatalf("advanced key settings did not open: return=%d", model.setupKeysReturn)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	if loads != 1 || model.screen != dashboardSetupKeys || !strings.Contains(view, "Maintenance  /  Settings  /  Advanced  /  Controller keys") || !strings.Contains(view, "Import") {
+		t.Fatalf("existing-key import is not in advanced settings: loads=%d screen=%d\n%s", loads, model.screen, view)
+	}
+	model.setupKeyCursor = 1
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "i"})
+	model = updated.(dashboardModel)
+	if !model.setupKeyImporting || !strings.Contains(model.View().Content, "Import existing administrator SSH private key") {
+		t.Fatalf("advanced import did not start:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettings {
+		t.Fatalf("advanced keys returned to screen %d, want settings", model.screen)
+	}
+}
+
 func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 	importedName, importedPath := "", ""
 	model := experienceFixture(2)
@@ -425,12 +636,16 @@ func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 }
 
 func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
-	loads := 0
+	loads, settingsLoads := 0, 0
 	setup := domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
 		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
 			loads++
 			return testDashboardReport("stopped"), setup, nil
+		},
+		LoadSettings: func() (domain.LabSettingsFile, error) {
+			settingsLoads++
+			return wizardSettings(), nil
 		},
 	}, false)
 	model.initializing = true
@@ -441,8 +656,13 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 
 	updated, command := model.Update(model.loadInitial()())
 	model = updated.(dashboardModel)
-	if command != nil || loads != 1 || model.initializing || model.screen != dashboardSetup || !model.setupMode {
-		t.Fatalf("initial result did not route to setup: loads=%d model=%+v", loads, model)
+	if command == nil || loads != 1 || model.initializing || model.screen != dashboardSettings || !model.installationFlow {
+		t.Fatalf("initial result did not route to laboratory settings: loads=%d model=%+v", loads, model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if settingsLoads != 1 || model.screen != dashboardSettingsEdit {
+		t.Fatalf("startup settings did not open: settingsLoads=%d screen=%d", settingsLoads, model.screen)
 	}
 }
 

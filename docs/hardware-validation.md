@@ -79,7 +79,8 @@ baseline failures before any destructive scenario.
 1. Install the controller through the documented release-pinned bootstrap.
 2. Reboot without the installation medium and sign in as `admin`.
 3. Confirm `nixorium` and the private deployment are available.
-4. Complete guided setup, key reconciliation, review/commit, and `setup apply`.
+4. Open **Installation → Install computers**, complete Laboratory settings,
+   and let the flow create missing keys and activate the controller.
 5. Reboot once more and run `nixorium setup status` and `nixorium doctor`.
 
 Pass when setup is complete, the active controller and durable receipt match
