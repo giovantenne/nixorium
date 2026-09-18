@@ -208,7 +208,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardUpdate, dashboardAdministration} {
+		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardSetupKeys, dashboardUpdate, dashboardAdministration} {
 			m := experienceFixture(200)
 			m.width = size[0]
 			m.height = size[1]
@@ -341,6 +341,33 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 	m = press(m, "esc")
 	if m.screen != dashboardInstallationArea {
 		t.Fatalf("installation task returned to %d", m.screen)
+	}
+}
+
+func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		m := experienceFixture(2)
+		m.width = size[0]
+		m.height = size[1]
+		m.screen = dashboardSetup
+		view := m.View().Content
+		for _, expected := range []string{"Installation", "Setup", "Continue", "Technical steps", "Esc", "Help"} {
+			if !strings.Contains(view, expected) {
+				t.Fatalf("setup %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
+			}
+		}
+
+		m.screen = dashboardSetupKeys
+		m.setupKeys = domain.KeyReconcileReport{State: "action-required"}
+		view = m.View().Content
+		for _, expected := range []string{"Controller keys", "Create missing", "Esc", "Help"} {
+			if !strings.Contains(view, expected) {
+				t.Fatalf("setup keys %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
+			}
+		}
+		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+			t.Fatalf("setup keys overflow at %dx%d: %dx%d", size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+		}
 	}
 }
 
