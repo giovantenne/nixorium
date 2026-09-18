@@ -23,7 +23,6 @@ in
     description = labSettings.teacherUser;
     extraGroups = [ "networkmanager" "veyon-master" ];
     hashedPassword = labSettings.teacherPassword;
-    autoSubUidGidRange = true;
   };
 
   users.users.${labSettings.studentUser} = {
@@ -31,7 +30,6 @@ in
     description = labSettings.studentUser;
     extraGroups = [ "networkmanager" "render" "video" ];
     hashedPassword = labSettings.studentPassword;
-    autoSubUidGidRange = true;
   };
 
   users.users.admin = {
@@ -39,7 +37,6 @@ in
     description = "admin";
     extraGroups = [ "networkmanager" "wheel" "veyon-master" ];
     hashedPassword = labSettings.adminPassword;
-    autoSubUidGidRange = true;
     openssh.authorizedKeys.keys =
       if labSettings.adminSshKey == null then
         []

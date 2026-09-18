@@ -46,11 +46,8 @@ internal/                  # Domain, application, adapter, and presentation laye
 modules/
   common.nix               # Composition point and shared system defaults
   firewall.nix             # Interface-scoped SSH, Veyon, cache, and PXE policy
-  desktop.nix              # GNOME, locale, fonts and desktop policy
-  packages.nix             # Shared package set
+  desktop.nix              # Core GNOME session, locale and regional policy
   power.nix                # Idle and controller sleep policy
-  screensaver.nix          # Screensaver files and user service
-  shell.nix                # Shell, prompt, Git and editor tooling
   ssh.nix                  # SSH client and server policy
   hardware.nix             # Generic hardware detection (replaces per-host hardware-configuration.nix)
   networking.nix           # Hostname + static IP with shared iface name
@@ -60,8 +57,6 @@ modules/
   cache.nix                # Controller Harmonia service + client cache trust
   filesystems.nix          # Btrfs subvolume mount declarations
   home-reset.nix           # Student home directory templating + boot-time reset
-  docker.nix               # Per-user rootless Docker daemon
-  development.nix          # Writable npm global prefix and PATH
   veyon.nix                # Veyon service, public key, firewall, base config
 scripts/
   release.sh               # Validates, tags, and publishes a release
@@ -71,17 +66,14 @@ scripts/
   lib/lab-meta.sh          # Shared helper: loads labMeta from the flake for shell scripts
   create-home-template.sh  # Builds clean home directory template
   home-reset.sh            # Boot-time snapshot rotation + home reset
-  cmd-screensaver.sh       # TTE screensaver animation loop
-  launch-screensaver.sh    # Fullscreen Ghostty screensaver launcher
-  screensaver-monitor.sh   # GNOME idle watcher for screensaver
   validate.sh              # Tiered upstream validation entry point
 assets/
-  backgrounds/             # Ristretto wallpapers (random at each home-reset)
-  logo.txt                 # ASCII art for screensaver
-  mimeapps.list            # Default browser = Chromium
-  vscode-settings.json     # VS Code defaults
+  empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
   software-catalog.nix     # Deployment-owned suggestions for the software UI
+  assets/                  # Site branding, MIME and editor defaults
+  modules/                 # Workstation, development and home-profile policy
+  scripts/                 # Optional site screensaver implementation
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 docs/management-architecture.md # Accepted management-system target design
@@ -313,7 +305,9 @@ Release from the matching changelog section.
   configured interface, and adds Harmonia/PXE ports only on the controller.
 - `Veyon.conf` is a build-time derivation: evaluation must never read a derivation output to encode its network objects. GitHub CI disables import-from-derivation to enforce this boundary.
 - The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
-- `modules/common.nix` is only the composition point for focused desktop, package, power, screensaver, shell, and SSH modules.
+- `modules/common.nix` is only the composition point for core desktop, firewall,
+  power, and SSH modules. Packages, shell preferences, development tools,
+  screensaver behavior, and application policy belong in the deployment.
 - The `gnome-user-setup.sh` script is generated inline in `modules/desktop.nix` to use parameterized user names from `labSettings`.
 
 ## Nix Code Style

@@ -3,10 +3,7 @@
   imports = [
     ./desktop.nix
     ./firewall.nix
-    ./packages.nix
     ./power.nix
-    ./screensaver.nix
-    ./shell.nix
     ./ssh.nix
   ];
 

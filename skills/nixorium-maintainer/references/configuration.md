@@ -8,6 +8,8 @@ The deployment passes these values to `nixorium.lib.mkLab`:
   `lab-settings.json`
 - `publicKeys`: cache, SSH, and Veyon public-key paths
 - `assets`: logo, backgrounds, MIME defaults, and VS Code settings
+- `labSoftware`: package declarations loaded from `lab-software.json`
+- `softwareCatalog`: local suggestions loaded from `software-catalog.nix`
 - `sharedModules`: every installed host
 - `controllerModules`: controller only
 - `clientModules`: student PCs only
@@ -17,6 +19,13 @@ The deployment passes these values to `nixorium.lib.mkLab`:
 Unknown settings, asset names, public-key names, host names, and Veyon pilot
 hosts are rejected. Keep every referenced file inside the deployment
 repository.
+
+The generated template owns the workstation profile in its package declaration,
+catalog, focused `modules/`, `assets/`, and optional `scripts/`. Profile modules
+receive `hostSoftwarePackages`, the effective managed package IDs for the host
+being evaluated. Keep browser/editor favorites, shortcuts, services, and home
+content conditional on the related ID so changing a package scope does not
+leave stale policy.
 
 `lab-settings.json` is deterministic, versioned JSON owned by the management
 application. Validate it through both schema layers after any edit:

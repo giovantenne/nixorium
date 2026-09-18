@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 6 ]]; then
-  echo "Usage: create-home-template.sh <template-dir> <git-name> <git-email> <xdg-bin> <mimeapps-file> <vscode-settings-file>" >&2
+if [[ $# -ne 4 ]]; then
+  echo "Usage: create-home-template.sh <template-dir> <git-name> <git-email> <xdg-bin>" >&2
   exit 1
 fi
 
@@ -10,8 +10,6 @@ TEMPLATE_DIR="$1"
 GIT_NAME="$2"
 GIT_EMAIL="$3"
 XDG_USER_DIRS_BIN="$4"
-MIMEAPPS_FILE="$5"
-VSCODE_SETTINGS_FILE="$6"
 
 echo "Creating home template..."
 
@@ -48,22 +46,5 @@ HOME="$TEMPLATE_DIR" "$XDG_USER_DIRS_BIN" --force
 # Create config directories
 mkdir -p "$TEMPLATE_DIR/.config"
 mkdir -p "$TEMPLATE_DIR/.local/share"
-mkdir -p "$TEMPLATE_DIR/.local/npm"
-
-# Copy mimeapps.list
-cp "$MIMEAPPS_FILE" "$TEMPLATE_DIR/.config/mimeapps.list"
-
-# Copy VS Code settings
-mkdir -p "$TEMPLATE_DIR/.config/Code/User"
-cp "$VSCODE_SETTINGS_FILE" "$TEMPLATE_DIR/.config/Code/User/settings.json"
-
-# Create VS Code argv.json to use basic password store (avoids gnome-keyring warning)
-mkdir -p "$TEMPLATE_DIR/.vscode"
-cat > "$TEMPLATE_DIR/.vscode/argv.json" << 'EOF'
-{
-  "password-store": "basic",
-  "enable-crash-reporter": false
-}
-EOF
 
 echo "Home template created successfully"

@@ -1,7 +1,8 @@
 # Nixorium system and extension reference
 
-This document describes the workstation defaults and supported extension
-points provided by the public Nixorium framework. Day-to-day commands belong in
+This document describes the core workstation mechanisms and supported extension
+points provided by the public Nixorium framework. The generated private
+deployment owns the actual workstation profile. Day-to-day commands belong in
 the [deployment administrator guide](../templates/site/README.md); architecture
 and privilege boundaries belong in the
 [management architecture](management-architecture.md).
@@ -56,6 +57,21 @@ updates fail if their candidate lock changes that root node. Legacy deployments
 without the direct input remain supported; migration and package-base update
 are separate reviewed operations.
 
+## Workstation-profile ownership
+
+Nixorium core supplies the GNOME session, accounts, networking, classroom
+control, installation, deployment, and reset mechanisms. The private deployment
+template supplies the user-facing profile: packages in `lab-software.json`,
+suggestions in `software-catalog.nix`, desktop and shell policy under
+`modules/`, and branding/editor defaults under `assets/`.
+
+`mkLab` passes each host's effective managed package IDs to downstream modules
+as `hostSoftwarePackages`. The template uses this list to enable Docker, npm
+setup, application favorites, shortcuts, browser policy, VS Code extensions,
+and the optional screensaver only when their packages apply to that host.
+Removing a declaration therefore does not leave an upstream launcher or service
+behind.
+
 ## Network interfaces
 
 `lab.ifaceName` is the compatibility fallback for every host. Deployments may
@@ -68,9 +84,9 @@ client records also expose their effective interface explicitly.
 ## Student home reset
 
 At boot, the previous student home becomes one of five rotating snapshots and
-a clean home is restored from the activation-time template. The template
-contains the configured Git identity, editor defaults, and standard XDG
-directories.
+a clean home is restored from the activation-time template. Core creates the
+configured Git identity and standard XDG directories; deployment modules add
+editor and MIME defaults when those applications are selected.
 
 Administrators and the teacher can recover a file from the snapshot store:
 
@@ -85,7 +101,7 @@ next reset; source files remain recoverable through the snapshots.
 
 ## Rootless Docker
 
-Each normal account has its own rootless Docker user service and subordinate
+The default site profile gives each normal account its own rootless Docker user service and subordinate
 UID/GID range. No account belongs to the root-equivalent `docker` group. Docker
 and Compose use the current user's socket automatically.
 
@@ -99,7 +115,8 @@ site policy. Prefer ports such as 3000, 8000, or 8080 for student projects.
 
 ## User-managed npm tools
 
-Global npm installs use `~/.local/npm`, which is already in `PATH`. They never
+When Node.js is selected by the site profile, global npm installs use
+`~/.local/npm`, which is already in `PATH`. They never
 need `sudo` and do not write into the Nix store.
 
 ```sh
@@ -140,7 +157,8 @@ a private deployment with these extension points:
 - `modules/controller.nix` for the controller only;
 - `modules/clients.nix` for all client PCs;
 - `hostModules` in `flake.nix` for a generated individual host;
-- `assets/logo.txt` and the `assets` argument for site branding.
+- `lab-software.json` and `software-catalog.nix` for package/profile choices;
+- the focused modules and assets already shipped in the private template.
 
 For example, add VLC only to `pc05` with `modules/pc05.nix`:
 
@@ -195,6 +213,7 @@ installer so client installation needs no second checkout.
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
+| `homeResetEphemeralPaths` | Deployment-owned relative cache/tool paths excluded before student snapshots |
 | `sharedModules` | NixOS modules applied to every generated host |
 | `controllerModules` | Modules applied only to the controller |
 | `clientModules` | Modules applied to all client PCs |

@@ -100,9 +100,19 @@ update is not implemented yet.
 - `modules/clients.nix`: client PCs only
 - `lab-software.json`: guided packages with explicit shared, controller or client scopes
 - `software-catalog.nix`: optional deployment-owned suggestions shown before package search
+- `modules/workstation.nix`: GNOME application policy, favorites and shortcuts
+- `modules/development.nix`: shell, npm and rootless Docker policy
+- `modules/home-profile.nix`: MIME defaults and VS Code settings/extensions
+- `modules/screensaver.nix`: optional Ghostty/TTE screensaver
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `hostModules` in `flake.nix`: individual hosts
 - `assets/logo.txt`: screensaver logo
+
+These files are the lab's workstation profile. They are intentionally part of
+this private repository rather than Nixorium core, so package and policy changes
+can be reviewed and deployed on the lab's schedule. Profile modules receive
+`hostSoftwarePackages`; keep application policy conditional on the corresponding
+managed package so scope changes do not leave stale launchers or services.
 
 <details>
 <summary>Example: customize pc05 and add backgrounds</summary>

@@ -175,7 +175,7 @@ in
     lib.optionals (laboratoryEnabled && !useNativeWayland) [ pkgs.gnome-remote-desktop ];
 
   # gnome-remote-desktop user service: set the VNC password via environment
-  # variable (GNOME Keyring is disabled in common.nix), and ensure it's enabled
+  # variable (GNOME Keyring is disabled in desktop.nix), and ensure it's enabled
   # at session start.
   systemd.user.services.gnome-remote-desktop = lib.mkIf (laboratoryEnabled && !useNativeWayland) {
     wantedBy = [ "gnome-session.target" ];

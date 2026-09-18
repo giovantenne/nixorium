@@ -89,6 +89,11 @@ let
       ];
     })).nixoriumSoftware
     true)).success;
+  rejectsUnsafeHomeResetPath = !(builtins.tryEval (builtins.deepSeq
+    (mkLab (baseArgs // {
+      homeResetEphemeralPaths = [ "../outside-home" ];
+    })).labMeta
+    true)).success;
   hasNixorium = packages:
     builtins.any (package: (package.pname or "") == "nixorium") packages;
   hasHostState = packages:
@@ -172,6 +177,11 @@ assert hasHostState subnetLab.nixosConfigurations.pc99.config.environment.system
 assert hasHostState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
 assert hasSessionState subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert hasSessionState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
+assert !(hasPackage subnetLab "pc01" "chromium");
+assert !(hasPackage subnetLab "pc01" "vscode");
+assert !(hasPackage subnetLab "pc01" "opencode");
+assert !(hasPackage subnetLab "pc01" "pi-coding-agent");
+assert !subnetLab.nixosConfigurations.pc01.config.virtualisation.docker.rootless.enable;
 assert subnetLab.nixosConfigurations.pc01.config.system.configurationRevision == "0123456789abcdef0123456789abcdef01234567";
 assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.enable;
 assert subnetLab.nixosConfigurations.pc99.config.services.harmonia.cache.signKeyPaths == [
@@ -262,4 +272,5 @@ assert blockedSoftware.availability == "blocked-unfree";
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 assert rejectsInvalidSoftwareCatalog;
+assert rejectsUnsafeHomeResetPath;
 true

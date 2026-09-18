@@ -4,6 +4,7 @@ args@{
   labConfig,
   publicKeys ? {},
   assets ? {},
+  homeResetEphemeralPaths ? [],
   sharedModules ? [],
   controllerModules ? [],
   clientModules ? [],
@@ -47,14 +48,10 @@ let
   adminSshKey = readSingleLine adminSshKeyFile;
 
   labAssets = {
-    logo = assets.logo or ../assets/logo.txt;
-    backgrounds = assets.backgrounds or [
-      ../assets/backgrounds/1-ristretto.jpg
-      ../assets/backgrounds/2-ristretto.jpg
-      ../assets/backgrounds/3-ristretto.jpg
-    ];
-    mimeApps = assets.mimeApps or ../assets/mimeapps.list;
-    vscodeSettings = assets.vscodeSettings or ../assets/vscode-settings.json;
+    logo = assets.logo or ../assets/empty-logo.txt;
+    backgrounds = assets.backgrounds or [];
+    mimeApps = assets.mimeApps or ../assets/empty-mimeapps.list;
+    vscodeSettings = assets.vscodeSettings or ../assets/empty-vscode-settings.json;
   };
 
   inherit (config) masterDhcpIp;
@@ -198,8 +195,6 @@ let
     (upstreamRoot + "/modules/cache.nix")
     (upstreamRoot + "/modules/filesystems.nix")
     (upstreamRoot + "/modules/home-reset.nix")
-    (upstreamRoot + "/modules/docker.nix")
-    (upstreamRoot + "/modules/development.nix")
     (upstreamRoot + "/modules/veyon.nix")
     (upstreamRoot + "/modules/management.nix")
     (upstreamRoot + "/modules/pxe.nix")
@@ -218,6 +213,9 @@ let
   specialArgsForHost = name: hostIp: {
     labSettings = labSettings // { ifaceName = ifaceForHost name; };
     inherit labAssets;
+    inherit homeResetEphemeralPaths;
+    hostSoftwarePackages = map (entry: entry.package)
+      (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages);
     inherit nixoriumPackage;
     inherit hostIp;
     hostName = name;
@@ -291,6 +289,11 @@ let
   isModulePath = module: builtins.isPath module || builtins.isString module;
   unknownPublicKeyNames = builtins.attrNames (builtins.removeAttrs publicKeys [ "cache" "ssh" "veyon" ]);
   unknownAssetNames = builtins.attrNames (builtins.removeAttrs assets [ "logo" "backgrounds" "mimeApps" "vscodeSettings" ]);
+  validHomeResetEphemeralPath = path:
+    builtins.isString path
+    && path != ""
+    && !(lib.hasPrefix "/" path)
+    && !(builtins.elem ".." (lib.splitString "/" path));
   validClientNames = map (n: "pc${padNumber n}") pcNumbers;
   validHostNames = validClientNames ++ [ masterHostName ];
   unknownHostModuleNames = builtins.attrNames (builtins.removeAttrs hostModules validHostNames);
@@ -462,6 +465,7 @@ let
           labConfig = builtins.fromJSON (builtins.readFile ./lab-config.json);
           labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
           softwareCatalog = ${builtins.toJSON softwareCatalog};
+          homeResetEphemeralPaths = ${builtins.toJSON homeResetEphemeralPaths};
           clientGroups = ${builtins.toJSON clientGroups};
           publicKeys = {
             cache = ${renderPath cachePublicKeyFile};
@@ -569,6 +573,8 @@ assert unknownPublicKeyNames == []
   || throw "Unknown publicKeys entries: ${builtins.concatStringsSep ", " unknownPublicKeyNames}";
 assert unknownAssetNames == []
   || throw "Unknown assets entries: ${builtins.concatStringsSep ", " unknownAssetNames}";
+assert builtins.isList homeResetEphemeralPaths && builtins.all validHomeResetEphemeralPath homeResetEphemeralPaths
+  || throw "mkLab homeResetEphemeralPaths must contain safe relative paths";
 assert builtins.isList softwareCatalog
   || throw "mkLab softwareCatalog must be a list";
 assert builtins.length softwareCatalogIds == builtins.length (lib.unique softwareCatalogIds)
