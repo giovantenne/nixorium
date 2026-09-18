@@ -66,6 +66,67 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 	}
 }
 
+func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		states := []struct {
+			name     string
+			model    dashboardModel
+			expected []string
+		}{
+			{
+				name: "ready",
+				model: dashboardModel{
+					report: func() domain.StatusReport {
+						report := testDashboardReport("ready")
+						report.PXEPreparation.Ready = true
+						return report
+					}(),
+					screen: dashboardPXE,
+				},
+				expected: []string{"Network installation", "Prepare", "Start PXE", "Recover", "Esc", "Help"},
+			},
+			{
+				name:     "pilot selection",
+				model:    dashboardModel{report: testDashboardReport("ready"), screen: dashboardPXE, setupMode: true},
+				expected: []string{"First computer", "Choose a pilot computer", "Select", "Choose", "Esc", "Help"},
+			},
+			{
+				name:     "active pilot",
+				model:    dashboardModel{report: testDashboardReport("active"), screen: dashboardPXE, setupMode: true, pilotName: "pc01"},
+				expected: []string{"First computer", "Check computer", "Stop PXE", "Leave active", "Help"},
+			},
+			{
+				name: "start review",
+				model: dashboardModel{
+					report:    testDashboardReport("ready"),
+					screen:    dashboardPXEStartReview,
+					startPlan: domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"},
+				},
+				expected: []string{"Type START PXE to continue", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
+			},
+			{
+				name:     "recovery",
+				model:    dashboardModel{report: testDashboardReport("recovery-required"), screen: dashboardPXE, setupMode: true},
+				expected: []string{"recovery", "Recover", "Esc", "Back", "Help"},
+			},
+		}
+
+		for _, state := range states {
+			state.model.width = size[0]
+			state.model.height = size[1]
+			view := state.model.View().Content
+			for _, expected := range state.expected {
+				if !strings.Contains(view, expected) {
+					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
+				}
+			}
+			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+				t.Fatalf("%s overflows at %dx%d: %dx%d", state.name, size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+			}
+		}
+	}
+}
+
 func TestConfigurationReviewHelpCannotApply(t *testing.T) {
 	m := configReviewModel{}
 	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
@@ -261,7 +322,11 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("shutdown confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
-			} else if screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
+			} else if screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
+				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+					t.Fatalf("PXE confirmation hidden screen %d size %v:\n%s", screen, size, view)
+				}
+			} else if screen == dashboardServicesRestartReview || screen == dashboardControllerReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}

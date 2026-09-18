@@ -280,10 +280,47 @@ func (model dashboardModel) frame(content string) string {
 				}
 			}
 		}
+		// Screens using the common shell keep their breadcrumb and action bar
+		// fixed. Only the body between those regions scrolls.
+		if model.usesTUIShell() {
+			footerStart := -1
+			for index := len(lines) - 1; index >= 2; index-- {
+				if strings.TrimSpace(lines[index]) == "" {
+					footerStart = index + 1
+					break
+				}
+			}
+			if footerStart > 2 && footerStart < len(lines) {
+				footer := lines[footerStart:]
+				body := lines[2 : footerStart-1]
+				bodyHeight := height - 2 - len(footer) - 2
+				if bodyHeight >= 2 {
+					start := min(model.pageScroll, max(0, len(body)-bodyHeight))
+					visible := append([]string{}, lines[:2]...)
+					visible = append(visible, body[start:min(len(body), start+bodyHeight)]...)
+					visible = append(visible, tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark), "")
+					visible = append(visible, footer...)
+					return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(visible, "\n"))
+				}
+			}
+		}
 		start := min(model.pageScroll, len(lines)-height+1)
 		lines = append(lines[start:min(len(lines), start+height-1)], tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark))
 	}
 	return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(lines, "\n"))
+}
+
+func (model dashboardModel) usesTUIShell() bool {
+	switch model.screen {
+	case dashboardHome, dashboardComputersArea, dashboardInstallationArea,
+		dashboardSetup, dashboardSetupKeys, dashboardRestore, dashboardHosts,
+		dashboardDeploy, dashboardDeployReview, dashboardPXE, dashboardPXEStartReview,
+		dashboardPXELeaveReview, dashboardAdministration, dashboardShutdown,
+		dashboardShutdownReview, dashboardShutdownResult:
+		return true
+	default:
+		return false
+	}
 }
 
 func (model dashboardModel) textEntry() bool {
