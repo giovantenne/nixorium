@@ -21,7 +21,7 @@ from `templates/site`.
 ## Project Structure
 
 ```
-.github/workflows/validate.yml # Evaluation-only CI for source and deployment template
+.github/workflows/validate.yml # Go build/tests plus evaluation-only source/template CI
 .github/workflows/release.yml # Revalidates release metadata and publishes GitHub Releases
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
@@ -85,6 +85,7 @@ templates/site/            # Private deployment repository template
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 docs/management-architecture.md # Accepted management-system target design
+docs/development-validation.md # Validation pyramid and gate-selection guide
 docs/troubleshooting.md         # Task-oriented recovery and backup guide
 docs/hardware-validation.md     # Manual VM/physical evidence plan
 docs/system-reference.md        # Workstation defaults and mkLab extension reference
@@ -105,8 +106,9 @@ nix eval .#nixosConfigurations.pc01.config.system.build.toplevel --no-write-lock
 # Build a single host (full build, outputs to ./result)
 nix build .#nixosConfigurations.pc01.config.system.build.toplevel
 
-# Build all client closures
-nix build .#nixosConfigurations.pc{01..20}.config.system.build.toplevel
+# Validation builds one representative client; add another only when its
+# host-specific module makes the resulting system materially different.
+nix build .#nixosConfigurations.pc01.config.system.build.toplevel
 
 # Run management application tests and build the package
 nix develop --command go test ./...
@@ -178,17 +180,25 @@ nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out
 nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
 ```
 
-`scripts/validate.sh` defaults to the quick local matrix: syntax, shell tests,
-skill and troubleshooting-copy coherence, schema and `mkLab` checks, and the
-packaged Go command with its unit tests. Use `--management-vm` or
-`--client-installer-vm` for the affected
-integration path. Use `--full` after public API, template, module, installer,
-asset, input, Disko, or netboot changes and before milestone or release
-completion; it builds representative hosts and artifacts and verifies offline
-equivalence. GitHub CI uses `--ci` for evaluation-only coverage without system
-closures. Validation reuses a persistent evaluation cache and creates no result
-roots; it must never garbage-collect the shared Nix store automatically. There
-is no automatic formatter; follow the styles below and run `git diff --check`.
+`scripts/validate.sh` defaults to the fast local matrix: syntax, shell tests,
+skill and troubleshooting-copy coherence, direct schema checks, and the
+packaged Go command with its unit tests. `--eval` adds the complete `mkLab`
+contract without a VM. Use `--management-vm` or `--client-installer-vm` only
+for the affected integration boundary. Reserve `--full` for cross-cutting
+build changes and milestone or release completion; do not run it repeatedly in
+the edit-test loop. GitHub CI uses `--ci` for evaluation-only coverage without
+system closures and a separate job builds the packaged Go command with its unit
+tests. The complete selection rules and performance model are in
+`docs/development-validation.md`. Validation reuses a persistent evaluation
+cache and creates no result roots; it must never garbage-collect the shared Nix
+store automatically. There is no automatic formatter; follow the styles below
+and run `git diff --check`.
+
+For repeated Go edits, enter
+`nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell`
+once and run
+`go test ./...` inside it to reuse Go's incremental build cache. Finish with
+the default validation gate.
 
 ## Releases
 
@@ -289,7 +299,7 @@ Release from the matching changelog section.
   typed result rendering.
 - Routine controller rebuild uses `controller plan`/`controller apply`, binds the privileged systemd instance to a full reviewed Git revision, builds a pinned Git source as the deployment owner, refuses repository drift before activation, and writes a root-owned success record only after both `switch-to-configuration` and `/run/current-system` verification succeed. Reconciliation must require that record to match both the reviewed revision and evaluated closure; the active symlink alone is not completion evidence. Keep `setup apply` as the first-run-compatible path through the same fixed service implementation.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. `nixoriumSoftware` is the typed non-secret catalog/scope/declaration contract. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
-- `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. No custom NixOS options are added to host configurations.
+- `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. Keep its semantic checks aligned with `internal/domain/settings.go` through `tests/lab-settings-validation-cases.json`. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.

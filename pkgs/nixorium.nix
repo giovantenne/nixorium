@@ -6,7 +6,18 @@ in
 buildGoModule {
   pname = "nixorium";
   inherit version;
-  src = ../.;
+  src = lib.fileset.toSource {
+    root = ../.;
+    fileset = lib.fileset.unions [
+      ../VERSION
+      ../go.mod
+      ../go.sum
+      ../cmd
+      ../internal
+      ../templates/site/lab-settings.json
+      ../tests/lab-settings-validation-cases.json
+    ];
+  };
 
   vendorHash = "sha256-wtmeoJiq2DEa/ZHY1JUFIs4A87Vi0khXNQEgmT0MkMA=";
   subPackages = [ "cmd/nixorium" ];

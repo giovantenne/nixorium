@@ -7,6 +7,7 @@ Usage: ./scripts/validate.sh [MODE]
 
 Modes:
   --quick                Fast local checks (default)
+  --eval                 Quick checks plus the complete mkLab evaluation
   --management-vm        Quick checks plus the management VM test
   --client-installer-vm  Quick checks plus the client installer VM test
   --full                 Complete release and milestone validation
@@ -21,7 +22,7 @@ fi
 
 MODE="${1:---quick}"
 case "$MODE" in
-  --quick | --management-vm | --client-installer-vm | --full | --ci) ;;
+  --quick | --eval | --management-vm | --client-installer-vm | --full | --ci) ;;
   --help | -h)
     usage
     exit 0
@@ -77,11 +78,18 @@ test -e .pi/skills/nixorium-developer/SKILL.md
 
 run_quick_checks() {
   nix build \
-    "path:${REPO_ROOT}#checks.x86_64-linux.config-schema" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.software-schema" \
+    --file "${REPO_ROOT}/tests/source-checks.nix" \
+    config-schema \
+    settings-schema \
+    software-schema \
+    nixorium \
+    --no-write-lock-file \
+    --no-link
+}
+
+run_mk_lab_check() {
+  nix build \
     "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
-    "path:${REPO_ROOT}#packages.x86_64-linux.nixorium" \
     --no-write-lock-file \
     --no-link
 }
@@ -103,6 +111,12 @@ case "$MODE" in
   --quick)
     run_quick_checks
     echo "Quick validation completed successfully."
+    exit 0
+    ;;
+  --eval)
+    run_quick_checks
+    run_mk_lab_check
+    echo "Complete mkLab evaluation completed successfully."
     exit 0
     ;;
   --management-vm)
@@ -135,9 +149,8 @@ else
   run_full_checks
 fi
 
-nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file >/dev/null
-
-CONTROLLER_NAME=$(nix eval "path:${REPO_ROOT}#labMeta.controller.name" --raw --no-write-lock-file)
+LAB_META=$(nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file)
+CONTROLLER_NAME=$(jq -r .controller.name <<<"$LAB_META")
 
 if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" --raw --no-write-lock-file >/dev/null
@@ -153,13 +166,16 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#colmena.pc01.deployment.targetHost" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#deploymentStatus" --json --no-write-lock-file >/dev/null
 else
-  nix build "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel" --no-write-lock-file --no-link
-  nix build "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-write-lock-file --no-link
-  nix build "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" --no-write-lock-file --no-link
-  nix build "path:${REPO_ROOT}#disko" --no-write-lock-file --no-link
-  nix build "path:${REPO_ROOT}#installerBundle" --no-write-lock-file --no-link
-  nix build "path:${REPO_ROOT}#pxeFirmware" --no-write-lock-file --no-link
-  nix build "path:${REPO_ROOT}#nixorium" --no-write-lock-file --no-link
+  nix build \
+    "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel" \
+    "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" \
+    "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" \
+    "path:${REPO_ROOT}#disko" \
+    "path:${REPO_ROOT}#installerBundle" \
+    "path:${REPO_ROOT}#pxeFirmware" \
+    "path:${REPO_ROOT}#nixorium" \
+    --no-write-lock-file \
+    --no-link
 fi
 
 (
@@ -201,30 +217,29 @@ if [[ "${MODE}" == "--ci" ]]; then
   exit 0
 fi
 
-nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
-  config validate --repo "$SITE_DIR" --json >/dev/null
-nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
-  software catalog --repo "$SITE_DIR" --json >/dev/null
-nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
-  software plan --repo "$SITE_DIR" --package vlc --scope all-clients | \
+SITE_NIXORIUM_STORE=$(nix build "path:${SITE_DIR}#nixorium" \
+  --print-out-paths \
+  --no-write-lock-file \
+  --no-link)
+SITE_NIXORIUM="${SITE_NIXORIUM_STORE}/bin/nixorium"
+
+"$SITE_NIXORIUM" config validate --repo "$SITE_DIR" --json >/dev/null
+"$SITE_NIXORIUM" software catalog --repo "$SITE_DIR" --json >/dev/null
+"$SITE_NIXORIUM" software plan --repo "$SITE_DIR" --package vlc --scope all-clients | \
   grep -q 'Software proposal: READY'
 cp "$SITE_DIR/lab-settings.json" "$TEMP_DIR/candidate.json"
-nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
-  config plan --repo "$SITE_DIR" --file "$TEMP_DIR/candidate.json" | \
+"$SITE_NIXORIUM" config plan --repo "$SITE_DIR" --file "$TEMP_DIR/candidate.json" | \
   grep -q 'Configuration plan: UNCHANGED'
-nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
-  setup status --repo "$SITE_DIR" --json >/dev/null
+"$SITE_NIXORIUM" setup status --repo "$SITE_DIR" --json >/dev/null
 
 # Exercise the actual save/validation boundary and carry shared declarations
 # through the offline-equivalence check below. This temporary site has no keys.
-nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
-  software plan --repo "$SITE_DIR" --package hello --scope shared --json \
+"$SITE_NIXORIUM" software plan --repo "$SITE_DIR" --package hello --scope shared --json \
   >"${TEMP_DIR}/shared-software-plan.json"
 jq -e '.state == "ready" and .affectedController != null and (.affectedClients | length) > 0' \
   "${TEMP_DIR}/shared-software-plan.json" >/dev/null
 SOFTWARE_REVIEW_TOKEN=$(jq -r .reviewToken "${TEMP_DIR}/shared-software-plan.json")
-nix run "path:${SITE_DIR}#nixorium" --no-write-lock-file -- \
-  software apply --repo "$SITE_DIR" --package hello --scope shared \
+"$SITE_NIXORIUM" software apply --repo "$SITE_DIR" --package hello --scope shared \
   --expect "$SOFTWARE_REVIEW_TOKEN" --yes --json \
   >"${TEMP_DIR}/shared-software-apply.json"
 jq -e '.state == "applied" and .affectedController != null' \
