@@ -1,6 +1,8 @@
 package presentation
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
@@ -10,8 +12,28 @@ import (
 	"image/color"
 )
 
+type tuiTheme struct {
+	accent    color.Color
+	text      color.Color
+	muted     color.Color
+	success   color.Color
+	attention color.Color
+	failure   color.Color
+}
+
+func newTUITheme(dark bool) tuiTheme {
+	return tuiTheme{
+		accent:    lipgloss.LightDark(dark)(lipgloss.Color("#1D4ED8"), lipgloss.Color("#7AA2F7")),
+		text:      lipgloss.LightDark(dark)(lipgloss.Color("#292524"), lipgloss.Color("#E7E5E4")),
+		muted:     lipgloss.LightDark(dark)(lipgloss.Color("#6B7280"), lipgloss.Color("#A8A29E")),
+		success:   lipgloss.LightDark(dark)(lipgloss.Color("#047857"), lipgloss.Color("#86EFAC")),
+		attention: lipgloss.LightDark(dark)(lipgloss.Color("#B45309"), lipgloss.Color("#FBBF24")),
+		failure:   lipgloss.LightDark(dark)(lipgloss.Color("#B91C1C"), lipgloss.Color("#FDA4AF")),
+	}
+}
+
 func tuiAccent(dark bool) color.Color {
-	return lipgloss.LightDark(dark)(lipgloss.Color("#76533F"), lipgloss.Color("#D8BA98"))
+	return newTUITheme(dark).accent
 }
 
 func tuiProgress(width int, dark bool) progress.Model {
@@ -37,48 +59,100 @@ const (
 )
 
 func tuiTitle(value string, darkBackground bool) string {
-	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#76533F"), lipgloss.Color("#D8BA98"))
-	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(value)
+	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).accent).Render(value)
 }
 
 func tuiError(value string, darkBackground bool) string {
-	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#B91C1C"), lipgloss.Color("#F7768E"))
-	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(value)
+	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).failure).Render(value)
 }
 
 func tuiSection(value string, darkBackground bool) string {
-	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#36332F"), lipgloss.Color("#E2DFD8"))
-	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(value)
+	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).text).Render(value)
 }
 
 func tuiMuted(value string, darkBackground bool) string {
-	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#69665F"), lipgloss.Color("#A09D96"))
-	return lipgloss.NewStyle().Foreground(color).Render(value)
+	return lipgloss.NewStyle().Foreground(newTUITheme(darkBackground).muted).Render(value)
 }
 
 func newTUISpinner(darkBackground bool) spinner.Model {
-	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#76533F"), lipgloss.Color("#D8BA98"))
 	return spinner.New(
 		spinner.WithSpinner(spinner.Dot),
-		spinner.WithStyle(lipgloss.NewStyle().Foreground(color)),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(newTUITheme(darkBackground).accent)),
 	)
 }
 
 func tuiStatus(value string, kind tuiStatusKind, darkBackground bool) string {
-	color := lipgloss.LightDark(darkBackground)(lipgloss.Color("#475569"), lipgloss.Color("#A9B1D6"))
+	theme := newTUITheme(darkBackground)
+	color := theme.muted
 	symbol := "○ "
 	switch kind {
 	case tuiStatusSuccess:
 		symbol = "✓ "
-		color = lipgloss.LightDark(darkBackground)(lipgloss.Color("#047857"), lipgloss.Color("#9ECE6A"))
+		color = theme.success
 	case tuiStatusAttention:
 		symbol = "! "
-		color = lipgloss.LightDark(darkBackground)(lipgloss.Color("#B45309"), lipgloss.Color("#E0AF68"))
+		color = theme.attention
 	case tuiStatusFailure:
 		symbol = "× "
-		color = lipgloss.LightDark(darkBackground)(lipgloss.Color("#B91C1C"), lipgloss.Color("#F7768E"))
+		color = theme.failure
 	}
 	return lipgloss.NewStyle().Bold(true).Foreground(color).Render(symbol + value)
+}
+
+type tuiNotice struct {
+	kind   tuiStatusKind
+	title  string
+	detail string
+}
+
+type tuiAction struct {
+	key   string
+	label string
+}
+
+type tuiShell struct {
+	path    []string
+	body    string
+	notices []tuiNotice
+	actions []tuiAction
+}
+
+func renderTUIShell(shell tuiShell, width int, darkBackground bool) string {
+	header := tuiTitle("Nixorium", darkBackground)
+	if len(shell.path) > 0 {
+		header += tuiMuted("  /  "+strings.Join(shell.path, "  /  "), darkBackground)
+	}
+	lines := []string{
+		header,
+		"",
+		strings.TrimSpace(shell.body),
+	}
+	if len(shell.notices) > 0 {
+		lines = append(lines, "", tuiMuted("NOTICE", darkBackground))
+		for _, notice := range shell.notices {
+			lines = append(lines, tuiStatus(notice.title, notice.kind, darkBackground))
+			if notice.detail != "" {
+				lines = append(lines, "  "+notice.detail)
+			}
+		}
+	}
+	if len(shell.actions) > 0 {
+		lines = append(lines, "", tuiActionBar(width, darkBackground, shell.actions...))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func tuiActionBar(width int, darkBackground bool, actions ...tuiAction) string {
+	items := make([]string, 0, len(actions))
+	for _, action := range actions {
+		items = append(items, tuiSection(action.key, darkBackground)+" "+action.label)
+	}
+	separator := tuiMuted("  ·  ", darkBackground)
+	bar := strings.Join(items, separator)
+	if width > 0 {
+		return lipgloss.NewStyle().MaxWidth(max(20, width-6)).Render(bar)
+	}
+	return bar
 }
 
 func tuiResult(value string, success, darkBackground bool) string {

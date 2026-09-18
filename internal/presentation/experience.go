@@ -112,8 +112,12 @@ func (model dashboardModel) computersView() string {
 }
 
 func (model dashboardModel) administrationView() string {
-	lines := []string{tuiTitle("Nixorium  /  Advanced tools", model.isDark), tuiMuted("Inventory, configuration, maintenance and technical evidence", model.isDark), ""}
-	start, end := listWindow(len(administrationTasks), model.adminCursor, max(3, (model.height-9)/2))
+	lines := []string{
+		tuiTitle("Choose a maintenance task", model.isDark),
+		tuiMuted("Configuration, controller operations and technical evidence", model.isDark),
+		"",
+	}
+	start, end := listWindow(len(administrationTasks), model.adminCursor, max(3, (model.height-15)/2))
 	for i := start; i < end; i++ {
 		task := administrationTasks[i]
 		marker := "  "
@@ -122,14 +126,23 @@ func (model dashboardModel) administrationView() string {
 		}
 		lines = append(lines, tuiSection(marker+task.title+"  ["+task.shortcut+"]", model.isDark), tuiMuted("  "+task.description, model.isDark))
 	}
-	return strings.Join(append(lines, "", "↑/↓ move   enter open   esc interventions   ? help"), "\n")
+	notices := []tuiNotice{}
+	if model.message != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
+	}
+	return renderTUIShell(tuiShell{
+		path:    []string{"Maintenance"},
+		body:    strings.Join(lines, "\n"),
+		notices: notices,
+		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "?", label: "Help"}},
+	}, model.width, model.isDark)
 }
 
 func (model dashboardModel) helpView() string {
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
 	case dashboardHome:
-		lines = append(lines, "w software   n install computers   d distribute", "x shut down clients   a advanced tools")
+		lines = append(lines, "w software   n install computers   d distribute", "x shut down clients   a maintenance")
 	case dashboardRestore:
 		lines = append(lines, "Choose reapply to keep the disk, or reinstall to erase", "the disk confirmed locally on each selected computer.")
 	case dashboardAdministration:

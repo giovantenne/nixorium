@@ -22,12 +22,47 @@ func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 			t.Fatal(err)
 		}
 		text := output.String()
-		if !strings.Contains(text, "What do you want to do?") || !strings.Contains(text, "› Add or change software") {
+		if !strings.Contains(text, "Nixorium") || !strings.Contains(text, "Overview") || !strings.Contains(text, "What do you want to do?") || !strings.Contains(text, "Add or change software") {
 			t.Fatalf("meaning lost with %v", profile)
 		}
 		if strings.Contains(text, "38;2;") {
 			t.Fatalf("truecolor leaked into %v", profile)
 		}
+	}
+}
+
+func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		m := experienceFixture(2)
+		m.width = size[0]
+		m.height = size[1]
+		view := m.View().Content
+		for _, expected := range []string{"Nixorium", "Overview", "What do you want to do?", "Enter", "Open", "Help"} {
+			if !strings.Contains(view, expected) {
+				t.Fatalf("overview %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
+			}
+		}
+		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+			t.Fatalf("overview overflow at %dx%d: %dx%d", size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+		}
+
+		m.screen = dashboardAdministration
+		view = m.View().Content
+		for _, expected := range []string{"Nixorium", "Maintenance", "Enter", "Open", "Esc", "Overview"} {
+			if !strings.Contains(view, expected) {
+				t.Fatalf("maintenance %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
+			}
+		}
+		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+			t.Fatalf("maintenance overflow at %dx%d: %dx%d", size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+		}
+	}
+
+	m := experienceFixture(2)
+	m.report.PXE.Mode = "recovery-required"
+	view := m.View().Content
+	if !strings.Contains(view, "NOTICE") || !strings.Contains(view, "Controller network recovery required") || !strings.Contains(view, "Enter") {
+		t.Fatalf("overview warning is not separated from its action bar:\n%s", view)
 	}
 }
 

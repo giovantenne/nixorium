@@ -25,7 +25,7 @@ var dashboardTasks = []dashboardTask{
 	{id: "install", shortcut: "n", title: "Install new computers", description: "Configure the laboratory when needed, then prepare and start network installation"},
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
 	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
-	{id: "admin", shortcut: "a", title: "Advanced tools", description: "Inventory, settings, revisions, services, logs and diagnostics"},
+	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
 }
 
 var administrationTasks = []dashboardTask{
@@ -106,55 +106,51 @@ func (model dashboardModel) homeView() string {
 	if len(menu.list.Items()) == 0 {
 		menu = newDashboardTaskMenu(model.isDark, model.width, model.height)
 	}
-	lines := []string{
-		tuiTitle("Nixorium  /  Computer laboratory", model.isDark),
-		"",
-	}
 	if model.initialError {
-		lines = append(lines,
-			tuiResult("The laboratory could not be opened", false, model.isDark),
-			model.message,
-			"",
-			"No configuration or computer was changed.",
-			"",
-			"enter try again   q quit   F1 help",
-		)
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{
+			path: []string{"Overview"},
+			body: "The saved laboratory state is not available yet.",
+			notices: []tuiNotice{{
+				kind:   tuiStatusFailure,
+				title:  "The laboratory could not be opened",
+				detail: model.message + " No configuration or computer was changed.",
+			}},
+			actions: []tuiAction{{key: "Enter", label: "Try again"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
+		}, model.width, model.isDark)
 	}
 	if model.initializing {
-		lines = append(lines,
-			model.busyView(),
-			"",
-			tuiMuted("Reading the saved laboratory configuration and setup state…", model.isDark),
-		)
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{
+			path:    []string{"Overview"},
+			body:    model.busyView() + "\n\n" + tuiMuted("Reading the saved laboratory configuration and setup state…", model.isDark),
+			actions: []tuiAction{{key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
+		}, model.width, model.isDark)
 	}
+	lines := []string{
+		tuiTitle("What do you want to do?", model.isDark),
+		tuiMuted("Choose one task. Computers are checked only when that task needs them.", model.isDark),
+		"",
+	}
+	notices := []tuiNotice{}
 	if model.report.PXE.Mode == "recovery-required" {
-		lines = append(lines,
-			tuiStatus("Controller network recovery required", tuiStatusAttention, model.isDark),
-			"A previous installation session must be reconciled before normal networking can be trusted.",
-			"Press p to open installation recovery.",
-			"",
-		)
+		notices = append(notices, tuiNotice{
+			kind:   tuiStatusAttention,
+			title:  "Controller network recovery required",
+			detail: "Open Install new computers to reconcile the previous session before trusting normal networking.",
+		})
 	} else if model.report.PXE.Mode == "active" {
-		lines = append(lines,
-			tuiStatus("Network installation is active", tuiStatusAttention, model.isDark),
-			"Press p to continue installation or restore normal controller networking.",
-			"",
-		)
+		notices = append(notices, tuiNotice{
+			kind:   tuiStatusAttention,
+			title:  "Network installation is active",
+			detail: "Open Install new computers to continue or restore normal controller networking.",
+		})
 	}
 	if model.setup.State != "ready" {
-		lines = append(lines,
-			tuiStatus("Computer installation is not configured yet", tuiStatusAttention, model.isDark),
-			"Choose Install new computers when you are ready to configure the laboratory.",
-			"",
-		)
+		notices = append(notices, tuiNotice{
+			kind:   tuiStatusAttention,
+			title:  "Computer installation is not configured yet",
+			detail: "Choose Install new computers when you are ready to configure the laboratory.",
+		})
 	}
-	lines = append(lines,
-		tuiTitle("What do you want to do?", model.isDark),
-		tuiMuted("Choose an intervention. Computers are checked only when the selected task needs them.", model.isDark),
-	)
-	lines = append(lines, "")
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
 	}
@@ -170,13 +166,12 @@ func (model dashboardModel) homeView() string {
 		lines = append(lines, label, tuiMuted("    "+item.description, model.isDark))
 	}
 	if model.message != "" {
-		lines = append(lines, "", tuiMuted(model.message, model.isDark))
+		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
-		tuiHelpBinding([]string{"enter"}, "enter", "open"),
-		tuiHelpBinding([]string{"?"}, "?", "help"),
-		tuiHelpBinding([]string{"q"}, "q", "quit"),
-	))
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{
+		path:    []string{"Overview"},
+		body:    strings.Join(lines, "\n"),
+		notices: notices,
+		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "?", label: "Help"}, {key: "q", label: "Quit"}},
+	}, model.width, model.isDark)
 }

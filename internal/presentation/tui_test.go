@@ -768,7 +768,7 @@ func TestDashboardTaskMenuUsesSelectionAndKeepsShortcuts(t *testing.T) {
 	model.height = 30
 	model.homeMenu.setSize(model.width, model.height)
 	view := model.View().Content
-	if !strings.Contains(view, "Install new computers") || !strings.Contains(view, "Advanced tools") || strings.Contains(view, "Update Nixorium") || !strings.Contains(view, "\x1b[") {
+	if !strings.Contains(view, "Install new computers") || !strings.Contains(view, "Maintenance") || strings.Contains(view, "Update Nixorium") || !strings.Contains(view, "\x1b[") {
 		t.Fatalf("home task menu lacks hierarchy or color:\n%s", view)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
@@ -839,7 +839,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if strings.Contains(model.View().Content, "2 computers configured") || !strings.Contains(model.View().Content, "Advanced tools") {
+	if strings.Contains(model.View().Content, "2 computers configured") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("home should not scan or summarise computers:\n%s", model.View().Content)
 	}
 
@@ -1305,7 +1305,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	actions.RunningVersion = "2.0.0-test"
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
-	if strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Advanced tools") {
+	if strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("home omits navigable task menu:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
@@ -1488,7 +1488,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions, width: 100, height: 30}
-	if !strings.Contains(model.View().Content, "Advanced tools") {
+	if !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("home omits settings task:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "e"})
