@@ -1,7 +1,7 @@
-{ lib, pkgs, clientNames, clientGroups ? {}, requireAvailable ? true }:
+{ lib, pkgs, clientNames, clientGroups ? {}, requireAvailable ? true, allowUnfree ? false }:
 rawSoftware:
 let
-  packageTools = import ./software-packages.nix { inherit lib pkgs; };
+  packageTools = import ./software-packages.nix { inherit lib pkgs allowUnfree; };
   fail = message: throw "lab-software.json: ${message}";
   software =
     if builtins.isAttrs rawSoftware then rawSoftware

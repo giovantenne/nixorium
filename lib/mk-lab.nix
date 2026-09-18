@@ -330,10 +330,12 @@ let
   softwarePkgs = import nixpkgs {
     inherit system;
     overlays = [ labOverlay ];
+    config.allowUnfree = true;
   };
   softwarePackageTools = import ./software-packages.nix {
     inherit lib;
     pkgs = softwarePkgs;
+    allowUnfree = true;
   };
   normalizeSoftwareCatalogItem = index: definition:
     let
@@ -368,6 +370,7 @@ let
     clientNames = validClientNames;
     inherit clientGroups;
     requireAvailable = false;
+    allowUnfree = true;
   } labSoftware;
   softwareAppliesTo = name: scope:
     scope.kind == "shared"
