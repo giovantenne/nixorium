@@ -193,9 +193,13 @@ func (model dashboardModel) helpView() string {
 }
 
 func (model dashboardModel) diagnosticsView() string {
-	lines := []string{tuiTitle("Nixorium  /  Diagnostics", model.isDark), ""}
+	path := []string{"Maintenance", "Diagnostics"}
+	if model.diagnosticReturn == dashboardHosts {
+		path = []string{"Computers", "Inventory", "Diagnostics"}
+	}
+	lines := []string{tuiTitle("Diagnostics", model.isDark), ""}
 	if model.busy != "" {
-		return strings.Join(append(lines, model.busyView()), "\n")
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(append(lines, model.busyView()), "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	findings := model.doctor.Findings
 	if len(findings) == 0 {
@@ -217,10 +221,20 @@ func (model dashboardModel) diagnosticsView() string {
 		}
 		lines = append(lines, "")
 	}
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, tuiStatus(model.message, tuiStatusAttention, model.isDark))
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(append(lines, "", "↑/↓ move   enter evidence   r check again   esc back   ? help"), "\n")
+	actions := []tuiAction{}
+	if len(findings) > 0 {
+		actions = append(actions, tuiAction{key: "↑/↓", label: "Select"}, tuiAction{key: "Enter", label: "Evidence"})
+	}
+	back := "Maintenance"
+	if model.diagnosticReturn == dashboardHosts {
+		back = "Inventory"
+	}
+	actions = append(actions, tuiAction{key: "r", label: "Check again"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
 }
 
 func (model dashboardModel) restoreView() string {
@@ -334,7 +348,8 @@ func (model dashboardModel) usesTUIShell() bool {
 		dashboardShutdownReview, dashboardShutdownResult, dashboardSoftware,
 		dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult,
 		dashboardController, dashboardControllerReview, dashboardServices,
-		dashboardServicesRestartReview:
+		dashboardServicesRestartReview, dashboardDiagnostics, dashboardLogs,
+		dashboardLogDetail:
 		return true
 	default:
 		return false

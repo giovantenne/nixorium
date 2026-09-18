@@ -1529,10 +1529,11 @@ func (model dashboardModel) serviceRestartAvailable() bool {
 }
 
 func (model dashboardModel) logsView() string {
-	lines := []string{tuiTitle("Nixorium — Operation logs", model.isDark), ""}
+	path := []string{"Maintenance", "History"}
+	lines := []string{tuiTitle("Operation history", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	lines = append(lines, tuiSection("Recent actions", model.isDark))
 	recordLimit := len(model.logs.Records)
@@ -1559,34 +1560,36 @@ func (model dashboardModel) logsView() string {
 		lines = append(lines, fmt.Sprintf("%s %s  %-10s %-11s %d bytes", cursor, entry.StartedAt.UTC().Format("2006-01-02 15:04Z"), entry.Kind, entry.State, entry.SizeBytes))
 		lines = append(lines, "    "+entry.ID)
 	}
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
-		tuiHelpBinding([]string{"enter"}, "enter", "view tail"),
-		tuiHelpBinding([]string{"f"}, "f", "refresh"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-	))
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", "Warning: "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	actions := []tuiAction{}
+	if len(model.logs.Logs) > 0 {
+		actions = append(actions, tuiAction{key: "↑/↓", label: "Select"}, tuiAction{key: "Enter", label: "View tail"})
+	}
+	back := "Maintenance"
+	if model.setupMode {
+		back = "Setup"
+	}
+	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
 }
 
 func (model dashboardModel) logDetailView() string {
-	lines := []string{tuiTitle("Nixorium — Operation log detail", model.isDark), ""}
+	path := []string{"Maintenance", "History", "Log"}
+	lines := []string{tuiTitle("Operation log detail", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.logDetail.Log == nil {
 		lines = append(lines, "The selected operation log could not be read safely.")
+		notices := []tuiNotice{}
 		if model.message != "" {
-			lines = append(lines, "", model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"esc"}, "esc", "back"),
-			tuiHelpBinding([]string{"q"}, "q", "quit"),
-		))
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Esc", label: "History"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	entry := model.logDetail.Log
 	contentLines := operationLogContentLines(model.logDetail.Content)
@@ -1601,21 +1604,16 @@ func (model dashboardModel) logDetailView() string {
 		"",
 	)
 	lines = append(lines, contentLines[model.logScroll:end]...)
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"up", "down", "pgup", "pgdown", "home", "end"}, "↑/↓/pg/home/end", "scroll"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-		tuiHelpBinding([]string{"q"}, "q", "quit"),
-	))
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "↑/↓/Pg/Home/End", label: "Scroll"}, {key: "Esc", label: "History"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func (model dashboardModel) logDetailHeight() int {
 	if model.height <= 0 {
 		return 12
 	}
-	height := model.height - 13
-	if height < 4 {
-		return 4
+	height := model.height - 15
+	if height < 1 {
+		return 1
 	}
 	return height
 }
