@@ -251,16 +251,29 @@ metadata, netboot artifacts, the offline installer bundle, and the packaged
 management application. Site-specific changes belong in a private deployment;
 reusable behavior belongs here.
 
+The public Nix evaluator and the management command enforce the same settings
+boundary through a shared invalid-candidate regression corpus. GitHub CI both
+evaluates the NixOS/template graph and separately builds and tests the packaged
+Go command.
+
 ```sh
-# Fast development gate
+# Fast development gate; this is the normal edit-test loop
 ./scripts/validate.sh --quick
 
-# Go tests in the development environment
-nix develop --command go test ./...
+# Optional persistent shell for incremental Go test runs
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix go-shell
 
-# Full milestone/release gate
+# Complete Nix API and host-composition evaluation
+./scripts/validate.sh --eval
+
+# Complete milestone/release checkpoint
 ./scripts/validate.sh --full
 ```
+
+The targeted VM modes and the gate-selection rules are documented in
+[Development validation](docs/development-validation.md). In particular,
+`--full` is not intended for repeated use while editing.
 
 Read [AGENTS.md](AGENTS.md) and the
 [`nixorium-developer` skill](skills/nixorium-developer/SKILL.md) before changing

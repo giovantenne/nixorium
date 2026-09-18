@@ -13,8 +13,25 @@ Use the quick validation during the normal edit-test cycle:
 
 This is equivalent to `--quick`. It checks shell syntax, Git whitespace,
 client-installer shell tests, skill distribution and discovery, configuration
-and settings schemas, the `mkLab` contract, and the packaged Go command with
-its unit tests. It does not build NixOS systems or run VM tests.
+and settings schemas, and the packaged Go command with its unit tests. The
+schema and Go derivations use `tests/source-checks.nix`, which imports the exact
+locked `nixpkgs` directly and avoids constructing the full laboratory graph.
+It does not evaluate `mkLab`, build NixOS systems, or run VM tests.
+
+For repeated Go edits, enter the lightweight locked toolchain once with
+`nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell`
+and run `go test ./...` inside it. Go's incremental cache makes this the tight
+loop; finish with the default gate for the reproducible package test.
+
+Add the full `mkLab` contract when Nix schemas, the Flake API, host composition,
+module wiring, or software scopes change:
+
+```sh
+./scripts/validate.sh --eval
+```
+
+This mode includes the quick checks and evaluates the complete `mkLab` test
+graph without booting a VM.
 
 Add the one affected integration test when changing its behavior:
 
@@ -23,10 +40,12 @@ Add the one affected integration test when changing its behavior:
 ./scripts/validate.sh --client-installer-vm
 ```
 
-The management VM is required for changes to management operations, adapters,
-controller lifecycle, or their TUI/CLI integration. The client-installer VM is
-required for changes to enrollment, Disko installation, or installer runtime
-behavior. Each targeted mode includes the quick checks.
+The management VM is required for changes to management operations that cross
+process, filesystem, network, privilege, systemd, or end-to-end terminal
+boundaries. Presentation-only refactors with focused state-transition unit
+tests do not require it. The client-installer VM is required for changes to
+enrollment, Disko installation, or installer runtime behavior. Each targeted
+mode includes the quick checks.
 
 Run the complete local matrix with:
 
@@ -41,11 +60,24 @@ offline derivation equivalence. It does not ask `nix flake check` to enumerate
 all generated clients: address/hostname generation is covered by `mk-lab`, and
 one client exercises their shared module graph. Run it after public API,
 template, built-in module, installer bundle, asset-plumbing, input, Disko, or
-netboot changes, and before a milestone or release is declared complete. A
-successful evaluation does not prove that source patches compile, so affected
-host roles require real builds.
+netboot changes only when the change crosses several built roles or affects
+offline equivalence. Always run it before a milestone or release is declared
+complete. During development, prefer `--eval`, one targeted VM, and affected
+real closure builds. A successful evaluation does not prove that source
+patches compile, so affected host roles require real builds.
 
-GitHub Actions must use the evaluation-only mode:
+Never build all generated clients merely to repeat their shared module graph.
+Build one representative client plus the controller; schema and `mkLab` tests
+cover the complete generated hostname/address inventory. Add another client
+build only when a changed host-specific module or role override makes that host
+materially different.
+
+The complete mode groups related upstream outputs into one `nix build`
+invocation. The generated deployment's management executable is built once and
+reused for its CLI scenarios. Keep this batching intact: repeated Flake
+evaluation is a material part of the uncached runtime.
+
+The GitHub source/template job must use the evaluation-only mode:
 
 ```sh
 ./scripts/validate.sh --ci
@@ -58,8 +90,11 @@ fresh deployment and its installer bundle without building system closures.
 It intentionally skips the other generated clients because they share the
 same module graph and their address generation is covered by `mk-lab` tests.
 The CI mode disables import-from-derivation so evaluation cannot trigger hidden
-builds. Keep the full matrix off GitHub-hosted runners; it is a local
-prerequisite for changes that affect builds and for release preparation.
+builds. A separate CI job builds the same direct-source `nixorium` check used by
+the fast gate, which also runs the Go unit tests, without constructing the
+laboratory graph or building NixOS system closures. Keep the full matrix off
+GitHub-hosted runners; it is a local prerequisite for changes that affect
+builds and for release preparation.
 
 Build modes use `--no-link`; the full mode's one installer result link exists
 only inside its automatically removed temporary directory. Validation therefore
@@ -72,3 +107,6 @@ cache.
 For skill changes, validate both skill directories with the skill validator.
 The upstream and template copies of `nixorium-maintainer` must be identical,
 and template discovery links must resolve to that copy.
+
+The contributor-facing decision table and guidance for placing new tests are
+maintained in `docs/development-validation.md`.
