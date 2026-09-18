@@ -990,10 +990,11 @@ func (model dashboardModel) gitReviewView() string {
 	if model.screen == dashboardGitCommitReview {
 		return model.gitCommitReviewView()
 	}
-	lines := []string{tuiTitle("Nixorium — Git change review", model.isDark), ""}
+	path := []string{"Maintenance", "Changes"}
+	lines := []string{tuiTitle("Repository changes", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.gitCommitResult.Operation != "" {
 		success := !model.gitCommitResult.HasErrors() && model.gitCommitResult.Committed
@@ -1001,9 +1002,9 @@ func (model dashboardModel) gitReviewView() string {
 		if success {
 			title = "Git changes committed locally"
 		}
-		returnLabel := "dashboard"
+		returnLabel := "Maintenance"
 		if model.setupMode {
-			returnLabel = "setup"
+			returnLabel = "Setup"
 		}
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
@@ -1011,14 +1012,11 @@ func (model dashboardModel) gitReviewView() string {
 			fmt.Sprintf("State: %s   Committed: %t", model.gitCommitResult.State, model.gitCommitResult.Committed),
 			"HEAD: "+model.gitCommitResult.Revision,
 		)
+		notices := []tuiNotice{}
 		if model.message != "" {
-			lines = append(lines, "", "Result: "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", returnLabel),
-			tuiHelpBinding([]string{"f"}, "f", "refresh review"),
-		))
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "f", label: "Refresh review"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	content := gitReviewContentLines(model.gitReview)
 	height := model.gitReviewHeight()
@@ -1037,23 +1035,24 @@ func (model dashboardModel) gitReviewView() string {
 		"",
 	)
 	lines = append(lines, content[model.gitScroll:end]...)
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"c"}, "c", "commit paths"),
-		tuiHelpBinding([]string{"up", "down", "pgup", "pgdown"}, "↑/↓/pg", "scroll"),
-		tuiHelpBinding([]string{"f"}, "f", "refresh"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-	))
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", "Warning: "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	actions := []tuiAction{{key: "↑/↓/Pg", label: "Scroll"}}
+	if len(model.gitReview.Changes) > 0 && !model.gitReview.HasErrors() {
+		actions = append(actions, tuiAction{key: "c", label: "Select commit paths"})
+	}
+	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
 }
 
 func (model dashboardModel) gitCommitSelectView() string {
-	lines := []string{tuiTitle("Nixorium — Select Git commit paths", model.isDark), ""}
+	path := []string{"Maintenance", "Changes", "Select paths"}
+	lines := []string{tuiTitle("Select paths for the local commit", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	start, end := listWindow(len(model.gitReview.Changes), model.gitCommitCursor, model.rowCapacity())
 	for index := start; index < end; index++ {
@@ -1071,23 +1070,19 @@ func (model dashboardModel) gitCommitSelectView() string {
 		}
 		lines = append(lines, fmt.Sprintf("%s %s %-10s %-10s %-9s %s", cursor, chosen, gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path))
 	}
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"space"}, "space", "select"),
-		tuiHelpBinding([]string{"a"}, "a", "all safe"),
-		tuiHelpBinding([]string{"enter"}, "enter", "review"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-	))
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Toggle"}, {key: "a", label: "All safe"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Changes"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func (model dashboardModel) gitCommitReviewView() string {
-	lines := []string{tuiTitle("Nixorium — Local Git commit review", model.isDark), ""}
+	path := []string{"Maintenance", "Changes", "Commit review"}
+	lines := []string{tuiTitle("Review local commit", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	diffLines := strings.Split(strings.TrimSuffix(model.gitCommitPlan.Diff.Content, "\n"), "\n")
 	height := model.gitReviewHeight()
@@ -1107,14 +1102,12 @@ func (model dashboardModel) gitCommitReviewView() string {
 		"",
 	)
 	lines = append(lines, diffLines[model.gitScroll:end]...)
-	lines = append(lines, "", "Type "+model.gitCommitPlan.Confirmation+" to continue:", "> "+model.confirmation+"█", "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"up", "down", "pgup", "pgdown"}, "↑/↓/pg", "scroll"),
-		tuiHelpBinding([]string{"esc"}, "esc", "cancel"),
-	))
+	lines = append(lines, "", tuiSection("Type "+model.gitCommitPlan.Confirmation+" to continue:", model.isDark), "> "+model.confirmation+"_")
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓/Pg", label: "Scroll diff"}, {key: "Enter", label: "Create commit"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
 
 func selectedGitCommitPaths(changes []domain.GitChange, chosen map[string]bool) string {
