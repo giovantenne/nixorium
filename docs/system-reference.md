@@ -34,7 +34,9 @@ The same pure Disko layout is used by controller bootstrap and guided client
 installation, so destructive tooling comes from the deployment's locked inputs
 instead of being downloaded at installation time.
 
-The public controller bootstrap resolves its selected branch or tag once. The
+The public controller bootstrap resolves its selected branch or tag once. Both
+bootstrap stages use only the official NixOS binary cache and its published
+signing key; signature checking is never disabled. The
 template, installer, local Disko layout, and initial lock use that full Git
 revision, while `flake.nix` retains the selected channel for later managed
 updates. Resolution failure stops before the installer is invoked.

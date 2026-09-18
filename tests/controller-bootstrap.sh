@@ -44,8 +44,9 @@ case "$url" in
     cat > "$output" <<'INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
-printf 'flake=%s\nlayout=%s\nlayout_url=%s\nmaster=%s\nstudent=%s\ndisk=%s\n' \
+printf 'flake=%s\nlayout=%s\nlayout_url=%s\nmaster=%s\nstudent=%s\ndisk=%s\nnix_config=%s\n' \
   "$FLAKE_REF" "$DISKO_LAYOUT_FILE" "$DISKO_LAYOUT_URL" "$MASTER_HOST_NUMBER" "$STUDENT_USER" "${1:-}" \
+  "${NIX_CONFIG//$'\n'/;}" \
   > "$BOOTSTRAP_INSTALLER_LOG"
 grep -Fx 'layout-from-resolved-revision' "$DISKO_LAYOUT_FILE" >/dev/null
 printf '{"nodes":{},"root":"root","version":7}\n' > "$NIXORIUM_DEPLOYMENT_PATH/flake.lock"
@@ -161,6 +162,12 @@ grep -F "layout_url=https://raw.githubusercontent.com/giovantenne/nixorium/${REV
 grep -F "master=99" "$INSTALLER_LOG" >/dev/null
 grep -F "student=student" "$INSTALLER_LOG" >/dev/null
 grep -F "disk=/dev/vda" "$INSTALLER_LOG" >/dev/null
+grep -F "trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" \
+  "$INSTALLER_LOG" >/dev/null
+if grep -F "6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo=" "$INSTALLER_LOG"; then
+  echo "bootstrap exported the obsolete cache.nixos.org signing key" >&2
+  exit 1
+fi
 grep -Fx '    nixorium.url = "github:giovantenne/nixorium/master";' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
 grep -Fx '    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";' \

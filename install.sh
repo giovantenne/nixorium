@@ -24,7 +24,7 @@ BOOTSTRAP_STUDENT_HASH=""
 BOOTSTRAP_INPUT_FD=""
 
 # Keep bootstrap downloads independent from any cache configured in the live environment.
-export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo='
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
 
 usage() {
   echo "Usage: install.sh [--release <tag|master>] [--disk <device>]" >&2

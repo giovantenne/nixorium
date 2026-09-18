@@ -93,6 +93,12 @@ test "$(grep -c '^nix|' "$ACTION_LOG")" -eq 2
 test "$(grep -c -- '--dry-run' "$ACTION_LOG" || true)" -eq 0
 grep -F 'max-jobs = 1' "$ACTION_LOG" >/dev/null
 grep -F 'cores = 1' "$ACTION_LOG" >/dev/null
+grep -F 'trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=' \
+  "$ACTION_LOG" >/dev/null
+if grep -F '6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo=' "$ACTION_LOG"; then
+  echo "controller installer exported the obsolete cache.nixos.org signing key" >&2
+  exit 1
+fi
 grep -F 'run github:giovantenne/nixorium/revision#disko -- --mode disko ' "$ACTION_LOG" >/dev/null
 grep -F 'flake lock --override-input nixorium github:giovantenne/nixorium/revision' "$ACTION_LOG" >/dev/null
 grep -F 'btrfs|filesystem mkswapfile --size 4G' "$ACTION_LOG" >/dev/null
