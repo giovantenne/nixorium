@@ -413,6 +413,7 @@ func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
 
 func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
 	m := experienceFixture(2)
+	m = press(m, "c")
 	updated, command := m.Update(tea.KeyPressMsg{Text: "r"})
 	next := updated.(dashboardModel)
 	if command != nil || next.screen != dashboardRestore {
