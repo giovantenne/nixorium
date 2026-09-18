@@ -1691,7 +1691,7 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if loads != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Git change review") || !strings.Contains(model.View().Content, "lab-settings.json") {
+	if loads != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Repository changes") || !strings.Contains(model.View().Content, "lab-settings.json") {
 		t.Fatalf("Git review missing: loads=%d\n%s", loads, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
@@ -1745,7 +1745,7 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardGitCommitSelect || !strings.Contains(model.View().Content, "Select Git commit paths") {
+	if model.screen != dashboardGitCommitSelect || !strings.Contains(model.View().Content, "Select paths for the local commit") {
 		t.Fatalf("commit selection missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeySpace})
@@ -1770,7 +1770,7 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Git changes committed locally") || !strings.Contains(model.View().Content, "no remote push was attempted") || !strings.Contains(model.View().Content, "refresh review") {
+	if applied != 1 || model.screen != dashboardGitReview || !strings.Contains(model.View().Content, "Git changes committed locally") || !strings.Contains(model.View().Content, "no remote push was attempted") || !strings.Contains(model.View().Content, "Refresh review") {
 		t.Fatalf("commit result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1793,7 +1793,7 @@ func TestFirstSetupCommitResultReturnsToObservedChecklist(t *testing.T) {
 			return testSetupReport(true, false, false, false)
 		}},
 	}
-	if !strings.Contains(model.View().Content, "enter") || !strings.Contains(model.View().Content, "setup") {
+	if !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Setup") {
 		t.Fatalf("setup return action missing:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
