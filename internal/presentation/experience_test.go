@@ -253,11 +253,15 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				if !strings.Contains(view, "Enter continues with this reviewed configuration") || !strings.Contains(view, "Esc cancels") {
 					t.Fatalf("software save action hidden screen %d size %v:\n%s", screen, size, view)
 				}
+			} else if screen == dashboardDeployReview {
+				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
+					t.Fatalf("deployment confirmation hidden screen %d size %v:\n%s", screen, size, view)
+				}
 			} else if screen == dashboardShutdownReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("shutdown confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
-			} else if screen == dashboardDeployReview || screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
+			} else if screen == dashboardServicesRestartReview || screen == dashboardControllerReview || screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "esc cancel") {
 					t.Fatalf("confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}

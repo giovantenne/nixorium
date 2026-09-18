@@ -1078,14 +1078,14 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	}
 	updated, command = model.Update(command())
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View().Content, "Building configurations") || !strings.Contains(model.View().Content, "progress details") || !strings.Contains(model.View().Content, "private deployment log") {
+	if !strings.Contains(model.View().Content, "Building configurations") || !strings.Contains(model.View().Content, "Progress details") || !strings.Contains(model.View().Content, "private log") {
 		t.Fatalf("deployment progress missing:\n%s", model.View().Content)
 	}
 	for model.deploying && command != nil {
 		updated, command = model.Update(command())
 		model = updated.(dashboardModel)
 	}
-	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Deployment completed and verified") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") || !strings.Contains(model.View().Content, "new review") {
+	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Deployment completed and verified") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") || !strings.Contains(model.View().Content, "New review") {
 		t.Fatalf("deployment result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
