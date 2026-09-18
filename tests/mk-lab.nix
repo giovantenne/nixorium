@@ -69,7 +69,8 @@ let
     builtins.any (package: (package.pname or "") == pname)
       lab.nixosConfigurations.${host}.config.environment.systemPackages;
   nestedSoftware = softwareLab.nixoriumResolveSoftwarePackage "python3Packages.numpy";
-  blockedSoftware = softwareLab.nixoriumResolveSoftwarePackage "hello-unfree";
+  allowedUnfreeSoftware = softwareLab.nixoriumResolveSoftwarePackage "hello-unfree";
+  bambuStudioSoftware = softwareLab.nixoriumResolveSoftwarePackage "bambu-studio";
   rejectsUnknownHost = !(builtins.tryEval (builtins.deepSeq
     (mkLab (baseArgs // {
       hostModules.pc00 = [ ../modules/common.nix ];
@@ -268,7 +269,8 @@ assert (builtins.head catalogLab.nixoriumSoftware.catalog).id == "vlc";
 assert builtins.any (item: item.id == "hello" && item.availability == "available") softwareSearch;
 assert nestedSoftware.id == "python3Packages.numpy";
 assert nestedSoftware.availability == "available";
-assert blockedSoftware.availability == "blocked-unfree";
+assert allowedUnfreeSoftware.availability == "available";
+assert bambuStudioSoftware.availability == "available";
 assert rejectsUnknownHost;
 assert rejectsUnknownVeyonHost;
 assert rejectsInvalidSoftwareCatalog;

@@ -5,6 +5,11 @@ let
     clientNames = [ "pc01" "pc02" ];
     clientGroups.graphics = [ "pc01" ];
   };
+  evaluateAllowUnfree = import ../lib/eval-lab-software.nix {
+    inherit lib pkgs;
+    clientNames = [ "pc01" ];
+    allowUnfree = true;
+  };
   valid = evaluate {
     schemaVersion = 1;
     packages = [
@@ -27,6 +32,11 @@ assert rejects { schemaVersion = 1; packages = [{ package = "hello"; scope = { k
 assert rejects { schemaVersion = 2; packages = []; };
 assert rejects { schemaVersion = 1; packages = []; unexpected = true; };
 assert rejects { schemaVersion = 1; packages = [{ package = "not-a-real-package"; scope.kind = "all-clients"; }]; };
+assert rejects { schemaVersion = 1; packages = [{ package = "hello-unfree"; scope.kind = "all-clients"; }]; };
+assert (evaluateAllowUnfree {
+  schemaVersion = 1;
+  packages = [{ package = "hello-unfree"; scope.kind = "all-clients"; }];
+}).packages != [];
 assert !rejects { schemaVersion = 1; packages = [{ package = "hello"; scope.kind = "all-clients"; }]; };
 assert !rejects { schemaVersion = 1; packages = [{ package = "python3Packages.pip"; scope.kind = "all-clients"; }]; };
 assert rejects { schemaVersion = 1; packages = [{ package = "vlc"; scope = { kind = "all-clients"; group = "graphics"; }; }]; };

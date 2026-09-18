@@ -1,4 +1,4 @@
-{ lib, pkgs }:
+{ lib, pkgs, allowUnfree ? false }:
 let
   validSegment = value:
     builtins.isString value
@@ -33,7 +33,7 @@ let
           availability =
             if broken then "blocked-broken"
             else if builtins.isList vulnerabilities && vulnerabilities != [] then "blocked-insecure"
-            else if unfree then "blocked-unfree"
+            else if unfree && !allowUnfree then "blocked-unfree"
             else if !platformAvailable then "unavailable-platform"
             else "available";
           label = package.pname or package.name or path;
