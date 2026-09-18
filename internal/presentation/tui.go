@@ -1231,10 +1231,8 @@ func (model dashboardModel) updateView() string {
 		if index == model.updateCursor {
 			marker = "› "
 		}
-		note := ""
-		if release.Tag == model.updateCheck.CurrentRef {
-			note = "  Current"
-		} else if release.Tag == latestStable {
+		note := updateReleaseStatus(model.updateCheck, release)
+		if note == "" && release.Tag == latestStable {
 			note = "  Latest stable"
 		}
 		if release.Channel == domain.UpdateChannelPrerelease {
@@ -1289,6 +1287,32 @@ func updateCheckFailureSummary(report domain.UpdateCheckReport) (string, string)
 		}
 	}
 	return "Updates could not be fetched", "Nixorium could not obtain an update list from the configured upstream."
+}
+
+func updateReleaseAlreadyCurrent(report domain.UpdateCheckReport, release domain.UpdateRelease) bool {
+	if release.Tag != report.CurrentRef {
+		return false
+	}
+	if release.Channel != domain.UpdateChannelMoving {
+		return true
+	}
+	return report.CurrentRev != "" && release.ObjectID != "" && report.CurrentRev == release.ObjectID
+}
+
+func updateReleaseStatus(report domain.UpdateCheckReport, release domain.UpdateRelease) string {
+	if release.Tag != report.CurrentRef {
+		return ""
+	}
+	if release.Channel != domain.UpdateChannelMoving {
+		return "  Current"
+	}
+	if updateReleaseAlreadyCurrent(report, release) {
+		return "  Current revision"
+	}
+	if report.CurrentRev != "" && release.ObjectID != "" {
+		return "  New revision available"
+	}
+	return "  Configured target"
 }
 
 func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
