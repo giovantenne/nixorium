@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -1851,15 +1850,17 @@ func (model dashboardModel) pxeView() string {
 	if model.report.PXEPreparation.Ready {
 		preparation = "ready"
 	}
-	title := "Nixorium — Install or reinstall computers"
+	path := []string{"Installation", "Network installation"}
+	title := "Network installation"
 	if model.setupMode {
-		title = "Nixorium — First setup / First computer"
+		path = []string{"Installation", "First computer"}
+		title = "Install the first computer"
 	} else if model.restoreMode {
-		title = "Nixorium — Restore / Reinstall from scratch"
+		path = []string{"Computers", "Restore", "Reinstall"}
+		title = "Reinstall a computer"
 	}
 	lines := []string{
 		tuiTitle(title, model.isDark),
-		"",
 		fmt.Sprintf("Installation mode:  %s", tuiStatus(model.report.PXE.Mode, pxeStatusKind(model.report.PXE.Mode), model.isDark)),
 		fmt.Sprintf("Prepared artifacts: %s", preparation),
 		fmt.Sprintf("Interface:          %s", model.report.Meta.Network.Interface),
@@ -1872,12 +1873,24 @@ func (model dashboardModel) pxeView() string {
 		}
 		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.operationProgressView(model.pxeProgress, "Current progress")...)
-		lines = append(lines, "", "q: close this view; systemd-owned work continues")
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{
+			path: path,
+			body: strings.Join(lines, "\n"),
+			notices: []tuiNotice{{
+				kind:   tuiStatusAttention,
+				title:  "Preparation continues if this view closes",
+				detail: "The systemd-owned operation is recorded and can be inspected again later.",
+			}},
+			actions: model.pxeActions(),
+		}, model.width, model.isDark)
 	}
 	if model.busy != "" {
-		lines = append(lines, "", model.busyView(), "", "q: close this view; systemd-owned work continues")
-		return strings.Join(lines, "\n") + "\n"
+		lines = append(lines, "", model.busyView())
+		return renderTUIShell(tuiShell{
+			path:    path,
+			body:    strings.Join(lines, "\n"),
+			actions: model.pxeActions(),
+		}, model.width, model.isDark)
 	}
 	if model.screen == dashboardPXEStartReview {
 		scope := model.startPlan.Interface + " · controller network"
@@ -1888,12 +1901,27 @@ func (model dashboardModel) pxeView() string {
 			}
 			scope += " · " + role + model.pilotName
 		}
-		return model.confirmationView("Start network installation?", scope, "Temporarily remove "+model.startPlan.StaticCIDR+"; remote connections may be interrupted.", "Serve ProxyDHCP, TFTP, HTTP and cache via "+model.startPlan.DHCPAddress+". Institutional DHCP remains authoritative. `nixorium pxe stop` or reboot recovery restores normal addressing.", "", "START PXE")
+		body := strings.Join([]string{
+			tuiTitle("Start network installation?", model.isDark),
+			"",
+			"Affects  " + scope,
+			"",
+			tuiSection("Type START PXE to continue:", model.isDark),
+			"> " + model.confirmation + "_",
+		}, "\n")
+		notices := []tuiNotice{{
+			kind:   tuiStatusAttention,
+			title:  "Temporarily remove " + model.startPlan.StaticCIDR + "; remote connections may be interrupted",
+			detail: "Serve ProxyDHCP, TFTP, HTTP and cache via " + model.startPlan.DHCPAddress + ". Institutional DHCP remains authoritative; stop or reboot recovery restores normal addressing.",
+		}}
+		if model.message != "" {
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+		}
+		return renderTUIShell(tuiShell{path: path, body: body, notices: notices, actions: model.pxeActions()}, model.width, model.isDark)
 	}
 	if model.screen == dashboardPXELeaveReview {
-		lines := []string{
-			tuiTitle("Nixorium — Exit while installation mode is active?", model.isDark),
-			"",
+		leaveLines := []string{
+			tuiTitle("Exit while installation mode is active?", model.isDark),
 			"Closing Nixorium will not stop installation mode.",
 			"It changes controller networking and can continue after Nixorium closes.",
 			"Configured computers may continue to network-boot into the installer.",
@@ -1904,24 +1932,21 @@ func (model dashboardModel) pxeView() string {
 			tuiSection("Keep it active", model.isDark),
 			"  Type LEAVE PXE ACTIVE to continue:",
 			"> " + model.confirmation + "_",
-			"",
-			"esc cancel   x stop and exit   enter confirm active exit   F1 help",
 		}
-		if model.busy != "" {
-			lines = append(lines, "", model.busyView())
-		}
+		notices := []tuiNotice{}
 		if model.message != "" {
-			lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(leaveLines, "\n"), notices: notices, actions: model.pxeActions()}, model.width, model.isDark)
 	}
 	if model.guidedInstallation() {
 		lines = append(lines, "")
 		lines = append(lines, model.pilotInstallationView()...)
+		notices := []tuiNotice{}
 		if model.message != "" {
-			lines = append(lines, "", tuiSection("Last action", model.isDark), "  "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 		}
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: model.pxeActions()}, model.width, model.isDark)
 	}
 	lines = append(lines, "")
 	lines = append(lines, model.pxeNextStepView()...)
@@ -1929,11 +1954,76 @@ func (model dashboardModel) pxeView() string {
 		lines = append(lines, "")
 		lines = append(lines, model.operationProgressView(model.pxeProgress, "Last preparation")...)
 	}
-	lines = append(lines, "", tuiSection("Available actions", model.isDark), model.pxeActionHelp())
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", tuiSection("Last action", model.isDark), "  "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: model.pxeActions()}, model.width, model.isDark)
+}
+
+func (model dashboardModel) pxeActions() []tuiAction {
+	if model.screen == dashboardPXEStartReview {
+		return []tuiAction{{key: "Enter", label: "Start PXE"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+	}
+	if model.screen == dashboardPXELeaveReview {
+		return []tuiAction{{key: "x", label: "Stop and exit"}, {key: "Enter", label: "Leave active"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+	}
+	if model.pxePreparing {
+		return []tuiAction{{key: "l", label: "Progress details"}, {key: "q", label: "Close view"}, {key: "F1", label: "Help"}}
+	}
+	if model.busy != "" {
+		return []tuiAction{{key: "q", label: "Close view"}, {key: "F1", label: "Help"}}
+	}
+	if model.guidedInstallation() {
+		recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
+		if recovery {
+			return []tuiAction{{key: "r", label: "Recover"}, {key: "Esc", label: "Back"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
+		}
+		if model.pilotName == "" {
+			if model.installationSummary {
+				return []tuiAction{{key: "Enter", label: model.installationChangeAnotherLabel()}, {key: "Esc", label: "Setup summary"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
+			}
+			if len(model.report.Meta.Clients.Hosts) == 0 {
+				return []tuiAction{{key: "Esc", label: "Back"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
+			}
+			return []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Choose"}, {key: "Esc", label: "Back"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
+		}
+		if model.report.PXE.Mode != "active" {
+			primary := tuiAction{key: "p", label: "Prepare"}
+			if model.report.PXEPreparation.Ready {
+				primary = tuiAction{key: "s", label: "Review start"}
+			}
+			return []tuiAction{primary, {key: "Esc", label: model.installationChangeLabel()}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
+		}
+		if !model.pilotTechnicallyVerified() {
+			return []tuiAction{{key: "v", label: "Check computer"}, {key: "x", label: "Stop PXE"}, {key: "Esc", label: model.installationChangeLabel()}, {key: "q", label: "Leave active"}, {key: "F1", label: "Help"}}
+		}
+		if !model.pilotPractical {
+			return []tuiAction{{key: "Enter", label: "Practical check passed"}, {key: "v", label: "Check again"}, {key: "x", label: "Stop PXE"}, {key: "q", label: "Leave active"}, {key: "F1", label: "Help"}}
+		}
+		return []tuiAction{{key: "Enter", label: model.installationChangeAnotherLabel()}, {key: "x", label: "Stop and finish"}, {key: "q", label: "Leave active"}, {key: "F1", label: "Help"}}
+	}
+	actions := []tuiAction{}
+	recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
+	if model.report.PXE.Mode != "active" && !recovery {
+		actions = append(actions, tuiAction{key: "p", label: "Prepare"})
+		if model.report.PXEPreparation.Ready {
+			actions = append(actions, tuiAction{key: "s", label: "Start PXE"})
+		}
+	}
+	if model.report.PXE.Mode == "active" || recovery {
+		actions = append(actions, tuiAction{key: "x", label: "Stop PXE"})
+	}
+	backLabel := "Installation"
+	if model.restoreMode {
+		backLabel = "Computers"
+	}
+	return append(actions,
+		tuiAction{key: "r", label: "Recover"},
+		tuiAction{key: "Esc", label: backLabel},
+		tuiAction{key: "q", label: "Quit"},
+		tuiAction{key: "F1", label: "Help"},
+	)
 }
 
 func (model dashboardModel) guidedInstallation() bool {
@@ -1975,12 +2065,6 @@ func (model dashboardModel) pilotInstallationView() []string {
 		return []string{
 			tuiResult("Controller networking needs recovery", false, model.isDark),
 			"Nixorium cannot safely continue the installation until normal addressing is reconciled.",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"r"}, "r", "recover"),
-				tuiHelpBinding([]string{"esc"}, "esc", "back"),
-				tuiHelpBinding([]string{"q"}, "q", "quit"),
-			),
 		}
 	}
 
@@ -1999,26 +2083,12 @@ func (model dashboardModel) pilotInstallationView() []string {
 		}
 		lines = append(lines, "")
 		lines = append(lines, model.pxeNextStepView()...)
-		bindings := []key.Binding{}
-		if !model.report.PXEPreparation.Ready {
-			bindings = append(bindings, tuiHelpBinding([]string{"p"}, "p", "prepare"))
-		} else {
-			bindings = append(bindings, tuiHelpBinding([]string{"s"}, "s", "review and start"))
-		}
-		bindings = append(bindings,
-			tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
-			tuiHelpBinding([]string{"q"}, "q", "quit"),
-		)
-		return append(lines, "", tuiHelp(model.width, model.isDark, bindings...))
+		return lines
 	}
 
 	host, observed := model.pilotHostStatus()
 	technicallyVerified := model.pilotTechnicallyVerified()
 	if !observed && !technicallyVerified {
-		checkLabel := "check pilot"
-		if model.restoreMode {
-			checkLabel = "check computer"
-		}
 		lines = append(lines,
 			"",
 			tuiResult("Continue at "+model.pilotName, false, model.isDark),
@@ -2030,13 +2100,6 @@ func (model dashboardModel) pilotInstallationView() []string {
 			tuiStatus("The disk selected on the computer will be erased.", tuiStatusAttention, model.isDark),
 			"Nixorium has not yet verified an authenticated installed system.",
 			"No remote progress is shown because the installer does not provide telemetry.",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"v"}, "v", checkLabel),
-				tuiHelpBinding([]string{"x"}, "x", "stop installation"),
-				tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
-				tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
-			),
 		)
 		return lines
 	}
@@ -2048,13 +2111,6 @@ func (model dashboardModel) pilotInstallationView() []string {
 			lines = append(lines,
 				guidance,
 				"This does not prove that installation completed. Finish the local steps, boot from disk, then check again.",
-				"",
-				tuiHelp(model.width, model.isDark,
-					tuiHelpBinding([]string{"v"}, "v", "check again"),
-					tuiHelpBinding([]string{"x"}, "x", "stop installation"),
-					tuiHelpBinding([]string{"esc"}, "esc", model.installationChangeLabel()),
-					tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
-				),
 			)
 			return lines
 		}
@@ -2073,32 +2129,15 @@ func (model dashboardModel) pilotInstallationView() []string {
 			"  • Log in and open the expected desktop session.",
 			"  • Check required software, network and classroom peripherals.",
 			"  • Confirm that the computer started from its installed disk.",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"enter"}, "enter", "practical check passed"),
-				tuiHelpBinding([]string{"v"}, "v", "check again"),
-				tuiHelpBinding([]string{"x"}, "x", "stop installation"),
-				tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
-			),
 		)
 		return lines
 	}
 
-	nextLabel := "install another"
-	if model.restoreMode {
-		nextLabel = "reinstall another"
-	}
 	lines = append(lines,
 		"",
 		tuiResult(model.installationVerifiedTitle(), true, model.isDark),
 		model.installationRemainingGuidance(),
 		"Powered-off computers are not errors.",
-		"",
-		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", nextLabel),
-			tuiHelpBinding([]string{"x"}, "x", "stop and finish"),
-			tuiHelpBinding([]string{"q"}, "q", "leave PXE active"),
-		),
 	)
 	return lines
 }
@@ -2112,12 +2151,6 @@ func (model dashboardModel) pilotSelectionView() []string {
 			fmt.Sprintf("%d configured identities were not verified in this session.", max(0, len(model.report.Meta.Clients.Hosts)-len(model.pilotVerified))),
 			"",
 			"You can return later to install the remaining computers.",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"enter"}, "enter", model.installationChangeAnotherLabel()),
-				tuiHelpBinding([]string{"esc"}, "esc", "setup summary"),
-				tuiHelpBinding([]string{"q"}, "q", "quit"),
-			),
 		)
 		return lines
 	}
@@ -2145,11 +2178,6 @@ func (model dashboardModel) pilotSelectionView() []string {
 		return append(lines,
 			"No client identity is configured.",
 			"Return to laboratory settings and add at least one computer.",
-			"",
-			tuiHelp(model.width, model.isDark,
-				tuiHelpBinding([]string{"esc"}, "esc", "back"),
-				tuiHelpBinding([]string{"q"}, "q", "quit"),
-			),
 		)
 	}
 	start, end := listWindow(len(model.report.Meta.Clients.Hosts), model.pilotCursor, max(3, model.height-18))
@@ -2168,13 +2196,6 @@ func (model dashboardModel) pilotSelectionView() []string {
 	lines = append(lines,
 		"",
 		"The identity comes from the saved inventory. Disk selection and erasure are confirmed locally.",
-		"",
-		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"up", "down"}, "↑/↓", "move"),
-			tuiHelpBinding([]string{"enter"}, "enter", "select"),
-			tuiHelpBinding([]string{"esc"}, "esc", "back"),
-			tuiHelpBinding([]string{"q"}, "q", "quit"),
-		),
 	)
 	return lines
 }
@@ -2273,26 +2294,6 @@ func (model dashboardModel) pxeNextStepView() []string {
 		tuiResult("Next: start network installation", false, model.isDark),
 		"  Press s to review the temporary address change and start PXE.",
 	}
-}
-
-func (model dashboardModel) pxeActionHelp() string {
-	bindings := []key.Binding{}
-	recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
-	if model.report.PXE.Mode != "active" && !recovery {
-		bindings = append(bindings, tuiHelpBinding([]string{"p"}, "p", "prepare"))
-		if model.report.PXEPreparation.Ready {
-			bindings = append(bindings, tuiHelpBinding([]string{"s"}, "s", "start PXE"))
-		}
-	}
-	if model.report.PXE.Mode == "active" || recovery {
-		bindings = append(bindings, tuiHelpBinding([]string{"x"}, "x", "stop PXE"))
-	}
-	bindings = append(bindings,
-		tuiHelpBinding([]string{"r"}, "r", "recover"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-		tuiHelpBinding([]string{"q"}, "q", "quit; services continue"),
-	)
-	return tuiHelp(model.width, model.isDark, bindings...)
 }
 
 func pxeStatusKind(mode string) tuiStatusKind {
