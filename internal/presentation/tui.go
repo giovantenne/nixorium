@@ -1448,7 +1448,10 @@ func (model dashboardModel) controllerView() string {
 
 func (model dashboardModel) servicesView() string {
 	path := []string{"Maintenance", "Services"}
-	lines := []string{tuiTitle("Managed services", model.isDark)}
+	lines := []string{
+		tuiTitle("Controller services", model.isDark),
+		tuiMuted("Normally no action is needed here. Use this view when Diagnostics reports a delivery or installation service problem.", model.isDark),
+	}
 	notices := []tuiNotice{}
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
@@ -1494,13 +1497,15 @@ func (model dashboardModel) servicesView() string {
 		}
 		lines = append(lines,
 			fmt.Sprintf("%s — %s", tuiSection(service.Name, model.isDark), tuiStatus(service.State, kind, model.isDark)),
-			"  "+service.Detail,
 		)
-		for _, unit := range service.Units {
-			lines = append(lines, fmt.Sprintf("  %-32s %s", unit.Name, unit.State))
+		if service.ID == "cache" {
+			lines = append(lines, "  Supplies already-built software to clients and network installers.")
+		} else if service.ID == "pxe" {
+			lines = append(lines, "  Provides network boot while PXE mode is active.")
 		}
+		lines = append(lines, tuiMuted("  "+service.Detail, model.isDark))
 		if service.ID == "pxe" {
-			lines = append(lines, "  Managed through the Install computers workflow")
+			lines = append(lines, "  Start, stop or recover it from Installation → PXE mode and network recovery.")
 		}
 		lines = append(lines, "")
 	}

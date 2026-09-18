@@ -51,7 +51,7 @@ func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 		AffectedController: "pc99",
 	}
 	review := strings.Join(model.softwareReviewView(), "\n")
-	if !strings.Contains(review, "pc99 (build and activate now)") || !strings.Contains(review, "this controller and all current or future clients") {
+	if !strings.Contains(review, "rebuild pc99") || !strings.Contains(review, "this controller and all current or future clients") {
 		t.Fatalf("unclear review: %s", review)
 	}
 	model.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", AffectedController: "pc99"}
@@ -196,14 +196,14 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Configured software") || !strings.Contains(model.View().Content, "not an observed installed inventory") {
+	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Selected software") || !strings.Contains(model.View().Content, "desired configuration") {
 		t.Fatalf("software catalog missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View().Content, "Suggested software") {
+	if !strings.Contains(model.View().Content, "Suggestions") {
 		t.Fatalf("suggested software view missing:\n%s", model.View().Content)
 	}
 
@@ -220,7 +220,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Proposal validated", "Configuration not saved", "System not prepared", "No client changed", "Only lab-software.json", "Enter saves this reviewed configuration"} {
+	for _, expected := range []string{"Validated against the pinned package set", "Destination", "Clients", "Update lab-software.json locally", "Deploy clients"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
@@ -851,7 +851,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 		t.Fatalf("home should not scan or summarise computers:\n%s", model.View().Content)
 	}
 
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "h"})
 	model = updated.(dashboardModel)
@@ -898,7 +898,7 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "disk confirmed on the computer is erased") {
+	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "disk is erased only after") || !strings.Contains(view, "does not remotely erase or reserve") {
 		t.Fatalf("restore choice is ambiguous:\n%s", view)
 	}
 
@@ -1586,7 +1586,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "healthy") || !strings.Contains(model.View().Content, "Managed through the Install computers workflow") {
+	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "healthy") || !strings.Contains(model.View().Content, "Installation → PXE mode and network recovery") {
 		t.Fatalf("services screen missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "r"})

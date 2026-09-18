@@ -193,7 +193,7 @@ func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeReque
 		model.message = "Software planning is not available in this deployment."
 		return model, nil
 	}
-	model.busy = "Validating the software proposal through pinned Nix inputs"
+	model.busy = "Checking the package and its destination"
 	model.message = ""
 	return model, func() tea.Msg { return dashboardSoftwarePlanMsg{report: model.actions.PlanSoftware(request)} }
 }
@@ -209,7 +209,7 @@ func (model dashboardModel) softwareView() string {
 	}
 	lines := []string{}
 	if model.busy != "" {
-		lines = append(lines, tuiTitle("Applying software configuration", model.isDark), "", model.busyView())
+		lines = append(lines, tuiTitle("Software change", model.isDark), "", model.busyView())
 		return renderTUIShell(tuiShell{
 			path:    path,
 			body:    strings.Join(lines, "\n"),
@@ -312,12 +312,12 @@ func (model dashboardModel) softwareCatalogView() []string {
 		tuiTitle("Software", model.isDark),
 		"",
 		softwareModeTabs(model.softwareMode),
-		tuiMuted("Controller choices are applied here; client distribution remains a separate task.", model.isDark),
+		tuiMuted("Choose desired software here. Running clients change only when you deploy them.", model.isDark),
 		"",
 	}
 	switch model.softwareMode {
 	case softwareConfigured:
-		lines = append(lines, tuiSection("Configured software", model.isDark), tuiMuted("Desired software managed by this screen; this is not an observed installed inventory.", model.isDark), "")
+		lines = append(lines, tuiSection("Selected software", model.isDark), tuiMuted("Enter reviews removing the highlighted item. Use Search or Suggestions to add software.", model.isDark), "")
 	case softwareSearch:
 		cursor := ""
 		if model.softwareSearching {
@@ -336,7 +336,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 			lines = append(lines, "No matching packages were found in the pinned package set.", "")
 		}
 	case softwareSuggested:
-		lines = append(lines, tuiSection("Suggested software", model.isDark), tuiMuted("A short list of common choices from the same pinned package set.", model.isDark), "")
+		lines = append(lines, tuiSection("Suggestions", model.isDark), tuiMuted("A short list of common choices from the same pinned package set.", model.isDark), "")
 	}
 	start, end := listWindow(len(items), model.softwareCursor, max(4, model.height-17))
 	for index := start; index < end; index++ {
@@ -362,9 +362,9 @@ func (model dashboardModel) softwareCatalogView() []string {
 		lines = append(lines, fmt.Sprintf("%s%-20s%s", marker, item.Label, status), tuiMuted("    "+item.Summary+" · "+item.ID+version, model.isDark))
 	}
 	if len(items) == 0 && model.softwareMode == softwareConfigured {
-		lines = append(lines, "No software is configured through this screen yet.", "", "Open Suggested software or Search packages to add one.")
+		lines = append(lines, "No software is selected through this screen yet.", "", "Open Suggestions or Search packages to add one.")
 	}
-	lines = append(lines, "", "Configuration can be prepared while every client is powered off.", "Clients change only through Distribute the prepared system.", "Private modules remain untouched and are managed through Maintenance.")
+	lines = append(lines, "", "This list is desired configuration, not a live installed-software inventory.", "Deploy from Computers when you want clients to receive the change.")
 	return lines
 }
 
@@ -406,9 +406,22 @@ func (model dashboardModel) softwareReviewView() []string {
 		action = "Remove"
 	}
 	item := model.softwareItem(plan.Request.Package)
-	lines := []string{tuiTitle(action+" "+item.Label+"?", model.isDark), tuiMuted("Package identifier  "+plan.Request.Package, model.isDark), "", "Configuration scope        " + softwareScopeLabel(plan.Request.Scope), fmt.Sprintf("Configured clients affected  %d", len(plan.AffectedClients)), "Managed file               " + plan.ManagedFile, "Powered-on clients         none required", "", tuiStatus("Proposal validated", tuiStatusSuccess, model.isDark), "○ Configuration not saved", "○ System not prepared", "○ No client changed", "", "Only lab-software.json will be replaced and saved locally.", "No PXE action or client deployment is included.", "", "Enter saves this reviewed configuration; Esc cancels."}
+	lines := []string{
+		tuiTitle(action+" "+item.Label+"?", model.isDark),
+		tuiMuted(plan.Request.Package, model.isDark),
+		"",
+		"Destination  " + softwareScopeLabel(plan.Request.Scope),
+		fmt.Sprintf("Clients      %d affected by this declaration", len(plan.AffectedClients)),
+		"",
+		tuiStatus("Validated against the pinned package set", tuiStatusSuccess, model.isDark),
+		"Save now     Update " + plan.ManagedFile + " locally",
+		"Later        Deploy clients to install this change",
+	}
 	if plan.AffectedController != "" {
-		lines = append(lines[:5], append([]string{"Controller                  " + plan.AffectedController + " (build and activate now)"}, lines[5:]...)...)
+		lines[len(lines)-2] = "Save now     Update " + plan.ManagedFile + " and rebuild " + plan.AffectedController
+	}
+	if len(plan.AffectedClients) == 0 {
+		lines[len(lines)-1] = "Later        No client deployment required"
 	}
 	return lines
 }
@@ -507,7 +520,7 @@ func (model *dashboardModel) scheduleSoftwareSearch() tea.Cmd {
 }
 
 func softwareModeTabs(mode softwareListMode) string {
-	labels := []string{"Configured", "Search packages", "Suggested"}
+	labels := []string{"Selected", "Search packages", "Suggestions"}
 	parts := make([]string, len(labels))
 	for index, label := range labels {
 		if index == int(mode) {
