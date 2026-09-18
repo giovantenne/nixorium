@@ -20,14 +20,23 @@ LAN. Clients do not need Internet access during installation or deployment.
 
 ## Why this exists
 
-PC laboratories drift: machines are reinstalled at different times, manual
-fixes accumulate, and repeating the same update across a room is slow and hard
-to verify. NixOS makes each machine declarative and reproducible; Nixorium adds
-the controller, offline distribution, guided installation, and fleet workflows
-needed to operate that model on a real LAN.
+Managing a multi-PC lab is painful. Machines drift over time, reinstalling by
+hand is slow and error-prone, and keeping many systems consistent becomes a
+full-time job. Traditional tools like Ansible help, but they cannot guarantee
+that two machines built a week apart end up identical.
 
-The reusable implementation stays public while each site's identity, network,
-keys, assets, and policy stay in a small private deployment repository.
+NixOS solves this with declarative, reproducible configurations—but most NixOS
+workflows assume Internet access. In many schools, offices, libraries, training
+rooms, and public labs, client PCs either have no Internet access or only gain
+it after a user signs in to an institutional network.
+
+Nixorium bridges that gap with a local-first workflow:
+
+- A single controller acts as build server, signed binary cache, and PXE server.
+- Clients are installed and updated entirely over the LAN.
+- A private deployment Flake is the source of truth for the whole site.
+- Site identity, network, keys, assets, and policy remain private while the
+  reusable implementation stays in this versioned public repository.
 
 ## Features
 
