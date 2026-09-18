@@ -1,6 +1,6 @@
 ---
 name: nixorium-developer
-description: Develop and release the public Nixorium upstream. Use for lib.mkLab, built-in NixOS modules, installer implementation, the site template, CI, compatibility, offline equivalence, and upstream releases. Do not use for routine configuration or operation of a private laboratory deployment.
+description: Develop and release the public Nixorium upstream. Use for lib.mkLab, built-in NixOS modules, the management CLI/TUI, installer implementation, the site template, CI, compatibility, offline equivalence, and upstream releases. Do not use for routine configuration or operation of a private laboratory deployment.
 license: MIT
 ---
 
@@ -25,6 +25,11 @@ Put reusable behavior, validation, and safe defaults upstream. Keep identities,
 network values, password hashes, keys, branding, printers, and host-specific
 policy in deployments.
 
+Keep the workstation profile deployment-owned. User-facing software presets,
+application configuration, desktop preferences, editor extensions, development
+toolchains, and AI assistants belong in the site template. Upstream owns the
+mechanisms and only the packages required for those mechanisms to function.
+
 Extend `mkLab` instead of requiring downstream copies of built-in modules.
 Reject unknown configuration rather than ignoring it. Preserve standalone
 outputs unless a deliberate breaking release removes them.
@@ -35,13 +40,21 @@ the public API, modules, assets, netboot, or template. Read
 change. Read [references/git-workflow.md](references/git-workflow.md) before
 creating commits, synchronizing branches, merging, rebasing, or pushing. Read
 [references/release.md](references/release.md) before versioning, tagging, or
-publishing.
+publishing. Read [references/tui-design.md](references/tui-design.md) before
+changing management navigation, interaction behavior, visual styling, or
+presentation components.
 
-Use the default quick validation while iterating, then select the affected VM
-test when management or installer behavior changes. Reserve `--full` for the
-high-impact changes and checkpoints listed in the validation reference; do not
-repeatedly run the full matrix when the change cannot affect those outputs.
-Validation must never run Nix store garbage collection automatically.
+Use the default quick validation while iterating. Add `--eval` when the Nix API
+or host composition changes, then select the affected VM only when behavior
+crosses its integration boundary. Reserve `--full` for cross-cutting build
+changes and milestone or release checkpoints; do not repeatedly run the full
+matrix while editing. Validation must never run Nix store garbage collection
+automatically.
+
+Build one representative client and the controller, not every generated client
+with the same module graph. Evaluation tests cover inventory, host-name, and
+address generation. Build an additional client only when affected host-specific
+modules make it materially different.
 
 ## Keep distribution coherent
 

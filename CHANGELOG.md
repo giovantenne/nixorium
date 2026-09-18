@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added one shared invalid-settings regression corpus for the public Nix
+  evaluator and Go management domain, plus a dedicated GitHub CI job that
+  builds the packaged management command and runs its unit tests.
+
 - Added optional controller, client-role, and per-host network-interface
   overrides with a compatibility fallback to `ifaceName`. The detected
   controller interface no longer becomes the implicit client interface, and
@@ -53,6 +57,18 @@ The project follows [Semantic Versioning](https://semver.org/).
   the source, and never perform implicit rotation.
 
 ### Changed
+
+- Reworked validation into a fast direct-source gate, an explicit full `mkLab`
+  evaluation tier, targeted VM gates, and a batched release checkpoint; added a
+  contributor guide describing how to select and maintain those levels. The Go
+  package now filters unrelated repository files and the fast checks expose a
+  lightweight locked Go shell for incremental tests.
+- Aligned public Nix settings validation with the management command for
+  required non-empty regional/Git values, absolute homepage URLs, and
+  configured Veyon host identities.
+- Split the dashboard state machine into focused asynchronous-message,
+  global-key, primary-workflow, operational, repository, and PXE handlers.
+  Presentation behavior and typed application callbacks remain unchanged.
 
 - Corrected the official `cache.nixos.org` public key used by both controller
   bootstrap stages. Signed substitutes are accepted again instead of being

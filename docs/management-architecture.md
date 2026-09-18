@@ -874,25 +874,6 @@ Every implementation increment runs the smallest relevant tests plus the
 repository validation matrix required by `skills/nixorium-developer`.
 Evaluation alone is not evidence that affected packages or host roles build.
 
-## Incremental delivery
-
-1. Package the Go command with typed read-only `status` and `doctor`, JSON
-   output, adapters, tests, and legacy deployment compatibility.
-2. Add structured settings, setup state reconciliation, secure
-   credential hashing and idempotent key handling.
-3. Add controller services, PXE preparation, transactional networking, and
-   recovery tests.
-4. Replace numeric client setup with guided enrollment and explicit destructive
-   review; decide whether an authenticated controller protocol is justified.
-5. Add host inventory, deployment, service/log, and Git review workflows.
-6. Add guided upstream update and richer recovery.
-7. Complete administrator documentation, VM/PXE automation, migration testing,
-   and physical-lab validation.
-
-Each step preserves the public `mkLab` outputs. Advanced compatibility helpers
-may remain exported after the normal documented workflow moves to managed
-operations.
-
 ## Risks and open questions
 
 - A multi-address controller interface can make runtime PXE address selection
