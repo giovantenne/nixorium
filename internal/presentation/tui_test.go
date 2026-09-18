@@ -409,7 +409,9 @@ func TestDashboardGuidesClientOnlyShutdownWithUnknownSessionAcknowledgement(t *t
 	}
 	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
 	model.width, model.height = 100, 30
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "x"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "x"})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardShutdown || strings.Contains(model.View().Content, "pc99") {
 		t.Fatalf("shutdown selection includes controller or did not open:\n%s", model.View().Content)
@@ -790,10 +792,19 @@ func TestDashboardAreaNavigationUsesVisibleSelection(t *testing.T) {
 	}
 
 	model = newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
+	for _, shortcut := range []string{"r", "d", "x", "h", "s", "l", "g", "u", "e", "p", "f", "i"} {
+		updated, _ = model.Update(tea.KeyPressMsg{Text: shortcut})
+		model = updated.(dashboardModel)
+		if model.screen != dashboardHome {
+			t.Fatalf("hidden %q shortcut still bypasses area navigation: screen=%d", shortcut, model.screen)
+		}
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "n"})
+	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardPXE {
-		t.Fatalf("existing PXE shortcut stopped working: screen=%d", model.screen)
+		t.Fatalf("PXE task did not open from Installation: screen=%d", model.screen)
 	}
 }
 
@@ -882,7 +893,9 @@ func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "p"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "n"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	view = model.View().Content
 	if model.screen != dashboardPXE || !strings.Contains(view, "Prepared artifacts: ready") || !strings.Contains(view, "Next: start network installation") {
@@ -895,6 +908,8 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 		return testInstallationReport(name, false, false)
 	}}
 	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
 	view := model.View().Content
@@ -963,7 +978,9 @@ func TestReinstallChecksOnlyTheSelectedComputer(t *testing.T) {
 
 func TestCompletedRestoreContextDoesNotLeakIntoLaterInstallation(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), restoreMode: true, screen: dashboardHome}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "p"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "n"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	if model.restoreMode || model.screen != dashboardPXE || strings.Contains(model.View().Content, "Choose a computer to reinstall") {
 		t.Fatalf("stale restore context changed a later installation:\n%s", model.View().Content)
@@ -1043,7 +1060,9 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: report, actions: actions}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "d"})
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "d"})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "[ ] pc01") {
 		t.Fatalf("deployment selection not shown:\n%s", model.View().Content)
@@ -1090,8 +1109,8 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHome {
-		t.Fatalf("deployment result did not return to dashboard: screen=%d", model.screen)
+	if model.screen != dashboardComputersArea {
+		t.Fatalf("deployment result did not return to Computers: screen=%d", model.screen)
 	}
 }
 
@@ -1220,8 +1239,8 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHome {
-		t.Fatalf("controller completion did not return to dashboard: screen=%d", model.screen)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("controller completion did not return to Maintenance: screen=%d", model.screen)
 	}
 }
 
@@ -1321,6 +1340,8 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	if strings.Contains(model.View().Content, "Update Nixorium") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("home omits navigable task menu:\n%s", model.View().Content)
 	}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
 	if command == nil || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Fetching available Nixorium updates") {
@@ -1391,8 +1412,8 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHome {
-		t.Fatalf("update result did not return to dashboard: screen=%d", model.screen)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("update result did not return to Maintenance: screen=%d", model.screen)
 	}
 }
 
@@ -1407,6 +1428,8 @@ func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 			}
 		}},
 	}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
@@ -1504,6 +1527,8 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	if !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("home omits settings task:\n%s", model.View().Content)
 	}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "e"})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
@@ -1582,6 +1607,8 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "s"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
@@ -1614,8 +1641,8 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHome {
-		t.Fatalf("service result did not return to dashboard: screen=%d", model.screen)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("service result did not return to Maintenance: screen=%d", model.screen)
 	}
 }
 
@@ -1642,6 +1669,8 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
 	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "l"})
 	model = updated.(dashboardModel)
@@ -1683,6 +1712,8 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
 	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)
@@ -1739,6 +1770,8 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 		},
 	}
 	model := dashboardModel{report: testDashboardReport("ready"), actions: actions}
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
+	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "g"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
@@ -1775,8 +1808,8 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHome {
-		t.Fatalf("Git result did not return to dashboard: screen=%d", model.screen)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("Git result did not return to Maintenance: screen=%d", model.screen)
 	}
 }
 

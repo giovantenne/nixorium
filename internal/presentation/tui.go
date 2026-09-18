@@ -471,7 +471,7 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if model.areaReturn != dashboardHome && model.screen != model.areaReturn && next.screen == dashboardHome {
 		next.screen = model.areaReturn
 	}
-	if k, ok := message.(tea.KeyPressMsg); ok && (k.String() == "esc" || k.String() == "left") && model.returnAdmin && model.screen != dashboardAdministration && next.screen == dashboardHome {
+	if model.returnAdmin && model.screen != dashboardAdministration && next.screen == dashboardHome {
 		next.screen = dashboardAdministration
 	}
 	if next.screen != model.screen {

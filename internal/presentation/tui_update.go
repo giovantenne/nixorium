@@ -803,6 +803,11 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		if key.String() == "c" {
 			return model.openControllerReview()
 		}
+		if key.String() == "i" {
+			model.diagnosticReturn = dashboardAdministration
+			model.screen = dashboardDiagnostics
+			return model, model.startDiagnostics()
+		}
 		known := false
 		for _, task := range administrationTasks {
 			if key.String() == task.shortcut {
@@ -813,9 +818,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		if !known {
 			return model, nil
 		}
-		model.screen = dashboardHome
+		return model.openMaintenanceTask(key.String())
 	}
-	if key.String() == "i" && (model.screen == dashboardHome || model.screen == dashboardHosts) {
+	if key.String() == "i" && model.screen == dashboardHosts {
 		model.diagnosticReturn = model.screen
 		model.screen = dashboardDiagnostics
 		command := model.startDiagnostics()

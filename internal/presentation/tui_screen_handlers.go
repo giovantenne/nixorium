@@ -39,6 +39,98 @@ func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
 	}
 }
 
+func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd) {
+	switch action {
+	case "r":
+		model.screen = dashboardRestore
+		model.restoreCursor = 0
+		model.pilotName = ""
+		model.pilotPractical = false
+		model.pilotVerified = nil
+		model.installationSummary = false
+		model.message = ""
+	case "x":
+		model.screen = dashboardShutdown
+		model.shutdownCursor = 0
+		model.shutdownChosen = map[string]bool{}
+		model.shutdownPolicy = domain.ShutdownRequireIdle
+		model.shutdownPlan = domain.ShutdownPlanReport{}
+		model.shutdownResult = domain.ShutdownApplyReport{}
+		model.shutdownTechnical = false
+		model.message = ""
+	case "d":
+		model.screen = dashboardDeploy
+		model.deployResult = domain.DeploymentExecutionReport{}
+		model.message = ""
+		model.deployChosen = map[string]bool{}
+		model.deployCursor = 0
+	case "h":
+		model.hostDetail = false
+		model.hostTechnical = false
+		model.screen = dashboardHosts
+		model.busy = "Checking configured computers"
+		model.message = ""
+		return model, model.loadHosts()
+	}
+	return model, nil
+}
+
+func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.Cmd) {
+	switch action {
+	case "s":
+		model.screen = dashboardServices
+		model.busy = "Checking managed controller services"
+		model.message = ""
+		return model, func() tea.Msg {
+			return dashboardServicesMsg{report: model.actions.LoadServices()}
+		}
+	case "l":
+		model.screen = dashboardLogs
+		model.busy = "Loading private operation logs"
+		model.message = ""
+		return model, func() tea.Msg {
+			return dashboardLogsMsg{report: model.actions.LoadLogs()}
+		}
+	case "g":
+		model.screen = dashboardGitReview
+		model.busy = "Reviewing Git changes without modifying the worktree"
+		model.message = ""
+		return model, func() tea.Msg {
+			return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
+		}
+	case "u":
+		model.screen = dashboardUpdate
+		model.updateResult = domain.UpdateApplyReport{}
+		model.controllerPlan = domain.ControllerRebuildPlanReport{}
+		model.controllerResult = domain.ControllerRebuildExecutionReport{}
+		model.updatePlan = domain.UpdatePlanReport{}
+		model.updatePrerelease = false
+		model.updateCheck = domain.UpdateCheckReport{}
+		model.updateCursor = 0
+		model.updateTarget = ""
+		model.message = ""
+		if model.actions.CheckUpdate == nil {
+			model.message = "Update discovery is not available in this session."
+			return model, nil
+		}
+		model.busy = "Fetching available Nixorium updates"
+		return model, model.checkUpdates()
+	case "e":
+		model.screen = dashboardSettings
+		model.settingsReturn = dashboardAdministration
+		model.settingsResult = domain.ConfigurationSaveReport{}
+		model.settingsPlan = domain.ConfigPlanReport{}
+		model.settingsCandidate = domain.LabSettingsFile{}
+		model.busy = "Loading managed laboratory settings"
+		model.message = ""
+		return model, func() tea.Msg {
+			settings, err := model.actions.LoadSettings()
+			return dashboardSettingsMsg{settings: settings, err: err}
+		}
+	}
+	return model, nil
+}
+
 func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardHome:
@@ -72,14 +164,6 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "c":
 			model.screen = dashboardComputersArea
 			model.message = ""
-		case "r":
-			model.screen = dashboardRestore
-			model.restoreCursor = 0
-			model.pilotName = ""
-			model.pilotPractical = false
-			model.pilotVerified = nil
-			model.installationSummary = false
-			model.message = ""
 		case "w":
 			model.screen = dashboardSoftware
 			model.softwareResult = domain.SoftwareChangeApplyReport{}
@@ -95,87 +179,8 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				return model, nil
 			}
 			return model, func() tea.Msg { return dashboardSoftwareCatalogMsg{report: model.actions.LoadSoftware()} }
-		case "x":
-			model.screen = dashboardShutdown
-			model.shutdownCursor = 0
-			model.shutdownChosen = map[string]bool{}
-			model.shutdownPolicy = domain.ShutdownRequireIdle
-			model.shutdownPlan = domain.ShutdownPlanReport{}
-			model.shutdownResult = domain.ShutdownApplyReport{}
-			model.shutdownTechnical = false
-			model.message = ""
-		case "d":
-			model.screen = dashboardDeploy
-			model.deployResult = domain.DeploymentExecutionReport{}
-			model.message = ""
-			model.deployChosen = map[string]bool{}
-			model.deployCursor = 0
-		case "h":
-			model.hostDetail = false
-			model.hostTechnical = false
-			model.screen = dashboardHosts
-			model.busy = "Checking configured computers"
-			model.message = ""
-			return model, model.loadHosts()
-		case "s":
-			model.screen = dashboardServices
-			model.busy = "Checking managed controller services"
-			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardServicesMsg{report: model.actions.LoadServices()}
-			}
-		case "l":
-			model.screen = dashboardLogs
-			model.busy = "Loading private operation logs"
-			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardLogsMsg{report: model.actions.LoadLogs()}
-			}
-		case "g":
-			model.screen = dashboardGitReview
-			model.busy = "Reviewing Git changes without modifying the worktree"
-			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
-			}
-		case "u":
-			model.screen = dashboardUpdate
-			model.updateResult = domain.UpdateApplyReport{}
-			model.controllerPlan = domain.ControllerRebuildPlanReport{}
-			model.controllerResult = domain.ControllerRebuildExecutionReport{}
-			model.updatePlan = domain.UpdatePlanReport{}
-			model.updatePrerelease = false
-			model.updateCheck = domain.UpdateCheckReport{}
-			model.updateCursor = 0
-			model.updateTarget = ""
-			model.message = ""
-			if model.actions.CheckUpdate == nil {
-				model.message = "Update discovery is not available in this session."
-				return model, nil
-			}
-			model.busy = "Fetching available Nixorium updates"
-			return model, model.checkUpdates()
-		case "e":
-			model.screen = dashboardSettings
-			model.settingsReturn = dashboardHome
-			model.settingsResult = domain.ConfigurationSaveReport{}
-			model.settingsPlan = domain.ConfigPlanReport{}
-			model.settingsCandidate = domain.LabSettingsFile{}
-			model.busy = "Loading managed laboratory settings"
-			model.message = ""
-			return model, func() tea.Msg {
-				settings, err := model.actions.LoadSettings()
-				return dashboardSettingsMsg{settings: settings, err: err}
-			}
-		case "p":
-			model.screen = dashboardPXE
-			model.message = ""
 		case "n":
 			model.screen = dashboardInstallationArea
-			model.message = ""
-		case "f":
-			model.setupMode = true
-			model.screen = dashboardSetup
 			model.message = ""
 		default:
 			var command tea.Cmd
@@ -197,8 +202,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.computersAreaCursor = min(len(computersAreaTasks)-1, model.computersAreaCursor+1)
 		case "h", "d", "r", "x":
 			model.areaReturn = dashboardComputersArea
-			model.screen = dashboardHome
-			return model.updatePrimaryScreenKey(tea.KeyPressMsg{Code: []rune(action)[0], Text: action})
+			return model.openComputerTask(action)
 		}
 	case dashboardInstallationArea:
 		action := key.String()
