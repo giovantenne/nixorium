@@ -1647,27 +1647,58 @@ func gitReviewStatusKind(report domain.GitReviewReport) tuiStatusKind {
 }
 
 func (model dashboardModel) deployView() string {
-	lines := []string{tuiTitle("Nixorium — Distribute the prepared system", model.isDark), ""}
+	path := []string{"Computers", "Distribute"}
+	if model.restoreMode {
+		path = []string{"Computers", "Restore", "Reapply"}
+	}
+	shell := tuiShell{path: path}
 	if model.deploying {
 		elapsed := time.Since(model.deployStarted).Truncate(time.Second)
 		if elapsed < 0 {
 			elapsed = 0
 		}
-		lines = append(lines, fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
-		lines = append(lines, model.deploymentProgressView()...)
-		lines = append(lines,
+		lines := []string{
+			tuiTitle("Distributing the prepared system", model.isDark),
 			"",
-			tuiMuted("Detailed Colmena output is being saved in the private deployment log.", model.isDark),
-			"Closing is disabled while this foreground deployment is running.",
-		)
-		return strings.Join(lines, "\n") + "\n"
+			fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed),
+		}
+		lines = append(lines, model.deploymentProgressView()...)
+		shell.body = strings.Join(lines, "\n")
+		shell.notices = []tuiNotice{{
+			kind:   tuiStatusAttention,
+			title:  "Deployment is running",
+			detail: "Detailed output is saved in the private log. Closing is disabled until this foreground operation returns.",
+		}}
+		shell.actions = []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}
+		return renderTUIShell(shell, model.width, model.isDark)
 	}
 	if model.busy != "" {
-		lines = append(lines, model.busyView())
-		return strings.Join(lines, "\n") + "\n"
+		shell.body = model.busyView()
+		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
+		return renderTUIShell(shell, model.width, model.isDark)
 	}
 	if model.screen == dashboardDeployReview {
-		return model.confirmationView("Distribute the system?", fmt.Sprintf("%s · %d computer(s)", model.deployPlan.ColmenaSelector, len(model.deployPlan.Targets)), "Target services may restart; unreachable computers may remain unchanged.", "Build every selected configuration before applying it. A failed apply may leave mixed target state; a fresh full retry is safe.", model.deployPlan.Revision, "DEPLOY "+model.deployPlan.ColmenaSelector)
+		lines := []string{
+			tuiTitle("Distribute the system?", model.isDark),
+			"",
+			fmt.Sprintf("Affects  %s · %d computer(s)", model.deployPlan.ColmenaSelector, len(model.deployPlan.Targets)),
+			"",
+			tuiMuted("Reviewed revision  "+model.deployPlan.Revision, model.isDark),
+			"",
+			tuiSection("Type DEPLOY "+model.deployPlan.ColmenaSelector+" to continue:", model.isDark),
+			"> " + model.confirmation + "_",
+		}
+		shell.body = strings.Join(lines, "\n")
+		shell.notices = []tuiNotice{{
+			kind:   tuiStatusAttention,
+			title:  "Target services may restart; unreachable computers may remain unchanged",
+			detail: "Every selected configuration is built first. A failed apply may leave mixed target state; a fresh full retry is safe.",
+		}}
+		if model.message != "" {
+			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+		}
+		shell.actions = []tuiAction{{key: "Enter", label: "Deploy"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+		return renderTUIShell(shell, model.width, model.isDark)
 	}
 
 	if model.deployResult.Operation != "" {
@@ -1676,12 +1707,12 @@ func (model dashboardModel) deployView() string {
 		if success {
 			resultTitle = "Deployment completed and verified"
 		}
-		lines = append(lines,
+		lines := []string{
 			tuiResult(resultTitle, success, model.isDark),
 			"",
 			fmt.Sprintf("State: %s   Phase: %s", model.deployResult.State, model.deployResult.Phase),
 			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployResult.BuildCompleted, model.deployResult.ApplyCompleted),
-		)
+		}
 		if model.deployResult.Verification.Attempted > 0 {
 			lines = append(lines, fmt.Sprintf("Authenticated: %d/%d   Recorded: %d", model.deployResult.Verification.Verified, model.deployResult.Verification.Attempted, model.deployResult.Verification.Recorded))
 		}
@@ -1689,16 +1720,18 @@ func (model dashboardModel) deployView() string {
 			lines = append(lines, "Detailed log: "+model.deployResult.LogPath)
 		}
 		if model.message != "" {
-			lines = append(lines, "", "Result: "+model.message)
+			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
-			tuiHelpBinding([]string{"l"}, "l", "logs"),
-			tuiHelpBinding([]string{"r"}, "r", "new review"),
-		))
-		return strings.Join(lines, "\n") + "\n"
+		shell.body = strings.Join(lines, "\n")
+		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "?", label: "Help"}}
+		return renderTUIShell(shell, model.width, model.isDark)
 	}
 
+	lines := []string{
+		tuiTitle("Distribute the prepared system", model.isDark),
+		tuiMuted("Select → Review → Deploy → Verify", model.isDark),
+		"",
+	}
 	hosts := model.report.Meta.Clients.Hosts
 	selected := 0
 	for _, host := range hosts {
@@ -1706,8 +1739,8 @@ func (model dashboardModel) deployView() string {
 			selected++
 		}
 	}
-	lines = append(lines, "Choose where to apply the saved configuration.", tuiMuted("Select → Review → Deploy → Verify", model.isDark), "", fmt.Sprintf("%d of %d computers selected", selected, len(hosts)), "")
-	start, end := listWindow(len(hosts), model.deployCursor, model.rowCapacity())
+	lines = append(lines, "Choose where to apply the saved configuration.", "", fmt.Sprintf("%d of %d computers selected", selected, len(hosts)), "")
+	start, end := listWindow(len(hosts), model.deployCursor, max(3, model.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
 		cursor := " "
@@ -1726,16 +1759,12 @@ func (model dashboardModel) deployView() string {
 	if len(hosts) == 0 {
 		lines = append(lines, "No configured client computers.")
 	}
-	lines = append(lines, "", tuiHelp(model.width, model.isDark,
-		tuiHelpBinding([]string{"space"}, "space", "select"),
-		tuiHelpBinding([]string{"a"}, "a", "all"),
-		tuiHelpBinding([]string{"enter"}, "enter", "review"),
-		tuiHelpBinding([]string{"esc"}, "esc", "back"),
-	))
 	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	shell.body = strings.Join(lines, "\n")
+	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}}
+	return renderTUIShell(shell, model.width, model.isDark)
 }
 
 func (model dashboardModel) deploymentProgressView() []string {
@@ -1768,7 +1797,7 @@ func (model dashboardModel) deploymentProgressView() []string {
 		if progressState.TargetTotal > 0 {
 			lines = append(lines, "", fmt.Sprintf("Computers checked: %d/%d", progressState.TargetCurrent, progressState.TargetTotal))
 		}
-		return append(lines, "", "l progress details   F1 help")
+		return lines
 	}
 	lines = append(lines, "", tuiSection("Current progress", model.isDark), "  Phase: "+phaseLabels[progressState.Phase])
 	if progressState.Total > 0 {
