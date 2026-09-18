@@ -351,7 +351,7 @@ func (model dashboardModel) usesTUIShell() bool {
 		dashboardServicesRestartReview, dashboardDiagnostics, dashboardLogs,
 		dashboardLogDetail, dashboardSettings, dashboardSettingsPasswords,
 		dashboardSettingsReview, dashboardGitReview, dashboardGitCommitSelect,
-		dashboardGitCommitReview:
+		dashboardGitCommitReview, dashboardUpdate, dashboardUpdateReview:
 		return true
 	default:
 		return false
@@ -414,7 +414,7 @@ func phaseSteps(labels []string, current int, complete bool, dark bool) []string
 }
 
 func (model dashboardModel) releaseReviewView() string {
-	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), "", tuiSection("Validated release review", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
+	lines := []string{tuiTitle("Review Nixorium update", model.isDark), "", tuiSection("Validated release", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
 	if model.updateDetails || model.height == 0 {
 		lines = append(lines, "Revision: "+model.updatePlan.Revision, fmt.Sprintf("Downgrade: %t", model.updatePlan.Downgrade))
 		for _, check := range model.updatePlan.Checks {
@@ -426,9 +426,10 @@ func (model dashboardModel) releaseReviewView() string {
 	end := min(len(patch), start+model.updateReviewHeight())
 	lines = append(lines, "", fmt.Sprintf("Diff lines %d-%d of %d", start+1, end, len(patch)))
 	lines = append(lines, patch[start:end]...)
-	lines = append(lines, "", "Type "+model.updatePlan.Confirmation+" to continue:", "> "+model.confirmation+"_")
+	lines = append(lines, "", tuiSection("Type "+model.updatePlan.Confirmation+" to continue:", model.isDark), "> "+model.confirmation+"_")
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, tuiStatus(model.message, tuiStatusAttention, model.isDark))
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(append(lines, "", "↑/↓ scroll diff   enter confirm   esc cancel   F1 help"), "\n")
+	return renderTUIShell(tuiShell{path: []string{"Maintenance", "Update Nixorium", "Review"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Scroll diff"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }

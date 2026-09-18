@@ -1147,15 +1147,17 @@ func maximumGitCommitPlanScroll(report domain.GitCommitPlanReport, height int) i
 }
 
 func (model dashboardModel) updateView() string {
-	lines := []string{tuiTitle("Nixorium — Update Nixorium", model.isDark), ""}
+	path := []string{"Maintenance", "Update Nixorium"}
+	lines := []string{tuiTitle("Update Nixorium", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
+		notices := []tuiNotice{}
 		if model.updating {
-			lines = append(lines, "", "Wait for the atomic two-file result before closing Nixorium.")
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Update save is running", detail: "Wait for the atomic two-file result before closing Nixorium."})
 		} else {
-			lines = append(lines, "", "Candidate evaluation and builds do not modify the deployment.")
+			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Validation does not modify the deployment", detail: "Candidate evaluation and representative builds are read-only."})
 		}
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 	if model.updateResult.Operation != "" {
 		success := !model.updateResult.HasErrors() && model.updateResult.Updated && model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified
@@ -1177,19 +1179,20 @@ func (model dashboardModel) updateView() string {
 		} else if model.updateResult.Updated {
 			lines = append(lines, "The update is saved safely. Retry controller activation after resolving the detail below.")
 		}
+		notices := []tuiNotice{}
 		if model.message != "" {
-			lines = append(lines, "", "Result: "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		retryLabel := "new update"
+		retryLabel := "New update"
 		if model.updateResult.RecoveryRequired {
-			retryLabel = "complete save"
+			retryLabel = "Complete save"
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"a"}, "a", "retry controller apply"),
-			tuiHelpBinding([]string{"r"}, "r", retryLabel),
-			tuiHelpBinding([]string{"enter"}, "enter", "dashboard"),
-		))
-		return strings.Join(lines, "\n") + "\n"
+		actions := []tuiAction{}
+		if model.updateResult.Updated && !success {
+			actions = append(actions, tuiAction{key: "a", label: "Retry controller"})
+		}
+		actions = append(actions, tuiAction{key: "r", label: retryLabel}, tuiAction{key: "Enter", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
 	}
 	if model.screen == dashboardUpdateReview {
 		return model.releaseReviewView()
@@ -1201,14 +1204,11 @@ func (model dashboardModel) updateView() string {
 			"Nixorium could not obtain a usable update list from the configured upstream.",
 			"No candidate can be selected and no file changed.",
 		)
+		notices := []tuiNotice{}
 		if model.message != "" {
-			lines = append(lines, "", "Detail: "+model.message)
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"r"}, "r", "try again"),
-			tuiHelpBinding([]string{"esc"}, "esc", "back"),
-		))
-		return strings.Join(lines, "\n") + "\n"
+		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "r", label: "Try again"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
 
 	releases := model.availableUpdateReleases()
@@ -1249,28 +1249,26 @@ func (model dashboardModel) updateView() string {
 	if model.updateCheck.Truncated {
 		lines = append(lines, "", tuiMuted("The upstream result was safely limited to the newest releases.", model.isDark))
 	}
-	prereleaseLabel := "show prereleases"
+	prereleaseLabel := "Show prereleases"
 	if model.updatePrerelease {
-		prereleaseLabel = "hide prereleases"
+		prereleaseLabel = "Hide prereleases"
 	}
 	lines = append(lines,
 		"",
 		"Select master for the latest development revision, or choose a tagged release.",
 		"Selection starts validation; it does not change files.",
 		"A confirmed update activates this controller; client distribution remains separate.",
-		"",
-		tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"up", "down"}, "↑/↓", "select"),
-			tuiHelpBinding([]string{"enter"}, "enter", "validate"),
-			tuiHelpBinding([]string{"p"}, "p", prereleaseLabel),
-			tuiHelpBinding([]string{"r"}, "r", "fetch again"),
-			tuiHelpBinding([]string{"esc"}, "esc", "back"),
-		),
 	)
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", "Result: "+model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return strings.Join(lines, "\n") + "\n"
+	actions := []tuiAction{}
+	if len(releases) > 0 {
+		actions = append(actions, tuiAction{key: "↑/↓", label: "Select"}, tuiAction{key: "Enter", label: "Validate"})
+	}
+	actions = append(actions, tuiAction{key: "p", label: prereleaseLabel}, tuiAction{key: "r", label: "Fetch again"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
 }
 
 func displayRunningVersion(version string) string {
