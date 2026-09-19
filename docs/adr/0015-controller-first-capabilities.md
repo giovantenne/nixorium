@@ -56,11 +56,14 @@ installation. It persists controller mode with US internal locales and defers
 client networking and keys. Installers for older revisions remain on their
 legacy workflow rather than invoking an unsupported command.
 
-Before reading the first password, bootstrap must activate the selected console
-keymap successfully. It fails closed from graphical terminals whose compositor
-layout cannot be verified portably, and when `loadkeys` is unavailable or
-fails. This keeps the entered password characters aligned with the installed
-console/login layout after reboot.
+Keyboard is the first controller-setting prompt, and bootstrap must activate
+the selected console keymap successfully before collecting any other value. It
+fails closed from graphical terminals whose compositor layout cannot be
+verified portably, and when `loadkeys` is unavailable or fails. This keeps all
+subsequent input, especially passwords, aligned with the installed console/login
+layout after reboot. The generated netboot system applies the same
+`labSettings.consoleKeyMap`, so local client enrollment and destructive
+confirmation use the controller's configured text-console layout.
 
 The operator TUI exposes five top-level tasks. Client installation owns the
 resumable laboratory configuration and never blocks using the controller.

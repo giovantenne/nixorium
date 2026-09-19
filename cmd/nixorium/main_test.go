@@ -45,7 +45,7 @@ func TestCollectBootstrapConfigurationCreatesReadyControllerSettings(t *testing.
 	}
 	secrets := &setupSecretReader{values: append([][]byte(nil), passwords...)}
 	hasher := &setupPasswordHasher{}
-	input := bufio.NewReader(strings.NewReader("teacher\nstudent\nEurope/Rome\nit\n"))
+	input := bufio.NewReader(strings.NewReader("it\nteacher\nstudent\nEurope/Rome\n"))
 	var output bytes.Buffer
 	keyboard := &setupKeyboardActivator{}
 	if err := collectBootstrapConfiguration(context.Background(), input, secrets, hasher, keyboard, &output, &candidate); err != nil {
@@ -63,8 +63,11 @@ func TestCollectBootstrapConfigurationCreatesReadyControllerSettings(t *testing.
 	if hasher.calls != 3 || strings.Contains(output.String(), "admin-password") {
 		t.Fatalf("password handling: calls=%d output=%q", hasher.calls, output.String())
 	}
-	if len(keyboard.keyMaps) != 1 || keyboard.keyMaps[0] != "it2" || !strings.Contains(output.String(), "Account passwords will use this layout now and after reboot") {
+	if len(keyboard.keyMaps) != 1 || keyboard.keyMaps[0] != "it2" || !strings.Contains(output.String(), "All remaining input, including account passwords, uses this layout") {
 		t.Fatalf("keyboard activation = %+v, output=%q", keyboard, output.String())
+	}
+	if keyboardPrompt, teacherPrompt := strings.Index(output.String(), "Keyboard layout"), strings.Index(output.String(), "Teacher username"); keyboardPrompt < 0 || teacherPrompt < 0 || keyboardPrompt >= teacherPrompt {
+		t.Fatalf("keyboard was not the first settings prompt: %q", output.String())
 	}
 }
 
@@ -80,9 +83,9 @@ func TestCollectBootstrapConfigurationStopsBeforePasswordsWhenKeyboardActivation
 	secrets := &setupSecretReader{values: [][]byte{[]byte("must-not-be-read")}}
 	hasher := &setupPasswordHasher{}
 	keyboard := &setupKeyboardActivator{err: errors.New("loadkeys failed")}
-	input := bufio.NewReader(strings.NewReader("teacher\nstudent\nEurope/Rome\nit\n"))
+	input := bufio.NewReader(strings.NewReader("it\nteacher\nstudent\nEurope/Rome\n"))
 	err = collectBootstrapConfiguration(context.Background(), input, secrets, hasher, keyboard, &bytes.Buffer{}, &candidate)
-	if err == nil || !strings.Contains(err.Error(), "activate the selected keyboard before password entry") {
+	if err == nil || !strings.Contains(err.Error(), "activate the selected keyboard before continuing") {
 		t.Fatalf("error = %v", err)
 	}
 	if hasher.calls != 0 || len(secrets.values) != 1 {

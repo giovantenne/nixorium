@@ -28,10 +28,11 @@ mode requires `pcCount: 0`; it permits local controller activation with secure
 account credentials, without lab keys or the client DHCP hint. Lab networking,
 cache and remote-control services are inactive; fleet readiness remains false.
 Existing deployments are not migrated automatically. New controller bootstrap
-sets this mode after collecting accounts, passwords, time zone, and keyboard.
-Run bootstrap password entry from a Linux text console: it applies the selected
-console keymap before reading any password and stops if activation fails or the
-terminal belongs to an unverifiable graphical session.
+sets this mode after collecting keyboard, accounts, time zone, and passwords.
+Run bootstrap from a Linux text console: keyboard is its first settings prompt,
+and it applies the selected console keymap before collecting any other value.
+It stops if activation fails or the terminal belongs to an unverifiable
+graphical session.
 Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
 The public Nix evaluator and the management command both reject empty required
@@ -68,9 +69,10 @@ The same screen shows progress through configuration, controller activation,
 and client preparation. The only confirmation in this path appears immediately
 before PXE starts, because that operation temporarily removes the controller's
 static laboratory address. After confirmation, boot any configured client from
-UEFI network boot. The downloaded installer asks for that computer's identity
-and confirms the target disk locally before erasing it. Nixorium stores no
-pilot/test-computer selection or installation-verification session.
+UEFI network boot. Its text console uses the controller's configured keyboard
+layout. The downloaded installer asks for that computer's identity and confirms
+the target disk locally before erasing it. Nixorium stores no pilot/test-computer
+selection or installation-verification session.
 
 You can press `q` at any safe point. While PXE is active, leaving it active is a
 separate exact-confirmation choice; stopping PXE restores normal controller

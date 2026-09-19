@@ -616,6 +616,7 @@ assert unknownVeyonNativeHosts == []
           # the installer uses that address explicitly for signed closure pulls.
           nix.settings.substituters = lib.mkForce [ ];
           networking.useDHCP = lib.mkForce true;
+          console.keyMap = labSettings.consoleKeyMap;
           boot.zfs.forceImportRoot = false;
           services.openssh.enable = true;
           environment.systemPackages = [

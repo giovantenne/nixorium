@@ -170,23 +170,8 @@ collect_bootstrap_configuration() {
 
   echo
   echo "Nixorium controller setup"
-  echo "Choose the accounts and regional settings used after the first reboot."
+  echo "Choose the keyboard first, then the accounts and regional settings used after the first reboot."
   echo "The administrator account name is fixed as 'admin'."
-  prompt_bootstrap_user "Teacher username" "$BOOTSTRAP_TEACHER_USER" "" BOOTSTRAP_TEACHER_USER
-  prompt_bootstrap_user "Student username" "$BOOTSTRAP_STUDENT_USER" "$BOOTSTRAP_TEACHER_USER" BOOTSTRAP_STUDENT_USER
-
-  while true; do
-    if ! prompt_bootstrap_value "Time zone" "$BOOTSTRAP_TIME_ZONE" BOOTSTRAP_TIME_ZONE; then
-      return 1
-    fi
-    if [[ "$BOOTSTRAP_TIME_ZONE" =~ ^[A-Za-z0-9_+.-]+(/[A-Za-z0-9_+.-]+)+$ ]] && \
-      { [[ -e "/etc/zoneinfo/${BOOTSTRAP_TIME_ZONE}" ]] || \
-        [[ -e "/usr/share/zoneinfo/${BOOTSTRAP_TIME_ZONE}" ]]; }; then
-      break
-    fi
-    echo "Choose an installed IANA time zone such as America/New_York or Europe/Rome."
-  done
-
   while true; do
     echo "Keyboard choices: us, it, gb, fr, de, es"
     if ! prompt_bootstrap_value "Keyboard layout" "$BOOTSTRAP_KEYBOARD" BOOTSTRAP_KEYBOARD; then
@@ -204,6 +189,22 @@ collect_bootstrap_configuration() {
   done
 
   activate_bootstrap_keyboard
+  echo "All remaining input, including account passwords, uses this layout."
+  prompt_bootstrap_user "Teacher username" "$BOOTSTRAP_TEACHER_USER" "" BOOTSTRAP_TEACHER_USER
+  prompt_bootstrap_user "Student username" "$BOOTSTRAP_STUDENT_USER" "$BOOTSTRAP_TEACHER_USER" BOOTSTRAP_STUDENT_USER
+
+  while true; do
+    if ! prompt_bootstrap_value "Time zone" "$BOOTSTRAP_TIME_ZONE" BOOTSTRAP_TIME_ZONE; then
+      return 1
+    fi
+    if [[ "$BOOTSTRAP_TIME_ZONE" =~ ^[A-Za-z0-9_+.-]+(/[A-Za-z0-9_+.-]+)+$ ]] && \
+      { [[ -e "/etc/zoneinfo/${BOOTSTRAP_TIME_ZONE}" ]] || \
+        [[ -e "/usr/share/zoneinfo/${BOOTSTRAP_TIME_ZONE}" ]]; }; then
+      break
+    fi
+    echo "Choose an installed IANA time zone such as America/New_York or Europe/Rome."
+  done
+
   echo "Set account passwords. Each password must contain at least 8 bytes."
   prompt_bootstrap_password "Administrator password" BOOTSTRAP_ADMIN_HASH
   prompt_bootstrap_password "Teacher password" BOOTSTRAP_TEACHER_HASH
