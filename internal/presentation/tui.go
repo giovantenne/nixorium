@@ -2078,34 +2078,50 @@ func (model dashboardModel) pxeView() string {
 		}
 	}
 	if model.controllerApplying {
-		elapsed := time.Since(model.controllerStarted).Truncate(time.Second)
-		if elapsed < 0 {
-			elapsed = 0
+		if model.controllerProgress.State != "completed" {
+			elapsed := time.Since(model.controllerStarted).Truncate(time.Second)
+			if elapsed < 0 {
+				elapsed = 0
+			}
+			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
+		} else {
+			lines = append(lines, "")
 		}
-		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.operationProgressView(model.controllerProgress, "Controller progress")...)
+		notice := tuiNotice{kind: tuiStatusAttention, title: "Controller activation is running", detail: "Services and networking may restart while the reviewed configuration is activated and verified."}
+		if model.controllerProgress.State == "completed" {
+			notice = tuiNotice{kind: tuiStatusSuccess, title: "Controller activation and verification completed", detail: "Continuing with client-system preparation."}
+		}
 		return renderTUIShell(tuiShell{
 			path:    path,
 			body:    strings.Join(lines, "\n"),
-			notices: []tuiNotice{{kind: tuiStatusAttention, title: "Controller activation is running", detail: "Services and networking may restart while the reviewed configuration is activated and verified."}},
+			notices: []tuiNotice{notice},
 			actions: model.pxeActions(),
 		}, model.width, model.isDark)
 	}
 	if model.pxePreparing {
-		elapsed := time.Since(model.pxeProgressStarted).Truncate(time.Second)
-		if elapsed < 0 {
-			elapsed = 0
+		if model.pxeProgress.State != "completed" {
+			elapsed := time.Since(model.pxeProgressStarted).Truncate(time.Second)
+			if elapsed < 0 {
+				elapsed = 0
+			}
+			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
+		} else {
+			lines = append(lines, "")
 		}
-		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.operationProgressView(model.pxeProgress, "Current progress")...)
+		notice := tuiNotice{
+			kind:   tuiStatusAttention,
+			title:  "Preparation continues if this view closes",
+			detail: "The systemd-owned operation is recorded and can be inspected again later.",
+		}
+		if model.pxeProgress.State == "completed" {
+			notice = tuiNotice{kind: tuiStatusSuccess, title: "Client preparation completed", detail: "The client systems and network installation files are ready."}
+		}
 		return renderTUIShell(tuiShell{
-			path: path,
-			body: strings.Join(lines, "\n"),
-			notices: []tuiNotice{{
-				kind:   tuiStatusAttention,
-				title:  "Preparation continues if this view closes",
-				detail: "The systemd-owned operation is recorded and can be inspected again later.",
-			}},
+			path:    path,
+			body:    strings.Join(lines, "\n"),
+			notices: []tuiNotice{notice},
 			actions: model.pxeActions(),
 		}, model.width, model.isDark)
 	}
