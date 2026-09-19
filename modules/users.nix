@@ -1,4 +1,4 @@
-{ hostName, labSettings, ... }:
+{ hostName, labSettings, lib, ... }:
 
 let
   # Master controller: no autologin (teacher selects account)
@@ -28,7 +28,7 @@ in
   users.users.${labSettings.studentUser} = {
     isNormalUser = true;
     description = labSettings.studentUser;
-    extraGroups = [ "networkmanager" "render" "video" ];
+    extraGroups = [ "render" "video" ];
     hashedPassword = labSettings.studentPassword;
   };
 
@@ -48,4 +48,15 @@ in
     enable = !isMaster;
     user = labSettings.studentUser;
   };
+
+  # Keep the student session online without allowing it to alter host
+  # connections, radios, DNS, or other NetworkManager-managed state.
+  security.polkit.extraConfig = lib.mkBefore ''
+    polkit.addRule(function(action, subject) {
+      if (subject.user == "${labSettings.studentUser}" &&
+          action.id.indexOf("org.freedesktop.NetworkManager.") == 0) {
+        return polkit.Result.NO;
+      }
+    });
+  '';
 }

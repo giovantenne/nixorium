@@ -8,6 +8,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Student accounts can now use system-provided connectivity but cannot alter
+  NetworkManager connections, radios, DNS, or other host network state. Admin
+  and teacher accounts retain network-management access.
+
 - Reviewed client shutdown now includes reachable clients with active sessions
   after an explicit unsaved-work warning. Unknown session state remains
   protected by default, unreachable clients remain unsent, and the interactive

@@ -79,6 +79,12 @@ Preparation prefers it while assigned, otherwise captures the only usable
 non-static, non-link-local IPv4 address on the configured interface. Update the
 hint only if multiple candidate addresses make runtime selection ambiguous.
 
+The student account consumes system-managed connectivity but is deliberately
+excluded from the `networkmanager` group and denied NetworkManager polkit
+actions. Do not grant it access through a deployment module unless the admin
+explicitly requests a reviewed relaxation of this security boundary. Teacher
+and admin retain network-management access.
+
 ## Per-host customization
 
 Create a deployment module and register it under the exact generated host name.

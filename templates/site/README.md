@@ -50,6 +50,12 @@ The number must be greater than `pcCount` and must fit inside the subnet; choose
 it before rolling out clients when possible to avoid an unnecessary controller
 rename later.
 
+The student session uses the network configured by the system but cannot change
+NetworkManager connections, radios, DNS, or other host network state through
+GNOME, `nmcli`, or `nmtui`. Teacher and administrator accounts retain network
+management access. Keep this role boundary unless the deployment has an
+explicitly reviewed reason to relax it.
+
 After the controller's first reboot, sign in as `admin` and run:
 
 ```sh

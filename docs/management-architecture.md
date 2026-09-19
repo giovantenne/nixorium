@@ -69,6 +69,9 @@ Important constraints in the current implementation are:
   configuration after reboot;
 - the firewall admits product ports only on the configured laboratory
   interface, with controller-only rules for Harmonia and PXE;
+- the student identity is excluded from the `networkmanager` group and denied
+  all NetworkManager polkit actions, while teacher and admin retain management
+  access and NetworkManager continues providing system connectivity;
 
 ## Architectural goals and invariants
 

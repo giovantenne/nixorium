@@ -14,6 +14,7 @@ an explicit product decision.
 | Software scopes and package ownership | `internal/domain/software.go`, `lib/eval-lab-software.nix`, template modules | Maintainer software guide; both AGENTS files |
 | Controller-only readiness, inventory, interfaces | `lib/mk-lab.nix`, domain/app readiness tests | Deployment AGENTS; maintainer context/validation |
 | Home reset, extensions, npm, desktop defaults | `modules/home-reset.nix`, home scripts, template modules/assets | Maintainer student-home guide; system reference |
+| Account roles and NetworkManager authorization | `modules/users.nix`, mkLab tests | Both AGENTS files; maintainer configuration guidance; deployment README; system/architecture docs; changelog |
 | Privilege, keys, PXE/recovery | Management/PXE modules, adapters, integration tests | Core invariants; maintainer configuration/operations; troubleshooting |
 | Input ownership and updates | Update adapters/tests, Flake/template contract | Maintainer software/framework-update guidance; deployment AGENTS |
 | Bootstrap prompts, sequencing, and netboot keyboard | `install.sh`, bootstrap CLI, `lib/mk-lab.nix`, controller-bootstrap and mkLab tests | Root README; deployment README; system reference; controller-first ADR; changelog |

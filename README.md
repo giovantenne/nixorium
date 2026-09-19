@@ -44,8 +44,9 @@ describes the site; the controller supplies the systems over the local network.
   responsible for address leases.
 - A terminal interface and CLI for installation, software selection, settings,
   controller updates, client deployment and shutdown, diagnostics, and logs.
-- GNOME workstations with Veyon integration; student homes reset from a clean
-  template at boot, retaining up to five local home snapshots.
+- GNOME workstations with Veyon integration; student sessions cannot change
+  NetworkManager state, and their homes reset from a clean template at boot
+  while retaining up to five local home snapshots.
 - Private, deployment-owned software presets, assets, and extension modules,
   separate from the reusable public framework.
 - Reviewed operations with progress and failure reporting, plus recorded PXE

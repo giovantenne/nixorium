@@ -113,6 +113,8 @@ let
   controllerUDP = controllerFirewall.interfaces.enp0s3.allowedUDPPorts;
   clientTCP = clientFirewall.interfaces.enp0s3.allowedTCPPorts;
   nativeClientTCP = nativeVeyonLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
+  clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
+  clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
 in
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
 assert controllerOnlyLab.labMeta.controller.staticIp == "";
@@ -190,6 +192,18 @@ assert hasHostState subnetLab.nixosConfigurations.pc99.config.environment.system
 assert hasHostState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
 assert hasSessionState subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert hasSessionState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
+assert !(builtins.elem "networkmanager" clientUsers.${labConfig.studentUser}.extraGroups);
+assert !(builtins.elem "networkmanager"
+  subnetLab.nixosConfigurations.pc99.config.users.users.${labConfig.studentUser}.extraGroups);
+assert builtins.elem "networkmanager" clientUsers.${labConfig.teacherUser}.extraGroups;
+assert builtins.elem "networkmanager" clientUsers.admin.extraGroups;
+assert clientPolkit.enable;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''subject.user == "${labConfig.studentUser}"'' clientPolkit.extraConfig;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''action.id.indexOf("org.freedesktop.NetworkManager.") == 0'' clientPolkit.extraConfig;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  "return polkit.Result.NO;" clientPolkit.extraConfig;
 assert !(hasPackage subnetLab "pc01" "chromium");
 assert !(hasPackage subnetLab "pc01" "vscode");
 assert !(hasPackage subnetLab "pc01" "opencode");
