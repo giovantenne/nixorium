@@ -42,11 +42,13 @@ template, installer, local Disko layout, and initial lock use that full Git
 revision, while `flake.nix` retains the selected channel for later managed
 updates. Resolution failure stops before the installer is invoked.
 For bootstrap-capability version 1, account and regional input is collected by
-the small shell launcher before it invokes Nix. The destructive confirmation
-precedes partitioning, locking, or controller-system transfer. Once Disko has
-mounted the target, the bootstrap places its evaluation cache and temporary
-swap there; `nixos-install` builds directly into the target store with one Nix
-job and one core per build.
+the small shell launcher before it invokes Nix. Keyboard is collected and
+activated first, so subsequent input uses the installed controller layout. The
+PXE environment later applies that same console keymap before local client
+enrollment. The destructive confirmation precedes partitioning, locking, or
+controller-system transfer. Once Disko has mounted the target, the bootstrap
+places its evaluation cache and temporary swap there; `nixos-install` builds
+directly into the target store with one Nix job and one core per build.
 
 ## Package-base ownership
 

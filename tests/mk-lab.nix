@@ -37,6 +37,12 @@ let
       veyonNativeHosts = [ "pc01" ];
     };
   });
+  keyboardLab = mkLab (baseArgs // {
+    labConfig = labConfig // {
+      keyboardLayout = "it";
+      consoleKeyMap = "it2";
+    };
+  });
   softwareLab = mkLab (baseArgs // {
     clientGroups.graphics = [ "pc01" ];
     labSoftware = {
@@ -165,6 +171,8 @@ assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 1).ifaceName == "
 assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.interfaces ? eno1;
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces ? enp2s0;
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
+assert keyboardLab.nixosConfigurations.pc99.config.console.keyMap == "it2";
+assert keyboardLab.nixosConfigurations.netboot.config.console.keyMap == "it2";
 assert builtins.elem "network.target"
   roleInterfaceLab.nixosConfigurations.pc99.config.systemd.services."network-addresses-eno1".wantedBy;
 assert !(builtins.elem "network.target"

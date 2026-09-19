@@ -97,11 +97,11 @@ inspect it first if required by your local policy. Select a published beta to
 evaluate the current workflow, rather than the moving `master` branch. Follow
 the prompts for accounts, regional settings, passwords, and the controller
 disk. Confirm disk erasure only after checking the selected device.
-Before requesting passwords, the bootstrap applies the selected console keymap
-and stops if it cannot do so. This ensures the characters entered for each
-password use the same layout that will be active after reboot; password setup
-from a graphical terminal is deliberately refused because its compositor
-layout cannot be verified portably.
+Keyboard layout is the first controller-setting prompt. The bootstrap applies
+its console keymap immediately and stops if it cannot do so. This ensures all
+remaining input, especially passwords, uses the same layout that will be active
+after reboot; password setup from a graphical terminal is deliberately refused
+because its compositor layout cannot be verified portably.
 
 ### 2. Configure the laboratory
 
@@ -131,8 +131,9 @@ run:
 ```
 
 Select that computer's configured identity and target disk. The installer
-requires explicit destructive confirmation before proceeding. After
-installation, boot the client from its local disk.
+console uses the controller's configured keyboard layout and requires explicit
+destructive confirmation before proceeding. After installation, boot the
+client from its local disk.
 
 Stop PXE from **Installation → PXE mode and network recovery** to restore the
 controller's normal static address. Check login, desktop behavior, home reset,

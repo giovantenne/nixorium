@@ -8,11 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Controller bootstrap now applies the selected Linux console keymap before it
-  requests any account password. It stops before credential entry if keymap
-  activation fails, and refuses graphical terminals whose compositor layout
-  cannot be verified portably, preventing a different post-reboot keyboard
-  mapping from changing the effective password.
+- Keyboard layout is now the first controller bootstrap setting, and its Linux
+  console keymap is applied before any later input. Bootstrap stops if keymap
+  activation fails and refuses graphical terminals whose compositor layout
+  cannot be verified portably. PXE-booted client installers use the same
+  configured console keymap as the controller.
 
 - Refreshed upstream and deployment agent instructions, with task-specific
   software-update and student-home guidance. Added cached parser-backed CLI

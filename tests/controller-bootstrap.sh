@@ -120,7 +120,7 @@ export BOOTSTRAP_INSTALLER_LOG="$INSTALLER_LOG"
 export BOOTSTRAP_REVISION="$REVISION"
 export BOOTSTRAP_TEMPLATE="${REPO_ROOT}/templates/site"
 
-printf '\n\n\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
+printf '%s\n\n\n\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
   'it' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
@@ -154,7 +154,7 @@ if grep -F "Set account passwords" "${TEST_ROOT}/graphical.out" >/dev/null; then
 fi
 : > "$CALL_LOG"
 
-printf '\n\n\n%s\n' 'us' > "${TEST_ROOT}/truncated-input"
+printf '%s\n\n\n\n' 'us' > "${TEST_ROOT}/truncated-input"
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/truncated-input" \
   timeout --foreground --kill-after=2s 10s \
@@ -202,6 +202,12 @@ grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-la
 grep -F "flake init -t github:giovantenne/nixorium/${REVISION}#site" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/flake.nix" "$CALL_LOG" >/dev/null
 grep -F "loadkeys it2" "$CALL_LOG" >/dev/null
+KEYBOARD_PROMPT_LINE="$(grep -n -m1 -F 'Keyboard layout' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+TEACHER_PROMPT_LINE="$(grep -n -m1 -F 'Teacher username' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+if (( KEYBOARD_PROMPT_LINE >= TEACHER_PROMPT_LINE )); then
+  echo "bootstrap did not ask for the keyboard before account settings" >&2
+  exit 1
+fi
 LOADKEYS_LINE="$(grep -n -m1 -F 'loadkeys it2' "$CALL_LOG" | cut -d: -f1)"
 MKPASSWD_LINE="$(grep -n -m1 -F 'mkpasswd' "$CALL_LOG" | cut -d: -f1)"
 if (( LOADKEYS_LINE >= MKPASSWD_LINE )); then

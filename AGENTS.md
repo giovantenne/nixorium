@@ -161,10 +161,11 @@ Release from the matching changelog section.
   `deploymentStatus.controller` is the controller-specific capability; older
   upstreams fall back to strict fleet readiness. Never use this capability to
   authorize PXE or client deployment. Bootstrap capability version 1 collects
-  controller identity, US-internal regional settings, and password hashes before
-  disk installation, then defers lab networking. Apply the selected console
-  keymap before password entry and fail closed when the live input layout cannot
-  be verified; see ADR 0015.
+  the keyboard first, then controller identity, other regional settings, and
+  password hashes before disk installation, then defers lab networking. Apply
+  the selected console keymap before any later input, fail closed when the live
+  input layout cannot be verified, and apply the same keymap to netboot; see
+  ADR 0015.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.

@@ -1782,8 +1782,18 @@ type bootstrapKeyboardActivator interface {
 
 func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, secrets app.SecretReader, hasher app.PasswordHasher, keyboardActivator bootstrapKeyboardActivator, output io.Writer, candidate *domain.LabSettingsFile) error {
 	fmt.Fprintln(output, "Nixorium controller setup")
-	fmt.Fprintln(output, "Choose the accounts and regional settings used after the first reboot.")
+	fmt.Fprintln(output, "Choose the keyboard first, then the accounts and regional settings used after the first reboot.")
 	fmt.Fprintln(output, "The administrator account name is fixed as 'admin'.")
+
+	keyboard, consoleKeyMap, err := promptBootstrapKeyboard(reader, output, candidate.Lab.KeyboardLayout)
+	if err != nil {
+		return err
+	}
+	if err := keyboardActivator.ActivateBootstrapKeyboard(ctx, consoleKeyMap); err != nil {
+		return fmt.Errorf("activate the selected keyboard before continuing: %w", err)
+	}
+	fmt.Fprintf(output, "Active console keyboard: %s (%s).\n", keyboard, consoleKeyMap)
+	fmt.Fprintln(output, "All remaining input, including account passwords, uses this layout.")
 
 	teacher, err := promptBootstrapUser(reader, output, "Teacher username", candidate.Lab.TeacherUser, "")
 	if err != nil {
@@ -1797,11 +1807,6 @@ func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, se
 	if err != nil {
 		return err
 	}
-	keyboard, consoleKeyMap, err := promptBootstrapKeyboard(reader, output, candidate.Lab.KeyboardLayout)
-	if err != nil {
-		return err
-	}
-
 	candidate.Lab.DeploymentMode = "controller"
 	candidate.Lab.PCCount = 0
 	candidate.Lab.MasterDHCPIP = domain.MasterDHCPPlaceholder
@@ -1814,11 +1819,6 @@ func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, se
 	candidate.Lab.DefaultLocale = "en_US.UTF-8"
 	candidate.Lab.ExtraLocale = "en_US.UTF-8"
 	candidate.Lab.VeyonNativeHosts = []string{}
-	if err := keyboardActivator.ActivateBootstrapKeyboard(ctx, consoleKeyMap); err != nil {
-		return fmt.Errorf("activate the selected keyboard before password entry: %w", err)
-	}
-	fmt.Fprintf(output, "Active console keyboard: %s (%s).\n", keyboard, consoleKeyMap)
-	fmt.Fprintln(output, "Account passwords will use this layout now and after reboot.")
 	if err := collectSetupCredentials(ctx, secrets, hasher, output, candidate); err != nil {
 		return err
 	}
