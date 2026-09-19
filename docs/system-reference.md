@@ -13,12 +13,19 @@ and privilege boundaries belong in the
 |---|---|
 | `admin` | System administrator, SSH access, sudo, and Veyon Master access |
 | Teacher account | Persistent instructor workspace and Veyon Master access |
-| Student account | Client autologin and a home directory reset at every boot |
+| Student account | Client autologin, reset home, and read-only host networking |
 | `root` | Disabled password and key-only SSH access |
 
 Teacher and student names are site settings. Accounts are declarative and
 `users.mutableUsers = false`; changing credentials therefore requires a
 reviewed configuration update rather than an imperative password edit.
+
+Admin and teacher belong to the `networkmanager` group. The student does not,
+and an explicit polkit rule denies every `org.freedesktop.NetworkManager.*`
+action for that identity. The session can use the system-managed connection and
+inspect ordinary network status, but cannot change connections, radios, DNS, or
+other NetworkManager state through GNOME, `nmcli`, `nmtui`, or direct D-Bus
+requests.
 
 ## Storage and boot
 

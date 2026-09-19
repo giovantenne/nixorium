@@ -35,6 +35,9 @@ configuration, software, home customization, diagnostics, and operations.
 - Use managed controller, deployment, and PXE operations. Do not work around
   a refusal with raw root commands, a second cache, or altered network state.
   Inspect `nixorium doctor` and the reported operation journal instead.
+- The student intentionally cannot administer NetworkManager. Do not add that
+  account to the `networkmanager` group or override its polkit denial without
+  an explicit, reviewed change to the lab's security policy.
 
 ## Validation and reporting
 

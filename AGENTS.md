@@ -384,6 +384,9 @@ set -euo pipefail
   and synchronously stop listener/network units after a failed start
 - keep product firewall openings interface- and role-scoped; do not restore
   global `allowed*Ports` or module `openFirewall` shortcuts
+- Keep the student outside the `networkmanager` group and preserve the explicit
+  polkit denial for `org.freedesktop.NetworkManager.*`; teacher and admin retain
+  network management while student sessions only consume system connectivity.
 - Passwords in `users.nix` are hashed (SHA-512 crypt); never store plaintext
 - SSH password auth is disabled; key-based only
 - `users.mutableUsers = false` enforces declarative user management
