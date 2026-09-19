@@ -183,7 +183,34 @@ the versioned operational and contributor references.
 | Understand architecture and security | [Management architecture](docs/management-architecture.md), [ADRs](docs/adr/) |
 | Evaluate firmware and physical hardware | [Hardware validation plan](docs/hardware-validation.md) |
 | Develop and validate changes | [Contributor instructions](AGENTS.md), [development validation](docs/development-validation.md) |
+| Work with a coding agent | [Agent skills](#agent-skills) |
 | Review release changes | [Changelog](CHANGELOG.md), [Releases](https://github.com/giovantenne/nixorium/releases) |
+
+## Agent skills
+
+Nixorium includes skills: task-specific instructions that help coding agents
+work with the project's configuration, validation, and safety rules.
+
+- **Core development:** use
+  [`nixorium-developer`](skills/nixorium-developer/SKILL.md) in this public
+  repository for changes to the NixOS modules, CLI/TUI, installers, API, or
+  tests.
+- **Lab administration:** use
+  [`nixorium-maintainer`](skills/nixorium-maintainer/SKILL.md) in the lab's
+  private deployment repository for settings, software, local modules,
+  troubleshooting, and reviewed installation or update operations. This skill
+  is included in the deployment template; the developer skill is not.
+
+Open your coding agent in the appropriate repository and ask it to use the
+named skill. Discovery links are included for Codex, OpenCode, Claude Code,
+and Pi. For example, an administrator can ask: “Use nixorium-maintainer to add
+Firefox for all computers and validate the configuration without deploying.”
+A contributor can ask: “Use nixorium-developer to improve the installation
+screen and add regression tests.”
+
+Skills guide the agent; they do not replace review or grant permission to
+install, deploy, change live services, commit, or push. Review the proposed
+changes and explicitly authorize the operations you want performed.
 
 ## Development
 
