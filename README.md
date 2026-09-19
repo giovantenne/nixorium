@@ -85,7 +85,8 @@ testing recommendation, not a separate mandatory stage in the interface.
 
 ### 1. Bootstrap the controller from USB
 
-Boot the official NixOS installer in UEFI mode with Internet access, then run:
+Boot the official NixOS installer in UEFI mode with Internet access. Switch to
+a Linux text console (for example with `Ctrl`+`Alt`+`F2`) before running:
 
 ```sh
 curl -fsSL https://nixorium.org/install.sh | bash
@@ -96,6 +97,11 @@ inspect it first if required by your local policy. Select a published beta to
 evaluate the current workflow, rather than the moving `master` branch. Follow
 the prompts for accounts, regional settings, passwords, and the controller
 disk. Confirm disk erasure only after checking the selected device.
+Before requesting passwords, the bootstrap applies the selected console keymap
+and stops if it cannot do so. This ensures the characters entered for each
+password use the same layout that will be active after reboot; password setup
+from a graphical terminal is deliberately refused because its compositor
+layout cannot be verified portably.
 
 ### 2. Configure the laboratory
 

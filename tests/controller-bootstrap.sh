@@ -85,11 +85,22 @@ chmod +x "${MOCK_BIN}/nix"
 cat > "${MOCK_BIN}/mkpasswd" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+printf 'mkpasswd\n' >> "$BOOTSTRAP_CALL_LOG"
 test "$*" = "-m sha-512 --stdin"
 IFS= read -r password
 printf '$6$testsalt$hash%s\n' "${#password}"
 EOF
 chmod +x "${MOCK_BIN}/mkpasswd"
+
+cat > "${MOCK_BIN}/loadkeys" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'loadkeys %s\n' "$*" >> "$BOOTSTRAP_CALL_LOG"
+if [[ "${BOOTSTRAP_LOADKEYS_FAIL:-false}" == "true" ]]; then
+  exit 1
+fi
+EOF
+chmod +x "${MOCK_BIN}/loadkeys"
 
 cat > "${MOCK_BIN}/sudo" <<'EOF'
 #!/usr/bin/env bash
@@ -102,6 +113,8 @@ EOF
 chmod +x "${MOCK_BIN}/sudo"
 
 export PATH="${MOCK_BIN}:$PATH"
+export DISPLAY=""
+export WAYLAND_DISPLAY=""
 export BOOTSTRAP_CALL_LOG="$CALL_LOG"
 export BOOTSTRAP_INSTALLER_LOG="$INSTALLER_LOG"
 export BOOTSTRAP_REVISION="$REVISION"
@@ -124,6 +137,23 @@ fi
 grep -F "must match the selected release" "${TEST_ROOT}/mismatch.out" >/dev/null
 test ! -e "$CALL_LOG"
 
+if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+  NIXORIUM_BOOTSTRAP_TTY="$BOOTSTRAP_INPUT" \
+  DISPLAY=:0 \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/graphical.out" 2>&1; then
+  echo "bootstrap accepted password setup from a graphical terminal" >&2
+  exit 1
+fi
+grep -F "cannot be verified safely from a graphical terminal" \
+  "${TEST_ROOT}/graphical.out" >/dev/null
+if grep -F "Set account passwords" "${TEST_ROOT}/graphical.out" >/dev/null; then
+  echo "bootstrap requested passwords in an unverified graphical layout" >&2
+  exit 1
+fi
+: > "$CALL_LOG"
+
 printf '\n\n\n%s\n' 'us' > "${TEST_ROOT}/truncated-input"
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/truncated-input" \
@@ -135,6 +165,24 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
 fi
 grep -F "input ended before configuration was complete" \
   "${TEST_ROOT}/truncated.out" >/dev/null
+: > "$CALL_LOG"
+
+if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+  NIXORIUM_BOOTSTRAP_TTY="$BOOTSTRAP_INPUT" \
+  BOOTSTRAP_LOADKEYS_FAIL=true \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/keymap-failure.out" 2>&1; then
+  echo "bootstrap continued after console keymap activation failed" >&2
+  exit 1
+fi
+grep -F "could not activate console keymap 'it2'" \
+  "${TEST_ROOT}/keymap-failure.out" >/dev/null
+if grep -F "Set account passwords" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
+  grep -F "mkpasswd" "$CALL_LOG" >/dev/null; then
+  echo "bootstrap requested or hashed a password before keyboard activation" >&2
+  exit 1
+fi
 : > "$CALL_LOG"
 
 if ! NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
@@ -153,6 +201,13 @@ grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/inst
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$CALL_LOG" >/dev/null
 grep -F "flake init -t github:giovantenne/nixorium/${REVISION}#site" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/flake.nix" "$CALL_LOG" >/dev/null
+grep -F "loadkeys it2" "$CALL_LOG" >/dev/null
+LOADKEYS_LINE="$(grep -n -m1 -F 'loadkeys it2' "$CALL_LOG" | cut -d: -f1)"
+MKPASSWD_LINE="$(grep -n -m1 -F 'mkpasswd' "$CALL_LOG" | cut -d: -f1)"
+if (( LOADKEYS_LINE >= MKPASSWD_LINE )); then
+  echo "bootstrap hashed a password before applying the selected keymap" >&2
+  exit 1
+fi
 if grep -Eq 'flake lock|bootstrap configure|#lib.controllerBootstrapVersion|#labMeta' "$CALL_LOG"; then
   echo "bootstrap performed Nix work before invoking the disk installer" >&2
   exit 1

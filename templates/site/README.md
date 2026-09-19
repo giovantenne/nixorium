@@ -29,6 +29,9 @@ account credentials, without lab keys or the client DHCP hint. Lab networking,
 cache and remote-control services are inactive; fleet readiness remains false.
 Existing deployments are not migrated automatically. New controller bootstrap
 sets this mode after collecting accounts, passwords, time zone, and keyboard.
+Run bootstrap password entry from a Linux text console: it applies the selected
+console keymap before reading any password and stops if activation fails or the
+terminal belongs to an unverifiable graphical session.
 Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
 The public Nix evaluator and the management command both reject empty required

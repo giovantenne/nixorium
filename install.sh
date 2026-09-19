@@ -139,6 +139,26 @@ prompt_bootstrap_password() {
   done
 }
 
+activate_bootstrap_keyboard() {
+  if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+    echo "Error: the selected keyboard cannot be verified safely from a graphical terminal." >&2
+    echo "Switch to a Linux text console (for example Ctrl+Alt+F2), then run the installer again." >&2
+    return 1
+  fi
+  if ! command -v loadkeys >/dev/null 2>&1; then
+    echo "Error: the live environment does not provide loadkeys." >&2
+    echo "Use the official NixOS installer in a Linux text console and retry." >&2
+    return 1
+  fi
+  if ! sudo loadkeys "$BOOTSTRAP_CONSOLE_KEYMAP"; then
+    echo "Error: could not activate console keymap '$BOOTSTRAP_CONSOLE_KEYMAP'." >&2
+    echo "No account password has been requested; correct the live console and retry." >&2
+    return 1
+  fi
+  echo "Active console keyboard: $BOOTSTRAP_KEYBOARD ($BOOTSTRAP_CONSOLE_KEYMAP)."
+  echo "Account passwords will use this layout now and after reboot."
+}
+
 collect_bootstrap_configuration() {
   local CONFIRMATION
 
@@ -183,6 +203,7 @@ collect_bootstrap_configuration() {
     esac
   done
 
+  activate_bootstrap_keyboard
   echo "Set account passwords. Each password must contain at least 8 bytes."
   prompt_bootstrap_password "Administrator password" BOOTSTRAP_ADMIN_HASH
   prompt_bootstrap_password "Teacher password" BOOTSTRAP_TEACHER_HASH
