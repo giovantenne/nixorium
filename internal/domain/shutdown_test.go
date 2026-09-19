@@ -7,7 +7,7 @@ import (
 
 func TestShutdownReviewTokenBindsTargetsPolicyAndExpiry(t *testing.T) {
 	base := ShutdownPlanReport{
-		Repository: "/deployment", Requested: "pc01", Policy: ShutdownRequireIdle,
+		Repository: "/deployment", Requested: "pc01", Policy: ShutdownProtectUnknown,
 		ExpiresAt: time.Unix(100, 0),
 		Targets:   []ShutdownTargetPlan{{Name: "pc01", IP: "10.0.0.1", Reachability: ReachabilityReachable, SSH: SSHAvailable, Session: ShutdownSessionIdle, Eligible: true}},
 	}

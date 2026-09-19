@@ -311,7 +311,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 	lines := []string{
 		tuiTitle("Software", model.isDark),
 		"",
-		softwareModeTabs(model.softwareMode),
+		softwareModeTabs(model.softwareMode, model.isDark),
 		tuiMuted("Choose desired software here. Running clients change only when you deploy them.", model.isDark),
 		"",
 	}
@@ -323,7 +323,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 		if model.softwareSearching {
 			cursor = "_"
 		}
-		lines = append(lines, tuiSection("Search packages", model.isDark), tuiMuted("Uses this deployment's locked Nix packages and overlays; inputs are never updated.", model.isDark), "", "Package name  "+model.softwareQuery+cursor, "")
+		lines = append(lines, tuiSection("Search packages", model.isDark), tuiMuted("Uses this deployment's locked Nix packages and overlays; inputs are never updated.", model.isDark), "", "Package name  "+tuiTitle(model.softwareQuery+cursor, model.isDark), "")
 		if model.softwareSearchBusy {
 			lines = append(lines, "Searching pinned packages…", "")
 		} else if model.softwareQuery == "" {
@@ -348,18 +348,22 @@ func (model dashboardModel) softwareCatalogView() []string {
 		status := ""
 		if model.softwareMode == softwareConfigured {
 			if entry, found := model.softwareDeclaration(item.ID); found {
-				status = "  " + softwareScopeLabel(entry.Scope)
+				status = "  " + tuiMuted(softwareScopeLabel(entry.Scope), model.isDark)
 			}
 		} else if entry, found := model.softwareDeclaration(item.ID); found {
-			status = "  ✓ configured for " + softwareScopeLabel(entry.Scope)
+			status = "  " + tuiStatus("configured for "+softwareScopeLabel(entry.Scope), tuiStatusSuccess, model.isDark)
 		} else if item.Availability != "available" {
-			status = "  ! " + item.Availability
+			status = "  " + tuiStatus(item.Availability, tuiStatusAttention, model.isDark)
 		}
 		version := ""
 		if item.Version != "" {
 			version = " · " + item.Version
 		}
-		lines = append(lines, fmt.Sprintf("%s%-20s%s", marker, item.Label, status), tuiMuted("    "+item.Summary+" · "+item.ID+version, model.isDark))
+		label := fmt.Sprintf("%s%-20s", marker, item.Label)
+		if index == model.softwareCursor {
+			label = tuiTitle(label, model.isDark)
+		}
+		lines = append(lines, label+status, tuiMuted("    "+item.Summary+" · "+item.ID+version, model.isDark))
 	}
 	if len(items) == 0 && model.softwareMode == softwareConfigured {
 		lines = append(lines, "No software is selected through this screen yet.", "", "Open Suggestions or Search packages to add one.")
@@ -519,14 +523,14 @@ func (model *dashboardModel) scheduleSoftwareSearch() tea.Cmd {
 	})
 }
 
-func softwareModeTabs(mode softwareListMode) string {
+func softwareModeTabs(mode softwareListMode, dark bool) string {
 	labels := []string{"Selected", "Search packages", "Suggestions"}
 	parts := make([]string, len(labels))
 	for index, label := range labels {
 		if index == int(mode) {
-			parts[index] = "[" + label + "]"
+			parts[index] = tuiTitle("["+label+"]", dark)
 		} else {
-			parts[index] = label
+			parts[index] = tuiMuted(label, dark)
 		}
 	}
 	return strings.Join(parts, "   ")

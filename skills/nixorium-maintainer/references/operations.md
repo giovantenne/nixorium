@@ -112,12 +112,14 @@ nixorium shutdown apply --on @lab --expect REVIEW_TOKEN
 
 The controller is never a valid target. Planning checks evaluated client
 identity, management access, interactive sessions, PXE/controller-network
-state, and concurrent client operations. An active user session blocks that
-target. Unknown session state remains blocked unless both plan and apply use
+state, and concurrent client operations. An active user session remains
+eligible after a prominent warning that unsaved work may be lost. Unknown
+session state remains blocked unless both plan and apply use
 `--acknowledge-unknown-sessions` after explicit review. Unreachable targets are
 shown as not sent and are never queued for later.
 
-Apply requires the generated `SHUTDOWN …` phrase, takes the same lock as
+When the plan includes an active session, the review states explicitly that
+`SHUTDOWN` authorizes interrupting it. Apply requires that single word, takes the same lock as
 deployment, and repeats inventory, conflict, and session checks immediately
 before issuing the fixed operating-system request. Results describe only
 `accepted`, `not-sent`, or `unconfirmed`. A successful request is not proof of

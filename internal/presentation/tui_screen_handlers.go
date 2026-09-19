@@ -32,7 +32,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.screen = dashboardShutdown
 		model.shutdownCursor = 0
 		model.shutdownChosen = map[string]bool{}
-		model.shutdownPolicy = domain.ShutdownRequireIdle
+		model.shutdownPolicy = domain.ShutdownProtectUnknown
 		model.shutdownPlan = domain.ShutdownPlanReport{}
 		model.shutdownResult = domain.ShutdownApplyReport{}
 		model.shutdownTechnical = false

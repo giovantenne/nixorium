@@ -75,13 +75,14 @@ func shutdownFixture() (*fakeShutdownSource, *ShutdownManager) {
 	return source, manager
 }
 
-func TestShutdownPlanFreezesOnlyEvaluatedClientsAndSessionPolicy(t *testing.T) {
-	_, manager := shutdownFixture()
-	plan := manager.Plan(context.Background(), "/deployment", "pc01,pc02,pc03", domain.ShutdownRequireIdle)
-	if plan.HasErrors() || plan.State != "ready" || plan.Eligible != 1 || len(plan.Targets) != 3 || plan.Confirmation == "" {
+func TestShutdownPlanIncludesActiveSessionsAndProtectsUnknownSessions(t *testing.T) {
+	source, manager := shutdownFixture()
+	source.observations["pc01"] = domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive}
+	plan := manager.Plan(context.Background(), "/deployment", "pc01,pc02,pc03", domain.ShutdownProtectUnknown)
+	if plan.HasErrors() || plan.State != "ready" || plan.Eligible != 1 || len(plan.Targets) != 3 || plan.Confirmation != "SHUTDOWN" {
 		t.Fatalf("plan = %+v", plan)
 	}
-	if plan.Targets[1].Eligible || !strings.Contains(plan.Targets[1].Detail, "session helper") || plan.Targets[2].Eligible {
+	if !plan.Targets[0].Eligible || plan.Targets[0].Session != domain.ShutdownSessionActive || !strings.Contains(plan.Targets[0].Detail, "unsaved work") || plan.Targets[1].Eligible || !strings.Contains(plan.Targets[1].Detail, "session helper") || plan.Targets[2].Eligible {
 		t.Fatalf("target eligibility = %+v", plan.Targets)
 	}
 	acknowledged := manager.Plan(context.Background(), "/deployment", "pc01,pc02,pc03", domain.ShutdownAcknowledgeUnknown)
@@ -93,18 +94,18 @@ func TestShutdownPlanFreezesOnlyEvaluatedClientsAndSessionPolicy(t *testing.T) {
 func TestShutdownPlanRejectsControllerUnknownDuplicateAndConflicts(t *testing.T) {
 	for _, requested := range []string{"pc99", "pc04", "pc01,pc01", ""} {
 		_, manager := shutdownFixture()
-		if report := manager.Plan(context.Background(), "/deployment", requested, domain.ShutdownRequireIdle); !report.HasErrors() {
+		if report := manager.Plan(context.Background(), "/deployment", requested, domain.ShutdownProtectUnknown); !report.HasErrors() {
 			t.Fatalf("unsafe targets %q accepted: %+v", requested, report)
 		}
 	}
 	source, manager := shutdownFixture()
 	source.active = true
-	if report := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownRequireIdle); !report.HasErrors() || !strings.Contains(report.Message, "already running") {
+	if report := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown); !report.HasErrors() || !strings.Contains(report.Message, "already running") {
 		t.Fatalf("active operation accepted: %+v", report)
 	}
 	source, manager = shutdownFixture()
 	source.listener.Active = true
-	if report := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownRequireIdle); !report.HasErrors() || !strings.Contains(report.Message, "installation") {
+	if report := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown); !report.HasErrors() || !strings.Contains(report.Message, "installation") {
 		t.Fatalf("active installation accepted: %+v", report)
 	}
 }
@@ -136,14 +137,14 @@ func TestShutdownApplyBlocksStaleExpiredAndChangedPlansBeforeDispatch(t *testing
 			source.acquireErr = errors.New("operation locked")
 		},
 		func(source *fakeShutdownSource, _ *ShutdownManager, _ *domain.ShutdownPlanReport, _ *string) {
-			source.observations["pc01"] = domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive}
+			source.observations["pc01"] = domain.ShutdownObservation{Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnavailable, Session: domain.ShutdownSessionUnknown}
 		},
 		func(source *fakeShutdownSource, _ *ShutdownManager, _ *domain.ShutdownPlanReport, _ *string) {
 			source.listener.Active = true
 		},
 	} {
 		source, manager := shutdownFixture()
-		plan := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownRequireIdle)
+		plan := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown)
 		token := plan.ReviewToken
 		mutate(source, manager, &plan, &token)
 		report := manager.ApplyPlan(context.Background(), plan, token)
@@ -153,10 +154,20 @@ func TestShutdownApplyBlocksStaleExpiredAndChangedPlansBeforeDispatch(t *testing
 	}
 }
 
+func TestShutdownApplyDispatchesWhenSessionBecomesActive(t *testing.T) {
+	source, manager := shutdownFixture()
+	plan := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown)
+	source.observations["pc01"] = domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive}
+	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+	if report.HasErrors() || report.Accepted != 1 || len(source.dispatchHosts) != 1 || source.dispatchHosts[0].Name != "pc01" {
+		t.Fatalf("active session was not dispatched: report=%+v hosts=%+v", report, source.dispatchHosts)
+	}
+}
+
 func TestShutdownApplyDoesNotRetryBlindlyAfterUnconfirmedDispatch(t *testing.T) {
 	source, manager := shutdownFixture()
 	source.dispatch["pc01"] = domain.ShutdownDispatchResult{Detail: "SSH connection closed during request"}
-	plan := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownRequireIdle)
+	plan := manager.Plan(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown)
 	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
 	if report.State != "partial" || report.Unconfirmed != 1 || report.RetrySafe || !strings.Contains(report.Message, "Do not retry blindly") || !strings.Contains(report.Targets[0].TechnicalDetail, "connection closed") || strings.Contains(report.Targets[0].Detail, "SSH") {
 		t.Fatalf("unconfirmed result = %+v", report)

@@ -146,7 +146,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 					screen: dashboardSoftware, softwareCatalog: catalog, softwareMode: softwareSearch,
 					softwareSearching: true, softwareQuery: "gi",
 				},
-				expected: []string{"Search packages", "Package name  gi_", "Type", "Search", "Results", "Stop typing", "Help"},
+				expected: []string{"Search packages", "Package name", "gi_", "Type", "Search", "Results", "Stop typing", "Help"},
 			},
 			{
 				name: "scope",
@@ -473,7 +473,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 			m.shutdownCursor = 199
 			m.shutdownChosen = map[string]bool{"pc200": true}
-			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownRequireIdle, Confirmation: "SHUTDOWN 1 CLIENTS abcdef012345", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
+			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
 			m.shutdownResult = domain.ShutdownApplyReport{State: "completed", Accepted: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc200", State: "accepted", Detail: "request accepted"}}}
 			m.controllerPlan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD pc99"}
 			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
@@ -758,7 +758,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.shutdownChosen = map[string]bool{"pc01": true, "pc02": true}
 		case "shutdown-confirmation":
 			m.screen = dashboardShutdownReview
-			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 2, Policy: domain.ShutdownAcknowledgeUnknown, Confirmation: "SHUTDOWN 2 CLIENTS abcdef012345", Targets: []domain.ShutdownTargetPlan{{Name: "pc01", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}, {Name: "pc02", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionUnknown, Eligible: true}, {Name: "pc07", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown, Session: domain.ShutdownSessionUnknown}}}
+			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 2, Policy: domain.ShutdownAcknowledgeUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc01", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive, Eligible: true}, {Name: "pc02", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionUnknown, Eligible: true}, {Name: "pc07", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown, Session: domain.ShutdownSessionUnknown}}}
 		case "shutdown-result":
 			m.screen = dashboardShutdownResult
 			m.shutdownResult = domain.ShutdownApplyReport{State: "partial", Accepted: 1, NotSent: 1, Unconfirmed: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc01", State: "accepted", Detail: "the operating system accepted the power-off request"}, {Name: "pc02", State: "unconfirmed", Detail: "request result could not be confirmed; inspect the computer before retrying", TechnicalDetail: "connection closed during dispatch"}, {Name: "pc07", State: "not-sent", Detail: "not reachable"}}, Message: "Requests accepted for 1 computer; 1 not sent and 1 unconfirmed. Do not retry blindly."}

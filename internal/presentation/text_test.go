@@ -303,9 +303,9 @@ func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
 
 func TestShutdownTextQualifiesRequestsAndPhysicalState(t *testing.T) {
 	plan := domain.ShutdownPlanReport{
-		State: "ready", Requested: "pc01,pc02", Policy: domain.ShutdownRequireIdle, Eligible: 1,
+		State: "ready", Requested: "pc01,pc02", Policy: domain.ShutdownProtectUnknown, Eligible: 1,
 		Targets:     []domain.ShutdownTargetPlan{{Name: "pc01", Eligible: true, Session: domain.ShutdownSessionIdle}, {Name: "pc02", Session: domain.ShutdownSessionActive, Detail: "interactive session active"}},
-		ReviewToken: "sha256:review", Confirmation: "SHUTDOWN 1 CLIENTS abcdef012345", ExpiresAt: time.Unix(100, 0),
+		ReviewToken: "sha256:review", Confirmation: "SHUTDOWN", ExpiresAt: time.Unix(100, 0),
 	}
 	var output bytes.Buffer
 	ShutdownPlanText(&output, plan)

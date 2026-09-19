@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Reviewed client shutdown now includes reachable clients with active sessions
+  after an explicit unsaved-work warning. Unknown session state remains
+  protected by default, unreachable clients remain unsent, and the interactive
+  confirmation is the single word `SHUTDOWN` instead of a generated phrase.
+  When active sessions are present, the review states explicitly that this
+  word authorizes their interruption.
+
 - Keyboard layout is now the first controller bootstrap setting, and its Linux
   console keymap is applied before any later input. Bootstrap stops if keymap
   activation fails and refuses graphical terminals whose compositor layout

@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-09-15
+- Amended: 2026-09-19
 
 ## Context
 
@@ -22,13 +23,16 @@ being physically off.
 Provide one typed client-only plan/apply operation shared by CLI and TUI. Plan
 resolves only evaluated client identities, observes authenticated management
 access and interactive session state, checks PXE/controller-network conflicts,
-and returns an expiring content-bound review token and exact confirmation
-phrase. Unreachable clients remain visible but ineligible and no request is
+and returns an expiring content-bound review token and the one-word
+`SHUTDOWN` confirmation. When an active session is present, the confirmation
+prompt states explicitly that this word authorizes its interruption.
+Unreachable clients remain visible but ineligible and no request is
 queued for later.
 
 Install a fixed `nixorium-session-state` helper in managed host generations.
 Its output is limited to `active` or `idle`; errors or invalid output become
-unknown. An active session always blocks the target. Unknown session state is
+unknown. An active session remains eligible after the review presents an
+explicit warning that unsaved work may be lost. Unknown session state is
 blocked by default and becomes eligible only in a newly reviewed
 `acknowledge-unknown` plan.
 
@@ -49,11 +53,12 @@ bounded typed summary in operation history.
 
 The ordinary workflow supports a partly occupied room without scanning or
 alarming on unrelated computers. It preserves the controller boundary,
-protects observed interactive users, and serializes with deployment while
-remaining available without a privileged controller service.
+warns clearly before interrupting observed interactive users, and serializes
+with deployment while remaining available without a privileged controller
+service.
 
 Older client generations without the session helper are unknown and require
 explicit risk acknowledgement; their next normal deployment installs the
 helper. The workflow cannot prove ACPI completion, physical power state, or
-whether an unconfirmed request took effect. Wake-on-LAN, scheduling, forced
-shutdown of active users, and automatic retry remain outside this decision.
+whether an unconfirmed request took effect. Wake-on-LAN, scheduling, and
+automatic retry remain outside this decision.

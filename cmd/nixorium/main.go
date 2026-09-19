@@ -305,7 +305,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		}
 	case "shutdown":
 		manager := app.NewShutdownManager(local)
-		policy := domain.ShutdownRequireIdle
+		policy := domain.ShutdownProtectUnknown
 		if options.acknowledgeUnknown {
 			policy = domain.ShutdownAcknowledgeUnknown
 		}
