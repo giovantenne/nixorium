@@ -41,6 +41,8 @@ type DemoBundle struct {
 
 var demoANSI = regexp.MustCompile(`(?:\x1b\][^\x07]*(?:\x07|\x1b\\))|(?:\x1b\[[0-?]*[ -/]*[@-~])`)
 
+const demoServiceAddress = "192.168.1.123"
+
 func RenderDemoBundle(sourceCommit, sourceDate string) DemoBundle {
 	return DemoBundle{
 		SchemaVersion: 2,
@@ -166,7 +168,6 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Review what saving changes", 3000)
 	r.command(r.key(demoCode(tea.KeyEnter)))
-	r.capture("Save the declaration; no client changed", 2800)
 
 	r.model.screen = dashboardDeploy
 	r.model.deployResult = domain.DeploymentExecutionReport{}
@@ -232,8 +233,25 @@ func renderInstallationDemo(revision string) DemoScenario {
 	r.model.controllerApplying = true
 	r.model.controllerStarted = time.Now()
 	r.model.busy = "Building and activating the laboratory controller"
-	r.model.controllerProgress = domain.OperationProgress{SchemaVersion: 1, Operation: "controller-apply", State: "running", Phase: "verify", Current: 3, Total: 4, Recent: []string{"Controller configuration activated; verifying the active system"}}
-	r.capture("Activate and verify the controller", 2600)
+	controllerPhases := []struct {
+		phase    string
+		current  int
+		state    string
+		activity string
+		label    string
+	}{
+		{phase: "build", current: 1, state: "running", activity: "Building the reviewed controller configuration", label: "Build the controller configuration"},
+		{phase: "activate", current: 2, state: "running", activity: "Activating the reviewed controller configuration", label: "Activate the controller configuration"},
+		{phase: "verify", current: 3, state: "running", activity: "Verifying the active controller system", label: "Verify the active controller"},
+		{phase: "complete", current: 4, state: "completed", activity: "Controller activation and verification completed", label: "Complete controller activation and verification"},
+	}
+	for _, phase := range controllerPhases {
+		r.model.controllerProgress = domain.OperationProgress{SchemaVersion: 1, Operation: "controller-apply", State: phase.state, Phase: phase.phase, Current: phase.current, Total: 4, Recent: []string{phase.activity}}
+		if phase.state == "completed" {
+			r.model.installationStage = 4
+		}
+		r.capture(phase.label, 1200)
+	}
 
 	r.model.controllerApplying = false
 	r.model.installationStage = 4
@@ -246,12 +264,19 @@ func renderInstallationDemo(revision string) DemoScenario {
 	r.model.pxeProgress.Current = 5
 	r.model.pxeProgress.Recent = []string{"Publishing immutable artifacts for the LAN installer"}
 	r.capture("Publish the prepared LAN artifacts", 2200)
+	r.model.pxeProgress.State = "completed"
+	r.model.pxeProgress.Phase = "complete"
+	r.model.pxeProgress.Current = 6
+	r.model.pxeProgress.Recent = []string{"Client systems and network installation files are ready"}
+	r.capture("Complete client and netboot preparation", 1500)
 
 	r.model.pxePreparing = false
 	r.model.busy = ""
 	r.model.installationStage = 5
+	r.model.report.PXEPreparation.Ready = true
+	r.capture("Complete every preparation step", 1800)
 	r.model.screen = dashboardPXEStartReview
-	r.model.startPlan = domain.PXELifecycleReport{SchemaVersion: 1, Operation: "pxe-start-plan", State: "ready", Mode: "ready", Interface: "enp1s0", DHCPAddress: "192.0.2.44", StaticCIDR: "10.42.0.99/24"}
+	r.model.startPlan = domain.PXELifecycleReport{SchemaVersion: 1, Operation: "pxe-start-plan", State: "ready", Mode: "ready", Interface: "enp1s0", DHCPAddress: demoServiceAddress, StaticCIDR: "10.42.0.99/24"}
 	r.capture("Review the temporary network impact", 3300)
 	r.typeAndCapture("START PXE", "Type the network-impact confirmation")
 	startCommand := r.key(demoCode(tea.KeyEnter))
@@ -261,11 +286,14 @@ func renderInstallationDemo(revision string) DemoScenario {
 	}
 
 	r.model.screen = dashboardPXE
-	r.model.installationFlow = false
+	r.model.busy = ""
+	r.model.installationStage = 6
 	r.model.report.PXE.Mode = "active"
 	r.model.report.PXEPreparation.Ready = true
 	r.model.message = "Network installation is active."
-	r.capture("Boot a client from the network", 4200)
+	r.capture("Complete every controller-side installation step", 1700)
+	r.model.installationFlow = false
+	r.capture("Follow the installation steps on each client", 4200)
 	return DemoScenario{ID: "installation", Title: "Prepare and start network installation", Description: "Review lab settings, prepare configured clients, inspect the controller network change, then start PXE. Disk identity and erasure are confirmed later on each client console.", Frames: r.frames}
 }
 
@@ -427,14 +455,14 @@ func demoActions() DashboardActions {
 }
 
 func demoStatus(mode, revision string) domain.StatusReport {
-	report := domain.StatusReport{SchemaVersion: domain.SchemaVersion, Operation: "status", State: "ready", Repository: "/demo/lab", Deployment: domain.DeploymentStatus{Ready: true}, PXE: domain.PXELifecycleState{Mode: mode}, PXEPreparation: domain.PXEPreparationState{Present: true, Ready: true, Revision: revision, DHCPAddress: "192.0.2.44"}}
+	report := domain.StatusReport{SchemaVersion: domain.SchemaVersion, Operation: "status", State: "ready", Repository: "/demo/lab", Deployment: domain.DeploymentStatus{Ready: true}, PXE: domain.PXELifecycleState{Mode: mode}, PXEPreparation: domain.PXEPreparationState{Present: true, Ready: true, Revision: revision, DHCPAddress: demoServiceAddress}}
 	report.Meta.SchemaVersion = domain.SchemaVersion
 	report.Meta.Version = "demo"
 	report.Meta.DeploymentMode = "laboratory"
 	report.Meta.Controller.Name = "pc99"
 	report.Meta.Controller.Number = 99
 	report.Meta.Controller.StaticIP = "10.42.0.99"
-	report.Meta.Controller.DHCPIP = "192.0.2.44"
+	report.Meta.Controller.DHCPIP = demoServiceAddress
 	report.Meta.Network.Base = "10.42.0.0"
 	report.Meta.Network.PrefixLength = 24
 	report.Meta.Network.Interface = "enp1s0"
@@ -461,7 +489,7 @@ func demoSoftwareCatalog() domain.SoftwareCatalogReport {
 
 func demoSettings() domain.LabSettingsFile {
 	return domain.LabSettingsFile{SchemaVersion: domain.SettingsSchemaVersion, Lab: domain.LabSettings{
-		DeploymentMode: "controller", MasterDHCPIP: "192.0.2.44", NetworkBase: "10.42.0.0", NetworkPrefix: 24, PCCount: 5, MasterHostNumber: 99,
+		DeploymentMode: "controller", MasterDHCPIP: demoServiceAddress, NetworkBase: "10.42.0.0", NetworkPrefix: 24, PCCount: 5, MasterHostNumber: 99,
 		InterfaceName: "enp1s0", TeacherUser: "teacher", StudentUser: "student", TeacherPassword: domain.DefaultPasswordHash, StudentPassword: domain.DefaultPasswordHash,
 		AdminPassword: domain.DefaultPasswordHash, HomepageURL: "https://school.example/", StudentGitName: "Student", StudentGitEmail: "student@example.invalid",
 		AdminGitName: "Lab Administrator", AdminGitEmail: "admin@example.invalid", TimeZone: "Europe/Rome", DefaultLocale: "en_US.UTF-8", ExtraLocale: "it_IT.UTF-8",
