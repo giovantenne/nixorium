@@ -474,11 +474,12 @@ before the controller's static address is removed. Reopening it skips
 prerequisites already observed as current.
 Status derives stage state from the managed settings,
 required commands, password-hash readiness, verified key correspondence and
-private modes, clean Git review state, Nix evaluation, artifacts, and
-`deploymentStatus`; it never advances a stage by writing a global completion
-flag. Readiness never records or implies that any client installation has
-completed. Client identity and destructive disk confirmation remain local to
-the downloaded installer; the controller does not require a pilot selection.
+private modes, clean Git review state, Nix evaluation, controller activation,
+and prepared artifacts; it never advances a stage by writing a global
+completion flag. Setup ends when the controller and installation artifacts are
+ready. Client identity and destructive disk confirmation remain local to the
+downloaded installer; the controller stores no per-installation target or
+verification evidence.
 
 Key creation uses create-new semantics. Existing keys are verified and reused;
 they are never overwritten. Regeneration is a separately named recovery action
@@ -920,8 +921,8 @@ Evaluation alone is not evidence that affected packages or host roles build.
   UEFI PXE, disk naming, and `snponly.efi`; physical validation remains distinct
   from VM validation.
 - Reliable duplicate enrollment is unresolved without a controller protocol.
-  The first client UX must describe the actual guarantee rather than simulate
-  coordination.
+  The local installer must describe the actual guarantee rather than simulate
+  controller-side coordination.
 
 The following decisions are recorded separately:
 

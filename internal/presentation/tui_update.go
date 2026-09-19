@@ -71,7 +71,6 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardSetupKeyImportMsg:
 		model.busy = ""
 		model.setupKeyImporting = false
-		model.setupKeyImportResult = message.report
 		model.setupKeys = message.keys
 		if message.err != nil {
 			model.message = message.report.Message + " " + firstValidationIssue(message.report.Issues)
@@ -209,12 +208,6 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.setupMode = false
 			model.areaReturn = dashboardHome
 		}
-		if message.screen == dashboardPXE && model.guidedInstallation() && model.pilotPractical && model.report.PXE.Mode != "active" {
-			model.pilotName = ""
-			model.pilotPractical = false
-			model.installationSummary = true
-			model.hosts = domain.HostsReport{}
-		}
 		if preparationFinished && model.actions.LoadPXEProgress != nil {
 			return model, model.loadPXEProgress(model.pxeProgressID)
 		}
@@ -264,13 +257,6 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = ""
 		}
 		model.screen = dashboardHosts
-		return model, nil
-	case dashboardInstallationSessionMsg:
-		model.busy = ""
-		model.installationSession = message.report
-		model.applyInstallationSession()
-		model.message = message.report.Message
-		model.screen = message.screen
 		return model, nil
 	case dashboardDeploymentPlanMsg:
 		model.busy = ""

@@ -171,15 +171,6 @@ func (menu routineSettingsMenu) selected() (routineSettingsGroup, bool) {
 	return routineSettingsGroups[item.index], true
 }
 
-func (menu *routineSettingsMenu) selectGroup(id string) {
-	for index, group := range routineSettingsGroups {
-		if group.id == id {
-			menu.list.Select(index)
-			return
-		}
-	}
-}
-
 func (menu routineSettingsMenu) update(message tea.Msg) (routineSettingsMenu, tea.Cmd) {
 	updated, command := menu.list.Update(message)
 	menu.list = updated

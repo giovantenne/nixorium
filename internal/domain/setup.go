@@ -10,8 +10,6 @@ const (
 	SetupStageReview             = "review-changes"
 	SetupStageApply              = "apply-controller"
 	SetupStageArtifacts          = "prepare-artifacts"
-	SetupStageReadiness          = "verify-readiness"
-	SetupStageInstall            = "offer-client-installation"
 )
 
 type SetupStageState string
@@ -37,8 +35,6 @@ type SetupFacts struct {
 	Review      SetupObservation
 	Apply       SetupObservation
 	Artifacts   SetupObservation
-	Readiness   SetupObservation
-	Install     SetupObservation
 }
 
 type SetupStage struct {
@@ -72,8 +68,6 @@ func ReconcileSetup(repository string, facts SetupFacts) SetupReport {
 		{SetupStageReview, "Save local configuration", facts.Review},
 		{SetupStageApply, "Apply controller configuration", facts.Apply},
 		{SetupStageArtifacts, "Prepare installation artifacts", facts.Artifacts},
-		{SetupStageReadiness, "Verify readiness", facts.Readiness},
-		{SetupStageInstall, "Offer first client installation", facts.Install},
 	}
 	report := SetupReport{
 		SchemaVersion: SchemaVersion,

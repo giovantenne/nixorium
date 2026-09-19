@@ -104,28 +104,29 @@ A failed reapply never becomes a reinstall automatically.
 ↑/↓ move   enter continue   esc interventions   ? help
 ```
 
-Choosing reinstall does not jump directly to a generic PXE console:
+Choosing reinstall opens the same generic PXE control used by ordinary
+installation:
 
 ```text
-Nixorium — Restore / Reinstall from scratch
+Nixorium  /  Computers  /  Restore  /  Reinstall
+
+Reinstall computers
 
 Installation mode:  ✓ ready
 Prepared artifacts: ready
+Interface:          enp1s0
+Service address:    192.0.2.10
 
-Choose a computer to reinstall
-› pc01         10.0.0.1
-  pc02         10.0.0.2
-  pc03         10.0.0.3
+Next: start network installation
+  Press s to review the temporary address change and start PXE.
 
-The identity comes from the saved inventory. Disk selection and erasure are confirmed locally.
-
-↑/↓ move  •  enter select  •  esc back  •  q quit
+p Prepare  •  s Start PXE  •  Esc Computers  •  q Quit  •  F1 Help
 ```
 
-After selection the screen repeats the identity-specific disk warning before
-PXE review. Once the local reinstall and installed-disk boot are complete, `v`
-checks only that computer. Reapply continues to use the separate reviewed
-deployment flow and never escalates into reinstall.
+There is no controller-side target selection or verification session. Each
+computer chooses its configured identity and confirms its disk in the local
+installer. Reapply continues to use the separate reviewed deployment flow and
+never escalates into reinstall.
 
 ## Add or change software
 

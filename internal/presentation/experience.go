@@ -161,7 +161,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardInstallationArea:
 		lines = append(lines, "Install computers validates and saves laboratory settings, prepares every configured client, then asks once before starting PXE.", "PXE mode and network recovery is the advanced controller-side view.")
 	case dashboardRestore:
-		lines = append(lines, "Choose reapply to keep the disk, or reinstall to erase", "the disk confirmed locally on each selected computer.")
+		lines = append(lines, "Choose reapply to keep the disk, or reinstall to start PXE.", "Identity and disk erasure are confirmed locally on each computer.")
 	case dashboardAdministration:
 		lines = append(lines, "u update Nixorium   e settings   c controller", "s controller services   g changes   l history   i diagnostics")
 	case dashboardHosts:
@@ -243,7 +243,7 @@ func (model dashboardModel) restoreView() string {
 		description string
 	}{
 		{"Reapply the intended system", "Keeps the disk and deploys the declared configuration again."},
-		{"Reinstall from scratch", "Choose this physical computer's configured identity, then start PXE. Its disk is erased only after local confirmation."},
+		{"Reinstall from scratch", "Starts PXE; each computer chooses its configured identity and target disk locally."},
 	}
 	lines := []string{tuiTitle("Restore computers", model.isDark), tuiMuted("Choose whether to keep or replace the installed system.", model.isDark), ""}
 	for index, option := range options {
@@ -258,8 +258,8 @@ func (model dashboardModel) restoreView() string {
 		body: strings.Join(lines, "\n"),
 		notices: []tuiNotice{{
 			kind:   tuiStatusNeutral,
-			title:  "Why reinstall asks for a computer",
-			detail: "The choice binds the checklist to one configured identity; it does not remotely erase or reserve that machine. Disk erasure is confirmed locally in the installer.",
+			title:  "Disk erasure is always confirmed locally",
+			detail: "Starting PXE does not erase or reserve a computer. The downloaded installer asks for identity and disk confirmation on each machine.",
 		}},
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}},
 	}, model.width, model.isDark)
@@ -385,18 +385,6 @@ func (model *dashboardModel) startDiagnostics() tea.Cmd {
 	model.message = ""
 	action := model.actions.LoadDoctor
 	return func() tea.Msg { report, err := action(); return dashboardDoctorMsg{report: report, err: err} }
-}
-
-func (model dashboardModel) confirmationView(title, scope, impact, recovery, revision, phrase string) string {
-	lines := []string{tuiTitle("Nixorium  /  Review", model.isDark), "", tuiSection(title, model.isDark), "", "Affects  " + scope, "", tuiStatus(impact, tuiStatusAttention, model.isDark), recovery}
-	if revision != "" {
-		lines = append(lines, "", tuiMuted("Reviewed revision  "+revision, model.isDark))
-	}
-	lines = append(lines, "", tuiSection("Type "+phrase+" to continue:", model.isDark), "> "+model.confirmation+"_", "", "enter confirm   esc cancel   F1 help")
-	if model.message != "" {
-		lines = append(lines, "", tuiStatus(model.message, tuiStatusAttention, model.isDark))
-	}
-	return strings.Join(lines, "\n")
 }
 
 func phaseSteps(labels []string, current int, complete bool, dark bool) []string {

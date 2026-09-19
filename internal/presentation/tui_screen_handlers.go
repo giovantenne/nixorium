@@ -27,10 +27,6 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 	case "r":
 		model.screen = dashboardRestore
 		model.restoreCursor = 0
-		model.pilotName = ""
-		model.pilotPractical = false
-		model.pilotVerified = nil
-		model.installationSummary = false
 		model.message = ""
 	case "x":
 		model.screen = dashboardShutdown
@@ -226,16 +222,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.deployCursor = 0
 			} else {
 				model.restoreMode = true
-				model.pilotName = ""
-				model.pilotPractical = false
-				model.pilotVerified = nil
-				model.installationSummary = false
-				model.hosts = domain.HostsReport{}
 				model.screen = dashboardPXE
-				if model.actions.LoadInstallationSession != nil {
-					model.busy = "Restoring installation session"
-					return model, model.loadInstallationSession(dashboardPXE)
-				}
 			}
 		}
 	case dashboardSetup:
@@ -307,21 +294,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				return report.Message
 			}, dashboardPXE)
 			return model, tea.Batch(operation, schedulePXEProgressTick(model.pxeProgressID))
-		case domain.SetupStageReadiness, domain.SetupStageInstall:
-			model.screen = dashboardPXE
-			model.message = ""
-			if model.actions.LoadInstallationSession != nil {
-				model.busy = "Restoring installation session"
-				return model, model.loadInstallationSession(dashboardPXE)
-			}
-			return model, nil
 		case "":
 			model.screen = dashboardPXE
 			model.message = ""
-			if model.actions.LoadInstallationSession != nil {
-				model.busy = "Restoring installation session"
-				return model, model.loadInstallationSession(dashboardPXE)
-			}
 			return model, nil
 		default:
 			model.message = "This setup step is not available in the current session. Refresh setup and try again."
@@ -1224,13 +1199,6 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 				model.message = ""
 				return model, nil
 			}
-			if model.guidedInstallation() && model.pilotName != "" {
-				model.pilotName = ""
-				model.pilotPractical = false
-				model.hosts = domain.HostsReport{}
-				model.message = ""
-				return model, nil
-			}
 			if model.restoreMode {
 				model.screen = dashboardRestore
 				model.restoreMode = false
@@ -1243,62 +1211,6 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			if model.setupMode && model.actions.LoadSetup != nil {
 				model.busy = "Refreshing first-run progress"
 				return model, model.loadSetup()
-			}
-		case "up", "k":
-			if model.guidedInstallation() && model.pilotName == "" {
-				model.pilotCursor = max(0, model.pilotCursor-1)
-			}
-		case "down", "j":
-			if model.guidedInstallation() && model.pilotName == "" {
-				model.pilotCursor = min(max(0, len(model.report.Meta.Clients.Hosts)-1), model.pilotCursor+1)
-			}
-		case "enter":
-			if model.guidedInstallation() {
-				if model.pilotName == "" {
-					if model.installationSummary {
-						model.installationSummary = false
-						model.message = "Choose the next configured computer. Previous session evidence remains recorded."
-						return model, nil
-					}
-					if len(model.report.Meta.Clients.Hosts) == 0 {
-						model.message = "No client identity is configured. Return to laboratory settings and add one first."
-						return model, nil
-					}
-					pilot := model.report.Meta.Clients.Hosts[min(model.pilotCursor, len(model.report.Meta.Clients.Hosts)-1)]
-					if model.actions.SelectInstallationTarget == nil {
-						model.message = "Resumable installation sessions are not available in this build."
-						return model, nil
-					}
-					model.busy = "Recording selected computer " + pilot.Name
-					model.message = ""
-					return model, model.selectInstallationTarget(pilot.Name)
-				}
-				if model.pilotTechnicallyVerified() && !model.pilotPractical {
-					if model.actions.ConfirmInstallationTarget == nil {
-						model.message = "Practical-check recording is not available in this build."
-						return model, nil
-					}
-					model.busy = "Recording the practical check for " + model.pilotName
-					model.message = ""
-					return model, model.confirmInstallationTarget(model.pilotName)
-				}
-				if model.pilotPractical {
-					model.pilotName = ""
-					model.pilotPractical = false
-					model.hosts = domain.HostsReport{}
-					model.message = "Choose another configured computer, or stop installation mode to finish."
-					return model, nil
-				}
-			}
-		case "v":
-			if model.guidedInstallation() && model.pilotName != "" {
-				if model.actions.VerifyInstallationTarget == nil {
-					model.message = "Pilot verification is not available in this session."
-					return model, nil
-				}
-				model.busy = "Checking authenticated system state on " + model.pilotName
-				model.message = ""
-				return model, model.verifyInstallationTarget(model.pilotName)
 			}
 		case "p":
 			model.busy = "Preparing netboot artifacts and client closures"

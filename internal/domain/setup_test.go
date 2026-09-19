@@ -18,8 +18,6 @@ func completeSetupFacts() SetupFacts {
 		Review:      complete,
 		Apply:       complete,
 		Artifacts:   complete,
-		Readiness:   complete,
-		Install:     complete,
 	}
 }
 

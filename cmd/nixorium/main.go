@@ -488,7 +488,6 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 func runDashboardProgram(ctx context.Context, repository string, setupMode bool, stderr io.Writer) int {
 	local := adapters.Local{}
 	inspector := app.NewInspector(local)
-	installationManager := app.NewInstallationSessionManager(local, inspector)
 	setupManager := app.NewSetupManager(local)
 	lifecycle := app.NewPXELifecycle(local)
 	deploymentManager := app.NewDeploymentManager(local)
@@ -552,18 +551,6 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		LoadHosts: func() (domain.HostsReport, error) {
 			return inspector.Hosts(ctx, repository)
-		},
-		LoadInstallationSession: func() domain.InstallationSessionReport {
-			return installationManager.Status(ctx, repository)
-		},
-		SelectInstallationTarget: func(name string) domain.InstallationSessionReport {
-			return installationManager.Select(ctx, repository, name)
-		},
-		VerifyInstallationTarget: func(name string) domain.InstallationSessionReport {
-			return installationManager.Verify(ctx, repository, name)
-		},
-		ConfirmInstallationTarget: func(name string) domain.InstallationSessionReport {
-			return installationManager.ConfirmPractical(ctx, repository, name)
 		},
 		LoadSoftware: func() domain.SoftwareCatalogReport { return softwareManager.Catalog(ctx, repository) },
 		SearchSoftware: func(searchContext context.Context, query string) domain.SoftwareSearchReport {

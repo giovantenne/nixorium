@@ -11,7 +11,6 @@ import (
 type SetupSource interface {
 	ReadSettings(repository string) ([]byte, error)
 	LabMeta(ctx context.Context, repository string) (domain.LabMeta, error)
-	DeploymentStatus(ctx context.Context, repository string) (domain.DeploymentStatus, error)
 	GitState(ctx context.Context, repository string) (domain.GitState, error)
 	ControllerApplied(ctx context.Context, repository string) (bool, string)
 	ArtifactState(repository, name, relativePath string) domain.ArtifactState
@@ -229,26 +228,6 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 		facts.Artifacts.Detail = "prepare installation artifacts after configuration validation"
 	}
 
-	if facts.Validation.Complete {
-		if readiness, err := m.source.DeploymentStatus(ctx, repository); err == nil {
-			facts.Readiness.Complete = readiness.Ready
-			if readiness.Ready {
-				facts.Readiness.Detail = "deploymentStatus.ready is true"
-			} else {
-				facts.Readiness.Detail = strings.Join(readiness.Issues, "; ")
-			}
-		} else {
-			facts.Readiness.Detail = fmt.Sprintf("deployment readiness evaluation failed: %v", err)
-		}
-	} else {
-		facts.Readiness.Detail = "verify deployment readiness after configuration validation"
-	}
-	facts.Install.Complete = facts.Readiness.Complete && preparation.Ready
-	if facts.Install.Complete {
-		facts.Install.Detail = "guided installation is available: open nixorium and choose Install computers over network"
-	} else {
-		facts.Install.Detail = "guided installation requires deployment readiness and current prepared artifacts"
-	}
 	return domain.ReconcileSetup(repository, facts)
 }
 
