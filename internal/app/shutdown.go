@@ -47,8 +47,8 @@ func (m *ShutdownManager) Plan(ctx context.Context, repository, requested string
 		return shutdownPlanIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
 	}
 	report.Repository = root
-	if policy != domain.ShutdownRequireIdle && policy != domain.ShutdownAcknowledgeUnknown {
-		return shutdownPlanIssue(report, "policy", "session policy must be require-idle or acknowledge-unknown")
+	if policy != domain.ShutdownProtectUnknown && policy != domain.ShutdownAcknowledgeUnknown {
+		return shutdownPlanIssue(report, "policy", "session policy must be protect-unknown or acknowledge-unknown")
 	}
 	meta, err := m.source.LabMeta(ctx, root)
 	if err != nil {
@@ -81,7 +81,7 @@ func (m *ShutdownManager) Plan(ctx context.Context, repository, requested string
 	report.State = "ready"
 	report.ExpiresAt = m.now().UTC().Truncate(shutdownReviewWindow).Add(shutdownReviewWindow)
 	report.ReviewToken = domain.ShutdownReviewToken(report)
-	report.Confirmation = fmt.Sprintf("SHUTDOWN %d CLIENTS %s", report.Eligible, report.ReviewToken[len("sha256:"):len("sha256:")+12])
+	report.Confirmation = "SHUTDOWN"
 	report.Message = fmt.Sprintf("%d of %d selected computer(s) are eligible; checks will run again before requests are sent.", report.Eligible, len(report.Targets))
 	return report
 }
@@ -224,7 +224,7 @@ func shutdownObservationEligible(observation domain.ShutdownObservation, policy 
 	case domain.ShutdownSessionIdle:
 		return true, "no interactive user session detected"
 	case domain.ShutdownSessionActive:
-		return false, "an interactive user session is active"
+		return true, "interactive user session active; unsaved work may be lost"
 	case domain.ShutdownSessionUnknown:
 		if policy == domain.ShutdownAcknowledgeUnknown {
 			return true, "session state is unknown; risk explicitly acknowledged"

@@ -1,0 +1,470 @@
+package presentation
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"regexp"
+	"strings"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/giovantenne/nixorium/internal/domain"
+)
+
+// DemoFrame is a deterministic frame exported from the real dashboard
+// renderer. The website replays these frames; it does not reproduce the TUI
+// state machine in JavaScript.
+type DemoFrame struct {
+	Label      string `json:"label"`
+	DurationMS int    `json:"durationMs"`
+	Text       string `json:"text"`
+	ANSI       string `json:"ansi"`
+}
+
+type DemoScenario struct {
+	ID          string      `json:"id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Frames      []DemoFrame `json:"frames"`
+}
+
+type DemoBundle struct {
+	SchemaVersion int            `json:"schemaVersion"`
+	SourceCommit  string         `json:"sourceCommit"`
+	SourceDate    string         `json:"sourceDate"`
+	Terminal      string         `json:"terminal"`
+	Synthetic     bool           `json:"synthetic"`
+	Scenarios     []DemoScenario `json:"scenarios"`
+}
+
+var demoANSI = regexp.MustCompile(`(?:\x1b\][^\x07]*(?:\x07|\x1b\\))|(?:\x1b\[[0-?]*[ -/]*[@-~])`)
+
+func RenderDemoBundle(sourceCommit, sourceDate string) DemoBundle {
+	return DemoBundle{
+		SchemaVersion: 2,
+		SourceCommit:  sourceCommit,
+		SourceDate:    sourceDate,
+		Terminal:      "120x30",
+		Synthetic:     true,
+		Scenarios: []DemoScenario{
+			renderSoftwareDeploymentDemo(sourceCommit),
+			renderInstallationDemo(sourceCommit),
+			renderShutdownDemo(sourceCommit),
+		},
+	}
+}
+
+type demoRecorder struct {
+	model  dashboardModel
+	frames []DemoFrame
+}
+
+func newDemoRecorder(actions DashboardActions, revision string) demoRecorder {
+	model := newDashboardModel(demoStatus("ready", revision), demoSetupReady(), actions, false)
+	model.width, model.height, model.isDark = 120, 30, true
+	model.homeMenu = newDashboardTaskMenu(true, model.width, model.height)
+	model.ensureActivitySpinner()
+	return demoRecorder{model: model}
+}
+
+func (r *demoRecorder) capture(label string, durationMS int) {
+	ansi := strings.TrimRight(r.model.View().Content, " \n")
+	text := demoANSI.ReplaceAllString(ansi, "")
+	r.frames = append(r.frames, DemoFrame{Label: label, DurationMS: durationMS, Text: text, ANSI: ansi})
+}
+
+func (r *demoRecorder) key(key tea.KeyPressMsg) tea.Cmd {
+	updated, command := r.model.Update(key)
+	r.model = updated.(dashboardModel)
+	return command
+}
+
+func (r *demoRecorder) message(message tea.Msg) tea.Cmd {
+	updated, command := r.model.Update(message)
+	r.model = updated.(dashboardModel)
+	return command
+}
+
+func (r *demoRecorder) command(command tea.Cmd) tea.Cmd {
+	if command == nil {
+		panic("demo transition did not return its expected command")
+	}
+	return r.message(command())
+}
+
+func demoText(value string) tea.KeyPressMsg { return tea.KeyPressMsg{Text: value} }
+func demoCode(value rune) tea.KeyPressMsg   { return tea.KeyPressMsg{Code: value} }
+
+func (r *demoRecorder) pressAndCapture(key tea.KeyPressMsg, label string, durationMS int) {
+	r.key(key)
+	r.capture(label, durationMS)
+}
+
+func (r *demoRecorder) typeAndCapture(value, label string) {
+	characters := []rune(value)
+	for index, character := range characters {
+		key := demoText(string(character))
+		if character == ' ' {
+			key = demoCode(tea.KeySpace)
+		}
+		r.key(key)
+		duration := 110
+		if index == len(characters)-1 {
+			duration = 700
+		}
+		r.capture(label, duration)
+	}
+}
+
+func renderSoftwareDeploymentDemo(revision string) DemoScenario {
+	actions := demoActions()
+	catalog := demoSoftwareCatalog()
+	actions.LoadSoftware = func() domain.SoftwareCatalogReport { return catalog }
+	actions.SearchSoftware = func(_ context.Context, query string) domain.SoftwareSearchReport {
+		return domain.SoftwareSearchReport{
+			SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-search", State: "ready", Repository: "/demo/lab", Query: query,
+			Results: []domain.SoftwareCatalogItem{{ID: "inkscape", Label: "Inkscape", Summary: "Create and edit vector graphics", Version: "1.4.2", Availability: "available"}},
+			Issues:  []domain.ValidationIssue{},
+		}
+	}
+	actions.PlanSoftware = func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+		return domain.SoftwareChangePlanReport{
+			SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
+			Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Confirmation: "SAVE SOFTWARE demo", Issues: []domain.ValidationIssue{},
+		}
+	}
+	actions.SaveSoftware = func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
+		return domain.SoftwareChangeApplyReport{
+			SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: "saved", Repository: plan.Repository, ManagedFile: plan.ManagedFile,
+			Request: plan.Request, AffectedClients: plan.AffectedClients, Revision: revision, Message: "Software selection saved locally.", Issues: []domain.ValidationIssue{},
+		}
+	}
+	actions.PlanDeployment = func(requested string) domain.DeploymentPlanReport {
+		return domain.DeploymentPlanReport{
+			SchemaVersion: domain.SchemaVersion, Operation: "deploy-plan", State: "ready", Repository: "/demo/lab", Requested: requested,
+			Revision: revision, ColmenaSelector: requested, Targets: demoDeploymentTargets(), BuildFirst: true, Issues: []domain.ValidationIssue{},
+		}
+	}
+
+	r := newDemoRecorder(actions, revision)
+	r.capture("Overview", 1200)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Installation", 550)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Software", 750)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.key(demoText("/"))
+	r.capture("Open Software directly in Search", 900)
+	r.typeAndCapture("inkscape", "Type the package name")
+	r.message(dashboardSoftwareSearchMsg{id: r.model.softwareSearchID, report: actions.SearchSoftware(context.Background(), "inkscape")})
+	r.capture("Find Inkscape in the pinned package set", 1900)
+	r.pressAndCapture(demoCode(tea.KeyEnter), "Choose Inkscape from Search", 1900)
+	for r.model.softwareScopeOptions()[r.model.softwareScopeCursor].scope.Kind != domain.SoftwareScopeAllClients {
+		r.pressAndCapture(demoCode(tea.KeyDown), "Move through declaration scopes", 550)
+	}
+	r.capture("Choose all current and future clients", 2400)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Review what saving changes", 3000)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Save the declaration; no client changed", 2800)
+
+	r.model.screen = dashboardDeploy
+	r.model.deployResult = domain.DeploymentExecutionReport{}
+	r.model.deployChosen = map[string]bool{"pc01": true, "pc02": true, "pc03": true, "pc04": true, "pc05": true}
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Review deployment to all five current clients", 2100)
+	r.typeAndCapture("DEPLOY @lab", "Type the reviewed deployment target")
+	deployCommand := r.key(demoCode(tea.KeyEnter))
+	r.capture("Press Enter to start deployment", 650)
+	if deployCommand == nil {
+		panic("deployment confirmation did not start the synthetic operation")
+	}
+
+	r.model.screen = dashboardDeploy
+	r.model.deploying = true
+	r.model.busy = "Building and applying the reviewed deployment"
+	r.model.deployStarted = time.Now()
+	r.model.deployProgress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Completed: 2, Total: 4, Activity: "Building all five clients from the reviewed revision"}
+	r.model.deployRecent = []string{"Validated clean revision", "Building all five clients from the reviewed revision"}
+	r.capture("Build the selected configuration", 1900)
+	r.model.deployProgress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 3, Total: 4, TargetCurrent: 3, TargetTotal: 5, Activity: "Activating pc03 over SSH"}
+	r.model.deployRecent = append(r.model.deployRecent, "Activating clients over SSH · 3 of 5")
+	r.capture("Apply to every selected client", 1900)
+	r.model.deployProgress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseVerify, Completed: 4, Total: 4, TargetCurrent: 5, TargetTotal: 5, Activity: "Authenticated all five client system states"}
+	r.model.deployRecent = append(r.model.deployRecent, "Authenticated all five client system states")
+	r.capture("Verify the observed client state", 2000)
+	r.message(dashboardDeploymentResultMsg{report: domain.DeploymentExecutionReport{
+		SchemaVersion: domain.SchemaVersion, Operation: "deploy-apply", State: "completed", Repository: "/demo/lab", Requested: "@lab", Revision: revision, ColmenaSelector: "@lab",
+		Targets: demoDeploymentTargets(), Phase: domain.DeploymentPhaseComplete, BuildCompleted: true, ApplyCompleted: true,
+		Verification: domain.DeploymentVerificationSummary{Attempted: 5, Verified: 5, Recorded: 5}, LogPath: "/demo/state/deploy-lab.log", Message: "All five clients report the reviewed revision.", Issues: []domain.ValidationIssue{},
+	}})
+	r.capture("Deployment completed and verified", 3500)
+
+	return DemoScenario{ID: "software-all-clients", Title: "Add one package to every client", Description: "Search the pinned package set for Inkscape, save it for every current and future client, then explicitly deploy and verify all five configured PCs.", Frames: r.frames}
+}
+
+func demoDeploymentTargets() []domain.DeploymentTarget {
+	return []domain.DeploymentTarget{
+		{Name: "pc01", IP: "10.42.0.11"},
+		{Name: "pc02", IP: "10.42.0.12"},
+		{Name: "pc03", IP: "10.42.0.13"},
+		{Name: "pc04", IP: "10.42.0.14"},
+		{Name: "pc05", IP: "10.42.0.15"},
+	}
+}
+
+func renderInstallationDemo(revision string) DemoScenario {
+	actions := demoActions()
+	actions.LoadSettings = func() (domain.LabSettingsFile, error) { return demoSettings(), nil }
+	r := newDemoRecorder(actions, revision)
+	r.capture("Overview", 1100)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Installation", 700)
+	r.key(demoCode(tea.KeyEnter))
+	r.capture("Open Installation", 1500)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Review laboratory network settings", 2300)
+	r.model.settingsEditor = r.model.settingsEditor.moveToField(4)
+	r.capture("Configure five client computers", 2300)
+
+	r.model.screen = dashboardPXE
+	r.model.installationFlow = true
+	r.model.installationStage = 3
+	r.model.controllerApplying = true
+	r.model.controllerStarted = time.Now()
+	r.model.busy = "Building and activating the laboratory controller"
+	r.model.controllerProgress = domain.OperationProgress{SchemaVersion: 1, Operation: "controller-apply", State: "running", Phase: "verify", Current: 3, Total: 4, Recent: []string{"Controller configuration activated; verifying the active system"}}
+	r.capture("Activate and verify the controller", 2600)
+
+	r.model.controllerApplying = false
+	r.model.installationStage = 4
+	r.model.pxePreparing = true
+	r.model.pxeProgressStarted = time.Now()
+	r.model.busy = "Preparing client systems and network installation files"
+	r.model.pxeProgress = domain.OperationProgress{SchemaVersion: 1, Operation: "pxe-prepare", State: "running", Phase: "clients", Current: 4, Total: 6, Recent: []string{"Building configured client systems from the reviewed revision"}}
+	r.capture("Prepare client systems and netboot files", 3000)
+	r.model.pxeProgress.Phase = "publish"
+	r.model.pxeProgress.Current = 5
+	r.model.pxeProgress.Recent = []string{"Publishing immutable artifacts for the LAN installer"}
+	r.capture("Publish the prepared LAN artifacts", 2200)
+
+	r.model.pxePreparing = false
+	r.model.busy = ""
+	r.model.installationStage = 5
+	r.model.screen = dashboardPXEStartReview
+	r.model.startPlan = domain.PXELifecycleReport{SchemaVersion: 1, Operation: "pxe-start-plan", State: "ready", Mode: "ready", Interface: "enp1s0", DHCPAddress: "192.0.2.44", StaticCIDR: "10.42.0.99/24"}
+	r.capture("Review the temporary network impact", 3300)
+	r.typeAndCapture("START PXE", "Type the network-impact confirmation")
+	startCommand := r.key(demoCode(tea.KeyEnter))
+	r.capture("Press Enter to start network installation", 650)
+	if startCommand == nil {
+		panic("PXE confirmation did not start the synthetic operation")
+	}
+
+	r.model.screen = dashboardPXE
+	r.model.installationFlow = false
+	r.model.report.PXE.Mode = "active"
+	r.model.report.PXEPreparation.Ready = true
+	r.model.message = "Network installation is active."
+	r.capture("Boot a client from the network", 4200)
+	return DemoScenario{ID: "installation", Title: "Prepare and start network installation", Description: "Review lab settings, prepare configured clients, inspect the controller network change, then start PXE. Disk identity and erasure are confirmed later on each client console.", Frames: r.frames}
+}
+
+func renderShutdownDemo(revision string) DemoScenario {
+	actions := demoActions()
+	actions.PlanShutdown = func(requested string, _ domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+		return domain.ShutdownPlanReport{
+			SchemaVersion: domain.SchemaVersion, Operation: "shutdown-plan", State: "ready", Repository: "/demo/lab", Requested: requested, Policy: domain.ShutdownProtectUnknown,
+			Targets: []domain.ShutdownTargetPlan{
+				{Name: "pc02", IP: "10.42.0.12", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive, Eligible: true, Detail: "Interactive student session active; unsaved work may be lost"},
+				{Name: "pc04", IP: "10.42.0.14", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true},
+				{Name: "pc05", IP: "10.42.0.15", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnavailable, Session: domain.ShutdownSessionUnknown, Eligible: false, Detail: "No management connection"},
+			},
+			Eligible: 2, ReviewToken: "sha256:demo", Confirmation: "SHUTDOWN", Message: "pc02 and pc04 are eligible; pc02 has an active session.", Issues: []domain.ValidationIssue{},
+		}
+	}
+	actions.ApplyShutdown = func(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
+		return domain.ShutdownApplyReport{
+			SchemaVersion: domain.SchemaVersion, Operation: "shutdown-apply", State: "partial", Repository: plan.Repository, Requested: plan.Requested, Policy: plan.Policy,
+			Targets:  []domain.ShutdownTargetOutcome{{Name: "pc02", State: "accepted", Detail: "Operating-system request accepted with an active session"}, {Name: "pc04", State: "accepted", Detail: "Operating-system request accepted"}, {Name: "pc05", State: "not-sent", Detail: "Unreachable; nothing queued"}},
+			Accepted: 2, NotSent: 1, Unconfirmed: 0, Message: "Requests were accepted for pc02 and pc04; physical power state was not observed.", Issues: []domain.ValidationIssue{},
+		}
+	}
+
+	r := newDemoRecorder(actions, revision)
+	r.capture("Overview", 1200)
+	r.key(demoText("c"))
+	r.capture("Open Computers", 1300)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move to client distribution", 450)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move to computer restore", 450)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move to Shut down computers", 700)
+	r.key(demoCode(tea.KeyEnter))
+	r.capture("Choose client computers", 1800)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to pc02", 500)
+	r.pressAndCapture(demoCode(tea.KeySpace), "Select pc02", 550)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to pc03", 350)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to pc04", 500)
+	r.pressAndCapture(demoCode(tea.KeySpace), "Select pc04", 550)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to pc05", 500)
+	r.pressAndCapture(demoCode(tea.KeySpace), "Select pc05", 700)
+	r.capture("Select pc02, pc04, and pc05; controller absent", 2200)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Active sessions will shut down; unreachable clients are not sent", 3300)
+	r.typeAndCapture("SHUTDOWN", "Type the one-word confirmation")
+	shutdownCommand := r.key(demoCode(tea.KeyEnter))
+	r.capture("Press Enter to send the reviewed requests", 650)
+	r.command(shutdownCommand)
+	r.capture("Report accepted and not-sent outcomes", 3900)
+	return DemoScenario{ID: "shutdown", Title: "Review a controlled shutdown", Description: "The controller is excluded. An active session produces a visible data-loss warning but still receives the reviewed request; an unreachable client receives nothing, and the result does not claim physical power-off.", Frames: r.frames}
+}
+
+func demoActions() DashboardActions {
+	fail := func(name string) { panic("demo callback invoked without a synthetic implementation: " + name) }
+	return DashboardActions{
+		RunningVersion: "demo",
+		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+			fail("LoadInitial")
+			return domain.StatusReport{}, domain.SetupReport{}, nil
+		},
+		LoadDoctor:    func() (domain.DoctorReport, error) { fail("LoadDoctor"); return domain.DoctorReport{}, nil },
+		Refresh:       func() (domain.StatusReport, error) { fail("Refresh"); return domain.StatusReport{}, nil },
+		LoadSetup:     func() domain.SetupReport { fail("LoadSetup"); return domain.SetupReport{} },
+		LoadSetupKeys: func() domain.KeyReconcileReport { fail("LoadSetupKeys"); return domain.KeyReconcileReport{} },
+		ReconcileSetupKeys: func() (domain.KeyReconcileReport, error) {
+			fail("ReconcileSetupKeys")
+			return domain.KeyReconcileReport{}, nil
+		},
+		ImportSetupKey: func(string, string) (domain.KeyImportReport, error) {
+			fail("ImportSetupKey")
+			return domain.KeyImportReport{}, nil
+		},
+		SaveSetupConfiguration: func() domain.ConfigurationSaveReport {
+			fail("SaveSetupConfiguration")
+			return domain.ConfigurationSaveReport{}
+		},
+		InstallSetupSecrets: func() domain.ActionReport { fail("InstallSetupSecrets"); return domain.ActionReport{} },
+		LoadHosts:           func() (domain.HostsReport, error) { fail("LoadHosts"); return domain.HostsReport{}, nil },
+		LoadSoftware:        func() domain.SoftwareCatalogReport { fail("LoadSoftware"); return domain.SoftwareCatalogReport{} },
+		SearchSoftware: func(context.Context, string) domain.SoftwareSearchReport {
+			fail("SearchSoftware")
+			return domain.SoftwareSearchReport{}
+		},
+		PlanSoftware: func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+			fail("PlanSoftware")
+			return domain.SoftwareChangePlanReport{}
+		},
+		SaveSoftware: func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
+			fail("SaveSoftware")
+			return domain.SoftwareChangeApplyReport{}
+		},
+		PlanShutdown: func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+			fail("PlanShutdown")
+			return domain.ShutdownPlanReport{}
+		},
+		ApplyShutdown: func(domain.ShutdownPlanReport) domain.ShutdownApplyReport {
+			fail("ApplyShutdown")
+			return domain.ShutdownApplyReport{}
+		},
+		PlanDeployment: func(string) domain.DeploymentPlanReport { fail("PlanDeployment"); return domain.DeploymentPlanReport{} },
+		ApplyDeployment: func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+			fail("ApplyDeployment")
+			return domain.DeploymentExecutionReport{}
+		},
+		PlanController: func() domain.ControllerRebuildPlanReport {
+			fail("PlanController")
+			return domain.ControllerRebuildPlanReport{}
+		},
+		ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			fail("ApplyController")
+			return domain.ControllerRebuildExecutionReport{}
+		},
+		LoadControllerProgress: func() (domain.OperationProgress, error) {
+			fail("LoadControllerProgress")
+			return domain.OperationProgress{}, nil
+		},
+		LoadServices:   func() domain.ServicesReport { fail("LoadServices"); return domain.ServicesReport{} },
+		RestartService: func(string) domain.ServiceActionReport { fail("RestartService"); return domain.ServiceActionReport{} },
+		LoadLogs:       func() domain.OperationLogsReport { fail("LoadLogs"); return domain.OperationLogsReport{} },
+		LoadLog:        func(string) domain.OperationLogReport { fail("LoadLog"); return domain.OperationLogReport{} },
+		LoadGitReview:  func() domain.GitReviewReport { fail("LoadGitReview"); return domain.GitReviewReport{} },
+		PlanGitCommit:  func(string) domain.GitCommitPlanReport { fail("PlanGitCommit"); return domain.GitCommitPlanReport{} },
+		ApplyGitCommit: func(domain.GitCommitPlanReport) domain.GitCommitReport {
+			fail("ApplyGitCommit")
+			return domain.GitCommitReport{}
+		},
+		CheckUpdate: func() domain.UpdateCheckReport { fail("CheckUpdate"); return domain.UpdateCheckReport{} },
+		PlanUpdate:  func(string, bool, bool) domain.UpdatePlanReport { fail("PlanUpdate"); return domain.UpdatePlanReport{} },
+		PlanUpdateWithProgress: func(string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+			fail("PlanUpdateWithProgress")
+			return domain.UpdatePlanReport{}
+		},
+		SaveUpdate: func(domain.UpdatePlanReport) domain.UpdateApplyReport {
+			fail("SaveUpdate")
+			return domain.UpdateApplyReport{}
+		},
+		LoadSettings: func() (domain.LabSettingsFile, error) { fail("LoadSettings"); return domain.LabSettingsFile{}, nil },
+		PlanSettings: func(domain.LabSettingsFile) domain.ConfigPlanReport {
+			fail("PlanSettings")
+			return domain.ConfigPlanReport{}
+		},
+		SaveSettings: func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport {
+			fail("SaveSettings")
+			return domain.ConfigurationSaveReport{}
+		},
+		ChangePassword: func(string, domain.LabSettingsFile, *os.File, io.Writer) (domain.LabSettingsFile, error) {
+			fail("ChangePassword")
+			return domain.LabSettingsFile{}, nil
+		},
+		PreparePXE: func() domain.ActionReport { fail("PreparePXE"); return domain.ActionReport{} },
+		LoadPXEProgress: func() (domain.OperationProgress, error) {
+			fail("LoadPXEProgress")
+			return domain.OperationProgress{}, nil
+		},
+		PlanPXEStart: func() domain.PXELifecycleReport { fail("PlanPXEStart"); return domain.PXELifecycleReport{} },
+		StartPXE:     func() domain.PXELifecycleReport { fail("StartPXE"); return domain.PXELifecycleReport{} },
+		StopPXE:      func() domain.PXELifecycleReport { fail("StopPXE"); return domain.PXELifecycleReport{} },
+		RecoverPXE:   func() domain.PXELifecycleReport { fail("RecoverPXE"); return domain.PXELifecycleReport{} },
+	}
+}
+
+func demoStatus(mode, revision string) domain.StatusReport {
+	report := domain.StatusReport{SchemaVersion: domain.SchemaVersion, Operation: "status", State: "ready", Repository: "/demo/lab", Deployment: domain.DeploymentStatus{Ready: true}, PXE: domain.PXELifecycleState{Mode: mode}, PXEPreparation: domain.PXEPreparationState{Present: true, Ready: true, Revision: revision, DHCPAddress: "192.0.2.44"}}
+	report.Meta.SchemaVersion = domain.SchemaVersion
+	report.Meta.Version = "demo"
+	report.Meta.DeploymentMode = "laboratory"
+	report.Meta.Controller.Name = "pc99"
+	report.Meta.Controller.Number = 99
+	report.Meta.Controller.StaticIP = "10.42.0.99"
+	report.Meta.Controller.DHCPIP = "192.0.2.44"
+	report.Meta.Network.Base = "10.42.0.0"
+	report.Meta.Network.PrefixLength = 24
+	report.Meta.Network.Interface = "enp1s0"
+	report.Meta.Clients.Count = 5
+	for index := 1; index <= 5; index++ {
+		report.Meta.Clients.Hosts = append(report.Meta.Clients.Hosts, domain.HostMeta{Name: fmt.Sprintf("pc%02d", index), IP: fmt.Sprintf("10.42.0.%d", 10+index), Interface: "enp1s0"})
+	}
+	return report
+}
+
+func demoSetupReady() domain.SetupReport {
+	complete := domain.SetupObservation{Complete: true}
+	return domain.ReconcileSetup("/demo/lab", domain.SetupFacts{Environment: complete, Network: complete, Identity: complete, Credentials: complete, Keys: complete, Validation: complete, Review: complete, Apply: complete, Artifacts: complete})
+}
+
+func demoSoftwareCatalog() domain.SoftwareCatalogReport {
+	return domain.SoftwareCatalogReport{
+		Controller: "pc99", SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-catalog", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
+		Clients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, Groups: map[string][]string{"graphics": {"pc01", "pc02"}},
+		Catalog:  []domain.SoftwareCatalogItem{{ID: "inkscape", Label: "Inkscape", Summary: "Create and edit vector graphics", Version: "1.4.2", Availability: "available"}, {ID: "gimp", Label: "GIMP", Summary: "Edit bitmap images", Version: "3.0.4", Availability: "available"}},
+		Packages: []domain.SoftwareDeclaration{{Package: "vlc", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}, Origin: "managed"}}, Issues: []domain.ValidationIssue{},
+	}
+}
+
+func demoSettings() domain.LabSettingsFile {
+	return domain.LabSettingsFile{SchemaVersion: domain.SettingsSchemaVersion, Lab: domain.LabSettings{
+		DeploymentMode: "controller", MasterDHCPIP: "192.0.2.44", NetworkBase: "10.42.0.0", NetworkPrefix: 24, PCCount: 5, MasterHostNumber: 99,
+		InterfaceName: "enp1s0", TeacherUser: "teacher", StudentUser: "student", TeacherPassword: domain.DefaultPasswordHash, StudentPassword: domain.DefaultPasswordHash,
+		AdminPassword: domain.DefaultPasswordHash, HomepageURL: "https://school.example/", StudentGitName: "Student", StudentGitEmail: "student@example.invalid",
+		AdminGitName: "Lab Administrator", AdminGitEmail: "admin@example.invalid", TimeZone: "Europe/Rome", DefaultLocale: "en_US.UTF-8", ExtraLocale: "it_IT.UTF-8",
+		KeyboardLayout: "it", ConsoleKeyMap: "it2", VeyonNativeHosts: []string{},
+	}}
+}

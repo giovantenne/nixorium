@@ -344,7 +344,7 @@ func TestDashboardSoftwareResultDistinguishesNoChangeAndUncertainSave(t *testing
 	}
 }
 
-func TestDashboardGuidesClientOnlyShutdownWithUnknownSessionAcknowledgement(t *testing.T) {
+func TestDashboardShutdownIncludesActiveSessionAndAcknowledgesUnknownSession(t *testing.T) {
 	plans := 0
 	applies := 0
 	actions := DashboardActions{
@@ -362,10 +362,10 @@ func TestDashboardGuidesClientOnlyShutdownWithUnknownSessionAcknowledgement(t *t
 			return domain.ShutdownPlanReport{
 				State: "ready", Requested: requested, Policy: policy, Eligible: eligible,
 				Targets: []domain.ShutdownTargetPlan{
-					{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true},
+					{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive, Eligible: true},
 					{Name: "pc02", IP: "10.0.0.2", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionUnknown, Eligible: secondEligible},
 				},
-				ReviewToken: "sha256:abcdef0123456789", Confirmation: fmt.Sprintf("SHUTDOWN %d CLIENTS abcdef012345", eligible),
+				ReviewToken: "sha256:abcdef0123456789", Confirmation: "SHUTDOWN",
 			}
 		},
 		ApplyShutdown: func(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
@@ -395,7 +395,7 @@ func TestDashboardGuidesClientOnlyShutdownWithUnknownSessionAcknowledgement(t *t
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardShutdownReview || !strings.Contains(model.View().Content, "Session unknown · not sent") || !strings.Contains(model.View().Content, "Controller  excluded") {
+	if model.screen != dashboardShutdownReview || !strings.Contains(model.View().Content, "Active user session · will shut down") || !strings.Contains(model.View().Content, "Session unknown · not sent") || !strings.Contains(model.View().Content, "Controller  excluded") || !strings.Contains(model.View().Content, "Type SHUTDOWN to confirm shutdown of active sessions") {
 		t.Fatalf("shutdown review is incomplete:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Text: "u"})
@@ -405,7 +405,7 @@ func TestDashboardGuidesClientOnlyShutdownWithUnknownSessionAcknowledgement(t *t
 	if plans != 2 || !strings.Contains(model.View().Content, "risk acknowledged") {
 		t.Fatalf("unknown-session policy was not replanned:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "SHUTDOWN 2 CLIENTS abcdef012345"})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "SHUTDOWN"})
 	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)

@@ -10,8 +10,11 @@ import (
 type ShutdownSessionPolicy string
 
 const (
-	ShutdownRequireIdle        ShutdownSessionPolicy = "require-idle"
+	ShutdownProtectUnknown     ShutdownSessionPolicy = "protect-unknown"
 	ShutdownAcknowledgeUnknown ShutdownSessionPolicy = "acknowledge-unknown"
+	// ShutdownRequireIdle is retained as a source-compatibility alias. Active
+	// sessions are reviewed warnings, not an eligibility block.
+	ShutdownRequireIdle = ShutdownProtectUnknown
 )
 
 type ShutdownSessionState string

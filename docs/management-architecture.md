@@ -243,12 +243,15 @@ authenticated SSH access, and the exact `active`/`idle` output of the fixed
 `nixorium-session-state` helper installed in every managed host generation.
 The helper treats interactive sessions for normal UIDs as active. Unreachable
 targets remain visible but ineligible and are never queued for later. Active
-sessions always block; unknown session state requires the distinct
-`acknowledge-unknown` policy and a new reviewed plan.
+sessions remain eligible after an explicit data-loss warning; unknown session
+state requires the distinct `acknowledge-unknown` policy and a new reviewed
+plan.
 
 The ready plan binds repository, normalized targets, evaluated addresses,
-observations, policy, and an expiry window to a review token and generated
-`SHUTDOWN …` phrase. `shutdown apply` validates that reviewed plan, takes the
+observations, policy, and an expiry window to a review token and the one-word
+`SHUTDOWN` confirmation. If active sessions are present, the review states
+explicitly that this word authorizes their interruption. `shutdown apply`
+validates that reviewed plan, takes the
 same non-blocking client-operation lock used by deployment, rejects active or
 degraded PXE networking, reevaluates inventory, and repeats session checks
 immediately before dispatch. The adapter receives only evaluated host metadata

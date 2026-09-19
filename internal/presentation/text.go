@@ -574,7 +574,7 @@ func ShutdownPlanText(writer io.Writer, report domain.ShutdownPlanReport) {
 	fmt.Fprintf(writer, "Shutdown plan: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Targets:       %s\n", report.Requested)
 	fmt.Fprintf(writer, "Eligible:      %d/%d\n", report.Eligible, len(report.Targets))
-	fmt.Fprintf(writer, "Session policy: %s\n", report.Policy)
+	fmt.Fprintf(writer, "Session safety: %s\n", shutdownPolicyLabel(report.Policy))
 	for _, target := range report.Targets {
 		status := "not eligible"
 		if target.Eligible {

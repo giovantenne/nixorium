@@ -337,10 +337,10 @@ the preflight. The controller is never selectable. Computers that are off,
 unreachable, or lack authenticated management access remain visible as not
 sent; Nixorium does not queue a request for later.
 
-By default, an interactive user session blocks that target and unknown session
-state is ineligible. The TUI can explicitly acknowledge unknown-session risk
-with `u`, which creates a new reviewed plan. An observed active session remains
-blocked. The same operation is available from the CLI:
+An interactive user session remains eligible, with a prominent warning that
+unsaved work may be lost. Unknown session state is ineligible by default. The
+TUI can explicitly acknowledge unknown-session risk with `u`, which creates a
+new reviewed plan. The same operation is available from the CLI:
 
 ```sh
 nix run .#nixorium -- shutdown plan --on pc01
@@ -351,7 +351,8 @@ nix run .#nixorium -- shutdown apply --on @lab \
 ```
 
 Planning checks installation/network recovery and concurrent client work as
-well as access and sessions. Apply requires the generated phrase (or explicit
+well as access and sessions. When an active session is present, the review says
+explicitly that `SHUTDOWN` authorizes interrupting it. Apply requires that single word (or explicit
 automation-only `--yes`), takes the same client-operation lock as deployment,
 and repeats inventory, conflict, and session checks immediately before sending
 the fixed operating-system request. Use

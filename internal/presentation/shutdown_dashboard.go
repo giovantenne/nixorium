@@ -56,7 +56,7 @@ func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.
 				return model, nil
 			}
 			if model.shutdownPolicy == domain.ShutdownAcknowledgeUnknown {
-				model.shutdownPolicy = domain.ShutdownRequireIdle
+				model.shutdownPolicy = domain.ShutdownProtectUnknown
 			} else {
 				model.shutdownPolicy = domain.ShutdownAcknowledgeUnknown
 			}
@@ -83,7 +83,7 @@ func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.
 				model.message = "Shutdown is not available in this deployment."
 				return model, nil
 			}
-			model.busy = "Rechecking sessions and sending reviewed power-off requests"
+			model.busy = "Rechecking access and sending reviewed power-off requests"
 			model.shutdownApplying = true
 			model.confirmation = ""
 			plan := model.shutdownPlan
@@ -147,9 +147,9 @@ func (model dashboardModel) shutdownView() string {
 	case dashboardShutdownReview:
 		shell.body = strings.Join(model.shutdownReviewView(), "\n")
 		if model.shutdownPlan.State == "ready" {
-			shell.actions = []tuiAction{{key: "Enter", label: "Send requests"}, {key: "u", label: "Session policy"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+			shell.actions = []tuiAction{{key: "Enter", label: "Send requests"}, {key: "u", label: "Unknown sessions"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 		} else {
-			shell.actions = []tuiAction{{key: "u", label: "Session policy"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+			shell.actions = []tuiAction{{key: "u", label: "Unknown sessions"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
 		}
 	case dashboardShutdownResult:
 		shell.body = strings.Join(model.shutdownResultView(), "\n")
@@ -202,7 +202,7 @@ func (model dashboardModel) shutdownSelectionView() []string {
 
 func (model dashboardModel) shutdownReviewView() []string {
 	plan := model.shutdownPlan
-	lines := []string{tuiSection(fmt.Sprintf("Shut down %d eligible client(s)?", plan.Eligible), model.isDark), "", fmt.Sprintf("Selected  %d", len(plan.Targets)), fmt.Sprintf("Eligible  %d", plan.Eligible), "Controller  excluded", "Session policy  " + string(plan.Policy), ""}
+	lines := []string{tuiSection(fmt.Sprintf("Shut down %d eligible client(s)?", plan.Eligible), model.isDark), "", fmt.Sprintf("Selected  %d", len(plan.Targets)), fmt.Sprintf("Eligible  %d", plan.Eligible), "Controller  excluded", "Session safety  " + shutdownPolicyLabel(plan.Policy), ""}
 	start, end := listWindow(len(plan.Targets), 0, max(3, model.height-20))
 	for _, target := range plan.Targets[start:end] {
 		lines = append(lines, shutdownTargetStatus(target, model.isDark))
@@ -210,16 +210,24 @@ func (model dashboardModel) shutdownReviewView() []string {
 	if end < len(plan.Targets) {
 		lines = append(lines, tuiMuted(fmt.Sprintf("Showing %d of %d reviewed targets", end, len(plan.Targets)), model.isDark))
 	}
-	lines = append(lines, "", tuiStatus("Unsaved user work may be lost.", tuiStatusAttention, model.isDark), "Checks run again immediately before requests are sent.", "An accepted request does not prove that a computer is physically off.")
+	warning := "Selected computers will be shut down; unsaved user work may be lost."
+	if shutdownHasActive(plan) {
+		warning = "Active user sessions will be shut down; unsaved work may be lost."
+	}
+	lines = append(lines, "", tuiStatus(warning, tuiStatusAttention, model.isDark), "Access and session state are checked again immediately before requests are sent.", "An accepted request does not prove that a computer is physically off.")
 	if shutdownHasUnknown(plan) {
 		if plan.Policy == domain.ShutdownAcknowledgeUnknown {
-			lines = append(lines, "", tuiStatus("Unknown session risk acknowledged", tuiStatusAttention, model.isDark), "Press u to return to the safer require-idle policy.")
+			lines = append(lines, "", tuiStatus("Unknown session risk acknowledged", tuiStatusAttention, model.isDark), "Press u to protect unknown session states again.")
 		} else {
 			lines = append(lines, "", "Press u to explicitly acknowledge unknown session state and create a new plan.")
 		}
 	}
 	if plan.State == "ready" {
-		lines = append(lines, "", tuiSection("Type "+plan.Confirmation+" to continue:", model.isDark), "> "+model.confirmation+"_")
+		confirmationPrompt := "Type " + plan.Confirmation + " to continue:"
+		if shutdownActiveCount(plan) > 0 {
+			confirmationPrompt = "Type " + plan.Confirmation + " to confirm shutdown of active sessions:"
+		}
+		lines = append(lines, "", tuiSection(confirmationPrompt, model.isDark), "> "+model.confirmation+"_")
 	} else {
 		lines = append(lines, "", tuiStatus("No request can be sent from this plan", tuiStatusAttention, model.isDark), plan.Message)
 	}
@@ -265,15 +273,36 @@ func shutdownTargetStatus(target domain.ShutdownTargetPlan, dark bool) string {
 	switch {
 	case target.Eligible && target.Session == domain.ShutdownSessionIdle:
 		return tuiStatus(target.Name+" · Ready", tuiStatusSuccess, dark)
+	case target.Eligible && target.Session == domain.ShutdownSessionActive:
+		return tuiStatus(target.Name+" · Active user session · will shut down", tuiStatusAttention, dark)
 	case target.Eligible:
 		return tuiStatus(target.Name+" · Session unknown · risk acknowledged", tuiStatusAttention, dark)
-	case target.Session == domain.ShutdownSessionActive:
-		return tuiStatus(target.Name+" · Active user session · not sent", tuiStatusAttention, dark)
 	case target.Reachability != domain.ReachabilityReachable:
 		return "○ " + target.Name + " · Not reachable · not sent"
 	default:
 		return tuiStatus(target.Name+" · Session unknown · not sent", tuiStatusAttention, dark)
 	}
+}
+
+func shutdownHasActive(plan domain.ShutdownPlanReport) bool {
+	return shutdownActiveCount(plan) > 0
+}
+
+func shutdownActiveCount(plan domain.ShutdownPlanReport) int {
+	count := 0
+	for _, target := range plan.Targets {
+		if target.Eligible && target.Session == domain.ShutdownSessionActive {
+			count++
+		}
+	}
+	return count
+}
+
+func shutdownPolicyLabel(policy domain.ShutdownSessionPolicy) string {
+	if policy == domain.ShutdownAcknowledgeUnknown {
+		return "unknown states acknowledged"
+	}
+	return "unknown states protected"
 }
 
 func shutdownHasUnknown(plan domain.ShutdownPlanReport) bool {

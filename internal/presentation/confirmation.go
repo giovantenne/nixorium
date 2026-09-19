@@ -142,8 +142,11 @@ func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPl
 	fmt.Fprintln(output, "Client shutdown review")
 	fmt.Fprintf(output, "Targets: %d eligible of %d selected computer(s)\n", report.Eligible, len(report.Targets))
 	fmt.Fprintln(output, "Controller: always excluded")
-	fmt.Fprintf(output, "Session policy: %s\n", report.Policy)
+	fmt.Fprintf(output, "Session safety: %s\n", shutdownPolicyLabel(report.Policy))
 	fmt.Fprintln(output, "Impact: unsaved user work may be lost; checks run again before dispatch")
+	if active := shutdownActiveCount(report); active > 0 {
+		fmt.Fprintf(output, "Explicit confirmation: %s authorizes shutdown of %d computer(s) with an active user session\n", report.Confirmation, active)
+	}
 	fmt.Fprintln(output, "Outcome: acceptance confirms only that the operating system received the request, not physical power state")
 	fmt.Fprintln(output, "Retry: do not retry an unconfirmed request blindly")
 	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)

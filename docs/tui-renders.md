@@ -238,9 +238,9 @@ space select  •  a all clients  •  enter check  •  esc back
 ```
 
 Planning checks authenticated management access, interactive sessions, PXE
-state, and conflicting client operations. Active sessions stay blocked;
-unknown session state becomes eligible only after the operator presses `u` and
-reviews a new plan:
+state, and conflicting client operations. Active sessions remain eligible with
+a data-loss warning; unknown session state becomes eligible only after the
+operator presses `u` and reviews a new plan:
 
 ```text
 Nixorium  /  Shut down computers
@@ -250,20 +250,20 @@ Shut down 2 eligible client(s)?
 Selected  3
 Eligible  2
 Controller  excluded
-Session policy  acknowledge-unknown
+Session safety  unknown states acknowledged
 
-✓ pc01 · Ready
+! pc01 · Active user session · will shut down
 ! pc02 · Session unknown · risk acknowledged
 ○ pc07 · Not reachable · not sent
 
-! Unsaved user work may be lost.
+! Active user sessions will be shut down; unsaved work may be lost.
 Checks run again immediately before requests are sent.
 An accepted request does not prove that a computer is physically off.
 
-Type SHUTDOWN 2 CLIENTS abcdef012345 to continue:
+Type SHUTDOWN to confirm shutdown of active sessions:
 > _
 
-enter send requests   u unknown-session policy   esc cancel   F1 help
+enter send requests   u unknown sessions   esc cancel   F1 help
 ```
 
 The final screen reports only what Nixorium can prove about the request:
