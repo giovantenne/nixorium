@@ -47,7 +47,8 @@ func TestCollectBootstrapConfigurationCreatesReadyControllerSettings(t *testing.
 	hasher := &setupPasswordHasher{}
 	input := bufio.NewReader(strings.NewReader("teacher\nstudent\nEurope/Rome\nit\n"))
 	var output bytes.Buffer
-	if err := collectBootstrapConfiguration(context.Background(), input, secrets, hasher, &output, &candidate); err != nil {
+	keyboard := &setupKeyboardActivator{}
+	if err := collectBootstrapConfiguration(context.Background(), input, secrets, hasher, keyboard, &output, &candidate); err != nil {
 		t.Fatal(err)
 	}
 	if candidate.Lab.DeploymentMode != "controller" || candidate.Lab.PCCount != 0 || candidate.Lab.MasterDHCPIP != domain.MasterDHCPPlaceholder {
@@ -61,6 +62,31 @@ func TestCollectBootstrapConfigurationCreatesReadyControllerSettings(t *testing.
 	}
 	if hasher.calls != 3 || strings.Contains(output.String(), "admin-password") {
 		t.Fatalf("password handling: calls=%d output=%q", hasher.calls, output.String())
+	}
+	if len(keyboard.keyMaps) != 1 || keyboard.keyMaps[0] != "it2" || !strings.Contains(output.String(), "Account passwords will use this layout now and after reboot") {
+		t.Fatalf("keyboard activation = %+v, output=%q", keyboard, output.String())
+	}
+}
+
+func TestCollectBootstrapConfigurationStopsBeforePasswordsWhenKeyboardActivationFails(t *testing.T) {
+	data, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, issues := domain.DecodeLabSettings(data)
+	if len(issues) != 0 {
+		t.Fatalf("template issues = %+v", issues)
+	}
+	secrets := &setupSecretReader{values: [][]byte{[]byte("must-not-be-read")}}
+	hasher := &setupPasswordHasher{}
+	keyboard := &setupKeyboardActivator{err: errors.New("loadkeys failed")}
+	input := bufio.NewReader(strings.NewReader("teacher\nstudent\nEurope/Rome\nit\n"))
+	err = collectBootstrapConfiguration(context.Background(), input, secrets, hasher, keyboard, &bytes.Buffer{}, &candidate)
+	if err == nil || !strings.Contains(err.Error(), "activate the selected keyboard before password entry") {
+		t.Fatalf("error = %v", err)
+	}
+	if hasher.calls != 0 || len(secrets.values) != 1 {
+		t.Fatalf("password input reached after activation failure: hasher=%d remaining=%d", hasher.calls, len(secrets.values))
 	}
 }
 
@@ -102,6 +128,16 @@ func (r *setupSecretReader) ReadSecret(string) ([]byte, error) {
 
 type setupPasswordHasher struct {
 	calls int
+}
+
+type setupKeyboardActivator struct {
+	keyMaps []string
+	err     error
+}
+
+func (a *setupKeyboardActivator) ActivateBootstrapKeyboard(_ context.Context, keyMap string) error {
+	a.keyMaps = append(a.keyMaps, keyMap)
+	return a.err
 }
 
 func (h *setupPasswordHasher) HashPassword(context.Context, []byte) (string, error) {

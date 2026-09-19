@@ -16,6 +16,7 @@ an explicit product decision.
 | Home reset, extensions, npm, desktop defaults | `modules/home-reset.nix`, home scripts, template modules/assets | Maintainer student-home guide; system reference |
 | Privilege, keys, PXE/recovery | Management/PXE modules, adapters, integration tests | Core invariants; maintainer configuration/operations; troubleshooting |
 | Input ownership and updates | Update adapters/tests, Flake/template contract | Maintainer software/framework-update guidance; deployment AGENTS |
+| Bootstrap prompts and sequencing | `install.sh`, bootstrap CLI, controller-bootstrap tests | Root README; controller-first ADR; changelog |
 | Validation or skill distribution | `scripts/validate.sh`, `tests/source-checks.nix`, package source fileset | Both AGENTS files; developer validation reference |
 
 Keep root `AGENTS.md` focused on upstream work. The template's `AGENTS.md`

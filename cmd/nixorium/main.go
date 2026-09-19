@@ -1731,7 +1731,7 @@ func runBootstrapConfigure(ctx context.Context, repository string, stdout, stder
 	}
 	lineReader := bufio.NewReader(os.Stdin)
 	secretReader := presentation.TerminalSecretReader{Input: os.Stdin, Output: stdout}
-	if err := collectBootstrapConfiguration(ctx, lineReader, secretReader, local, stdout, &candidate); err != nil {
+	if err := collectBootstrapConfiguration(ctx, lineReader, secretReader, local, local, stdout, &candidate); err != nil {
 		fmt.Fprintln(stderr, "Error:", err)
 		return 1
 	}
@@ -1776,7 +1776,11 @@ func runBootstrapConfigure(ctx context.Context, repository string, stdout, stder
 	return 0
 }
 
-func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, secrets app.SecretReader, hasher app.PasswordHasher, output io.Writer, candidate *domain.LabSettingsFile) error {
+type bootstrapKeyboardActivator interface {
+	ActivateBootstrapKeyboard(context.Context, string) error
+}
+
+func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, secrets app.SecretReader, hasher app.PasswordHasher, keyboardActivator bootstrapKeyboardActivator, output io.Writer, candidate *domain.LabSettingsFile) error {
 	fmt.Fprintln(output, "Nixorium controller setup")
 	fmt.Fprintln(output, "Choose the accounts and regional settings used after the first reboot.")
 	fmt.Fprintln(output, "The administrator account name is fixed as 'admin'.")
@@ -1810,6 +1814,11 @@ func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, se
 	candidate.Lab.DefaultLocale = "en_US.UTF-8"
 	candidate.Lab.ExtraLocale = "en_US.UTF-8"
 	candidate.Lab.VeyonNativeHosts = []string{}
+	if err := keyboardActivator.ActivateBootstrapKeyboard(ctx, consoleKeyMap); err != nil {
+		return fmt.Errorf("activate the selected keyboard before password entry: %w", err)
+	}
+	fmt.Fprintf(output, "Active console keyboard: %s (%s).\n", keyboard, consoleKeyMap)
+	fmt.Fprintln(output, "Account passwords will use this layout now and after reboot.")
 	if err := collectSetupCredentials(ctx, secrets, hasher, output, candidate); err != nil {
 		return err
 	}
