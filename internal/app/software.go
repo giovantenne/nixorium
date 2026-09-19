@@ -380,15 +380,6 @@ func softwareDigits(value string) bool {
 	return true
 }
 
-func softwareCatalogItem(items []domain.SoftwareCatalogItem, id string) (domain.SoftwareCatalogItem, bool) {
-	for _, item := range items {
-		if item.ID == id {
-			return item, true
-		}
-	}
-	return domain.SoftwareCatalogItem{}, false
-}
-
 func softwareDeclaration(entries []domain.SoftwareDeclaration, id string) (domain.SoftwareDeclaration, bool) {
 	for _, entry := range entries {
 		if entry.Package == id {

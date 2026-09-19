@@ -14,11 +14,9 @@ type fakeSetupSource struct {
 	data        []byte
 	dirty       bool
 	applied     bool
-	ready       bool
 	preparation domain.PXEPreparationState
 	keyCalls    *int
 	metaCalls   *int
-	readyCalls  *int
 }
 
 func (f fakeSetupSource) ReadSettings(string) ([]byte, error) {
@@ -30,16 +28,6 @@ func (f fakeSetupSource) LabMeta(context.Context, string) (domain.LabMeta, error
 		*f.metaCalls++
 	}
 	return domain.LabMeta{}, nil
-}
-
-func (f fakeSetupSource) DeploymentStatus(context.Context, string) (domain.DeploymentStatus, error) {
-	if f.readyCalls != nil {
-		*f.readyCalls++
-	}
-	if f.ready {
-		return domain.DeploymentStatus{Ready: true}, nil
-	}
-	return domain.DeploymentStatus{Ready: false, Issues: []string{"keys missing"}}, nil
 }
 
 func (f fakeSetupSource) GitState(context.Context, string) (domain.GitState, error) {
@@ -117,13 +105,13 @@ func TestSetupStatusSelectsNetworkForFreshTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	keyCalls, metaCalls, readyCalls := 0, 0, 0
-	report := NewSetupManager(fakeSetupSource{data: data, keyCalls: &keyCalls, metaCalls: &metaCalls, readyCalls: &readyCalls}).Status(context.Background(), "/repo")
+	keyCalls, metaCalls := 0, 0
+	report := NewSetupManager(fakeSetupSource{data: data, keyCalls: &keyCalls, metaCalls: &metaCalls}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageNetwork {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageNetwork, report)
 	}
-	if keyCalls != 0 || metaCalls != 0 || readyCalls != 0 {
-		t.Fatalf("fresh setup ran deferred checks: keys=%d meta=%d readiness=%d", keyCalls, metaCalls, readyCalls)
+	if keyCalls != 0 || metaCalls != 0 {
+		t.Fatalf("fresh setup ran deferred checks: keys=%d meta=%d", keyCalls, metaCalls)
 	}
 }
 
@@ -197,7 +185,7 @@ func TestSetupStatusIgnoresUnrelatedHistoryChanges(t *testing.T) {
 	}
 }
 
-func TestSetupStatusCompletesWhenFirstInstallWorkflowIsAvailable(t *testing.T) {
+func TestSetupStatusCompletesWhenInstallationArtifactsArePrepared(t *testing.T) {
 	data, err := os.ReadFile("../../templates/site/lab-settings.json")
 	if err != nil {
 		t.Fatal(err)
@@ -207,14 +195,13 @@ func TestSetupStatusCompletesWhenFirstInstallWorkflowIsAvailable(t *testing.T) {
 	report := NewSetupManager(fakeSetupSource{
 		data:        data,
 		applied:     true,
-		ready:       true,
 		preparation: domain.PXEPreparationState{Present: true, Ready: true},
 	}).Status(context.Background(), "/repo")
 	if report.State != "ready" || report.CurrentStage != "" {
 		t.Fatalf("report = %+v", report)
 	}
-	install := report.Stages[len(report.Stages)-1]
-	if install.ID != domain.SetupStageInstall || install.State != domain.SetupStageComplete || !strings.Contains(install.Detail, "Install computers over network") {
-		t.Fatalf("install stage = %+v", install)
+	artifacts := report.Stages[len(report.Stages)-1]
+	if artifacts.ID != domain.SetupStageArtifacts || artifacts.State != domain.SetupStageComplete {
+		t.Fatalf("artifact stage = %+v", artifacts)
 	}
 }

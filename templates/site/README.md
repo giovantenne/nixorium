@@ -66,8 +66,8 @@ and client preparation. The only confirmation in this path appears immediately
 before PXE starts, because that operation temporarily removes the controller's
 static laboratory address. After confirmation, boot any configured client from
 UEFI network boot. The downloaded installer asks for that computer's identity
-and confirms the target disk locally before erasing it; no pilot computer or
-controller-side client selection is required.
+and confirms the target disk locally before erasing it. Nixorium stores no
+pilot/test-computer selection or installation-verification session.
 
 You can press `q` at any safe point. While PXE is active, leaving it active is a
 separate exact-confirmation choice; stopping PXE restores normal controller

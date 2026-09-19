@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- Removed the legacy pilot/test-computer workflow, including its private
+  installation-session state, controller-side target selection, technical
+  verification, and practical-check recording. First setup and reinstall now
+  use the same generic PXE screen as ordinary installation: any configured
+  computer may boot, then identity and disk erasure are confirmed locally.
+
 ## [2.0.0-beta.4] - 2026-09-18
 
 ### Added

@@ -86,14 +86,14 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 				expected: []string{"Network installation", "Prepare", "Start PXE", "Esc", "Help"},
 			},
 			{
-				name:     "pilot selection",
+				name:     "setup installation",
 				model:    dashboardModel{report: testDashboardReport("ready"), screen: dashboardPXE, setupMode: true},
-				expected: []string{"First computer", "Choose a pilot computer", "Select", "Choose", "Esc", "Help"},
+				expected: []string{"Install computers", "Start PXE", "Esc", "Help"},
 			},
 			{
-				name:     "active pilot",
-				model:    dashboardModel{report: testDashboardReport("active"), screen: dashboardPXE, setupMode: true, pilotName: "pc01"},
-				expected: []string{"First computer", "Check computer", "Stop PXE", "Leave active", "Help"},
+				name:     "active setup installation",
+				model:    dashboardModel{report: testDashboardReport("active"), screen: dashboardPXE, setupMode: true},
+				expected: []string{"Install computers", "Stop PXE", "Quit", "Help"},
 			},
 			{
 				name: "start review",
@@ -107,7 +107,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 			{
 				name:     "recovery",
 				model:    dashboardModel{report: testDashboardReport("recovery-required"), screen: dashboardPXE, setupMode: true},
-				expected: []string{"recovery", "Recover", "Esc", "Back", "Help"},
+				expected: []string{"recovery", "Recover", "Esc", "Installation", "Help"},
 			},
 		}
 

@@ -100,7 +100,7 @@ func TestSoftwareSaveAutomaticallyAppliesAffectedController(t *testing.T) {
 	}
 }
 
-func testSetupReport(reviewed, applied, artifacts, ready bool) domain.SetupReport {
+func testSetupReport(reviewed, applied, artifacts, _ bool) domain.SetupReport {
 	complete := domain.SetupObservation{Complete: true}
 	return domain.ReconcileSetup("/deployment", domain.SetupFacts{
 		Environment: complete,
@@ -112,38 +112,7 @@ func testSetupReport(reviewed, applied, artifacts, ready bool) domain.SetupRepor
 		Review:      domain.SetupObservation{Complete: reviewed},
 		Apply:       domain.SetupObservation{Complete: applied},
 		Artifacts:   domain.SetupObservation{Complete: artifacts},
-		Readiness:   domain.SetupObservation{Complete: ready},
-		Install:     domain.SetupObservation{Complete: ready},
 	})
-}
-
-func testInstallationReport(selected string, technical, practical bool) domain.InstallationSessionReport {
-	revision := strings.Repeat("a", 40)
-	report := domain.InstallationSessionReport{
-		SchemaVersion: domain.InstallationSessionSchemaVersion,
-		Operation:     "installation-session-status",
-		State:         domain.InstallationSessionActive,
-		Repository:    "/deployment",
-		Revision:      revision,
-		Selected:      selected,
-		Evidence:      []domain.InstallationEvidence{},
-		Issues:        []domain.ValidationIssue{},
-	}
-	if technical {
-		verifiedAt := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
-		evidence := domain.InstallationEvidence{
-			Name:                selected,
-			Revision:            revision,
-			SystemPath:          "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-" + selected + "-system",
-			TechnicalVerifiedAt: verifiedAt,
-		}
-		if practical {
-			practicalAt := verifiedAt.Add(time.Minute)
-			evidence.PracticalConfirmedAt = &practicalAt
-		}
-		report.Evidence = append(report.Evidence, evidence)
-	}
-	return report
 }
 
 func testSoftwareCatalogReport() domain.SoftwareCatalogReport {
@@ -530,7 +499,7 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 			},
 		},
 	}
-	if view := model.View().Content; !strings.Contains(view, "Step 1 of 5") || !strings.Contains(view, "Laboratory settings") || !strings.Contains(view, "Save the generated configuration locally") || strings.Contains(view, "› ●") || strings.Contains(view, "! Next step") || !strings.Contains(view, "Continue setup") {
+	if view := model.View().Content; !strings.Contains(view, "Step 1 of 3") || !strings.Contains(view, "Laboratory settings") || !strings.Contains(view, "Save the generated configuration locally") || strings.Contains(view, "› ●") || strings.Contains(view, "! Next step") || !strings.Contains(view, "Continue setup") {
 		t.Fatalf("setup progress screen is incomplete:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -550,99 +519,20 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 	}
 }
 
-func TestCompletedSetupOpensPilotSelection(t *testing.T) {
+func TestCompletedSetupOpensGenericNetworkInstallation(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), setup: testSetupReport(true, true, true, true), setupMode: true, screen: dashboardSetup}
-	if !strings.Contains(model.View().Content, "Controller and client system are ready") || !strings.Contains(model.View().Content, "opens network installation") {
+	if !strings.Contains(model.View().Content, "Controller and client systems are ready") || !strings.Contains(model.View().Content, "Any configured computer") {
 		t.Fatalf("completed setup omits first installation action:\n%s", model.View().Content)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardPXE || !strings.Contains(model.View().Content, "Choose a pilot computer") || !strings.Contains(model.View().Content, "pc01") {
-		t.Fatalf("completed setup did not open pilot selection:\n%s", model.View().Content)
+	if model.screen != dashboardPXE || !strings.Contains(model.View().Content, "Install computers") || strings.Contains(strings.ToLower(model.View().Content), "pilot") {
+		t.Fatalf("completed setup did not open generic installation:\n%s", model.View().Content)
 	}
 }
 
-func TestFirstSetupGuidesAndVerifiesPilotWithoutInventedProgress(t *testing.T) {
-	checks := 0
-	report := testDashboardReport("active")
-	actions := DashboardActions{
-		SelectInstallationTarget: func(name string) domain.InstallationSessionReport {
-			return testInstallationReport(name, false, false)
-		},
-		VerifyInstallationTarget: func(name string) domain.InstallationSessionReport {
-			checks++
-			if name != "pc01" {
-				t.Fatalf("pilot check targeted %q, want pc01", name)
-			}
-			result := testInstallationReport(name, true, false)
-			observation := domain.HostStatus{
-				Name: name, IP: "192.0.2.11", Reachability: domain.ReachabilityReachable,
-				SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent,
-				CurrentRevision: result.Revision, DesiredRevision: result.Revision,
-				CurrentSystem: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-" + name + "-system",
-			}
-			result.Observation = &observation
-			return result
-		},
-		ConfirmInstallationTarget: func(name string) domain.InstallationSessionReport {
-			return testInstallationReport(name, true, true)
-		},
-	}
-	model := dashboardModel{report: report, setupMode: true, screen: dashboardPXE, actions: actions, width: 100, height: 30}
-
-	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command == nil {
-		t.Fatal("pilot selection was not recorded")
-	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	view := model.View().Content
-	for _, expected := range []string{"Continue at pc01", "run /installer/setup.sh", "disk selected on the computer will be erased", "does not provide telemetry"} {
-		if !strings.Contains(view, expected) {
-			t.Fatalf("pilot handoff omits %q:\n%s", expected, view)
-		}
-	}
-
-	updated, command = model.Update(tea.KeyPressMsg{Text: "v"})
-	model = updated.(dashboardModel)
-	if command == nil || !strings.Contains(model.View().Content, "Checking authenticated system state") {
-		t.Fatalf("pilot check did not start:\n%s", model.View().Content)
-	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	if checks != 1 || !strings.Contains(model.View().Content, "Technical verification succeeded") || !strings.Contains(model.View().Content, "Check at the computer") {
-		t.Fatalf("pilot check did not separate technical and practical evidence:\n%s", model.View().Content)
-	}
-
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command == nil {
-		t.Fatal("practical check was not recorded")
-	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	if !model.pilotPractical || len(model.pilotVerified) != 1 || !strings.Contains(model.View().Content, "Powered-off computers are not errors") {
-		t.Fatalf("practical confirmation did not offer a partial-room exit: practical=%t verified=%v session=%+v\n%s", model.pilotPractical, model.pilotVerified, model.installationSession, model.View().Content)
-	}
-}
-
-func TestFirstSetupDoesNotTreatReachabilityAsPilotVerification(t *testing.T) {
-	report := testDashboardReport("active")
-	model := dashboardModel{
-		report: report, setupMode: true, screen: dashboardPXE, pilotName: "pc01",
-		hosts: domain.HostsReport{Hosts: []domain.HostStatus{{
-			Name: "pc01", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentUnknown,
-		}}},
-	}
-	view := model.View().Content
-	if strings.Contains(view, "Technical verification succeeded") || !strings.Contains(view, "does not prove that installation completed") {
-		t.Fatalf("weak evidence was presented as completed installation:\n%s", view)
-	}
-}
-
-func TestFirstSetupRequiresExplicitConfirmationToLeavePXEActive(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("active"), setupMode: true, screen: dashboardPXE, pilotName: "pc01"}
+func TestSetupRequiresExplicitConfirmationToLeavePXEActive(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("active"), setupMode: true, screen: dashboardPXE}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
 	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "Closing Nixorium will not stop installation mode") {
@@ -662,105 +552,6 @@ func TestFirstSetupRequiresExplicitConfirmationToLeavePXEActive(t *testing.T) {
 	_, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if command == nil {
 		t.Fatal("exact leave confirmation did not quit")
-	}
-}
-
-func TestFirstSetupStopSummarisesOnlySessionEvidence(t *testing.T) {
-	model := dashboardModel{
-		report:         testDashboardReport("active"),
-		setupMode:      true,
-		screen:         dashboardPXE,
-		pilotName:      "pc01",
-		pilotPractical: true,
-		pilotVerified:  []string{"pc01"},
-		message:        "pc01 was verified in this session.",
-	}
-	updated, _ := model.Update(dashboardOperationMsg{
-		message: "PXE stopped and normal networking restored.",
-		report:  testDashboardReport("ready"),
-		screen:  dashboardPXE,
-	})
-	model = updated.(dashboardModel)
-	view := model.View().Content
-	if model.pilotName != "" || !strings.Contains(view, "Installation session complete") || !strings.Contains(view, "1 configured identities were not verified in this session") {
-		t.Fatalf("stopped session overclaimed completion:\n%s", view)
-	}
-}
-
-func TestFirstSetupRestoresPartialSessionAcrossDashboardProcesses(t *testing.T) {
-	loads := 0
-	model := dashboardModel{
-		report: testDashboardReport("ready"), setup: testSetupReport(true, true, true, true),
-		setupMode: true, screen: dashboardSetup,
-		actions: DashboardActions{LoadInstallationSession: func() domain.InstallationSessionReport {
-			loads++
-			report := testInstallationReport("pc01", true, true)
-			report.Message = "Installation session restored from private operator state."
-			return report
-		}},
-	}
-	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command == nil || model.screen != dashboardPXE {
-		t.Fatal("completed setup did not load resumable installation state")
-	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	view := model.View().Content
-	if loads != 1 || !strings.Contains(view, "Installation session complete") || !strings.Contains(view, "Verified in this session: pc01") || !strings.Contains(view, "1 configured identities were not verified") {
-		t.Fatalf("durable partial session was not restored:\n%s", view)
-	}
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command != nil || model.installationSummary || !strings.Contains(model.View().Content, "Choose a pilot computer") || !strings.Contains(model.View().Content, "verified this session") {
-		t.Fatalf("resumed summary did not offer another computer:\n%s", model.View().Content)
-	}
-}
-
-func TestFirstSetupRestoresTechnicalEvidenceWithoutClaimingCurrentObservation(t *testing.T) {
-	model := dashboardModel{
-		report: testDashboardReport("active"), setupMode: true, screen: dashboardPXE,
-		installationSession: testInstallationReport("pc01", true, false),
-	}
-	model.applyInstallationSession()
-	view := model.View().Content
-	if !strings.Contains(view, "Technical verification succeeded") ||
-		!strings.Contains(view, "evidence was restored") ||
-		!strings.Contains(view, "check current state") {
-		t.Fatalf("technical-only session was not represented honestly:\n%s", view)
-	}
-}
-
-func TestFirstSetupFailedRecheckTakesPrecedenceOverStoredEvidence(t *testing.T) {
-	report := testInstallationReport("pc01", true, false)
-	report.State = "attention"
-	report.Observation = &domain.HostStatus{
-		Name: "pc01", Reachability: domain.ReachabilityUnreachable,
-		SSH: domain.SSHUnavailable, Deployment: domain.DeploymentUnknown,
-	}
-	model := dashboardModel{
-		report: testDashboardReport("active"), setupMode: true, screen: dashboardPXE,
-	}
-	updated, _ := model.Update(dashboardInstallationSessionMsg{report: report, screen: dashboardPXE})
-	model = updated.(dashboardModel)
-	view := model.View().Content
-	if strings.Contains(view, "Technical verification succeeded") || !strings.Contains(view, "does not prove that installation completed") {
-		t.Fatalf("stored evidence masked a failed current check:\n%s", view)
-	}
-}
-
-func TestFirstSetupStaleSessionRequiresNewSelection(t *testing.T) {
-	report := testInstallationReport("pc01", true, true)
-	report.State = "stale"
-	report.Message = "The saved installation session belongs to an older laboratory revision. Selecting a computer starts a new session."
-	model := dashboardModel{
-		report: testDashboardReport("active"), setupMode: true, screen: dashboardPXE,
-		installationSession: report,
-	}
-	model.applyInstallationSession()
-	view := model.View().Content
-	if model.pilotName != "" || !strings.Contains(view, "Choose a pilot computer") || !strings.Contains(view, "older laboratory revision") {
-		t.Fatalf("stale session was treated as current:\n%s", view)
 	}
 }
 
@@ -904,16 +695,13 @@ func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 }
 
 func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
-	actions := DashboardActions{SelectInstallationTarget: func(name string) domain.InstallationSessionReport {
-		return testInstallationReport(name, false, false)
-	}}
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), actions, false)
+	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "disk is erased only after") || !strings.Contains(view, "does not remotely erase or reserve") {
+	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "target disk locally") || !strings.Contains(view, "does not erase or reserve") {
 		t.Fatalf("restore choice is ambiguous:\n%s", view)
 	}
 
@@ -932,47 +720,9 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardPXE || !model.restoreMode || !strings.Contains(model.View().Content, "Choose a computer to reinstall") {
-		t.Fatalf("reinstall did not require an explicit identity: %s", model.View().Content)
-	}
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if command == nil {
-		t.Fatal("reinstall identity was not recorded")
-	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	if model.pilotName != "pc01" || !strings.Contains(model.View().Content, "Reinstallation erases the disk confirmed locally on pc01") {
-		t.Fatalf("reinstall did not preserve the selected local disk warning: %s", model.View().Content)
-	}
-}
-
-func TestReinstallChecksOnlyTheSelectedComputer(t *testing.T) {
-	target := ""
-	report := testDashboardReport("active")
-	model := dashboardModel{
-		report: report, restoreMode: true, screen: dashboardPXE, pilotName: "pc02",
-		actions: DashboardActions{VerifyInstallationTarget: func(name string) domain.InstallationSessionReport {
-			target = name
-			result := testInstallationReport(name, true, false)
-			observation := domain.HostStatus{
-				Name: name, Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable,
-				Deployment: domain.DeploymentCurrent, CurrentRevision: result.Revision,
-				CurrentSystem: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-" + name + "-system",
-			}
-			result.Observation = &observation
-			return result
-		}},
-	}
-	updated, command := model.Update(tea.KeyPressMsg{Text: "v"})
-	model = updated.(dashboardModel)
-	if command == nil {
-		t.Fatal("reinstall verification did not start")
-	}
-	updated, _ = model.Update(command())
-	model = updated.(dashboardModel)
-	if target != "pc02" || !strings.Contains(model.View().Content, "Technical verification succeeded") {
-		t.Fatalf("reinstall verified %q instead of pc02:\n%s", target, model.View().Content)
+	view = model.View().Content
+	if model.screen != dashboardPXE || !model.restoreMode || !strings.Contains(view, "Reinstall computers") || strings.Contains(view, "Choose a computer") {
+		t.Fatalf("reinstall did not open generic network installation: %s", view)
 	}
 }
 
@@ -982,13 +732,13 @@ func TestCompletedRestoreContextDoesNotLeakIntoLaterInstallation(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
-	if model.restoreMode || model.screen != dashboardPXE || strings.Contains(model.View().Content, "Choose a computer to reinstall") {
+	if model.restoreMode || model.screen != dashboardPXE || strings.Contains(model.View().Content, "Reinstall computers") {
 		t.Fatalf("stale restore context changed a later installation:\n%s", model.View().Content)
 	}
 }
 
 func TestReinstallReviewsConsequencesBeforeLeavingPXEActive(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("active"), restoreMode: true, screen: dashboardPXE, pilotName: "pc01"}
+	model := dashboardModel{report: testDashboardReport("active"), restoreMode: true, screen: dashboardPXE}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
 	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "LEAVE PXE ACTIVE") {
@@ -1006,7 +756,7 @@ func TestPXEScreenRecommendsOnlyTheObservedNextStage(t *testing.T) {
 
 	report = testDashboardReport("active")
 	view = (dashboardModel{report: report, screen: dashboardPXE}).View().Content
-	for _, expected := range []string{"Next: install a computer", "/installer/setup.sh", "x", "stop PXE"} {
+	for _, expected := range []string{"Next: install computers", "/installer/setup.sh", "x", "stop PXE"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("active PXE guidance omits %q:\n%s", expected, view)
 		}

@@ -56,10 +56,12 @@ func TestSiteTemplateExposesCanonicalManagedUpdateInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot, err := (Local{}).InspectUpdateInput(repository)
-	if err != nil || snapshot.SourcePrefix != "giovantenne/nixorium" || snapshot.CurrentRef != "master" {
+	version, versionErr := os.ReadFile("../../VERSION")
+	expectedRef := "v" + strings.TrimSpace(string(version))
+	if versionErr != nil || err != nil || snapshot.SourcePrefix != "giovantenne/nixorium" || snapshot.CurrentRef != expectedRef {
 		t.Fatalf("template snapshot = %+v, error = %v", snapshot, err)
 	}
-	if !strings.Contains(string(template), `inputs.nixorium.url = "github:giovantenne/nixorium/master";`) {
+	if !strings.Contains(string(template), `inputs.nixorium.url = "github:giovantenne/nixorium/`+expectedRef+`";`) {
 		t.Fatal("site template does not use the canonical managed input assignment")
 	}
 }

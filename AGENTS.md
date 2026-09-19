@@ -224,11 +224,6 @@ Release from the matching changelog section.
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
 - Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
-- Partial installation evidence is private per-deployment operator state,
-  stored atomically outside Git by the adapter and validated in the domain.
-  Keep it bound to the evaluated client identity, full Git revision and
-  authenticated Nix store path; it is historical evidence, not desired
-  configuration, current reachability or disk-erasure authority.
 - Hostname, static IP, and effective network interface are centralized in
   `lib/mk-lab.nix`. `ifaceName` is the compatibility fallback;
   `controllerIfaceName`, `clientIfaceName`, and `hostIfaceNames` resolve in
