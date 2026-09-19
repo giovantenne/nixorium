@@ -56,9 +56,12 @@ describes the site; the controller supplies the systems over the local network.
 - **Hardware:** the supported target is `x86_64-linux`. Controller and clients
   require UEFI; clients need working UEFI network boot. Start with a disposable
   controller and one client, using VMs or dedicated test hardware.
-- **Controller:** bootstrap from an official NixOS installer ISO with Internet
-  access. Allow storage for the deployment, build outputs, and prepared client
-  systems; requirements depend on the software selected.
+- **Controller:** bootstrap from the official [NixOS Minimal
+  ISO](https://nixos.org/download/#nixos-iso) in UEFI mode with Internet access.
+  It provides the predictable Linux text console required while choosing the
+  keyboard and entering passwords. Allow storage for the deployment, build
+  outputs, and prepared client systems; requirements depend on the software
+  selected.
 - **Network:** use a lab LAN with an existing DHCP server and permission to run
   PXE services. For an initial test, keep the controller and client on the same
   isolated segment with DHCP available. Choose a static lab address range that
@@ -85,8 +88,8 @@ testing recommendation, not a separate mandatory stage in the interface.
 
 ### 1. Bootstrap the controller from USB
 
-Boot the official NixOS installer in UEFI mode with Internet access. Switch to
-a Linux text console (for example with `Ctrl`+`Alt`+`F2`) before running:
+Boot the official **NixOS Minimal ISO** in UEFI mode with Internet access. It
+starts in the Linux text console expected by the bootstrap. Then run:
 
 ```sh
 curl -fsSL https://nixorium.org/install.sh | bash
@@ -100,8 +103,9 @@ disk. Confirm disk erasure only after checking the selected device.
 Keyboard layout is the first controller-setting prompt. The bootstrap applies
 its console keymap immediately and stops if it cannot do so. This ensures all
 remaining input, especially passwords, uses the same layout that will be active
-after reboot; password setup from a graphical terminal is deliberately refused
-because its compositor layout cannot be verified portably.
+after reboot. Do not run the command from a terminal inside the Graphical ISO:
+its compositor layout cannot be verified portably. Switching that image to a
+real Linux TTY may work, but the Minimal ISO is the supported bootstrap path.
 
 ### 2. Configure the laboratory
 

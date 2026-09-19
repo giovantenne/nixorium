@@ -1782,6 +1782,7 @@ type bootstrapKeyboardActivator interface {
 
 func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, secrets app.SecretReader, hasher app.PasswordHasher, keyboardActivator bootstrapKeyboardActivator, output io.Writer, candidate *domain.LabSettingsFile) error {
 	fmt.Fprintln(output, "Nixorium controller setup")
+	fmt.Fprintln(output, "Recommended environment: official NixOS Minimal ISO in UEFI mode.")
 	fmt.Fprintln(output, "Choose the keyboard first, then the accounts and regional settings used after the first reboot.")
 	fmt.Fprintln(output, "The administrator account name is fixed as 'admin'.")
 

@@ -196,6 +196,8 @@ fi
 
 grep -F "Resolving master to one immutable revision" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "Preparing Nixorium master at ${REVISION}" "${TEST_ROOT}/install.out" >/dev/null
+grep -F "Recommended environment: official NixOS Minimal ISO in UEFI mode." \
+  "${TEST_ROOT}/install.out" >/dev/null
 grep -F "commits/master" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/install-controller.sh" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$CALL_LOG" >/dev/null

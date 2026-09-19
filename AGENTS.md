@@ -164,8 +164,9 @@ Release from the matching changelog section.
   the keyboard first, then controller identity, other regional settings, and
   password hashes before disk installation, then defers lab networking. Apply
   the selected console keymap before any later input, fail closed when the live
-  input layout cannot be verified, and apply the same keymap to netboot; see
-  ADR 0015.
+  input layout cannot be verified, document the official NixOS Minimal ISO as
+  the supported bootstrap environment, and apply the same keymap to netboot;
+  see ADR 0015.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
 - Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.

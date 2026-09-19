@@ -29,10 +29,12 @@ account credentials, without lab keys or the client DHCP hint. Lab networking,
 cache and remote-control services are inactive; fleet readiness remains false.
 Existing deployments are not migrated automatically. New controller bootstrap
 sets this mode after collecting keyboard, accounts, time zone, and passwords.
-Run bootstrap from a Linux text console: keyboard is its first settings prompt,
-and it applies the selected console keymap before collecting any other value.
-It stops if activation fails or the terminal belongs to an unverifiable
-graphical session.
+Use the official [NixOS Minimal ISO](https://nixos.org/download/#nixos-iso) in
+UEFI mode for controller bootstrap. It provides the expected Linux text
+console: keyboard is the first settings prompt, and the selected console keymap
+is applied before any other value is collected. The bootstrap stops if
+activation fails or the terminal belongs to an unverifiable graphical session;
+a terminal inside the Graphical ISO is not the supported path.
 Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
 The public Nix evaluator and the management command both reject empty required

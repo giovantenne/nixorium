@@ -63,7 +63,9 @@ verified portably, and when `loadkeys` is unavailable or fails. This keeps all
 subsequent input, especially passwords, aligned with the installed console/login
 layout after reboot. The generated netboot system applies the same
 `labSettings.consoleKeyMap`, so local client enrollment and destructive
-confirmation use the controller's configured text-console layout.
+confirmation use the controller's configured text-console layout. The official
+NixOS Minimal ISO booted in UEFI mode is the supported controller-bootstrap
+environment; the Graphical ISO is not the documented path.
 
 The operator TUI exposes five top-level tasks. Client installation owns the
 resumable laboratory configuration and never blocks using the controller.

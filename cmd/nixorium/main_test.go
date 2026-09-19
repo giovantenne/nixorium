@@ -66,6 +66,9 @@ func TestCollectBootstrapConfigurationCreatesReadyControllerSettings(t *testing.
 	if len(keyboard.keyMaps) != 1 || keyboard.keyMaps[0] != "it2" || !strings.Contains(output.String(), "All remaining input, including account passwords, uses this layout") {
 		t.Fatalf("keyboard activation = %+v, output=%q", keyboard, output.String())
 	}
+	if !strings.Contains(output.String(), "official NixOS Minimal ISO") {
+		t.Fatalf("minimal ISO recommendation missing: %q", output.String())
+	}
 	if keyboardPrompt, teacherPrompt := strings.Index(output.String(), "Keyboard layout"), strings.Index(output.String(), "Teacher username"); keyboardPrompt < 0 || teacherPrompt < 0 || keyboardPrompt >= teacherPrompt {
 		t.Fatalf("keyboard was not the first settings prompt: %q", output.String())
 	}
