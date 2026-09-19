@@ -16,6 +16,7 @@ let
     inherit (pkgs) lib;
     inherit pkgs;
   };
+  nixoriumPackage = pkgs.callPackage ../pkgs/nixorium.nix {};
 in
 {
   config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
@@ -27,7 +28,21 @@ in
   software-schema = assert softwareSchemaTest; pkgs.runCommand "nixorium-software-schema-test" {} ''
     touch "$out"
   '';
-  nixorium = pkgs.callPackage ../pkgs/nixorium.nix {};
+  nixorium = nixoriumPackage;
+  # Compile once from code only; inspect checkout guidance at runtime.
+  guidance-check = nixoriumPackage.overrideAttrs {
+    pname = "nixorium-guidance-check";
+    doCheck = false;
+    buildPhase = ''
+      runHook preBuild
+      go test -tags guidance -c -o guidance-check ./cmd/nixorium
+      runHook postBuild
+    '';
+    installPhase = ''
+      install -D -m 0755 guidance-check "$out/bin/guidance-check"
+    '';
+    postFixup = "";
+  };
   go-shell = pkgs.mkShell {
     packages = [ pkgs.go ];
   };

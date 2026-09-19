@@ -89,108 +89,51 @@ Generated locally during setup and committed in the private deployment repo:
 - `keys/admin-ssh.pub`
 - `keys/veyon-public-key.pem`
 
-## Build / Deploy Commands
+## Development and validation
+
+Use the smallest gate appropriate to the change:
 
 ```sh
-# Evaluate a single host config (syntax/type check without building)
-nix eval .#nixosConfigurations.pc01.config.system.build.toplevel --no-write-lock-file
+# Default: syntax, shell regressions, agent guidance, schemas, Go build/tests
+./scripts/validate.sh --quick
 
-# Build a single host (full build, outputs to ./result)
-nix build .#nixosConfigurations.pc01.config.system.build.toplevel
+# Add full mkLab evaluation for Nix API or host-composition changes
+./scripts/validate.sh --eval
 
-# Validation builds one representative client; add another only when its
-# host-specific module makes the resulting system materially different.
-nix build .#nixosConfigurations.pc01.config.system.build.toplevel
-
-# Run management application tests and build the package
-nix develop --command go test ./...
-nix build .#nixorium
-
-# Inspect the deterministic first-run setup stage without mutating state
-nix run .#nixorium -- setup status
-
-# Run guided configuration, key reconciliation, and final review
-nix run .#nixorium -- setup
-
-# Create missing key pairs and verify all existing correspondence
-nix run .#nixorium -- setup keys
-
-# Install verified private material through the fixed privileged unit
-nix run .#nixorium -- setup install-secrets
-
-# Apply the committed controller configuration through the fixed unit
-nix run .#nixorium -- setup apply
-
-# Prepare immutable netboot artifacts and every configured client closure
-nix run .#nixorium -- pxe prepare
-
-# Enter, leave, or explicitly recover managed PXE installation mode
-nix run .#nixorium -- pxe start
-nix run .#nixorium -- pxe stop
-nix run .#nixorium -- pxe recover
-
-# Validate and review a complete settings candidate without writing it
-nix run .#nixorium -- config plan --file candidate.json
-
-# Review, rebuild, activate, and verify this controller
-nix run .#nixorium -- controller plan
-nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
-
-# Inspect managed services or restart and verify only the signed cache
-nix run .#nixorium -- services
-nix run .#nixorium -- services restart cache
-
-# List or safely inspect bounded private deployment operation logs
-nix run .#nixorium -- logs
-nix run .#nixorium -- logs show OPERATION_LOG_ID
-
-# Review staged, unstaged, and untracked deployment changes without mutation
-nix run .#nixorium -- git review
-nix run .#nixorium -- git commit plan --paths lab-settings.json,keys/admin-ssh.pub
-nix run .#nixorium -- git commit apply --paths lab-settings.json,keys/admin-ssh.pub --expect REVIEW_TOKEN
-nix run .#nixorium -- update check
-nix run .#nixorium -- update plan --target v2.0.0
-nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
-
-# Review and execute a managed client deployment
-nix run .#nixorium -- deploy plan --on @lab
-nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
-
-# Review and request client-only power-off
-nix run .#nixorium -- shutdown plan --on @lab
-nix run .#nixorium -- shutdown apply --on @lab --expect REVIEW_TOKEN
-
-# Advanced compatibility: deploy to all lab PCs via raw Colmena
-colmena apply --on @lab
-
-# Deploy to a single PC
-colmena apply --on pc05
-
-# Advanced compatibility: build mutable netboot result links manually
-nix build .#nixosConfigurations.netboot.config.system.build.kernel --out-link result-kernel
-nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
-nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
+# Persistent, pinned shell for repeated Go edits
+nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell
+go test ./...
 ```
 
-`scripts/validate.sh` defaults to the fast local matrix: syntax, shell tests,
-skill and troubleshooting-copy coherence, direct schema checks, and the
-packaged Go command with its unit tests. `--eval` adds the complete `mkLab`
-contract without a VM. Use `--management-vm` or `--client-installer-vm` only
-for the affected integration boundary. Reserve `--full` for cross-cutting
-build changes and milestone or release completion; do not run it repeatedly in
-the edit-test loop. GitHub CI uses `--ci` for evaluation-only coverage without
-system closures and a separate job builds the packaged Go command with its unit
-tests. The complete selection rules and performance model are in
-`docs/development-validation.md`. Validation reuses a persistent evaluation
-cache and creates no result roots; it must never garbage-collect the shared Nix
-store automatically. There is no automatic formatter; follow the styles below
-and run `git diff --check`.
+Use the affected management or client-installer VM only when changing its
+integration boundary. Reserve `--full` for cross-cutting system-build changes
+and milestone/release completion, not the edit-test loop. Build one
+representative client and the controller when needed; add another client only
+for materially different host-specific modules. See
+[development validation](docs/development-validation.md) for the complete policy.
 
-For repeated Go edits, enter
-`nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell`
-once and run
-`go test ./...` inside it to reuse Go's incremental build cache. Finish with
-the default validation gate.
+Validation reuses a persistent evaluation cache, creates no persistent result
+roots, and must never garbage-collect the shared Nix store automatically.
+Run `git diff --check`; there is no automatic repository-wide formatter.
+
+Lab operation commands belong in the
+[administrator guide](templates/site/README.md) and the
+[maintainer skill](skills/nixorium-maintainer/SKILL.md), not in the upstream
+development workflow. Do not run a deployment merely to validate upstream code.
+
+## Keep agent guidance current
+
+Behavior changes must review the affected instructions in the same change.
+Use the [guidance maintenance map](docs/agent-guidance.md) to identify owners,
+source contracts, and checks. Keep this file focused on upstream invariants;
+keep administrator procedures in the deployment skill and its references.
+Do not copy TUI labels or confirmation phrases where referring to the current
+review report is sufficient.
+
+Update both maintainer skill copies together. Tests validate documented CLI
+examples using the real argument parser, relative instruction links, and skill
+discovery/distribution. They do not prove that prose describes runtime effects:
+review CLI versus TUI behavior and existing workflow tests explicitly.
 
 ## Releases
 
@@ -307,7 +250,9 @@ Release from the matching changelog section.
 - `modules/common.nix` is only the composition point for core desktop, firewall,
   power, and SSH modules. Packages, shell preferences, development tools,
   screensaver behavior, and application policy belong in the deployment.
-- The `gnome-user-setup.sh` script is generated inline in `modules/desktop.nix` to use parameterized user names from `labSettings`.
+- Site desktop favorites and shortcuts live in `templates/site/modules/workstation.nix`;
+  student template content lives in `templates/site/modules/home-profile.nix`.
+  Keep both conditional on effective software scope, not in core desktop policy.
 
 ## Nix Code Style
 
@@ -402,7 +347,9 @@ set -euo pipefail
 ## Security
 
 - **Never commit** `secret-key` or `admin-ssh` (both in the deployment `.gitignore`)
-- **Never commit** `veyon-private-key.pem` (in `.gitignore`); deploy manually to `/etc/veyon/keys/private/teacher/key` with mode `0640` and group `veyon-master`
+- **Never commit** `veyon-private-key.pem` (in `.gitignore`). Install it through
+  `nixorium setup install-secrets`; the fixed destination is
+  `/etc/veyon/keys/private/teacher/key`, mode `0640`, group `veyon-master`.
 - `nixorium git review` must refuse known private-key paths before reading any
   patch content; do not weaken this boundary when adding the optional commit
   workflow
@@ -439,11 +386,12 @@ set -euo pipefail
 ## Host Configuration
 
 Hostname + static IP are generated in `lib/mk-lab.nix` from the IPv4 network,
-CIDR prefix, and host offset. The shared interface name is configured via
-`labSettings.ifaceName` and applied in `modules/networking.nix`.
+CIDR prefix, and host offset. Interface resolution uses host, role, then shared
+fallback settings in `lib/mk-lab.nix`; `modules/networking.nix` applies the
+resolved interface.
 
-All machine-managed parameters live in a new deployment's
-`lab-settings.json`; legacy `lab-config.nix` deployments remain supported and
+Managed site settings live in a new deployment's `lab-settings.json`, and
+managed software declarations in `lab-software.json`; legacy `lab-config.nix` deployments remain supported and
 read-only until explicitly migrated.
 Additional behavior belongs in downstream extension modules, never in copies of upstream modules.
 Shell scripts must load operational settings from `labMeta` via `scripts/lib/lab-meta.sh`.

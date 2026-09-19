@@ -2,28 +2,36 @@
 
 ## Validation
 
-For every configuration change:
+Evaluate before building. For settings changes, use the managed validator;
+for other changes, evaluate the affected outputs. Inspect mode, readiness, and
+inventory without writing the lock:
 
 ```sh
 git diff --check
-nix run .#nixorium -- config validate
+nixorium config validate
 nix eval .#labMeta --json --no-write-lock-file
 nix eval .#deploymentStatus --json --no-write-lock-file
 ```
 
-Build every affected role. A representative client and controller validation
-is:
+In explicit controller-only mode, validate only the controller and use
+`deploymentStatus.controller` when supported. Zero clients is valid: do not
+require a client, lab keys, or netboot artifacts. Legacy metadata uses the
+older readiness contract; never use controller readiness to authorize clients.
 
-```sh
-CONTROLLER_NAME="$(nix eval .#labMeta.controller.name --raw --no-write-lock-file)"
-nix build .#nixosConfigurations.pc01.config.system.build.toplevel --no-write-lock-file --no-link
-nix build ".#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" --no-write-lock-file --no-link
-```
+Build changed roles before live application, not on every exploratory edit.
+For client-only changes use one actual representative client from `labMeta`;
+for shared changes include the controller. Do not build every client unless
+their changed host-specific modules produce materially different systems.
+Derive names from inventory instead of assuming `pc01` or `pc99`.
 
-For netboot, assets, or extension-module plumbing, also build the netboot
-ramdisk, `pxeFirmware`, and `installerBundle`. Evaluate one client through both
-the deployment and the real installer-bundle store path with `--offline`; the
-two `system.build.toplevel.drvPath` values must match.
+When a change affects netboot or inclusion of modules/assets in the installer,
+also validate the netboot ramdisk, `pxeFirmware`, and `installerBundle`.
+Evaluate the same client through the deployment and the real bundle store
+path with `--offline`; their `system.build.toplevel.drvPath` must match.
+Do not add this boundary check to a settings-only or controller-only task.
+
+Report evaluations and builds separately. Building may fetch sources and use
+substantial storage/time; it does not activate a system or authorize deployment.
 
 ## Installation and deployment
 
@@ -31,7 +39,7 @@ Disk installation is destructive. Resolve the exact host and disk first and
 retain the installer's explicit confirmation. Do not install or deploy merely
 because builds succeeded.
 
-Use Colmena only after authorization:
+Use the managed deployment workflow only after authorization:
 
 ```sh
 nixorium deploy plan --on pc05
@@ -49,7 +57,7 @@ reviewed revision and a concrete system path; the private per-repository
 history lives under `~/.local/state/nixorium/deployments/`. Inspect the
 reported log and host state, make a fresh plan, and retry. `--yes` is only for
 explicit automation. The raw commands below remain advanced manual operations
-and bypass these safeguards:
+and bypass these safeguards.
 
 For routine changes to this controller, use the separate reviewed workflow:
 
@@ -58,14 +66,16 @@ nixorium controller plan
 nixorium controller apply --expect REVISION_FROM_PLAN
 ```
 
-Apply requires exact `REBUILD <controller>` confirmation and starts only a
+CLI apply requires the exact confirmation returned by the plan and starts only a
 revision-bound systemd instance. It builds the pinned Git source as the
 deployment owner, refuses repository drift before activation, and verifies the
 active system plus its revision-bound durable success receipt afterward. The
 TUI's **Rebuild controller** task uses the same
-typed operation; the systemd job and journal survive closing the dashboard.
+typed operation with an Enter confirmation after review; the systemd job and
+journal survive closing the dashboard. Keep `setup apply` for first-run
+compatibility, not as a replacement for routine reviewed controller plans.
 
-The default TUI's **Deploy updates** screen invokes the same plan/apply
+The TUI's client distribution task invokes the same plan/apply
 operations. Select the intended computers, review the resolved revision and
 targets, and enter the exact phrase shown. Do not close the controller terminal
 until the final result, authenticated/recorded counts, and log path appear.
@@ -115,30 +125,13 @@ physical power state; a lost connection may mean the request took effect, so
 do not retry an unconfirmed target blindly. `--yes` is only for deliberate
 automation with the exact fresh review token.
 
-## Guided client software
+## Software and configuration changes
 
-Use suggestions or search the deployment's locked package set, then use the
-reviewed declaration workflow:
+Use [the software guide](software.md) for scopes, package updates, and the
+different CLI/TUI effects. Use [the student-home guide](student-home.md) for
+editor extensions, desktop preferences, and content that must survive resets.
 
-```sh
-nixorium software catalog
-nixorium software search --query libreoffice
-nixorium software plan --package vlc --scope all-clients
-nixorium software plan --package python3Packages.numpy --scope all-clients
-nixorium software apply --package vlc --scope all-clients --expect REVIEW_TOKEN
-```
-
-Scopes are `all-clients`, `group:NAME`, or comma-separated evaluated identities
-such as `clients:pc01,pc04`. Add `--remove` to both plan and apply to remove a
-managed declaration. Search uses pinned inputs and overlays, resolves dotted
-attributes as structured data, and reports packages blocked by policy.
-
-Apply re-evaluates the candidate, rechecks the content-bound token and source
-fingerprint, and atomically changes only `lab-software.json`. The normal TUI
-records that file locally without exposing Git. It does not push, build,
-activate, prepare PXE, or deploy. Then run a separate deployment for the
-intended powered-on clients. Packages
-and options in private NixOS modules remain outside this workflow.
+## Git review and operation logs
 
 Review deployment changes without mutating the index or worktree:
 
@@ -192,7 +185,8 @@ it. The TUI's **View operation logs** task uses the same bounded operations.
 
 ## Binary cache
 
-After `nixorium setup apply`, the controller owns Harmonia through systemd; do
+In laboratory mode, the controller owns Harmonia through systemd after
+activation. Controller-only mode intentionally leaves the lab cache inactive; do
 not launch a second foreground cache. Check both unit and HTTP readiness with:
 
 ```sh
@@ -217,7 +211,7 @@ Restart requires exact `RESTART CACHE` confirmation, invokes only the fixed
 capability-free `nixorium-restart-cache.service` action, and verifies both the
 unit and HTTP endpoint afterward. Do not use this path to control PXE units;
 their listener and network transition must remain coordinated through
-`nixorium pxe`. The TUI's **Manage services** task uses the same typed
+`nixorium pxe`. The TUI's controller services task uses the same typed
 operations. `--yes` is only for intentional automation.
 
 ## PXE preparation
@@ -249,25 +243,35 @@ failures.
 
 Use the reviewed workflow for a generated deployment:
 
+Replace `RELEASE_TAG` with the chosen published tag (or the explicitly requested
+`master` channel), and `REVIEW_TOKEN` with the token returned by that plan.
+
 ```sh
 nixorium update check
-nixorium update plan --target v2.0.0
-nixorium update apply --target v2.0.0 --expect REVIEW_TOKEN
+nixorium update plan --target RELEASE_TAG
+nixorium update apply --target RELEASE_TAG --expect REVIEW_TOKEN
 ```
 
 `update check` is the only remote-enumerating operation. It queries only the
 configured public GitHub upstream, with Git prompts/helpers/config overrides
 disabled, a 15-second timeout, bounded output, and at most 20 newest stable plus
 20 newest prerelease tags. It is read-only and optional; use an explicit target
-without discovery when offline.
+without enumeration if the required sources are already available. An explicit
+target does not guarantee offline validation: resolving/building it may need
+controller Internet access.
 
 It preserves upstream identity, validates a candidate lock outside the checkout,
 builds representative outputs, and writes only `flake.nix`/`flake.lock` after
-exact confirmation. Prerelease and downgrade targets require their explicit
-policy flags. It never commits, pushes, activates, starts PXE, or deploys.
-The TUI's **Update Nixorium** task invokes the same typed workflow and presents
-target/policy entry, candidate checks, a scrollable patch, exact confirmation,
-and the final two-file result. It does not add any implicit follow-up action.
+reviewed CLI confirmation. Preserve the deployment-owned `nixpkgs` lock node;
+a framework update is not a package-base refresh. In supported controller-only
+mode, candidate validation builds the controller only. Laboratory mode includes
+one representative client and the installation outputs. Prerelease and downgrade
+targets require their explicit policy flags. CLI apply never commits, pushes,
+activates, starts PXE, or deploys.
+The TUI's update task uses the same reviewed proposal, then records it locally
+and builds/activates the controller after Enter confirmation. Client distribution
+remains separate. Inspect the active deployment's capabilities and the current
+review; do not mistake this TUI path for a configuration-only operation.
 
 For an unsupported computed input, create a temporary upgrade branch, change
 `inputs.nixorium.url` to the chosen released tag, and update only that input:
@@ -279,4 +283,22 @@ git diff -- flake.nix flake.lock
 
 Review release notes and schema changes. Run the full representative client,
 controller, netboot, installer-bundle, and offline-equivalence validation
-before merging. Updating the pin does not authorize deployment.
+before merging when in laboratory mode; controller-only deployments require
+only their supported controller checks. Inspect the lock diff to ensure the
+package base and unrelated inputs were preserved. Updating the pin does not
+authorize deployment.
+
+## PXE lifecycle and interrupted operations
+
+Use `nixorium pxe start`, `nixorium pxe stop`, and `nixorium pxe recover`
+through their managed boundaries. Start requires the reviewed network transition
+and can interrupt static-address connections; stop restores normal networking.
+Recovery is for interrupted PXE state, not a general fix for unapplied network
+configuration. Never start the internal network unit directly.
+
+After a failure, inspect the operation report, `nixorium doctor`, and the named
+journal/log before retrying. Do not loosen permissions, delete receipts, rotate
+keys, clear host identity records, or manipulate interface addresses to bypass
+a refusal. A failed deployment can be partial; a disconnected host is not proof
+of shutdown or rollback. Ask for direction when recovery requires a new
+destructive action or uncertain target.

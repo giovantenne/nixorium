@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed upstream and deployment agent instructions, with task-specific
+  software-update and student-home guidance. Added cached parser-backed CLI
+  example checks, skill distribution/link checks, and a behavior-review map
+  to keep instructions aligned without rebuilding systems for prose edits.
+
 ### Removed
 
 - Removed the legacy pilot/test-computer workflow, including its private

@@ -108,5 +108,13 @@ For skill changes, validate both skill directories with the skill validator.
 The upstream and template copies of `nixorium-maintainer` must be identical,
 and template discovery links must resolve to that copy.
 
+`bash scripts/check-agent-guidance.sh` checks the actual instruction examples
+against the CLI parser without executing operations, checks relative links,
+and validates skill copies/discovery. The quick gate and management-command CI
+run it automatically. Its compiled checker reads prose at runtime to preserve
+the code build cache. Review behavioral claims using
+[the guidance maintenance map](../../../docs/agent-guidance.md); these checks
+cannot prove prose semantics or replace workflow tests.
+
 The contributor-facing decision table and guidance for placing new tests are
 maintained in `docs/development-validation.md`.
