@@ -172,6 +172,15 @@ not arbitrary root commands from the interface. Firewall openings are scoped
 to the configured lab interface and machine role. Client installation requires
 local confirmation; unattended installation is disabled.
 
+> [!NOTE]
+> TCP port 5900 is open on the lab interface only for hosts using Nixorium's
+> temporary Veyon Wayland fallback. Veyon's native PipeWire backend is still
+> experimental and GNOME requires interactive screen-sharing consent, so the
+> fallback uses view-only GNOME Remote Desktop with a shared VNC password for
+> unattended monitoring. This workaround will be retired as native Wayland
+> support and managed GNOME authorization mature; hosts using the native Veyon
+> backend do not open port 5900.
+
 Site settings, password hashes, public keys, and policy belong in the private
 deployment repository. Private SSH, cache-signing, and Veyon keys must stay out
 of Git and the Nix store. Public keys may be committed to the deployment.
