@@ -85,7 +85,7 @@ hash_bootstrap_password() {
     printf '%s\n' "$PASSWORD" | openssl passwd -6 -stdin
   else
     echo "Error: the live environment provides neither mkpasswd nor openssl." >&2
-    echo "Use the official NixOS installer image and retry." >&2
+    echo "Use the official NixOS Minimal ISO and retry." >&2
     return 1
   fi
 }
@@ -142,12 +142,12 @@ prompt_bootstrap_password() {
 activate_bootstrap_keyboard() {
   if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
     echo "Error: the selected keyboard cannot be verified safely from a graphical terminal." >&2
-    echo "Switch to a Linux text console (for example Ctrl+Alt+F2), then run the installer again." >&2
+    echo "Boot the official NixOS Minimal ISO, or switch to a Linux text console, then retry." >&2
     return 1
   fi
   if ! command -v loadkeys >/dev/null 2>&1; then
     echo "Error: the live environment does not provide loadkeys." >&2
-    echo "Use the official NixOS installer in a Linux text console and retry." >&2
+    echo "Use the official NixOS Minimal ISO and retry." >&2
     return 1
   fi
   if ! sudo loadkeys "$BOOTSTRAP_CONSOLE_KEYMAP"; then
@@ -170,6 +170,7 @@ collect_bootstrap_configuration() {
 
   echo
   echo "Nixorium controller setup"
+  echo "Recommended environment: official NixOS Minimal ISO in UEFI mode."
   echo "Choose the keyboard first, then the accounts and regional settings used after the first reboot."
   echo "The administrator account name is fixed as 'admin'."
   while true; do

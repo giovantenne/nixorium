@@ -12,7 +12,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   console keymap is applied before any later input. Bootstrap stops if keymap
   activation fails and refuses graphical terminals whose compositor layout
   cannot be verified portably. PXE-booted client installers use the same
-  configured console keymap as the controller.
+  configured console keymap as the controller. The official NixOS Minimal ISO
+  in UEFI mode is now explicitly documented and reported as the supported
+  controller-bootstrap environment.
 
 - Refreshed upstream and deployment agent instructions, with task-specific
   software-update and student-home guidance. Added cached parser-backed CLI
