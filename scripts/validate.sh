@@ -85,6 +85,7 @@ run_quick_checks() {
     nixorium \
     --no-write-lock-file \
     --no-link
+  bash scripts/check-agent-guidance.sh
 }
 
 run_mk_lab_check() {
@@ -146,6 +147,7 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.management-vm.drvPath" --raw --no-write-lock-file >/dev/null
 else
+  bash scripts/check-agent-guidance.sh
   run_full_checks
 fi
 

@@ -30,6 +30,9 @@ jobs:
       - name: Build packaged Go command and run unit tests
         run: nix build --file tests/source-checks.nix nixorium --no-link
 
+      - name: Check agent guidance against the command parser
+        run: bash scripts/check-agent-guidance.sh
+
   validate:
     name: Evaluate source and deployment template
     runs-on: ubuntu-latest

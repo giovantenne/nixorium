@@ -34,7 +34,10 @@ application. Validate it through both schema layers after any edit:
 nix run .#nixorium -- config validate
 ```
 
-For first-run configuration, prefer the interactive wizard:
+For an administrator using the current TUI, prefer its installation flow:
+laboratory settings are followed by validation/save, keys, controller activation,
+client preparation, and a reviewed PXE start. This is not a save-only editor.
+For the first-run CLI settings/key workflow:
 
 ```sh
 nix run .#nixorium -- setup
@@ -96,9 +99,15 @@ Run:
 nix eval .#deploymentStatus --json --no-write-lock-file
 ```
 
-Do not install clients or deploy until `ready` is true. The status detects
+Do not install clients or deploy to them until `ready` is true. The status detects
 the DHCP placeholder, missing public keys, and unchanged public password
 hashes.
+
+Controller-only mode instead uses `deploymentStatus.controller` when supported;
+it permits local activation without clients or laboratory keys. Never turn this
+exception into permission for client/PXE operations. Derive interface names
+from evaluated metadata: per-host and controller/client overrides take priority
+over the shared `ifaceName` fallback.
 
 Private files stay outside Git:
 
@@ -134,7 +143,7 @@ Commit the reviewed settings and public keys, then apply this controller with:
 nix run .#nixorium -- setup apply
 ```
 
-The worktree must be clean. Confirm by typing the exact `APPLY` token after
+The worktree must be clean. Use the confirmation requested by the CLI after
 reviewing the networking/service warning. The fixed service builds the Git
 view of the deployment as `admin`, which excludes the three ignored private
 files from the Nix store, then activates only that exact closure as root.
@@ -144,3 +153,7 @@ Completion requires a root-owned receipt matching both the current Git
 revision and active closure; `/run/current-system` alone is insufficient. After
 upgrading from a version without receipts, run one reviewed `setup apply` to
 create that proof even if the closure already matches.
+
+For routine controller changes, use `nixorium controller plan` and its reviewed
+apply command; see [operations](operations.md). Keep first-run compatibility
+distinct from the ordinary rebuild workflow.

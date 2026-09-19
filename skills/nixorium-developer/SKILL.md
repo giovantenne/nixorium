@@ -63,5 +63,10 @@ Public API changes must update the template, both READMEs, `AGENTS.md`, and
 identical to the upstream copy. The upstream-only `nixorium-developer` skill
 must not be copied into private deployments.
 
+For behavior changes, use the [guidance maintenance map](../../docs/agent-guidance.md)
+to review affected agent instructions in the same change. CLI, TUI follow-up,
+readiness, software scopes, and template behavior must agree with the skill;
+passing syntax/link checks alone does not establish semantic coherence.
+
 Commits, pushes, tags, releases, installations, live deployments, and external
 repository changes require explicit authorization.

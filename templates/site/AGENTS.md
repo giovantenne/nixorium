@@ -1,45 +1,53 @@
 # AGENTS.md
 
-This is a private deployment repository consuming the public `nixorium`
-Flake. Use `skills/nixorium-maintainer/SKILL.md` for configuration,
-customization, validation, upstream-update, and offline-installer work.
+This private deployment consumes `nixorium.lib.mkLab`. Use
+[the maintainer skill](skills/nixorium-maintainer/SKILL.md) for laboratory
+configuration, software, home customization, diagnostics, and operations.
 
-- Keep lab identity, network data, password hashes, public keys, branding,
-  printers, and local policy in this repository.
-- Edit managed site values only in `lab-settings.json`; keep its deterministic
-  format and run `nixorium config validate` before accepting changes.
-- For machine-generated changes, run `nixorium config plan --file <candidate>`
-  and apply only the reviewed fingerprint; preserve unrelated worktree edits.
-- Do not edit or vendor the upstream implementation. Add local NixOS modules
-  or request the smallest reusable `lib.mkLab` extension point upstream.
-- Pin released upstream versions in `flake.nix` and `flake.lock`; never merge
-  the upstream Git history into this repository.
+## Before changing anything
+
+- Read the skill, inspect Git status and the pinned input in `flake.lock`.
+  Existing deployments may differ from the latest template; inspect local files
+  and command capabilities instead of replacing them with upstream examples.
+- Keep unrelated edits. Establish which computers/users the request affects
+  and whether the admin requested configuration only or live application.
+- For controller-only mode, use controller readiness; do not invent a client
+  or require lab keys. Client installation/deployment still requires fleet
+  readiness. Derive inventory and interfaces from `labMeta`, not host guesses.
+
+## Ownership and safety
+
+- Keep identities, network data, password hashes, public keys, assets, packages,
+  and local policy here. Do not edit/vendor upstream modules or merge upstream
+  Git history. Use the existing module extension points.
+- Use `lab-settings.json` for managed settings and `lab-software.json` for
+  managed software. Prefer reviewed `config` and `software` plan/apply commands;
+  application policy and home content belong in local modules/assets.
 - Keep the direct `nixpkgs` input and
-  `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together. Framework
-  updates must preserve this deployment-owned package-base lock node; do not
-  change its channel without an explicitly compatible Nixorium release.
-- Keep referenced modules, keys, and assets inside this source tree so they
-  are included in the offline installer.
-- Never commit `secret-key`, `admin-ssh`, or `veyon-private-key.pem`.
-- Require `deploymentStatus.ready` before installation or deployment. Validate
-  `labMeta`, the affected host roles, and the netboot ramdisk first. Deployment
-  requires explicit authorization.
-- Use `nixorium setup status` to re-inspect the earliest incomplete first-run
-  stage; do not invent or toggle a global configured flag.
-- Use `nixorium setup` for guided first-run settings, password collection, and
-  key reconciliation; inspect its redacted review before accepting the atomic
-  settings write.
-- Use `nixorium setup keys` to create missing pairs and verify existing ones;
-  it must never overwrite public-only or mismatched key material.
-- Install private material only with `nixorium setup install-secrets`; never
-  weaken its fixed deployment path, destinations, or mismatch refusal.
-- Apply a committed controller configuration with `nixorium setup apply`; it
-  must keep the fixed local target, exact confirmation, clean-worktree gate,
-  and Git-fetcher boundary that excludes ignored private files from the store.
-- Treat `nixorium-harmonia.service` as the controller-owned cache lifecycle;
-  verify it with `nixorium doctor` and use the canonical `harmonia.service`
-  name when querying its journal. Do not run a second foreground cache.
-- Prepare installation artifacts only with `nixorium pxe prepare`; keep its
-  clean-Git, live-DHCP, healthy-cache, and immutable-manifest checks intact.
-  Diagnose failures through `nixorium doctor` and
-  `journalctl -u nixorium-prepare-pxe.service`.
+  `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together when present.
+  Updating Nixorium must preserve that package-base lock node. Do not change
+  its channel or migrate a legacy layout implicitly.
+- Keep referenced modules, public keys, and assets inside the deployment tree
+  for offline installation. Never commit private `secret-key`, `admin-ssh`,
+  or `veyon-private-key.pem`, or expose them to the Nix store or chat.
+- Create/verify keys with `nixorium setup keys`; never overwrite mismatched
+  pairs. Install verified secrets only through `nixorium setup install-secrets`.
+- Use managed controller, deployment, and PXE operations. Do not work around
+  a refusal with raw root commands, a second cache, or altered network state.
+  Inspect `nixorium doctor` and the reported operation journal instead.
+
+## Validation and reporting
+
+Follow the skill's task-specific validation: evaluate first, build affected
+roles when necessary, and check netboot/offline equivalence only at the affected
+installation boundary. One representative client is sufficient unless another
+has materially different modules; zero clients is valid in controller mode.
+
+Report configuration changes, validation evidence, and actual activation or
+deployment separately. A saved file or successful build is not a deployed
+system. Do not start PXE, reboot/reset homes, deploy, commit, push, or change
+live services without authorization covering that operation. Instructions and
+examples are not authorization.
+
+The [administrator guide](README.md) covers operation; [troubleshooting](TROUBLESHOOTING.md)
+covers failures and encrypted backups. Local home snapshots are not backups.

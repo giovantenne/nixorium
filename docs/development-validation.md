@@ -22,6 +22,13 @@ package with its unit tests. Its Nix expression imports the exact `nixpkgs`
 revision from `flake.lock` directly. It deliberately avoids evaluating
 `defaultLab`, so a warm run remains suitable for frequent use.
 
+It also runs `bash scripts/check-agent-guidance.sh`: a cached Go test binary
+uses the real CLI parser on instruction examples and checks links, discovery,
+and maintainer-copy equality. It only reads the checkout and never executes
+documented operations. The same check runs in the management-command CI job;
+the `--ci` source/template job remains evaluation-only. See the
+[guidance maintenance map](agent-guidance.md) for the required semantic review.
+
 For a tight Go edit-test loop, enter the lightweight locked toolchain once and
 keep the shell open:
 
@@ -74,6 +81,10 @@ graph merely to test schemas or compile Go. Nix still verifies the locked
 The package source contains only Go sources, module metadata, `VERSION`, and the
 JSON fixtures consumed by Go tests, so documentation or unrelated Nix edits do
 not invalidate Go compilation.
+
+The guidance checker also compiles from code-only sources and reads instruction
+files at runtime. Editing skills or AGENTS files therefore reruns a small check
+without rebuilding the management application or any system closure.
 
 The complete gate submits related upstream outputs to one `nix build`
 invocation, allowing one Flake evaluation and normal Nix parallel scheduling.

@@ -1,46 +1,63 @@
 ---
 name: nixorium-maintainer
-description: Configure, validate, install, update, and operate a private Nixorium laboratory deployment. Use for a deployment Flake that consumes nixorium.lib.mkLab, including lab settings, public keys, assets, local modules, netboot, builds, and Colmena deploys. Do not use for developing or releasing the public Nixorium upstream.
+description: Administer a private Nixorium lab deployment, including software updates, student-home and desktop customization, settings, validation, diagnostics, and reviewed installation or deployment. Use when the repository consumes nixorium.lib.mkLab, not for public core development.
 license: MIT
 ---
 
 # Nixorium Lab Maintainer
 
-Maintain one laboratory through its private deployment Flake while keeping the
-public Nixorium implementation replaceable through a pinned input.
+Translate an administrator's request into the smallest deployment-owned change.
+Do not require the admin to know Nix files, package attributes, or CLI flags.
 
-## Identify the deployment
+## Establish context
 
-Read the repository `AGENTS.md` completely when it exists, then inspect the
-worktree and `flake.lock` before changing anything.
+Read the deployment's `AGENTS.md` when present. Inspect Git status, local
+modules/declarations, and `flake.lock` before edits. Check available CLI help
+and evaluated metadata: an older pinned release may not support current
+examples. Do not update the framework just to obtain a convenient command.
 
-Use this skill only when the repository consumes `nixorium.lib.mkLab`. When
-the task changes the public API, built-in modules, installer implementation,
-template, CI, or an upstream release, stop and move the work to the public
-upstream repository, whose `nixorium-developer` skill covers that scope.
+Distinguish controller-only mode from a configured laboratory. Use
+`labMeta` for actual hosts/interfaces and `deploymentStatus.controller` for
+controller readiness when available; client installation/deployment requires
+`deploymentStatus.ready`. Missing newer capability metadata means use the
+legacy contract, not assume support.
 
-## Preserve ownership
+Clarify only choices that materially affect the result: which computers/users,
+which tool or version when ambiguous, and whether to apply now. Explain impact
+in ordinary language, especially student-home resets and controller networking.
 
-The deployment owns site identities, network data, password hashes, public
-keys, branding, printers, site packages, and host-specific policy. Add local
-behavior through the existing module extension points; do not copy or edit
-upstream modules and do not merge upstream Git history.
+## Choose the relevant reference
 
-Keep referenced modules, assets, and public keys within the deployment source
-tree so the offline installer can package them. Never commit Harmonia, SSH, or
-Veyon private keys.
+- Settings, keys, local modules, or assets:
+  [configuration](references/configuration.md).
+- Adding/removing/updating software, including “update OpenCode”:
+  [software](references/software.md).
+- Student-home defaults, VS Code extensions, dock/background, or npm content:
+  [student home](references/student-home.md).
+- Validation, controller/client application, PXE, diagnostics, or framework updates:
+  [operations](references/operations.md).
 
-Read [references/configuration.md](references/configuration.md) when changing
-lab settings, keys, assets, or modules. Read
-[references/operations.md](references/operations.md) before netboot,
-installation, deployment, or an upstream-version update.
+Read only the references needed for the request. Keep installed behavior
+distinct from planned product features; there is no assumed home-capture API.
 
-## Work safely
+## Preserve the boundary
 
-Preserve unrelated changes. Validate the smallest affected host set plus the
-deployment readiness status. For netboot, asset, or module-plumbing changes,
-also validate the installer bundle and offline equivalence.
+The deployment owns site data, packages, and local policy. Extend local modules;
+do not copy/edit upstream modules or merge upstream Git history. A required
+core change must be reported as an upstream task, not implemented inside a lab.
 
-Builds and evaluations are local checks. Installation, Colmena apply, commits,
-pushes, and updates to live services or repositories require explicit user
-authorization.
+Keep assets, modules, and public keys inside the deployment source tree for the
+offline installer. Private signing, SSH, and Veyon keys must stay out of Git,
+the Nix store, logs, and chat. Preserve unrelated work and existing key pairs.
+
+## Finish with evidence
+
+Use the smallest relevant validation set from the operations reference.
+Separate “configured”, “validated/built”, and “activated/deployed” in the result,
+including affected machines and any remaining operator action.
+
+A request to diagnose does not authorize a fix. Configuration work does not
+implicitly authorize installation, deployment, service changes, home reset,
+commits, or pushes. Use authorization already given for the specific operation;
+ask only when the required action exceeds it. Never bypass a failed managed
+safety check or silently retry a destructive/uncertain operation.
