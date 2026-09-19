@@ -87,6 +87,11 @@ Check the requirements above before proceeding. For an initial evaluation,
 configure **one client** and verify it before expanding the lab. This is a
 testing recommendation, not a separate mandatory stage in the interface.
 
+For a disposable evaluation, use one controller VM and one client VM on an
+isolated segment with DHCP. The installation still erases the selected virtual
+disks. See the [evaluation environment](docs/evaluation-environment.md) for the
+current manual path and the bounded plan for a future one-command QEMU harness.
+
 ### 1. Bootstrap the controller from USB
 
 Boot the official **NixOS Minimal ISO** in UEFI mode with Internet access. It
@@ -203,6 +208,7 @@ the versioned operational and contributor references.
 | Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
 | Understand architecture and security | [Management architecture](docs/management-architecture.md), [ADRs](docs/adr/) |
 | Evaluate firmware and physical hardware | [Hardware validation plan](docs/hardware-validation.md) |
+| Evaluate with disposable virtual machines | [Evaluation environment](docs/evaluation-environment.md) |
 | Develop and validate changes | [Contributor instructions](AGENTS.md), [development validation](docs/development-validation.md) |
 | Work with a coding agent | [Agent skills](#agent-skills) |
 | Review release changes | [Changelog](CHANGELOG.md), [Releases](https://github.com/giovantenne/nixorium/releases) |
