@@ -202,7 +202,7 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 		return softwarePlanIssue(report, "review", err.Error())
 	}
 	report.ReviewToken = domain.SoftwareReviewToken(report.BaseFingerprint, reviewData)
-	report.Confirmation = "SAVE SOFTWARE " + report.ReviewToken[len("sha256:"):len("sha256:")+12]
+	report.Confirmation = "SAVE"
 	action := "Add "
 	if !request.Present {
 		action = "Remove "

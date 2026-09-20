@@ -134,7 +134,7 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	actions.PlanSoftware = func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 		return domain.SoftwareChangePlanReport{
 			SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
-			Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Confirmation: "SAVE SOFTWARE demo", Issues: []domain.ValidationIssue{},
+			Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Confirmation: "SAVE", Issues: []domain.ValidationIssue{},
 		}
 	}
 	actions.SaveSoftware = func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
@@ -174,7 +174,7 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	r.model.deployChosen = map[string]bool{"pc01": true, "pc02": true, "pc03": true, "pc04": true, "pc05": true}
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Review deployment to all five current clients", 2100)
-	r.typeAndCapture("DEPLOY @lab", "Type the reviewed deployment target")
+	r.typeAndCapture("DEPLOY", "Type the one-word deployment confirmation")
 	deployCommand := r.key(demoCode(tea.KeyEnter))
 	r.capture("Press Enter to start deployment", 650)
 	if deployCommand == nil {
@@ -278,7 +278,7 @@ func renderInstallationDemo(revision string) DemoScenario {
 	r.model.screen = dashboardPXEStartReview
 	r.model.startPlan = domain.PXELifecycleReport{SchemaVersion: 1, Operation: "pxe-start-plan", State: "ready", Mode: "ready", Interface: "enp1s0", DHCPAddress: demoServiceAddress, StaticCIDR: "10.42.0.99/24"}
 	r.capture("Review the temporary network impact", 3300)
-	r.typeAndCapture("START PXE", "Type the network-impact confirmation")
+	r.typeAndCapture("START", "Type the one-word network-impact confirmation")
 	startCommand := r.key(demoCode(tea.KeyEnter))
 	r.capture("Press Enter to start network installation", 650)
 	if startCommand == nil {

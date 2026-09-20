@@ -75,7 +75,7 @@ test_guided_success_and_reboot() (
   OUTPUT=$(main <<'EOF'
 2
 2
-ERASE /dev/vdb INSTALL pc02
+ERASE
 REBOOT
 EOF
   )
@@ -147,7 +147,7 @@ test_disk_identity_change_is_refused() (
 
   set +e
   OUTPUT=$(main pc01 /dev/vda <<'EOF' 2>&1
-ERASE /dev/vda INSTALL pc01
+ERASE
 EOF
   )
   STATUS=$?
@@ -167,7 +167,7 @@ test_failure_reports_modified_disk() (
   set +e
   (
     main pc02 /dev/vdb <<'EOF'
-ERASE /dev/vdb INSTALL pc02
+ERASE
 
 EOF
   ) > "${FIXTURE_DIR}/failure-output" 2>&1

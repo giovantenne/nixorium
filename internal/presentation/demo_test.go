@@ -33,7 +33,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 			t.Fatalf("main demo omits %q", expected)
 		}
 	}
-	if !demoFramesContain(main.Frames, "Move the cursor to Software") || !demoFramesContain(main.Frames, "Open Software directly in Search") || !demoFramesContain(main.Frames, "Type the package name") || !demoFramesContain(main.Frames, "Choose Inkscape from Search") || !demoFramesContain(main.Frames, "Review deployment to all five current clients") || !demoFramesContain(main.Frames, "Type the reviewed deployment target") || !demoFramesContain(main.Frames, "Press Enter to start deployment") {
+	if !demoFramesContain(main.Frames, "Move the cursor to Software") || !demoFramesContain(main.Frames, "Open Software directly in Search") || !demoFramesContain(main.Frames, "Type the package name") || !demoFramesContain(main.Frames, "Choose Inkscape from Search") || !demoFramesContain(main.Frames, "Review deployment to all five current clients") || !demoFramesContain(main.Frames, "Type the one-word deployment confirmation") || !demoFramesContain(main.Frames, "Press Enter to start deployment") {
 		t.Fatal("main demo does not expose cursor movement and typing")
 	}
 	if demoFramesContain(main.Frames, "Open client distribution") || demoFramesContain(main.Frames, "Select all five clients for deployment") {
@@ -55,7 +55,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range installation.Frames {
 		installationText += frame.Text
 	}
-	for _, expected := range []string{"Service address:    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Type START PXE to continue", "Next: install computers", "Boot one configured computer using UEFI network boot", "run /installer/setup.sh"} {
+	for _, expected := range []string{"Service address:    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Type START to continue", "Next: install computers", "Boot one configured computer using UEFI network boot", "run /installer/setup.sh"} {
 		if !strings.Contains(installationText, expected) {
 			t.Fatalf("installation demo omits %q", expected)
 		}
@@ -63,7 +63,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	if strings.Contains(installationText, "192.0.2.44") {
 		t.Fatal("installation demo still contains the obsolete service address")
 	}
-	for _, label := range []string{"Build the controller configuration", "Activate the controller configuration", "Verify the active controller", "Complete controller activation and verification", "Complete every preparation step", "Type the network-impact confirmation", "Press Enter to start network installation", "Complete every controller-side installation step"} {
+	for _, label := range []string{"Build the controller configuration", "Activate the controller configuration", "Verify the active controller", "Complete controller activation and verification", "Complete every preparation step", "Type the one-word network-impact confirmation", "Press Enter to start network installation", "Complete every controller-side installation step"} {
 		if !demoFramesContain(installation.Frames, label) {
 			t.Fatalf("installation demo omits animation frame %q", label)
 		}

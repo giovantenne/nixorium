@@ -73,6 +73,14 @@ func (Local) RunDeploymentPhase(ctx context.Context, repository string, phase do
 		return err
 	}
 	command := exec.CommandContext(ctx, "colmena", arguments...)
+	cleanup := func() {}
+	if phase == domain.DeploymentPhaseApply {
+		cleanup, err = configureColmenaSSH(command)
+		if err != nil {
+			return fmt.Errorf("prepare Colmena SSH policy: %w", err)
+		}
+	}
+	defer cleanup()
 	command.Dir = repository
 	command.Stdout = output
 	command.Stderr = output
@@ -94,6 +102,44 @@ func deploymentCommand(phase domain.DeploymentPhase, selector string) ([]string,
 	default:
 		return nil, fmt.Errorf("unsupported deployment phase %q", phase)
 	}
+}
+
+func configureColmenaSSH(command *exec.Cmd) (func(), error) {
+	config, err := os.CreateTemp("", "nixorium-colmena-ssh-*")
+	if err != nil {
+		return nil, err
+	}
+	path := config.Name()
+	cleanup := func() {
+		_ = os.Remove(path)
+	}
+	content := "Host *\n  BatchMode yes\n  PasswordAuthentication no\n  StrictHostKeyChecking accept-new\n"
+	if _, err := io.WriteString(config, content); err != nil {
+		_ = config.Close()
+		cleanup()
+		return nil, err
+	}
+	if err := config.Close(); err != nil {
+		cleanup()
+		return nil, err
+	}
+	environment := command.Env
+	if environment == nil {
+		environment = os.Environ()
+	}
+	command.Env = environmentWithValue(environment, "SSH_CONFIG_FILE", path)
+	return cleanup, nil
+}
+
+func environmentWithValue(environment []string, name, value string) []string {
+	prefix := name + "="
+	result := make([]string, 0, len(environment)+1)
+	for _, entry := range environment {
+		if !strings.HasPrefix(entry, prefix) {
+			result = append(result, entry)
+		}
+	}
+	return append(result, prefix+value)
 }
 
 func (Local) ServiceState(ctx context.Context, name string) domain.ServiceState {

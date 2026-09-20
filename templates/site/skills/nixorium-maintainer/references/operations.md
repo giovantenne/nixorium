@@ -49,13 +49,14 @@ nixorium deploy apply --on @lab --expect REVISION_FROM_PLAN
 
 Planning requires a ready deployment and clean Git worktree, records HEAD, and
 rejects unknown or duplicate clients. Use the exact command and revision shown
-by the plan. Apply revalidates the review, requires `DEPLOY <targets>`, runs a
+by the plan. Apply revalidates the review, requires the one-word `DEPLOY` confirmation, runs a
 verbose build before activation, and records a private durable log. If apply
 fails, some targets may already have changed. After every attempt, Nixorium
 authenticates to the selected hosts and records only those reporting the
 reviewed revision and a concrete system path; the private per-repository
 history lives under `~/.local/state/nixorium/deployments/`. Inspect the
-reported log and host state, make a fresh plan, and retry. `--yes` is only for
+reported log and host state, make a fresh plan, and retry. The interactive
+apply confirmation is the single word `DEPLOY`; `--yes` is only for
 explicit automation. The raw commands below remain advanced manual operations
 and bypass these safeguards.
 
@@ -209,7 +210,7 @@ nixorium services
 nixorium services restart cache
 ```
 
-Restart requires exact `RESTART CACHE` confirmation, invokes only the fixed
+Restart requires the exact one-word `RESTART` confirmation, invokes only the fixed
 capability-free `nixorium-restart-cache.service` action, and verifies both the
 unit and HTTP endpoint afterward. Do not use this path to control PXE units;
 their listener and network transition must remain coordinated through

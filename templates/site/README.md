@@ -112,7 +112,7 @@ update is not implemented yet.
 - `software-catalog.nix`: optional deployment-owned suggestions shown before package search
 - `modules/workstation.nix`: GNOME application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
-- `modules/home-profile.nix`: MIME defaults and VS Code settings/extensions
+- `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
 - `modules/screensaver.nix`: optional Ghostty/TTE screensaver
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `hostModules` in `flake.nix`: individual hosts
@@ -322,7 +322,7 @@ nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 
 Planning is read-only. It requires a ready deployment and clean Git revision,
 expands only configured clients, and prints the revision-bound apply command.
-Apply repeats the preflight, requires `DEPLOY <targets>`, builds before
+Apply repeats the preflight, requires the one-word `DEPLOY` confirmation, builds before
 activation, and streams output to a mode-0600 log. In the dashboard, the same
 foreground operation shows elapsed time, named stages and authenticated-computer
 verification counts. `l` expands the progress bar and up to five authored
@@ -418,7 +418,7 @@ nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 ```
 
-Apply requires `REBUILD <controller>`, starts only the matching revision-bound
+Apply requires the one-word `REBUILD` confirmation, starts only the matching revision-bound
 systemd unit, builds as the deployment owner, refuses repository drift, and
 records success only after activation and active-system verification. Closing
 the dashboard does not stop the systemd-owned job. The dashboard shows elapsed
@@ -426,8 +426,7 @@ time, four typed phases, recent activity, and a progress bar; CLI text/JSON
 flows write the same safe activity to stderr. When the job ends, the dashboard
 refreshes reconciled state and shows a compact result with explicit actions to
 return home, reveal the activity detail, inspect logs, or create a new review.
-The `REBUILD <controller>` phrase belongs to the CLI command above; the TUI
-uses Enter after showing the reviewed revision and restart impact.
+The TUI uses Enter after showing the reviewed revision and restart impact.
 Use `setup apply` for the equivalent first-run action with identical progress
 feedback.
 
@@ -439,7 +438,7 @@ nix run .#nixorium -- services restart cache
 ```
 
 The report combines the persistent signed cache and on-demand PXE lifecycle.
-Cache restart requires `RESTART CACHE` and succeeds only after both systemd and
+Cache restart requires the one-word `RESTART` confirmation and succeeds only after both systemd and
 HTTP checks pass. PXE uses its dedicated transactional workflow and cannot be
 mutated through this generic service action.
 
@@ -537,7 +536,7 @@ nix run .#nixorium -- pxe recover
 ```
 
 Start validates preparation, live addressing, cache, and services before
-requiring `START PXE`. Stop restores normal controller addressing. Recover
+requiring the one-word `START` confirmation. Stop restores normal controller addressing. Recover
 reconciles an interrupted session, and boot recovery performs the same repair
 automatically. These actions are idempotent; a failed start rolls back before
 returning. Quitting the dashboard does not stop active systemd-owned services.
@@ -559,8 +558,8 @@ probe. Silence is not treated as a reservation. It verifies the selected
 closure offline and requires its size plus 2 GiB of headroom before offering a
 disk.
 
-Disko starts only after an exact confirmation such as `ERASE /dev/sda INSTALL
-pc05`. The installer reports partition, installation, and verification stages,
+Disko starts only after the one-word `ERASE` confirmation on a review that
+shows the exact client identity and disk. The installer reports partition, installation, and verification stages,
 then offers a separately confirmed reboot. There is no unattended mode and no
 client-side fallback fetch.
 

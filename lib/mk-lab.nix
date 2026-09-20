@@ -683,7 +683,6 @@ assert unknownVeyonNativeHosts == []
     defaults.deployment = {
       targetUser = "root";
       buildOnTarget = false;
-      sshOptions = [ "-o" "StrictHostKeyChecking=accept-new" ];
     };
     ${masterHostName} = {
       _module.args = specialArgsForHost masterHostName masterIp;

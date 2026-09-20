@@ -49,7 +49,7 @@
           }
           probe_host_identity() { return 2; }
           main pc01 /dev/vdb <<'EOF'
-          ERASE /dev/vdb INSTALL pc01
+          ERASE
 
           EOF
         '';

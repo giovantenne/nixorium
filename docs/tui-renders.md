@@ -74,7 +74,7 @@ NOTICE
 ! Temporarily remove 10.0.0.99/24; remote connections may be interrupted
   Serve ProxyDHCP, TFTP, HTTP and cache via 192.0.2.10.
 
-Type START PXE to continue:
+Type START to continue:
 > _
 
 Enter Start PXE  •  Esc Cancel  •  F1 Help
@@ -392,7 +392,7 @@ NOTICE
 After validation, the review states that only `flake.nix` and `flake.lock` are
 saved before this controller is built, activated, and verified. Enter accepts
 the visible review; the TUI no longer asks the administrator to retype
-`UPDATE NIXORIUM TO …`. The result shows the original interface version and
+an update phrase. The result shows the original interface version and
 asks the administrator to reopen Nixorium; clients remain unchanged. Git review,
 commit language, hashes, and push actions are absent from this ordinary flow;
 Maintenance retains the explicit repository tools.
@@ -410,14 +410,14 @@ Affects  eth0 · controller network
 Serve ProxyDHCP, TFTP, HTTP and cache via 192.168.1.10. Institutional DHCP
 remains authoritative. `nixorium pxe stop` or reboot recovery restores normal addressing.
 
-Type START PXE to continue:
+Type START to continue:
 > _
 
 enter confirm   esc cancel   F1 help
 ```
 
-The client installer retains a separate local confirmation containing both the
-selected identity and disk before any disk is erased.
+The client installer retains a separate local `ERASE` confirmation after
+showing the selected identity and disk, then verifies the disk again before erasure.
 
 ## Semantic progress
 

@@ -32,8 +32,15 @@ inside each package rather than assuming Marketplace IDs are Nix attributes.
 Add only the agreed extensions to the local profile, preserving existing
 ones and any settings unrelated to Python. Inspect current activation ordering
 and ownership; keep the profile conditional on the effective VS Code package.
-Settings assets may affect both admin and student in the supplied template:
+Settings assets affect admin, teacher, and student in the supplied template:
 do not broaden a student-only request to staff without identifying that effect.
+
+Create staff application directories with their final owner instead of relying
+on `install -D -o` for intermediate directories. Core repairs the managed
+`.config/Code`, `.vscode/extensions`, and npm trees for admin, teacher, and
+student during activation; do not replace this with world-writable modes.
+`/run/user/<uid>` is created by logind, while activation only reconciles an
+already existing top-level directory whose ownership or mode is wrong.
 
 Build a representative affected system and check the extension payload/settings.
 Do not rely on a Marketplace download at student login: clients must receive

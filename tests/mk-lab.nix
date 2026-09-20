@@ -115,6 +115,7 @@ let
   nativeClientTCP = nativeVeyonLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
   clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
   clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
+  clientHomeOwnership = subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumUserHomeOwnership;
 in
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
 assert controllerOnlyLab.labMeta.controller.staticIp == "";
@@ -197,6 +198,20 @@ assert !(builtins.elem "networkmanager"
   subnetLab.nixosConfigurations.pc99.config.users.users.${labConfig.studentUser}.extraGroups);
 assert builtins.elem "networkmanager" clientUsers.${labConfig.teacherUser}.extraGroups;
 assert builtins.elem "networkmanager" clientUsers.admin.extraGroups;
+assert builtins.elem "users" clientHomeOwnership.deps;
+assert builtins.elem "createHomeTemplates" clientHomeOwnership.deps;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''HOME_DIR="/home/admin"'' clientHomeOwnership.text;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''HOME_DIR="/home/${labConfig.teacherUser}"'' clientHomeOwnership.text;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''HOME_DIR="/home/${labConfig.studentUser}"'' clientHomeOwnership.text;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''.config/Code'' clientHomeOwnership.text;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''.vscode/extensions'' clientHomeOwnership.text;
+assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''RUNTIME_DIR="/run/user/$USER_ID"'' clientHomeOwnership.text;
 assert clientPolkit.enable;
 assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   ''subject.user == "${labConfig.studentUser}"'' clientPolkit.extraConfig;

@@ -8,6 +8,22 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Interactive operational confirmations are now either a single explicit word
+  or Enter on an already visible review. Deployment target lists, release names,
+  controller names, review-token prefixes, and other generated phrases no
+  longer need to be retyped. Content-bound review tokens, revision checks, and
+  the client installer's final disk revalidation remain unchanged.
+
+- Colmena 0.4 deployments no longer emit the unsupported
+  `deployment.sshOptions` option. Nixorium supplies the supported private
+  `SSH_CONFIG_FILE` policy during apply instead, retaining non-interactive SSH
+  and first-connection host-key enrollment.
+
+- Activation now repairs root-owned managed VS Code/XDG directories for the
+  admin, teacher, and student accounts, including an already existing runtime
+  directory, without using world-writable permissions. New site profiles
+  create staff editor directories with their final owner from the start.
+
 - Student accounts can now use system-provided connectivity but cannot alter
   NetworkManager connections, radios, DNS, or other host network state. Admin
   and teacher accounts retain network-management access.

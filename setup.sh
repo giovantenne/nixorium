@@ -418,8 +418,8 @@ main() {
   echo "  Erase disk:       ${SELECTED_DISK}"
   echo "  All data on this disk will be permanently destroyed."
   echo "  No host reservation has been made on the controller."
-  EXPECTED_CONFIRMATION="ERASE ${SELECTED_DISK} INSTALL ${SELECTED_HOST}"
-  prompt_input "Type '${EXPECTED_CONFIRMATION}' to continue: " CONFIRMATION || return 1
+  EXPECTED_CONFIRMATION="ERASE"
+  prompt_input "Type ERASE to continue: " CONFIRMATION || return 1
   if [[ "$CONFIRMATION" != "$EXPECTED_CONFIRMATION" ]]; then
     echo "Installation cancelled; no disk operation was started."
     return 1

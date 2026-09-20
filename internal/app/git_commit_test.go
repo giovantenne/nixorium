@@ -59,7 +59,7 @@ func TestGitCommitPlanAndApplyUseExactReviewToken(t *testing.T) {
 	}
 	manager := NewGitCommitManager(source)
 	plan := manager.Plan(context.Background(), ".", "module.nix")
-	if plan.State != "ready" || !strings.HasPrefix(plan.ReviewToken, "sha256:") || !strings.HasPrefix(plan.Confirmation, "COMMIT ") || plan.CommitMessage != "chore: update laboratory deployment" {
+	if plan.State != "ready" || !strings.HasPrefix(plan.ReviewToken, "sha256:") || plan.Confirmation != "COMMIT" || plan.CommitMessage != "chore: update laboratory deployment" {
 		t.Fatalf("plan = %+v", plan)
 	}
 	blocked := manager.Apply(context.Background(), ".", "module.nix", "sha256:stale")

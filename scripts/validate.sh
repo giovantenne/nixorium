@@ -213,12 +213,19 @@ profile_state() {
       screensaver = config.systemd.user.services ? lab-screensaver;
       vscodeHome = builtins.match ".*vscjava[.]vscode-java-pack.*"
         config.system.activationScripts.siteHomeProfile.text != null;
+      homeOwnershipOrdering =
+        builtins.elem "siteHomeProfile" config.system.activationScripts.nixoriumUserHomeOwnership.deps;
+      vscodeHomeOwnership =
+        builtins.match ".*install -d -o admin.*[.]config/Code/User.*"
+          config.system.activationScripts.siteHomeProfile.text != null
+        && builtins.match ".*install -d -o teacher.*[.]vscode/extensions.*"
+          config.system.activationScripts.siteHomeProfile.text != null;
     }
   '
 }
 
 PROFILE_STATE=$(profile_state)
-jq -e '.chromiumPolicy and .docker and .screensaver and .vscodeHome' <<<"$PROFILE_STATE" >/dev/null
+jq -e '.chromiumPolicy and .docker and .screensaver and .vscodeHome and .vscodeHomeOwnership and .homeOwnershipOrdering' <<<"$PROFILE_STATE" >/dev/null
 cp "$SITE_DIR/lab-software.json" "$TEMP_DIR/lab-software-profile.json"
 jq '.packages |= map(select(.package as $package | [
   "chromium",
@@ -229,7 +236,7 @@ jq '.packages |= map(select(.package as $package | [
   "vscode"
 ] | index($package) | not))' "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
 PROFILE_STATE=$(profile_state)
-jq -e '(.chromiumPolicy or .docker or .screensaver or .vscodeHome) | not' <<<"$PROFILE_STATE" >/dev/null
+jq -e '((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and .homeOwnershipOrdering' <<<"$PROFILE_STATE" >/dev/null
 cp "$TEMP_DIR/lab-software-profile.json" "$SITE_DIR/lab-software.json"
 
 if [[ "${MODE}" == "--ci" ]]; then

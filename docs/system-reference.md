@@ -99,6 +99,11 @@ a clean home is restored from the activation-time template. Core creates the
 configured Git identity and standard XDG directories; deployment modules add
 editor and MIME defaults when those applications are selected.
 
+Activation also repairs ownership and user-write access on the managed VS Code,
+npm, and XDG roots for admin, teacher, and student accounts. If a runtime
+directory already exists, only its top-level ownership and mode are reconciled;
+logind remains responsible for creating `/run/user/<uid>` and its contents.
+
 Administrators and the teacher can recover a file from the snapshot store:
 
 ```sh

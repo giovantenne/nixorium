@@ -51,13 +51,13 @@ func ConfirmServiceRestart(input io.Reader, output io.Writer, service domain.Man
 	fmt.Fprintf(output, "Service: %s\n", service.Name)
 	fmt.Fprintln(output, "Impact: the binary cache will be briefly unavailable; active PXE clients may retry downloads")
 	fmt.Fprintln(output, "Safety: PXE networking and listeners are not controlled by this action")
-	fmt.Fprint(output, "Type RESTART CACHE to continue: ")
+	fmt.Fprint(output, "Type RESTART to continue: ")
 	reader := bufio.NewReader(input)
 	value, err := reader.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, err
 	}
-	return strings.TrimSpace(value) == "RESTART CACHE", nil
+	return strings.TrimSpace(value) == "RESTART", nil
 }
 
 func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecycleReport) (bool, error) {
@@ -67,12 +67,12 @@ func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecyc
 	fmt.Fprintf(output, "Service address: %s (institutional DHCP remains authoritative)\n", report.DHCPAddress)
 	fmt.Fprintln(output, "Services: ProxyDHCP, TFTP, HTTP, and the local binary cache")
 	fmt.Fprintln(output, "Recovery: `nixorium pxe stop` restores normal addressing; reboot recovery is enabled")
-	fmt.Fprint(output, "Type START PXE to continue: ")
+	fmt.Fprint(output, "Type START to continue: ")
 	value, err := bufio.NewReader(input).ReadString('\n')
 	if err != nil && len(value) == 0 {
 		return false, err
 	}
-	return strings.TrimSpace(value) == "START PXE", nil
+	return strings.TrimSpace(value) == "START", nil
 }
 
 func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.DeploymentPlanReport) (bool, error) {
@@ -82,12 +82,12 @@ func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.Dep
 	fmt.Fprintln(output, "Action: build every selected configuration, then apply it with Colmena")
 	fmt.Fprintln(output, "Impact: target services may restart; offline or failed targets will be reported")
 	fmt.Fprintln(output, "Retry: safe; Nixorium revalidates the revision and rebuilds before every apply")
-	fmt.Fprintf(output, "Type DEPLOY %s to continue: ", report.ColmenaSelector)
+	fmt.Fprint(output, "Type DEPLOY to continue: ")
 	value, err := bufio.NewReader(input).ReadString('\n')
 	if err != nil && len(value) == 0 {
 		return false, err
 	}
-	return strings.TrimSpace(value) == "DEPLOY "+report.ColmenaSelector, nil
+	return strings.TrimSpace(value) == "DEPLOY", nil
 }
 
 func ConfirmGitCommit(input io.Reader, output io.Writer, report domain.GitCommitPlanReport) (bool, error) {

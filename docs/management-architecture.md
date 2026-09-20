@@ -225,7 +225,7 @@ Colmena.
 
 `deploy apply --on ... --expect <revision>` is the corresponding unprivileged
 execution boundary. It repeats the plan checks before execution and after the
-build, requires exact `DEPLOY <canonical-targets>` confirmation (or explicit
+build, requires the exact one-word `DEPLOY` confirmation (or explicit
 automation-only `--yes`), and constructs fixed argument arrays for verbose
 `colmena build` followed by `colmena apply switch`. A per-administrator
 non-blocking lock prevents overlapping Nixorium deploys. Output is streamed and
@@ -343,14 +343,14 @@ logout survival would also require linger policy and a durable job/result
 protocol; it is not introduced merely to move the same process out of view.
 The controller screen follows the same boundary: Bubble Tea renders the typed
 revision/current-state plan and invokes the application callback only after a
-second Enter on the review. The CLI retains its exact `REBUILD <controller>`
+second Enter on the review. The CLI retains its exact one-word `REBUILD`
 confirmation. The systemd-owned rebuild may outlive the
 dashboard and retains its build/activation journal. Completion refreshes the
 ordinary typed dashboard status, presents a compact result, and leaves bounded
 activity available on demand with explicit dashboard, log, and review routes.
 The services screen likewise receives typed component status and one cache
 restart callback. It renders the persistent cache and composite on-demand PXE
-lifecycle, requires exact `RESTART CACHE` confirmation, and cannot issue raw
+lifecycle, requires the exact one-word `RESTART` confirmation, and cannot issue raw
 systemd actions. PXE remains linked to its dedicated transactional workflow.
 The operation-log screen receives typed bounded list/detail callbacks. Bubble
 Tea owns recent-outcome rendering, log selection, and viewport scrolling only;
