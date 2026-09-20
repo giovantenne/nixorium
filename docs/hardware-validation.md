@@ -4,9 +4,35 @@ This plan validates behavior that unit and NixOS VM tests cannot prove about
 real firmware, network adapters, switches, disks, and multi-machine timing. A
 scenario is not passed until its evidence is recorded from the named machines.
 
+For the first controller, client, and software change, start with the
+[isolated VirtualBox recipe](evaluation-environment.md). Return here for the
+broader validation matrix and physical compatibility work.
+
 Disk installation erases the selected target. Use disposable VirtualBox disks
 or dedicated test hardware with verified backups. Never run enrollment against
 a disk containing data that must be retained.
+
+## Reported deployments and compatibility evidence
+
+| Deployment | Evidence | What it establishes |
+|---|---|---|
+| Original Italian school lab: 30 student workstations + 1 controller (31 machines) | Maintainer's public post and [adapted account](https://nixorium.org/case-study/original-classroom/) | The author's original operating experience; not independent validation or a current-release test |
+
+The public account reports reinstalling the lab in **less than 20 minutes**;
+the maintainer later clarified the observed time as **approximately 15 minutes**.
+The exact hardware inventory, cache/build conditions, timing method, and
+software chronology remain undocumented. Do not turn the observation into a
+benchmark or a known-working hardware-model entry. The account does not
+establish additional external deployments or duration of use.
+
+No model-specific compatibility pass is recorded here. Add named hardware only
+with the run evidence below. Keep reported deployments, virtual tests, and
+physical compatibility reports distinct in the same record. Share redacted
+reports through existing [Discussions](https://github.com/giovantenne/nixorium/discussions)
+and reproducible failures through [Issues](https://github.com/giovantenne/nixorium/issues).
+
+The initial VirtualBox recipe documents its own limited authoring checks; the
+runtime scenarios in the result matrix remain **NOT TESTED** until executed.
 
 ## Evidence record
 
@@ -53,6 +79,11 @@ Use a dedicated test VLAN or isolated switch with the institution's DHCP
 behavior represented. Start with one disposable client, then add at least one
 different firmware/NIC family and a second simultaneous client. Include both a
 SATA/SCSI-style disk name and NVMe when hardware is available.
+
+Use wired Ethernet for PXE, including when VirtualBox participates through a
+physical bridged adapter. Wi-Fi and wireless bridging can prevent PXE discovery
+or boot; do not use them as the baseline. The isolated VM recipe uses virtual
+Ethernet on an Internal Network and does not bridge DHCP/ProxyDHCP to the LAN.
 
 Before testing, identify the switch recovery path and confirm that stopping PXE
 cannot remove ordinary DHCP service. Keep console access to the controller in

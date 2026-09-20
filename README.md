@@ -22,9 +22,13 @@ Learn what Nixorium is designed for and how it is used in a lab:
 
 ## Why this exists
 
-Lab computers drift as software and settings change. Installing, repairing,
-and updating each machine individually takes time and makes it difficult to
-reproduce a known working setup.
+The project began in one Italian school lab with 30 student workstations and
+one controller (31 machines total). Clients had no Internet access until a
+user authenticated to the school network, complicating installation, updates,
+and recovery. Read the [maintainer’s original classroom account](https://nixorium.org/case-study/original-classroom/),
+adapted from his public post
+and replies. It documents the project’s origin, not hardware certification or
+a benchmark of the current software.
 
 NixOS provides declarative, reproducible system configurations. Nixorium adds
 the controller-based installation and management workflow needed to use them
@@ -90,7 +94,7 @@ testing recommendation, not a separate mandatory stage in the interface.
 For a disposable evaluation, use one controller VM and one client VM on an
 isolated segment with DHCP. The installation still erases the selected virtual
 disks. See the [evaluation environment](docs/evaluation-environment.md) for the
-current manual path and the bounded plan for a future one-command QEMU harness.
+concrete VirtualBox recipe, expected results, and explicit verification status.
 
 ### 1. Bootstrap the controller from USB
 
@@ -202,6 +206,7 @@ the versioned operational and contributor references.
 | I want to… | Read |
 |---|---|
 | Understand the product and lab use cases | [Website](https://nixorium.org/) |
+| Evaluate one controller, one client, and one change | [Isolated VM recipe](docs/evaluation-environment.md), then [quick start](#quick-start) |
 | Set up and manage a lab | [Administrator guide](templates/site/README.md) |
 | Understand the management interface | [TUI tour and renders](docs/tui-renders.md) |
 | Diagnose a failure or restore a backup | [Troubleshooting](docs/troubleshooting.md) |

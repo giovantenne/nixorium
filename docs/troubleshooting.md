@@ -9,6 +9,12 @@ Do not delete state, keys, Git changes, network addresses, or Nix store paths
 as a first response. Nixorium operations either reconcile observed state or
 report when a retry is unsafe.
 
+For a first trial, use the [isolated VM recipe](https://github.com/giovantenne/nixorium/blob/master/docs/evaluation-environment.md).
+For day-to-day software, reinstallation, and snapshot procedures, start with
+the [administrator guide](https://github.com/giovantenne/nixorium/blob/master/templates/site/README.md).
+This page covers diagnosis and recovery when an operation has not reached its
+expected state.
+
 ## First diagnostics
 
 Run these read-only commands from the deployment repository:
