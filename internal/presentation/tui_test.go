@@ -1016,10 +1016,13 @@ func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
 		t.Fatal("controller apply did not schedule another progress poll")
 	}
 	view := model.View().Content
-	for _, expected := range []string{"Building system", "1/4", "progress details", "Building the reviewed controller system", "elapsed"} {
+	for _, expected := range []string{"Building system", "1/4", "Progress details", "Building the reviewed controller system", "elapsed"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("controller progress omits %q:\n%s", expected, view)
 		}
+	}
+	if strings.Count(view, "Progress details") != 1 || strings.Contains(view, "l progress details") {
+		t.Fatalf("controller progress duplicates the contextual action bar:\n%s", view)
 	}
 }
 
@@ -1917,10 +1920,13 @@ func TestDashboardPXEProgressShowsPhaseBarAndRecentActivity(t *testing.T) {
 		t.Fatal("running preparation did not schedule the next progress poll")
 	}
 	view := model.View().Content
-	for _, expected := range []string{"Building client systems", "2/10", "progress details", "Built client pc02 (2/10)", "elapsed"} {
+	for _, expected := range []string{"Building client systems", "2/10", "Progress details", "Built client pc02 (2/10)", "elapsed"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("PXE progress omits %q:\n%s", expected, view)
 		}
+	}
+	if strings.Count(view, "Progress details") != 1 || strings.Contains(view, "l progress details") {
+		t.Fatalf("PXE progress duplicates the contextual action bar:\n%s", view)
 	}
 	if strings.Contains(view, "journalctl") {
 		t.Fatalf("PXE progress exposes journal access instead of typed progress:\n%s", view)

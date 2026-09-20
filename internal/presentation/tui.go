@@ -2342,9 +2342,6 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 		if len(operation.Recent) > 0 {
 			lines = append(lines, tuiMuted(operation.Recent[len(operation.Recent)-1], model.isDark))
 		}
-		if model.pxePreparing || model.controllerApplying {
-			lines = append(lines, "", "l progress details   F1 help")
-		}
 		return lines
 	}
 	if operation.Total > 0 {
