@@ -132,9 +132,13 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 		}
 	}
 	actions.PlanSoftware = func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+		confirmation := "SAVE"
+		if !request.Present {
+			confirmation = "REMOVE"
+		}
 		return domain.SoftwareChangePlanReport{
 			SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
-			Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Confirmation: "SAVE", Issues: []domain.ValidationIssue{},
+			Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Confirmation: confirmation, Issues: []domain.ValidationIssue{},
 		}
 	}
 	actions.SaveSoftware = func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {

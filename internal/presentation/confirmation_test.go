@@ -131,6 +131,23 @@ func TestConfirmSoftwareChangeRequiresSingleExactWord(t *testing.T) {
 	}
 }
 
+func TestConfirmSoftwareRemovalRequiresRemove(t *testing.T) {
+	report := domain.SoftwareChangePlanReport{
+		Request:      domain.SoftwareChangeRequest{Package: "vlc", Present: false},
+		Confirmation: "REMOVE",
+	}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"REMOVE\n", true}, {"SAVE\n", false}, {"remove\n", false}} {
+		var output bytes.Buffer
+		approved, err := ConfirmSoftwareChange(strings.NewReader(test.input), &output, report)
+		if err != nil || approved != test.want || !strings.Contains(output.String(), "Type REMOVE to continue") {
+			t.Fatalf("removal confirmation %q = %t, %v:\n%s", test.input, approved, err, output.String())
+		}
+	}
+}
+
 func TestConfirmShutdownRequiresSingleExactWord(t *testing.T) {
 	report := domain.ShutdownPlanReport{Eligible: 2, Targets: []domain.ShutdownTargetPlan{{Name: "pc01", Eligible: true, Session: domain.ShutdownSessionActive}, {Name: "pc02", Eligible: true, Session: domain.ShutdownSessionIdle}}, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN"}
 	for _, test := range []struct {

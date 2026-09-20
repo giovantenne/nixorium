@@ -197,6 +197,48 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 	}
 }
 
+func TestConfiguredSoftwareViewportKeepsFocusedItemVisible(t *testing.T) {
+	catalog := domain.SoftwareCatalogReport{State: "ready", ManagedFile: "lab-software.json", Issues: []domain.ValidationIssue{}}
+	for index := 1; index <= 24; index++ {
+		id := fmt.Sprintf("package-%02d", index)
+		label := fmt.Sprintf("Package %02d", index)
+		catalog.Catalog = append(catalog.Catalog, domain.SoftwareCatalogItem{ID: id, Label: label, Summary: "Configured classroom software", Availability: "available"})
+		catalog.Packages = append(catalog.Packages, domain.SoftwareDeclaration{Package: id, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}, Origin: "managed"})
+	}
+
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		model := dashboardModel{screen: dashboardSoftware, softwareCatalog: catalog, softwareMode: softwareConfigured, width: size[0], height: size[1], isDark: true}
+		for index := range catalog.Packages {
+			model.softwareCursor = index
+			view := model.View().Content
+			label := fmt.Sprintf("%-20s", fmt.Sprintf("Package %02d", index+1))
+			if !strings.Contains(view, tuiSelection(label, true, true)) {
+				t.Fatalf("focused software %d hidden at %dx%d:\n%s", index+1, size[0], size[1], view)
+			}
+			if !strings.Contains(view, "software selections") || !strings.Contains(view, "Enter") || !strings.Contains(view, "Review removal") {
+				t.Fatalf("software viewport context or actions hidden at %dx%d:\n%s", size[0], size[1], view)
+			}
+			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+				t.Fatalf("software viewport overflow at %dx%d: %dx%d", size[0], size[1], lipgloss.Width(view), lipgloss.Height(view))
+			}
+		}
+	}
+}
+
+func TestConfiguredSoftwareListSummarizesExplicitClientScope(t *testing.T) {
+	catalog := testSoftwareCatalogReport()
+	clients := make([]string, 20)
+	for index := range clients {
+		clients[index] = fmt.Sprintf("pc%02d", index+1)
+	}
+	catalog.Packages[0].Scope = domain.SoftwareScope{Kind: domain.SoftwareScopeClients, Clients: clients}
+	model := dashboardModel{screen: dashboardSoftware, softwareCatalog: catalog, softwareMode: softwareConfigured, width: 80, height: 24}
+	view := model.View().Content
+	if !strings.Contains(view, "20 selected clients") || strings.Contains(view, "pc01, pc02") {
+		t.Fatalf("configured software scope is not compact:\n%s", view)
+	}
+}
+
 func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 	services := domain.ServicesReport{Services: []domain.ManagedService{{
 		ID: "cache", Name: "Binary cache", State: "healthy", Detail: "HTTP-ready",

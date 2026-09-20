@@ -3,6 +3,8 @@ package presentation
 import (
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
 )
 
 func TestTUIComponentsPreserveTextualMeaning(t *testing.T) {
@@ -37,5 +39,15 @@ func TestTUIHelpRespectsTerminalWidth(t *testing.T) {
 	)
 	if len(compact) >= len(full) || !strings.Contains(compact, "enter") {
 		t.Fatalf("help did not adapt to width: full=%q compact=%q", full, compact)
+	}
+}
+
+func TestTUIActionBarUsesDedicatedControlColor(t *testing.T) {
+	theme := newTUITheme(true)
+	bar := tuiActionBar(80, true, tuiAction{key: "Enter", label: "Open"}, tuiAction{key: "Esc", label: "Back"})
+	controlLabel := lipgloss.NewStyle().Foreground(theme.controls).Render("Open")
+	accentLabel := lipgloss.NewStyle().Foreground(theme.accent).Render("Open")
+	if !strings.Contains(bar, controlLabel) || controlLabel == accentLabel {
+		t.Fatalf("action bar does not use its dedicated control color: %q", bar)
 	}
 }
