@@ -95,5 +95,7 @@
     target.wait_for_unit("multi-user.target")
     target.succeed("test \"$(hostname)\" = pc01")
     target.succeed("findmnt -n -o SOURCE / | grep -E '/dev/vda2|/dev/disk/by-label/nixos'")
+    target.succeed("for user in admin teacher student; do home=$(getent passwd $user | cut -d: -f6); test \"$(stat -c %U:%G $home)\" = $user:users; for path in .config .config/Code/User/globalStorage .vscode .vscode/extensions .local .local/npm; do test \"$(stat -c %U:%G $home/$path)\" = $user:users; su -s /bin/sh $user -c \"test -w $home/$path\"; done; test -z \"$(find $home/.config/Code $home/.vscode/extensions $home/.local/npm -xdev ! -user $user -print -quit)\"; done")
+    target.succeed("for user in admin teacher student; do uid=$(id -u $user); systemctl start user-runtime-dir@$uid.service; test \"$(stat -c %U:%G:%a /run/user/$uid)\" = $user:users:700; su -s /bin/sh $user -c \"test -w /run/user/$uid\"; done")
   '';
 }
