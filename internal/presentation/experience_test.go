@@ -535,13 +535,53 @@ func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 		model.updatePlanStarted = time.Now().Add(-2 * time.Minute)
 		model.updatePlanProgress = domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5}
 		view := model.View().Content
-		for _, expected := range []string{"Target: master", "Build representative outputs", "Building the controller", "Representative output 2/5", "elapsed", "local store", "remain unchanged", "Help"} {
+		for _, expected := range []string{"Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "elapsed", "current deployment remains unchanged", "Help"} {
 			if !strings.Contains(view, expected) {
 				t.Fatalf("update progress %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
 		}
+		for _, jargon := range []string{"representative output", "candidate output", "local store", "flake.lock"} {
+			if strings.Contains(strings.ToLower(view), jargon) {
+				t.Fatalf("update progress %dx%d exposes implementation term %q:\n%s", size[0], size[1], jargon, view)
+			}
+		}
 		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 			t.Fatalf("update progress overflow at %dx%d: %dx%d\n%s", size[0], size[1], lipgloss.Width(view), lipgloss.Height(view), view)
+		}
+	}
+}
+
+func TestRestoreSelectionUsesSharedNavigationAccent(t *testing.T) {
+	model := dashboardModel{screen: dashboardRestore, isDark: true, width: 100, height: 30}
+	view := model.View().Content
+	if !strings.Contains(view, tuiSelection("Reapply the intended system", true, true)) ||
+		strings.Contains(view, tuiSelection("Reinstall from scratch", true, true)) {
+		t.Fatalf("restore did not accent only the focused choice:\n%s", view)
+	}
+
+	model.restoreCursor = 1
+	view = model.View().Content
+	if !strings.Contains(view, tuiSelection("Reinstall from scratch", true, true)) ||
+		strings.Contains(view, tuiSelection("Reapply the intended system", true, true)) {
+		t.Fatalf("restore accent did not follow navigation:\n%s", view)
+	}
+}
+
+func TestUpdateProgressExplainsSystemChecksInOperatorLanguage(t *testing.T) {
+	tests := []struct {
+		detail string
+		want   string
+	}{
+		{detail: "Building the representative client", want: "Testing a client computer system"},
+		{detail: "Building the controller", want: "Testing the controller system"},
+		{detail: "Building the netboot environment", want: "Testing the network installer"},
+		{detail: "Building the PXE firmware", want: "Testing computer network boot"},
+		{detail: "Building the offline installer bundle", want: "Testing the offline installer"},
+	}
+	for _, test := range tests {
+		progress := domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: test.detail}
+		if got := updatePlanProgressDescription(progress); got != test.want {
+			t.Errorf("update progress %q = %q, want %q", test.detail, got, test.want)
 		}
 	}
 }

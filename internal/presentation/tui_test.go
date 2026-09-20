@@ -1187,7 +1187,7 @@ func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
 		model = updated.(dashboardModel)
 		if progress, ok := message.(dashboardUpdatePlanProgressMsg); ok && progress.progress.Phase == domain.UpdatePlanPhaseBuild {
 			view := model.View().Content
-			foundBuild = strings.Contains(view, "Build representative outputs") && strings.Contains(view, "Building the controller") && strings.Contains(view, "Representative output 2/5") && strings.Contains(view, "elapsed") && strings.Contains(view, "local store") && strings.Contains(view, "remain unchanged")
+			foundBuild = strings.Contains(view, "Test systems before saving") && strings.Contains(view, "Testing the controller system") && strings.Contains(view, "Safety check 2/5") && strings.Contains(view, "elapsed") && strings.Contains(view, "current deployment remains unchanged")
 		}
 	}
 	if !foundBuild || model.updatePlanning || model.screen != dashboardUpdateReview {

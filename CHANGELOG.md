@@ -8,6 +8,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Update planning now describes its safety checks in operator-facing language
+  instead of exposing Nix build terminology, and hand-rendered TUI lists now
+  share the same accented focus treatment across restore, software, computer,
+  maintenance, update, deployment, shutdown, key, change, and log screens.
+
+- Colmena now receives the unmodified pinned package set and lets each host's
+  NixOS module graph apply the laboratory overlays exactly once. This fixes
+  client builds where the GNOME Remote Desktop and Veyon patches were appended
+  twice and the second application failed before deployment began.
+
 - Interactive operational confirmations are now either a single explicit word
   or Enter on an already visible review. Deployment target lists, release names,
   controller names, review-token prefixes, and other generated phrases no

@@ -74,6 +74,21 @@ func tuiMuted(value string, darkBackground bool) string {
 	return lipgloss.NewStyle().Foreground(newTUITheme(darkBackground).muted).Render(value)
 }
 
+func tuiSelectionMarker(selected bool, darkBackground bool) string {
+	if !selected {
+		return "  "
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).accent).Render("› ")
+}
+
+func tuiSelection(value string, selected bool, darkBackground bool) string {
+	if !selected {
+		return "  " + value
+	}
+	style := lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).accent)
+	return tuiSelectionMarker(true, darkBackground) + style.Render(value)
+}
+
 func newTUISpinner(darkBackground bool) spinner.Model {
 	return spinner.New(
 		spinner.WithSpinner(spinner.Dot),

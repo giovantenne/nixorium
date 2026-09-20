@@ -164,15 +164,7 @@ func (model dashboardModel) homeView() string {
 		lines = append(lines, model.busyView(), "")
 	}
 	for index, item := range dashboardTasks {
-		marker := "  "
-		if index == menu.list.Index() {
-			marker = "› "
-		}
-		label := marker + item.title
-		if index == menu.list.Index() {
-			label = tuiTitle(label, model.isDark)
-		}
-		lines = append(lines, label, tuiMuted("    "+item.description, model.isDark))
+		lines = append(lines, tuiSelection(item.title, index == menu.list.Index(), model.isDark), tuiMuted("    "+item.description, model.isDark))
 	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
@@ -188,15 +180,7 @@ func (model dashboardModel) homeView() string {
 func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
 	lines := []string{tuiTitle(title, model.isDark), tuiMuted(description, model.isDark), ""}
 	for index, task := range tasks {
-		marker := "  "
-		if index == cursor {
-			marker = "› "
-		}
-		label := marker + task.title
-		if index == cursor {
-			label = tuiTitle(label, model.isDark)
-		}
-		lines = append(lines, label, tuiMuted("    "+task.description, model.isDark))
+		lines = append(lines, tuiSelection(task.title, index == cursor, model.isDark), tuiMuted("    "+task.description, model.isDark))
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
