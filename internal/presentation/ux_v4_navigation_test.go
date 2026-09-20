@@ -120,13 +120,16 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 	model.softwareCatalog = testSoftwareCatalogReport()
 	model.softwareCursor = 1
 	model.actions.PlanSoftware = func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
-		return domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "SAVE"}
+		return domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "REMOVE"}
 	}
 
 	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
+	if view := model.View().Content; !strings.Contains(view, "Remove VLC?") || !strings.Contains(view, "Enter") || !strings.Contains(view, "Remove") {
+		t.Fatalf("software removal review lacks removal action:\n%s", view)
+	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardSoftware || model.softwareSelected != "vlc" || model.softwareCursor != 1 {

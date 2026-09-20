@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -250,10 +251,12 @@ func (model dashboardModel) softwareActions() []tuiAction {
 	}
 	if model.screen == dashboardSoftwareReview {
 		back := "Catalog"
+		primary := "Remove"
 		if model.softwarePlan.Request.Present {
 			back = "Scope"
+			primary = "Save"
 		}
-		return []tuiAction{{key: "Enter", label: "Save"}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "Enter", label: primary}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
 	}
 	if model.screen == dashboardSoftwareResult {
 		if model.softwareResult.State == "partial" {
@@ -338,13 +341,14 @@ func (model dashboardModel) softwareCatalogView() []string {
 	case softwareSuggested:
 		lines = append(lines, tuiSection("Suggestions", model.isDark), tuiMuted("A short list of common choices from the same pinned package set.", model.isDark), "")
 	}
-	start, end := listWindow(len(items), model.softwareCursor, max(4, model.height-17))
+	capacity := model.softwareCatalogListCapacity(lines, len(items))
+	start, end := listWindow(len(items), model.softwareCursor, capacity)
 	for index := start; index < end; index++ {
 		item := items[index]
 		status := ""
 		if model.softwareMode == softwareConfigured {
 			if entry, found := model.softwareDeclaration(item.ID); found {
-				status = "  " + tuiMuted(softwareScopeLabel(entry.Scope), model.isDark)
+				status = "  " + tuiMuted(softwareScopeListLabel(entry.Scope), model.isDark)
 			}
 		} else if entry, found := model.softwareDeclaration(item.ID); found {
 			status = "  " + tuiStatus("configured for "+softwareScopeLabel(entry.Scope), tuiStatusSuccess, model.isDark)
@@ -358,11 +362,36 @@ func (model dashboardModel) softwareCatalogView() []string {
 		label := tuiSelection(fmt.Sprintf("%-20s", item.Label), index == model.softwareCursor, model.isDark)
 		lines = append(lines, label+status, tuiMuted("    "+item.Summary+" · "+item.ID+version, model.isDark))
 	}
+	if start > 0 || end < len(items) {
+		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d software selections", displayedLineStart(start, len(items)), end, len(items)), model.isDark))
+	}
 	if len(items) == 0 && model.softwareMode == softwareConfigured {
 		lines = append(lines, "No software is selected through this screen yet.", "", "Open Suggestions or Search packages to add one.")
 	}
-	lines = append(lines, "", "This list is desired configuration, not a live installed-software inventory.", "Deploy from Computers when you want clients to receive the change.")
+	lines = append(lines, "", "This is desired configuration; deploy from Computers to update clients.")
 	return lines
+}
+
+func (model dashboardModel) softwareCatalogListCapacity(prefix []string, total int) int {
+	if model.height <= 0 {
+		return max(1, total)
+	}
+	width := min(116, max(20, model.width-6))
+	if model.width == 0 {
+		width = 100
+	}
+	prefixHeight := lipgloss.Height(lipgloss.NewStyle().Width(width).Render(strings.Join(prefix, "\n")))
+	actionHeight := lipgloss.Height(tuiActionBar(model.width, model.isDark, model.softwareActions()...))
+	available := model.height - 4 // frame padding
+	available -= 2                // shell breadcrumb and following blank line
+	available -= prefixHeight
+	available -= 2 // blank plus the compact desired-configuration footer
+	available -= 1 + actionHeight
+	available-- // visible-range indicator
+	// Each catalog item occupies a title and description row. Reserve the
+	// wrapped shell, pagination, explanatory footer and action bar before
+	// choosing the item window so the focused row cannot be clipped by frame.
+	return max(1, available/2)
 }
 
 func (model dashboardModel) softwareScopeView() []string {
@@ -391,8 +420,12 @@ func (model dashboardModel) softwareScopeView() []string {
 func (model dashboardModel) softwareReviewView() []string {
 	plan := model.softwarePlan
 	action := "Add"
+	changeNow := "Save now"
+	later := "Later        Deploy clients to install this change"
 	if !plan.Request.Present {
 		action = "Remove"
+		changeNow = "Remove now"
+		later = "Later        Deploy clients to remove this software"
 	}
 	item := model.softwareItem(plan.Request.Package)
 	lines := []string{
@@ -403,11 +436,11 @@ func (model dashboardModel) softwareReviewView() []string {
 		fmt.Sprintf("Clients      %d affected by this declaration", len(plan.AffectedClients)),
 		"",
 		tuiStatus("Validated against the pinned package set", tuiStatusSuccess, model.isDark),
-		"Save now     Update " + plan.ManagedFile + " locally",
-		"Later        Deploy clients to install this change",
+		fmt.Sprintf("%-12s Update %s locally", changeNow, plan.ManagedFile),
+		later,
 	}
 	if plan.AffectedController != "" {
-		lines[len(lines)-2] = "Save now     Update " + plan.ManagedFile + " and rebuild " + plan.AffectedController
+		lines[len(lines)-2] = fmt.Sprintf("%-12s Update %s and rebuild %s", changeNow, plan.ManagedFile, plan.AffectedController)
 	}
 	if len(plan.AffectedClients) == 0 {
 		lines[len(lines)-1] = "Later        No client deployment required"
@@ -579,6 +612,16 @@ func softwareScopeLabel(scope domain.SoftwareScope) string {
 		return strings.Join(scope.Clients, ", ")
 	}
 	return "unknown scope"
+}
+
+func softwareScopeListLabel(scope domain.SoftwareScope) string {
+	if scope.Kind != domain.SoftwareScopeClients {
+		return softwareScopeLabel(scope)
+	}
+	if len(scope.Clients) == 1 {
+		return "1 selected client"
+	}
+	return fmt.Sprintf("%d selected clients", len(scope.Clients))
 }
 
 func softwareCatalogItemForView(items []domain.SoftwareCatalogItem, id string) (domain.SoftwareCatalogItem, bool) {

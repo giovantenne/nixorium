@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Configured-software navigation now sizes its viewport by rendered rows, keeps
+  the focused package visible, summarizes long explicit-client scopes, and
+  reports the visible range. Software removals use `REMOVE` rather than `SAVE`,
+  and contextual command bars now use a dedicated control color.
+
 - Update planning now describes its safety checks in operator-facing language
   instead of exposing Nix build terminology, and hand-rendered TUI lists now
   share the same accented focus treatment across restore, software, computer,

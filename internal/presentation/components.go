@@ -14,6 +14,7 @@ import (
 
 type tuiTheme struct {
 	accent    color.Color
+	controls  color.Color
 	text      color.Color
 	muted     color.Color
 	success   color.Color
@@ -24,6 +25,7 @@ type tuiTheme struct {
 func newTUITheme(dark bool) tuiTheme {
 	return tuiTheme{
 		accent:    lipgloss.LightDark(dark)(lipgloss.Color("#1D4ED8"), lipgloss.Color("#7AA2F7")),
+		controls:  lipgloss.LightDark(dark)(lipgloss.Color("#6D28D9"), lipgloss.Color("#C4B5FD")),
 		text:      lipgloss.LightDark(dark)(lipgloss.Color("#292524"), lipgloss.Color("#E7E5E4")),
 		muted:     lipgloss.LightDark(dark)(lipgloss.Color("#6B7280"), lipgloss.Color("#A8A29E")),
 		success:   lipgloss.LightDark(dark)(lipgloss.Color("#047857"), lipgloss.Color("#86EFAC")),
@@ -158,9 +160,12 @@ func renderTUIShell(shell tuiShell, width int, darkBackground bool) string {
 }
 
 func tuiActionBar(width int, darkBackground bool, actions ...tuiAction) string {
+	theme := newTUITheme(darkBackground)
+	keyStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.controls)
+	labelStyle := lipgloss.NewStyle().Foreground(theme.controls)
 	items := make([]string, 0, len(actions))
 	for _, action := range actions {
-		items = append(items, tuiSection(action.key, darkBackground)+" "+action.label)
+		items = append(items, keyStyle.Render(action.key)+" "+labelStyle.Render(action.label))
 	}
 	separator := tuiMuted("  ·  ", darkBackground)
 	bar := strings.Join(items, separator)

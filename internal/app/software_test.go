@@ -228,7 +228,7 @@ func TestSoftwareRemovalDoesNotRequirePackageToRemainResolvable(t *testing.T) {
 	source.data = configured
 	source.definition.Packages = []domain.SoftwareDeclaration{{Package: "retired-package", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}, Origin: "managed"}}
 	plan := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{Package: "retired-package", Present: false})
-	if plan.HasErrors() || plan.State != "ready" || len(plan.Candidate.Packages) != 0 {
+	if plan.HasErrors() || plan.State != "ready" || len(plan.Candidate.Packages) != 0 || plan.Confirmation != "REMOVE" {
 		t.Fatalf("retired package removal = %+v", plan)
 	}
 }
