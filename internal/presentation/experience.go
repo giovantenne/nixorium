@@ -90,11 +90,12 @@ func (model dashboardModel) computersView() string {
 		for index := start; index < end; index++ {
 			h := hosts[index]
 			level, label, _ := domain.ComputerCondition(h)
-			marker := "  "
+			marker := tuiSelectionMarker(index == model.hostCursor, model.isDark)
+			name := fmt.Sprintf("%-10s", h.Name)
 			if index == model.hostCursor {
-				marker = "› "
+				name = lipgloss.NewStyle().Bold(true).Foreground(tuiAccent(model.isDark)).Render(name)
 			}
-			rows = append(rows, fmt.Sprintf("%s%-10s %s", marker, h.Name, tuiStatus(label, statusLevel(level), model.isDark)))
+			rows = append(rows, marker+name+" "+tuiStatus(label, statusLevel(level), model.isDark))
 		}
 		if len(hosts) == 0 {
 			if model.hostQuery != "" {
@@ -133,11 +134,7 @@ func (model dashboardModel) administrationView() string {
 	start, end := listWindow(len(administrationTasks), model.adminCursor, max(3, (model.height-15)/2))
 	for i := start; i < end; i++ {
 		task := administrationTasks[i]
-		marker := "  "
-		if i == model.adminCursor {
-			marker = "› "
-		}
-		lines = append(lines, tuiSection(marker+task.title+"  ["+task.shortcut+"]", model.isDark), tuiMuted("  "+task.description, model.isDark))
+		lines = append(lines, tuiSelection(task.title+"  ["+task.shortcut+"]", i == model.adminCursor, model.isDark), tuiMuted("    "+task.description, model.isDark))
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
@@ -183,7 +180,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
 		lines = append(lines, "c select commit paths   Space select   a all safe paths", "f refresh review   ↑/↓/pg scroll patch", "Exact confirmation creates a local commit; nothing is pushed.")
 	case dashboardUpdate, dashboardUpdateReview:
-		lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation shows candidate-lock, evaluation and representative-build phases.", "On the review, Enter saves and activates; Esc cancels.", "After result: r new update")
+		lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation prepares the selected version, checks the lab configuration and tests required systems without saving it.", "On the review, Enter saves and activates; Esc cancels.", "After result: r new update")
 	case dashboardDiagnostics:
 		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")
 	default:
@@ -208,11 +205,7 @@ func (model dashboardModel) diagnosticsView() string {
 	start, end := listWindow(len(findings), model.diagnosticCursor, max(2, (model.height-12)/3))
 	for i := start; i < end; i++ {
 		f := findings[i]
-		marker := "  "
-		if i == model.diagnosticCursor {
-			marker = "› "
-		}
-		lines = append(lines, marker+tuiStatus(f.Summary, statusLevel(f.Level), model.isDark))
+		lines = append(lines, tuiSelectionMarker(i == model.diagnosticCursor, model.isDark)+tuiStatus(f.Summary, statusLevel(f.Level), model.isDark))
 		if f.Remediation != "" {
 			lines = append(lines, "  "+f.Remediation)
 		}
@@ -247,11 +240,7 @@ func (model dashboardModel) restoreView() string {
 	}
 	lines := []string{tuiTitle("Restore computers", model.isDark), tuiMuted("Choose whether to keep or replace the installed system.", model.isDark), ""}
 	for index, option := range options {
-		marker := "  "
-		if index == model.restoreCursor {
-			marker = "› "
-		}
-		lines = append(lines, tuiSection(marker+option.title, model.isDark), tuiMuted("  "+option.description, model.isDark), "")
+		lines = append(lines, tuiSelection(option.title, index == model.restoreCursor, model.isDark), tuiMuted("    "+option.description, model.isDark), "")
 	}
 	return renderTUIShell(tuiShell{
 		path: []string{"Computers", "Restore"},

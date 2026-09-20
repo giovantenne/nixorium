@@ -180,15 +180,11 @@ func (model dashboardModel) shutdownSelectionView() []string {
 	start, end := listWindow(len(hosts), model.shutdownCursor, max(3, model.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
-		cursor := " "
-		if index == model.shutdownCursor {
-			cursor = "›"
-		}
 		checked := " "
 		if model.shutdownChosen[host.Name] {
 			checked = "x"
 		}
-		lines = append(lines, fmt.Sprintf("%s [%s] %-10s %s", cursor, checked, host.Name, host.IP))
+		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s", checked, host.Name, host.IP), index == model.shutdownCursor, model.isDark))
 	}
 	if len(hosts) > end || start > 0 {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d", start+1, end, len(hosts)), model.isDark))

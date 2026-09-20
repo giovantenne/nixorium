@@ -907,10 +907,6 @@ func (model dashboardModel) setupKeysView() string {
 		states[state.Name] = state
 	}
 	for index, definition := range definitions {
-		marker := "  "
-		if index == model.setupKeyCursor {
-			marker = "› "
-		}
 		state := states[definition.name]
 		status := "Action required"
 		if state.Ready() {
@@ -918,7 +914,7 @@ func (model dashboardModel) setupKeysView() string {
 		} else if state.Problem != "" {
 			status += " — " + state.Problem
 		}
-		lines = append(lines, marker+definition.label+"  ·  "+status, "    "+definition.purpose)
+		lines = append(lines, tuiSelection(definition.label+"  ·  "+status, index == model.setupKeyCursor, model.isDark), "    "+definition.purpose)
 	}
 	if model.setupKeyImporting {
 		name := model.selectedSetupKeyName()
@@ -1158,10 +1154,6 @@ func (model dashboardModel) gitCommitSelectView() string {
 	start, end := listWindow(len(model.gitReview.Changes), model.gitCommitCursor, model.rowCapacity())
 	for index := start; index < end; index++ {
 		change := model.gitReview.Changes[index]
-		cursor := " "
-		if index == model.gitCommitCursor {
-			cursor = ">"
-		}
 		chosen := "[ ]"
 		if model.gitCommitChosen[change.Path] {
 			chosen = "[x]"
@@ -1169,7 +1161,8 @@ func (model dashboardModel) gitCommitSelectView() string {
 		if change.Private {
 			chosen = "[!]"
 		}
-		lines = append(lines, fmt.Sprintf("%s %s %-10s %-10s %-9s %s", cursor, chosen, gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path))
+		row := fmt.Sprintf("%s %-10s %-10s %-9s %s", chosen, gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path)
+		lines = append(lines, tuiSelection(row, index == model.gitCommitCursor, model.isDark))
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
@@ -1252,7 +1245,10 @@ func (model dashboardModel) updateView() string {
 	lines := []string{tuiTitle("Update Nixorium", model.isDark), ""}
 	if model.busy != "" {
 		if model.updatePlanning {
-			lines = append(lines, "Target: "+model.updateTarget)
+			lines = append(lines,
+				"Target: "+model.updateTarget,
+				tuiMuted("Checking whether this version can replace the current one. Nothing is saved or activated yet.", model.isDark),
+			)
 			phaseLabels := updatePlanPhaseLabels()
 			phaseIndex := updatePlanPhaseIndex(model.updatePlanProgress.Phase)
 			if model.height > 0 && model.height < 28 {
@@ -1264,9 +1260,10 @@ func (model dashboardModel) updateView() string {
 			if elapsed < 0 {
 				elapsed = 0
 			}
+			model.busy = updatePlanProgressDescription(model.updatePlanProgress)
 			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 			if model.updatePlanProgress.Total > 0 {
-				lines = append(lines, fmt.Sprintf("Representative output %d/%d", model.updatePlanProgress.Current, model.updatePlanProgress.Total))
+				lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updatePlanProgress.Current, model.updatePlanProgress.Total))
 			}
 		} else {
 			lines = append(lines, model.busyView())
@@ -1275,7 +1272,7 @@ func (model dashboardModel) updateView() string {
 		if model.updating {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Update save is running", detail: "Wait for the atomic two-file result before closing Nixorium."})
 		} else {
-			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Deployment files and running systems remain unchanged", detail: "Nix may download and build candidate outputs in the local store. This can take several minutes; flake.nix and flake.lock are not written."})
+			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "No deployment files or running systems change during these checks. The controller may download or build software locally, so this can take several minutes."})
 		}
 		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
 	}
@@ -1347,10 +1344,6 @@ func (model dashboardModel) updateView() string {
 	}
 	for index := start; index < end; index++ {
 		release := releases[index]
-		marker := "  "
-		if index == model.updateCursor {
-			marker = "› "
-		}
 		note := updateReleaseStatus(model.updateCheck, release)
 		if note == "" && release.Tag == latestStable {
 			note = "  Latest stable"
@@ -1360,7 +1353,7 @@ func (model dashboardModel) updateView() string {
 		} else if release.Channel == domain.UpdateChannelMoving {
 			note += "  Development branch"
 		}
-		lines = append(lines, marker+release.Tag+tuiMuted(note, model.isDark))
+		lines = append(lines, tuiSelection(release.Tag, index == model.updateCursor, model.isDark)+tuiMuted(note, model.isDark))
 	}
 	if len(releases) == 0 {
 		lines = append(lines, "No updates are available in the selected channel.")
@@ -1392,12 +1385,45 @@ func (model dashboardModel) updateView() string {
 
 func updatePlanPhaseLabels() []string {
 	return []string{
-		"Inspect deployment",
-		"Resolve candidate release",
-		"Evaluate configuration",
-		"Build representative outputs",
+		"Check current deployment",
+		"Prepare selected version",
+		"Check laboratory configuration",
+		"Test systems before saving",
 		"Prepare review",
-		"Verify unchanged deployment",
+		"Confirm files remain unchanged",
+	}
+}
+
+func updatePlanProgressDescription(progress domain.UpdatePlanProgress) string {
+	switch progress.Phase {
+	case domain.UpdatePlanPhaseInspect:
+		return "Checking this deployment and the selected version"
+	case domain.UpdatePlanPhaseLock:
+		return "Preparing the selected Nixorium version"
+	case domain.UpdatePlanPhaseEvaluate:
+		return "Checking the laboratory configuration"
+	case domain.UpdatePlanPhaseBuild:
+		detail := strings.ToLower(progress.Detail)
+		switch {
+		case strings.Contains(detail, "representative client"):
+			return "Testing a client computer system"
+		case strings.Contains(detail, "controller"):
+			return "Testing the controller system"
+		case strings.Contains(detail, "netboot"):
+			return "Testing the network installer"
+		case strings.Contains(detail, "pxe firmware"):
+			return "Testing computer network boot"
+		case strings.Contains(detail, "offline installer"):
+			return "Testing the offline installer"
+		default:
+			return "Testing a required system before saving"
+		}
+	case domain.UpdatePlanPhaseReview:
+		return "Preparing the update review"
+	case domain.UpdatePlanPhaseVerify:
+		return "Confirming that deployment files did not change"
+	default:
+		return "Starting the update safety checks"
 	}
 }
 
@@ -1733,11 +1759,8 @@ func (model dashboardModel) logsView() string {
 	start, end := listWindow(len(model.logs.Logs), model.logCursor, max(1, (model.height-16)/2))
 	for index := start; index < end; index++ {
 		entry := model.logs.Logs[index]
-		cursor := " "
-		if index == model.logCursor {
-			cursor = ">"
-		}
-		lines = append(lines, fmt.Sprintf("%s %s  %-10s %-11s %d bytes", cursor, entry.StartedAt.UTC().Format("2006-01-02 15:04Z"), entry.Kind, entry.State, entry.SizeBytes))
+		row := fmt.Sprintf("%s  %-10s %-11s %d bytes", entry.StartedAt.UTC().Format("2006-01-02 15:04Z"), entry.Kind, entry.State, entry.SizeBytes)
+		lines = append(lines, tuiSelection(row, index == model.logCursor, model.isDark))
 		lines = append(lines, "    "+entry.ID)
 	}
 	notices := []tuiNotice{}
@@ -1951,15 +1974,11 @@ func (model dashboardModel) deployView() string {
 	start, end := listWindow(len(hosts), model.deployCursor, max(3, model.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
-		cursor := " "
-		if index == model.deployCursor {
-			cursor = ">"
-		}
 		checked := " "
 		if model.deployChosen[host.Name] {
 			checked = "x"
 		}
-		lines = append(lines, fmt.Sprintf("%s [%s] %-10s %s", cursor, checked, host.Name, host.IP))
+		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s", checked, host.Name, host.IP), index == model.deployCursor, model.isDark))
 	}
 	if len(hosts) > end || start > 0 {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d", start+1, end, len(hosts)), model.isDark))

@@ -341,10 +341,6 @@ func (model dashboardModel) softwareCatalogView() []string {
 	start, end := listWindow(len(items), model.softwareCursor, max(4, model.height-17))
 	for index := start; index < end; index++ {
 		item := items[index]
-		marker := "  "
-		if index == model.softwareCursor {
-			marker = "› "
-		}
 		status := ""
 		if model.softwareMode == softwareConfigured {
 			if entry, found := model.softwareDeclaration(item.ID); found {
@@ -359,10 +355,7 @@ func (model dashboardModel) softwareCatalogView() []string {
 		if item.Version != "" {
 			version = " · " + item.Version
 		}
-		label := fmt.Sprintf("%s%-20s", marker, item.Label)
-		if index == model.softwareCursor {
-			label = tuiTitle(label, model.isDark)
-		}
+		label := tuiSelection(fmt.Sprintf("%-20s", item.Label), index == model.softwareCursor, model.isDark)
 		lines = append(lines, label+status, tuiMuted("    "+item.Summary+" · "+item.ID+version, model.isDark))
 	}
 	if len(items) == 0 && model.softwareMode == softwareConfigured {
@@ -377,26 +370,18 @@ func (model dashboardModel) softwareScopeView() []string {
 	lines := []string{tuiTitle("Add "+item.Label, model.isDark), "Choose where this declaration applies. This is not the set of computers deployed today.", ""}
 	options := model.softwareScopeOptions()
 	for index, option := range options {
-		marker := "  "
-		if index == model.softwareScopeCursor {
-			marker = "› "
-		}
-		lines = append(lines, marker+option.label)
+		lines = append(lines, tuiSelection(option.label, index == model.softwareScopeCursor, model.isDark))
 	}
 	if options[model.softwareScopeCursor].scope.Kind == domain.SoftwareScopeClients {
 		lines = append(lines, "")
 		start, end := listWindow(len(model.softwareCatalog.Clients), model.softwareClientCursor, max(2, model.height-len(lines)-16))
 		for index := start; index < end; index++ {
 			name := model.softwareCatalog.Clients[index]
-			marker := "  "
-			if index == model.softwareClientCursor {
-				marker = "› "
-			}
 			checked := "[ ]"
 			if model.softwareClients[name] {
 				checked = "[x]"
 			}
-			lines = append(lines, fmt.Sprintf("%s%s %s", marker, checked, name))
+			lines = append(lines, tuiSelection(fmt.Sprintf("%s %s", checked, name), index == model.softwareClientCursor, model.isDark))
 		}
 	}
 	lines = append(lines, "", "Powered-on clients required: none", "Managed file: "+model.softwareCatalog.ManagedFile)
