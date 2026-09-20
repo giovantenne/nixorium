@@ -224,7 +224,7 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 	if report.Downgrade {
 		verb = "DOWNGRADE"
 	}
-	report.Confirmation = verb + " NIXORIUM TO " + target
+	report.Confirmation = verb
 	report.State = "ready"
 	return report
 }

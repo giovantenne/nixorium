@@ -676,8 +676,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		case "space":
 			model.confirmation += " "
 		case "enter":
-			expected := "DEPLOY " + model.deployPlan.ColmenaSelector
-			if model.confirmation != expected {
+			if model.confirmation != "DEPLOY" {
 				model.confirmation = ""
 				model.message = "Confirmation did not match; no build or apply was started."
 				return model, nil
@@ -806,7 +805,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		case "space":
 			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "RESTART CACHE" {
+			if model.confirmation != "RESTART" {
 				model.confirmation = ""
 				model.message = "Confirmation did not match; the cache was not restarted."
 				return model, nil
@@ -1275,7 +1274,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 		case "space":
 			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "START PXE" {
+			if model.confirmation != "START" {
 				model.confirmation = ""
 				model.message = "Confirmation did not match; networking was not changed."
 				return model, nil
@@ -1305,7 +1304,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 		case "space":
 			model.confirmation += " "
 		case "enter":
-			if model.confirmation != "LEAVE PXE ACTIVE" {
+			if model.confirmation != "LEAVE" {
 				model.confirmation = ""
 				model.message = "Confirmation did not match; Nixorium remains open."
 				return model, nil

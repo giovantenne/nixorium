@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -95,6 +96,54 @@ func TestDeploymentCommandIsFixedAndUsesArgumentArray(t *testing.T) {
 	}
 	if _, err := deploymentCommand(domain.DeploymentPhaseBuild, ""); err == nil {
 		t.Fatal("empty deployment selector was accepted")
+	}
+}
+
+func TestConfigureColmenaSSHUsesPrivateSupportedConfig(t *testing.T) {
+	command := exec.Command("true")
+	command.Env = []string{"PATH=/bin", "SSH_CONFIG_FILE=/tmp/untrusted"}
+	cleanup, err := configureColmenaSSH(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := ""
+	pathEnvironmentPreserved := false
+	for _, entry := range command.Env {
+		if entry == "PATH=/bin" {
+			pathEnvironmentPreserved = true
+		}
+		if strings.HasPrefix(entry, "SSH_CONFIG_FILE=") {
+			if path != "" {
+				t.Fatalf("duplicate SSH_CONFIG_FILE entries: %q", command.Env)
+			}
+			path = strings.TrimPrefix(entry, "SSH_CONFIG_FILE=")
+		}
+	}
+	if path == "" || path == "/tmp/untrusted" {
+		t.Fatalf("SSH_CONFIG_FILE = %q", path)
+	}
+	if !pathEnvironmentPreserved {
+		t.Fatalf("existing command environment was not preserved: %q", command.Env)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"Host *", "BatchMode yes", "PasswordAuthentication no", "StrictHostKeyChecking accept-new"} {
+		if !strings.Contains(string(content), expected) {
+			t.Fatalf("SSH config omits %q:\n%s", expected, content)
+		}
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("SSH config mode = %v, want 0600", info.Mode().Perm())
+	}
+	cleanup()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("SSH config still exists after cleanup: %v", err)
 	}
 }
 

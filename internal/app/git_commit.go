@@ -107,7 +107,7 @@ func (m *GitCommitManager) Plan(ctx context.Context, repository, requestedPaths 
 	report.Diff = proposal.Diff
 	report.CommitMessage = generatedGitCommitMessage(paths)
 	report.ReviewToken = gitCommitReviewToken(report.Revision, report.TreeID, report.Paths, report.CommitMessage)
-	report.Confirmation = "COMMIT " + strings.TrimPrefix(report.ReviewToken, "sha256:")[:12]
+	report.Confirmation = "COMMIT"
 	report.State = "ready"
 	return report
 }

@@ -1663,7 +1663,7 @@ func (model dashboardModel) servicesView() string {
 			"",
 			"Affects  Controller cache; active installations may be affected",
 			"",
-			tuiSection("Type RESTART CACHE to continue:", model.isDark),
+			tuiSection("Type RESTART to continue:", model.isDark),
 			"> " + model.confirmation + "_",
 		}, "\n")
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The signed cache will be briefly unavailable", detail: "Active installers may retry downloads. PXE networking and listeners are unchanged; the cache is verified afterward."})
@@ -1893,7 +1893,7 @@ func (model dashboardModel) deployView() string {
 			"",
 			tuiMuted("Reviewed revision  "+model.deployPlan.Revision, model.isDark),
 			"",
-			tuiSection("Type DEPLOY "+model.deployPlan.ColmenaSelector+" to continue:", model.isDark),
+			tuiSection("Type DEPLOY to continue:", model.isDark),
 			"> " + model.confirmation + "_",
 		}
 		shell.body = strings.Join(lines, "\n")
@@ -2140,7 +2140,7 @@ func (model dashboardModel) pxeView() string {
 			"",
 			"Affects  " + scope,
 			"",
-			tuiSection("Type START PXE to continue:", model.isDark),
+			tuiSection("Type START to continue:", model.isDark),
 			"> " + model.confirmation + "_",
 		}, "\n")
 		notices := []tuiNotice{{
@@ -2164,7 +2164,7 @@ func (model dashboardModel) pxeView() string {
 			"  x  Stop installation mode, verify normal networking, and exit",
 			"",
 			tuiSection("Keep it active", model.isDark),
-			"  Type LEAVE PXE ACTIVE to continue:",
+			"  Type LEAVE to continue:",
 			"> " + model.confirmation + "_",
 		}
 		notices := []tuiNotice{}

@@ -95,7 +95,7 @@ func TestSoftwarePlanUsesCatalogAndSeparatesConfigurationFromDistribution(t *tes
 	report := manager.Plan(context.Background(), "/deployment", domain.SoftwareChangeRequest{
 		Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients},
 	})
-	if report.HasErrors() || report.State != "ready" || source.validations != 1 || len(report.AffectedClients) != 2 || report.ReviewToken == "" || !strings.HasPrefix(report.Confirmation, "SAVE SOFTWARE ") {
+	if report.HasErrors() || report.State != "ready" || source.validations != 1 || len(report.AffectedClients) != 2 || report.ReviewToken == "" || report.Confirmation != "SAVE" {
 		t.Fatalf("software plan = %+v validations=%d", report, source.validations)
 	}
 	if !strings.Contains(report.Message, "no system has been built or changed") {

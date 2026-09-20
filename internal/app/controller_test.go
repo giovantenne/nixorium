@@ -67,7 +67,7 @@ func (f *fakeControllerSource) StartSystemUnit(_ context.Context, unit string) e
 func TestControllerPlanBindsCleanReadyRevision(t *testing.T) {
 	source := readyControllerSource()
 	report := NewControllerManager(source).Plan(context.Background(), "/deployment")
-	if report.HasErrors() || report.State != "ready" || report.Controller != "pc99" || report.Revision != source.revision || report.Confirmation != "REBUILD pc99" {
+	if report.HasErrors() || report.State != "ready" || report.Controller != "pc99" || report.Revision != source.revision || report.Confirmation != "REBUILD" {
 		t.Fatalf("plan = %+v", report)
 	}
 	source.current = true

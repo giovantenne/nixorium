@@ -45,7 +45,7 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 		return controllerIssue(report, "configuration", fmt.Sprintf("evaluate labMeta: %v", err))
 	}
 	report.Controller = meta.Controller.Name
-	report.Confirmation = "REBUILD " + meta.Controller.Name
+	report.Confirmation = "REBUILD"
 	deployment, err := m.source.DeploymentStatus(ctx, root)
 	if err != nil {
 		report = controllerIssue(report, "readiness", fmt.Sprintf("evaluate deploymentStatus: %v", err))

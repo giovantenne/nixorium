@@ -107,7 +107,7 @@ func TestControllerRebuildTextShowsReviewAndVerifiedResult(t *testing.T) {
 	planOutput := &bytes.Buffer{}
 	ControllerRebuildPlanText(planOutput, domain.ControllerRebuildPlanReport{
 		State: "ready", Repository: "/deployment", Controller: "pc99", Revision: revision,
-		CurrentDetail: "not active", Confirmation: "REBUILD pc99", Issues: []domain.ValidationIssue{},
+		CurrentDetail: "not active", Confirmation: "REBUILD", Issues: []domain.ValidationIssue{},
 	})
 	for _, expected := range []string{"READY", "pc99", revision, "controller apply --expect"} {
 		if !strings.Contains(planOutput.String(), expected) {
@@ -205,12 +205,12 @@ func TestGitCommitTextShowsPlanAndLocalResult(t *testing.T) {
 		Paths:         []string{"lab-settings.json"},
 		ReviewToken:   "sha256:review",
 		CommitMessage: "chore: update laboratory settings",
-		Confirmation:  "COMMIT abcdef012345",
+		Confirmation:  "COMMIT",
 		Diff:          domain.GitDiff{Content: "+password: <redacted>\n"},
 	}
 	var output bytes.Buffer
 	GitCommitPlanText(&output, plan)
-	for _, expected := range []string{"commit plan: READY", "lab-settings.json", "sha256:review", "COMMIT abcdef012345", "No remote or push", "<redacted>"} {
+	for _, expected := range []string{"commit plan: READY", "lab-settings.json", "sha256:review", "COMMIT", "No remote or push", "<redacted>"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("commit plan output omits %q:\n%s", expected, output.String())
 		}
@@ -229,7 +229,7 @@ func TestUpdateTextShowsValidatedPlanAndReviewableResult(t *testing.T) {
 		State: "ready", Repository: "/deployment", Revision: strings.Repeat("a", 40),
 		CurrentRef: "v2.0.0", CurrentRev: strings.Repeat("b", 40), CurrentChannel: domain.UpdateChannelStable,
 		Target: "v2.1.0-beta.1", TargetChannel: domain.UpdateChannelPrerelease,
-		ReviewToken: "sha256:review", Confirmation: "UPDATE NIXORIUM TO v2.1.0-beta.1",
+		ReviewToken: "sha256:review", Confirmation: "UPDATE",
 		Checks: []domain.UpdateCheck{{ID: "client", State: "passed", Message: "built"}},
 		Diff:   domain.GitDiff{Content: "+github:owner/repo/v2.1.0-beta.1\n"},
 	}
@@ -285,7 +285,7 @@ func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
 	plan := domain.SoftwareChangePlanReport{
 		State: "ready", ManagedFile: "lab-software.json",
 		Request:         domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "media"}},
-		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review", Confirmation: "SAVE SOFTWARE abcdef012345",
+		AffectedClients: []string{"pc01", "pc02"}, ReviewToken: "sha256:review", Confirmation: "SAVE",
 		Message: "no system has been built or changed",
 	}
 	SoftwareChangePlanText(&output, plan)

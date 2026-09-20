@@ -22,11 +22,11 @@ func TestConfirmControllerApplyRequiresExactToken(t *testing.T) {
 }
 
 func TestConfirmControllerRebuildRequiresExactToken(t *testing.T) {
-	report := domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: "0123456789abcdef0123456789abcdef01234567", Confirmation: "REBUILD pc99"}
+	report := domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: "0123456789abcdef0123456789abcdef01234567", Confirmation: "REBUILD"}
 	for _, test := range []struct {
 		input string
 		want  bool
-	}{{"REBUILD pc99\n", true}, {"REBUILD\n", false}, {"rebuild pc99\n", false}} {
+	}{{"REBUILD\n", true}, {"REBUILD pc99\n", false}, {"rebuild\n", false}} {
 		output := &bytes.Buffer{}
 		got, err := ConfirmControllerRebuild(strings.NewReader(test.input), output, report)
 		if err != nil || got != test.want || !strings.Contains(output.String(), report.Revision) {
@@ -40,7 +40,7 @@ func TestConfirmServiceRestartRequiresExactToken(t *testing.T) {
 	for _, test := range []struct {
 		input string
 		want  bool
-	}{{"RESTART CACHE\n", true}, {"restart cache\n", false}, {"RESTART\n", false}} {
+	}{{"RESTART\n", true}, {"RESTART CACHE\n", false}, {"restart\n", false}} {
 		output := &bytes.Buffer{}
 		got, err := ConfirmServiceRestart(strings.NewReader(test.input), output, service)
 		if err != nil || got != test.want || !strings.Contains(output.String(), "PXE networking") {
@@ -54,7 +54,7 @@ func TestConfirmPXEStartRequiresExactToken(t *testing.T) {
 	for _, test := range []struct {
 		input string
 		want  bool
-	}{{"START PXE\n", true}, {"start pxe\n", false}, {"yes\n", false}} {
+	}{{"START\n", true}, {"START PXE\n", false}, {"start\n", false}} {
 		output := &bytes.Buffer{}
 		got, err := ConfirmPXEStart(strings.NewReader(test.input), output, report)
 		if err != nil || got != test.want || !strings.Contains(output.String(), "10.0.0.99/8") || !strings.Contains(output.String(), "reboot recovery is enabled") {
@@ -63,7 +63,7 @@ func TestConfirmPXEStartRequiresExactToken(t *testing.T) {
 	}
 }
 
-func TestConfirmDeploymentApplyRequiresExactTargets(t *testing.T) {
+func TestConfirmDeploymentApplyRequiresSingleExactWord(t *testing.T) {
 	report := domain.DeploymentPlanReport{
 		Revision:        "0123456789abcdef",
 		ColmenaSelector: "pc01,pc03",
@@ -72,7 +72,7 @@ func TestConfirmDeploymentApplyRequiresExactTargets(t *testing.T) {
 	for _, test := range []struct {
 		input string
 		want  bool
-	}{{"DEPLOY pc01,pc03\n", true}, {"DEPLOY pc01\n", false}, {"deploy pc01,pc03\n", false}} {
+	}{{"DEPLOY\n", true}, {"DEPLOY pc01,pc03\n", false}, {"deploy\n", false}} {
 		output := &bytes.Buffer{}
 		got, err := ConfirmDeploymentApply(strings.NewReader(test.input), output, report)
 		if err != nil || got != test.want || !strings.Contains(output.String(), report.Revision) || !strings.Contains(output.String(), "rebuilds before every apply") {
@@ -81,14 +81,14 @@ func TestConfirmDeploymentApplyRequiresExactTargets(t *testing.T) {
 	}
 }
 
-func TestConfirmGitCommitRequiresExactReviewPhrase(t *testing.T) {
-	report := domain.GitCommitPlanReport{Revision: "abc", Paths: []string{"lab-settings.json"}, CommitMessage: "chore: update laboratory settings", Confirmation: "COMMIT abcdef012345"}
+func TestConfirmGitCommitRequiresSingleExactWord(t *testing.T) {
+	report := domain.GitCommitPlanReport{Revision: "abc", Paths: []string{"lab-settings.json"}, CommitMessage: "chore: update laboratory settings", Confirmation: "COMMIT"}
 	for _, test := range []struct {
 		input string
 		want  bool
 	}{
-		{input: "COMMIT abcdef012345\n", want: true},
-		{input: "commit abcdef012345\n", want: false},
+		{input: "COMMIT\n", want: true},
+		{input: "commit\n", want: false},
 		{input: "COMMIT wrong\n", want: false},
 	} {
 		var output bytes.Buffer
@@ -99,12 +99,12 @@ func TestConfirmGitCommitRequiresExactReviewPhrase(t *testing.T) {
 	}
 }
 
-func TestConfirmUpdateRequiresExactReleasePhrase(t *testing.T) {
-	report := domain.UpdatePlanReport{CurrentRef: "v2.0.0", CurrentRev: "abc", Target: "v2.1.0", TargetChannel: domain.UpdateChannelStable, Confirmation: "UPDATE NIXORIUM TO v2.1.0"}
+func TestConfirmUpdateRequiresSingleExactWord(t *testing.T) {
+	report := domain.UpdatePlanReport{CurrentRef: "v2.0.0", CurrentRev: "abc", Target: "v2.1.0", TargetChannel: domain.UpdateChannelStable, Confirmation: "UPDATE"}
 	for _, test := range []struct {
 		input string
 		want  bool
-	}{{"UPDATE NIXORIUM TO v2.1.0\n", true}, {"update nixorium to v2.1.0\n", false}, {"UPDATE NIXORIUM\n", false}} {
+	}{{"UPDATE\n", true}, {"update\n", false}, {"UPDATE NIXORIUM\n", false}} {
 		var output bytes.Buffer
 		approved, err := ConfirmUpdate(strings.NewReader(test.input), &output, report)
 		if err != nil || approved != test.want || !strings.Contains(output.String(), "no branch, commit, push, activation") {
@@ -113,16 +113,16 @@ func TestConfirmUpdateRequiresExactReleasePhrase(t *testing.T) {
 	}
 }
 
-func TestConfirmSoftwareChangeRequiresExactReviewPhrase(t *testing.T) {
+func TestConfirmSoftwareChangeRequiresSingleExactWord(t *testing.T) {
 	report := domain.SoftwareChangePlanReport{
 		Request:         domain.SoftwareChangeRequest{Package: "vlc", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "graphics"}},
 		AffectedClients: []string{"pc01", "pc02"},
-		Confirmation:    "SAVE SOFTWARE abcdef012345",
+		Confirmation:    "SAVE",
 	}
 	for _, test := range []struct {
 		input string
 		want  bool
-	}{{"SAVE SOFTWARE abcdef012345\n", true}, {"save software abcdef012345\n", false}, {"SAVE SOFTWARE wrong\n", false}} {
+	}{{"SAVE\n", true}, {"save\n", false}, {"SAVE SOFTWARE\n", false}} {
 		var output bytes.Buffer
 		approved, err := ConfirmSoftwareChange(strings.NewReader(test.input), &output, report)
 		if err != nil || approved != test.want || !strings.Contains(output.String(), "only lab-software.json") || !strings.Contains(output.String(), "no commit, build, controller activation") {

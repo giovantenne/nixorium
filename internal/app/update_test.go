@@ -161,7 +161,7 @@ func TestUpdatePlanAcceptsReviewedMasterTarget(t *testing.T) {
 	plan := NewUpdateManager(source).PlanWithProgress(context.Background(), ".", "master", false, false, func(item domain.UpdatePlanProgress) {
 		progress = append(progress, item)
 	})
-	if plan.State != "ready" || plan.TargetChannel != domain.UpdateChannelMoving || plan.Downgrade || plan.Confirmation != "UPDATE NIXORIUM TO master" || source.lastTarget != "master" {
+	if plan.State != "ready" || plan.TargetChannel != domain.UpdateChannelMoving || plan.Downgrade || plan.Confirmation != "UPDATE" || source.lastTarget != "master" {
 		t.Fatalf("master plan = %+v, prepared target = %q", plan, source.lastTarget)
 	}
 	if len(progress) != 3 || progress[0].Phase != domain.UpdatePlanPhaseInspect || progress[1].Phase != domain.UpdatePlanPhaseLock || progress[2].Phase != domain.UpdatePlanPhaseVerify {
@@ -200,7 +200,7 @@ func TestUpdatePlanRequiresOptInsAndBindsValidatedProposal(t *testing.T) {
 		t.Fatalf("blocked plan = %+v, prepared = %d", blocked, source.prepared)
 	}
 	plan := manager.Plan(context.Background(), ".", "v1.9.0-beta.1", true, true)
-	if plan.State != "ready" || !plan.Downgrade || plan.TargetChannel != domain.UpdateChannelPrerelease || plan.Confirmation != "DOWNGRADE NIXORIUM TO v1.9.0-beta.1" || !strings.HasPrefix(plan.ReviewToken, "sha256:") || len(plan.Checks) != 1 {
+	if plan.State != "ready" || !plan.Downgrade || plan.TargetChannel != domain.UpdateChannelPrerelease || plan.Confirmation != "DOWNGRADE" || !strings.HasPrefix(plan.ReviewToken, "sha256:") || len(plan.Checks) != 1 {
 		t.Fatalf("ready plan = %+v", plan)
 	}
 }

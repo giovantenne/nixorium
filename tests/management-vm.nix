@@ -2,7 +2,7 @@
 {
   name = "nixorium-management";
 
-  nodes.controller = { pkgs, ... }:
+  nodes.controller = { lib, pkgs, ... }:
   let
     fakeRuntime = pkgs.buildEnv {
       name = "nixorium-test-system-path";
@@ -52,6 +52,14 @@
       set -eu
       printf '%s\n' "$*" >> "''${NIXORIUM_TEST_COLMENA_INVOCATIONS}"
       printf 'fake colmena: %s\n' "$*"
+      if [ "''${1:-}" = apply ]; then
+        test -n "''${SSH_CONFIG_FILE:-}"
+        test "$(stat -c %a "$SSH_CONFIG_FILE")" = 600
+        grep -Fx '  BatchMode yes' "$SSH_CONFIG_FILE"
+        grep -Fx '  PasswordAuthentication no' "$SSH_CONFIG_FILE"
+        grep -Fx '  StrictHostKeyChecking accept-new' "$SSH_CONFIG_FILE"
+        touch /tmp/nixorium-test-colmena-ssh-policy
+      fi
       if [ "''${NIXORIUM_TEST_COLMENA_FAIL:-}" = "''${1:-}" ]; then
         exit 42
       fi
@@ -152,6 +160,7 @@
       ../modules/firewall.nix
       ../modules/management.nix
       ../modules/pxe.nix
+      ../modules/users.nix
     ];
 
     _module.args = {
@@ -166,6 +175,12 @@
         pxeHttpPort = 8080;
         cachePublicKey = null;
         veyonNativeHosts = [];
+        teacherUser = "teacher";
+        studentUser = "student";
+        teacherPassword = "!";
+        studentPassword = "!";
+        adminPassword = "!";
+        adminSshKey = null;
       };
       inherit nixoriumPackage;
     };
@@ -176,10 +191,22 @@
     virtualisation.writableStoreUseTmpfs = false;
     environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit ];
     users.groups.veyon-master = {};
-    users.users.admin = {
-      isNormalUser = true;
-      extraGroups = [ "wheel" "veyon-master" ];
+    system.activationScripts.createHomeTemplates = "";
+    system.activationScripts.siteHomeProfile = {
+      deps = [ "users" ];
+      text = ''
+        for user in admin teacher student; do
+          mkdir -p "/home/$user/.config/Code/User/globalStorage" "/home/$user/.vscode/extensions"
+          chown -R root:root "/home/$user/.config" "/home/$user/.vscode"
+          user_id="$(${pkgs.coreutils}/bin/id -u "$user")"
+          mkdir -p "/run/user/$user_id"
+          chown root:root "/run/user/$user_id"
+          chmod 0755 "/run/user/$user_id"
+        done
+      '';
     };
+    system.activationScripts.nixoriumUserHomeOwnership.deps = [ "siteHomeProfile" ];
+    users.users.root.hashedPassword = lib.mkForce null;
     systemd.services.nixorium-test-network = {
       description = "Create the persistent dummy network used by the Nixorium VM test";
       wantedBy = [ "multi-user.target" ];
@@ -323,6 +350,7 @@
     controller.succeed("iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 5000'; iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 8080'; iptables-save | grep -F -- '-i lab0' | grep -F -- '--dport 67'")
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
+    controller.succeed("for user in admin teacher student; do uid=$(id -u $user); test \"$(stat -c %U:%G /home/$user/.config/Code/User/globalStorage)\" = $user:users; test \"$(stat -c %U:%G /home/$user/.vscode/extensions)\" = $user:users; test \"$(stat -c %U:%G:%a /run/user/$uid)\" = $user:users:700; su -s /bin/sh $user -c \"test -w /home/$user/.config/Code/User/globalStorage && test -w /home/$user/.vscode/extensions && test -w /run/user/$uid\"; done")
     controller.succeed("grep -Fx 'X-RestartIfChanged=false' /etc/systemd/system/nixorium-apply-controller.service; grep -Fx 'X-RestartIfChanged=false' /etc/systemd/system/nixorium-apply-controller@.service")
     controller.succeed("mkdir /tmp/fake-colmena-bin; ln -s /run/current-system/sw/bin/nixorium-test-colmena /tmp/fake-colmena-bin/colmena")
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
@@ -365,7 +393,7 @@
     controller.succeed("sha256sum -c /tmp/existing-admin-key.sha256; cmp /tmp/existing-admin-key /tmp/deployment/admin-ssh; test \"$(stat -c '%a' /tmp/deployment/admin-ssh)\" = 600; nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'; ! git -C /tmp/deployment status --porcelain=v1 | grep -F 'keys/admin-ssh.pub'")
     controller.succeed("nixorium software catalog --repo /tmp/deployment --json > /tmp/software-catalog.json; jq -e '.operation == \"software-catalog\" and .state == \"ready\" and .managedFile == \"lab-software.json\" and (.catalog | length) == 2 and (.packages | length) == 0 and .groups.graphics == [\"pc01\"]' /tmp/software-catalog.json")
     controller.succeed("nixorium software search --repo /tmp/deployment --query hell --json > /tmp/software-search.json; jq -e '.operation == \"software-search\" and .state == \"ready\" and .query == \"hell\" and .results == [{\"id\":\"hello\",\"label\":\"hello\",\"summary\":\"A friendly greeting program\",\"version\":\"2.12\",\"availability\":\"available\"}]' /tmp/software-search.json")
-    controller.succeed("nixorium software plan --repo /tmp/deployment --package vlc --scope group:graphics --json > /tmp/software-plan.json; jq -e '.operation == \"software-change-plan\" and .state == \"ready\" and .request.package == \"vlc\" and .request.scope.group == \"graphics\" and .affectedClients == [\"pc01\"] and (.reviewToken | startswith(\"sha256:\")) and (.confirmation | startswith(\"SAVE SOFTWARE \"))' /tmp/software-plan.json")
+    controller.succeed("nixorium software plan --repo /tmp/deployment --package vlc --scope group:graphics --json > /tmp/software-plan.json; jq -e '.operation == \"software-change-plan\" and .state == \"ready\" and .request.package == \"vlc\" and .request.scope.group == \"graphics\" and .affectedClients == [\"pc01\"] and (.reviewToken | startswith(\"sha256:\")) and .confirmation == \"SAVE\"' /tmp/software-plan.json")
     controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); token=$(jq -r .reviewToken /tmp/software-plan.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect \"$token\" </dev/null >/tmp/software-noninteractive.out 2>/tmp/software-noninteractive.err || test $? = 2; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; grep -F 'requires an interactive terminal or explicit --yes' /tmp/software-noninteractive.err")
     controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect sha256:stale --yes --json > /tmp/software-stale.json || test $? = 1; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; jq -e '.operation == \"software-change-apply\" and .state == \"conflict\" and any(.issues[]; .field == \"reviewToken\")' /tmp/software-stale.json")
     controller.succeed("token=$(jq -r .reviewToken /tmp/software-plan.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect \"$token\" --yes --json > /tmp/software-apply.json; jq -e '.operation == \"software-change-apply\" and .state == \"applied\" and .managedFile == \"lab-software.json\" and .affectedClients == [\"pc01\"]' /tmp/software-apply.json; jq -e '.packages == [{\"package\":\"vlc\",\"scope\":{\"kind\":\"group\",\"group\":\"graphics\"}}]' /tmp/deployment/lab-software.json; test \"$(git -C /tmp/deployment status --porcelain=v1)\" = ' M lab-software.json'")
@@ -377,15 +405,15 @@
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
     controller.succeed("cp -a /tmp/deployment /tmp/commit-deployment; git -C /tmp/commit-deployment config user.name Test; git -C /tmp/commit-deployment config user.email test@example.invalid")
     controller.succeed("printf '\n# unrelated-staged-change\n' >> /tmp/commit-deployment/flake.nix; git -C /tmp/commit-deployment add flake.nix; jq '.lab.adminPassword = \"$6$commit$new-admin\"' /tmp/commit-deployment/lab-settings.json > /tmp/commit-settings.json; mv /tmp/commit-settings.json /tmp/commit-deployment/lab-settings.json; printf 'reviewed local note\n' > /tmp/commit-deployment/review-note")
-    controller.succeed("old_head=$(git -C /tmp/commit-deployment rev-parse HEAD); nixorium git commit plan --repo /tmp/commit-deployment --paths lab-settings.json,review-note --json > /tmp/git-commit-plan.json; jq -e '.operation == \"git-commit-plan\" and .state == \"ready\" and (.reviewToken | startswith(\"sha256:\")) and (.confirmation | startswith(\"COMMIT \")) and (.diff.content | contains(\"<redacted>\")) and (.diff.content | contains(\"$6$commit$new-admin\") | not)' /tmp/git-commit-plan.json; token=$(jq -r .reviewToken /tmp/git-commit-plan.json); nixorium git commit apply --repo /tmp/commit-deployment --paths lab-settings.json,review-note --expect \"$token\" --yes --json > /tmp/git-commit.json; jq -e --arg old \"$old_head\" '.operation == \"git-commit\" and .state == \"completed\" and .committed and (.retrySafe | not) and .previousRevision == $old and .revision != $old and (.message | contains(\"no remote push\"))' /tmp/git-commit.json")
+    controller.succeed("old_head=$(git -C /tmp/commit-deployment rev-parse HEAD); nixorium git commit plan --repo /tmp/commit-deployment --paths lab-settings.json,review-note --json > /tmp/git-commit-plan.json; jq -e '.operation == \"git-commit-plan\" and .state == \"ready\" and (.reviewToken | startswith(\"sha256:\")) and .confirmation == \"COMMIT\" and (.diff.content | contains(\"<redacted>\")) and (.diff.content | contains(\"$6$commit$new-admin\") | not)' /tmp/git-commit-plan.json; token=$(jq -r .reviewToken /tmp/git-commit-plan.json); nixorium git commit apply --repo /tmp/commit-deployment --paths lab-settings.json,review-note --expect \"$token\" --yes --json > /tmp/git-commit.json; jq -e --arg old \"$old_head\" '.operation == \"git-commit\" and .state == \"completed\" and .committed and (.retrySafe | not) and .previousRevision == $old and .revision != $old and (.message | contains(\"no remote push\"))' /tmp/git-commit.json")
     controller.succeed("git -C /tmp/commit-deployment show HEAD:review-note | grep -Fx 'reviewed local note'; git -C /tmp/commit-deployment show HEAD:lab-settings.json | grep -F '$6$commit$new-admin'; ! git -C /tmp/commit-deployment show HEAD:flake.nix | grep -qF 'unrelated-staged-change'; test \"$(git -C /tmp/commit-deployment diff --cached --name-only)\" = flake.nix; test -z \"$(git -C /tmp/commit-deployment status --porcelain=v1 -- lab-settings.json review-note)\"")
     controller.succeed("printf 'first\n' > /tmp/commit-deployment/stale-note; nixorium git commit plan --repo /tmp/commit-deployment --paths stale-note --json > /tmp/git-stale-plan.json; token=$(jq -r .reviewToken /tmp/git-stale-plan.json); printf 'second\n' > /tmp/commit-deployment/stale-note; before=$(git -C /tmp/commit-deployment rev-parse HEAD); nixorium git commit apply --repo /tmp/commit-deployment --paths stale-note --expect \"$token\" --yes --json > /tmp/git-stale.json || test $? = 1; test \"$before\" = \"$(git -C /tmp/commit-deployment rev-parse HEAD)\"; jq -e '.state == \"blocked\" and (.committed | not) and any(.issues[]; .field == \"review\")' /tmp/git-stale.json")
     controller.succeed("printf '{ token = \"plaintext-secret\"; }\n' > /tmp/commit-deployment/unsafe.nix; nixorium git commit plan --repo /tmp/commit-deployment --paths unsafe.nix --json > /tmp/git-unsafe-plan.json || test $? = 1; jq -e '.state == \"blocked\" and any(.issues[]; .field == \"proposal\" and (.message | contains(\"plaintext\")))' /tmp/git-unsafe-plan.json")
     controller.succeed("cp -a /tmp/deployment /tmp/update-deployment; printf '{\n  inputs.nixorium.url = \"github:giovantenne/nixorium/v2.0.0\";\n  outputs = { self, nixorium }: {};\n}\n' > /tmp/update-deployment/flake.nix; printf '%s\n' '{\"root\":\"root\",\"nodes\":{\"root\":{\"inputs\":{\"nixorium\":\"nixorium\"}},\"nixorium\":{\"locked\":{\"rev\":\"1111111111111111111111111111111111111111\"}}}}' > /tmp/update-deployment/flake.lock; chown -R admin:users /tmp/update-deployment; su - admin -c 'git -C /tmp/update-deployment add flake.nix flake.lock && git -C /tmp/update-deployment -c user.name=Test -c user.email=test@example.invalid commit -qm update-fixture'; mkdir /tmp/fake-update-bin /tmp/fake-update-check-bin; ln -s /run/current-system/sw/bin/nixorium-test-update-nix /tmp/fake-update-bin/nix; ln -s /run/current-system/sw/bin/nixorium-test-update-git /tmp/fake-update-check-bin/git")
     controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_GIT_LOG=/tmp/update-git.log PATH=/tmp/fake-update-check-bin:$PATH nixorium update check --repo /tmp/update-deployment --json' > /tmp/update-check.json; jq -e '.operation == \"update-check\" and .state == \"available\" and .upstream == \"github:giovantenne/nixorium\" and .currentRef == \"v2.0.0\" and .currentChannel == \"stable\" and .development == [{\"tag\":\"master\",\"objectId\":\"7777777777777777777777777777777777777777\",\"channel\":\"moving\"}] and (.stable | length) == 1 and .stable[0].tag == \"v2.3.0\" and (.prerelease | length) == 1 and .prerelease[0].tag == \"v2.4.0-beta.1\" and (.truncated | not)' /tmp/update-check.json; grep -F 'credential.helper=' /tmp/update-git.log; grep -F 'prompt=0 askpass= sshaskpass= interactive=Never global=/dev/null nosystem=1' /tmp/update-git.log")
     controller.succeed("rm -f /tmp/update-nix.log; su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.1.0-beta.1 --json' > /tmp/update-prerelease.json || test $? = 1; jq -e '.operation == \"update-plan\" and .state == \"blocked\" and any(.issues[]; .field == \"target\" and (.message | contains(\"--allow-prerelease\")))' /tmp/update-prerelease.json; test ! -e /tmp/update-nix.log")
-    controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target master --json' > /tmp/update-master.json; jq -e '.operation == \"update-plan\" and .state == \"ready\" and .target == \"master\" and .targetChannel == \"moving\" and .confirmation == \"UPDATE NIXORIUM TO master\" and (.reviewToken | startswith(\"sha256:\"))' /tmp/update-master.json; rm -f /tmp/update-nix.log")
-    controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.1.0 --json' > /tmp/update-plan.json; jq -e '.operation == \"update-plan\" and .state == \"ready\" and .currentRef == \"v2.0.0\" and .target == \"v2.1.0\" and .targetChannel == \"stable\" and (.reviewToken | startswith(\"sha256:\")) and .confirmation == \"UPDATE NIXORIUM TO v2.1.0\" and (.checks | length) == 7 and all(.checks[]; .state == \"passed\") and (.diff.content | contains(\"flake.nix\")) and (.diff.content | contains(\"flake.lock\"))' /tmp/update-plan.json; test \"$(wc -l < /tmp/update-nix.log)\" = 8; test \"$(grep -c ' build ' /tmp/update-nix.log)\" = 5")
+    controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target master --json' > /tmp/update-master.json; jq -e '.operation == \"update-plan\" and .state == \"ready\" and .target == \"master\" and .targetChannel == \"moving\" and .confirmation == \"UPDATE\" and (.reviewToken | startswith(\"sha256:\"))' /tmp/update-master.json; rm -f /tmp/update-nix.log")
+    controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.1.0 --json' > /tmp/update-plan.json; jq -e '.operation == \"update-plan\" and .state == \"ready\" and .currentRef == \"v2.0.0\" and .target == \"v2.1.0\" and .targetChannel == \"stable\" and (.reviewToken | startswith(\"sha256:\")) and .confirmation == \"UPDATE\" and (.checks | length) == 7 and all(.checks[]; .state == \"passed\") and (.diff.content | contains(\"flake.nix\")) and (.diff.content | contains(\"flake.lock\"))' /tmp/update-plan.json; test \"$(wc -l < /tmp/update-nix.log)\" = 8; test \"$(grep -c ' build ' /tmp/update-nix.log)\" = 5")
     controller.succeed("rm -f /tmp/update-controller-nix.log; su - admin -c 'NIXORIUM_TEST_UPDATE_MODE=controller NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-controller-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.2.0 --json' > /tmp/update-controller-plan.json; jq -e '.state == \"ready\" and (.checks | length) == 3 and .checks[1].message == \"candidate controller is ready\" and .checks[2].id == \"controller\"' /tmp/update-controller-plan.json; test \"$(wc -l < /tmp/update-controller-nix.log)\" = 4; test \"$(grep -c ' build ' /tmp/update-controller-nix.log)\" = 1; grep -F '#nixosConfigurations.pc99.config.system.build.toplevel' /tmp/update-controller-nix.log; ! grep -E '#(nixosConfigurations\\.pc01|nixosConfigurations\\.netboot|pxeFirmware|installerBundle)' /tmp/update-controller-nix.log")
     controller.succeed("before=$(sha256sum /tmp/update-deployment/flake.nix /tmp/update-deployment/flake.lock); token=$(jq -r .reviewToken /tmp/update-plan.json); su - admin -c \"NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:\$PATH nixorium update apply --repo /tmp/update-deployment --target v2.1.0 --expect '$token' </dev/null >/tmp/update-noninteractive.out 2>/tmp/update-noninteractive.err\" || test $? = 2; after=$(sha256sum /tmp/update-deployment/flake.nix /tmp/update-deployment/flake.lock); test \"$before\" = \"$after\"; test ! -s /tmp/update-noninteractive.out; grep -F 'requires an interactive terminal or explicit --yes' /tmp/update-noninteractive.err")
     controller.succeed("before=$(sha256sum /tmp/update-deployment/flake.nix /tmp/update-deployment/flake.lock); su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update apply --repo /tmp/update-deployment --target v2.1.0 --expect sha256:stale --yes --json' > /tmp/update-stale.json || test $? = 1; after=$(sha256sum /tmp/update-deployment/flake.nix /tmp/update-deployment/flake.lock); test \"$before\" = \"$after\"; jq -e '.operation == \"update-apply\" and .state == \"blocked\" and (.updated | not) and .retrySafe and any(.issues[]; .field == \"review\")' /tmp/update-stale.json")
@@ -483,7 +511,7 @@
     controller.succeed("touch /run/nixorium-test-activation-fail; ! systemctl start nixorium-apply-controller.service; test ! -e /var/lib/nixorium/controller/applied.json; rm /run/nixorium-test-activation-fail; systemctl reset-failed nixorium-apply-controller.service")
     controller.succeed("nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'")
     controller.succeed("su - admin -c 'nixorium setup apply --repo ~/nixorium-deployment --yes --json' | jq -e '.state == \"completed\"'")
-    controller.succeed("su - admin -c 'nixorium controller plan --repo ~/nixorium-deployment --json' > /tmp/controller-plan.json; jq -e '.operation == \"controller-plan\" and .state == \"current\" and .controller == \"pc99\" and .current and (.revision | length) == 40 and .confirmation == \"REBUILD pc99\"' /tmp/controller-plan.json")
+    controller.succeed("su - admin -c 'nixorium controller plan --repo ~/nixorium-deployment --json' > /tmp/controller-plan.json; jq -e '.operation == \"controller-plan\" and .state == \"current\" and .controller == \"pc99\" and .current and (.revision | length) == 40 and .confirmation == \"REBUILD\"' /tmp/controller-plan.json")
     controller.succeed("su - admin -c 'nixorium controller apply --repo ~/nixorium-deployment --expect 0000000000000000000000000000000000000000 --yes --json >/tmp/controller-stale.json' || test $? = 1; jq -e '.state == \"blocked\" and any(.issues[]; .field == \"review\")' /tmp/controller-stale.json")
     controller.succeed("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium controller apply --repo ~/nixorium-deployment --expect \"$revision\" --yes --json 2>/tmp/controller-apply.progress' > /tmp/controller-apply.json; jq -e '.operation == \"controller-apply\" and .state == \"completed\" and .phase == \"complete\" and .applied and .verified and .unit == (\"nixorium-apply-controller@\" + .revision + \".service\")' /tmp/controller-apply.json; grep -F 'Progress [complete] (4/4): Controller revision activated and verified' /tmp/controller-apply.progress")
     controller.fail("su - admin -c 'systemctl start nixorium-apply-controller@short.service'")
@@ -506,7 +534,7 @@
     controller.fail("nixorium deploy plan --repo /tmp/deployment --on pc02 --json")
     controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-success PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on pc01 --expect \"$revision\" --yes --json >/tmp/deploy-success.json 2>/tmp/deploy-success.progress' || { cat /tmp/deploy-success.json /tmp/deploy-success.progress; false; }")
     controller.succeed("jq -e '.operation == \"deploy-apply\" and .state == \"completed\" and .phase == \"complete\" and .buildCompleted and .applyCompleted and .retrySafe and .colmenaSelector == \"pc01\" and .verification.attempted == 1 and .verification.verified == 1 and .verification.recorded == 1 and .verification.targets[0].name == \"pc01\" and .verification.targets[0].state == \"verified\" and (.logPath | startswith(\"/home/admin/.local/state/nixorium/operations/deploy-\"))' /tmp/deploy-success.json")
-    controller.succeed("test \"$(head -n 1 /tmp/colmena-success)\" = 'build --on pc01 --verbose --color never'; test \"$(tail -n 1 /tmp/colmena-success)\" = 'apply switch --on pc01 --verbose --color never'; test \"$(wc -l </tmp/colmena-success)\" = 2")
+    controller.succeed("test \"$(head -n 1 /tmp/colmena-success)\" = 'build --on pc01 --verbose --color never'; test \"$(tail -n 1 /tmp/colmena-success)\" = 'apply switch --on pc01 --verbose --color never'; test \"$(wc -l </tmp/colmena-success)\" = 2; test -e /tmp/nixorium-test-colmena-ssh-policy")
     controller.succeed("log=$(jq -r .logPath /tmp/deploy-success.json); test \"$(stat -c '%U:%G:%a' \"$log\")\" = admin:users:600; grep -F 'fake colmena: build' \"$log\"; grep -F 'Result: completed' \"$log\"; grep -F 'Verified targets: 1/1' \"$log\"; grep -F 'fake colmena: apply' /tmp/deploy-success.progress")
     controller.succeed("history=(/home/admin/.local/state/nixorium/deployments/*.json); test \"''${#history[@]}\" = 1; test \"$(stat -c '%U:%G:%a' \"''${history[0]}\")\" = admin:users:600; jq -e '.schemaVersion == 1 and .repository == \"/home/admin/nixorium-deployment\" and (.hosts | keys) == [\"pc01\"] and (.hosts.pc01.revision | length) == 40 and (.hosts.pc01.systemPath | startswith(\"/nix/store/\")) and (.hosts.pc01.verifiedAt | endswith(\"Z\"))' \"''${history[0]}\"")
     controller.succeed("su - admin -c 'nixorium hosts --repo /home/admin/nixorium-deployment --json' > /tmp/hosts-verified.json; jq -e '.hosts[0].lastSuccessfulDeploy.revision == .hosts[0].desiredRevision and (.hosts[0].lastSuccessfulDeploy.systemPath | startswith(\"/nix/store/\")) and (.hosts[0].lastSuccessfulDeploy.verifiedAt | endswith(\"Z\"))' /tmp/hosts-verified.json")

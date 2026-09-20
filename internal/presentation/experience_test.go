@@ -102,7 +102,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 					screen:    dashboardPXEStartReview,
 					startPlan: domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"},
 				},
-				expected: []string{"Type START PXE to continue", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
+				expected: []string{"Type START to continue", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
 			},
 			{
 				name:     "recovery",
@@ -428,7 +428,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	m := experienceFixture(2)
 	m.screen = dashboardDeployReview
 	m.deployPlan = domain.DeploymentPlanReport{ColmenaSelector: "@lab"}
-	m.confirmation = "DEPLOY @lab"
+	m.confirmation = "DEPLOY"
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	m = updated.(dashboardModel)
 	if !m.helpOpen {
@@ -469,13 +469,13 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.softwareSelected = "gimp"
 			m.softwareScopeCursor = len(m.softwareScopeOptions()) - 1
 			m.softwareClientCursor = 199
-			m.softwarePlan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.softwareCatalog.Clients, Confirmation: "SAVE SOFTWARE abcdef012345"}
+			m.softwarePlan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.softwareCatalog.Clients, Confirmation: "SAVE"}
 			m.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 			m.shutdownCursor = 199
 			m.shutdownChosen = map[string]bool{"pc200": true}
 			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
 			m.shutdownResult = domain.ShutdownApplyReport{State: "completed", Accepted: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc200", State: "accepted", Detail: "request accepted"}}}
-			m.controllerPlan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD pc99"}
+			m.controllerPlan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD"}
 			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 			if screen == dashboardPXELeaveReview {
 				m.setupMode = true
@@ -658,9 +658,9 @@ func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
 		m := experienceFixture(2)
 		m.screen = screen
 		m.confirmation = "wrong"
-		m.controllerPlan.Confirmation = "REBUILD pc99"
-		m.gitCommitPlan.Confirmation = "COMMIT 1 PATH"
-		m.updatePlan.Confirmation = "UPDATE NIXORIUM TO v2.3.0"
+		m.controllerPlan.Confirmation = "REBUILD"
+		m.gitCommitPlan.Confirmation = "COMMIT"
+		m.updatePlan.Confirmation = "UPDATE"
 		m.deployPlan.ColmenaSelector = "@lab"
 		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		m = updated.(dashboardModel)
@@ -741,7 +741,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.softwarePlan = domain.SoftwareChangePlanReport{
 				State: "ready", ManagedFile: "lab-software.json",
 				Request:         domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
-				AffectedClients: []string{"pc01", "pc02", "pc03"}, Confirmation: "SAVE SOFTWARE abcdef012345",
+				AffectedClients: []string{"pc01", "pc02", "pc03"}, Confirmation: "SAVE",
 			}
 		case "software-result":
 			m.screen = dashboardSoftwareResult
