@@ -673,7 +673,6 @@ assert unknownVeyonNativeHosts == []
     meta = {
       nixpkgs = import nixpkgs {
         inherit system;
-        overlays = [ labOverlay ];
       };
       specialArgs = {
         inherit labSettings;

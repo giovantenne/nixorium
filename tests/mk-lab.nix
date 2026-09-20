@@ -116,6 +116,8 @@ let
   clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
   clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
   clientHomeOwnership = subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumUserHomeOwnership;
+  colmenaBaseGnomeRemoteDesktop = subnetLab.colmena.meta.nixpkgs.gnome-remote-desktop;
+  clientGnomeRemoteDesktop = subnetLab.nixosConfigurations.pc01.pkgs.gnome-remote-desktop;
 in
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
 assert controllerOnlyLab.labMeta.controller.staticIp == "";
@@ -184,6 +186,10 @@ assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.firewall.inte
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.interfaces ? enp2s0;
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.firewall.interfaces ? enp3s0;
 assert subnetLab.colmena.pc01.deployment.targetHost == "10.23.4.129";
+# Colmena starts from the unmodified package set. Each host's module graph
+# applies the laboratory overlay exactly once while evaluating that node.
+assert !(builtins.elem "-Dvnc=true" (colmenaBaseGnomeRemoteDesktop.mesonFlags or [ ]));
+assert builtins.elem "-Dvnc=true" (clientGnomeRemoteDesktop.mesonFlags or [ ]);
 assert subnetLab.apps.x86_64-linux.nixorium.type == "app";
 assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";
 assert subnetLab.packages.x86_64-linux.pxeFirmware.name == "nixorium-ipxe-firmware";
