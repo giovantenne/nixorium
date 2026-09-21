@@ -267,7 +267,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				plan := manager.Plan(ctx, repository, request)
 				if plan.HasErrors() {
 					if options.json {
-						err = presentation.JSON(stdout, plan)
+						presentation.JSON(stdout, plan)
 					} else {
 						presentation.SoftwareChangePlanText(stderr, plan)
 					}
@@ -403,7 +403,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 				return 1
 			}
 		} else if options.subcommand == "keys" {
-			report := domain.KeyReconcileReport{}
+			var report domain.KeyReconcileReport
 			var reconcileErr error
 			if options.verifyOnly {
 				report = manager.VerifyKeys(ctx, repository)
