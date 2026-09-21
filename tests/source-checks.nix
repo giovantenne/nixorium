@@ -46,4 +46,7 @@ in
   go-shell = pkgs.mkShell {
     packages = [ pkgs.go ];
   };
+  security-shell = pkgs.mkShell {
+    packages = [ pkgs.go pkgs.go-tools pkgs.govulncheck pkgs.actionlint ];
+  };
 }

@@ -1851,7 +1851,7 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 			}
 			message = batch[0]()
 		}
-		updated, _ = model.Update(message)
+		_, _ = model.Update(message)
 		if called != expected {
 			t.Errorf("%s called %q, want %q", key, called, expected)
 		}

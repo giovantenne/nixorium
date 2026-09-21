@@ -15,6 +15,7 @@ development command.
 | `./scripts/validate.sh --client-installer-vm` | Installer integration | Enrollment, Disko installation, or installer runtime behavior changed |
 | `./scripts/validate.sh --ci` | Evaluation-only source and template graph | CI and release-source evaluation |
 | `./scripts/validate.sh --full` | Complete build, VM, template, and offline-equivalence checkpoint | Before a milestone or release, and after cross-cutting changes that can affect several built roles |
+| `nix develop --file tests/source-checks.nix security-shell --command ./scripts/security-check.sh` | Pinned Go static and known-vulnerability analysis | Security-sensitive Go changes and the dedicated security workflow |
 
 The default gate checks whitespace, shell syntax, shell regression tests, skill
 and troubleshooting-copy coherence, the three Nix data schemas, and the Go
@@ -41,6 +42,16 @@ go test ./...
 This uses Go's incremental build cache between edits. Run the default gate
 before considering the change complete; it repeats the tests in the
 reproducible package build.
+
+The dedicated security workflow validates the workflow files with `actionlint`
+and runs `staticcheck` and `govulncheck` from the same locked `nixpkgs`
+revision. `staticcheck` is deterministic for that lock; `govulncheck` consults
+the current Go vulnerability database, so a scheduled run can find a newly
+published advisory without a source change. GitHub Actions also performs a
+manual-build CodeQL analysis of the Go commands and publishes its results
+through code scanning. These tools complement review of NixOS, shell,
+privilege, network, and credential boundaries; they do not prove that a
+deployment is secure.
 
 `--eval` adds the complete `checks.x86_64-linux.mk-lab` assertion graph. It is
 the normal escalation for Nix behavior that does not require booting a machine.

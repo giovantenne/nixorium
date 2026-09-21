@@ -22,6 +22,7 @@ from `templates/site`.
 
 ```
 .github/workflows/validate.yml # Go build/tests plus evaluation-only source/template CI
+.github/workflows/security.yml # CodeQL plus pinned Go vulnerability/static analysis
 .github/workflows/release.yml # Revalidates release metadata and publishes GitHub Releases
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
@@ -29,6 +30,7 @@ flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
+SECURITY.md                # Private reporting and coordinated disclosure policy
 lab-config.nix             # Standalone example configuration for this upstream
 disko-uefi.nix             # NixOS wrapper for the shared Disko layout
 lib/
@@ -68,6 +70,7 @@ scripts/
   create-home-template.sh  # Builds clean home directory template
   home-reset.sh            # Boot-time snapshot rotation + home reset
   validate.sh              # Tiered upstream validation entry point
+  security-check.sh        # Pinned staticcheck and govulncheck entry point
 assets/
   empty-*                  # Neutral fallbacks for optional deployment assets
 templates/site/            # Private deployment repository template
@@ -104,6 +107,11 @@ Use the smallest gate appropriate to the change:
 # Persistent, pinned shell for repeated Go edits
 nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell
 go test ./...
+
+# Dedicated Go security and static analysis with the locked toolchain
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix security-shell \
+  --command ./scripts/security-check.sh
 ```
 
 Use the affected management or client-installer VM only when changing its

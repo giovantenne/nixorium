@@ -71,7 +71,7 @@ func (model dashboardModel) computersView() string {
 		}, model.width, model.isDark)
 	}
 	hosts := model.filteredHosts()
-	actions := []tuiAction{}
+	var actions []tuiAction
 	if model.hostDetail && len(hosts) > 0 {
 		lines = append(lines, model.computerDetail(hosts[min(model.hostCursor, len(hosts)-1)]))
 		actions = []tuiAction{{key: "d", label: "Deploy"}, {key: "t", label: "Technical"}, {key: "i", label: "Diagnostics"}, {key: "Esc", label: "Back"}, {key: "?", label: "Help"}}

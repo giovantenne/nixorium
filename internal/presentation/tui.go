@@ -937,7 +937,7 @@ func (model dashboardModel) setupKeysView() string {
 			)
 		}
 	}
-	actions := []tuiAction{}
+	var actions []tuiAction
 	if model.setupKeyImporting {
 		actions = []tuiAction{{key: "Enter", label: "Import"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	} else if model.setupKeys.State == "ready" {

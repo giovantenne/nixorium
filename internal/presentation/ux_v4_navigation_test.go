@@ -476,7 +476,7 @@ func TestSetupValidationRetryKeepsAcceptedPasswords(t *testing.T) {
 	if command == nil || model.screen == dashboardSettingsPasswords || model.busy == "" {
 		t.Fatalf("validation retry did not proceed directly to one plan: screen=%d busy=%q", model.screen, model.busy)
 	}
-	updated, _ = model.Update(command())
+	_, _ = model.Update(command())
 	if plans != 1 {
 		t.Fatalf("validation plans = %d, want 1", plans)
 	}
