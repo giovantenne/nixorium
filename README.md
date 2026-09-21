@@ -213,6 +213,7 @@ the versioned operational and contributor references.
 | Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
 | Understand architecture and security | [Management architecture](docs/management-architecture.md), [ADRs](docs/adr/) |
 | Report a suspected vulnerability | [Security policy](SECURITY.md) |
+| Review operator responsibilities and limitations | [Operational disclaimer](DISCLAIMER.md) |
 | Evaluate firmware and physical hardware | [Hardware validation plan](docs/hardware-validation.md) |
 | Evaluate with disposable virtual machines | [Evaluation environment](docs/evaluation-environment.md) |
 | Develop and validate changes | [Contributor instructions](AGENTS.md), [development validation](docs/development-validation.md) |

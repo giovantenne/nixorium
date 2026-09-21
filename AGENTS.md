@@ -30,6 +30,7 @@ flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
 VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
+DISCLAIMER.md              # Operational responsibility and risk boundaries
 SECURITY.md                # Private reporting and coordinated disclosure policy
 lab-config.nix             # Standalone example configuration for this upstream
 disko-uefi.nix             # NixOS wrapper for the shared Disko layout
