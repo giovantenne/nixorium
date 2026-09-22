@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.5] - 2026-09-22
+
 ### Changed
 
 - Laboratories can update their NixOS/package base independently with
@@ -687,7 +689,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.4...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.5...HEAD
+[2.0.0-beta.5]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.4...v2.0.0-beta.5
 [2.0.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.3...v2.0.0-beta.4
 [2.0.0-beta.3]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.2...v2.0.0-beta.3
 [2.0.0-beta.2]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.1...v2.0.0-beta.2
