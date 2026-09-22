@@ -102,6 +102,10 @@
           fi
           while [[ $# -gt 0 ]]; do
             if [[ "$1" == --output-lock-file ]]; then
+              if [[ -n "''${NIXORIUM_TEST_BASE_CANDIDATE-}" ]]; then
+                cp "$NIXORIUM_TEST_BASE_CANDIDATE" "$2"
+                exit 0
+              fi
               printf '%s\n' "{\"root\":\"root\",\"nodes\":{\"root\":{\"inputs\":{\"nixorium\":\"nixorium\"}},\"nixorium\":{\"locked\":{\"rev\":\"$revision\"}}}}" > "$2"
               exit 0
             fi
@@ -122,6 +126,9 @@
           else
             printf '%s\n' '{"ready":true,"issues":[]}'
           fi
+          ;;
+        *"#nixoriumUpdateTargets "*)
+          printf '%s\n' '["pc99","pc01"]'
           ;;
         *" build "*)
           ;;
@@ -343,6 +350,9 @@
   };
 
   testScript = ''
+    import json
+    import shlex
+
     start_all()
     controller.wait_for_unit("sshd.service")
     controller.wait_for_unit("nixorium-test-network.service")
@@ -420,6 +430,38 @@
     controller.succeed("token=$(jq -r .reviewToken /tmp/update-plan.json); su - admin -c \"NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:\$PATH nixorium update apply --repo /tmp/update-deployment --target v2.1.0 --expect '$token' --yes --json\" > /tmp/update-apply.json; jq -e '.operation == \"update-apply\" and .state == \"completed\" and .target == \"v2.1.0\" and .updated and (.retrySafe | not) and (.message | contains(\"review and commit\"))' /tmp/update-apply.json; grep -F 'github:giovantenne/nixorium/v2.1.0' /tmp/update-deployment/flake.nix; grep -F '2222222222222222222222222222222222222222' /tmp/update-deployment/flake.lock; test \"$(git -c safe.directory=/tmp/update-deployment -C /tmp/update-deployment status --porcelain=v1 | wc -l)\" = 2; git -c safe.directory=/tmp/update-deployment -C /tmp/update-deployment status --porcelain=v1 | grep -F ' M flake.nix'; git -c safe.directory=/tmp/update-deployment -C /tmp/update-deployment status --porcelain=v1 | grep -F ' M flake.lock'; test ! -e /tmp/update-deployment/result")
     controller.succeed("su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update apply --repo /tmp/update-deployment --target v2.1.0 --expect sha256:stale --yes --json' > /tmp/update-dirty-retry.json || test $? = 1; jq -e '.operation == \"update-plan\" and .state == \"blocked\" and any(.issues[]; .field == \"git\")' /tmp/update-dirty-retry.json")
     controller.succeed("su - admin -c 'git -C /tmp/update-deployment add flake.nix flake.lock && git -C /tmp/update-deployment -c user.name=Test -c user.email=test@example.invalid commit -qm updated'; rm -f /tmp/update-nix.log; su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.1.0 --json' > /tmp/update-current.json || test $? = 1; jq -e '.state == \"blocked\" and any(.issues[]; .field == \"target\" and (.message | contains(\"already configured\")))' /tmp/update-current.json; test ! -e /tmp/update-nix.log; su - admin -c 'NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium update plan --repo /tmp/update-deployment --target v2.2.0 --json' | jq -e '.state == \"ready\" and .target == \"v2.2.0\"'")
+    with subtest("autonomous package-base planning and reviewed apply"):
+      base_flake = '{\n  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";\n  inputs.nixorium.url = "github:giovantenne/nixorium/v2.1.0";\n  inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";\n}\n'
+      base_lock = {"version": 7, "root": "root", "nodes": {
+        "root": {"inputs": {"nixpkgs": "nixpkgs", "nixorium": "nixorium"}},
+        "nixorium": {"inputs": {"nixpkgs": ["nixpkgs"]}, "locked": {"rev": "2" * 40}},
+        "nixpkgs": {"original": {"type": "github", "owner": "NixOS", "repo": "nixpkgs", "ref": "nixos-26.05"}, "locked": {"type": "github", "owner": "NixOS", "repo": "nixpkgs", "rev": "a" * 40, "narHash": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}}
+      }}
+      controller.succeed("cp -a /tmp/update-deployment /tmp/base-deployment")
+      for name, content in [("flake.nix", base_flake), ("flake.lock", json.dumps(base_lock))]:
+        controller.succeed("printf %s " + shlex.quote(content) + " > /tmp/base-deployment/" + name)
+      controller.succeed("chown -R admin:users /tmp/base-deployment; su - admin -c 'git -C /tmp/base-deployment add flake.nix flake.lock && git -C /tmp/base-deployment -c user.name=Test -c user.email=test@example.invalid commit -qm base-fixture'")
+      base_lock["nodes"]["nixpkgs"]["locked"]["rev"] = "b" * 40
+      controller.succeed("printf %s " + shlex.quote(json.dumps(base_lock)) + " > /tmp/base-candidate.json; chmod 644 /tmp/base-candidate.json")
+      base_command = "NIXORIUM_TEST_BASE_CANDIDATE=/tmp/base-candidate.json NIXORIUM_TEST_UPDATE_NIX_LOG=/tmp/base-update-nix.log PATH=/tmp/fake-update-bin:$PATH nixorium package-base "
+      def run_base(arguments):
+        return "su - admin -c " + shlex.quote(base_command + arguments + " --repo /tmp/base-deployment --json")
+      status = json.loads(controller.succeed(run_base("status")))
+      assert status["channel"] == "nixos-26.05" and status["revision"] == "a" * 40
+      controller.succeed(run_base("plan --target nixos-26.11") + " > /tmp/base-policy.json || test $? = 1")
+      controller.succeed("jq -e '.state == \"blocked\" and any(.issues[]; .field == \"policy\")' /tmp/base-policy.json; test ! -e /tmp/base-update-nix.log")
+      plan = json.loads(controller.succeed(run_base("plan")))
+      assert plan["state"] == "ready" and plan["kind"] == "package-base"
+      assert plan["packageBase"]["targetRevision"] == "b" * 40
+      controller.succeed("git -c safe.directory=/tmp/base-deployment -C /tmp/base-deployment diff --exit-code; grep -F '#nixoriumOfflineCheck' /tmp/base-update-nix.log")
+      controller.succeed(run_base("apply --expect sha256:stale --yes") + " > /tmp/base-stale.json || test $? = 1")
+      controller.succeed("jq -e '.operation == \"package-base-apply\" and .state == \"blocked\" and (.updated | not)' /tmp/base-stale.json; git -c safe.directory=/tmp/base-deployment -C /tmp/base-deployment diff --exit-code")
+      applied = json.loads(controller.succeed(run_base("apply --expect " + plan["reviewToken"] + " --yes")))
+      assert applied["state"] == "completed" and applied["updated"]
+      actual = json.loads(controller.succeed("cat /tmp/base-deployment/flake.lock"))
+      assert actual == base_lock
+      assert controller.succeed("cat /tmp/base-deployment/flake.nix") == base_flake
+
     controller.succeed("source_path=$(nix --extra-experimental-features 'nix-command flakes' flake metadata git+file:///tmp/deployment --json --no-write-lock-file | jq -r .path); test ! -e \"$source_path/secret-key\"; test ! -e \"$source_path/admin-ssh\"; test ! -e \"$source_path/veyon-private-key.pem\"")
     controller.succeed("git -C /tmp/deployment add -f secret-key")
     controller.fail("nixorium status --repo /tmp/deployment --json")

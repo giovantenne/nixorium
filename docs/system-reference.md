@@ -68,6 +68,19 @@ updates fail if their candidate lock changes that root node. Legacy deployments
 without the direct input remain supported; migration and package-base update
 are separate reviewed operations.
 
+The advertised channel is reference metadata, not a hard compatibility gate.
+`package-base status/plan/apply` and Maintenance → Update system and packages
+manage the direct base independently, preserving every other locked node.
+Channel changes require explicit unverified-compatibility acknowledgement.
+`nixoriumUpdateTargets` covers the controller and distinct client variants
+(scoped software, Veyon mode, interface and explicit host modules); private
+host-conditional policies declare additional `mkLab.updateValidationHosts`.
+`nixoriumOfflineCheck`
+compares direct and standalone-installer derivations in an isolated offline
+store. Read [updates](updates.md) for migration, activation, package overrides,
+runtime checks and recovery. Framework updates can still change framework-owned
+patches and auxiliary inputs without changing nixpkgs.
+
 ## Workstation-profile ownership
 
 Nixorium core supplies the GNOME session, accounts, networking, classroom
@@ -234,6 +247,7 @@ installer so client installation needs no second checkout.
 | `controllerModules` | Modules applied only to the controller |
 | `clientModules` | Modules applied to all client PCs |
 | `hostModules` | Attribute set of modules keyed by generated host name |
+| `updateValidationHosts` | Extra generated hosts with private host-conditional policy; included in base-update builds and offline equivalence |
 | `netbootModules` | Additional modules applied only to the PXE environment |
 
 Unknown settings, host names, and asset names fail evaluation. Referenced
@@ -251,6 +265,7 @@ consume `lib.mkLab`. Important generated outputs include:
 - `labMeta` for non-sensitive operational identity and network data;
 - `deploymentStatus` for readiness blockers;
 - `nixoriumSoftware` for the supported pinned catalog, evaluated scopes, and managed declarations;
+- `nixoriumUpdateTargets` and `nixoriumOfflineCheck` for base-update validation;
 - `nixorium` and supporting Flake applications;
 - `pxeFirmware` and `installerBundle`;
 - schema, compatibility, package, and VM checks.

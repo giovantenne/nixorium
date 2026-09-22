@@ -34,7 +34,8 @@ type UpdateProgressSource interface {
 }
 
 type UpdateManager struct {
-	source UpdateSource
+	source      UpdateSource
+	packageBase bool
 }
 
 func NewUpdateManager(source UpdateSource) *UpdateManager {
@@ -129,6 +130,9 @@ func (m *UpdateManager) Plan(ctx context.Context, repository, target string, all
 }
 
 func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+	if m.packageBase {
+		return m.planPackageBase(ctx, repository, target, allowPrerelease, progress)
+	}
 	emitUpdatePlanProgress(progress, domain.UpdatePlanPhaseInspect, "Checking the deployment repository and selected release", 0, 0)
 	report := domain.UpdatePlanReport{
 		SchemaVersion: domain.SchemaVersion,
@@ -252,11 +256,18 @@ func (m *UpdateManager) ApplyPlan(ctx context.Context, plan domain.UpdatePlanRep
 		RetrySafe:     true,
 		Issues:        append([]domain.ValidationIssue(nil), plan.Issues...),
 	}
+	if m.packageBase {
+		report.Operation = "package-base-apply"
+	}
+	if m.packageBase != (plan.Kind == "package-base") {
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "review", Message: "update kind does not match the selected manager"})
+		return report
+	}
 	if plan.HasErrors() {
 		report.Message = "update preflight failed; flake.nix and flake.lock were not changed"
 		return report
 	}
-	if expectedToken == "" || expectedToken != plan.ReviewToken {
+	if expectedToken == "" || expectedToken != plan.ReviewToken || expectedToken != updateReviewToken(plan, plan.Snapshot, plan.Proposal) {
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "review", Message: "review token does not match the current validated update proposal"})
 		report.Message = "update was not applied; run a fresh update plan"
 		return report
@@ -277,6 +288,10 @@ func (m *UpdateManager) ApplyPlan(ctx context.Context, plan domain.UpdatePlanRep
 	report.Updated = true
 	report.RetrySafe = false
 	report.Message = "validated Nixorium release written to flake.nix and flake.lock; review and commit it separately before deployment"
+	if plan.Kind == "package-base" {
+		report.Operation = "package-base-apply"
+		report.Message = "validated system/package base saved; commit the reviewed files, activate and verify the controller, then distribute explicitly to clients"
+	}
 	return report
 }
 
@@ -285,6 +300,9 @@ func updateReviewToken(report domain.UpdatePlanReport, snapshot domain.UpdateInp
 	for _, content := range [][]byte{[]byte(report.Revision), []byte(report.Target), snapshot.FlakeContent, snapshot.LockContent, proposal.FlakeContent, proposal.LockContent} {
 		_, _ = digest.Write(content)
 		_, _ = digest.Write([]byte{0})
+	}
+	if report.Kind != "" {
+		fmt.Fprintf(digest, "%s\x00%t\x00%s\x00", report.Kind, report.AllowUnverified, report.Repository)
 	}
 	return fmt.Sprintf("sha256:%x", digest.Sum(nil))
 }

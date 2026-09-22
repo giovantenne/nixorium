@@ -437,6 +437,12 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.screen = dashboardUpdate
 		return model, nil
+	case dashboardPackageBaseMsg:
+		model.busy = ""
+		model.baseStatus = message.report
+		model.baseTarget = message.report.Channel
+		model.message = operationLogIssues(message.report.Issues)
+		return model, nil
 	case dashboardUpdatePlanProgressMsg:
 		if !model.updatePlanning || model.updatePlanEvents == nil {
 			return model, nil
@@ -845,6 +851,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	if key.String() == "shift+up" {
 		model.pageScroll = max(0, model.pageScroll-1)
 		return model, nil
+	}
+	if model.baseUpdate && model.baseEditing && model.screen == dashboardUpdate && model.busy == "" && key.String() != "ctrl+c" {
+		return model.updatePackageBaseKey(key)
 	}
 	if model.screen == dashboardHosts && model.hostSearching {
 		switch key.String() {

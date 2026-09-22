@@ -27,6 +27,11 @@ configuration, software, home customization, diagnostics, and operations.
   `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together when present.
   Updating Nixorium must preserve that package-base lock node. Do not change
   its channel or migrate a legacy layout implicitly.
+- Use `package-base status/plan/apply` or Maintenance → Update system and
+  packages for a separately authorized base refresh; see UPDATES.md. Channel
+  changes require explicit unverified-compatibility acceptance, not upstream
+  permission. Preserve every other lock node and `system.stateVersion`.
+  A successful build does not certify boot, hardware or application data.
 - Keep referenced modules, public keys, and assets inside the deployment tree
   for offline installation. Never commit private `secret-key`, `admin-ssh`,
   or `veyon-private-key.pem`, or expose them to the Nix store or chat.

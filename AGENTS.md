@@ -161,10 +161,14 @@ Release from the matching changelog section.
   `flake.nix` for managed updates. Never restore independently moving bootstrap
   downloads; see ADR 0018.
 - New deployment templates own the direct `nixpkgs` input and make Nixorium's
-  input follow it. `lib.packageBase` declares the compatible source/channel;
+  input follow it. `lib.packageBase` describes a reference source/channel;
   `Update Nixorium` must preserve the complete deployment-owned lock node.
   Legacy deployments remain readable and are never migrated implicitly; see
-  ADR 0019.
+  ADR 0019 and ADR 0020. `package-base` updates own only root nixpkgs, preserve
+  every other lock node, and require explicit unverified-channel acceptance.
+  Never bypass actual builds or change `system.stateVersion` automatically.
+  Keep docs/updates.md and templates/site/UPDATES.md identical. Runtime/hardware
+  certification is separate from build and offline-equivalence evidence.
 - `lab.deploymentMode` is optional (`laboratory` by default). Explicit
   `controller` mode requires zero clients, leaves lab networking/cache/remote
   control inactive, and permits local controller activation without lab keys.

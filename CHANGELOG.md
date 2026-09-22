@@ -8,6 +8,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Laboratories can update their NixOS/package base independently with
+  `package-base status/plan/apply` and Maintenance → Update system and packages.
+  Channel advice replaces the template's hard upstream-channel assertion;
+  migrations require explicit unverified-compatibility acceptance. Candidate
+  updates preserve every non-nixpkgs lock node, validate configured role variants
+  and offline installation equivalence, and reuse reviewed save/controller
+  recovery without automatically distributing to clients. Existing private
+  templates require reviewed adoption; see `docs/updates.md` and ADR 0020.
+
 - Configured-software navigation now sizes its viewport by rendered rows, keeps
   the focused package visible, summarizes long explicit-client scopes, and
   reports the visible range. Software removals use `REMOVE` rather than `SAVE`,

@@ -99,9 +99,11 @@ and NixOS policy can be added later under `assets/` and `modules/`.
 This template owns its `nixpkgs` pin directly. Nixorium and its Disko/Veyon
 inputs follow that same package base, so controller and client systems cannot
 drift onto a second implicit pin. `Update Nixorium` preserves the package-base
-lock node. Do not change `nixos-26.05` to another channel without an explicitly
-compatible Nixorium release and complete validation; a guided package-base
-update is not implemented yet.
+lock node. `Update system and packages` advances that base separately; changing
+channel requires an explicit target and acknowledgement of unverified runtime
+compatibility, not a new Nixorium release. Actual evaluation/build failures
+still block. See [UPDATES.md](UPDATES.md) for the complete TUI/CLI journey,
+one-time adoption for older deployments, independent packages and recovery.
 
 ## Local customization
 
@@ -116,6 +118,8 @@ update is not implemented yet.
 - `modules/screensaver.nix`: optional Ghostty/TTE screensaver
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `hostModules` in `flake.nix`: individual hosts
+- `updateValidationHosts` in `mkLab`: extra validation hosts when private shared
+  modules branch on host identity (explicit host modules are already covered)
 - `assets/logo.txt`: screensaver logo
 
 These files are the lab's workstation profile. They are intentionally part of

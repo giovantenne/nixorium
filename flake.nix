@@ -82,8 +82,14 @@
         settingsSchemaVersion = 1;
         softwareSchemaVersion = 1;
         packageBase = {
+          schemaVersion = 2;
           source = "github:NixOS/nixpkgs";
+          # Recommendation, not permission to evaluate a deployment-owned pin.
           channel = "nixos-26.05";
+          # Read upstream's own lock: a downstream follows override must not
+          # masquerade as the revision used by the upstream source tree.
+          referenceRevision = let lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+            in lock.nodes.${lock.nodes.${lock.root}.inputs.nixpkgs}.locked.rev;
         };
         evalLabSettings = import ./lib/eval-lab-settings.nix {
           inherit (nixpkgs) lib;

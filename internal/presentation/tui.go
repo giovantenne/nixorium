@@ -45,6 +45,9 @@ type DashboardActions struct {
 	PlanUpdate             func(string, bool, bool) domain.UpdatePlanReport
 	PlanUpdateWithProgress func(string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
 	SaveUpdate             func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadPackageBase        func() domain.PackageBaseStatus
+	PlanPackageBase        func(string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	SavePackageBase        func(domain.UpdatePlanReport) domain.UpdateApplyReport
 	LoadSettings           func() (domain.LabSettingsFile, error)
 	PlanSettings           func(domain.LabSettingsFile) domain.ConfigPlanReport
 	SaveSettings           func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
@@ -165,6 +168,11 @@ type dashboardModel struct {
 	gitCommitPlan          domain.GitCommitPlanReport
 	gitCommitResult        domain.GitCommitReport
 	updateCheck            domain.UpdateCheckReport
+	baseUpdate             bool
+	baseStatus             domain.PackageBaseStatus
+	baseEditing            bool
+	baseTarget             string
+	baseAllowUnverified    bool
 	updateCursor           int
 	updateTarget           string
 	updatePrerelease       bool
@@ -1241,8 +1249,8 @@ func maximumGitCommitPlanScroll(report domain.GitCommitPlanReport, height int) i
 }
 
 func (model dashboardModel) updateView() string {
-	path := []string{"Maintenance", "Update Nixorium"}
-	lines := []string{tuiTitle("Update Nixorium", model.isDark), ""}
+	path := []string{"Maintenance", model.updateTitle()}
+	lines := []string{tuiTitle(model.updateTitle(), model.isDark), ""}
 	if model.busy != "" {
 		if model.updatePlanning {
 			lines = append(lines,
@@ -1261,6 +1269,9 @@ func (model dashboardModel) updateView() string {
 				elapsed = 0
 			}
 			model.busy = updatePlanProgressDescription(model.updatePlanProgress)
+			if model.baseUpdate && model.updatePlanProgress.Phase == domain.UpdatePlanPhaseLock {
+				model.busy = "Preparing the selected system and package base"
+			}
 			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 			if model.updatePlanProgress.Total > 0 {
 				lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updatePlanProgress.Current, model.updatePlanProgress.Total))
@@ -1282,6 +1293,12 @@ func (model dashboardModel) updateView() string {
 		if success {
 			title = "Nixorium and this controller are updated"
 		}
+		if model.baseUpdate {
+			title = "System update needs attention"
+			if success {
+				title = "Controller configuration activated and verified"
+			}
+		}
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
 			"",
@@ -1291,9 +1308,13 @@ func (model dashboardModel) updateView() string {
 			fmt.Sprintf("Controller activated and verified: %t", success),
 			"Client computers are unchanged until you distribute the prepared system.",
 		)
-		if success {
+		if success && model.baseUpdate {
+			lines = append(lines, "Check boot, networking, desktop and services before client distribution; a reboot may be needed.")
+		} else if success {
 			lines = append(lines, "Reopen Nixorium to use the updated interface.")
-		} else if model.updateResult.Updated {
+		} else if model.updateResult.RecoveryRequired {
+			lines = append(lines, "Files were written but saving needs recovery. Complete the save before controller activation.")
+		} else if model.updateResult.Updated && !model.updateResult.HasErrors() {
 			lines = append(lines, "The update is saved safely. Retry controller activation after resolving the detail below.")
 		}
 		notices := []tuiNotice{}
@@ -1305,7 +1326,7 @@ func (model dashboardModel) updateView() string {
 			retryLabel = "Complete save"
 		}
 		actions := []tuiAction{}
-		if model.updateResult.Updated && !success {
+		if model.updateResult.Updated && !model.updateResult.HasErrors() && !model.updateResult.RecoveryRequired && !success {
 			actions = append(actions, tuiAction{key: "a", label: "Retry controller"})
 		}
 		actions = append(actions, tuiAction{key: "r", label: retryLabel}, tuiAction{key: "Enter", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
@@ -1313,6 +1334,9 @@ func (model dashboardModel) updateView() string {
 	}
 	if model.screen == dashboardUpdateReview {
 		return model.releaseReviewView()
+	}
+	if model.baseUpdate {
+		return model.packageBaseView()
 	}
 	if model.updateCheck.HasErrors() {
 		failureTitle, failureDetail := updateCheckFailureSummary(model.updateCheck)
@@ -1527,6 +1551,9 @@ func (model dashboardModel) updateReviewHeight() int {
 		return 10
 	}
 	height := model.height - 21
+	if model.baseUpdate {
+		height -= 4
+	}
 	if model.updateDetails {
 		height -= len(model.updatePlan.Checks) + 2
 	}

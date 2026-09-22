@@ -8,9 +8,6 @@
   outputs = { self, nixpkgs, nixorium }:
     let
       packageBase = nixorium.lib.packageBase;
-      packageBaseCompatible =
-        packageBase.source == "github:NixOS/nixpkgs"
-        && packageBase.channel == "nixos-26.05";
       # deploymentMode is optional: existing deployments remain laboratories.
       # Explicit controller mode requires pcCount = 0 (see README).
       labConfig = nixorium.lib.evalLabSettings
@@ -21,8 +18,6 @@
         # graphics = [ "pc01" "pc02" ];
       };
       mkDeployment = candidateLabConfig: candidateLabSoftware:
-        assert packageBaseCompatible
-          || throw "The configured nixpkgs pin is not compatible with this Nixorium release";
         nixorium.lib.mkLab {
           deploymentSelf = self;
           labConfig = candidateLabConfig;
@@ -90,9 +85,13 @@
     in
     deployment // {
       nixoriumPackageBase = {
-        schemaVersion = 1;
-        inherit (packageBase) source channel;
+        schemaVersion = 2;
+        # Support advice is distinct from the effective locked input.
+        support = packageBase;
         revision = nixpkgs.rev or "";
+        narHash = nixpkgs.narHash or "";
+        # Read source/channel from the root declaration AND lock using
+        # package-base status; flake sourceInfo need not retain a channel ref.
       };
       # Machine-facing validation hook used before lab-settings.json is written.
       nixoriumValidateCandidate = validateCandidate;

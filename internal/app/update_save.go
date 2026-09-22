@@ -38,6 +38,9 @@ func (m UpdateSaveManager) Save(ctx context.Context, plan domain.UpdatePlanRepor
 		report.Message = "The reviewed update is no longer ready; validate the release again."
 		return report
 	}
+	if m.update.packageBase != (plan.Kind == "package-base") || plan.ReviewToken != updateReviewToken(plan, plan.Snapshot, plan.Proposal) {
+		return updateSaveIssue(report, "review", "The proposal changed after review; validate it again.")
+	}
 
 	review := m.review.Review(ctx, plan.Repository)
 	if review.HasErrors() {
@@ -55,6 +58,9 @@ func (m UpdateSaveManager) Save(ctx context.Context, plan domain.UpdatePlanRepor
 	}
 
 	if targetChanged {
+		if head, err := m.source.GitRevision(ctx, plan.Repository); err != nil || head != plan.Revision {
+			return updateSaveIssue(report, "review", "Deployment HEAD changed after review; inspect the pending save before retrying.")
+		}
 		current, err := m.source.InspectUpdateInput(plan.Repository)
 		if err != nil || !updateProposalIsCurrent(current, plan.Proposal) {
 			return updateSaveIssue(report, "storage", "The update files differ from the reviewed proposal; resolve them in Advanced and validate the release again.")
@@ -83,6 +89,9 @@ func (m UpdateSaveManager) Save(ctx context.Context, plan domain.UpdatePlanRepor
 	report.State = "saved"
 	report.RetrySafe = false
 	report.Message = "Nixorium update saved locally. Running systems were not changed."
+	if plan.Kind == "package-base" {
+		report.Message = "System and package update saved locally. Running systems were not changed."
+	}
 	return report
 }
 

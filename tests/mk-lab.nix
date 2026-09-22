@@ -120,6 +120,12 @@ let
   clientGnomeRemoteDesktop = subnetLab.nixosConfigurations.pc01.pkgs.gnome-remote-desktop;
 in
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
+assert controllerOnlyLab.nixoriumUpdateTargets == [ "pc99" ];
+assert subnetLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];
+assert builtins.elem "pc02" nativeVeyonLab.nixoriumUpdateTargets;
+assert builtins.elem "pc02" softwareLab.nixoriumUpdateTargets;
+assert (mkLab (baseArgs // { updateValidationHosts = [ "pc03" ]; })).nixoriumUpdateTargets == [ "pc99" "pc01" "pc03" ];
+assert controllerOnlyLab.nixoriumOfflineCheck.drvPath != "";
 assert controllerOnlyLab.labMeta.controller.staticIp == "";
 assert controllerOnlyLab.labMeta.clients.count == 0;
 assert controllerOnlyLab.labMeta.clients.hosts == [];

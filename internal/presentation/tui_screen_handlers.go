@@ -78,6 +78,7 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 			return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
 		}
 	case "u":
+		model.baseUpdate = false
 		model.screen = dashboardUpdate
 		model.updateResult = domain.UpdateApplyReport{}
 		model.controllerPlan = domain.ControllerRebuildPlanReport{}
@@ -94,6 +95,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		}
 		model.busy = "Fetching available Nixorium updates"
 		return model, model.checkUpdates()
+	case "b":
+		return model.openPackageBase()
 	case "e":
 		model.screen = dashboardSettings
 		model.settingsReturn = dashboardAdministration
@@ -1070,23 +1073,29 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 					model.message = ""
 					plan := model.updatePlan
 					return model, func() tea.Msg {
-						return dashboardUpdateResultMsg{report: model.actions.SaveUpdate(plan)}
+						return dashboardUpdateResultMsg{report: model.saveReviewedUpdate(plan)}
 					}
 				}
 				model.updateResult = domain.UpdateApplyReport{}
 				model.updateCheck = domain.UpdateCheckReport{}
 				model.updateTarget = ""
 				model.message = ""
+				if model.baseUpdate {
+					return model.openPackageBase()
+				}
 				if model.actions.CheckUpdate != nil {
 					model.busy = "Fetching available Nixorium updates"
 					return model, model.checkUpdates()
 				}
 			case "a":
-				if model.updateResult.Updated {
+				if model.updateResult.Updated && !model.updateResult.HasErrors() && !model.updateResult.RecoveryRequired {
 					return model.startUpdateControllerApply()
 				}
 			}
 			return model, nil
+		}
+		if model.baseUpdate {
+			return model.updatePackageBaseKey(key)
 		}
 		switch key.String() {
 		case "esc":
@@ -1172,12 +1181,12 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				model.updateScroll = maximum
 			}
 		case "enter":
-			model.busy = "Saving the validated Nixorium release update"
+			model.busy = "Saving the validated update"
 			model.updating = true
 			model.message = ""
 			plan := model.updatePlan
 			return model, func() tea.Msg {
-				return dashboardUpdateResultMsg{report: model.actions.SaveUpdate(plan)}
+				return dashboardUpdateResultMsg{report: model.saveReviewedUpdate(plan)}
 			}
 		}
 	default:

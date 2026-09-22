@@ -53,6 +53,9 @@ describes the site; the controller supplies the systems over the local network.
   while retaining up to five local home snapshots.
 - Private, deployment-owned software presets, assets, and extension modules,
   separate from the reusable public framework.
+- Independent, reviewed framework and NixOS/package-base updates, including
+  explicitly acknowledged channel migrations. See [the update guide](docs/updates.md)
+  for validation, deployment adoption and recovery.
 - Reviewed operations with progress and failure reporting, plus recorded PXE
   network state for explicit recovery and recovery at boot.
 
@@ -211,6 +214,7 @@ the versioned operational and contributor references.
 | Understand the management interface | [TUI tour and renders](docs/tui-renders.md) |
 | Diagnose a failure or restore a backup | [Troubleshooting](docs/troubleshooting.md) |
 | Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
+| Update the core, NixOS or packages; adopt older deployments | [Update and recovery guide](docs/updates.md) |
 | Understand architecture and security | [Management architecture](docs/management-architecture.md), [ADRs](docs/adr/) |
 | Report a suspected vulnerability | [Security policy](SECURITY.md) |
 | Review operator responsibilities and limitations | [Operational disclaimer](DISCLAIMER.md) |

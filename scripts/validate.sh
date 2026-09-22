@@ -72,6 +72,7 @@ bash tests/controller-bootstrap.sh
 bash tests/controller-installer.sh
 diff -qr skills/nixorium-maintainer templates/site/skills/nixorium-maintainer
 diff -u docs/troubleshooting.md templates/site/TROUBLESHOOTING.md
+diff -u docs/updates.md templates/site/UPDATES.md
 test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md
 test -e .pi/skills/nixorium-developer/SKILL.md
@@ -104,6 +105,7 @@ run_full_checks() {
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer" \
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm" \
     "path:${REPO_ROOT}#checks.x86_64-linux.management-vm" \
+    "path:${REPO_ROOT}#nixoriumOfflineCheck" \
     --no-write-lock-file \
     --no-link
 }
@@ -167,6 +169,8 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#packages.x86_64-linux.nixorium.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#colmena.pc01.deployment.targetHost" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#deploymentStatus" --json --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#nixoriumUpdateTargets" --json --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#nixoriumOfflineCheck.drvPath" --raw --no-write-lock-file >/dev/null
 else
   nix build \
     "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel" \
