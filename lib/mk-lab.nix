@@ -9,6 +9,7 @@ args@{
   controllerModules ? [],
   clientModules ? [],
   hostModules ? {},
+  updateValidationHosts ? [],
   labSoftware ? { schemaVersion = 1; packages = []; },
   softwareCatalog ? [],
   clientGroups ? {},
@@ -301,6 +302,12 @@ let
   validClientNames = map (n: "pc${padNumber n}") pcNumbers;
   validHostNames = validClientNames ++ [ masterHostName ];
   unknownHostModuleNames = builtins.attrNames (builtins.removeAttrs hostModules validHostNames);
+  updateClientVariants = lib.groupBy (name: builtins.toJSON {
+    packages = lib.sort builtins.lessThan (lib.unique (map (entry: entry.package)
+      (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages)));
+    nativeVeyon = builtins.elem name veyonNativeHosts;
+    interface = ifaceForHost name;
+  }) validClientNames;
   unknownVeyonNativeHosts = builtins.filter (name: !builtins.elem name validHostNames) veyonNativeHosts;
   defaultPasswordHash = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
   credentialIssues =
@@ -489,6 +496,7 @@ let
           controllerModules = ${renderPathList controllerModules};
           clientModules = ${renderPathList clientModules};
           hostModules = ${renderHostModules};
+          updateValidationHosts = builtins.fromJSON ${builtins.toJSON (builtins.toJSON updateValidationHosts)};
           netbootModules = ${renderPathList netbootModules};
           installerSource = self;
           nixosVersionMetadata = {
@@ -589,11 +597,14 @@ assert builtins.isList softwareCatalog
   || throw "mkLab softwareCatalog must be a list";
 assert builtins.length softwareCatalogIds == builtins.length (lib.unique softwareCatalogIds)
   || throw "mkLab softwareCatalog contains duplicate ids";
+assert builtins.isList updateValidationHosts && builtins.all
+  (name: builtins.isString name && builtins.elem name validHostNames) updateValidationHosts
+  || throw "updateValidationHosts must contain configured host names";
 assert unknownHostModuleNames == []
   || throw "hostModules contains unknown hosts: ${builtins.concatStringsSep ", " unknownHostModuleNames}";
 assert unknownVeyonNativeHosts == []
   || throw "veyonNativeHosts contains unknown hosts: ${builtins.concatStringsSep ", " unknownVeyonNativeHosts}";
-{
+rec {
   nixosConfigurations = builtins.listToAttrs (map mkHost pcNumbers) // {
     ${masterHostName} = nixpkgs.lib.nixosSystem {
       inherit system;
@@ -636,6 +647,41 @@ assert unknownVeyonNativeHosts == []
   };
 
   inherit labMeta;
+
+  # Build each materially different graph, not repeated identical client roles.
+  # Private modules branching on hostName must declare extra validation hosts.
+  nixoriumUpdateTargets = lib.unique (
+    [ masterHostName ]
+    ++ lib.optional (validClientNames != []) (builtins.head validClientNames)
+    ++ builtins.attrNames hostModules
+    ++ map builtins.head (builtins.attrValues updateClientVariants)
+    ++ updateValidationHosts
+  );
+
+  # Build-time offline evaluation avoids import-from-derivation. Compare every
+  # selected role with the self-contained installer, using its exact sources.
+  nixoriumOfflineCheck = bootstrapPkgs.runCommand "nixorium-offline-equivalence" {
+    nativeBuildInputs = [ bootstrapPkgs.nix ];
+    expected = builtins.toJSON (builtins.listToAttrs (map (name: {
+      inherit name;
+      # These are comparison strings, not build inputs. Keeping .drv context
+      # would pull the entire build-time source closure into this check.
+      value = builtins.unsafeDiscardStringContext nixosConfigurations.${name}.config.system.build.toplevel.drvPath;
+    }) nixoriumUpdateTargets));
+    passAsFile = [ "expected" ];
+  } ''
+    export XDG_CACHE_HOME="$TMPDIR/cache"
+    mkdir -p "$XDG_CACHE_HOME"
+    export NIX_CONFIG="experimental-features = nix-command flakes"
+    nix eval --offline --store "$TMPDIR/nix" --no-write-lock-file --impure --json \
+      --expr 'let f = builtins.getFlake "path:${installerBundle}"; in
+        builtins.mapAttrs (name: _: f.nixosConfigurations.''${name}.config.system.build.toplevel.drvPath)
+          (builtins.fromJSON (builtins.readFile ${builtins.toJSON (bootstrapPkgs.writeText "update-targets.json" (builtins.toJSON (builtins.listToAttrs (map (name: { inherit name; value = true; }) nixoriumUpdateTargets))))}))' > actual.json
+    ${bootstrapPkgs.jq}/bin/jq -S . "$expectedPath" > expected.json
+    ${bootstrapPkgs.jq}/bin/jq -S . actual.json > actual-sorted.json
+    diff -u expected.json actual-sorted.json
+    touch "$out"
+  '';
 
   nixoriumSoftware = {
     schemaVersion = 1;

@@ -240,6 +240,10 @@ func (Local) PrepareUpdateWithProgress(ctx context.Context, repository, target s
 		return domain.UpdateProposal{}, fmt.Errorf("validate candidate package-base pin: %w", err)
 	}
 	common := []string{"--override-input", "nixorium", targetURL, "--reference-lock-file", lockPath, "--no-write-lock-file"}
+	return validateUpdateCandidate(ctx, flake, common, snapshot, proposedFlake, proposedLock, progress, false)
+}
+
+func validateUpdateCandidate(ctx context.Context, flake string, common []string, snapshot domain.UpdateInputSnapshot, proposedFlake, proposedLock []byte, progress func(domain.UpdatePlanProgress), packageBase bool) (domain.UpdateProposal, error) {
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Evaluating candidate laboratory metadata", 0, 0)
 	metaOutput, err := runBoundedNix(ctx, 1024*1024, append([]string{"eval", flake + "#labMeta", "--json"}, common...)...)
 	if err != nil {
@@ -261,6 +265,34 @@ func (Local) PrepareUpdateWithProgress(ctx context.Context, repository, target s
 	builds, checks, err := updateCandidateChecks(meta, status)
 	if err != nil {
 		return domain.UpdateProposal{}, err
+	}
+	if packageBase {
+		output, err := runBoundedNix(ctx, 256*1024, append([]string{"eval", flake + "#nixoriumUpdateTargets", "--json"}, common...)...)
+		if err != nil {
+			return domain.UpdateProposal{}, fmt.Errorf("deployment needs the autonomous-update outputs; see the deployment migration guide: %w", err)
+		}
+		var targets []string
+		if err := json.Unmarshal([]byte(output), &targets); err != nil || len(targets) == 0 || len(targets) > 256 {
+			return domain.UpdateProposal{}, errors.New("invalid deployment update targets")
+		}
+		allowed := map[string]bool{meta.Controller.Name: true}
+		for _, host := range meta.Clients.Hosts {
+			allowed[host.Name] = true
+		}
+		seen := map[string]bool{meta.Controller.Name: true}
+		if len(meta.Clients.Hosts) > 0 {
+			seen[meta.Clients.Hosts[0].Name] = true
+		}
+		for _, host := range targets {
+			if !allowed[host] {
+				return domain.UpdateProposal{}, fmt.Errorf("unknown update target %q", host)
+			}
+			if !seen[host] {
+				builds = append(builds, updateCandidateBuild{"host-" + host, "nixosConfigurations." + host + ".config.system.build.toplevel"})
+				seen[host] = true
+			}
+		}
+		builds = append(builds, updateCandidateBuild{"offline-equivalence", "nixoriumOfflineCheck"})
 	}
 	for index, build := range builds {
 		emitUpdateProgress(progress, domain.UpdatePlanPhaseBuild, "Building "+updateBuildLabel(build.id), index+1, len(builds))

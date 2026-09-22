@@ -39,6 +39,12 @@ plan/apply workflows with mandatory build-first ordering, streamed/private
 logs, explicit retry state, and bounded typed log browsing. Updates and richer
 recovery are now implemented through bounded update discovery, reviewed
 plan/apply, fail-visible two-file recovery, and the shared CLI/TUI operations.
+System/package-base updates have a separate input adapter and policy while
+sharing the reviewed storage and controller workflow. They preserve every
+non-nixpkgs lock node and require explicit acknowledgement for channel changes.
+Compatibility advice never authorizes bypassing evaluation/build failures;
+see [ADR 0020](adr/0020-autonomous-package-base-updates.md) and
+[the complete operator journey](updates.md).
 Guided software changes now use a curated pinned catalog, evaluated client
 scopes, candidate validation, and a token-bound atomic `lab-software.json`
 writer; Git recording and client deployment remain separate operations.
@@ -311,6 +317,7 @@ Actions
   Diagnose a problem
   Change settings
   Update Nixorium
+  Update system and packages
   Advanced services and logs
 ```
 

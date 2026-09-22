@@ -106,7 +106,11 @@ func ConfirmGitCommit(input io.Reader, output io.Writer, report domain.GitCommit
 }
 
 func ConfirmUpdate(input io.Reader, output io.Writer, report domain.UpdatePlanReport) (bool, error) {
-	fmt.Fprintln(output, "Nixorium release update review")
+	if report.Kind == "package-base" {
+		fmt.Fprintln(output, "System and package update review (runtime compatibility unverified)")
+	} else {
+		fmt.Fprintln(output, "Nixorium release update review")
+	}
 	fmt.Fprintf(output, "Current: %s (%s)\n", report.CurrentRef, report.CurrentRev)
 	fmt.Fprintf(output, "Target: %s (%s)\n", report.Target, report.TargetChannel)
 	fmt.Fprintln(output, "Action: replace only flake.nix and flake.lock with the validated proposal")

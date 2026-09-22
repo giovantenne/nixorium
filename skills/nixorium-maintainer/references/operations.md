@@ -276,6 +276,22 @@ and builds/activates the controller after Enter confirmation. Client distributio
 remains separate. Inspect the active deployment's capabilities and the current
 review; do not mistake this TUI path for a configuration-only operation.
 
+System/package updates are separate: inspect `nixorium package-base status`,
+then `package-base plan` to advance the current channel. A new stable channel
+requires `--target nixos-YY.MM --allow-unverified` in both plan and apply;
+apply also requires `--expect REVIEW_TOKEN`. These plans preserve every other
+lock node, validate controller/client variants and offline installer equivalence,
+and refuse ambiguous/legacy source layouts. The TUI Maintenance → Update
+system and packages task exposes the same operation and shared save/controller
+recovery. Build success does not prove reboot, hardware, Veyon or data migration.
+Verify a canary client before explicit fleet distribution; refresh PXE artifacts
+before new installations. Do not change `system.stateVersion` or bypass a
+failed build. Older private templates need a reviewed adoption, never an
+automatic rewrite; see the deployment's UPDATES.md (upstream docs/updates.md).
+A framework update may change its own patches/packages despite fixed nixpkgs.
+Declare `mkLab.updateValidationHosts` for private host-conditional variants;
+explicit host modules, scoped software, interface and Veyon variants are covered.
+
 For an unsupported computed input, create a temporary upgrade branch, change
 `inputs.nixorium.url` to the chosen released tag, and update only that input:
 

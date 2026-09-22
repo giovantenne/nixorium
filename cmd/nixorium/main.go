@@ -43,6 +43,7 @@ type options struct {
 	yes                bool
 	allowPrerelease    bool
 	allowDowngrade     bool
+	allowUnverified    bool
 	acknowledgeUnknown bool
 	remove             bool
 }
@@ -198,6 +199,32 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 		} else {
 			return runGitCommitApply(ctx, app.NewGitCommitManager(local), repository, stdout, stderr, options.paths, options.expect, options.yes, options.json)
+		}
+	case "package-base":
+		manager := app.NewPackageBaseManager(adapters.PackageBase{})
+		switch options.subcommand {
+		case "status":
+			report := manager.PackageBaseStatus(repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.PackageBaseStatusText(stdout, report)
+			}
+			if len(report.Issues) > 0 {
+				return 1
+			}
+		case "plan":
+			report := manager.Plan(ctx, repository, options.target, options.allowUnverified, false)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.UpdatePlanText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		case "apply":
+			return runUpdateApply(ctx, manager, repository, stdout, stderr, options.target, options.expect, options.allowUnverified, false, options.yes, options.json)
 		}
 	case "update":
 		manager := app.NewUpdateManager(local)
@@ -497,16 +524,28 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	gitReviewManager := app.NewGitReviewManager(local)
 	gitCommitManager := app.NewGitCommitManager(local)
 	updateManager := app.NewUpdateManager(local)
+	baseSource := adapters.PackageBase{}
+	baseManager := app.NewPackageBaseManager(baseSource)
 	settingsManager := app.NewSettingsManager(local)
 	settingsSaveManager := app.NewSettingsSaveManager(settingsManager, gitReviewManager, gitCommitManager)
 	configurationSaveManager := app.NewManagedConfigurationSaveManager(gitReviewManager, gitCommitManager)
 	updateSaveManager := app.NewUpdateSaveManager(updateManager, local, gitReviewManager, configurationSaveManager)
+	baseSaveManager := app.NewUpdateSaveManager(baseManager, baseSource, gitReviewManager, configurationSaveManager)
 	softwareManager := app.NewSoftwareManager(local)
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
-		RunningVersion: nixoriumVersion,
+		RunningVersion:  nixoriumVersion,
+		LoadPackageBase: func() domain.PackageBaseStatus { return baseManager.PackageBaseStatus(repository) },
+		PlanPackageBase: func(target string, allowUnverified bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+			return baseManager.PlanWithProgress(ctx, repository, target, allowUnverified, false, progress)
+		},
+		SavePackageBase: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
+			report := baseSaveManager.Save(ctx, plan)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
 		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
 			setup := setupManager.Status(ctx, repository)
 			if setupMode || setupStartsBeforeDashboardInspection(setup) {
@@ -800,6 +839,8 @@ func parseArguments(arguments []string) (options, error) {
 			result.allowPrerelease = true
 		case "--allow-downgrade":
 			result.allowDowngrade = true
+		case "--allow-unverified":
+			result.allowUnverified = true
 		case "--acknowledge-unknown-sessions":
 			result.acknowledgeUnknown = true
 		case "--json":
@@ -813,7 +854,7 @@ func parseArguments(arguments []string) (options, error) {
 		case "-h", "--help", "help":
 			result.help = true
 		case "status":
-			if result.command == "setup" && result.subcommand == "" {
+			if (result.command == "setup" || result.command == "package-base") && result.subcommand == "" {
 				result.subcommand = "status"
 				continue
 			}
@@ -821,7 +862,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "software", "shutdown":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "shutdown":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -851,7 +892,7 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "commit-plan"
 				continue
 			}
-			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "software" && result.command != "shutdown") || result.subcommand != "" {
+			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "shutdown") || result.subcommand != "" {
 				return options{}, errors.New("plan must follow config, deploy, controller, update, software, shutdown, or git commit")
 			}
 			result.subcommand = "plan"
@@ -875,7 +916,7 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "commit-apply"
 				continue
 			}
-			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software" || result.command == "shutdown") && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
@@ -932,7 +973,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
 		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, shutdown apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
@@ -947,7 +988,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
 		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, shutdown apply, or git commit apply")
 	}
 	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown") || (result.subcommand != "plan" && result.subcommand != "apply")) {
@@ -962,7 +1003,16 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "update" && result.subcommand != "check" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("update requires the check, plan, or apply subcommand")
 	}
-	if result.target != "" && (result.command != "update" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+	if result.command == "package-base" && result.subcommand != "status" && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, errors.New("package-base requires status, plan or apply")
+	}
+	if result.allowUnverified && (result.command != "package-base" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--allow-unverified is only valid with package-base plan/apply")
+	}
+	if result.command == "package-base" && result.subcommand == "apply" && result.expect == "" {
+		return options{}, errors.New("package-base apply requires --expect from a reviewed plan")
+	}
+	if result.target != "" && ((result.command != "update" && result.command != "package-base") || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--target is only valid with update plan or update apply")
 	}
 	if (result.allowPrerelease || result.allowDowngrade) && (result.command != "update" || (result.subcommand != "plan" && result.subcommand != "apply")) {
@@ -1141,6 +1191,10 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       update check explicitly queries the configured public upstream")
 	fmt.Fprintln(writer, "       update plan --target <vMAJOR.MINOR.PATCH[-PRERELEASE]>")
 	fmt.Fprintln(writer, "       update apply --target <release> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       package-base status shows the effective deployment-owned system/package pin")
+	fmt.Fprintln(writer, "       package-base plan [--target <nixos-YY.MM>] [--allow-unverified]")
+	fmt.Fprintln(writer, "       package-base apply [--target <nixos-YY.MM>] [--allow-unverified] --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       channel changes require --allow-unverified; apply saves files only, never activates machines")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")

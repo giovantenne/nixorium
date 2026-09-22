@@ -213,7 +213,15 @@ func GitCommitText(writer io.Writer, report domain.GitCommitReport) {
 }
 
 func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
-	fmt.Fprintf(writer, "Nixorium update plan: %s\n", strings.ToUpper(report.State))
+	title := "Nixorium update plan"
+	if report.Kind == "package-base" {
+		title = "System and package update plan"
+	}
+	fmt.Fprintf(writer, "%s: %s\n", title, strings.ToUpper(report.State))
+	if report.PackageBase != nil {
+		base := report.PackageBase
+		fmt.Fprintf(writer, "Package base: %s\n%s (%s) -> %s (%s)\n%s\n", base.Source, base.CurrentChannel, base.CurrentRevision, base.TargetChannel, base.TargetRevision, base.Validation)
+	}
 	fmt.Fprintf(writer, "Repository:       %s\n", report.Repository)
 	if report.Revision != "" {
 		fmt.Fprintf(writer, "Deployment HEAD:  %s\n", report.Revision)
@@ -239,6 +247,14 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 			fmt.Fprintln(writer)
 		}
 	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
+	}
+}
+
+func PackageBaseStatusText(writer io.Writer, report domain.PackageBaseStatus) {
+	fmt.Fprintf(writer, "System and packages: %s\nChannel: %s\nLocked revision: %s\n", report.Source, report.Channel, report.Revision)
+	fmt.Fprintln(writer, "Package versions come from this pin. Rebuilding alone does not refresh it.")
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
 	}

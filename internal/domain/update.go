@@ -59,6 +59,26 @@ type UpdateProposal struct {
 	LockContent  []byte
 	Diff         GitDiff
 	Checks       []UpdateCheck
+	PackageBase  *PackageBaseChange
+}
+
+// PackageBaseChange reports observed pins, not a certification of runtime compatibility.
+type PackageBaseChange struct {
+	Source          string `json:"source"`
+	CurrentChannel  string `json:"currentChannel"`
+	CurrentRevision string `json:"currentRevision"`
+	TargetChannel   string `json:"targetChannel"`
+	TargetRevision  string `json:"targetRevision"`
+	Validation      string `json:"validation"`
+}
+
+type PackageBaseStatus struct {
+	Operation  string            `json:"operation"`
+	Repository string            `json:"repository"`
+	Source     string            `json:"source"`
+	Channel    string            `json:"channel"`
+	Revision   string            `json:"revision"`
+	Issues     []ValidationIssue `json:"issues"`
 }
 
 type UpdateCheck struct {
@@ -86,25 +106,28 @@ type UpdatePlanProgress struct {
 }
 
 type UpdatePlanReport struct {
-	SchemaVersion  int                 `json:"schemaVersion"`
-	Operation      string              `json:"operation"`
-	GeneratedAt    time.Time           `json:"generatedAt"`
-	State          string              `json:"state"`
-	Repository     string              `json:"repository"`
-	Revision       string              `json:"revision,omitempty"`
-	CurrentRef     string              `json:"currentRef,omitempty"`
-	CurrentRev     string              `json:"currentRevision,omitempty"`
-	CurrentChannel UpdateChannel       `json:"currentChannel,omitempty"`
-	Target         string              `json:"target,omitempty"`
-	TargetChannel  UpdateChannel       `json:"targetChannel,omitempty"`
-	Downgrade      bool                `json:"downgrade"`
-	ReviewToken    string              `json:"reviewToken,omitempty"`
-	Confirmation   string              `json:"confirmation,omitempty"`
-	Diff           GitDiff             `json:"diff"`
-	Checks         []UpdateCheck       `json:"checks"`
-	Issues         []ValidationIssue   `json:"issues"`
-	Snapshot       UpdateInputSnapshot `json:"-"`
-	Proposal       UpdateProposal      `json:"-"`
+	Kind            string              `json:"kind,omitempty"`
+	AllowUnverified bool                `json:"allowUnverified,omitempty"`
+	PackageBase     *PackageBaseChange  `json:"packageBase,omitempty"`
+	SchemaVersion   int                 `json:"schemaVersion"`
+	Operation       string              `json:"operation"`
+	GeneratedAt     time.Time           `json:"generatedAt"`
+	State           string              `json:"state"`
+	Repository      string              `json:"repository"`
+	Revision        string              `json:"revision,omitempty"`
+	CurrentRef      string              `json:"currentRef,omitempty"`
+	CurrentRev      string              `json:"currentRevision,omitempty"`
+	CurrentChannel  UpdateChannel       `json:"currentChannel,omitempty"`
+	Target          string              `json:"target,omitempty"`
+	TargetChannel   UpdateChannel       `json:"targetChannel,omitempty"`
+	Downgrade       bool                `json:"downgrade"`
+	ReviewToken     string              `json:"reviewToken,omitempty"`
+	Confirmation    string              `json:"confirmation,omitempty"`
+	Diff            GitDiff             `json:"diff"`
+	Checks          []UpdateCheck       `json:"checks"`
+	Issues          []ValidationIssue   `json:"issues"`
+	Snapshot        UpdateInputSnapshot `json:"-"`
+	Proposal        UpdateProposal      `json:"-"`
 }
 
 func (r UpdatePlanReport) HasErrors() bool {

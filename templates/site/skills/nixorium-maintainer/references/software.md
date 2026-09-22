@@ -49,7 +49,11 @@ If the target is unavailable offline, report that instead of guessing.
 Updating Nixorium is not an application update strategy: new deployments own
 their `nixpkgs` input independently. A `nixpkgs` lock update can change many
 packages; explain that impact and obtain approval for a broad refresh.
-Do not change its compatible channel implicitly. For a one-application request,
+Use `package-base plan/apply` or Maintenance → Update system and packages for
+a separately approved broad refresh. Channel migration requires an explicit
+target and `--allow-unverified`; support metadata is advice, not permission.
+Build and offline checks still block; do not raise `system.stateVersion`.
+Do not change its channel implicitly. For a one-application request,
 consider a deployment-local pinned override with verified source hashes and
 dependencies if feasible; do not promise that an arbitrary newer version builds.
 

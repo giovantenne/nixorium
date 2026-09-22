@@ -2,6 +2,10 @@
 
 Status: Accepted
 
+The hard channel gate and deferred updater described below are superseded by
+[ADR 0020](0020-autonomous-package-base-updates.md). Pin ownership and framework
+update isolation remain in effect.
+
 ## Context
 
 Nixorium previously owned the only `nixpkgs` input. A private deployment could

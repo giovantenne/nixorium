@@ -180,7 +180,11 @@ func (model dashboardModel) helpView() string {
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
 		lines = append(lines, "c select commit paths   Space select   a all safe paths", "f refresh review   ↑/↓/pg scroll patch", "Exact confirmation creates a local commit; nothing is pushed.")
 	case dashboardUpdate, dashboardUpdateReview:
-		lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation prepares the selected version, checks the lab configuration and tests required systems without saving it.", "On the review, Enter saves and activates; Esc cancels.", "After result: r new update")
+		if model.baseUpdate {
+			lines = append(lines, "Enter check current channel   m change channel   r inspect pin", "In the channel form, type nixos-YY.MM and Space to acknowledge unverified compatibility.", "Review/build precedes saving and controller activation. Client distribution is separate.", "Build success does not verify runtime or hardware; check boot and services afterwards.")
+		} else {
+			lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation prepares the selected version, checks the lab configuration and tests required systems without saving it.", "On the review, Enter saves and activates; Esc cancels.", "After result: r new update")
+		}
 	case dashboardDiagnostics:
 		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")
 	default:
@@ -348,6 +352,9 @@ func (model dashboardModel) usesTUIShell() bool {
 }
 
 func (model dashboardModel) textEntry() bool {
+	if model.screen == dashboardUpdate && model.baseUpdate && model.baseEditing {
+		return true
+	}
 	if model.screen == dashboardSetupKeys && model.setupKeyImporting {
 		return true
 	}
@@ -392,6 +399,13 @@ func phaseSteps(labels []string, current int, complete bool, dark bool) []string
 
 func (model dashboardModel) releaseReviewView() string {
 	lines := []string{tuiTitle("Review Nixorium update", model.isDark), "", tuiSection("Validated release", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
+	if model.baseUpdate {
+		lines[0] = tuiTitle("Review system and package update", model.isDark)
+		lines[2] = "Kernel, services and application versions may all change"
+		if base := model.updatePlan.PackageBase; base != nil {
+			lines[3] = fmt.Sprintf("%s → %s · %s → %s", base.CurrentChannel, base.TargetChannel, shortRevision(base.CurrentRevision), shortRevision(base.TargetRevision))
+		}
+	}
 	if model.updateDetails || model.height == 0 {
 		lines = append(lines, "Revision: "+model.updatePlan.Revision, fmt.Sprintf("Downgrade: %t", model.updatePlan.Downgrade))
 		for _, check := range model.updatePlan.Checks {
@@ -405,8 +419,11 @@ func (model dashboardModel) releaseReviewView() string {
 	lines = append(lines, patch[start:end]...)
 	lines = append(lines, "", "Press Enter to save this validated update and activate the controller.")
 	notices := []tuiNotice{}
+	if model.baseUpdate {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Builds passed; runtime and hardware remain unverified", detail: "Check the controller and a selected client before distributing to the fleet."})
+	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: []string{"Maintenance", "Update Nixorium", "Review"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Scroll diff"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return renderTUIShell(tuiShell{path: []string{"Maintenance", model.updateTitle(), "Review"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Scroll diff"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
 }
