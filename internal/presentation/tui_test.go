@@ -33,11 +33,11 @@ func testDashboardReport(mode string) domain.StatusReport {
 
 func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 	model := dashboardModel{}
-	if first := model.softwareScopeOptions()[0].scope.Kind; first != domain.SoftwareScopeAllClients {
+	if first := model.software.scopeOptions()[0].scope.Kind; first != domain.SoftwareScopeAllClients {
 		t.Fatalf("legacy default changed: %s", first)
 	}
 	model.software.catalog.Controller = "pc99"
-	options := model.softwareScopeOptions()
+	options := model.software.scopeOptions()
 	if options[0].scope.Kind != domain.SoftwareScopeShared || options[1].scope.Kind != domain.SoftwareScopeController {
 		t.Fatalf("controller scopes missing: %+v", options)
 	}
@@ -479,7 +479,7 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 	model.busy = ""
 	model.screen = dashboardSoftwareScope
 	model.software.selected = "gimp"
-	model.software.scopeCursor = len(model.softwareScopeOptions()) - 1
+	model.software.scopeCursor = len(model.software.scopeOptions()) - 1
 	view := model.View().Content
 	if !strings.Contains(view, "pc01") || strings.Contains(view, "pc40") || strings.Count(view, "\npc") > 12 {
 		t.Fatalf("client selection is not bounded at 90x22:\n%s", view)

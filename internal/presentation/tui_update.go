@@ -879,10 +879,12 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		changed := false
 		switch key.String() {
 		case "tab":
-			model = model.changeSoftwareMode(1)
+			model.software = model.software.changeMode(1)
+			model.message = ""
 			return model, nil
 		case "shift+tab":
-			model = model.changeSoftwareMode(-1)
+			model.software = model.software.changeMode(-1)
+			model.message = ""
 			return model, nil
 		case "esc":
 			model.software.searching = false
@@ -903,7 +905,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		}
 		model.software.cursor = 0
 		if changed {
-			return model, model.scheduleSoftwareSearch()
+			return model, model.software.scheduleSearch(model.actions.SearchSoftware)
 		}
 		return model, nil
 	}
