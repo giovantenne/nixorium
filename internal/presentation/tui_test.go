@@ -914,12 +914,12 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardDeploy || !model.restoreMode {
+	if model.screen != dashboardDeploy || !model.computers.restoreMode {
 		t.Fatalf("reapply did not route to reviewed deployment: %+v", model)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardRestore || model.restoreMode {
+	if model.screen != dashboardRestore || model.computers.restoreMode {
 		t.Fatal("deployment did not return to the restoration choice")
 	}
 
@@ -928,24 +928,24 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	view = model.View().Content
-	if model.screen != dashboardPXE || !model.restoreMode || !strings.Contains(view, "Reinstall computers") || strings.Contains(view, "Choose a computer") {
+	if model.screen != dashboardPXE || !model.computers.restoreMode || !strings.Contains(view, "Reinstall computers") || strings.Contains(view, "Choose a computer") {
 		t.Fatalf("reinstall did not open generic network installation: %s", view)
 	}
 }
 
 func TestCompletedRestoreContextDoesNotLeakIntoLaterInstallation(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("ready"), restoreMode: true, screen: dashboardHome}
+	model := dashboardModel{report: testDashboardReport("ready"), computers: computersModel{restoreMode: true}, screen: dashboardHome}
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "n"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
-	if model.restoreMode || model.screen != dashboardPXE || strings.Contains(model.View().Content, "Reinstall computers") {
+	if model.computers.restoreMode || model.screen != dashboardPXE || strings.Contains(model.View().Content, "Reinstall computers") {
 		t.Fatalf("stale restore context changed a later installation:\n%s", model.View().Content)
 	}
 }
 
 func TestReinstallReviewsConsequencesBeforeLeavingPXEActive(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("active"), restoreMode: true, screen: dashboardPXE}
+	model := dashboardModel{report: testDashboardReport("active"), computers: computersModel{restoreMode: true}, screen: dashboardPXE}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
 	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "Type LEAVE to continue") {

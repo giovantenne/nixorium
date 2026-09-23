@@ -585,13 +585,13 @@ func (model dashboardModel) openConfigurationState() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	model.screen = dashboardHosts
-	model.configurationState = domain.ConfigurationStateReport{}
-	model.hosts = domain.HostsReport{}
-	model.hostCursor = 0
-	model.hostQuery = ""
-	model.hostSearching = false
-	model.hostDetail = false
-	model.hostTechnical = false
+	model.computers.configurationState = domain.ConfigurationStateReport{}
+	model.computers.hosts = domain.HostsReport{}
+	model.computers.hostCursor = 0
+	model.computers.hostQuery = ""
+	model.computers.hostSearching = false
+	model.computers.hostDetail = false
+	model.computers.hostTechnical = false
 	model.busy = "Checking desired and observed system state"
 	model.message = ""
 	return model, model.loadConfigurationState()

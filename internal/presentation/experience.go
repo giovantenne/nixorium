@@ -33,8 +33,8 @@ func (model dashboardModel) rowCapacity() int { return max(3, model.height-15) }
 
 func (model dashboardModel) filteredHosts() []domain.HostStatus {
 	result := []domain.HostStatus{}
-	query := strings.ToLower(model.hostQuery)
-	for _, h := range model.hosts.Hosts {
+	query := strings.ToLower(model.computers.hostQuery)
+	for _, h := range model.computers.hosts.Hosts {
 		_, label, _ := domain.ComputerCondition(h)
 		if strings.Contains(strings.ToLower(h.Name+" "+h.IP+" "+label), query) {
 			result = append(result, h)
@@ -46,23 +46,23 @@ func (model dashboardModel) filteredHosts() []domain.HostStatus {
 func (model dashboardModel) computerDetail(h domain.HostStatus) string {
 	level, label, guidance := domain.ComputerCondition(h)
 	lines := []string{tuiSection(h.Name, model.isDark), tuiStatus(label, statusLevel(level), model.isDark), "", guidance, "", tuiMuted("Address  "+h.IP, model.isDark)}
-	if !model.hosts.GeneratedAt.IsZero() {
-		lines = append(lines, tuiMuted("Checked  "+model.hosts.GeneratedAt.Local().Format("15:04:05"), model.isDark))
+	if !model.computers.hosts.GeneratedAt.IsZero() {
+		lines = append(lines, tuiMuted("Checked  "+model.computers.hosts.GeneratedAt.Local().Format("15:04:05"), model.isDark))
 	}
-	if model.hostTechnical {
+	if model.computers.hostTechnical {
 		lines = append(lines, "", tuiSection("Technical details", model.isDark), "Network: "+string(h.Reachability)+" · SSH: "+string(h.SSH), "Current revision: "+h.CurrentRevision, "Desired revision: "+h.DesiredRevision, "System: "+h.CurrentSystem, h.Detail, h.DeploymentDetail)
 		if h.LastSuccessfulDeploy != nil {
 			lines = append(lines, "Last verified deployment: "+h.LastSuccessfulDeploy.VerifiedAt.Format(time.RFC3339))
 		}
-		if model.hosts.HistoryDetail != "" {
-			lines = append(lines, "History warning: "+model.hosts.HistoryDetail)
+		if model.computers.hosts.HistoryDetail != "" {
+			lines = append(lines, "History warning: "+model.computers.hosts.HistoryDetail)
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
 func (model dashboardModel) computersView() string {
-	configurationView := model.configurationState.Operation != ""
+	configurationView := model.computers.configurationState.Operation != ""
 	title := "Computer inventory"
 	path := []string{"Computers", "Inventory"}
 	back := "Computers"
@@ -80,7 +80,7 @@ func (model dashboardModel) computersView() string {
 		})
 	}
 	if configurationView {
-		desired := model.configurationState.DesiredRevision
+		desired := model.computers.configurationState.DesiredRevision
 		if desired == "" {
 			desired = "changed while this snapshot was collected"
 		} else {
@@ -88,19 +88,19 @@ func (model dashboardModel) computersView() string {
 		}
 		controllerLabel := "Not verified for the desired revision"
 		controllerKind := tuiStatusAttention
-		if model.configurationState.ControllerVerified() {
+		if model.computers.configurationState.ControllerVerified() {
 			controllerLabel = "Verified at the desired revision"
 			controllerKind = tuiStatusSuccess
 		}
 		freshness := "not recorded"
-		if !model.configurationState.GeneratedAt.IsZero() {
-			freshness = model.configurationState.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST") + " · r refreshes this snapshot"
+		if !model.computers.configurationState.GeneratedAt.IsZero() {
+			freshness = model.computers.configurationState.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST") + " · r refreshes this snapshot"
 		}
 		lines = append(lines,
 			tuiSection("Desired and observed state", model.isDark),
 			"Desired revision  "+desired,
 			"Controller        "+tuiStatus(controllerLabel, controllerKind, model.isDark),
-			fmt.Sprintf("Clients           %d up to date · %d update ready · %d not verified", model.hosts.Deployment.Current, model.hosts.Deployment.Outdated, model.hosts.Deployment.Unknown),
+			fmt.Sprintf("Clients           %d up to date · %d update ready · %d not verified", model.computers.hosts.Deployment.Current, model.computers.hosts.Deployment.Outdated, model.computers.hosts.Deployment.Unknown),
 			tuiMuted("Freshness         "+freshness, model.isDark),
 			"",
 			tuiSection("Client observations", model.isDark),
@@ -108,33 +108,33 @@ func (model dashboardModel) computersView() string {
 	}
 	hosts := model.filteredHosts()
 	var actions []tuiAction
-	if model.hostDetail && len(hosts) > 0 {
-		lines = append(lines, model.computerDetail(hosts[min(model.hostCursor, len(hosts)-1)]))
+	if model.computers.hostDetail && len(hosts) > 0 {
+		lines = append(lines, model.computerDetail(hosts[min(model.computers.hostCursor, len(hosts)-1)]))
 		actions = []tuiAction{{key: "d", label: "Deploy"}, {key: "t", label: "Technical"}, {key: "i", label: "Diagnostics"}, {key: "Esc", label: "Back"}, {key: "?", label: "Help"}}
 	} else {
-		available, total := hostAvailability(model.hosts.Hosts)
-		lines = append(lines, fmt.Sprintf("%d / %d reachable · %d up to date · %d update ready", available, total, model.hosts.Deployment.Current, model.hosts.Deployment.Outdated))
-		if !model.hosts.GeneratedAt.IsZero() {
-			lines = append(lines, tuiMuted("Observation: "+model.hosts.GeneratedAt.Local().Format("15:04:05")+" · r refresh", model.isDark))
+		available, total := hostAvailability(model.computers.hosts.Hosts)
+		lines = append(lines, fmt.Sprintf("%d / %d reachable · %d up to date · %d update ready", available, total, model.computers.hosts.Deployment.Current, model.computers.hosts.Deployment.Outdated))
+		if !model.computers.hosts.GeneratedAt.IsZero() {
+			lines = append(lines, tuiMuted("Observation: "+model.computers.hosts.GeneratedAt.Local().Format("15:04:05")+" · r refresh", model.isDark))
 		}
 		lines = append(lines, "")
-		if model.hostSearching || model.hostQuery != "" {
-			lines = append(lines, "Search  / "+model.hostQuery+"_")
+		if model.computers.hostSearching || model.computers.hostQuery != "" {
+			lines = append(lines, "Search  / "+model.computers.hostQuery+"_")
 		}
-		start, end := listWindow(len(hosts), model.hostCursor, max(3, model.height-18))
+		start, end := listWindow(len(hosts), model.computers.hostCursor, max(3, model.height-18))
 		rows := []string{}
 		for index := start; index < end; index++ {
 			h := hosts[index]
 			level, label, _ := domain.ComputerCondition(h)
-			marker := tuiSelectionMarker(index == model.hostCursor, model.isDark)
+			marker := tuiSelectionMarker(index == model.computers.hostCursor, model.isDark)
 			name := fmt.Sprintf("%-10s", h.Name)
-			if index == model.hostCursor {
+			if index == model.computers.hostCursor {
 				name = lipgloss.NewStyle().Bold(true).Foreground(tuiAccent(model.isDark)).Render(name)
 			}
 			rows = append(rows, marker+name+" "+tuiStatus(label, statusLevel(level), model.isDark))
 		}
 		if len(hosts) == 0 {
-			if model.hostQuery != "" {
+			if model.computers.hostQuery != "" {
 				rows = append(rows, "No computers match your search.", "Press Esc to clear it.")
 			} else {
 				rows = append(rows, "No computer observations yet.", "Refresh to check the configured computers.")
@@ -143,21 +143,21 @@ func (model dashboardModel) computersView() string {
 		body := strings.Join(rows, "\n")
 		if model.width >= 108 && len(hosts) > 0 {
 			left := lipgloss.NewStyle().Width(43).Render(body)
-			right := lipgloss.NewStyle().Width(min(62, model.width-52)).Render(model.computerDetail(hosts[min(model.hostCursor, len(hosts)-1)]))
+			right := lipgloss.NewStyle().Width(min(62, model.width-52)).Render(model.computerDetail(hosts[min(model.computers.hostCursor, len(hosts)-1)]))
 			body = lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", right)
 		}
 		lines = append(lines, body, "", tuiMuted(fmt.Sprintf("%d–%d of %d computers", displayedLineStart(start, len(hosts)), end, len(hosts)), model.isDark))
 		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Details"}, {key: "/", label: "Search"}, {key: "r", label: "Refresh"}, {key: "Esc", label: back}, {key: "?", label: "Help"}}
 	}
 	notices := []tuiNotice{}
-	if configurationView && model.configurationState.HasErrors() {
-		details := make([]string, 0, len(model.configurationState.Issues))
-		for _, issue := range model.configurationState.Issues {
+	if configurationView && model.computers.configurationState.HasErrors() {
+		details := make([]string, 0, len(model.computers.configurationState.Issues))
+		for _, issue := range model.computers.configurationState.Issues {
 			details = append(details, issue.Field+": "+issue.Message)
 		}
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The state snapshot is incomplete", detail: strings.Join(details, "; ")})
-	} else if configurationView && !model.configurationState.ControllerVerified() && model.configurationState.Controller.CurrentDetail != "" {
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller is not verified for the desired revision", detail: model.configurationState.Controller.CurrentDetail})
+	} else if configurationView && !model.computers.configurationState.ControllerVerified() && model.computers.configurationState.Controller.CurrentDetail != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller is not verified for the desired revision", detail: model.computers.configurationState.Controller.CurrentDetail})
 	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
@@ -291,7 +291,7 @@ func (model dashboardModel) restoreView() string {
 	}
 	lines := []string{tuiTitle("Restore computers", model.isDark), tuiMuted("Choose whether to keep or replace the installed system.", model.isDark), ""}
 	for index, option := range options {
-		lines = append(lines, tuiSelection(option.title, index == model.restoreCursor, model.isDark), tuiMuted("    "+option.description, model.isDark), "")
+		lines = append(lines, tuiSelection(option.title, index == model.computers.restoreCursor, model.isDark), tuiMuted("    "+option.description, model.isDark), "")
 	}
 	return model.renderShell(tuiShell{
 		path: []string{"Computers", "Restore"},
@@ -393,7 +393,7 @@ func (model dashboardModel) textEntry() bool {
 		dashboardSettingsEdit, dashboardPXEStartReview, dashboardPXELeaveReview:
 		return true
 	case dashboardHosts:
-		return model.hostSearching
+		return model.computers.hostSearching
 	case dashboardSoftware:
 		return model.software.acceptsText()
 	default:

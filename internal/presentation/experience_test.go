@@ -412,7 +412,7 @@ func experienceFixture(count int) dashboardModel {
 		hosts.Hosts = append(hosts.Hosts, domain.HostStatus{Name: name, IP: ip, SSH: domain.SSHAvailable, Reachability: domain.ReachabilityReachable, Deployment: domain.DeploymentCurrent})
 	}
 	m := newDashboardModel(status, domain.SetupReport{State: "ready"}, DashboardActions{}, false)
-	m.hosts = hosts
+	m.computers.hosts = hosts
 	m.width = 120
 	m.height = 30
 	return m
@@ -442,7 +442,7 @@ func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
 	// q is text while searching, never a quit operation.
 	updated, command := m.Update(tea.KeyPressMsg{Text: "q"})
 	m = updated.(dashboardModel)
-	if command != nil || !strings.Contains(m.hostQuery, "q") {
+	if command != nil || !strings.Contains(m.computers.hostQuery, "q") {
 		t.Fatal("search stole quit key")
 	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
@@ -451,7 +451,7 @@ func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(dashboardModel)
-	if !m.hostDetail || !strings.Contains(m.View().Content, "pc17") {
+	if !m.computers.hostDetail || !strings.Contains(m.View().Content, "pc17") {
 		t.Fatal("detail not opened")
 	}
 	m = press(m, "d")
@@ -525,7 +525,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.width = size[0]
 			m.height = size[1]
 			m.screen = screen
-			m.hostCursor = 199
+			m.computers.hostCursor = 199
 			m.deployment.cursor = 199
 			m.deployment.plan = domain.DeploymentPlanReport{Revision: strings.Repeat("a", 40), ColmenaSelector: "@lab", Targets: []domain.DeploymentTarget{{Name: "pc01"}}}
 			m.software.catalog = domain.SoftwareCatalogReport{
@@ -622,7 +622,7 @@ func TestRestoreSelectionUsesSharedNavigationAccent(t *testing.T) {
 		t.Fatalf("restore did not accent only the focused choice:\n%s", view)
 	}
 
-	model.restoreCursor = 1
+	model.computers.restoreCursor = 1
 	view = model.View().Content
 	if !strings.Contains(view, tuiSelection("Reinstall from scratch", true, true)) ||
 		strings.Contains(view, tuiSelection("Reapply the intended system", true, true)) {
@@ -806,7 +806,7 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 	}
 	m = experienceFixture(2)
 	m.screen = dashboardHosts
-	m.hosts.Hosts[0].CurrentSystem = "/nix/store/technical-system"
+	m.computers.hosts.Hosts[0].CurrentSystem = "/nix/store/technical-system"
 	if strings.Contains(m.View().Content, "/nix/store/") {
 		t.Fatal("technical data dominates default list")
 	}
@@ -820,7 +820,7 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 // useful for review without connecting to or changing a real laboratory.
 func TestExperienceRenderGallery(t *testing.T) {
 	m := experienceFixture(24)
-	m.hosts.GeneratedAt = time.Now().Truncate(time.Minute)
+	m.computers.hosts.GeneratedAt = time.Now().Truncate(time.Minute)
 	for _, name := range []string{"interventions", "setup", "restore", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "shutdown", "shutdown-confirmation", "shutdown-result", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
 		m.screen = dashboardHome
 		m.busy = ""
@@ -830,12 +830,12 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.screen = dashboardRestore
 		case "computers":
 			m.screen = dashboardHosts
-			m.hostCursor = 6
-			m.hosts.Hosts[6].SSH = domain.SSHUnknown
-			m.hosts.Hosts[6].Reachability = domain.ReachabilityUnreachable
-			m.hosts.Hosts[6].Deployment = domain.DeploymentUnknown
-			m.hosts.Deployment.Current = 23
-			m.hosts.Deployment.Unknown = 1
+			m.computers.hostCursor = 6
+			m.computers.hosts.Hosts[6].SSH = domain.SSHUnknown
+			m.computers.hosts.Hosts[6].Reachability = domain.ReachabilityUnreachable
+			m.computers.hosts.Hosts[6].Deployment = domain.DeploymentUnknown
+			m.computers.hosts.Deployment.Current = 23
+			m.computers.hosts.Deployment.Unknown = 1
 		case "deploy":
 			m.screen = dashboardDeploy
 			m.deployment.chosen = map[string]bool{"pc01": true, "pc02": true}

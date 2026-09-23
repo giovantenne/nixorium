@@ -26,7 +26,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 	switch action {
 	case "r":
 		model.screen = dashboardRestore
-		model.restoreCursor = 0
+		model.computers.restoreCursor = 0
 		model.message = ""
 	case "x":
 		model.screen = dashboardShutdown
@@ -40,9 +40,9 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.deployment.chosen = map[string]bool{}
 		model.deployment.cursor = 0
 	case "h":
-		model.hostDetail = false
-		model.hostTechnical = false
-		model.configurationState = domain.ConfigurationStateReport{}
+		model.computers.hostDetail = false
+		model.computers.hostTechnical = false
+		model.computers.configurationState = domain.ConfigurationStateReport{}
 		model.screen = dashboardHosts
 		model.busy = "Checking configured computers"
 		model.message = ""
@@ -129,7 +129,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		}
 		// Restoration context never leaks into a later intervention after a
 		// completed result or a detour through logs.
-		model.restoreMode = false
+		model.computers.restoreMode = false
 		model.ensureHomeMenu()
 		action := key.String()
 		if action == "enter" {
@@ -167,16 +167,16 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 	case dashboardComputersArea:
 		action := key.String()
 		if action == "enter" {
-			action = computersAreaTasks[model.computersAreaCursor].shortcut
+			action = computersAreaTasks[model.computers.areaCursor].shortcut
 		}
 		switch action {
 		case "esc", "left":
 			model.screen = dashboardHome
 			model.message = ""
 		case "up", "k":
-			model.computersAreaCursor = max(0, model.computersAreaCursor-1)
+			model.computers.areaCursor = max(0, model.computers.areaCursor-1)
 		case "down", "j":
-			model.computersAreaCursor = min(len(computersAreaTasks)-1, model.computersAreaCursor+1)
+			model.computers.areaCursor = min(len(computersAreaTasks)-1, model.computers.areaCursor+1)
 		case "h", "d", "r", "x":
 			model.areaReturn = dashboardComputersArea
 			return model.openComputerTask(action)
@@ -207,20 +207,20 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.screen = dashboardHome
 			model.message = ""
 		case "up", "k":
-			model.restoreCursor = max(0, model.restoreCursor-1)
+			model.computers.restoreCursor = max(0, model.computers.restoreCursor-1)
 		case "down", "j":
-			model.restoreCursor = min(1, model.restoreCursor+1)
+			model.computers.restoreCursor = min(1, model.computers.restoreCursor+1)
 		case "enter":
 			model.message = ""
-			if model.restoreCursor == 0 {
-				model.restoreMode = true
+			if model.computers.restoreCursor == 0 {
+				model.computers.restoreMode = true
 				model.screen = dashboardDeploy
 				model.deployment.result = domain.DeploymentExecutionReport{}
 				model.deployment.context = ""
 				model.deployment.chosen = map[string]bool{}
 				model.deployment.cursor = 0
 			} else {
-				model.restoreMode = true
+				model.computers.restoreMode = true
 				model.screen = dashboardPXE
 			}
 		}
@@ -552,47 +552,47 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 	case dashboardHosts:
 		switch key.String() {
 		case "esc", "left":
-			if model.hostDetail {
-				model.hostDetail = false
-				model.hostTechnical = false
+			if model.computers.hostDetail {
+				model.computers.hostDetail = false
+				model.computers.hostTechnical = false
 				return model, nil
 			}
-			if model.hostQuery != "" {
-				model.hostQuery = ""
-				model.hostCursor = 0
+			if model.computers.hostQuery != "" {
+				model.computers.hostQuery = ""
+				model.computers.hostCursor = 0
 				return model, nil
 			}
-			if model.configurationState.Operation != "" {
+			if model.computers.configurationState.Operation != "" {
 				model.screen = dashboardSoftware
 			} else {
 				model.screen = dashboardHome
 			}
 			model.message = ""
 		case "/":
-			model.hostSearching = true
-			model.hostDetail = false
+			model.computers.hostSearching = true
+			model.computers.hostDetail = false
 		case "up", "k":
-			model.hostCursor = max(0, model.hostCursor-1)
+			model.computers.hostCursor = max(0, model.computers.hostCursor-1)
 		case "down", "j":
-			model.hostCursor = max(0, min(len(model.filteredHosts())-1, model.hostCursor+1))
+			model.computers.hostCursor = max(0, min(len(model.filteredHosts())-1, model.computers.hostCursor+1))
 		case "enter":
-			model.hostDetail = len(model.filteredHosts()) > 0
+			model.computers.hostDetail = len(model.filteredHosts()) > 0
 		case "t":
-			model.hostTechnical = !model.hostTechnical
-			model.hostDetail = true
+			model.computers.hostTechnical = !model.computers.hostTechnical
+			model.computers.hostDetail = true
 		case "d":
 			hosts := model.filteredHosts()
 			if len(hosts) > 0 {
 				model.screen = dashboardDeploy
 				model.deployment.result = domain.DeploymentExecutionReport{}
 				model.deployment.context = ""
-				model.deployment.chosen = map[string]bool{hosts[min(model.hostCursor, len(hosts)-1)].Name: true}
+				model.deployment.chosen = map[string]bool{hosts[min(model.computers.hostCursor, len(hosts)-1)].Name: true}
 				model.deployment.cursor = 0
 			}
 		case "r":
 			model.busy = "Refreshing computer status"
 			model.message = ""
-			if model.configurationState.Operation != "" {
+			if model.computers.configurationState.Operation != "" {
 				model.busy = "Refreshing desired and observed system state"
 				return model, model.loadConfigurationState()
 			}
@@ -1119,9 +1119,9 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 				model.message = ""
 				return model, nil
 			}
-			if model.restoreMode {
+			if model.computers.restoreMode {
 				model.screen = dashboardRestore
-				model.restoreMode = false
+				model.computers.restoreMode = false
 			} else if model.setupMode {
 				model.screen = dashboardSetup
 			} else {
