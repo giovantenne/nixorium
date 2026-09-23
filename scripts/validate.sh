@@ -70,6 +70,7 @@ bash -n install.sh setup.sh scripts/*.sh scripts/lib/*.sh
 bash tests/client-installer.sh
 bash tests/controller-bootstrap.sh
 bash tests/controller-installer.sh
+bash tests/software-profile-bootstrap.sh
 diff -qr skills/nixorium-maintainer templates/site/skills/nixorium-maintainer
 diff -u docs/troubleshooting.md templates/site/TROUBLESHOOTING.md
 diff -u docs/updates.md templates/site/UPDATES.md

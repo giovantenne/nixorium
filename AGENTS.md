@@ -174,9 +174,11 @@ Release from the matching changelog section.
   control inactive, and permits local controller activation without lab keys.
   `deploymentStatus.controller` is the controller-specific capability; older
   upstreams fall back to strict fleet readiness. Never use this capability to
-  authorize PXE or client deployment. Bootstrap capability version 1 collects
+  authorize PXE or client deployment. Bootstrap capability version 2 collects
   the keyboard first, then controller identity, other regional settings, and
-  password hashes before disk installation, then defers lab networking. Apply
+  password hashes; it then reviews an initial deployment-owned software profile
+  before Git initialization, Nix evaluation, or disk installation. Version 1
+  keeps the settings-only sequence. Both defer lab networking. Apply
   the selected console keymap before any later input, fail closed when the live
   input layout cannot be verified, document the official NixOS Minimal ISO as
   the supported bootstrap environment, and apply the same keymap to netboot;

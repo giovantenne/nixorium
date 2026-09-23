@@ -58,6 +58,15 @@
       installerTestLab = mkLab {
         deploymentSelf = self;
         labConfig = import ./lab-config.nix;
+        homeResetEphemeralPaths = [
+          ".cache/opencode"
+          ".config/opencode"
+          ".local/share/opencode"
+          ".local/npm"
+          ".npm"
+          ".opencode"
+          ".pi"
+        ];
         publicKeys = {
           cache = ./public-key;
           ssh = ./id_ed25519.pub;
@@ -80,7 +89,7 @@
     defaultLab // {
       lib = {
         inherit mkLab;
-        controllerBootstrapVersion = 1;
+        controllerBootstrapVersion = 2;
         configSchemaVersion = 2;
         settingsSchemaVersion = 1;
         softwareSchemaVersion = 1;

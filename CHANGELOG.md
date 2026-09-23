@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Controller bootstrap capability version 2 now asks for and reviews the
+  initial software profile after account and regional settings, but before Git
+  initialization, Nix evaluation, or disk changes. Catalog, helper, and
+  declarations come from the same immutable template revision; version 1
+  revisions retain their settings-only flow.
 - New private site templates define seven deployment-owned software profiles:
   Essential, General education, Programming, Graphics and illustration, Audio
   and video, CAD and 3D modelling, and STEM and scientific computing. Essential
