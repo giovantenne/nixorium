@@ -495,6 +495,18 @@ func TestParseArgumentsAcceptsReviewedSoftwareChanges(t *testing.T) {
 	if err != nil || apply.subcommand != "apply" || !apply.remove || !apply.yes || apply.expect != "sha256:review" {
 		t.Fatalf("software apply = %+v, error = %v", apply, err)
 	}
+	presets, err := parseArguments([]string{"software", "presets", "--json"})
+	if err != nil || presets.subcommand != "presets" || !presets.json {
+		t.Fatalf("software presets = %+v, error = %v", presets, err)
+	}
+	presetPlan, err := parseArguments([]string{"software", "preset", "plan", "--preset", "essential", "--scope", "shared", "--exclude", "firefox,vlc", "--json"})
+	if err != nil || presetPlan.subcommand != "preset-plan" || presetPlan.softwarePreset != "essential" || presetPlan.softwareScope != "shared" || presetPlan.softwareExclude != "firefox,vlc" {
+		t.Fatalf("software preset plan = %+v, error = %v", presetPlan, err)
+	}
+	presetApply, err := parseArguments([]string{"software", "preset", "apply", "--preset", "coding", "--scope", "all-clients", "--expect", "sha256:preset", "--yes"})
+	if err != nil || presetApply.subcommand != "preset-apply" || presetApply.softwarePreset != "coding" || presetApply.expect != "sha256:preset" || !presetApply.yes {
+		t.Fatalf("software preset apply = %+v, error = %v", presetApply, err)
+	}
 	for _, arguments := range [][]string{
 		{"software"},
 		{"software", "search"},
@@ -503,6 +515,11 @@ func TestParseArgumentsAcceptsReviewedSoftwareChanges(t *testing.T) {
 		{"software", "plan", "--package", "vlc", "--scope", "arbitrary"},
 		{"software", "apply", "--package", "vlc", "--scope", "all-clients"},
 		{"software", "catalog", "--package", "vlc"},
+		{"software", "preset"},
+		{"software", "preset", "plan", "--preset", "essential"},
+		{"software", "preset", "apply", "--preset", "essential", "--scope", "shared"},
+		{"software", "presets", "--preset", "essential"},
+		{"software", "plan", "--package", "vlc", "--scope", "shared", "--exclude", "vlc"},
 		{"status", "--remove"},
 	} {
 		if _, err := parseArguments(arguments); err == nil {

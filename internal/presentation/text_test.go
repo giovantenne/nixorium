@@ -301,6 +301,44 @@ func TestSoftwareTextSeparatesDeclarationFromBuildAndDeployment(t *testing.T) {
 	}
 }
 
+func TestSoftwarePresetTextShowsDefaultsPreservedScopesAndReviewBoundary(t *testing.T) {
+	catalog := domain.SoftwarePresetCatalogReport{State: "ready", Catalog: &domain.SoftwarePresetCatalog{
+		SchemaVersion: 1, DefaultPreset: "essential",
+		Presets: []domain.SoftwarePreset{{ID: "essential", Label: "Essential", Description: "Everyday software", Packages: []string{"firefox", "vlc"}}},
+	}}
+	var output bytes.Buffer
+	SoftwarePresetCatalogText(&output, catalog)
+	for _, expected := range []string{"Software profiles: READY", "Default profile:   essential", "Essential (default)", "Everyday software", "firefox, vlc"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("software profile catalog omits %q:\n%s", expected, output.String())
+		}
+	}
+	output.Reset()
+	plan := domain.SoftwarePresetPlanReport{
+		State: "ready", ManagedFile: "lab-software.json",
+		Request:            domain.SoftwarePresetRequest{Preset: "essential", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}, Exclude: []string{"vlc"}},
+		Preset:             domain.SoftwarePreset{ID: "essential", Label: "Essential"},
+		SelectedPackages:   []domain.SoftwareCatalogItem{{ID: "firefox"}},
+		Existing:           []domain.SoftwareDeclaration{{Package: "firefox", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeController}}},
+		Additions:          []domain.SoftwareDeclaration{{Package: "libreoffice", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}},
+		AffectedController: "controller", AffectedClients: []string{"pc01"}, ReviewToken: "sha256:preset", Confirmation: "ADD PROFILE",
+		Message: "No system has been built or changed.",
+	}
+	SoftwarePresetPlanText(&output, plan)
+	for _, expected := range []string{"Software profile proposal: READY", "Essential (essential)", "Excluded:                 vlc", "scope preserved", "controller", "libreoffice", "pc01", "sha256:preset", "ADD PROFILE", "No system has been built or changed"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("software profile plan omits %q:\n%s", expected, output.String())
+		}
+	}
+	output.Reset()
+	SoftwarePresetApplyText(&output, domain.SoftwarePresetApplyReport{State: "applied", ManagedFile: "lab-software.json", Request: plan.Request, Preset: plan.Preset, Existing: plan.Existing, Additions: plan.Additions, Message: "Review and commit lab-software.json."})
+	for _, expected := range []string{"Software profile change: APPLIED", "Added declarations:      1", "scopes preserved", "Review and commit"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("software profile apply omits %q:\n%s", expected, output.String())
+		}
+	}
+}
+
 func TestShutdownTextQualifiesRequestsAndPhysicalState(t *testing.T) {
 	plan := domain.ShutdownPlanReport{
 		State: "ready", Requested: "pc01,pc02", Policy: domain.ShutdownProtectUnknown, Eligible: 1,
