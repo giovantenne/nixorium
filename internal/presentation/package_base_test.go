@@ -122,7 +122,7 @@ func TestSystemUpdateJourneyRequiresReviewAndUsesSeparateSave(t *testing.T) {
 		next, command = model.Update(command())
 		model = next.(dashboardModel)
 	}
-	if saved != 1 || activated != 1 || !model.controllerResult.Verified {
+	if saved != 1 || activated != 1 || !model.controller.result.Verified {
 		t.Fatalf("save=%d activation=%d", saved, activated)
 	}
 }

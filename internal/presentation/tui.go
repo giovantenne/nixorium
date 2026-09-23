@@ -118,6 +118,19 @@ type deploymentModel struct {
 	confirmation string
 }
 
+// controllerModel is the shared activation boundary used after settings,
+// software and update saves. It owns job identity so stale progress messages
+// cannot be mistaken for the current activation.
+type controllerModel struct {
+	plan       domain.ControllerRebuildPlanReport
+	result     domain.ControllerRebuildExecutionReport
+	applying   bool
+	progress   domain.OperationProgress
+	started    time.Time
+	progressID uint64
+	details    bool
+}
+
 type dashboardModel struct {
 	updateDetails          bool
 	returnAdmin            bool
@@ -158,13 +171,7 @@ type dashboardModel struct {
 	startPlan              domain.PXELifecycleReport
 	hosts                  domain.HostsReport
 	deployment             deploymentModel
-	controllerPlan         domain.ControllerRebuildPlanReport
-	controllerResult       domain.ControllerRebuildExecutionReport
-	controllerApplying     bool
-	controllerProgress     domain.OperationProgress
-	controllerStarted      time.Time
-	controllerProgressID   uint64
-	controllerDetails      bool
+	controller             controllerModel
 	services               domain.ServicesReport
 	serviceResult          domain.ServiceActionReport
 	logs                   domain.OperationLogsReport
@@ -538,8 +545,8 @@ func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
 	model.settingsResult = domain.ConfigurationSaveReport{}
 	model.settingsPlan = domain.ConfigPlanReport{}
 	model.settingsCandidate = domain.LabSettingsFile{}
-	model.controllerPlan = domain.ControllerRebuildPlanReport{}
-	model.controllerResult = domain.ControllerRebuildExecutionReport{}
+	model.controller.plan = domain.ControllerRebuildPlanReport{}
+	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	model.pxeProgress = domain.OperationProgress{}
 	model.areaReturn = dashboardHome
 	model.screen = dashboardSettings
@@ -554,7 +561,7 @@ func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
 func (model dashboardModel) failComputerInstallation(message string) (tea.Model, tea.Cmd) {
 	model.busy = ""
 	model.installationFailed = true
-	model.controllerApplying = false
+	model.controller.applying = false
 	model.pxePreparing = false
 	model.message = message
 	model.screen = dashboardPXE
@@ -1301,7 +1308,7 @@ func (model dashboardModel) updateView() string {
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	if model.updateResult.Operation != "" {
-		success := !model.updateResult.HasErrors() && model.updateResult.Updated && model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified
+		success := !model.updateResult.HasErrors() && model.updateResult.Updated && model.controller.result.Operation != "" && !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified
 		title := "Nixorium update needs attention"
 		if success {
 			title = "Nixorium and this controller are updated"
@@ -1548,8 +1555,8 @@ func (model dashboardModel) startUpdateControllerApply() (tea.Model, tea.Cmd) {
 	}
 	model.busy = "Building, activating, and verifying the updated controller"
 	model.updating = true
-	model.controllerPlan = domain.ControllerRebuildPlanReport{}
-	model.controllerResult = domain.ControllerRebuildExecutionReport{}
+	model.controller.plan = domain.ControllerRebuildPlanReport{}
+	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	return model, func() tea.Msg {
 		plan := model.actions.PlanController()
 		if plan.HasErrors() {
@@ -1628,13 +1635,13 @@ func (model dashboardModel) controllerView() string {
 	path := []string{"Maintenance", "Controller"}
 	lines := []string{tuiTitle("Controller configuration", model.isDark)}
 	notices := []tuiNotice{}
-	if model.controllerApplying {
-		elapsed := time.Since(model.controllerStarted).Truncate(time.Second)
+	if model.controller.applying {
+		elapsed := time.Since(model.controller.started).Truncate(time.Second)
 		if elapsed < 0 {
 			elapsed = 0
 		}
 		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
-		lines = append(lines, model.operationProgressView(model.controllerProgress, "Current progress")...)
+		lines = append(lines, model.operationProgressView(model.controller.progress, "Current progress")...)
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller update is running", detail: "Wait for the verified result before closing Nixorium."})
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}})
 	}
@@ -1646,8 +1653,8 @@ func (model dashboardModel) controllerView() string {
 		body := strings.Join([]string{
 			tuiTitle("Update this controller?", model.isDark),
 			"",
-			"Affects   " + model.controllerPlan.Controller + " (this controller only)",
-			"Revision  " + model.controllerPlan.Revision,
+			"Affects   " + model.controller.plan.Controller + " (this controller only)",
+			"Revision  " + model.controller.plan.Revision,
 			"",
 			"Press Enter to build, activate, and verify this controller.",
 		}, "\n")
@@ -1657,26 +1664,26 @@ func (model dashboardModel) controllerView() string {
 		}
 		return model.renderShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Update controller"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 	}
-	if model.controllerResult.Operation != "" {
+	if model.controller.result.Operation != "" {
 		resultTitle := "Controller action needs attention"
-		if !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified {
+		if !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified {
 			resultTitle = "Controller updated and verified"
 		}
 		lines = append(lines,
-			tuiResult(resultTitle, !model.controllerResult.HasErrors(), model.isDark),
+			tuiResult(resultTitle, !model.controller.result.HasErrors(), model.isDark),
 			"",
-			fmt.Sprintf("Last result: %s at phase %s", model.controllerResult.State, model.controllerResult.Phase),
-			fmt.Sprintf("Applied: %t   Verified: %t", model.controllerResult.Applied, model.controllerResult.Verified),
+			fmt.Sprintf("Last result: %s at phase %s", model.controller.result.State, model.controller.result.Phase),
+			fmt.Sprintf("Applied: %t   Verified: %t", model.controller.result.Applied, model.controller.result.Verified),
 		)
-		if model.controllerDetails && model.controllerProgress.Operation != "" {
+		if model.controller.details && model.controller.progress.Operation != "" {
 			lines = append(lines, "")
-			lines = append(lines, model.operationProgressView(model.controllerProgress, "Last controller apply")...)
+			lines = append(lines, model.operationProgressView(model.controller.progress, "Last controller apply")...)
 		}
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		detailsLabel := "Show details"
-		if model.controllerDetails {
+		if model.controller.details {
 			detailsLabel = "Hide details"
 		}
 		returnLabel := "Maintenance"
@@ -2140,9 +2147,9 @@ func (model dashboardModel) pxeView() string {
 			})
 		}
 	}
-	if model.controllerApplying {
-		if model.controllerProgress.State != "completed" {
-			elapsed := time.Since(model.controllerStarted).Truncate(time.Second)
+	if model.controller.applying {
+		if model.controller.progress.State != "completed" {
+			elapsed := time.Since(model.controller.started).Truncate(time.Second)
 			if elapsed < 0 {
 				elapsed = 0
 			}
@@ -2150,9 +2157,9 @@ func (model dashboardModel) pxeView() string {
 		} else {
 			lines = append(lines, "")
 		}
-		lines = append(lines, model.operationProgressView(model.controllerProgress, "Controller progress")...)
+		lines = append(lines, model.operationProgressView(model.controller.progress, "Controller progress")...)
 		notice := tuiNotice{kind: tuiStatusAttention, title: "Controller activation is running", detail: "Services and networking may restart while the reviewed configuration is activated and verified."}
-		if model.controllerProgress.State == "completed" {
+		if model.controller.progress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Controller activation and verification completed", detail: "Continuing with client-system preparation."}
 		}
 		return model.renderShell(tuiShell{
@@ -2281,7 +2288,7 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	if model.pxePreparing {
 		return []tuiAction{{key: "l", label: "Progress details"}, {key: "q", label: "Close view"}, {key: "F1", label: "Help"}}
 	}
-	if model.controllerApplying {
+	if model.controller.applying {
 		return []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}
 	}
 	if model.busy != "" {
@@ -2385,7 +2392,7 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 		"verify":    "Verifying activation",
 	}
 	lines := []string{title, "  Phase: " + phaseLabels[operation.Phase]}
-	if !model.progressDetails && !model.controllerDetails {
+	if !model.progressDetails && !model.controller.details {
 		kind := tuiStatusNeutral
 		label := "● " + phaseLabels[operation.Phase] + " · Running"
 		if operation.State == "completed" {

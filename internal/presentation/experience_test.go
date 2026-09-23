@@ -280,16 +280,19 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 			{
 				name: "controller progress",
 				model: dashboardModel{
-					screen: dashboardController, controllerApplying: true, busy: "Activating controller", controllerStarted: time.Now(),
-					controllerProgress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4},
+					screen: dashboardController, busy: "Activating controller",
+					controller: controllerModel{
+						applying: true, started: time.Now(),
+						progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "activate", Current: 2, Total: 4},
+					},
 				},
 				expected: []string{"Controller update is running", "Progress details", "Help"},
 			},
 			{
 				name: "controller result",
 				model: dashboardModel{
-					screen:           dashboardController,
-					controllerResult: domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true},
+					screen:     dashboardController,
+					controller: controllerModel{result: domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}},
 				},
 				expected: []string{"Controller updated and verified", "Enter", "Maintenance", "Show details", "Logs", "New review", "Help"},
 			},
@@ -539,7 +542,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.shutdown.chosen = map[string]bool{"pc200": true}
 			m.shutdown.plan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
 			m.shutdown.result = domain.ShutdownApplyReport{State: "completed", Accepted: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc200", State: "accepted", Detail: "request accepted"}}}
-			m.controllerPlan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD"}
+			m.controller.plan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD"}
 			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 			if screen == dashboardPXELeaveReview {
 				m.setupMode = true
@@ -762,7 +765,7 @@ func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
 		} else {
 			m.confirmation = "wrong"
 		}
-		m.controllerPlan.Confirmation = "REBUILD"
+		m.controller.plan.Confirmation = "REBUILD"
 		m.gitCommitPlan.Confirmation = "COMMIT"
 		m.updatePlan.Confirmation = "UPDATE"
 		m.deployment.plan.ColmenaSelector = "@lab"

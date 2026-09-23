@@ -295,7 +295,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, waitForDeploymentEvent(model.deployment.events)
 	case dashboardControllerPlanMsg:
 		model.busy = ""
-		model.controllerPlan = message.report
+		model.controller.plan = message.report
 		if model.installationFlow {
 			if message.report.HasErrors() {
 				return model.failComputerInstallation(controllerPlanIssues(message.report))
@@ -305,10 +305,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model, model.loadSetup()
 			}
 			model.busy = "Building and activating the laboratory controller"
-			model.controllerApplying = true
-			model.controllerProgress = domain.OperationProgress{}
-			model.controllerStarted = time.Now().UTC()
-			model.controllerProgressID++
+			model.controller.applying = true
+			model.controller.progress = domain.OperationProgress{}
+			model.controller.started = time.Now().UTC()
+			model.controller.progressID++
 			plan := message.report
 			operation := func() tea.Msg {
 				report := model.actions.ApplyController(plan)
@@ -319,7 +319,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
 			}
-			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controllerProgressID))
+			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
 		}
 		if message.report.HasErrors() {
 			model.message = controllerPlanIssues(message.report)
@@ -333,10 +333,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardControllerResultMsg:
 		model.hosts = domain.HostsReport{}
 		model.busy = ""
-		model.controllerApplying = false
-		model.controllerResult = message.report
+		model.controller.applying = false
+		model.controller.result = message.report
 		model.message = message.report.Message
-		model.controllerDetails = false
+		model.controller.details = false
 		if message.statusErr != nil {
 			model.message += "; dashboard refresh failed: " + message.statusErr.Error()
 		} else {
@@ -349,28 +349,28 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			model.busy = "Checking installation prerequisites"
 			if model.actions.LoadControllerProgress != nil {
-				return model, tea.Batch(model.loadControllerProgress(model.controllerProgressID), model.loadSetup())
+				return model, tea.Batch(model.loadControllerProgress(model.controller.progressID), model.loadSetup())
 			}
 			return model, model.loadSetup()
 		}
 		model.screen = dashboardController
 		if model.actions.LoadControllerProgress != nil {
-			return model, model.loadControllerProgress(model.controllerProgressID)
+			return model, model.loadControllerProgress(model.controller.progressID)
 		}
 		return model, nil
 	case dashboardControllerProgressTickMsg:
-		if !model.controllerApplying || message.id != model.controllerProgressID || model.actions.LoadControllerProgress == nil {
+		if !model.controller.applying || message.id != model.controller.progressID || model.actions.LoadControllerProgress == nil {
 			return model, nil
 		}
 		return model, model.loadControllerProgress(message.id)
 	case dashboardControllerProgressMsg:
-		if message.id != model.controllerProgressID {
+		if message.id != model.controller.progressID {
 			return model, nil
 		}
-		if message.err == nil && (model.controllerStarted.IsZero() || !message.progress.StartedAt.Before(model.controllerStarted)) {
-			model.controllerProgress = message.progress
+		if message.err == nil && (model.controller.started.IsZero() || !message.progress.StartedAt.Before(model.controller.started)) {
+			model.controller.progress = message.progress
 		}
-		if model.controllerApplying {
+		if model.controller.applying {
 			return model, scheduleControllerProgressTick(message.id)
 		}
 		return model, nil
@@ -487,8 +487,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardUpdateControllerMsg:
 		model.busy = ""
 		model.updating = false
-		model.controllerPlan = message.plan
-		model.controllerResult = message.report
+		model.controller.plan = message.plan
+		model.controller.result = message.report
 		if message.plan.HasErrors() {
 			model.message = controllerPlanIssues(message.plan)
 		} else {
@@ -729,8 +729,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSoftwareControllerMsg:
 		model.busy = ""
-		model.controllerPlan = message.plan
-		model.controllerResult = message.report
+		model.controller.plan = message.plan
+		model.controller.result = message.report
 		software, result := model.software.finishController(message.plan, message.report)
 		model.software = software
 		model.message = result.message
@@ -885,7 +885,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			return model, input.command
 		}
 	}
-	if key.String() == "l" && (model.deployment.applying || model.controllerApplying || model.pxePreparing) {
+	if key.String() == "l" && (model.deployment.applying || model.controller.applying || model.pxePreparing) {
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}

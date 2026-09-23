@@ -29,7 +29,7 @@ func (model dashboardModel) openPackageBase() (tea.Model, tea.Cmd) {
 	model.baseUpdate, model.baseEditing, model.baseAllowUnverified = true, false, false
 	model.screen = dashboardUpdate
 	model.updatePlan, model.updateResult = domain.UpdatePlanReport{}, domain.UpdateApplyReport{}
-	model.controllerPlan, model.controllerResult = domain.ControllerRebuildPlanReport{}, domain.ControllerRebuildExecutionReport{}
+	model.controller.plan, model.controller.result = domain.ControllerRebuildPlanReport{}, domain.ControllerRebuildExecutionReport{}
 	model.message, model.baseTarget = "", ""
 	model.baseStatus = domain.PackageBaseStatus{}
 	if model.actions.LoadPackageBase == nil || model.actions.PlanPackageBase == nil || model.actions.SavePackageBase == nil {

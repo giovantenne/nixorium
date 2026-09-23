@@ -463,7 +463,7 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 		}
 		return model.startSoftwareControllerApply()
 	case softwareDeployIntent:
-		if !model.software.canDistribute(model.controllerResult) {
+		if !model.software.canDistribute(model.controller.result) {
 			return model, nil
 		}
 		return model.openSoftwareDeployment()
@@ -526,8 +526,8 @@ func (model dashboardModel) startSoftwareControllerApply() (tea.Model, tea.Cmd) 
 	}
 	model.busy = "Building and activating the reviewed software on this controller"
 	model.software.applying = true
-	model.controllerPlan = domain.ControllerRebuildPlanReport{}
-	model.controllerResult = domain.ControllerRebuildExecutionReport{}
+	model.controller.plan = domain.ControllerRebuildPlanReport{}
+	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	return model, func() tea.Msg {
 		plan := model.actions.PlanController()
 		if plan.HasErrors() {
@@ -604,7 +604,7 @@ func (model dashboardModel) softwareView() string {
 		dark:             model.isDark,
 		message:          model.message,
 		busy:             model.busy,
-		controllerResult: model.controllerResult,
+		controllerResult: model.controller.result,
 	}
 	if model.busy != "" {
 		context.busyView = model.busyView()
