@@ -1813,8 +1813,8 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if loads != 2 || model.gitScroll != 0 {
-		t.Fatalf("Git review refresh = loads %d, scroll %d", loads, model.gitScroll)
+	if loads != 2 || model.maintenance.gitScroll != 0 {
+		t.Fatalf("Git review refresh = loads %d, scroll %d", loads, model.maintenance.gitScroll)
 	}
 }
 
@@ -1893,8 +1893,10 @@ func TestFirstSetupCommitResultReturnsToObservedChecklist(t *testing.T) {
 	model := dashboardModel{
 		setupMode: true,
 		screen:    dashboardGitReview,
-		gitCommitResult: domain.GitCommitReport{
-			Operation: "git-commit", State: "completed", Committed: true,
+		maintenance: maintenanceModel{
+			gitCommitResult: domain.GitCommitReport{
+				Operation: "git-commit", State: "completed", Committed: true,
+			},
 		},
 		actions: DashboardActions{LoadSetup: func() domain.SetupReport {
 			loads++

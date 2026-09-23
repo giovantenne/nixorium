@@ -298,14 +298,14 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 			},
 			{
 				name:     "services",
-				model:    dashboardModel{screen: dashboardServices, services: services},
+				model:    dashboardModel{screen: dashboardServices, maintenance: maintenanceModel{services: services}},
 				expected: []string{"Maintenance  /  Services", "Binary cache", "Review cache restart", "Refresh", "Esc", "Maintenance", "Help"},
 			},
 			{
 				name: "service result",
 				model: dashboardModel{
-					screen:        dashboardServices,
-					serviceResult: domain.ServiceActionReport{Operation: "service-restart", State: "completed", Service: "cache", Verified: true},
+					screen:      dashboardServices,
+					maintenance: maintenanceModel{serviceResult: domain.ServiceActionReport{Operation: "service-restart", State: "completed", Service: "cache", Verified: true}},
 				},
 				expected: []string{"Binary cache restarted and verified", "Enter", "Maintenance", "Logs", "Restart again", "Help"},
 			},
@@ -346,16 +346,16 @@ func TestEvidenceScreensKeepNavigationVisible(t *testing.T) {
 			{
 				name: "history",
 				model: dashboardModel{
-					screen: dashboardLogs,
-					logs:   domain.OperationLogsReport{Logs: []domain.OperationLogEntry{entry}},
+					screen:      dashboardLogs,
+					maintenance: maintenanceModel{logs: domain.OperationLogsReport{Logs: []domain.OperationLogEntry{entry}}},
 				},
 				expected: []string{"Maintenance  /  History", "deploy-example.log", "Enter", "View tail", "Refresh", "Esc", "Maintenance", "Help"},
 			},
 			{
 				name: "log detail",
 				model: dashboardModel{
-					screen:    dashboardLogDetail,
-					logDetail: domain.OperationLogReport{Log: &entry, Content: "first\nsecond\nthird\n"},
+					screen:      dashboardLogDetail,
+					maintenance: maintenanceModel{logDetail: domain.OperationLogReport{Log: &entry, Content: "first\nsecond\nthird\n"}},
 				},
 				expected: []string{"History  /  Log", "deploy-example.log", "Scroll", "Esc", "History", "Help"},
 			},
@@ -766,7 +766,7 @@ func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
 			m.confirmation = "wrong"
 		}
 		m.controller.plan.Confirmation = "REBUILD"
-		m.gitCommitPlan.Confirmation = "COMMIT"
+		m.maintenance.gitCommitPlan.Confirmation = "COMMIT"
 		m.updates.plan.Confirmation = "UPDATE"
 		m.deployment.plan.ColmenaSelector = "@lab"
 		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

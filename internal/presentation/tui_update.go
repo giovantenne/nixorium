@@ -376,58 +376,58 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardServicesMsg:
 		model.busy = ""
-		model.services = message.report
+		model.maintenance.services = message.report
 		model.message = ""
 		model.screen = dashboardServices
 		return model, nil
 	case dashboardServiceResultMsg:
 		model.busy = ""
-		model.serviceResult = message.report
+		model.maintenance.serviceResult = message.report
 		model.message = message.report.Message
 		model.screen = dashboardServices
 		return model, nil
 	case dashboardLogsMsg:
 		model.busy = ""
-		model.logs = message.report
-		if model.logCursor >= len(message.report.Logs) {
-			model.logCursor = 0
+		model.maintenance.logs = message.report
+		if model.maintenance.logCursor >= len(message.report.Logs) {
+			model.maintenance.logCursor = 0
 		}
 		model.message = operationLogIssues(message.report.Issues)
 		model.screen = dashboardLogs
 		return model, nil
 	case dashboardLogMsg:
 		model.busy = ""
-		model.logDetail = message.report
-		model.logScroll = maximumLogScroll(message.report, model.logDetailHeight())
+		model.maintenance.logDetail = message.report
+		model.maintenance.logScroll = maximumLogScroll(message.report, model.logDetailHeight())
 		model.message = operationLogIssues(message.report.Issues)
 		model.screen = dashboardLogDetail
 		return model, nil
 	case dashboardGitReviewMsg:
 		model.busy = ""
-		model.gitReview = message.report
-		model.gitScroll = 0
+		model.maintenance.gitReview = message.report
+		model.maintenance.gitScroll = 0
 		model.message = operationLogIssues(message.report.Issues)
 		model.screen = dashboardGitReview
 		return model, nil
 	case dashboardGitCommitPlanMsg:
 		model.busy = ""
-		model.gitCommitPlan = message.report
+		model.maintenance.gitCommitPlan = message.report
 		if message.report.HasErrors() {
 			model.message = operationLogIssues(message.report.Issues)
 			model.screen = dashboardGitCommitSelect
 			return model, nil
 		}
 		model.confirmation = ""
-		model.gitScroll = 0
+		model.maintenance.gitScroll = 0
 		model.message = ""
 		model.screen = dashboardGitCommitReview
 		return model, nil
 	case dashboardGitCommitResultMsg:
 		model.hosts = domain.HostsReport{}
 		model.busy = ""
-		model.gitCommitResult = message.report
-		model.gitReview = message.review
-		model.gitScroll = 0
+		model.maintenance.gitCommitResult = message.report
+		model.maintenance.gitReview = message.review
+		model.maintenance.gitScroll = 0
 		model.confirmation = ""
 		model.message = message.report.Message
 		model.screen = dashboardGitReview
@@ -759,8 +759,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.height = message.Height
 		model.ensureHomeMenu()
 		model.homeMenu.setSize(model.width, model.height)
-		if model.screen == dashboardLogDetail && model.logScroll > maximumLogScroll(model.logDetail, model.logDetailHeight()) {
-			model.logScroll = maximumLogScroll(model.logDetail, model.logDetailHeight())
+		if model.screen == dashboardLogDetail && model.maintenance.logScroll > maximumLogScroll(model.maintenance.logDetail, model.logDetailHeight()) {
+			model.maintenance.logScroll = maximumLogScroll(model.maintenance.logDetail, model.logDetailHeight())
 		}
 		if model.screen == dashboardUpdateReview && model.updates.scroll > maximumUpdateScroll(model.updates.plan, model.updateReviewHeight()) {
 			model.updates.scroll = maximumUpdateScroll(model.updates.plan, model.updateReviewHeight())

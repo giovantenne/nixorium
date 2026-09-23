@@ -668,7 +668,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
 		}
 	case dashboardServices:
-		if model.serviceResult.Operation != "" {
+		if model.maintenance.serviceResult.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
 				model.screen = dashboardHome
@@ -680,7 +680,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 					return dashboardLogsMsg{report: model.actions.LoadLogs()}
 				}
 			case "r":
-				model.serviceResult = domain.ServiceActionReport{}
+				model.maintenance.serviceResult = domain.ServiceActionReport{}
 				model.confirmation = ""
 				model.message = ""
 				model.screen = dashboardServicesRestartReview
@@ -698,7 +698,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				return dashboardServicesMsg{report: model.actions.LoadServices()}
 			}
 		case "r":
-			if len(model.services.Services) == 0 || model.services.Services[0].ID != "cache" || len(model.services.Services[0].Units) == 0 || !model.services.Services[0].Units[0].Loaded {
+			if len(model.maintenance.services.Services) == 0 || model.maintenance.services.Services[0].ID != "cache" || len(model.maintenance.services.Services[0].Units) == 0 || !model.maintenance.services.Services[0].Units[0].Loaded {
 				model.message = "Binary cache restart is unavailable because the managed unit is not installed."
 				return model, nil
 			}
@@ -750,12 +750,12 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				return model, model.loadSetup()
 			}
 		case "up", "k":
-			if model.logCursor > 0 {
-				model.logCursor--
+			if model.maintenance.logCursor > 0 {
+				model.maintenance.logCursor--
 			}
 		case "down", "j":
-			if model.logCursor+1 < len(model.logs.Logs) {
-				model.logCursor++
+			if model.maintenance.logCursor+1 < len(model.maintenance.logs.Logs) {
+				model.maintenance.logCursor++
 			}
 		case "f":
 			model.busy = "Refreshing private operation logs"
@@ -764,11 +764,11 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				return dashboardLogsMsg{report: model.actions.LoadLogs()}
 			}
 		case "enter":
-			if len(model.logs.Logs) == 0 || !model.logs.Logs[model.logCursor].Available {
+			if len(model.maintenance.logs.Logs) == 0 || !model.maintenance.logs.Logs[model.maintenance.logCursor].Available {
 				model.message = "The selected operation log is not available for safe reading."
 				return model, nil
 			}
-			id := model.logs.Logs[model.logCursor].ID
+			id := model.maintenance.logs.Logs[model.maintenance.logCursor].ID
 			model.busy = "Reading the bounded operation log tail"
 			model.message = ""
 			return model, func() tea.Msg {
@@ -776,33 +776,33 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			}
 		}
 	case dashboardLogDetail:
-		maximum := maximumLogScroll(model.logDetail, model.logDetailHeight())
+		maximum := maximumLogScroll(model.maintenance.logDetail, model.logDetailHeight())
 		switch key.String() {
 		case "esc", "left":
 			model.screen = dashboardLogs
 			model.message = ""
 		case "up", "k":
-			if model.logScroll > 0 {
-				model.logScroll--
+			if model.maintenance.logScroll > 0 {
+				model.maintenance.logScroll--
 			}
 		case "down", "j":
-			if model.logScroll < maximum {
-				model.logScroll++
+			if model.maintenance.logScroll < maximum {
+				model.maintenance.logScroll++
 			}
 		case "pgup":
-			model.logScroll -= model.logDetailHeight()
-			if model.logScroll < 0 {
-				model.logScroll = 0
+			model.maintenance.logScroll -= model.logDetailHeight()
+			if model.maintenance.logScroll < 0 {
+				model.maintenance.logScroll = 0
 			}
 		case "pgdown":
-			model.logScroll += model.logDetailHeight()
-			if model.logScroll > maximum {
-				model.logScroll = maximum
+			model.maintenance.logScroll += model.logDetailHeight()
+			if model.maintenance.logScroll > maximum {
+				model.maintenance.logScroll = maximum
 			}
 		case "home":
-			model.logScroll = 0
+			model.maintenance.logScroll = 0
 		case "end":
-			model.logScroll = maximum
+			model.maintenance.logScroll = maximum
 		}
 	default:
 		return model.updateRepositoryScreenKey(key)
@@ -813,7 +813,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardGitReview:
-		if model.gitCommitResult.Operation != "" {
+		if model.maintenance.gitCommitResult.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
 				if model.setupMode {
@@ -828,7 +828,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 					model.message = ""
 				}
 			case "f":
-				model.gitCommitResult = domain.GitCommitReport{}
+				model.maintenance.gitCommitResult = domain.GitCommitReport{}
 				model.busy = "Refreshing the read-only Git review"
 				model.message = ""
 				return model, func() tea.Msg {
@@ -837,7 +837,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 			return model, nil
 		}
-		maximum := maximumGitReviewScroll(model.gitReview, model.gitReviewHeight())
+		maximum := maximumGitReviewScroll(model.maintenance.gitReview, model.gitReviewHeight())
 		switch key.String() {
 		case "esc", "left":
 			if model.setupMode {
@@ -851,27 +851,27 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				return model, model.loadSetup()
 			}
 		case "up", "k":
-			if model.gitScroll > 0 {
-				model.gitScroll--
+			if model.maintenance.gitScroll > 0 {
+				model.maintenance.gitScroll--
 			}
 		case "down", "j":
-			if model.gitScroll < maximum {
-				model.gitScroll++
+			if model.maintenance.gitScroll < maximum {
+				model.maintenance.gitScroll++
 			}
 		case "pgup":
-			model.gitScroll -= model.gitReviewHeight()
-			if model.gitScroll < 0 {
-				model.gitScroll = 0
+			model.maintenance.gitScroll -= model.gitReviewHeight()
+			if model.maintenance.gitScroll < 0 {
+				model.maintenance.gitScroll = 0
 			}
 		case "pgdown":
-			model.gitScroll += model.gitReviewHeight()
-			if model.gitScroll > maximum {
-				model.gitScroll = maximum
+			model.maintenance.gitScroll += model.gitReviewHeight()
+			if model.maintenance.gitScroll > maximum {
+				model.maintenance.gitScroll = maximum
 			}
 		case "home":
-			model.gitScroll = 0
+			model.maintenance.gitScroll = 0
 		case "end":
-			model.gitScroll = maximum
+			model.maintenance.gitScroll = maximum
 		case "f":
 			model.busy = "Refreshing the read-only Git review"
 			model.message = ""
@@ -879,38 +879,38 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
 			}
 		case "c":
-			if len(model.gitReview.Changes) == 0 || model.gitReview.HasErrors() {
+			if len(model.maintenance.gitReview.Changes) == 0 || model.maintenance.gitReview.HasErrors() {
 				model.message = "A clean, unblocked change review is required before selecting commit paths."
 				return model, nil
 			}
-			model.gitCommitChosen = map[string]bool{}
-			model.gitCommitCursor = 0
+			model.maintenance.gitCommitChosen = map[string]bool{}
+			model.maintenance.gitCommitCursor = 0
 			model.message = ""
 			model.screen = dashboardGitCommitSelect
 		}
 	case dashboardGitCommitSelect:
-		changes := model.gitReview.Changes
+		changes := model.maintenance.gitReview.Changes
 		switch key.String() {
 		case "esc", "left":
 			model.screen = dashboardGitReview
 			model.message = ""
 		case "up", "k":
-			if model.gitCommitCursor > 0 {
-				model.gitCommitCursor--
+			if model.maintenance.gitCommitCursor > 0 {
+				model.maintenance.gitCommitCursor--
 			}
 		case "down", "j":
-			if model.gitCommitCursor+1 < len(changes) {
-				model.gitCommitCursor++
+			if model.maintenance.gitCommitCursor+1 < len(changes) {
+				model.maintenance.gitCommitCursor++
 			}
 		case "space":
-			if len(changes) > 0 && !changes[model.gitCommitCursor].Private {
-				path := changes[model.gitCommitCursor].Path
-				model.gitCommitChosen[path] = !model.gitCommitChosen[path]
+			if len(changes) > 0 && !changes[model.maintenance.gitCommitCursor].Private {
+				path := changes[model.maintenance.gitCommitCursor].Path
+				model.maintenance.gitCommitChosen[path] = !model.maintenance.gitCommitChosen[path]
 			}
 		case "a":
-			model.gitCommitChosen = toggleAllGitCommitPaths(changes, model.gitCommitChosen)
+			model.maintenance.gitCommitChosen = toggleAllGitCommitPaths(changes, model.maintenance.gitCommitChosen)
 		case "enter":
-			paths := selectedGitCommitPaths(changes, model.gitCommitChosen)
+			paths := selectedGitCommitPaths(changes, model.maintenance.gitCommitChosen)
 			if paths == "" {
 				model.message = "Select at least one changed path before creating a commit plan."
 				return model, nil
@@ -922,29 +922,29 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 		}
 	case dashboardGitCommitReview:
-		maximum := maximumGitCommitPlanScroll(model.gitCommitPlan, model.gitReviewHeight())
+		maximum := maximumGitCommitPlanScroll(model.maintenance.gitCommitPlan, model.gitReviewHeight())
 		switch key.String() {
 		case "esc":
 			model.screen = dashboardGitCommitSelect
 			model.confirmation = ""
 			model.message = "Git commit cancelled; no repository state changed."
 		case "up":
-			if model.gitScroll > 0 {
-				model.gitScroll--
+			if model.maintenance.gitScroll > 0 {
+				model.maintenance.gitScroll--
 			}
 		case "down":
-			if model.gitScroll < maximum {
-				model.gitScroll++
+			if model.maintenance.gitScroll < maximum {
+				model.maintenance.gitScroll++
 			}
 		case "pgup":
-			model.gitScroll -= model.gitReviewHeight()
-			if model.gitScroll < 0 {
-				model.gitScroll = 0
+			model.maintenance.gitScroll -= model.gitReviewHeight()
+			if model.maintenance.gitScroll < 0 {
+				model.maintenance.gitScroll = 0
 			}
 		case "pgdown":
-			model.gitScroll += model.gitReviewHeight()
-			if model.gitScroll > maximum {
-				model.gitScroll = maximum
+			model.maintenance.gitScroll += model.gitReviewHeight()
+			if model.maintenance.gitScroll > maximum {
+				model.maintenance.gitScroll = maximum
 			}
 		case "backspace":
 			value := []rune(model.confirmation)
@@ -954,7 +954,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 		case "space":
 			model.confirmation += " "
 		case "enter":
-			if model.confirmation != model.gitCommitPlan.Confirmation {
+			if model.confirmation != model.maintenance.gitCommitPlan.Confirmation {
 				model.confirmation = ""
 				model.message = "Confirmation did not match; no Git commit was created."
 				return model, nil
@@ -962,7 +962,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.busy = "Revalidating and creating the reviewed local commit"
 			model.confirmation = ""
 			model.message = ""
-			plan := model.gitCommitPlan
+			plan := model.maintenance.gitCommitPlan
 			return model, func() tea.Msg {
 				result := model.actions.ApplyGitCommit(plan)
 				return dashboardGitCommitResultMsg{report: result, review: model.actions.LoadGitReview()}
