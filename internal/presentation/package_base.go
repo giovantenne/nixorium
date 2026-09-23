@@ -12,7 +12,7 @@ import (
 type dashboardPackageBaseMsg struct{ report domain.PackageBaseStatus }
 
 func (model dashboardModel) updateTitle() string {
-	if model.baseUpdate {
+	if model.updates.packageBase {
 		return "Update system and packages"
 	}
 	return "Update Nixorium"
@@ -26,14 +26,14 @@ func (model dashboardModel) saveReviewedUpdate(plan domain.UpdatePlanReport) dom
 }
 
 func (model dashboardModel) openPackageBase() (tea.Model, tea.Cmd) {
-	model.baseUpdate, model.baseEditing, model.baseAllowUnverified = true, false, false
+	model.updates.packageBase, model.updates.baseEditing, model.updates.allowUnverified = true, false, false
 	model.screen = dashboardUpdate
-	model.updatePlan, model.updateResult = domain.UpdatePlanReport{}, domain.UpdateApplyReport{}
+	model.updates.plan, model.updates.result = domain.UpdatePlanReport{}, domain.UpdateApplyReport{}
 	model.controller.plan, model.controller.result = domain.ControllerRebuildPlanReport{}, domain.ControllerRebuildExecutionReport{}
-	model.message, model.baseTarget = "", ""
-	model.baseStatus = domain.PackageBaseStatus{}
+	model.message, model.updates.baseTarget = "", ""
+	model.updates.baseStatus = domain.PackageBaseStatus{}
 	if model.actions.LoadPackageBase == nil || model.actions.PlanPackageBase == nil || model.actions.SavePackageBase == nil {
-		model.baseStatus.Issues = []domain.ValidationIssue{{Field: "capability", Message: "System updates are unavailable in this session"}}
+		model.updates.baseStatus.Issues = []domain.ValidationIssue{{Field: "capability", Message: "System updates are unavailable in this session"}}
 		return model, nil
 	}
 	model.busy = "Reading the system and package pin"
@@ -41,12 +41,12 @@ func (model dashboardModel) openPackageBase() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) packageBaseView() string {
-	lines := []string{tuiTitle(model.updateTitle(), model.isDark), "", "Channel: " + model.baseStatus.Channel,
-		"Revision: " + shortRevision(model.baseStatus.Revision), "", "Updates can change kernel, desktop, services and applications.",
+	lines := []string{tuiTitle(model.updateTitle(), model.isDark), "", "Channel: " + model.updates.baseStatus.Channel,
+		"Revision: " + shortRevision(model.updates.baseStatus.Revision), "", "Updates can change kernel, desktop, services and applications.",
 		"Nixorium and other input sources keep their existing revisions."}
 	actions := []tuiAction{{key: "Enter", label: "Check and build"}, {key: "m", label: "Change channel"}, {key: "r", label: "Refresh"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}
-	if model.baseEditing {
-		lines = append(lines, "", "Target channel: "+model.baseTarget+"_", fmt.Sprintf("[%s] Accept unverified channel compatibility", map[bool]string{true: "x", false: " "}[model.baseAllowUnverified]), "A channel change requires this acknowledgement. Build failures still block.")
+	if model.updates.baseEditing {
+		lines = append(lines, "", "Target channel: "+model.updates.baseTarget+"_", fmt.Sprintf("[%s] Accept unverified channel compatibility", map[bool]string{true: "x", false: " "}[model.updates.allowUnverified]), "A channel change requires this acknowledgement. Build failures still block.")
 		actions = []tuiAction{{key: "Space", label: "Acknowledge"}, {key: "Enter", label: "Validate channel"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	} else {
 		lines = append(lines, "", "Enter checks for a newer revision of the current channel.", "Review comes before saving and controller activation.")
@@ -55,8 +55,8 @@ func (model dashboardModel) packageBaseView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	if len(model.baseStatus.Issues) > 0 {
-		lines = append(lines, "", operationLogIssues(model.baseStatus.Issues))
+	if len(model.updates.baseStatus.Issues) > 0 {
+		lines = append(lines, "", operationLogIssues(model.updates.baseStatus.Issues))
 		actions = []tuiAction{{key: "r", label: "Refresh"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}
 	}
 	return model.renderShell(tuiShell{path: []string{"Maintenance", model.updateTitle()}, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
@@ -64,40 +64,40 @@ func (model dashboardModel) packageBaseView() string {
 
 func (model dashboardModel) updatePackageBaseKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if key.String() == "esc" {
-		if model.baseEditing {
-			model.baseEditing = false
-			model.baseTarget = model.baseStatus.Channel
-			model.baseAllowUnverified = false
+		if model.updates.baseEditing {
+			model.updates.baseEditing = false
+			model.updates.baseTarget = model.updates.baseStatus.Channel
+			model.updates.allowUnverified = false
 		} else {
 			model.screen = dashboardAdministration
 		}
 		return model, nil
 	}
-	if len(model.baseStatus.Issues) > 0 {
+	if len(model.updates.baseStatus.Issues) > 0 {
 		if key.String() == "r" {
 			return model.openPackageBase()
 		}
 		return model, nil
 	}
-	if model.baseEditing {
+	if model.updates.baseEditing {
 		switch key.String() {
 		case "space":
-			model.baseAllowUnverified = !model.baseAllowUnverified
+			model.updates.allowUnverified = !model.updates.allowUnverified
 		case "backspace":
-			if len(model.baseTarget) > 0 {
-				model.baseTarget = model.baseTarget[:len(model.baseTarget)-1]
+			if len(model.updates.baseTarget) > 0 {
+				model.updates.baseTarget = model.updates.baseTarget[:len(model.updates.baseTarget)-1]
 			}
 		case "enter":
-			if model.baseTarget != model.baseStatus.Channel && !model.baseAllowUnverified {
+			if model.updates.baseTarget != model.updates.baseStatus.Channel && !model.updates.allowUnverified {
 				model.message = "Acknowledge unverified compatibility before validating a new channel."
 				return model, nil
 			}
-			return model.startPackageBasePlan(model.baseTarget, model.baseAllowUnverified)
+			return model.startPackageBasePlan(model.updates.baseTarget, model.updates.allowUnverified)
 		default:
 			for _, c := range key.Text {
 				if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-' {
-					if len(model.baseTarget) < 32 {
-						model.baseTarget += string(c)
+					if len(model.updates.baseTarget) < 32 {
+						model.updates.baseTarget += string(c)
 					}
 				}
 			}
@@ -108,8 +108,8 @@ func (model dashboardModel) updatePackageBaseKey(key tea.KeyPressMsg) (tea.Model
 	case "r":
 		return model.openPackageBase()
 	case "m":
-		model.baseEditing = true
-		model.baseAllowUnverified = false
+		model.updates.baseEditing = true
+		model.updates.allowUnverified = false
 		model.message = ""
 	case "enter":
 		return model.startPackageBasePlan("current", false)
@@ -118,13 +118,13 @@ func (model dashboardModel) updatePackageBaseKey(key tea.KeyPressMsg) (tea.Model
 }
 
 func (model dashboardModel) startPackageBasePlan(target string, allow bool) (tea.Model, tea.Cmd) {
-	model.baseEditing = false
-	model.updateTarget, model.message = target, ""
-	model.busy, model.updatePlanning = "Validating system and package update", true
-	model.updatePlanProgress = domain.UpdatePlanProgress{}
-	model.updatePlanStarted = time.Now().UTC()
+	model.updates.baseEditing = false
+	model.updates.target, model.message = target, ""
+	model.busy, model.updates.planning = "Validating system and package update", true
+	model.updates.planProgress = domain.UpdatePlanProgress{}
+	model.updates.planStarted = time.Now().UTC()
 	events := make(chan tea.Msg)
-	model.updatePlanEvents = events
+	model.updates.planEvents = events
 	action := func(target string, acknowledge, _ bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
 		return model.actions.PlanPackageBase(target, acknowledge, progress)
 	}

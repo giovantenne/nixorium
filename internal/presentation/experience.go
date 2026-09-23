@@ -225,7 +225,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
 		lines = append(lines, "c select commit paths   Space select   a all safe paths", "f refresh review   ↑/↓/pg scroll patch", "Exact confirmation creates a local commit; nothing is pushed.")
 	case dashboardUpdate, dashboardUpdateReview:
-		if model.baseUpdate {
+		if model.updates.packageBase {
 			lines = append(lines, "Enter check current channel   m change channel   r inspect pin", "In the channel form, type nixos-YY.MM and Space to acknowledge unverified compatibility.", "Review/build precedes saving and controller activation. Client distribution is separate.", "Build success does not verify runtime or hardware; check boot and services afterwards.")
 		} else {
 			lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation prepares the selected version, checks the lab configuration and tests required systems without saving it.", "On the review, Enter saves and activates; Esc cancels.", "After result: r new update")
@@ -381,7 +381,7 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 }
 
 func (model dashboardModel) textEntry() bool {
-	if model.screen == dashboardUpdate && model.baseUpdate && model.baseEditing {
+	if model.screen == dashboardUpdate && model.updates.packageBase && model.updates.baseEditing {
 		return true
 	}
 	if model.screen == dashboardSetupKeys && model.setupKeyImporting {
@@ -427,28 +427,28 @@ func phaseSteps(labels []string, current int, complete bool, dark bool) []string
 }
 
 func (model dashboardModel) releaseReviewView() string {
-	lines := []string{tuiTitle("Review Nixorium update", model.isDark), "", tuiSection("Validated release", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updatePlan.CurrentRef, model.updatePlan.Target, model.updatePlan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updatePlan.Checks))}
-	if model.baseUpdate {
+	lines := []string{tuiTitle("Review Nixorium update", model.isDark), "", tuiSection("Validated release", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updates.plan.CurrentRef, model.updates.plan.Target, model.updates.plan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updates.plan.Checks))}
+	if model.updates.packageBase {
 		lines[0] = tuiTitle("Review system and package update", model.isDark)
 		lines[2] = "Kernel, services and application versions may all change"
-		if base := model.updatePlan.PackageBase; base != nil {
+		if base := model.updates.plan.PackageBase; base != nil {
 			lines[3] = fmt.Sprintf("%s → %s · %s → %s", base.CurrentChannel, base.TargetChannel, shortRevision(base.CurrentRevision), shortRevision(base.TargetRevision))
 		}
 	}
 	if model.updateDetails || model.height == 0 {
-		lines = append(lines, "Revision: "+model.updatePlan.Revision, fmt.Sprintf("Downgrade: %t", model.updatePlan.Downgrade))
-		for _, check := range model.updatePlan.Checks {
+		lines = append(lines, "Revision: "+model.updates.plan.Revision, fmt.Sprintf("Downgrade: %t", model.updates.plan.Downgrade))
+		for _, check := range model.updates.plan.Checks {
 			lines = append(lines, check.ID+" · "+check.State+" · "+check.Message)
 		}
 	}
-	patch := strings.Split(strings.TrimSuffix(model.updatePlan.Diff.Content, "\n"), "\n")
-	start := min(model.updateScroll, max(0, len(patch)-model.updateReviewHeight()))
+	patch := strings.Split(strings.TrimSuffix(model.updates.plan.Diff.Content, "\n"), "\n")
+	start := min(model.updates.scroll, max(0, len(patch)-model.updateReviewHeight()))
 	end := min(len(patch), start+model.updateReviewHeight())
 	lines = append(lines, "", fmt.Sprintf("Diff lines %d-%d of %d", start+1, end, len(patch)))
 	lines = append(lines, patch[start:end]...)
 	lines = append(lines, "", "Press Enter to save this validated update and activate the controller.")
 	notices := []tuiNotice{}
-	if model.baseUpdate {
+	if model.updates.packageBase {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Builds passed; runtime and hardware remain unverified", detail: "Check the controller and a selected client before distributing to the fleet."})
 	}
 	if model.message != "" {
