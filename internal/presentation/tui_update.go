@@ -654,30 +654,30 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.screen = dashboardSettings
 		return model, nil
 	case dashboardSoftwareCatalogMsg:
-		if model.softwareSearchCancel != nil {
-			model.softwareSearchCancel()
-			model.softwareSearchCancel = nil
+		if model.software.searchCancel != nil {
+			model.software.searchCancel()
+			model.software.searchCancel = nil
 		}
 		model.busy = ""
-		model.softwareCatalog = message.report
-		model.softwareCursor = 0
-		model.softwareQuery = ""
-		model.softwareSearching = false
-		model.softwareSearch = domain.SoftwareSearchReport{}
-		model.softwareSearchBusy = false
-		model.softwareSearchID++
-		model.softwareMode = softwareSuggested
+		model.software.catalog = message.report
+		model.software.cursor = 0
+		model.software.query = ""
+		model.software.searching = false
+		model.software.search = domain.SoftwareSearchReport{}
+		model.software.searchBusy = false
+		model.software.searchID++
+		model.software.mode = softwareSuggested
 		if len(message.report.Packages) > 0 {
-			model.softwareMode = softwareConfigured
+			model.software.mode = softwareConfigured
 		}
 		model.message = message.report.Message
 		model.screen = dashboardSoftware
 		return model, nil
 	case dashboardSoftwareSearchStartMsg:
-		if model.screen != dashboardSoftware || model.softwareMode != softwareSearch || message.id != model.softwareSearchID || message.query != strings.TrimSpace(model.softwareQuery) || model.actions.SearchSoftware == nil {
+		if model.screen != dashboardSoftware || model.software.mode != softwareSearch || message.id != model.software.searchID || message.query != strings.TrimSpace(model.software.query) || model.actions.SearchSoftware == nil {
 			return model, nil
 		}
-		model.softwareSearchBusy = true
+		model.software.searchBusy = true
 		query := message.query
 		id := message.id
 		searchContext := message.ctx
@@ -685,16 +685,16 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			return dashboardSoftwareSearchMsg{id: id, report: model.actions.SearchSoftware(searchContext, query)}
 		}
 	case dashboardSoftwareSearchMsg:
-		if model.screen != dashboardSoftware || model.softwareMode != softwareSearch || message.id != model.softwareSearchID {
+		if model.screen != dashboardSoftware || model.software.mode != softwareSearch || message.id != model.software.searchID {
 			return model, nil
 		}
-		model.softwareSearchBusy = false
-		if model.softwareSearchCancel != nil {
-			model.softwareSearchCancel()
-			model.softwareSearchCancel = nil
+		model.software.searchBusy = false
+		if model.software.searchCancel != nil {
+			model.software.searchCancel()
+			model.software.searchCancel = nil
 		}
-		model.softwareSearch = message.report
-		model.softwareCursor = 0
+		model.software.search = message.report
+		model.software.cursor = 0
 		if message.report.HasErrors() {
 			model.message = message.report.Message
 		} else {
@@ -703,7 +703,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSoftwarePlanMsg:
 		model.busy = ""
-		model.softwarePlan = message.report
+		model.software.plan = message.report
 		model.message = message.report.Message
 		if message.report.HasErrors() || message.report.State == "unchanged" {
 			if message.report.Request.Present {
@@ -718,8 +718,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSoftwareApplyMsg:
 		model.busy = ""
-		model.softwareApplying = false
-		model.softwareResult = message.report
+		model.software.applying = false
+		model.software.result = message.report
 		model.message = message.report.Message
 		model.screen = dashboardSoftwareResult
 		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
@@ -728,7 +728,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSoftwareControllerMsg:
 		model.busy = ""
-		model.softwareApplying = false
+		model.software.applying = false
 		model.controllerPlan = message.plan
 		model.controllerResult = message.report
 		if message.plan.HasErrors() {
@@ -875,7 +875,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.hostCursor = 0
 		return model, nil
 	}
-	if model.screen == dashboardSoftware && model.softwareSearching {
+	if model.screen == dashboardSoftware && model.software.searching {
 		changed := false
 		switch key.String() {
 		case "tab":
@@ -885,23 +885,23 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			model = model.changeSoftwareMode(-1)
 			return model, nil
 		case "esc":
-			model.softwareSearching = false
+			model.software.searching = false
 		case "up", "down", "enter":
-			model.softwareSearching = false
+			model.software.searching = false
 			return model.updateSoftware(key)
 		case "backspace":
-			value := []rune(model.softwareQuery)
+			value := []rune(model.software.query)
 			if len(value) > 0 {
-				model.softwareQuery = string(value[:len(value)-1])
+				model.software.query = string(value[:len(value)-1])
 				changed = true
 			}
 		default:
-			if key.Text != "" && len(model.softwareQuery) < 80 {
-				model.softwareQuery += key.Text
+			if key.Text != "" && len(model.software.query) < 80 {
+				model.software.query += key.Text
 				changed = true
 			}
 		}
-		model.softwareCursor = 0
+		model.software.cursor = 0
 		if changed {
 			return model, model.scheduleSoftwareSearch()
 		}
@@ -911,7 +911,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.softwareApplying || model.shutdownApplying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.software.applying || model.shutdownApplying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -925,8 +925,8 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	if exitKey {
-		if model.softwareSearchCancel != nil {
-			model.softwareSearchCancel()
+		if model.software.searchCancel != nil {
+			model.software.searchCancel()
 		}
 		return model, tea.Quit
 	}

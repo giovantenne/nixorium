@@ -148,11 +148,11 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.message = ""
 		case "w":
 			model.screen = dashboardSoftware
-			model.softwareResult = domain.SoftwareChangeApplyReport{}
+			model.software.result = domain.SoftwareChangeApplyReport{}
 			model.controllerPlan = domain.ControllerRebuildPlanReport{}
 			model.controllerResult = domain.ControllerRebuildExecutionReport{}
-			model.softwareSearchID++
-			model.softwareSearchCancel = nil
+			model.software.searchID++
+			model.software.searchCancel = nil
 			model.busy = "Loading supported software from pinned inputs"
 			model.message = ""
 			if model.actions.LoadSoftware == nil {

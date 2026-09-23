@@ -137,16 +137,16 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 		}{
 			{
 				name:     "configured",
-				model:    dashboardModel{screen: dashboardSoftware, softwareDashboardState: softwareDashboardState{softwareCatalog: catalog}},
+				model:    dashboardModel{screen: dashboardSoftware, software: softwareModel{catalog: catalog}},
 				expected: []string{"Software", "Selected", "Review removal", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
 			},
 			{
 				name: "search input",
 				model: dashboardModel{
 					screen: dashboardSoftware,
-					softwareDashboardState: softwareDashboardState{
-						softwareCatalog: catalog, softwareMode: softwareSearch,
-						softwareSearching: true, softwareQuery: "gi",
+					software: softwareModel{
+						catalog: catalog, mode: softwareSearch,
+						searching: true, query: "gi",
 					},
 				},
 				expected: []string{"Search packages", "Package name", "gi_", "Type", "Search", "Results", "Stop typing", "Help"},
@@ -155,12 +155,12 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 				name: "scope",
 				model: dashboardModel{
 					screen: dashboardSoftwareScope,
-					softwareDashboardState: softwareDashboardState{
-						softwareCatalog:      catalog,
-						softwareSelected:     "gimp",
-						softwareScopeCursor:  len((dashboardModel{softwareDashboardState: softwareDashboardState{softwareCatalog: catalog}}).softwareScopeOptions()) - 1,
-						softwareClientCursor: len(catalog.Clients) - 1,
-						softwareClients:      map[string]bool{"pc03": true},
+					software: softwareModel{
+						catalog:      catalog,
+						selected:     "gimp",
+						scopeCursor:  len((dashboardModel{software: softwareModel{catalog: catalog}}).softwareScopeOptions()) - 1,
+						clientCursor: len(catalog.Clients) - 1,
+						clients:      map[string]bool{"pc03": true},
 					},
 				},
 				expected: []string{"Software  /  Scope", "pc03", "Space", "Toggle", "Enter", "Review", "Esc", "Catalog", "Help"},
@@ -169,9 +169,9 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 				name: "review",
 				model: dashboardModel{
 					screen: dashboardSoftwareReview,
-					softwareDashboardState: softwareDashboardState{
-						softwareCatalog: catalog,
-						softwarePlan: domain.SoftwareChangePlanReport{
+					software: softwareModel{
+						catalog: catalog,
+						plan: domain.SoftwareChangePlanReport{
 							Request:     domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
 							ManagedFile: "lab-software.json", AffectedClients: catalog.Clients,
 						},
@@ -183,8 +183,8 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 				name: "partial result",
 				model: dashboardModel{
 					screen: dashboardSoftwareResult,
-					softwareDashboardState: softwareDashboardState{
-						softwareResult: domain.SoftwareChangeApplyReport{
+					software: softwareModel{
+						result: domain.SoftwareChangeApplyReport{
 							State: "partial", Message: "Durability could not be confirmed.",
 							Issues: []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
 						},
@@ -222,10 +222,10 @@ func TestConfiguredSoftwareViewportKeepsFocusedItemVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		model := dashboardModel{
 			screen: dashboardSoftware, width: size[0], height: size[1], isDark: true,
-			softwareDashboardState: softwareDashboardState{softwareCatalog: catalog, softwareMode: softwareConfigured},
+			software: softwareModel{catalog: catalog, mode: softwareConfigured},
 		}
 		for index := range catalog.Packages {
-			model.softwareCursor = index
+			model.software.cursor = index
 			view := model.View().Content
 			label := fmt.Sprintf("%-20s", fmt.Sprintf("Package %02d", index+1))
 			if !strings.Contains(view, tuiSelection(label, true, true)) {
@@ -250,7 +250,7 @@ func TestConfiguredSoftwareListSummarizesExplicitClientScope(t *testing.T) {
 	catalog.Packages[0].Scope = domain.SoftwareScope{Kind: domain.SoftwareScopeClients, Clients: clients}
 	model := dashboardModel{
 		screen: dashboardSoftware, width: 80, height: 24,
-		softwareDashboardState: softwareDashboardState{softwareCatalog: catalog, softwareMode: softwareConfigured},
+		software: softwareModel{catalog: catalog, mode: softwareConfigured},
 	}
 	view := model.View().Content
 	if !strings.Contains(view, "20 selected clients") || strings.Contains(view, "pc01, pc02") {
@@ -522,16 +522,16 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.hostCursor = 199
 			m.deployCursor = 199
 			m.deployPlan = domain.DeploymentPlanReport{Revision: strings.Repeat("a", 40), ColmenaSelector: "@lab", Targets: []domain.DeploymentTarget{{Name: "pc01"}}}
-			m.softwareCatalog = domain.SoftwareCatalogReport{
+			m.software.catalog = domain.SoftwareCatalogReport{
 				State: "ready", ManagedFile: "lab-software.json",
 				Catalog: []domain.SoftwareCatalogItem{{ID: "gimp", Label: "GIMP", Summary: "Edit bitmap images", Availability: "available"}},
 				Clients: hostMetaNames(m.report.Meta.Clients.Hosts), Groups: map[string][]string{}, Issues: []domain.ValidationIssue{},
 			}
-			m.softwareSelected = "gimp"
-			m.softwareScopeCursor = len(m.softwareScopeOptions()) - 1
-			m.softwareClientCursor = 199
-			m.softwarePlan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.softwareCatalog.Clients, Confirmation: "SAVE"}
-			m.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
+			m.software.selected = "gimp"
+			m.software.scopeCursor = len(m.softwareScopeOptions()) - 1
+			m.software.clientCursor = 199
+			m.software.plan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.software.catalog.Clients, Confirmation: "SAVE"}
+			m.software.result = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 			m.shutdownCursor = 199
 			m.shutdownChosen = map[string]bool{"pc200": true}
 			m.shutdownPlan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
@@ -831,25 +831,25 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.deployChosen = map[string]bool{"pc01": true, "pc02": true}
 		case "software":
 			m.screen = dashboardSoftware
-			m.softwareCatalog = testSoftwareCatalogReport()
+			m.software.catalog = testSoftwareCatalogReport()
 		case "software-scope":
 			m.screen = dashboardSoftwareScope
-			m.softwareCatalog = testSoftwareCatalogReport()
-			m.softwareSelected = "gimp"
-			m.softwareClients = map[string]bool{}
+			m.software.catalog = testSoftwareCatalogReport()
+			m.software.selected = "gimp"
+			m.software.clients = map[string]bool{}
 		case "software-confirmation":
 			m.screen = dashboardSoftwareReview
-			m.softwarePlan = domain.SoftwareChangePlanReport{
+			m.software.plan = domain.SoftwareChangePlanReport{
 				State: "ready", ManagedFile: "lab-software.json",
 				Request:         domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
 				AffectedClients: []string{"pc01", "pc02", "pc03"}, Confirmation: "SAVE",
 			}
 		case "software-result":
 			m.screen = dashboardSoftwareResult
-			m.softwareResult = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
+			m.software.result = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 		case "software-partial":
 			m.screen = dashboardSoftwareResult
-			m.softwareResult = domain.SoftwareChangeApplyReport{
+			m.software.result = domain.SoftwareChangeApplyReport{
 				State:   "partial",
 				Message: "lab-software.json was replaced, but durable storage could not be confirmed.",
 				Issues:  []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},

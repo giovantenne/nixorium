@@ -117,8 +117,8 @@ func TestActivePXEStopFailureKeepsDashboardOpen(t *testing.T) {
 func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 	model := experienceFixture(2)
 	model.screen = dashboardSoftware
-	model.softwareCatalog = testSoftwareCatalogReport()
-	model.softwareCursor = 1
+	model.software.catalog = testSoftwareCatalogReport()
+	model.software.cursor = 1
 	model.actions.PlanSoftware = func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 		return domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "REMOVE"}
 	}
@@ -132,8 +132,8 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftware || model.softwareSelected != "vlc" || model.softwareCursor != 1 {
-		t.Fatalf("removal cancellation lost its origin: screen=%d selected=%q cursor=%d", model.screen, model.softwareSelected, model.softwareCursor)
+	if model.screen != dashboardSoftware || model.software.selected != "vlc" || model.software.cursor != 1 {
+		t.Fatalf("removal cancellation lost its origin: screen=%d selected=%q cursor=%d", model.screen, model.software.selected, model.software.cursor)
 	}
 	if strings.Contains(model.View().Content, "Add VLC") {
 		t.Fatalf("removal cancellation opened an add flow:\n%s", model.View().Content)
