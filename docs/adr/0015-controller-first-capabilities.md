@@ -52,9 +52,14 @@ typed controller plan/apply boundary.
 
 Bootstrap capability `lib.controllerBootstrapVersion = 1` collects teacher and
 student identities, timezone, keyboard, and all three passwords before disk
-installation. It persists controller mode with US internal locales and defers
-client networking and keys. Installers for older revisions remain on their
-legacy workflow rather than invoking an unsupported command.
+installation. Capability version 2 adds a reviewed initial software-profile
+choice after those settings. The profile catalog and helper come from the same
+resolved template revision; the launcher writes only `lab-software.json` before
+Git initialization, Nix evaluation, or disk changes. Version 1 remains
+supported without the extra prompt. Both versions persist controller mode with
+US internal locales and defer client networking and keys. Installers for older
+revisions remain on their legacy workflow rather than invoking an unsupported
+command.
 
 Keyboard is the first controller-setting prompt, and bootstrap must activate
 the selected console keymap successfully before collecting any other value. It

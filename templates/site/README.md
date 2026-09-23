@@ -28,7 +28,10 @@ mode requires `pcCount: 0`; it permits local controller activation with secure
 account credentials, without lab keys or the client DHCP hint. Lab networking,
 cache and remote-control services are inactive; fleet readiness remains false.
 Existing deployments are not migrated automatically. New controller bootstrap
-sets this mode after collecting keyboard, accounts, time zone, and passwords.
+sets this mode after collecting keyboard, accounts, time zone, and passwords,
+then asks for the initial software profile before the first build or disk
+change. The selected profile becomes ordinary `shared` declarations in
+`lab-software.json`; it does not remain an active policy.
 Use the official [NixOS Minimal ISO](https://nixos.org/download/#nixos-iso) in
 UEFI mode for controller bootstrap. It provides the expected Linux text
 console: keyboard is the first settings prompt, and the selected console keymap

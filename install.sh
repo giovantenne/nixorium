@@ -229,11 +229,15 @@ collect_bootstrap_configuration() {
     fi
     case "${CONFIRMATION,,}" in
       ""|y|yes)
-        exec {BOOTSTRAP_INPUT_FD}<&-
+        if [[ "$BOOTSTRAP_VERSION" == "1" ]]; then
+          exec {BOOTSTRAP_INPUT_FD}<&-
+          BOOTSTRAP_INPUT_FD=""
+        fi
         return
         ;;
       n|no)
         exec {BOOTSTRAP_INPUT_FD}<&-
+        BOOTSTRAP_INPUT_FD=""
         echo "Controller installation cancelled; no settings were changed." >&2
         return 1
         ;;
@@ -474,6 +478,10 @@ TEMP_DISKO_LAYOUT="$(mktemp)"
 TEMP_DEPLOYMENT="$(mktemp -d)"
 
 cleanup() {
+  if [[ -n "$BOOTSTRAP_INPUT_FD" ]]; then
+    exec {BOOTSTRAP_INPUT_FD}<&-
+    BOOTSTRAP_INPUT_FD=""
+  fi
   BOOTSTRAP_ADMIN_HASH=""
   BOOTSTRAP_TEACHER_HASH=""
   BOOTSTRAP_STUDENT_HASH=""
@@ -487,11 +495,13 @@ if ! CAPABILITY_SOURCE="$(curl -fsSL "$CAPABILITY_URL")"; then
   echo "Error: could not inspect the installer at ${UPSTREAM_REV}." >&2
   exit 1
 fi
-if grep -Eq 'controllerBootstrapVersion[[:space:]]*=[[:space:]]*1;' <<< "$CAPABILITY_SOURCE"; then
+if grep -Eq 'controllerBootstrapVersion[[:space:]]*=[[:space:]]*2;' <<< "$CAPABILITY_SOURCE"; then
+  BOOTSTRAP_VERSION=2
+elif grep -Eq 'controllerBootstrapVersion[[:space:]]*=[[:space:]]*1;' <<< "$CAPABILITY_SOURCE"; then
   BOOTSTRAP_VERSION=1
 fi
 CAPABILITY_SOURCE=""
-if [[ "$BOOTSTRAP_VERSION" == "1" ]]; then
+if [[ "$BOOTSTRAP_VERSION" == "1" || "$BOOTSTRAP_VERSION" == "2" ]]; then
   collect_bootstrap_configuration
 else
   echo "Warning: ${RELEASE} uses the legacy post-install setup flow." >&2
@@ -529,12 +539,27 @@ curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
     echo "Error: could not configure the generated deployment for ${DECLARED_UPSTREAM_REF}." >&2
     exit 1
   fi
-  if [[ "$BOOTSTRAP_VERSION" == "1" ]]; then
+  if [[ "$BOOTSTRAP_VERSION" == "1" || "$BOOTSTRAP_VERSION" == "2" ]]; then
     configure_bootstrap_settings lab-settings.json
+  fi
+  if [[ "$BOOTSTRAP_VERSION" == "2" ]]; then
+    PROFILE_HELPER="scripts/configure-software-profile.sh"
+    if [[ ! -r "$PROFILE_HELPER" ]]; then
+      echo "Error: the selected revision advertises software profiles but its template helper is missing." >&2
+      exit 1
+    fi
+    # shellcheck source=/dev/null
+    source "$PROFILE_HELPER"
+    configure_site_software_profile software-presets.json lab-software.json "$BOOTSTRAP_INPUT_FD"
   fi
   "${GIT_COMMAND[@]}" init -b master
   "${GIT_COMMAND[@]}" add .
 )
+
+if [[ -n "$BOOTSTRAP_INPUT_FD" ]]; then
+  exec {BOOTSTRAP_INPUT_FD}<&-
+  BOOTSTRAP_INPUT_FD=""
+fi
 
 MASTER_HOST_NUMBER="$(
   sed -n 's/^[[:space:]]*"masterHostNumber":[[:space:]]*\([0-9][0-9]*\),*$/\1/p' \

@@ -56,7 +56,7 @@ INSTALLER
     printf 'layout-from-resolved-revision\n' > "$output"
     ;;
   https://raw.githubusercontent.com/giovantenne/nixorium/*/flake.nix)
-    printf '%s\n' 'controllerBootstrapVersion = 1;'
+    printf 'controllerBootstrapVersion = %s;\n' "${BOOTSTRAP_CAPABILITY_VERSION:-2}"
     ;;
   *)
     echo "unexpected curl URL: $url" >&2
@@ -120,12 +120,12 @@ export BOOTSTRAP_INSTALLER_LOG="$INSTALLER_LOG"
 export BOOTSTRAP_REVISION="$REVISION"
 export BOOTSTRAP_TEMPLATE="${REPO_ROOT}/templates/site"
 
-printf '%s\n\n\n\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
-  'it' \
+printf '%s\n' \
+  'it' '' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
-  '' > "$BOOTSTRAP_INPUT"
+  '' '3' 'vlc' '' > "$BOOTSTRAP_INPUT"
 
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_INSTALLER_REF="v2.0.0" \
@@ -185,6 +185,48 @@ if grep -F "Set account passwords" "${TEST_ROOT}/keymap-failure.out" >/dev/null 
 fi
 : > "$CALL_LOG"
 
+printf '%s\n' \
+  'it' '' '' '' \
+  'admin-secret' 'admin-secret' \
+  'teacher-secret' 'teacher-secret' \
+  'student-secret' 'student-secret' \
+  '' '' '' 'n' > "${TEST_ROOT}/profile-cancel-input"
+rm -f "$INSTALLER_LOG"
+if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+  NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/profile-cancel-input" \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/profile-cancel.out" 2>&1; then
+  echo "bootstrap accepted cancelled software profile" >&2
+  exit 1
+fi
+grep -F "Software profile review" "${TEST_ROOT}/profile-cancel.out" >/dev/null
+grep -F "disk was not changed" "${TEST_ROOT}/profile-cancel.out" >/dev/null
+test ! -e "$INSTALLER_LOG"
+: > "$CALL_LOG"
+
+V1_TARGET_ROOT="${TEST_ROOT}/v1-target"
+mkdir -p "${V1_TARGET_ROOT}/home/admin"
+rm -f "$INSTALLER_LOG"
+if ! NIXORIUM_TARGET_ROOT="$V1_TARGET_ROOT" \
+  NIXORIUM_BOOTSTRAP_TTY="$BOOTSTRAP_INPUT" \
+  BOOTSTRAP_CAPABILITY_VERSION=1 \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/v1-install.out" 2>&1; then
+  cat "${TEST_ROOT}/v1-install.out" >&2
+  exit 1
+fi
+if grep -F "Software profile" "${TEST_ROOT}/v1-install.out" >/dev/null; then
+  echo "bootstrap capability version 1 unexpectedly prompted for software" >&2
+  exit 1
+fi
+cmp "$REPO_ROOT/templates/site/lab-software.json" \
+  "${V1_TARGET_ROOT}/home/admin/nixorium-deployment/lab-software.json"
+test -f "$INSTALLER_LOG"
+: > "$CALL_LOG"
+rm -f "$INSTALLER_LOG"
+
 if ! NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_BOOTSTRAP_TTY="$BOOTSTRAP_INPUT" \
   timeout --foreground --kill-after=2s 10s \
@@ -214,6 +256,13 @@ LOADKEYS_LINE="$(grep -n -m1 -F 'loadkeys it2' "$CALL_LOG" | cut -d: -f1)"
 MKPASSWD_LINE="$(grep -n -m1 -F 'mkpasswd' "$CALL_LOG" | cut -d: -f1)"
 if (( LOADKEYS_LINE >= MKPASSWD_LINE )); then
   echo "bootstrap hashed a password before applying the selected keymap" >&2
+  exit 1
+fi
+PROFILE_PROMPT_LINE="$(grep -n -m1 -F 'Profile [essential]' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+SETTINGS_REVIEW_LINE="$(grep -n -m1 -F 'Continue with these settings?' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+INSTALL_LINE="$(grep -n -m1 -F 'Installing the controller from the generated private deployment' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+if (( PROFILE_PROMPT_LINE <= SETTINGS_REVIEW_LINE || PROFILE_PROMPT_LINE >= INSTALL_LINE )); then
+  echo "software profile was not selected after settings and before installation" >&2
   exit 1
 fi
 if grep -Eq 'flake lock|bootstrap configure|#lib.controllerBootstrapVersion|#labMeta' "$CALL_LOG"; then
@@ -253,6 +302,27 @@ jq -e '
   .lab.keyboardLayout == "it" and
   .lab.consoleKeyMap == "it2"
 ' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
+jq -e '
+  .schemaVersion == 1 and
+  all(.packages[]; .scope.kind == "shared") and
+  any(.packages[]; .package == "nodejs") and
+  any(.packages[]; .package == "opencode") and
+  any(.packages[]; .package == "pi-coding-agent") and
+  any(.packages[]; .package == "vscode") and
+  (any(.packages[]; .package == "vlc") | not)
+' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-software.json" >/dev/null
+test -f "${TARGET_ROOT}/home/admin/nixorium-deployment/software-presets.json"
+for path in \
+  '.cache/opencode' \
+  '.config/opencode' \
+  '.local/share/opencode' \
+  '.local/npm' \
+  '.npm' \
+  '.opencode' \
+  '.pi'; do
+  grep -F "\"$path\"" \
+    "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.nix" >/dev/null
+done
 if grep -R -F -e 'admin-secret' -e 'teacher-secret' -e 'student-secret' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment"; then
   echo "plaintext bootstrap password reached the deployment" >&2
