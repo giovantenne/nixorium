@@ -220,6 +220,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Split the dashboard state machine into focused asynchronous-message,
   global-key, primary-workflow, operational, repository, and PXE handlers.
   Presentation behavior and typed application callbacks remain unchanged.
+- Isolated Software, Computers, Deployment, Shutdown, Installation/PXE,
+  Settings, Controller, Update/Package Base and Maintenance state behind named
+  feature models, including job identity for delayed progress messages. Split
+  CLI family dispatch and reviewed apply boundaries out of the composition
+  root while preserving parser, text/JSON output and exit-code behavior.
 
 - Corrected the official `cache.nixos.org` public key used by both controller
   bootstrap stages. Signed substitutes are accepted again instead of being
