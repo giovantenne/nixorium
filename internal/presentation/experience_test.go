@@ -137,33 +137,44 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 		}{
 			{
 				name:     "configured",
-				model:    dashboardModel{screen: dashboardSoftware, softwareCatalog: catalog},
+				model:    dashboardModel{screen: dashboardSoftware, softwareDashboardState: softwareDashboardState{softwareCatalog: catalog}},
 				expected: []string{"Software", "Selected", "Review removal", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
 			},
 			{
 				name: "search input",
 				model: dashboardModel{
-					screen: dashboardSoftware, softwareCatalog: catalog, softwareMode: softwareSearch,
-					softwareSearching: true, softwareQuery: "gi",
+					screen: dashboardSoftware,
+					softwareDashboardState: softwareDashboardState{
+						softwareCatalog: catalog, softwareMode: softwareSearch,
+						softwareSearching: true, softwareQuery: "gi",
+					},
 				},
 				expected: []string{"Search packages", "Package name", "gi_", "Type", "Search", "Results", "Stop typing", "Help"},
 			},
 			{
 				name: "scope",
 				model: dashboardModel{
-					screen: dashboardSoftwareScope, softwareCatalog: catalog, softwareSelected: "gimp",
-					softwareScopeCursor:  len((dashboardModel{softwareCatalog: catalog}).softwareScopeOptions()) - 1,
-					softwareClientCursor: len(catalog.Clients) - 1, softwareClients: map[string]bool{"pc03": true},
+					screen: dashboardSoftwareScope,
+					softwareDashboardState: softwareDashboardState{
+						softwareCatalog:      catalog,
+						softwareSelected:     "gimp",
+						softwareScopeCursor:  len((dashboardModel{softwareDashboardState: softwareDashboardState{softwareCatalog: catalog}}).softwareScopeOptions()) - 1,
+						softwareClientCursor: len(catalog.Clients) - 1,
+						softwareClients:      map[string]bool{"pc03": true},
+					},
 				},
 				expected: []string{"Software  /  Scope", "pc03", "Space", "Toggle", "Enter", "Review", "Esc", "Catalog", "Help"},
 			},
 			{
 				name: "review",
 				model: dashboardModel{
-					screen: dashboardSoftwareReview, softwareCatalog: catalog,
-					softwarePlan: domain.SoftwareChangePlanReport{
-						Request:     domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
-						ManagedFile: "lab-software.json", AffectedClients: catalog.Clients,
+					screen: dashboardSoftwareReview,
+					softwareDashboardState: softwareDashboardState{
+						softwareCatalog: catalog,
+						softwarePlan: domain.SoftwareChangePlanReport{
+							Request:     domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
+							ManagedFile: "lab-software.json", AffectedClients: catalog.Clients,
+						},
 					},
 				},
 				expected: []string{"Software  /  Review", "Validated against the pinned package set", "Enter", "Save", "Esc", "Scope", "Help"},
@@ -172,9 +183,11 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 				name: "partial result",
 				model: dashboardModel{
 					screen: dashboardSoftwareResult,
-					softwareResult: domain.SoftwareChangeApplyReport{
-						State: "partial", Message: "Durability could not be confirmed.",
-						Issues: []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
+					softwareDashboardState: softwareDashboardState{
+						softwareResult: domain.SoftwareChangeApplyReport{
+							State: "partial", Message: "Durability could not be confirmed.",
+							Issues: []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
+						},
 					},
 				},
 				expected: []string{"Software  /  Result", "needs attention", "Retry save", "Esc", "Overview", "Help"},
@@ -207,7 +220,10 @@ func TestConfiguredSoftwareViewportKeepsFocusedItemVisible(t *testing.T) {
 	}
 
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		model := dashboardModel{screen: dashboardSoftware, softwareCatalog: catalog, softwareMode: softwareConfigured, width: size[0], height: size[1], isDark: true}
+		model := dashboardModel{
+			screen: dashboardSoftware, width: size[0], height: size[1], isDark: true,
+			softwareDashboardState: softwareDashboardState{softwareCatalog: catalog, softwareMode: softwareConfigured},
+		}
 		for index := range catalog.Packages {
 			model.softwareCursor = index
 			view := model.View().Content
@@ -232,7 +248,10 @@ func TestConfiguredSoftwareListSummarizesExplicitClientScope(t *testing.T) {
 		clients[index] = fmt.Sprintf("pc%02d", index+1)
 	}
 	catalog.Packages[0].Scope = domain.SoftwareScope{Kind: domain.SoftwareScopeClients, Clients: clients}
-	model := dashboardModel{screen: dashboardSoftware, softwareCatalog: catalog, softwareMode: softwareConfigured, width: 80, height: 24}
+	model := dashboardModel{
+		screen: dashboardSoftware, width: 80, height: 24,
+		softwareDashboardState: softwareDashboardState{softwareCatalog: catalog, softwareMode: softwareConfigured},
+	}
 	view := model.View().Content
 	if !strings.Contains(view, "20 selected clients") || strings.Contains(view, "pc01, pc02") {
 		t.Fatalf("configured software scope is not compact:\n%s", view)

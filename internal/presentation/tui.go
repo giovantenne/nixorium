@@ -200,37 +200,22 @@ type dashboardModel struct {
 	installationStage        int
 	installationFailed       bool
 
-	pxePreparing         bool
-	pxeProgress          domain.OperationProgress
-	pxeProgressStarted   time.Time
-	pxeProgressID        uint64
-	softwareCatalog      domain.SoftwareCatalogReport
-	softwareMode         softwareListMode
-	softwareCursor       int
-	softwareQuery        string
-	softwareSearching    bool
-	softwareSearch       domain.SoftwareSearchReport
-	softwareSearchID     uint64
-	softwareSearchBusy   bool
-	softwareSearchCancel context.CancelFunc
-	softwareSelected     string
-	softwareScopeCursor  int
-	softwareClientCursor int
-	softwareClients      map[string]bool
-	softwarePlan         domain.SoftwareChangePlanReport
-	softwareResult       domain.SoftwareChangeApplyReport
-	softwareApplying     bool
-	shutdownCursor       int
-	shutdownChosen       map[string]bool
-	shutdownPolicy       domain.ShutdownSessionPolicy
-	shutdownPlan         domain.ShutdownPlanReport
-	shutdownResult       domain.ShutdownApplyReport
-	shutdownApplying     bool
-	shutdownTechnical    bool
-	width                int
-	height               int
-	isDark               bool
-	activitySpinner      spinner.Model
+	pxePreparing       bool
+	pxeProgress        domain.OperationProgress
+	pxeProgressStarted time.Time
+	pxeProgressID      uint64
+	softwareDashboardState
+	shutdownCursor    int
+	shutdownChosen    map[string]bool
+	shutdownPolicy    domain.ShutdownSessionPolicy
+	shutdownPlan      domain.ShutdownPlanReport
+	shutdownResult    domain.ShutdownApplyReport
+	shutdownApplying  bool
+	shutdownTechnical bool
+	width             int
+	height            int
+	isDark            bool
+	activitySpinner   spinner.Model
 
 	initializing bool
 	initialError bool
@@ -814,7 +799,7 @@ func (model dashboardModel) View() tea.View {
 	default:
 		content = model.homeView()
 	}
-	view := tea.NewView(model.frame(content))
+	view := tea.NewView(content)
 	view.AltScreen = true
 	return view
 }
@@ -878,7 +863,7 @@ func (model dashboardModel) setupView() string {
 	if model.message != "" {
 		shell.notices = []tuiNotice{{kind: tuiStatusNeutral, title: model.message}}
 	}
-	return renderTUIShell(shell, model.width, model.isDark)
+	return model.renderShell(shell)
 }
 
 func (model dashboardModel) setupKeysView() string {
@@ -897,11 +882,11 @@ func (model dashboardModel) setupKeysView() string {
 		"",
 	}
 	if model.busy != "" {
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path:    path,
 			body:    strings.Join(append(lines, model.busyView()), "\n"),
 			actions: []tuiAction{{key: "F1", label: "Help"}},
-		}, model.width, model.isDark)
+		})
 	}
 	definitions := []struct {
 		name, label, purpose string
@@ -961,7 +946,7 @@ func (model dashboardModel) setupKeysView() string {
 	if model.message != "" {
 		shell.notices = []tuiNotice{{kind: tuiStatusNeutral, title: model.message}}
 	}
-	return renderTUIShell(shell, model.width, model.isDark)
+	return model.renderShell(shell)
 }
 
 func (model dashboardModel) selectedSetupKey() (domain.KeyMaterialState, bool) {
@@ -1099,7 +1084,7 @@ func (model dashboardModel) gitReviewView() string {
 	lines := []string{tuiTitle("Repository changes", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	if model.gitCommitResult.Operation != "" {
 		success := !model.gitCommitResult.HasErrors() && model.gitCommitResult.Committed
@@ -1121,7 +1106,7 @@ func (model dashboardModel) gitReviewView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "f", label: "Refresh review"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "f", label: "Refresh review"}, {key: "F1", label: "Help"}}})
 	}
 	content := gitReviewContentLines(model.gitReview)
 	height := model.gitReviewHeight()
@@ -1149,7 +1134,7 @@ func (model dashboardModel) gitReviewView() string {
 		actions = append(actions, tuiAction{key: "c", label: "Select commit paths"})
 	}
 	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 func (model dashboardModel) gitCommitSelectView() string {
@@ -1157,7 +1142,7 @@ func (model dashboardModel) gitCommitSelectView() string {
 	lines := []string{tuiTitle("Select paths for the local commit", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	start, end := listWindow(len(model.gitReview.Changes), model.gitCommitCursor, model.rowCapacity())
 	for index := start; index < end; index++ {
@@ -1176,7 +1161,7 @@ func (model dashboardModel) gitCommitSelectView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Toggle"}, {key: "a", label: "All safe"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Changes"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Toggle"}, {key: "a", label: "All safe"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Changes"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) gitCommitReviewView() string {
@@ -1184,7 +1169,7 @@ func (model dashboardModel) gitCommitReviewView() string {
 	lines := []string{tuiTitle("Review local commit", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	diffLines := strings.Split(strings.TrimSuffix(model.gitCommitPlan.Diff.Content, "\n"), "\n")
 	height := model.gitReviewHeight()
@@ -1204,12 +1189,17 @@ func (model dashboardModel) gitCommitReviewView() string {
 		"",
 	)
 	lines = append(lines, diffLines[model.gitScroll:end]...)
-	lines = append(lines, "", tuiSection("Type "+model.gitCommitPlan.Confirmation+" to continue:", model.isDark), "> "+model.confirmation+"_")
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓/Pg", label: "Scroll diff"}, {key: "Enter", label: "Create commit"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{
+		path:      path,
+		body:      strings.Join(lines, "\n"),
+		fixedBody: tuiSection("Type "+model.gitCommitPlan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+		notices:   notices,
+		actions:   []tuiAction{{key: "↑/↓/Pg", label: "Scroll diff"}, {key: "Enter", label: "Create commit"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
+	})
 }
 
 func selectedGitCommitPaths(changes []domain.GitChange, chosen map[string]bool) string {
@@ -1285,7 +1275,7 @@ func (model dashboardModel) updateView() string {
 		} else {
 			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "No deployment files or running systems change during these checks. The controller may download or build software locally, so this can take several minutes."})
 		}
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	if model.updateResult.Operation != "" {
 		success := !model.updateResult.HasErrors() && model.updateResult.Updated && model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() && model.controllerResult.Applied && model.controllerResult.Verified
@@ -1330,7 +1320,7 @@ func (model dashboardModel) updateView() string {
 			actions = append(actions, tuiAction{key: "a", label: "Retry controller"})
 		}
 		actions = append(actions, tuiAction{key: "r", label: retryLabel}, tuiAction{key: "Enter", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
-		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	if model.screen == dashboardUpdateReview {
 		return model.releaseReviewView()
@@ -1350,7 +1340,7 @@ func (model dashboardModel) updateView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "r", label: "Try again"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "r", label: "Try again"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}})
 	}
 
 	releases := model.availableUpdateReleases()
@@ -1404,7 +1394,7 @@ func (model dashboardModel) updateView() string {
 		actions = append(actions, tuiAction{key: "↑/↓", label: "Select"}, tuiAction{key: "Enter", label: "Validate"})
 	}
 	actions = append(actions, tuiAction{key: "p", label: prereleaseLabel}, tuiAction{key: "r", label: "Fetch again"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 func updatePlanPhaseLabels() []string {
@@ -1623,11 +1613,11 @@ func (model dashboardModel) controllerView() string {
 		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 		lines = append(lines, model.operationProgressView(model.controllerProgress, "Current progress")...)
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller update is running", detail: "Wait for the verified result before closing Nixorium."})
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}})
 	}
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	if model.screen == dashboardControllerReview {
 		body := strings.Join([]string{
@@ -1642,7 +1632,7 @@ func (model dashboardModel) controllerView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Update controller"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Update controller"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 	}
 	if model.controllerResult.Operation != "" {
 		resultTitle := "Controller action needs attention"
@@ -1671,7 +1661,7 @@ func (model dashboardModel) controllerView() string {
 			returnLabel = "Setup"
 		}
 		actions := []tuiAction{{key: "Enter", label: returnLabel}, {key: "d", label: detailsLabel}, {key: "l", label: "Logs"}, {key: "r", label: "New review"}, {key: "F1", label: "Help"}}
-		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	lines = append(lines,
 		"",
@@ -1680,7 +1670,7 @@ func (model dashboardModel) controllerView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "r", label: "Create review"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "r", label: "Create review"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) servicesView() string {
@@ -1692,7 +1682,7 @@ func (model dashboardModel) servicesView() string {
 	notices := []tuiNotice{}
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	if model.serviceResult.Operation != "" {
 		success := !model.serviceResult.HasErrors() && model.serviceResult.Verified
@@ -1708,22 +1698,25 @@ func (model dashboardModel) servicesView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "l", label: "Logs"}, {key: "r", label: "Restart again"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "l", label: "Logs"}, {key: "r", label: "Restart again"}, {key: "F1", label: "Help"}}})
 	}
 	if model.screen == dashboardServicesRestartReview {
 		body := strings.Join([]string{
 			tuiTitle("Restart the software cache?", model.isDark),
 			"",
 			"Affects  Controller cache; active installations may be affected",
-			"",
-			tuiSection("Type RESTART to continue:", model.isDark),
-			"> " + model.confirmation + "_",
 		}, "\n")
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The signed cache will be briefly unavailable", detail: "Active installers may retry downloads. PXE networking and listeners are unchanged; the cache is verified afterward."})
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Restart cache"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{
+			path:      append(path, "Review"),
+			body:      body,
+			fixedBody: tuiSection("Type RESTART to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+			notices:   notices,
+			actions:   []tuiAction{{key: "Enter", label: "Restart cache"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
+		})
 	}
 	for _, service := range model.services.Services {
 		kind := tuiStatusAttention
@@ -1754,7 +1747,7 @@ func (model dashboardModel) servicesView() string {
 		actions = append(actions, tuiAction{key: "r", label: "Review cache restart"})
 	}
 	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 func (model dashboardModel) serviceRestartAvailable() bool {
@@ -1766,7 +1759,7 @@ func (model dashboardModel) logsView() string {
 	lines := []string{tuiTitle("Operation history", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	lines = append(lines, tuiSection("Recent actions", model.isDark))
 	recordLimit := len(model.logs.Records)
@@ -1803,7 +1796,7 @@ func (model dashboardModel) logsView() string {
 		back = "Setup"
 	}
 	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 func (model dashboardModel) logDetailView() string {
@@ -1811,7 +1804,7 @@ func (model dashboardModel) logDetailView() string {
 	lines := []string{tuiTitle("Operation log detail", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	if model.logDetail.Log == nil {
 		lines = append(lines, "The selected operation log could not be read safely.")
@@ -1819,7 +1812,7 @@ func (model dashboardModel) logDetailView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Esc", label: "History"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Esc", label: "History"}, {key: "F1", label: "Help"}}})
 	}
 	entry := model.logDetail.Log
 	contentLines := operationLogContentLines(model.logDetail.Content)
@@ -1834,7 +1827,7 @@ func (model dashboardModel) logDetailView() string {
 		"",
 	)
 	lines = append(lines, contentLines[model.logScroll:end]...)
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "↑/↓/Pg/Home/End", label: "Scroll"}, {key: "Esc", label: "History"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "↑/↓/Pg/Home/End", label: "Scroll"}, {key: "Esc", label: "History"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) logDetailHeight() int {
@@ -1928,12 +1921,12 @@ func (model dashboardModel) deployView() string {
 			detail: "Detailed output is saved in the private log. Closing is disabled until this foreground operation returns.",
 		}}
 		shell.actions = []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}
-		return renderTUIShell(shell, model.width, model.isDark)
+		return model.renderShell(shell)
 	}
 	if model.busy != "" {
 		shell.body = model.busyView()
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
-		return renderTUIShell(shell, model.width, model.isDark)
+		return model.renderShell(shell)
 	}
 	if model.screen == dashboardDeployReview {
 		lines := []string{
@@ -1942,11 +1935,9 @@ func (model dashboardModel) deployView() string {
 			fmt.Sprintf("Affects  %s · %d computer(s)", model.deployPlan.ColmenaSelector, len(model.deployPlan.Targets)),
 			"",
 			tuiMuted("Reviewed revision  "+model.deployPlan.Revision, model.isDark),
-			"",
-			tuiSection("Type DEPLOY to continue:", model.isDark),
-			"> " + model.confirmation + "_",
 		}
 		shell.body = strings.Join(lines, "\n")
+		shell.fixedBody = tuiSection("Type DEPLOY to continue:", model.isDark) + "\n> " + model.confirmation + "_"
 		shell.notices = []tuiNotice{{
 			kind:   tuiStatusAttention,
 			title:  "Target services may restart; unreachable computers may remain unchanged",
@@ -1956,7 +1947,7 @@ func (model dashboardModel) deployView() string {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		shell.actions = []tuiAction{{key: "Enter", label: "Deploy"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
-		return renderTUIShell(shell, model.width, model.isDark)
+		return model.renderShell(shell)
 	}
 
 	if model.deployResult.Operation != "" {
@@ -1982,7 +1973,7 @@ func (model dashboardModel) deployView() string {
 		}
 		shell.body = strings.Join(lines, "\n")
 		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "?", label: "Help"}}
-		return renderTUIShell(shell, model.width, model.isDark)
+		return model.renderShell(shell)
 	}
 
 	lines := []string{
@@ -2018,7 +2009,7 @@ func (model dashboardModel) deployView() string {
 	}
 	shell.body = strings.Join(lines, "\n")
 	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}}
-	return renderTUIShell(shell, model.width, model.isDark)
+	return model.renderShell(shell)
 }
 
 func (model dashboardModel) deploymentProgressView() []string {
@@ -2115,12 +2106,12 @@ func (model dashboardModel) pxeView() string {
 		lines = append(lines, "")
 		lines = append(lines, model.computerInstallationSteps(steps)...)
 		if model.installationFailed {
-			return renderTUIShell(tuiShell{
+			return model.renderShell(tuiShell{
 				path:    path,
 				body:    strings.Join(lines, "\n"),
 				notices: []tuiNotice{{kind: tuiStatusFailure, title: "Computer installation could not continue", detail: model.message}},
 				actions: []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}},
-			}, model.width, model.isDark)
+			})
 		}
 	}
 	if model.controllerApplying {
@@ -2138,12 +2129,12 @@ func (model dashboardModel) pxeView() string {
 		if model.controllerProgress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Controller activation and verification completed", detail: "Continuing with client-system preparation."}
 		}
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path:    path,
 			body:    strings.Join(lines, "\n"),
 			notices: []tuiNotice{notice},
 			actions: model.pxeActions(),
-		}, model.width, model.isDark)
+		})
 	}
 	if model.pxePreparing {
 		if model.pxeProgress.State != "completed" {
@@ -2164,20 +2155,20 @@ func (model dashboardModel) pxeView() string {
 		if model.pxeProgress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Client preparation completed", detail: "The client systems and network installation files are ready."}
 		}
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path:    path,
 			body:    strings.Join(lines, "\n"),
 			notices: []tuiNotice{notice},
 			actions: model.pxeActions(),
-		}, model.width, model.isDark)
+		})
 	}
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path:    path,
 			body:    strings.Join(lines, "\n"),
 			actions: model.pxeActions(),
-		}, model.width, model.isDark)
+		})
 	}
 	if model.screen == dashboardPXEStartReview {
 		scope := model.startPlan.Interface + " · controller network"
@@ -2185,9 +2176,6 @@ func (model dashboardModel) pxeView() string {
 			tuiTitle("Start network installation?", model.isDark),
 			"",
 			"Affects  " + scope,
-			"",
-			tuiSection("Type START to continue:", model.isDark),
-			"> " + model.confirmation + "_",
 		}, "\n")
 		notices := []tuiNotice{{
 			kind:   tuiStatusAttention,
@@ -2197,7 +2185,13 @@ func (model dashboardModel) pxeView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: path, body: body, notices: notices, actions: model.pxeActions()}, model.width, model.isDark)
+		return model.renderShell(tuiShell{
+			path:      path,
+			body:      body,
+			fixedBody: tuiSection("Type START to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+			notices:   notices,
+			actions:   model.pxeActions(),
+		})
 	}
 	if model.screen == dashboardPXELeaveReview {
 		leaveLines := []string{
@@ -2208,16 +2202,18 @@ func (model dashboardModel) pxeView() string {
 			"",
 			tuiSection("Recommended", model.isDark),
 			"  x  Stop installation mode, verify normal networking, and exit",
-			"",
-			tuiSection("Keep it active", model.isDark),
-			"  Type LEAVE to continue:",
-			"> " + model.confirmation + "_",
 		}
 		notices := []tuiNotice{}
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(leaveLines, "\n"), notices: notices, actions: model.pxeActions()}, model.width, model.isDark)
+		return model.renderShell(tuiShell{
+			path:      path,
+			body:      strings.Join(leaveLines, "\n"),
+			fixedBody: tuiSection("Keep it active", model.isDark) + "\n  Type LEAVE to continue:\n> " + model.confirmation + "_",
+			notices:   notices,
+			actions:   model.pxeActions(),
+		})
 	}
 	lines = append(lines, "")
 	lines = append(lines, model.pxeNextStepView()...)
@@ -2229,7 +2225,7 @@ func (model dashboardModel) pxeView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: model.pxeActions()}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: model.pxeActions()})
 }
 
 func (model dashboardModel) computerInstallationSteps(labels []string) []string {

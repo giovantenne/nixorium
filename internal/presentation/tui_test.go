@@ -65,9 +65,11 @@ func TestSoftwareSaveAutomaticallyAppliesAffectedController(t *testing.T) {
 	planCalls, applyCalls := 0, 0
 	model := dashboardModel{
 		screen: dashboardSoftwareReview,
-		softwarePlan: domain.SoftwareChangePlanReport{
-			State: "ready", Repository: "/deployment", AffectedController: "pc99",
-			Request: domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
+		softwareDashboardState: softwareDashboardState{
+			softwarePlan: domain.SoftwareChangePlanReport{
+				State: "ready", Repository: "/deployment", AffectedController: "pc99",
+				Request: domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
+			},
 		},
 		actions: DashboardActions{
 			SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
@@ -228,7 +230,10 @@ func TestDashboardSearchesPinnedPackagesAndIgnoresStaleResults(t *testing.T) {
 			}
 		},
 	}
-	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, actions: actions, softwareCatalog: catalog, softwareMode: softwareSuggested}
+	model := dashboardModel{
+		screen: dashboardSoftware, width: 100, height: 30, actions: actions,
+		softwareDashboardState: softwareDashboardState{softwareCatalog: catalog, softwareMode: softwareSuggested},
+	}
 
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "/"})
 	model = updated.(dashboardModel)
@@ -279,8 +284,11 @@ func TestDashboardSearchesPinnedPackagesAndIgnoresStaleResults(t *testing.T) {
 
 func TestDashboardExplainsBlockedSearchResultBeforeScope(t *testing.T) {
 	model := dashboardModel{
-		screen: dashboardSoftware, width: 100, height: 30, softwareMode: softwareSearch,
-		softwareSearch: domain.SoftwareSearchReport{Operation: "software-search", State: "ready", Results: []domain.SoftwareCatalogItem{{ID: "hello-unfree", Label: "Example", Summary: "Policy test", Availability: "blocked-unfree"}}},
+		screen: dashboardSoftware, width: 100, height: 30,
+		softwareDashboardState: softwareDashboardState{
+			softwareMode:   softwareSearch,
+			softwareSearch: domain.SoftwareSearchReport{Operation: "software-search", State: "ready", Results: []domain.SoftwareCatalogItem{{ID: "hello-unfree", Label: "Example", Summary: "Policy test", Availability: "blocked-unfree"}}},
+		},
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
@@ -293,8 +301,11 @@ func TestDashboardCancelsSupersededPackageSearch(t *testing.T) {
 	started := make(chan struct{})
 	finished := make(chan tea.Msg, 1)
 	model := dashboardModel{
-		screen: dashboardSoftware, softwareMode: softwareSearch, softwareSearching: true,
-		softwareQuery: "he", softwareSearchID: 1, width: 100, height: 30,
+		screen: dashboardSoftware, width: 100, height: 30,
+		softwareDashboardState: softwareDashboardState{
+			softwareMode: softwareSearch, softwareSearching: true,
+			softwareQuery: "he", softwareSearchID: 1,
+		},
 		actions: DashboardActions{SearchSoftware: func(ctx context.Context, query string) domain.SoftwareSearchReport {
 			close(started)
 			<-ctx.Done()
@@ -426,8 +437,10 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 	}
 	var request domain.SoftwareChangeRequest
 	model := dashboardModel{
-		report: testDashboardReport("ready"), screen: dashboardSoftware, softwareCatalog: catalog,
-		softwareClients: map[string]bool{}, width: 90, height: 22,
+		report: testDashboardReport("ready"), screen: dashboardSoftware,
+		softwareDashboardState: softwareDashboardState{softwareCatalog: catalog, softwareClients: map[string]bool{}},
+		width:                  90,
+		height:                 22,
 		actions: DashboardActions{
 			SearchSoftware: func(_ context.Context, query string) domain.SoftwareSearchReport {
 				return domain.SoftwareSearchReport{Operation: "software-search", State: "ready", Query: query, Results: []domain.SoftwareCatalogItem{{ID: "vlc", Label: "VLC", Summary: "Play audio and video", Availability: "available"}}, Issues: []domain.ValidationIssue{}}
@@ -474,7 +487,10 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 }
 
 func TestDashboardSoftwareCatalogFailureBlocksManualPackageBypass(t *testing.T) {
-	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, softwareCatalog: domain.SoftwareCatalogReport{State: "failed", Message: "pinned evaluation failed", Issues: []domain.ValidationIssue{{Field: "catalog", Message: "failed"}}}}
+	model := dashboardModel{
+		screen: dashboardSoftware, width: 100, height: 30,
+		softwareDashboardState: softwareDashboardState{softwareCatalog: domain.SoftwareCatalogReport{State: "failed", Message: "pinned evaluation failed", Issues: []domain.ValidationIssue{{Field: "catalog", Message: "failed"}}}},
+	}
 	view := model.View().Content
 	if !strings.Contains(view, "Software information unavailable") || !strings.Contains(view, "deployment inputs are available") {
 		t.Fatalf("catalog failure does not explain the safe boundary:\n%s", view)

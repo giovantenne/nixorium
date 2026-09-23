@@ -117,7 +117,7 @@ func (model dashboardModel) homeView() string {
 		menu = newDashboardTaskMenu(model.isDark, model.width, model.height)
 	}
 	if model.initialError {
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path: []string{"Overview"},
 			body: "The saved laboratory state is not available yet.",
 			notices: []tuiNotice{{
@@ -126,14 +126,14 @@ func (model dashboardModel) homeView() string {
 				detail: model.message + " No configuration or computer was changed.",
 			}},
 			actions: []tuiAction{{key: "Enter", label: "Try again"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
-		}, model.width, model.isDark)
+		})
 	}
 	if model.initializing {
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path:    []string{"Overview"},
 			body:    model.busyView() + "\n\n" + tuiMuted("Reading the saved laboratory configuration and setup state…", model.isDark),
 			actions: []tuiAction{{key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
-		}, model.width, model.isDark)
+		})
 	}
 	lines := []string{
 		tuiTitle("Laboratory overview", model.isDark),
@@ -170,12 +170,12 @@ func (model dashboardModel) homeView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	return renderTUIShell(tuiShell{
+	return model.renderShell(tuiShell{
 		path:    []string{"Overview"},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "?", label: "Help"}, {key: "q", label: "Quit"}},
-	}, model.width, model.isDark)
+	})
 }
 
 func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
@@ -187,12 +187,12 @@ func (model dashboardModel) areaView(path, title, description string, tasks []da
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	return renderTUIShell(tuiShell{
+	return model.renderShell(tuiShell{
 		path:    []string{path},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "?", label: "Help"}},
-	}, model.width, model.isDark)
+	})
 }
 
 func (model dashboardModel) computersAreaView() string {

@@ -51,3 +51,40 @@ func TestTUIActionBarUsesDedicatedControlColor(t *testing.T) {
 		t.Fatalf("action bar does not use its dedicated control color: %q", bar)
 	}
 }
+
+func TestTUIShellScrollsOnlyStructuredBodyRegions(t *testing.T) {
+	body := []string{"NOTICE is ordinary body content", "This wording may change without changing layout"}
+	for index := 0; index < 20; index++ {
+		body = append(body, "body row")
+	}
+	model := dashboardModel{width: 80, height: 16, pageScroll: 4}
+	view := model.renderShell(tuiShell{
+		path:      []string{"Translated screen"},
+		body:      strings.Join(body, "\n"),
+		fixedBody: "Localized confirmation prompt\n> _",
+		notices:   []tuiNotice{{kind: tuiStatusAttention, title: "Localized warning"}},
+		actions:   []tuiAction{{key: "Enter", label: "Continue"}, {key: "Esc", label: "Cancel"}},
+	})
+	for _, expected := range []string{"Translated screen", "Localized confirmation prompt", "Localized warning", "Enter", "Continue", "Esc", "Cancel", "scroll"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("structured shell hid %q:\n%s", expected, view)
+		}
+	}
+	if lipgloss.Width(view) > model.width || lipgloss.Height(view) > model.height {
+		t.Fatalf("structured shell overflowed: %dx%d", lipgloss.Width(view), lipgloss.Height(view))
+	}
+}
+
+func TestTUIShellUsesBoundedFallbackWhenFixedRegionsExceedHeight(t *testing.T) {
+	model := dashboardModel{width: 80, height: 8}
+	view := model.renderShell(tuiShell{
+		path:      []string{"Small terminal"},
+		body:      "body row one\nbody row two\nbody row three",
+		fixedBody: "confirmation one\nconfirmation two\nconfirmation three",
+		notices:   []tuiNotice{{kind: tuiStatusAttention, title: "warning", detail: "long fixed detail"}},
+		actions:   []tuiAction{{key: "Enter", label: "Continue"}, {key: "Esc", label: "Cancel"}},
+	})
+	if view == "" || lipgloss.Width(view) > model.width || lipgloss.Height(view) > model.height {
+		t.Fatalf("small-terminal fallback is not bounded: %dx%d\n%s", lipgloss.Width(view), lipgloss.Height(view), view)
+	}
+}

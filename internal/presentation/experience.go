@@ -64,11 +64,11 @@ func (model dashboardModel) computerDetail(h domain.HostStatus) string {
 func (model dashboardModel) computersView() string {
 	lines := []string{tuiTitle("Computer inventory", model.isDark), ""}
 	if model.busy != "" {
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path:    []string{"Computers", "Inventory"},
 			body:    model.busyView(),
 			actions: []tuiAction{{key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}},
-		}, model.width, model.isDark)
+		})
 	}
 	hosts := model.filteredHosts()
 	var actions []tuiAction
@@ -117,12 +117,12 @@ func (model dashboardModel) computersView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{
+	return model.renderShell(tuiShell{
 		path:    []string{"Computers", "Inventory"},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
 		actions: actions,
-	}, model.width, model.isDark)
+	})
 }
 
 func (model dashboardModel) administrationView() string {
@@ -140,12 +140,12 @@ func (model dashboardModel) administrationView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	return renderTUIShell(tuiShell{
+	return model.renderShell(tuiShell{
 		path:    []string{"Maintenance"},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "?", label: "Help"}},
-	}, model.width, model.isDark)
+	})
 }
 
 func (model dashboardModel) helpView() string {
@@ -200,7 +200,7 @@ func (model dashboardModel) diagnosticsView() string {
 	}
 	lines := []string{tuiTitle("Diagnostics", model.isDark), ""}
 	if model.busy != "" {
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(append(lines, model.busyView()), "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(append(lines, model.busyView()), "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	findings := model.doctor.Findings
 	if len(findings) == 0 {
@@ -231,7 +231,7 @@ func (model dashboardModel) diagnosticsView() string {
 		back = "Inventory"
 	}
 	actions = append(actions, tuiAction{key: "r", label: "Check again"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 func (model dashboardModel) restoreView() string {
@@ -246,7 +246,7 @@ func (model dashboardModel) restoreView() string {
 	for index, option := range options {
 		lines = append(lines, tuiSelection(option.title, index == model.restoreCursor, model.isDark), tuiMuted("    "+option.description, model.isDark), "")
 	}
-	return renderTUIShell(tuiShell{
+	return model.renderShell(tuiShell{
 		path: []string{"Computers", "Restore"},
 		body: strings.Join(lines, "\n"),
 		notices: []tuiNotice{{
@@ -255,11 +255,11 @@ func (model dashboardModel) restoreView() string {
 			detail: "Starting PXE does not erase or reserve a computer. The downloaded installer asks for identity and disk confirmation on each machine.",
 		}},
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}},
-	}, model.width, model.isDark)
+	})
 }
 
-// frame bounds reading width and provides an explicit scroll surface. It never
-// truncates source data; the same content remains reachable after a resize.
+// frame bounds plain content such as contextual help. Routine screens use
+// renderShell so their body, notices, confirmations, and actions stay distinct.
 func (model dashboardModel) frame(content string) string {
 	width := min(116, max(20, model.width-6))
 	if model.width == 0 {
@@ -273,82 +273,64 @@ func (model dashboardModel) frame(content string) string {
 	}
 	height = max(2, height)
 	if len(lines) > height {
-		// Keep the exact phrase, input, mismatch feedback and cancellation visible
-		// while long impact/diff content scrolls independently above it.
-		if model.textEntry() && !model.helpOpen {
-			for i, line := range lines {
-				if strings.Contains(line, "to continue:") && len(lines)-i < height-2 {
-					space := height - (len(lines) - i) - 1
-					start := min(model.pageScroll, max(0, i-space))
-					body := append([]string{}, lines[start:min(i, start+space)]...)
-					body = append(body, tuiMuted("Shift ↑/↓ review more · F1 help", model.isDark))
-					body = append(body, lines[i:]...)
-					return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(body, "\n"))
-				}
-			}
-		}
-		// Screens using the common shell keep their breadcrumb and action bar
-		// fixed. Only the body between those regions scrolls.
-		if model.usesTUIShell() {
-			footerStart := -1
-			for index := len(lines) - 1; index >= 2; index-- {
-				if strings.TrimSpace(lines[index]) == "" {
-					footerStart = index + 1
-					break
-				}
-			}
-			if footerStart > 2 && footerStart < len(lines) {
-				footer := lines[footerStart:]
-				bodyEnd := footerStart - 1
-				fixed := []string{}
-				for index := 2; index < bodyEnd; index++ {
-					if strings.Contains(lines[index], "NOTICE") {
-						fixedStart := index
-						if index > 2 && strings.TrimSpace(lines[index-1]) == "" {
-							fixedStart--
-						}
-						fixed = append(fixed, lines[fixedStart:bodyEnd]...)
-						bodyEnd = fixedStart
-						break
-					}
-				}
-				body := lines[2:bodyEnd]
-				bodyHeight := height - 2 - len(fixed) - len(footer) - 2
-				if bodyHeight >= 2 {
-					start := min(model.pageScroll, max(0, len(body)-bodyHeight))
-					visible := append([]string{}, lines[:2]...)
-					visible = append(visible, body[start:min(len(body), start+bodyHeight)]...)
-					visible = append(visible, tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark))
-					visible = append(visible, fixed...)
-					visible = append(visible, "")
-					visible = append(visible, footer...)
-					return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(visible, "\n"))
-				}
-			}
-		}
 		start := min(model.pageScroll, len(lines)-height+1)
 		lines = append(lines[start:min(len(lines), start+height-1)], tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark))
 	}
 	return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(lines, "\n"))
 }
 
-func (model dashboardModel) usesTUIShell() bool {
-	switch model.screen {
-	case dashboardHome, dashboardComputersArea, dashboardInstallationArea,
-		dashboardSetup, dashboardSetupKeys, dashboardRestore, dashboardHosts,
-		dashboardDeploy, dashboardDeployReview, dashboardPXE, dashboardPXEStartReview,
-		dashboardPXELeaveReview, dashboardAdministration, dashboardShutdown,
-		dashboardShutdownReview, dashboardShutdownResult, dashboardSoftware,
-		dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult,
-		dashboardController, dashboardControllerReview, dashboardServices,
-		dashboardServicesRestartReview, dashboardDiagnostics, dashboardLogs,
-		dashboardLogDetail, dashboardSettings, dashboardSettingsPasswords,
-		dashboardSettingsReview, dashboardGitReview, dashboardGitCommitSelect,
-		dashboardGitCommitReview, dashboardUpdate, dashboardUpdateReview:
-		return true
-	default:
-		return false
+func (model dashboardModel) renderShell(shell tuiShell) string {
+	width := min(116, max(20, model.width-6))
+	if model.width == 0 {
+		width = 100
 	}
+	regions := buildTUIShellRegions(shell, model.width, model.isDark)
+	wrappedLines := func(content string) []string {
+		if content == "" {
+			return nil
+		}
+		rendered := lipgloss.NewStyle().Width(width).Render(content)
+		return strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+	}
+	header := wrappedLines(regions.header)
+	body := wrappedLines(regions.body)
+	fixed := wrappedLines(regions.fixedBody)
+	notices := wrappedLines(regions.notices)
+	actions := wrappedLines(regions.actions)
+
+	compose := func(bodyLines []string, showScrollHint bool) []string {
+		lines := append([]string{}, header...)
+		lines = append(lines, "")
+		lines = append(lines, bodyLines...)
+		if showScrollHint {
+			lines = append(lines, tuiMuted("Shift ↑/↓ scroll · ? help", model.isDark))
+		}
+		for _, region := range [][]string{fixed, notices, actions} {
+			if len(region) > 0 {
+				lines = append(lines, "")
+				lines = append(lines, region...)
+			}
+		}
+		return lines
+	}
+
+	height := model.height - 4
+	if model.height == 0 {
+		height = len(compose(body, false))
+	}
+	height = max(2, height)
+	lines := compose(body, false)
+	if len(lines) > height {
+		fixedHeight := len(compose(nil, true))
+		bodyHeight := height - fixedHeight
+		if bodyHeight > 0 {
+			start := min(model.pageScroll, max(0, len(body)-bodyHeight))
+			lines = compose(body[start:min(len(body), start+bodyHeight)], true)
+		} else {
+			return model.frame(renderTUIShell(shell, model.width, model.isDark))
+		}
+	}
+	return lipgloss.NewStyle().Padding(1, 3).Render(strings.Join(lines, "\n"))
 }
 
 func (model dashboardModel) textEntry() bool {
@@ -425,5 +407,5 @@ func (model dashboardModel) releaseReviewView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: []string{"Maintenance", model.updateTitle(), "Review"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Scroll diff"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: []string{"Maintenance", model.updateTitle(), "Review"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Scroll diff"}, {key: "F4", label: "Details"}, {key: "Enter", label: "Apply update"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 }

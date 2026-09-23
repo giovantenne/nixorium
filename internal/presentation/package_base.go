@@ -59,7 +59,7 @@ func (model dashboardModel) packageBaseView() string {
 		lines = append(lines, "", operationLogIssues(model.baseStatus.Issues))
 		actions = []tuiAction{{key: "r", label: "Refresh"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}
 	}
-	return renderTUIShell(tuiShell{path: []string{"Maintenance", model.updateTitle()}, body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: []string{"Maintenance", model.updateTitle()}, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
 func (model dashboardModel) updatePackageBaseKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {

@@ -128,33 +128,54 @@ type tuiAction struct {
 }
 
 type tuiShell struct {
-	path    []string
-	body    string
-	notices []tuiNotice
-	actions []tuiAction
+	path      []string
+	body      string
+	fixedBody string
+	notices   []tuiNotice
+	actions   []tuiAction
 }
 
-func renderTUIShell(shell tuiShell, width int, darkBackground bool) string {
+type tuiShellRegions struct {
+	header    string
+	body      string
+	fixedBody string
+	notices   string
+	actions   string
+}
+
+func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShellRegions {
 	header := tuiTitle("Nixorium", darkBackground)
 	if len(shell.path) > 0 {
 		header += tuiMuted("  /  "+strings.Join(shell.path, "  /  "), darkBackground)
 	}
-	lines := []string{
-		header,
-		"",
-		strings.TrimSpace(shell.body),
+	regions := tuiShellRegions{
+		header:    header,
+		body:      strings.TrimSpace(shell.body),
+		fixedBody: strings.TrimSpace(shell.fixedBody),
 	}
 	if len(shell.notices) > 0 {
-		lines = append(lines, "", tuiMuted("NOTICE", darkBackground))
+		lines := []string{tuiMuted("NOTICE", darkBackground)}
 		for _, notice := range shell.notices {
 			lines = append(lines, tuiStatus(notice.title, notice.kind, darkBackground))
 			if notice.detail != "" {
 				lines = append(lines, "  "+notice.detail)
 			}
 		}
+		regions.notices = strings.Join(lines, "\n")
 	}
 	if len(shell.actions) > 0 {
-		lines = append(lines, "", tuiActionBar(width, darkBackground, shell.actions...))
+		regions.actions = tuiActionBar(width, darkBackground, shell.actions...)
+	}
+	return regions
+}
+
+func renderTUIShell(shell tuiShell, width int, darkBackground bool) string {
+	regions := buildTUIShellRegions(shell, width, darkBackground)
+	lines := []string{regions.header, "", regions.body}
+	for _, region := range []string{regions.fixedBody, regions.notices, regions.actions} {
+		if region != "" {
+			lines = append(lines, "", region)
+		}
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
