@@ -165,7 +165,7 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	r.message(dashboardSoftwareSearchMsg{id: r.model.software.searchID, report: actions.SearchSoftware(context.Background(), "inkscape")})
 	r.capture("Find Inkscape in the pinned package set", 1900)
 	r.pressAndCapture(demoCode(tea.KeyEnter), "Choose Inkscape from Search", 1900)
-	for r.model.softwareScopeOptions()[r.model.software.scopeCursor].scope.Kind != domain.SoftwareScopeAllClients {
+	for r.model.software.scopeOptions()[r.model.software.scopeCursor].scope.Kind != domain.SoftwareScopeAllClients {
 		r.pressAndCapture(demoCode(tea.KeyDown), "Move through declaration scopes", 550)
 	}
 	r.capture("Choose all current and future clients", 2400)

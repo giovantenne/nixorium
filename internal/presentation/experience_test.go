@@ -158,7 +158,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 					software: softwareModel{
 						catalog:      catalog,
 						selected:     "gimp",
-						scopeCursor:  len((dashboardModel{software: softwareModel{catalog: catalog}}).softwareScopeOptions()) - 1,
+						scopeCursor:  len((softwareModel{catalog: catalog}).scopeOptions()) - 1,
 						clientCursor: len(catalog.Clients) - 1,
 						clients:      map[string]bool{"pc03": true},
 					},
@@ -528,7 +528,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				Clients: hostMetaNames(m.report.Meta.Clients.Hosts), Groups: map[string][]string{}, Issues: []domain.ValidationIssue{},
 			}
 			m.software.selected = "gimp"
-			m.software.scopeCursor = len(m.softwareScopeOptions()) - 1
+			m.software.scopeCursor = len(m.software.scopeOptions()) - 1
 			m.software.clientCursor = 199
 			m.software.plan = domain.SoftwareChangePlanReport{State: "ready", ManagedFile: "lab-software.json", Request: domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}, AffectedClients: m.software.catalog.Clients, Confirmation: "SAVE"}
 			m.software.result = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
