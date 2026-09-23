@@ -8,6 +8,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added GitHub Sponsors metadata and a public support link so users can fund
+  project infrastructure, test hardware, documentation, and maintainer time.
 - Software now exposes **Add profile** in the ordinary TUI. It presents the
   deployment-owned descriptions, package exclusions and supported scopes, then
   saves one aggregated candidate while preserving existing package scopes. The

@@ -10,6 +10,7 @@ Internet access for installation or system deployment.
 [Website](https://nixorium.org/) ·
 [Documentation](#documentation) ·
 [Contributing](CONTRIBUTING.md) ·
+[Sponsor](https://github.com/sponsors/giovantenne) ·
 [Releases](https://github.com/giovantenne/nixorium/releases)
 
 > **Status: beta.** The current development line is intended for evaluation and
@@ -255,6 +256,14 @@ screen and add regression tests.”
 Skills guide the agent; they do not replace review or grant permission to
 install, deploy, change live services, commit, or push. Review the proposed
 changes and explicitly authorize the operations you want performed.
+
+## Support the project
+
+If Nixorium helps your school, laboratory, or organization, you can support its
+continued development through [GitHub Sponsors](https://github.com/sponsors/giovantenne).
+Sponsorship helps cover project infrastructure, test hardware, documentation,
+and maintainer time. It does not change the MIT license or grant privileged
+access to security reports, releases, or project decisions.
 
 ## Development
 
