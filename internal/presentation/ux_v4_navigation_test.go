@@ -351,7 +351,7 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 	updated, command = model.Update(command())
 	model = updated.(dashboardModel)
 	batch, ok := command().(tea.BatchMsg)
-	if !ok || len(batch) != 2 || !model.controllerApplying {
+	if !ok || len(batch) != 2 || !model.controller.applying {
 		t.Fatalf("controller activation was not started automatically")
 	}
 	updated, command = model.Update(batch[0]())

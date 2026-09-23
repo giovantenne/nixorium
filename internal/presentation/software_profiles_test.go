@@ -241,7 +241,7 @@ func TestControllerOnlyProfileResultDoesNotOfferClientDistribution(t *testing.T)
 		AffectedController: "pc99", AffectedClients: []string{}, Issues: []domain.ValidationIssue{},
 	})
 	model.software = software
-	model.controllerResult = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Applied: true, Verified: true}
+	model.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Applied: true, Verified: true}
 	view := model.View().Content
 	if strings.Contains(view, "Distribute affected computers") || !strings.Contains(view, "No client deployment is required") {
 		t.Fatalf("controller-only result offers client deployment:\n%s", view)

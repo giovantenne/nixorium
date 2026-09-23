@@ -78,8 +78,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		model.baseUpdate = false
 		model.screen = dashboardUpdate
 		model.updateResult = domain.UpdateApplyReport{}
-		model.controllerPlan = domain.ControllerRebuildPlanReport{}
-		model.controllerResult = domain.ControllerRebuildExecutionReport{}
+		model.controller.plan = domain.ControllerRebuildPlanReport{}
+		model.controller.result = domain.ControllerRebuildExecutionReport{}
 		model.updatePlan = domain.UpdatePlanReport{}
 		model.updatePrerelease = false
 		model.updateCheck = domain.UpdateCheckReport{}
@@ -146,8 +146,8 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "w":
 			model.screen = dashboardSoftware
 			model.software = model.software.open()
-			model.controllerPlan = domain.ControllerRebuildPlanReport{}
-			model.controllerResult = domain.ControllerRebuildExecutionReport{}
+			model.controller.plan = domain.ControllerRebuildPlanReport{}
+			model.controller.result = domain.ControllerRebuildExecutionReport{}
 			model.busy = "Loading supported software from pinned inputs"
 			model.message = ""
 			if model.actions.LoadSoftware == nil {
@@ -613,13 +613,13 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 	case dashboardDeploy, dashboardDeployReview:
 		return model.updateDeployment(key)
 	case dashboardController:
-		if key.String() == "esc" || key.String() == "left" || (key.String() == "enter" && model.controllerResult.Operation != "") {
+		if key.String() == "esc" || key.String() == "left" || (key.String() == "enter" && model.controller.result.Operation != "") {
 			if model.setupMode {
 				model.screen = dashboardSetup
 			} else {
 				model.screen = dashboardHome
 			}
-			if model.controllerResult.Operation != "" && !model.controllerResult.HasErrors() {
+			if model.controller.result.Operation != "" && !model.controller.result.HasErrors() {
 				model.message = "Controller configuration activated and verified."
 			} else {
 				model.message = ""
@@ -628,9 +628,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				model.busy = "Refreshing first-run progress"
 				return model, model.loadSetup()
 			}
-		} else if key.String() == "d" && model.controllerResult.Operation != "" {
-			model.controllerDetails = !model.controllerDetails
-		} else if key.String() == "l" && model.controllerResult.Operation != "" {
+		} else if key.String() == "d" && model.controller.result.Operation != "" {
+			model.controller.details = !model.controller.details
+		} else if key.String() == "l" && model.controller.result.Operation != "" {
 			model.screen = dashboardLogs
 			model.busy = "Loading private operation logs"
 			model.message = ""
@@ -651,12 +651,12 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			model.message = "Controller rebuild cancelled; no action was started."
 		case "enter":
 			model.busy = "Building and activating the reviewed controller revision"
-			model.controllerApplying = true
-			model.controllerProgress = domain.OperationProgress{}
-			model.controllerStarted = time.Now().UTC()
-			model.controllerProgressID++
+			model.controller.applying = true
+			model.controller.progress = domain.OperationProgress{}
+			model.controller.started = time.Now().UTC()
+			model.controller.progressID++
 			model.message = ""
-			plan := model.controllerPlan
+			plan := model.controller.plan
 			operation := func() tea.Msg {
 				report := model.actions.ApplyController(plan)
 				if model.actions.Refresh == nil {
@@ -665,7 +665,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				status, err := model.actions.Refresh()
 				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
 			}
-			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controllerProgressID))
+			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
 		}
 	case dashboardServices:
 		if model.serviceResult.Operation != "" {

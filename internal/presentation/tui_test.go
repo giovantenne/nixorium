@@ -445,8 +445,10 @@ func TestSoftwareDeploymentWaitsForControllerActivation(t *testing.T) {
 				AffectedClients:    []string{"pc01"},
 			},
 		},
-		controllerResult: domain.ControllerRebuildExecutionReport{
-			Operation: "controller apply", Applied: false, Verified: false,
+		controller: controllerModel{
+			result: domain.ControllerRebuildExecutionReport{
+				Operation: "controller apply", Applied: false, Verified: false,
+			},
 		},
 	}
 
@@ -1172,7 +1174,7 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Controller updated and verified") || !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("controller result missing: applied=%d refreshed=%d\n%s", applied, refreshed, model.View().Content)
 	}
-	model.controllerProgress = domain.OperationProgress{
+	model.controller.progress = domain.OperationProgress{
 		Operation: "controller-apply", State: "completed", Phase: "complete",
 		Current: 4, Total: 4, Recent: []string{"Controller revision activated and verified"},
 	}
@@ -1194,12 +1196,14 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
 	started := time.Now().UTC().Add(-2 * time.Second)
 	model := dashboardModel{
-		screen:               dashboardController,
-		busy:                 "Building and activating the reviewed controller revision",
-		controllerApplying:   true,
-		controllerStarted:    started,
-		controllerProgressID: 3,
-		width:                90,
+		screen: dashboardController,
+		busy:   "Building and activating the reviewed controller revision",
+		controller: controllerModel{
+			applying:   true,
+			started:    started,
+			progressID: 3,
+		},
+		width: 90,
 		actions: DashboardActions{LoadControllerProgress: func() (domain.OperationProgress, error) {
 			return domain.OperationProgress{}, nil
 		}},

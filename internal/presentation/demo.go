@@ -313,8 +313,8 @@ func renderInstallationDemo(revision string) DemoScenario {
 	r.model.screen = dashboardPXE
 	r.model.installationFlow = true
 	r.model.installationStage = 3
-	r.model.controllerApplying = true
-	r.model.controllerStarted = time.Now()
+	r.model.controller.applying = true
+	r.model.controller.started = time.Now()
 	r.model.busy = "Building and activating the laboratory controller"
 	controllerPhases := []struct {
 		phase    string
@@ -329,14 +329,14 @@ func renderInstallationDemo(revision string) DemoScenario {
 		{phase: "complete", current: 4, state: "completed", activity: "Controller activation and verification completed", label: "Complete controller activation and verification"},
 	}
 	for _, phase := range controllerPhases {
-		r.model.controllerProgress = domain.OperationProgress{SchemaVersion: 1, Operation: "controller-apply", State: phase.state, Phase: phase.phase, Current: phase.current, Total: 4, Recent: []string{phase.activity}}
+		r.model.controller.progress = domain.OperationProgress{SchemaVersion: 1, Operation: "controller-apply", State: phase.state, Phase: phase.phase, Current: phase.current, Total: 4, Recent: []string{phase.activity}}
 		if phase.state == "completed" {
 			r.model.installationStage = 4
 		}
 		r.capture(phase.label, 1200)
 	}
 
-	r.model.controllerApplying = false
+	r.model.controller.applying = false
 	r.model.installationStage = 4
 	r.model.pxePreparing = true
 	r.model.pxeProgressStarted = time.Now()
