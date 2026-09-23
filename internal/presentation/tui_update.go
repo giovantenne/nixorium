@@ -267,32 +267,32 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardDeploymentPlanMsg:
 		model.busy = ""
-		model.deployPlan = message.report
+		model.deployment.plan = message.report
 		if message.report.HasErrors() {
 			model.message = deploymentPlanIssues(message.report)
 			model.screen = dashboardDeploy
 			return model, nil
 		}
-		model.confirmation = ""
+		model.deployment.confirmation = ""
 		model.message = ""
 		model.screen = dashboardDeployReview
 		return model, nil
 	case dashboardDeploymentResultMsg:
 		model.hosts = domain.HostsReport{}
 		model.busy = ""
-		model.deploying = false
-		model.deployEvents = nil
-		model.deployResult = message.report
+		model.deployment.applying = false
+		model.deployment.events = nil
+		model.deployment.result = message.report
 		model.message = message.report.Message
 		model.screen = dashboardDeploy
 		return model, nil
 	case dashboardDeploymentProgressMsg:
-		if !model.deploying || model.deployEvents == nil {
+		if !model.deployment.applying || model.deployment.events == nil {
 			return model, nil
 		}
-		model.deployProgress = message.progress
-		model.deployRecent = appendBoundedActivity(model.deployRecent, message.progress.Activity, 5)
-		return model, waitForDeploymentEvent(model.deployEvents)
+		model.deployment.progress = message.progress
+		model.deployment.recent = appendBoundedActivity(model.deployment.recent, message.progress.Activity, 5)
+		return model, waitForDeploymentEvent(model.deployment.events)
 	case dashboardControllerPlanMsg:
 		model.busy = ""
 		model.controllerPlan = message.report
@@ -885,11 +885,11 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			return model, input.command
 		}
 	}
-	if key.String() == "l" && (model.deploying || model.controllerApplying || model.pxePreparing) {
+	if key.String() == "l" && (model.deployment.applying || model.controllerApplying || model.pxePreparing) {
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.software.mutating() || model.shutdown.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updating || model.settingsApplying || model.software.mutating() || model.shutdown.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}

@@ -385,8 +385,8 @@ func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "d"})
 	model = updated.(dashboardModel)
-	if command != nil || model.screen != dashboardDeploy || !model.deployChosen["pc01"] || model.deployChosen["pc02"] || !model.deployChosen["pc03"] {
-		t.Fatalf("contextual selection: command=%v screen=%d chosen=%v", command != nil, model.screen, model.deployChosen)
+	if command != nil || model.screen != dashboardDeploy || !model.deployment.chosen["pc01"] || model.deployment.chosen["pc02"] || !model.deployment.chosen["pc03"] {
+		t.Fatalf("contextual selection: command=%v screen=%d chosen=%v", command != nil, model.screen, model.deployment.chosen)
 	}
 	if view := model.View().Content; !strings.Contains(view, "complete current system") || !strings.Contains(view, "not only that package") {
 		t.Fatalf("deployment scope is unclear:\n%s", model.View().Content)
@@ -426,8 +426,8 @@ func TestSoftwareDeploymentDoesNotExpandMissingTargets(t *testing.T) {
 
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "d"})
 	model = updated.(dashboardModel)
-	if !model.deployChosen["pc01"] || model.deployChosen["pc02"] || model.deployChosen["pc09"] {
-		t.Fatalf("missing target expanded selection: %v", model.deployChosen)
+	if !model.deployment.chosen["pc01"] || model.deployment.chosen["pc02"] || model.deployment.chosen["pc09"] {
+		t.Fatalf("missing target expanded selection: %v", model.deployment.chosen)
 	}
 	if !strings.Contains(model.message, "pc09") || !strings.Contains(model.message, "no longer in the current inventory") {
 		t.Fatalf("missing target was not explained: %q", model.message)
@@ -1036,7 +1036,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || !model.deploying || !strings.Contains(model.View().Content, "Closing is disabled") {
+	if command == nil || !model.deployment.applying || !strings.Contains(model.View().Content, "Closing is disabled") {
 		t.Fatalf("confirmed deployment did not enter protected busy state:\n%s", model.View().Content)
 	}
 	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
@@ -1049,11 +1049,11 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	if !strings.Contains(model.View().Content, "Building configurations") || !strings.Contains(model.View().Content, "Progress details") || !strings.Contains(model.View().Content, "private log") {
 		t.Fatalf("deployment progress missing:\n%s", model.View().Content)
 	}
-	for model.deploying && command != nil {
+	for model.deployment.applying && command != nil {
 		updated, command = model.Update(command())
 		model = updated.(dashboardModel)
 	}
-	if applied != 1 || model.deploying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Deployment completed and verified") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") || !strings.Contains(model.View().Content, "New review") {
+	if applied != 1 || model.deployment.applying || model.screen != dashboardDeploy || !strings.Contains(model.View().Content, "Deployment completed and verified") || !strings.Contains(model.View().Content, "Authenticated: 2/2   Recorded: 2") || !strings.Contains(model.View().Content, "/state/deploy.log") || !strings.Contains(model.View().Content, "New review") {
 		t.Fatalf("deployment result missing: applied=%d\n%s", applied, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1073,11 +1073,13 @@ func TestDeploymentProgressKeepsOnlyFiveAuthoredActivities(t *testing.T) {
 	}
 
 	model := dashboardModel{
-		deployProgress: domain.DeploymentProgress{
-			Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
-			TargetCurrent: 2, TargetTotal: 3,
+		deployment: deploymentModel{
+			progress: domain.DeploymentProgress{
+				Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4,
+				TargetCurrent: 2, TargetTotal: 3,
+			},
+			recent: recent,
 		},
-		deployRecent:    recent,
 		progressDetails: true,
 		width:           80,
 	}
@@ -1093,7 +1095,7 @@ func TestDeploymentProgressKeepsOnlyFiveAuthoredActivities(t *testing.T) {
 }
 
 func TestDeploymentProgressDoesNotRegressAfterBuild(t *testing.T) {
-	model := dashboardModel{deployProgress: domain.DeploymentProgress{Phase: domain.DeploymentPhasePreflight}}
+	model := dashboardModel{deployment: deploymentModel{progress: domain.DeploymentProgress{Phase: domain.DeploymentPhasePreflight}}}
 	view := strings.Join(model.deploymentProgressView(), "\n")
 	if !strings.Contains(view, "✓ Building configurations") || !strings.Contains(view, "● Revalidating reviewed configuration · Running") {
 		t.Fatalf("post-build revalidation regressed to an initial step:\n%s", view)
@@ -1922,7 +1924,7 @@ func TestDashboardDeploymentRejectsEmptySelectionAndBlockedPlan(t *testing.T) {
 			return domain.DeploymentPlanReport{State: "blocked", Issues: []domain.ValidationIssue{{Field: "git", Message: "worktree is dirty"}}}
 		},
 	}
-	model := dashboardModel{report: report, actions: actions, screen: dashboardDeploy, deployChosen: map[string]bool{}}
+	model := dashboardModel{report: report, actions: actions, screen: dashboardDeploy, deployment: deploymentModel{chosen: map[string]bool{}}}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command != nil || !strings.Contains(model.View().Content, "Select at least one") {

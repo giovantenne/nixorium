@@ -452,8 +452,8 @@ func TestComputersSearchAndDetailsPreserveTargetIdentity(t *testing.T) {
 		t.Fatal("detail not opened")
 	}
 	m = press(m, "d")
-	if m.screen != dashboardDeploy || !m.deployChosen["pc17"] || len(m.deployChosen) != 1 {
-		t.Fatalf("wrong deploy scope: %v", m.deployChosen)
+	if m.screen != dashboardDeploy || !m.deployment.chosen["pc17"] || len(m.deployment.chosen) != 1 {
+		t.Fatalf("wrong deploy scope: %v", m.deployment.chosen)
 	}
 }
 
@@ -491,8 +491,8 @@ func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
 func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	m := experienceFixture(2)
 	m.screen = dashboardDeployReview
-	m.deployPlan = domain.DeploymentPlanReport{ColmenaSelector: "@lab"}
-	m.confirmation = "DEPLOY"
+	m.deployment.plan = domain.DeploymentPlanReport{ColmenaSelector: "@lab"}
+	m.deployment.confirmation = "DEPLOY"
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyF1})
 	m = updated.(dashboardModel)
 	if !m.helpOpen {
@@ -500,7 +500,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	}
 	updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(dashboardModel)
-	if command != nil || m.deploying {
+	if command != nil || m.deployment.applying {
 		t.Fatal("help confirmed deployment")
 	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
@@ -510,7 +510,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 	}
 	updated, command = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = updated.(dashboardModel)
-	if command != nil || m.confirmation != "" || m.screen != dashboardDeploy {
+	if command != nil || m.deployment.confirmation != "" || m.screen != dashboardDeploy {
 		t.Fatal("cancel mutated")
 	}
 }
@@ -523,8 +523,8 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.height = size[1]
 			m.screen = screen
 			m.hostCursor = 199
-			m.deployCursor = 199
-			m.deployPlan = domain.DeploymentPlanReport{Revision: strings.Repeat("a", 40), ColmenaSelector: "@lab", Targets: []domain.DeploymentTarget{{Name: "pc01"}}}
+			m.deployment.cursor = 199
+			m.deployment.plan = domain.DeploymentPlanReport{Revision: strings.Repeat("a", 40), ColmenaSelector: "@lab", Targets: []domain.DeploymentTarget{{Name: "pc01"}}}
 			m.software.catalog = domain.SoftwareCatalogReport{
 				State: "ready", ManagedFile: "lab-software.json",
 				Catalog: []domain.SoftwareCatalogItem{{ID: "gimp", Label: "GIMP", Summary: "Edit bitmap images", Availability: "available"}},
@@ -757,14 +757,22 @@ func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
 	for _, screen := range []dashboardScreen{dashboardDeployReview, dashboardServicesRestartReview, dashboardPXEStartReview, dashboardGitCommitReview} {
 		m := experienceFixture(2)
 		m.screen = screen
-		m.confirmation = "wrong"
+		if screen == dashboardDeployReview {
+			m.deployment.confirmation = "wrong"
+		} else {
+			m.confirmation = "wrong"
+		}
 		m.controllerPlan.Confirmation = "REBUILD"
 		m.gitCommitPlan.Confirmation = "COMMIT"
 		m.updatePlan.Confirmation = "UPDATE"
-		m.deployPlan.ColmenaSelector = "@lab"
+		m.deployment.plan.ColmenaSelector = "@lab"
 		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		m = updated.(dashboardModel)
-		if command != nil || m.confirmation != "" || m.screen != screen || m.busy != "" {
+		confirmation := m.confirmation
+		if screen == dashboardDeployReview {
+			confirmation = m.deployment.confirmation
+		}
+		if command != nil || confirmation != "" || m.screen != screen || m.busy != "" {
 			t.Fatalf("screen %d accepted incorrect input", screen)
 		}
 		updated, command = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
@@ -813,7 +821,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 	for _, name := range []string{"interventions", "setup", "restore", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "shutdown", "shutdown-confirmation", "shutdown-result", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
 		m.screen = dashboardHome
 		m.busy = ""
-		m.deploying = false
+		m.deployment.applying = false
 		switch name {
 		case "restore":
 			m.screen = dashboardRestore
@@ -827,7 +835,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.hosts.Deployment.Unknown = 1
 		case "deploy":
 			m.screen = dashboardDeploy
-			m.deployChosen = map[string]bool{"pc01": true, "pc02": true}
+			m.deployment.chosen = map[string]bool{"pc01": true, "pc02": true}
 		case "software":
 			m.screen = dashboardSoftware
 			m.software.catalog = testSoftwareCatalogReport()
@@ -877,10 +885,10 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.setup = testSetupReport(true, false, false, false)
 		case "progress":
 			m.screen = dashboardDeploy
-			m.deploying = true
+			m.deployment.applying = true
 			m.busy = "Updating selected computers"
-			m.deployStarted = time.Now()
-			m.deployProgress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}
+			m.deployment.started = time.Now()
+			m.deployment.progress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}
 		case "recovery":
 			m.report.PXE.Mode = "recovery-required"
 		}
