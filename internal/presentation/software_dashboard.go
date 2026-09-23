@@ -75,6 +75,7 @@ const (
 	softwarePlanIntent
 	softwareSaveIntent
 	softwareControllerIntent
+	softwareDeployIntent
 )
 
 type softwareIntent struct {
@@ -381,6 +382,10 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 				return model, softwareIntent{}
 			}
 			return model, softwareIntent{kind: softwareControllerIntent}
+		case "d":
+			if model.result.State == "saved" && len(model.result.AffectedClients) > 0 {
+				return model, softwareIntent{kind: softwareDeployIntent}
+			}
 		case "enter", "esc", "left":
 			return model, softwareIntent{kind: softwareCloseIntent, setMessage: true}
 		}
@@ -418,8 +423,23 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			return model, nil
 		}
 		return model.startSoftwareControllerApply()
+	case softwareDeployIntent:
+		if !model.software.canDistribute(model.controllerResult) {
+			return model, nil
+		}
+		return model.openSoftwareDeployment()
 	}
 	return model, nil
+}
+
+func (model softwareModel) canDistribute(controller domain.ControllerRebuildExecutionReport) bool {
+	if model.result.State != "saved" || len(model.result.AffectedClients) == 0 {
+		return false
+	}
+	if model.result.AffectedController == "" {
+		return true
+	}
+	return controller.Operation != "" && !controller.HasErrors() && controller.Applied && controller.Verified
 }
 
 func (model dashboardModel) startSoftwareControllerApply() (tea.Model, tea.Cmd) {
@@ -448,6 +468,38 @@ func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeReque
 	model.busy = "Checking the package and its destination"
 	model.message = ""
 	return model, func() tea.Msg { return dashboardSoftwarePlanMsg{report: model.actions.PlanSoftware(request)} }
+}
+
+func (model dashboardModel) openSoftwareDeployment() (tea.Model, tea.Cmd) {
+	configured := map[string]bool{}
+	for _, host := range model.report.Meta.Clients.Hosts {
+		configured[host.Name] = true
+	}
+	chosen := map[string]bool{}
+	missing := []string{}
+	for _, name := range model.software.result.AffectedClients {
+		if configured[name] {
+			chosen[name] = true
+		} else {
+			missing = append(missing, name)
+		}
+	}
+	model.screen = dashboardDeploy
+	model.deployResult = domain.DeploymentExecutionReport{}
+	model.deployPlan = domain.DeploymentPlanReport{}
+	model.deployProgress = domain.DeploymentProgress{}
+	model.deployRecent = nil
+	model.deployChosen = chosen
+	model.deployCursor = 0
+	model.deployContext = "Opened from a saved software change. The review deploys the complete current system configuration, not only that package."
+	model.message = ""
+	if len(missing) > 0 {
+		model.message = "Affected computers no longer in the current inventory were not selected: " + strings.Join(missing, ", ") + ". Review the remaining selection."
+	}
+	if len(chosen) == 0 {
+		model.message = "None of the affected computers are in the current inventory. Return to Software or refresh the laboratory configuration before continuing."
+	}
+	return model, nil
 }
 
 func (model dashboardModel) softwareView() string {
@@ -529,6 +581,9 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		}
 		if model.result.State == "saved" && model.result.AffectedController != "" && (context.controllerResult.Operation == "" || context.controllerResult.HasErrors() || !context.controllerResult.Applied || !context.controllerResult.Verified) {
 			return []tuiAction{{key: "a", label: "Retry controller"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
+		}
+		if model.canDistribute(context.controllerResult) {
+			return []tuiAction{{key: "d", label: "Distribute clients"}, {key: "Enter", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		return []tuiAction{{key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
 	}

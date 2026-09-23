@@ -140,6 +140,7 @@ type dashboardModel struct {
 	deployChosen           map[string]bool
 	deployPlan             domain.DeploymentPlanReport
 	deployResult           domain.DeploymentExecutionReport
+	deployContext          string
 	deploying              bool
 	deployProgress         domain.DeploymentProgress
 	deployRecent           []string
@@ -1925,6 +1926,9 @@ func (model dashboardModel) deployView() string {
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
+	if model.deployContext != "" {
+		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.deployContext})
+	}
 	if model.screen == dashboardDeployReview {
 		lines := []string{
 			tuiTitle("Distribute the system?", model.isDark),
@@ -1935,11 +1939,11 @@ func (model dashboardModel) deployView() string {
 		}
 		shell.body = strings.Join(lines, "\n")
 		shell.fixedBody = tuiSection("Type DEPLOY to continue:", model.isDark) + "\n> " + model.confirmation + "_"
-		shell.notices = []tuiNotice{{
+		shell.notices = append(shell.notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Target services may restart; unreachable computers may remain unchanged",
 			detail: "Every selected configuration is built first. A failed apply may leave mixed target state; a fresh full retry is safe.",
-		}}
+		})
 		if model.message != "" {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
@@ -2418,16 +2422,21 @@ func hostAvailability(hosts []domain.HostStatus) (int, int) {
 }
 
 func selectedDeploymentTargets(hosts []domain.HostMeta, chosen map[string]bool) string {
+	selected := selectedDeploymentTargetNames(hosts, chosen)
+	if len(selected) == len(hosts) && len(hosts) > 0 {
+		return "@lab"
+	}
+	return strings.Join(selected, ",")
+}
+
+func selectedDeploymentTargetNames(hosts []domain.HostMeta, chosen map[string]bool) []string {
 	selected := []string{}
 	for _, host := range hosts {
 		if chosen[host.Name] {
 			selected = append(selected, host.Name)
 		}
 	}
-	if len(selected) == len(hosts) && len(hosts) > 0 {
-		return "@lab"
-	}
-	return strings.Join(selected, ",")
+	return selected
 }
 
 func toggleAllDeploymentTargets(hosts []domain.HostMeta, chosen map[string]bool) map[string]bool {

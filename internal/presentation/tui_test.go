@@ -356,6 +356,105 @@ func TestDashboardSoftwareResultDistinguishesNoChangeAndUncertainSave(t *testing
 	}
 }
 
+func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
+	requested := ""
+	report := domain.StatusReport{}
+	report.Meta.Clients.Hosts = []domain.HostMeta{
+		{Name: "pc01", IP: "10.0.0.1"},
+		{Name: "pc03", IP: "10.0.0.3"},
+	}
+	model := dashboardModel{
+		screen: dashboardSoftware,
+		report: report,
+		software: softwareModel{
+			stage: softwareResult,
+			result: domain.SoftwareChangeApplyReport{
+				State: "saved", AffectedClients: []string{"pc01", "pc03"},
+			},
+		},
+		actions: DashboardActions{PlanDeployment: func(value string) domain.DeploymentPlanReport {
+			requested = value
+			return domain.DeploymentPlanReport{State: "ready"}
+		}},
+		width: 100, height: 30,
+	}
+
+	view := model.View().Content
+	if !strings.Contains(view, "Distribute clients") || !strings.Contains(view, "Later") {
+		t.Fatalf("software result omits contextual deployment action:\n%s", view)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "d"})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardDeploy || !model.deployChosen["pc01"] || model.deployChosen["pc02"] || !model.deployChosen["pc03"] {
+		t.Fatalf("contextual selection: command=%v screen=%d chosen=%v", command != nil, model.screen, model.deployChosen)
+	}
+	if view := model.View().Content; !strings.Contains(view, "complete current system") || !strings.Contains(view, "not only that package") {
+		t.Fatalf("deployment scope is unclear:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || requested != "" {
+		t.Fatalf("deployment planning was not deferred: command=%v requested=%q", command != nil, requested)
+	}
+	_ = command()
+	if requested != "pc01,pc03" {
+		t.Fatalf("fresh deployment requested %q", requested)
+	}
+}
+
+func TestSoftwareDeploymentDoesNotExpandMissingTargets(t *testing.T) {
+	report := domain.StatusReport{}
+	report.Meta.Clients.Hosts = []domain.HostMeta{
+		{Name: "pc01", IP: "10.0.0.1"},
+		{Name: "pc02", IP: "10.0.0.2"},
+	}
+	model := dashboardModel{
+		screen: dashboardSoftware,
+		report: report,
+		software: softwareModel{
+			stage: softwareResult,
+			result: domain.SoftwareChangeApplyReport{
+				State: "saved", AffectedClients: []string{"pc01", "pc09"},
+			},
+		},
+	}
+
+	updated, _ := model.Update(tea.KeyPressMsg{Text: "d"})
+	model = updated.(dashboardModel)
+	if !model.deployChosen["pc01"] || model.deployChosen["pc02"] || model.deployChosen["pc09"] {
+		t.Fatalf("missing target expanded selection: %v", model.deployChosen)
+	}
+	if !strings.Contains(model.message, "pc09") || !strings.Contains(model.message, "no longer in the current inventory") {
+		t.Fatalf("missing target was not explained: %q", model.message)
+	}
+}
+
+func TestSoftwareDeploymentWaitsForControllerActivation(t *testing.T) {
+	model := dashboardModel{
+		screen: dashboardSoftware,
+		software: softwareModel{
+			stage: softwareResult,
+			result: domain.SoftwareChangeApplyReport{
+				State:              "saved",
+				AffectedController: "controller",
+				AffectedClients:    []string{"pc01"},
+			},
+		},
+		controllerResult: domain.ControllerRebuildExecutionReport{
+			Operation: "controller apply", Applied: false, Verified: false,
+		},
+	}
+
+	if strings.Contains(model.View().Content, "Distribute clients") {
+		t.Fatalf("client deployment was offered before controller activation:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "d"})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardSoftware {
+		t.Fatalf("blocked client deployment changed screen: command=%v screen=%d", command != nil, model.screen)
+	}
+}
+
 func TestDashboardShutdownIncludesActiveSessionAndAcknowledgesUnknownSession(t *testing.T) {
 	plans := 0
 	applies := 0
@@ -1759,6 +1858,9 @@ func TestSelectedDeploymentTargetsPreservesInventoryOrder(t *testing.T) {
 	}
 	if got := selectedDeploymentTargets(hosts, map[string]bool{"pc01": true, "pc02": true, "pc03": true}); got != "@lab" {
 		t.Fatalf("all targets = %q, want @lab", got)
+	}
+	if got := strings.Join(selectedDeploymentTargetNames(hosts, map[string]bool{"pc01": true, "pc02": true, "pc03": true}), ","); got != "pc01,pc02,pc03" {
+		t.Fatalf("explicit targets = %q, want pc01,pc02,pc03", got)
 	}
 }
 

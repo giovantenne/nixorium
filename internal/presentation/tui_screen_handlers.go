@@ -40,6 +40,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 	case "d":
 		model.screen = dashboardDeploy
 		model.deployResult = domain.DeploymentExecutionReport{}
+		model.deployContext = ""
 		model.message = ""
 		model.deployChosen = map[string]bool{}
 		model.deployCursor = 0
@@ -219,6 +220,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.restoreMode = true
 				model.screen = dashboardDeploy
 				model.deployResult = domain.DeploymentExecutionReport{}
+				model.deployContext = ""
 				model.deployChosen = map[string]bool{}
 				model.deployCursor = 0
 			} else {
@@ -583,6 +585,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			if len(hosts) > 0 {
 				model.screen = dashboardDeploy
 				model.deployResult = domain.DeploymentExecutionReport{}
+				model.deployContext = ""
 				model.deployChosen = map[string]bool{hosts[min(model.hostCursor, len(hosts)-1)].Name: true}
 				model.deployCursor = 0
 			}
@@ -653,6 +656,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			model.deployChosen = toggleAllDeploymentTargets(hosts, model.deployChosen)
 		case "enter":
 			requested := selectedDeploymentTargets(hosts, model.deployChosen)
+			if model.deployContext != "" {
+				requested = strings.Join(selectedDeploymentTargetNames(hosts, model.deployChosen), ",")
+			}
 			if requested == "" {
 				model.message = "Select at least one computer before reviewing a deployment."
 				return model, nil
