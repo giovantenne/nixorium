@@ -737,20 +737,20 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardShutdownPlanMsg:
 		model.busy = ""
-		model.shutdownPlan = message.report
+		model.shutdown.plan = message.report
 		model.message = message.report.Message
 		if len(message.report.Targets) == 0 {
 			model.screen = dashboardShutdown
 			return model, nil
 		}
-		model.confirmation = ""
+		model.shutdown.confirmation = ""
 		model.screen = dashboardShutdownReview
 		return model, nil
 	case dashboardShutdownApplyMsg:
 		model.busy = ""
-		model.shutdownApplying = false
-		model.shutdownResult = message.report
-		model.shutdownTechnical = false
+		model.shutdown.applying = false
+		model.shutdown.result = message.report
+		model.shutdown.technical = false
 		model.message = message.report.Message
 		model.screen = dashboardShutdownResult
 		return model, nil
@@ -889,7 +889,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.software.mutating() || model.shutdownApplying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.software.mutating() || model.shutdown.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
