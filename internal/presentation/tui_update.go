@@ -511,37 +511,37 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				model.installationFlow = false
 				model.installationFailed = false
 			}
-			if model.settingsReturn == dashboardSetup {
+			if model.settings.returnScreen == dashboardSetup {
 				model.screen = dashboardSetup
 			} else {
 				model.screen = dashboardHome
 			}
 			return model, nil
 		}
-		model.settings = message.settings
-		model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+		model.settings.current = message.settings
+		model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		if model.startingLabSetup {
 			model.startingLabSetup = false
-			model.settings.Lab.DeploymentMode = "laboratory"
-			if model.settings.Lab.PCCount == 0 {
-				model.settings.Lab.PCCount = 20
+			model.settings.current.Lab.DeploymentMode = "laboratory"
+			if model.settings.current.Lab.PCCount == 0 {
+				model.settings.current.Lab.PCCount = 20
 			}
-			model.settingsCollectPasswords = model.settings.Lab.AdminPassword == domain.DefaultPasswordHash || model.settings.Lab.TeacherPassword == domain.DefaultPasswordHash || model.settings.Lab.StudentPassword == domain.DefaultPasswordHash
-			model.settingsEditor = newSettingsEditorModel(model.settings, installationSettingsFields, "Nixorium — Install computers / Laboratory settings")
-			model.settingsEditor.width = model.width
-			model.settingsEditor.height = model.height
-			model.settingsEditor.isDark = model.isDark
-			model.settingsEditor.prepareCurrentField()
+			model.settings.collectPasswords = model.settings.current.Lab.AdminPassword == domain.DefaultPasswordHash || model.settings.current.Lab.TeacherPassword == domain.DefaultPasswordHash || model.settings.current.Lab.StudentPassword == domain.DefaultPasswordHash
+			model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Nixorium — Install computers / Laboratory settings")
+			model.settings.editor.width = model.width
+			model.settings.editor.height = model.height
+			model.settings.editor.isDark = model.isDark
+			model.settings.editor.prepareCurrentField()
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 			return model, nil
 		}
-		if model.settingsReturn == dashboardSetup {
-			model.settingsEditor = newSettingsEditorModel(model.settings, settingsFields, "Nixorium — First setup / Laboratory settings")
-			model.settingsEditor.width = model.width
-			model.settingsEditor.height = model.height
-			model.settingsEditor.isDark = model.isDark
-			model.settingsEditor.prepareCurrentField()
+		if model.settings.returnScreen == dashboardSetup {
+			model.settings.editor = newSettingsEditorModel(model.settings.current, settingsFields, "Nixorium — First setup / Laboratory settings")
+			model.settings.editor.width = model.width
+			model.settings.editor.height = model.height
+			model.settings.editor.isDark = model.isDark
+			model.settings.editor.prepareCurrentField()
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 			return model, nil
@@ -551,11 +551,11 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSettingsPlanMsg:
 		model.busy = ""
-		model.settingsEditor = settingsWizardModel{}
-		model.settingsPlan = message.report
+		model.settings.editor = settingsWizardModel{}
+		model.settings.plan = message.report
 		if message.report.HasErrors() {
 			model.message = "Candidate validation failed: " + settingsIssueMessage(message.report.Issues)
-			if model.settingsReturn == dashboardSetup || model.installationFlow {
+			if model.settings.returnScreen == dashboardSetup || model.installationFlow {
 				title := "Nixorium — First setup / Laboratory settings"
 				if model.installationFlow {
 					title = "Nixorium — Install computers / Laboratory settings"
@@ -564,11 +564,11 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				if model.installationFlow {
 					fields = installationSettingsFields
 				}
-				model.settingsEditor = newSettingsEditorModel(model.settingsCandidate, fields, title)
-				model.settingsEditor.index = len(model.settingsEditor.fields) - 1
-				model.settingsEditor.accepted = false
-				model.settingsEditor.err = model.message
-				model.settingsEditor.prepareCurrentField()
+				model.settings.editor = newSettingsEditorModel(model.settings.candidate, fields, title)
+				model.settings.editor.index = len(model.settings.editor.fields) - 1
+				model.settings.editor.accepted = false
+				model.settings.editor.err = model.message
+				model.settings.editor.prepareCurrentField()
 				model.screen = dashboardSettingsEdit
 			} else {
 				model.screen = dashboardSettings
@@ -581,10 +581,10 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			}
 			model.installationStage = 1
 			model.busy = "Saving the validated laboratory settings"
-			model.settingsApplying = true
+			model.settings.applying = true
 			model.message = ""
-			candidate := model.settingsCandidate
-			plan := model.settingsPlan
+			candidate := model.settings.candidate
+			plan := model.settings.plan
 			return model, func() tea.Msg {
 				return dashboardSettingsApplyMsg{report: model.actions.SaveSettings(candidate, plan)}
 			}
@@ -601,28 +601,28 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = ""
 		if message.err != nil {
 			model.message = "Password change failed: " + message.err.Error()
-			if (model.settingsReturn == dashboardSetup || model.installationFlow) && message.candidate.SchemaVersion != 0 {
-				model.settingsCandidate = message.candidate
+			if (model.settings.returnScreen == dashboardSetup || model.installationFlow) && message.candidate.SchemaVersion != 0 {
+				model.settings.candidate = message.candidate
 			}
-			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 			model.screen = dashboardSettingsPasswords
 			return model, nil
 		}
-		model.settingsCandidate = message.candidate
-		model.settingsCollectPasswords = false
+		model.settings.candidate = message.candidate
+		model.settings.collectPasswords = false
 		model.busy = "Validating the password change through Nix"
 		model.message = ""
-		candidate := model.settingsCandidate
+		candidate := model.settings.candidate
 		return model, func() tea.Msg {
 			return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
 		}
 	case dashboardSettingsApplyMsg:
 		model.hosts = domain.HostsReport{}
 		model.busy = ""
-		model.settingsApplying = false
-		model.settingsResult = message.report
+		model.settings.applying = false
+		model.settings.result = message.report
 		if !message.report.HasErrors() && message.report.State == "saved" {
-			model.settings = model.settingsCandidate
+			model.settings.current = model.settings.candidate
 			model.message = message.report.Message
 		} else if message.report.State == "unchanged" {
 			model.message = message.report.Message
@@ -636,8 +636,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			if message.report.HasErrors() || (message.report.State != "saved" && message.report.State != "unchanged") {
 				return model.failComputerInstallation(message.report.Message)
 			}
-			model.settings = model.settingsCandidate
-			model.settingsReturn = dashboardHome
+			model.settings.current = model.settings.candidate
+			model.settings.returnScreen = dashboardHome
 			model.screen = dashboardPXE
 			model.busy = "Checking installation prerequisites"
 			model.message = ""
@@ -646,9 +646,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			}
 			return model, model.loadSetup()
 		}
-		if model.settingsReturn == dashboardSetup && !message.report.HasErrors() && (message.report.State == "saved" || message.report.State == "unchanged") {
-			model.settingsReturn = dashboardHome
-			model.settingsCollectPasswords = false
+		if model.settings.returnScreen == dashboardSetup && !message.report.HasErrors() && (message.report.State == "saved" || message.report.State == "unchanged") {
+			model.settings.returnScreen = dashboardHome
+			model.settings.collectPasswords = false
 			model.screen = dashboardSetup
 			model.busy = "Continuing first setup"
 			model.message = ""
@@ -766,14 +766,14 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			model.updateScroll = maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
 		}
 		if model.screen == dashboardSettings {
-			model.settingsMenu.setSize(model.width, model.height)
+			model.settings.menu.setSize(model.width, model.height)
 		}
 		if model.screen == dashboardSettingsPasswords {
-			model.settingsPasswordMenu.setSize(model.width, model.height)
+			model.settings.passwordMenu.setSize(model.width, model.height)
 		}
 		if model.screen == dashboardSettingsEdit {
-			updated, _ := model.settingsEditor.Update(message)
-			model.settingsEditor = updated.(settingsWizardModel)
+			updated, _ := model.settings.editor.Update(message)
+			model.settings.editor = updated.(settingsWizardModel)
 		}
 		return model, nil
 	case tea.BackgroundColorMsg:
@@ -783,14 +783,14 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.homeMenu = newDashboardTaskMenu(model.isDark, model.width, model.height)
 		model.homeMenu.list.Select(selected)
 		if model.screen == dashboardSettings {
-			model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+			model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		}
 		if model.screen == dashboardSettingsPasswords {
-			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 		}
 		if model.screen == dashboardSettingsEdit {
-			updated, _ := model.settingsEditor.Update(message)
-			model.settingsEditor = updated.(settingsWizardModel)
+			updated, _ := model.settings.editor.Update(message)
+			model.settings.editor = updated.(settingsWizardModel)
 		}
 		return model, nil
 	default:
@@ -806,21 +806,21 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			model.homeMenu, _ = model.homeMenu.update(message)
 		}
 		if model.screen == dashboardSettings {
-			model.settingsMenu, _ = model.settingsMenu.update(message)
+			model.settings.menu, _ = model.settings.menu.update(message)
 		}
 		if model.screen == dashboardSettingsPasswords {
-			model.settingsPasswordMenu, _ = model.settingsPasswordMenu.update(message)
+			model.settings.passwordMenu, _ = model.settings.passwordMenu.update(message)
 		}
 		if model.screen == dashboardSettingsEdit {
-			updated, command := model.settingsEditor.Update(message)
-			model.settingsEditor = updated.(settingsWizardModel)
+			updated, command := model.settings.editor.Update(message)
+			model.settings.editor = updated.(settingsWizardModel)
 			return model, command
 		}
 		return model, nil
 	}
-	if !model.helpOpen && model.screen == dashboardSettings && key.String() != "f1" && (model.settingsMenu.list.FilterState() == list.Filtering || (model.settingsMenu.list.FilterState() == list.FilterApplied && key.String() == "esc")) {
+	if !model.helpOpen && model.screen == dashboardSettings && key.String() != "f1" && (model.settings.menu.list.FilterState() == list.Filtering || (model.settings.menu.list.FilterState() == list.FilterApplied && key.String() == "esc")) {
 		var command tea.Cmd
-		model.settingsMenu, command = model.settingsMenu.update(key)
+		model.settings.menu, command = model.settings.menu.update(key)
 		return model, command
 	}
 	if model.helpOpen {
@@ -889,7 +889,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updating || model.settingsApplying || model.software.mutating() || model.shutdown.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updating || model.settings.applying || model.software.mutating() || model.shutdown.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}

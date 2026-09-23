@@ -131,6 +131,21 @@ type controllerModel struct {
 	details    bool
 }
 
+// settingsModel owns the settings editor and its reviewed local save. The
+// controller activation that may follow remains a separate shared model.
+type settingsModel struct {
+	current          domain.LabSettingsFile
+	candidate        domain.LabSettingsFile
+	menu             routineSettingsMenu
+	passwordMenu     routinePasswordMenu
+	editor           settingsWizardModel
+	plan             domain.ConfigPlanReport
+	result           domain.ConfigurationSaveReport
+	applying         bool
+	returnScreen     dashboardScreen
+	collectPasswords bool
+}
+
 type dashboardModel struct {
 	updateDetails          bool
 	returnAdmin            bool
@@ -201,21 +216,11 @@ type dashboardModel struct {
 	updatePlanStarted      time.Time
 	updatePlanEvents       <-chan tea.Msg
 	updating               bool
-	settings               domain.LabSettingsFile
-	settingsCandidate      domain.LabSettingsFile
-	settingsMenu           routineSettingsMenu
-	settingsPasswordMenu   routinePasswordMenu
-	settingsEditor         settingsWizardModel
-	settingsPlan           domain.ConfigPlanReport
-	settingsResult         domain.ConfigurationSaveReport
-	settingsApplying       bool
-
-	settingsReturn           dashboardScreen
-	settingsCollectPasswords bool
-	startingLabSetup         bool
-	installationFlow         bool
-	installationStage        int
-	installationFailed       bool
+	settings               settingsModel
+	startingLabSetup       bool
+	installationFlow       bool
+	installationStage      int
+	installationFailed     bool
 
 	pxePreparing       bool
 	pxeProgress        domain.OperationProgress
@@ -517,11 +522,11 @@ func (model dashboardModel) openSetupSettings() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	model.screen = dashboardSettings
-	model.settingsReturn = dashboardSetup
-	model.settingsCollectPasswords = model.setup.CurrentStage != domain.SetupStageValidate
-	model.settingsResult = domain.ConfigurationSaveReport{}
-	model.settingsPlan = domain.ConfigPlanReport{}
-	model.settingsCandidate = domain.LabSettingsFile{}
+	model.settings.returnScreen = dashboardSetup
+	model.settings.collectPasswords = model.setup.CurrentStage != domain.SetupStageValidate
+	model.settings.result = domain.ConfigurationSaveReport{}
+	model.settings.plan = domain.ConfigPlanReport{}
+	model.settings.candidate = domain.LabSettingsFile{}
 	model.busy = "Loading laboratory settings"
 	model.message = ""
 	return model, func() tea.Msg {
@@ -540,11 +545,11 @@ func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
 	model.installationFailed = false
 	model.setupMode = false
 	model.startingLabSetup = true
-	model.settingsReturn = dashboardHome
-	model.settingsCollectPasswords = false
-	model.settingsResult = domain.ConfigurationSaveReport{}
-	model.settingsPlan = domain.ConfigPlanReport{}
-	model.settingsCandidate = domain.LabSettingsFile{}
+	model.settings.returnScreen = dashboardHome
+	model.settings.collectPasswords = false
+	model.settings.result = domain.ConfigurationSaveReport{}
+	model.settings.plan = domain.ConfigPlanReport{}
+	model.settings.candidate = domain.LabSettingsFile{}
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	model.pxeProgress = domain.OperationProgress{}
@@ -638,13 +643,13 @@ func (model dashboardModel) startComputerInstallationPreparation() (tea.Model, t
 }
 
 func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
-	returnTo := model.settingsReturn
-	model.settingsReturn = dashboardHome
-	model.settingsCollectPasswords = false
+	returnTo := model.settings.returnScreen
+	model.settings.returnScreen = dashboardHome
+	model.settings.collectPasswords = false
 	model.message = ""
 	if returnTo == dashboardSetup {
 		model.screen = dashboardSetup
-		if model.actions.LoadSetup != nil && (model.settingsResult.State == "saved" || model.settingsResult.State == "unchanged") {
+		if model.actions.LoadSetup != nil && (model.settings.result.State == "saved" || model.settings.result.State == "unchanged") {
 			model.busy = "Refreshing setup progress"
 			return model, model.loadSetup()
 		}

@@ -56,7 +56,7 @@ func TestSettingsPasswordReviewIsRedacted(t *testing.T) {
 			}
 		},
 	}
-	model := dashboardModel{settings: current, actions: actions, screen: dashboardSettingsPasswords}
+	model := dashboardModel{settings: settingsModel{current: current}, actions: actions, screen: dashboardSettingsPasswords}
 	updated, command := model.Update(dashboardSettingsPasswordMsg{candidate: candidate})
 	model = updated.(dashboardModel)
 	if command == nil || model.busy == "" {
@@ -85,9 +85,11 @@ func TestFirstSetupValidatesAndSavesTheCompleteCandidateOnce(t *testing.T) {
 	candidate.Lab.TeacherPassword = "$6$new$teacher"
 	candidate.Lab.StudentPassword = "$6$new$student"
 	model := dashboardModel{
-		screen:            dashboardSettingsPasswords,
-		settingsReturn:    dashboardSetup,
-		settingsCandidate: candidate,
+		screen: dashboardSettingsPasswords,
+		settings: settingsModel{
+			returnScreen: dashboardSetup,
+			candidate:    candidate,
+		},
 		actions: DashboardActions{
 			PlanSettings: func(received domain.LabSettingsFile) domain.ConfigPlanReport {
 				plans++

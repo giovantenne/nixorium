@@ -307,7 +307,7 @@ func renderInstallationDemo(revision string) DemoScenario {
 	r.capture("Open Installation", 1500)
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Review laboratory network settings", 2300)
-	r.model.settingsEditor = r.model.settingsEditor.moveToField(4)
+	r.model.settings.editor = r.model.settings.editor.moveToField(4)
 	r.capture("Configure five client computers", 2300)
 
 	r.model.screen = dashboardPXE
