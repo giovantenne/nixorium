@@ -12,6 +12,7 @@ an explicit product decision.
 | CLI commands/options | `cmd/nixorium/main.go` argument parser and CLI tests | Maintainer command examples; administrator guide |
 | TUI navigation, confirmations, automatic follow-up | `internal/presentation/` workflow tests and typed callbacks in `cmd/nixorium/` | Maintainer operations/software guidance; TUI tour; README if entry flow changes |
 | Software scopes and package ownership | `internal/domain/software.go`, `lib/eval-lab-software.nix`, template modules | Maintainer software guide; both AGENTS files |
+| Software profile schema and batch apply | `internal/domain/software_presets.go`, `lib/eval-software-presets.nix`, application tests | System reference; deployment README; maintainer software/configuration guidance; both AGENTS files |
 | Controller-only readiness, inventory, interfaces | `lib/mk-lab.nix`, domain/app readiness tests | Deployment AGENTS; maintainer context/validation |
 | Home reset, extensions, npm, desktop defaults | `modules/home-reset.nix`, home scripts, template modules/assets | Maintainer student-home guide; system reference |
 | Account roles and NetworkManager authorization | `modules/users.nix`, mkLab tests | Both AGENTS files; maintainer configuration guidance; deployment README; system/architecture docs; changelog |

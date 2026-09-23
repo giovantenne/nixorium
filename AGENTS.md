@@ -197,7 +197,9 @@ Release from the matching changelog section.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
 - Guided software changes use `software catalog`, `software plan`, and
-  `software apply`. Resolve package IDs from the pinned package set and
+  `software apply`. Optional deployment-owned profiles use `software presets`
+  and a single `software preset plan`/`apply` batch; `nixoriumSoftwarePresets`
+  is `null` when absent. Resolve every selected package ID from the pinned package set and
   deployment validators; the curated catalog is suggestions, not an allowlist.
   `shared` applies to the controller and present/future clients; `controller`
   applies only to the controller. Existing `all-clients`, groups and explicit
@@ -207,7 +209,11 @@ Release from the matching changelog section.
   token binds that impact. Always compose the existing deployment validation
   with the upstream controller-candidate hook when old/new declarations include
   the controller, including removal. Apply may atomically replace only `lab-software.json`
-  after token and fingerprint rechecks. CLI apply remains declaration-only; the
+  after token and fingerprint rechecks. A profile is additive initial input,
+  never persistent policy: preserve existing declarations and scopes, permit
+  explicit exclusions, reject the whole candidate on any invalid package, bind
+  review to the normalized profile catalog and resolved package data, and never
+  write the catalog, modules, or lock. CLI apply remains declaration-only; the
   ordinary TUI records it transparently and immediately invokes the typed
   controller plan/apply boundary when the reviewed scope affects the controller.
   It must not push, prepare PXE, deploy clients, or rewrite packages supplied by
@@ -255,7 +261,7 @@ Release from the matching changelog section.
   their own `switch-to-configuration` cannot terminate the in-flight reviewed
   job when the target changes its `ExecStart` store path. The job must survive
   through active-system verification and receipt creation.
-- `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. `nixoriumSoftware` is the typed non-secret catalog/scope/declaration contract. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
+- `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. `nixoriumSoftware` is the typed non-secret catalog/scope/declaration contract; optional `nixoriumSoftwarePresets` is the versioned deployment-owned profile catalog. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. Keep its semantic checks aligned with `internal/domain/settings.go` through `tests/lab-settings-validation-cases.json`. No custom NixOS options are added to host configurations.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.

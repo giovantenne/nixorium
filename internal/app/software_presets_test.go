@@ -129,6 +129,9 @@ func TestSoftwarePresetApplyRejectsCatalogFileAndTokenDrift(t *testing.T) {
 		func(_ *fakeSoftwareSource, plan *domain.SoftwarePresetPlanReport) {
 			plan.ReviewToken = "sha256:wrong"
 		},
+		func(source *fakeSoftwareSource, _ *domain.SoftwarePresetPlanReport) {
+			source.resolved["gimp"] = domain.SoftwareCatalogItem{ID: "gimp", Label: "GIMP", Summary: "Edit images", Version: "changed-lock-version", Availability: "available"}
+		},
 	} {
 		source, manager := softwarePresetFixture(t)
 		plan := manager.PlanPreset(context.Background(), "/deployment", domain.SoftwarePresetRequest{

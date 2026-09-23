@@ -8,6 +8,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added an optional, deployment-owned `nixoriumSoftwarePresets` contract and
+  `software presets` / `software preset plan` / `software preset apply` CLI
+  workflow. A profile produces one reviewed, additive and atomic
+  `lab-software.json` candidate; exclusions are explicit, existing scopes are
+  preserved, and catalog, package-resolution, file and token drift invalidate
+  the review.
 - Successful guided software saves can continue directly to a fresh client
   deployment review with exactly the affected computers preselected. The review
   states that it applies the complete current configuration, reports removed

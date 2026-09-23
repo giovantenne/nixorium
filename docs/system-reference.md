@@ -186,7 +186,8 @@ a private deployment with these extension points:
 - `modules/controller.nix` for the controller only;
 - `modules/clients.nix` for all client PCs;
 - `hostModules` in `flake.nix` for a generated individual host;
-- `lab-software.json` and `software-catalog.nix` for package/profile choices;
+- `lab-software.json`, `software-catalog.nix`, and optional
+  `software-presets.json` for package and initial-profile choices;
 - the focused modules and assets already shipped in the private template.
 
 For example, add VLC only to `pc05` with `modules/pc05.nix`:
@@ -239,6 +240,7 @@ installer so client installation needs no second checkout.
 | `labConfig` | Required typed site settings, normally decoded from `lab-settings.json` |
 | `labSoftware` | Strict versioned supported client-package declarations, normally decoded from `lab-software.json` |
 | `softwareCatalog` | Deployment-owned suggested packages shown before free search; each entry has `id`, `label`, and `summary` |
+| `softwarePresets` | Optional versioned deployment-owned software-profile catalog; each profile has an ID, label, description, and package IDs |
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
@@ -265,6 +267,7 @@ consume `lib.mkLab`. Important generated outputs include:
 - `labMeta` for non-sensitive operational identity and network data;
 - `deploymentStatus` for readiness blockers;
 - `nixoriumSoftware` for the supported pinned catalog, evaluated scopes, and managed declarations;
+- `nixoriumSoftwarePresets` for the normalized optional profile catalog, or `null` when a deployment does not provide one;
 - `nixoriumUpdateTargets` and `nixoriumOfflineCheck` for base-update validation;
 - `nixorium` and supporting Flake applications;
 - `pxeFirmware` and `installerBundle`;

@@ -112,6 +112,7 @@ one-time adoption for older deployments, independent packages and recovery.
 - `modules/clients.nix`: client PCs only
 - `lab-software.json`: guided packages with explicit shared, controller or client scopes
 - `software-catalog.nix`: optional deployment-owned suggestions shown before package search
+- `software-presets.json`: optional versioned software profiles whose packages can be added as one reviewed batch
 - `modules/workstation.nix`: GNOME application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
@@ -253,16 +254,27 @@ older upstreams retain their client-only choices. Existing declarations are not
 migrated or expanded automatically. Clients may all remain powered off, and
 shared/controller declarations work before any clients are configured.
 
-Both the initial package preset and the suggestion list belong to this private
-repository. Edit `lab-software.json` or `software-catalog.nix` to evolve them
-without waiting for a Nixorium release. The catalog is convenience only: package
-search and pinned-package validation remain available for entries not listed.
+Software profiles and the suggestion list belong to this private repository.
+When `software-presets.json` is present, each profile is a versioned list of
+package IDs with a label and description; it is a starting selection rather
+than persistent policy. Adding one creates ordinary entries in
+`lab-software.json`, so later package and scope changes continue through the
+same workflow. Existing declarations retain their scopes and selecting another
+profile never removes packages. Edit these files to evolve the local choices
+without waiting for a Nixorium release. The catalog is convenience only:
+package search and pinned-package validation remain available for entries not
+listed.
 
 The same typed workflow is available from the CLI:
 
 ```sh
 nix run .#nixorium -- software catalog
 nix run .#nixorium -- software search --query libreoffice
+nix run .#nixorium -- software presets
+nix run .#nixorium -- software preset plan --preset essential --scope shared \
+  --exclude vlc
+nix run .#nixorium -- software preset apply --preset essential --scope shared \
+  --exclude vlc --expect REVIEW_TOKEN
 nix run .#nixorium -- software plan --package hello --scope shared
 nix run .#nixorium -- software plan --package hello --scope controller
 nix run .#nixorium -- software plan --package vlc --scope all-clients
@@ -278,8 +290,13 @@ scopes accept comma-separated evaluated identities such as
 owned by this workflow. Search and resolution use the deployment's locked input
 and overlays; dotted attributes are resolved as data rather than Nix code.
 
-Apply atomically replaces only `lab-software.json` after repeating pinned Nix
-validation and checking the review token and source fingerprint. The ordinary
+Both single-package and profile apply atomically replace only
+`lab-software.json` after repeating pinned Nix validation and checking the
+review token and source fingerprints. Profile review resolves every selected
+package before proposing one candidate; one rejected package blocks the whole
+batch. Applying an already-added profile is idempotent, and excluding all its
+packages is a valid no-change proposal. Neither operation writes the profile
+catalog, modules, or lock. The ordinary
 TUI also records that one managed file locally without exposing Git. For
 `shared` and `controller` scopes, the same reviewed action then builds,
 activates, and verifies this controller. It never pushes, starts PXE, or
