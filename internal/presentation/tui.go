@@ -204,18 +204,18 @@ type dashboardModel struct {
 	pxeProgress        domain.OperationProgress
 	pxeProgressStarted time.Time
 	pxeProgressID      uint64
-	softwareDashboardState
-	shutdownCursor    int
-	shutdownChosen    map[string]bool
-	shutdownPolicy    domain.ShutdownSessionPolicy
-	shutdownPlan      domain.ShutdownPlanReport
-	shutdownResult    domain.ShutdownApplyReport
-	shutdownApplying  bool
-	shutdownTechnical bool
-	width             int
-	height            int
-	isDark            bool
-	activitySpinner   spinner.Model
+	software           softwareModel
+	shutdownCursor     int
+	shutdownChosen     map[string]bool
+	shutdownPolicy     domain.ShutdownSessionPolicy
+	shutdownPlan       domain.ShutdownPlanReport
+	shutdownResult     domain.ShutdownApplyReport
+	shutdownApplying   bool
+	shutdownTechnical  bool
+	width              int
+	height             int
+	isDark             bool
+	activitySpinner    spinner.Model
 
 	initializing bool
 	initialError bool
