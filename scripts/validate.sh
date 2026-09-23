@@ -234,8 +234,23 @@ profile_state() {
 }
 
 PROFILE_STATE=$(profile_state)
-jq -e '.chromiumPolicy and .docker and .screensaver and .vscodeHome and .vscodeHomeOwnership and .homeOwnershipOrdering' <<<"$PROFILE_STATE" >/dev/null
+jq -e '
+  .chromiumPolicy and
+  ((.docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and
+  .homeOwnershipOrdering
+' <<<"$PROFILE_STATE" >/dev/null
 cp "$SITE_DIR/lab-software.json" "$TEMP_DIR/lab-software-profile.json"
+jq '.packages += [
+  {"package": "docker", "scope": {"kind": "shared"}},
+  {"package": "python3Packages.terminaltexteffects", "scope": {"kind": "shared"}},
+  {"package": "vscode", "scope": {"kind": "shared"}}
+] | .packages |= sort_by(.package)' \
+  "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
+PROFILE_STATE=$(profile_state)
+jq -e '
+  .chromiumPolicy and .docker and .screensaver and .vscodeHome and
+  .vscodeHomeOwnership and .homeOwnershipOrdering
+' <<<"$PROFILE_STATE" >/dev/null
 jq '.packages |= map(select(.package as $package | [
   "chromium",
   "docker",
