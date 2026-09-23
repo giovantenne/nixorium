@@ -1613,10 +1613,10 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettings || len(model.settingsMenu.list.Items()) != len(routineSettingsGroups) || !strings.Contains(model.View().Content, "Regional") {
+	if model.screen != dashboardSettings || len(model.settings.menu.list.Items()) != len(routineSettingsGroups) || !strings.Contains(model.View().Content, "Regional") {
 		t.Fatalf("settings categories missing:\n%s", model.View().Content)
 	}
-	model.settingsMenu.list.Select(5)
+	model.settings.menu.list.Select(5)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardSettingsEdit || !strings.Contains(model.View().Content, "Edit Git") {
@@ -1643,7 +1643,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Text: "y"})
 	model = updated.(dashboardModel)
-	if command == nil || !model.settingsApplying {
+	if command == nil || !model.settings.applying {
 		t.Fatalf("settings apply did not start: %+v", model)
 	}
 	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
@@ -1653,12 +1653,12 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if applied != 1 || model.settingsApplying || model.screen != dashboardSettings || model.settings.Lab.StudentGitName != "Lab Student" || !strings.Contains(model.View().Content, "Configuration saved") || strings.Contains(model.View().Content, "Git") {
+	if applied != 1 || model.settings.applying || model.screen != dashboardSettings || model.settings.current.Lab.StudentGitName != "Lab Student" || !strings.Contains(model.View().Content, "Configuration saved") || strings.Contains(model.View().Content, "Git") {
 		t.Fatalf("settings result missing: applied=%d model=%+v\n%s", applied, model, model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "e"})
 	model = updated.(dashboardModel)
-	if model.settingsResult.Operation != "" || !strings.Contains(model.View().Content, "Choose one area to edit") {
+	if model.settings.result.Operation != "" || !strings.Contains(model.View().Content, "Choose one area to edit") {
 		t.Fatalf("settings result did not open another edit:\n%s", model.View().Content)
 	}
 }

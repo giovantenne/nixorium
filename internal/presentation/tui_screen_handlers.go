@@ -96,10 +96,10 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		return model.openPackageBase()
 	case "e":
 		model.screen = dashboardSettings
-		model.settingsReturn = dashboardAdministration
-		model.settingsResult = domain.ConfigurationSaveReport{}
-		model.settingsPlan = domain.ConfigPlanReport{}
-		model.settingsCandidate = domain.LabSettingsFile{}
+		model.settings.returnScreen = dashboardAdministration
+		model.settings.result = domain.ConfigurationSaveReport{}
+		model.settings.plan = domain.ConfigPlanReport{}
+		model.settings.candidate = domain.LabSettingsFile{}
 		model.busy = "Loading managed laboratory settings"
 		model.message = ""
 		return model, func() tea.Msg {
@@ -383,25 +383,25 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			return model, model.prepareSetupKeys()
 		}
 	case dashboardSettings:
-		if model.settingsResult.Operation != "" {
+		if model.settings.result.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
 				return model.returnFromSettings()
 			case "r":
-				if !model.settingsResult.RecoveryRequired || model.actions.SaveSettings == nil {
+				if !model.settings.result.RecoveryRequired || model.actions.SaveSettings == nil {
 					return model, nil
 				}
 				model.busy = "Recovering the local configuration save"
-				model.settingsApplying = true
+				model.settings.applying = true
 				model.message = ""
-				candidate := model.settingsCandidate
-				plan := model.settingsPlan
+				candidate := model.settings.candidate
+				plan := model.settings.plan
 				return model, func() tea.Msg {
 					report := model.actions.SaveSettings(candidate, plan)
 					return dashboardSettingsApplyMsg{report: report}
 				}
 			case "e":
-				model.settingsResult = domain.ConfigurationSaveReport{}
+				model.settings.result = domain.ConfigurationSaveReport{}
 				model.message = ""
 			}
 			return model, nil
@@ -410,20 +410,20 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "esc", "left":
 			return model.returnFromSettings()
 		case "enter":
-			group, selected := model.settingsMenu.selected()
+			group, selected := model.settings.menu.selected()
 			if !selected {
 				model.message = "Select a settings category."
 				return model, nil
 			}
-			model.settingsEditor = newSettingsEditorModel(model.settings, group.fields, "Nixorium — Edit "+group.label)
-			model.settingsEditor.width = model.width
-			model.settingsEditor.height = model.height
-			model.settingsEditor.isDark = model.isDark
-			model.settingsEditor.prepareCurrentField()
+			model.settings.editor = newSettingsEditorModel(model.settings.current, group.fields, "Nixorium — Edit "+group.label)
+			model.settings.editor.width = model.width
+			model.settings.editor.height = model.height
+			model.settings.editor.isDark = model.isDark
+			model.settings.editor.prepareCurrentField()
 			model.message = ""
 			model.screen = dashboardSettingsEdit
 		case "p":
-			model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 			model.message = ""
 			model.screen = dashboardSettingsPasswords
 		case "k":
@@ -439,17 +439,17 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys()}
 			}
 		default:
-			model.settingsMenu, _ = model.settingsMenu.update(key)
+			model.settings.menu, _ = model.settings.menu.update(key)
 		}
 	case dashboardSettingsEdit:
-		updated, command := model.settingsEditor.Update(key)
-		model.settingsEditor = updated.(settingsWizardModel)
-		if model.settingsEditor.cancelled {
-			model.settingsEditor = settingsWizardModel{}
+		updated, command := model.settings.editor.Update(key)
+		model.settings.editor = updated.(settingsWizardModel)
+		if model.settings.editor.cancelled {
+			model.settings.editor = settingsWizardModel{}
 			if model.installationFlow {
 				model.installationFlow = false
 				model.installationFailed = false
-				model.settingsReturn = dashboardHome
+				model.settings.returnScreen = dashboardHome
 				model.screen = dashboardHome
 				model.message = "Computer installation cancelled; no setting was changed."
 			} else {
@@ -458,16 +458,16 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			return model, nil
 		}
-		if model.settingsEditor.accepted {
-			model.settingsCandidate = model.settingsEditor.settings
-			if (model.settingsReturn == dashboardSetup || model.installationFlow) && model.settingsCollectPasswords {
+		if model.settings.editor.accepted {
+			model.settings.candidate = model.settings.editor.settings
+			if (model.settings.returnScreen == dashboardSetup || model.installationFlow) && model.settings.collectPasswords {
 				if model.actions.ChangePassword == nil {
 					model.message = "Password setup is not available in this deployment."
 					return model, nil
 				}
-				model.settingsPasswordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+				model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 				model.screen = dashboardSettingsPasswords
-				candidate := model.settingsCandidate
+				candidate := model.settings.candidate
 				command := &settingsPasswordCommand{action: model.actions.ChangePassword, account: "all", settings: candidate}
 				return model, tea.Exec(command, func(err error) tea.Msg {
 					return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
@@ -475,18 +475,18 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			model.busy = "Validating the complete settings candidate through Nix"
 			model.message = ""
-			candidate := model.settingsCandidate
+			candidate := model.settings.candidate
 			return model, func() tea.Msg {
 				return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
 			}
 		}
 		return model, command
 	case dashboardSettingsPasswords:
-		if model.settingsReturn == dashboardSetup || model.installationFlow {
+		if model.settings.returnScreen == dashboardSetup || model.installationFlow {
 			switch key.String() {
 			case "esc", "left":
-				model.settingsEditor = settingsWizardModel{}
-				model.settingsCandidate = domain.LabSettingsFile{}
+				model.settings.editor = settingsWizardModel{}
+				model.settings.candidate = domain.LabSettingsFile{}
 				if model.installationFlow {
 					model.installationFlow = false
 					model.installationFailed = false
@@ -494,15 +494,15 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				} else {
 					model.screen = dashboardSetup
 				}
-				model.settingsReturn = dashboardHome
-				model.settingsCollectPasswords = false
+				model.settings.returnScreen = dashboardHome
+				model.settings.collectPasswords = false
 				model.message = "Computer installation cancelled; no setting was changed."
 			case "enter":
 				if model.actions.ChangePassword == nil {
 					model.message = "Password setup is not available in this deployment."
 					return model, nil
 				}
-				candidate := model.settingsCandidate
+				candidate := model.settings.candidate
 				command := &settingsPasswordCommand{action: model.actions.ChangePassword, account: "all", settings: candidate}
 				model.message = ""
 				return model, tea.Exec(command, func(err error) tea.Msg {
@@ -516,7 +516,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.message = ""
 			model.screen = dashboardSettings
 		case "enter":
-			choice, selected := model.settingsPasswordMenu.selected()
+			choice, selected := model.settings.passwordMenu.selected()
 			if !selected {
 				model.message = "Select an account."
 				return model, nil
@@ -524,14 +524,14 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			command := &settingsPasswordCommand{
 				action:   model.actions.ChangePassword,
 				account:  choice.id,
-				settings: model.settings,
+				settings: model.settings.current,
 			}
 			model.message = ""
 			return model, tea.Exec(command, func(err error) tea.Msg {
 				return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
 			})
 		default:
-			model.settingsPasswordMenu, _ = model.settingsPasswordMenu.update(key)
+			model.settings.passwordMenu, _ = model.settings.passwordMenu.update(key)
 		}
 	case dashboardSettingsReview:
 		switch strings.ToLower(key.String()) {
@@ -540,10 +540,10 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.screen = dashboardSettings
 		case "y", "enter":
 			model.busy = "Saving the reviewed laboratory configuration"
-			model.settingsApplying = true
+			model.settings.applying = true
 			model.message = ""
-			candidate := model.settingsCandidate
-			plan := model.settingsPlan
+			candidate := model.settings.candidate
+			plan := model.settings.plan
 			return model, func() tea.Msg {
 				report := model.actions.SaveSettings(candidate, plan)
 				return dashboardSettingsApplyMsg{report: report}

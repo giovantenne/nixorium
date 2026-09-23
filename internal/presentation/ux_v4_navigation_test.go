@@ -156,13 +156,13 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 
 	model.screen = dashboardHome
 	model.busy = ""
-	model.settingsResult = domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
+	model.settings.result = domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
 	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return domain.LabSettingsFile{}, nil }
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
 	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Text: "e"})
 	model = updated.(dashboardModel)
-	if model.settingsResult.Operation != "" || command == nil {
+	if model.settings.result.Operation != "" || command == nil {
 		t.Fatal("Settings retained a result from the previous session")
 	}
 }
@@ -251,19 +251,19 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsEdit || model.settingsEditor.settings.Lab.DeploymentMode != "laboratory" || model.settingsEditor.settings.Lab.PCCount != 20 || len(model.settingsEditor.fields) != len(installationSettingsFields) {
-		t.Fatalf("client setup editor = %+v", model.settingsEditor)
+	if model.screen != dashboardSettingsEdit || model.settings.editor.settings.Lab.DeploymentMode != "laboratory" || model.settings.editor.settings.Lab.PCCount != 20 || len(model.settings.editor.fields) != len(installationSettingsFields) {
+		t.Fatalf("client setup editor = %+v", model.settings.editor)
 	}
-	if model.settingsEditor.title != "Nixorium — Install computers / Laboratory settings" || model.settingsEditor.fields[6].label != "Teacher user name" {
-		t.Fatalf("complete laboratory settings are not shown: title=%q fields=%+v", model.settingsEditor.title, model.settingsEditor.fields)
+	if model.settings.editor.title != "Nixorium — Install computers / Laboratory settings" || model.settings.editor.fields[6].label != "Teacher user name" {
+		t.Fatalf("complete laboratory settings are not shown: title=%q fields=%+v", model.settings.editor.title, model.settings.editor.fields)
 	}
-	for _, field := range model.settingsEditor.fields {
+	for _, field := range model.settings.editor.fields {
 		if field.id == "lab.timeZone" || field.id == "lab.keyboardLayout" {
 			t.Fatalf("installation asks for controller regional setting %q", field.id)
 		}
 	}
-	if model.settingsEditor.settings.Lab.TimeZone != settings.Lab.TimeZone || model.settingsEditor.settings.Lab.KeyboardLayout != settings.Lab.KeyboardLayout {
-		t.Fatalf("installation changed controller regional settings: %+v", model.settingsEditor.settings.Lab)
+	if model.settings.editor.settings.Lab.TimeZone != settings.Lab.TimeZone || model.settings.editor.settings.Lab.KeyboardLayout != settings.Lab.KeyboardLayout {
+		t.Fatalf("installation changed controller regional settings: %+v", model.settings.editor.settings.Lab)
 	}
 }
 
@@ -271,9 +271,9 @@ func TestInstallComputersSavesValidatedSettingsWithoutReviewScreen(t *testing.T)
 	saves, setupLoads := 0, 0
 	candidate := wizardSettings()
 	model := dashboardModel{
-		screen:            dashboardSettingsEdit,
-		installationFlow:  true,
-		settingsCandidate: candidate,
+		screen:           dashboardSettingsEdit,
+		installationFlow: true,
+		settings:         settingsModel{candidate: candidate},
 		actions: DashboardActions{
 			SaveSettings: func(received domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
 				saves++
@@ -291,7 +291,7 @@ func TestInstallComputersSavesValidatedSettingsWithoutReviewScreen(t *testing.T)
 	plan := domain.ConfigPlanReport{Operation: "config-plan", State: "valid", Changes: []domain.SettingChange{{Field: "lab.pcCount"}}}
 	updated, command := model.Update(dashboardSettingsPlanMsg{report: plan})
 	model = updated.(dashboardModel)
-	if command == nil || model.screen == dashboardSettingsReview || !model.settingsApplying {
+	if command == nil || model.screen == dashboardSettingsReview || !model.settings.applying {
 		t.Fatalf("installation settings stopped for a save review: screen=%d", model.screen)
 	}
 	updated, command = model.Update(command())
@@ -405,13 +405,13 @@ func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || model.screen != dashboardSettings || model.settingsReturn != dashboardSetup {
+	if command == nil || model.screen != dashboardSettings || model.settings.returnScreen != dashboardSetup {
 		t.Fatalf("setup did not open in-TUI settings: %+v", model)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if loaded != 1 || model.screen != dashboardSettingsEdit || len(model.settingsEditor.fields) != len(settingsFields) {
-		t.Fatalf("setup did not open one complete settings sequence: loaded=%d screen=%d fields=%d", loaded, model.screen, len(model.settingsEditor.fields))
+	if loaded != 1 || model.screen != dashboardSettingsEdit || len(model.settings.editor.fields) != len(settingsFields) {
+		t.Fatalf("setup did not open one complete settings sequence: loaded=%d screen=%d fields=%d", loaded, model.screen, len(model.settings.editor.fields))
 	}
 	if view := model.View().Content; !strings.Contains(view, "First setup / Laboratory settings") || !strings.Contains(view, "one complete validation") || strings.Contains(view, "exit and run") {
 		t.Fatalf("setup settings are not a continuous English flow:\n%s", view)
@@ -432,16 +432,16 @@ func TestSetupCredentialsFollowTheSameSettingsAndPasswordSequence(t *testing.T) 
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsEdit || len(model.settingsEditor.fields) != len(settingsFields) {
-		t.Fatalf("credential stage did not start the unified settings sequence: screen=%d fields=%d", model.screen, len(model.settingsEditor.fields))
+	if model.screen != dashboardSettingsEdit || len(model.settings.editor.fields) != len(settingsFields) {
+		t.Fatalf("credential stage did not start the unified settings sequence: screen=%d fields=%d", model.screen, len(model.settings.editor.fields))
 	}
 
-	model.settingsEditor.index = len(model.settingsEditor.fields) - 1
-	model.settingsEditor.prepareCurrentField()
+	model.settings.editor.index = len(model.settings.editor.fields) - 1
+	model.settings.editor.prepareCurrentField()
 	updated, passwordCommand := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsPasswords || passwordCommand == nil || !model.settingsPasswordMenu.initialized {
-		t.Fatalf("completed settings did not open one protected password session: screen=%d initialized=%t", model.screen, model.settingsPasswordMenu.initialized)
+	if model.screen != dashboardSettingsPasswords || passwordCommand == nil || !model.settings.passwordMenu.initialized {
+		t.Fatalf("completed settings did not open one protected password session: screen=%d initialized=%t", model.screen, model.settings.passwordMenu.initialized)
 	}
 	updated, _ = model.Update(struct{}{})
 	model = updated.(dashboardModel)
@@ -466,11 +466,11 @@ func TestSetupValidationRetryKeepsAcceptedPasswords(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.settingsCollectPasswords {
+	if model.settings.collectPasswords {
 		t.Fatal("validation retry would collect already accepted passwords again")
 	}
-	model.settingsEditor.index = len(model.settingsEditor.fields) - 1
-	model.settingsEditor.prepareCurrentField()
+	model.settings.editor.index = len(model.settings.editor.fields) - 1
+	model.settings.editor.prepareCurrentField()
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || model.screen == dashboardSettingsPasswords || model.busy == "" {
@@ -576,7 +576,7 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 	loads := 0
 	model := experienceFixture(2)
 	model.screen = dashboardSettings
-	model.settingsMenu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+	model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 	model.actions.LoadSetupKeys = func() domain.KeyReconcileReport {
 		loads++
 		return domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{

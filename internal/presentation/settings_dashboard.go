@@ -260,7 +260,7 @@ func (model dashboardModel) settingsView() string {
 	title := "Laboratory settings"
 	intro := "Choose one area to edit. Values are validated before any file changes."
 	backLabel := "Maintenance"
-	if model.settingsReturn == dashboardSetup {
+	if model.settings.returnScreen == dashboardSetup {
 		path = []string{"Installation", "Setup", "Settings"}
 		title = "Laboratory settings"
 		intro = "Complete the required laboratory settings here, then return to setup."
@@ -277,7 +277,7 @@ func (model dashboardModel) settingsView() string {
 	}
 	switch model.screen {
 	case dashboardSettingsEdit:
-		return model.settingsEditor.View().Content
+		return model.settings.editor.View().Content
 	case dashboardSettingsPasswords:
 		return model.settingsPasswordsView()
 	case dashboardSettingsReview:
@@ -285,8 +285,8 @@ func (model dashboardModel) settingsView() string {
 	}
 	lines := []string{tuiTitle(title, model.isDark), ""}
 	notices := []tuiNotice{}
-	if model.settingsResult.Operation != "" {
-		success := !model.settingsResult.HasErrors() && (model.settingsResult.State == "saved" || model.settingsResult.State == "unchanged")
+	if model.settings.result.Operation != "" {
+		success := !model.settings.result.HasErrors() && (model.settings.result.State == "saved" || model.settings.result.State == "unchanged")
 		title := "Configuration needs attention"
 		if success {
 			title = "Configuration saved"
@@ -294,17 +294,17 @@ func (model dashboardModel) settingsView() string {
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
 			"",
-			fmt.Sprintf("State: %s   Changed fields: %d", model.settingsResult.State, len(model.settingsResult.Changes)),
+			fmt.Sprintf("State: %s   Changed fields: %d", model.settings.result.State, len(model.settings.result.Changes)),
 		)
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		returnLabel := "Maintenance"
-		if model.settingsReturn == dashboardSetup {
+		if model.settings.returnScreen == dashboardSetup {
 			returnLabel = "Setup"
 		}
 		actions := []tuiAction{{key: "e", label: "Edit more"}}
-		if model.settingsResult.RecoveryRequired {
+		if model.settings.result.RecoveryRequired {
 			actions = append(actions, tuiAction{key: "r", label: "Retry save"})
 		}
 		actions = append(actions, tuiAction{key: "Enter", label: returnLabel}, tuiAction{key: "F1", label: "Help"})
@@ -313,7 +313,7 @@ func (model dashboardModel) settingsView() string {
 	lines = append(lines,
 		intro,
 		"",
-		model.settingsMenu.list.View(),
+		model.settings.menu.list.View(),
 	)
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
@@ -322,7 +322,7 @@ func (model dashboardModel) settingsView() string {
 }
 
 func (model dashboardModel) settingsPasswordsView() string {
-	if model.settingsReturn == dashboardSetup || model.installationFlow {
+	if model.settings.returnScreen == dashboardSetup || model.installationFlow {
 		lines := []string{
 			tuiTitle("Account passwords", model.isDark),
 			"Enter the administrator, teacher, and student passwords in one protected session.",
@@ -345,7 +345,7 @@ func (model dashboardModel) settingsPasswordsView() string {
 		"Choose the account whose password you want to change.",
 		"Your password stays hidden while you type.",
 		"",
-		model.settingsPasswordMenu.list.View(),
+		model.settings.passwordMenu.list.View(),
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
@@ -359,7 +359,7 @@ func (model dashboardModel) settingsReviewView() string {
 		tuiTitle("Review settings", model.isDark),
 		"Validated managed-setting changes",
 	}
-	for _, change := range model.settingsPlan.Changes {
+	for _, change := range model.settings.plan.Changes {
 		before := change.Before
 		after := change.After
 		if change.Sensitive {
@@ -381,7 +381,7 @@ func (model dashboardModel) settingsReviewView() string {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
 	path := []string{"Maintenance", "Settings", "Review"}
-	if model.settingsReturn == dashboardSetup {
+	if model.settings.returnScreen == dashboardSetup {
 		path = []string{"Installation", "Setup", "Settings", "Review"}
 	}
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Save"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
