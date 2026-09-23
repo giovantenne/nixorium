@@ -268,6 +268,13 @@ without waiting for a Nixorium release. The catalog is convenience only:
 package search and pinned-package validation remain available for entries not
 listed.
 
+In the Software screen, press **p — Add profile**. Choose one profile, toggle
+packages with Space, choose a supported scope, and inspect the aggregated
+review. The review marks missing declarations as additions and shows the
+preserved scope for packages already present. Enter saves the batch once; Esc
+from any selection or review step leaves `lab-software.json` unchanged. If the
+catalog is absent, individual package search and management continue normally.
+
 New sites provide **Essential** (the default), **General education**,
 **Programming**, **Graphics and illustration**, **Audio and video**, **CAD and
 3D modelling**, and **STEM and scientific computing**. The lists are expanded
@@ -331,8 +338,8 @@ review token and source fingerprints. Profile review resolves every selected
 package before proposing one candidate; one rejected package blocks the whole
 batch. Applying an already-added profile is idempotent, and excluding all its
 packages is a valid no-change proposal. Neither operation writes the profile
-catalog, modules, or lock. The ordinary
-TUI also records that one managed file locally without exposing Git. For
+catalog, modules, or lock. The ordinary TUI also records that one managed file
+locally without exposing Git. For
 `shared` and `controller` scopes, the same reviewed action then builds,
 activates, and verifies this controller. It never pushes, starts PXE, or
 distributes clients. After a successful save that affects clients, choose

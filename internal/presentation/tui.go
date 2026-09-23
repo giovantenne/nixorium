@@ -28,6 +28,9 @@ type DashboardActions struct {
 	SearchSoftware         func(context.Context, string) domain.SoftwareSearchReport
 	PlanSoftware           func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
 	SaveSoftware           func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
+	LoadSoftwarePresets    func() domain.SoftwarePresetCatalogReport
+	PlanSoftwarePreset     func(domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport
+	SaveSoftwarePreset     func(domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport
 	PlanShutdown           func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
 	ApplyShutdown          func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
 	PlanDeployment         func(string) domain.DeploymentPlanReport
@@ -418,6 +421,15 @@ type dashboardSoftwarePlanMsg struct {
 }
 type dashboardSoftwareApplyMsg struct {
 	report domain.SoftwareChangeApplyReport
+}
+type dashboardSoftwarePresetCatalogMsg struct {
+	report domain.SoftwarePresetCatalogReport
+}
+type dashboardSoftwarePresetPlanMsg struct {
+	report domain.SoftwarePresetPlanReport
+}
+type dashboardSoftwarePresetApplyMsg struct {
+	report domain.SoftwarePresetApplyReport
 }
 type dashboardSoftwareControllerMsg struct {
 	plan   domain.ControllerRebuildPlanReport

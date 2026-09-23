@@ -54,6 +54,7 @@ func RenderDemoBundle(sourceCommit, sourceDate string) DemoBundle {
 			renderSoftwareDeploymentDemo(sourceCommit),
 			renderInstallationDemo(sourceCommit),
 			renderShutdownDemo(sourceCommit),
+			renderSoftwareProfileDemo(sourceCommit),
 		},
 	}
 }
@@ -206,6 +207,84 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	r.capture("Deployment completed and verified", 3500)
 
 	return DemoScenario{ID: "software-all-clients", Title: "Add one package to every client", Description: "Search the pinned package set for Inkscape, save it for every current and future client, then explicitly deploy and verify all five configured PCs.", Frames: r.frames}
+}
+
+func renderSoftwareProfileDemo(revision string) DemoScenario {
+	actions := demoActions()
+	catalog := demoSoftwareCatalog()
+	catalog.Controller = "pc99"
+	profiles := domain.SoftwarePresetCatalog{
+		SchemaVersion: domain.SoftwarePresetSchemaVersion,
+		DefaultPreset: "essential",
+		Presets: []domain.SoftwarePreset{
+			{ID: "essential", Label: "Essential", Description: "Browser, terminal, fonts, npm, Pi and OpenCode", Packages: []string{"chromium", "ghostty", "liberation_ttf", "nodejs", "opencode", "pi-coding-agent"}},
+			{ID: "general-education", Label: "General education", Description: "Documents, spelling, web access and media playback", Packages: []string{"chromium", "libreoffice-qt", "nodejs", "opencode", "pi-coding-agent", "vlc"}},
+			{ID: "programming", Label: "Programming", Description: "Editors and common development toolchains", Packages: []string{"git", "nodejs", "opencode", "pi-coding-agent", "python3", "vscode"}},
+			{ID: "graphics", Label: "Graphics and illustration", Description: "Raster, vector and digital painting tools", Packages: []string{"gimp", "inkscape", "krita", "nodejs", "opencode", "pi-coding-agent"}},
+			{ID: "multimedia", Label: "Audio and video", Description: "Audio editing, screen recording and video production", Packages: []string{"audacity", "nodejs", "obs-studio", "opencode", "pi-coding-agent", "vlc"}},
+			{ID: "cad-3d", Label: "CAD and 3D modelling", Description: "Parametric CAD, modelling and rendering", Packages: []string{"blender", "freecad", "nodejs", "opencode", "pi-coding-agent"}},
+			{ID: "stem", Label: "STEM and scientific computing", Description: "Numerical, plotting and symbolic mathematics tools", Packages: []string{"gnuplot", "maxima", "nodejs", "octave", "opencode", "pi-coding-agent"}},
+		},
+	}
+	actions.LoadSoftware = func() domain.SoftwareCatalogReport { return catalog }
+	actions.LoadSoftwarePresets = func() domain.SoftwarePresetCatalogReport {
+		return domain.SoftwarePresetCatalogReport{SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-presets", State: "ready", Repository: "/demo/lab", Catalog: &profiles, Fingerprint: "sha256:demo-profiles", Issues: []domain.ValidationIssue{}}
+	}
+	actions.PlanSoftwarePreset = func(request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+		preset := profiles.Presets[0]
+		selected := []domain.SoftwareCatalogItem{}
+		additions := []domain.SoftwareDeclaration{}
+		excluded := map[string]bool{}
+		for _, packageID := range request.Exclude {
+			excluded[packageID] = true
+		}
+		for _, packageID := range preset.Packages {
+			if excluded[packageID] {
+				continue
+			}
+			selected = append(selected, domain.SoftwareCatalogItem{ID: packageID, Label: packageID, Summary: "Pinned package", Availability: "available"})
+			additions = append(additions, domain.SoftwareDeclaration{Package: packageID, Scope: request.Scope})
+		}
+		return domain.SoftwarePresetPlanReport{
+			SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-preset-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
+			Request: request, Preset: preset, SelectedPackages: selected, Additions: additions,
+			AffectedController: "pc99", AffectedClients: catalog.Clients, ReviewToken: "sha256:demo-profile-review", Confirmation: "ADD PROFILE", Issues: []domain.ValidationIssue{},
+		}
+	}
+	actions.SaveSoftwarePreset = func(plan domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport {
+		return domain.SoftwarePresetApplyReport{
+			SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-preset-save", State: "saved", Repository: plan.Repository, ManagedFile: plan.ManagedFile,
+			Request: plan.Request, Preset: plan.Preset, Existing: plan.Existing, Additions: plan.Additions,
+			AffectedController: plan.AffectedController, AffectedClients: plan.AffectedClients, Revision: revision, Issues: []domain.ValidationIssue{},
+		}
+	}
+	actions.PlanController = func() domain.ControllerRebuildPlanReport {
+		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision, Issues: []domain.ValidationIssue{}}
+	}
+	actions.ApplyController = func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+		return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Controller: plan.Controller, Revision: plan.Revision, Applied: true, Verified: true, Issues: []domain.ValidationIssue{}}
+	}
+
+	r := newDemoRecorder(actions, revision)
+	r.capture("Overview", 1000)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Installation", 450)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Software", 650)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Open Software", 900)
+	r.command(r.key(demoText("p")))
+	r.capture("Choose a deployment-owned profile", 2200)
+	r.pressAndCapture(demoCode(tea.KeyEnter), "Review Essential packages", 1800)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move to the terminal package", 350)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Move to the fonts package", 350)
+	r.pressAndCapture(demoCode(tea.KeySpace), "Exclude the fonts package", 1500)
+	r.pressAndCapture(demoCode(tea.KeyEnter), "Choose where missing packages apply", 1800)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Review the complete profile addition", 2600)
+	controllerCommand := r.command(r.key(demoCode(tea.KeyEnter)))
+	r.command(controllerCommand)
+	r.capture("Controller verified; clients remain unchanged", 2600)
+
+	return DemoScenario{ID: "software-profile", Title: "Add a software profile as one reviewed change", Description: "Choose a deployment-owned profile, exclude one package, preserve existing scopes, save all missing declarations together, and verify the controller before offering a separate client deployment.", Frames: r.frames}
 }
 
 func demoDeploymentTargets() []domain.DeploymentTarget {
@@ -391,6 +470,18 @@ func demoActions() DashboardActions {
 		SaveSoftware: func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 			fail("SaveSoftware")
 			return domain.SoftwareChangeApplyReport{}
+		},
+		LoadSoftwarePresets: func() domain.SoftwarePresetCatalogReport {
+			fail("LoadSoftwarePresets")
+			return domain.SoftwarePresetCatalogReport{}
+		},
+		PlanSoftwarePreset: func(domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+			fail("PlanSoftwarePreset")
+			return domain.SoftwarePresetPlanReport{}
+		},
+		SaveSoftwarePreset: func(domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport {
+			fail("SaveSoftwarePreset")
+			return domain.SoftwarePresetApplyReport{}
 		},
 		PlanShutdown: func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 			fail("PlanShutdown")

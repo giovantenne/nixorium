@@ -8,6 +8,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Software now exposes **Add profile** in the ordinary TUI. It presents the
+  deployment-owned descriptions, package exclusions and supported scopes, then
+  saves one aggregated candidate while preserving existing package scopes. The
+  result reuses controller recovery and the fresh affected-client deployment
+  review; absent profile metadata leaves individual software management intact.
 - Controller bootstrap capability version 2 now asks for and reviews the
   initial software profile after account and regional settings, but before Git
   initialization, Nix evaluation, or disk changes. Catalog, helper, and

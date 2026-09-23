@@ -7,7 +7,7 @@ import (
 
 func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-09-19")
-	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 3 {
+	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 4 {
 		t.Fatalf("unexpected bundle metadata: %+v", bundle)
 	}
 	for _, scenario := range bundle.Scenarios {
@@ -86,6 +86,20 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	shutdownText := ""
 	for _, frame := range shutdown.Frames {
 		shutdownText += frame.Text
+	}
+
+	profile := bundle.Scenarios[3]
+	if profile.ID != "software-profile" || len(profile.Frames) < 6 {
+		t.Fatalf("profile scenario = %+v", profile)
+	}
+	profileText := ""
+	for _, frame := range profile.Frames {
+		profileText += frame.Text
+	}
+	for _, expected := range []string{"Add a software profile", "Essential packages", "excluded", "Validated together", "ready on this controller"} {
+		if !strings.Contains(profileText, expected) {
+			t.Fatalf("profile demo omits %q", expected)
+		}
 	}
 	for _, expected := range []string{"Active user session · will shut down", "Type SHUTDOWN to confirm shutdown of active sessions", "pc02       accepted", "Accepted  2"} {
 		if !strings.Contains(shutdownText, expected) {
