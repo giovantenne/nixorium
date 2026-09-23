@@ -562,13 +562,13 @@ func (model dashboardModel) openSoftwareDeployment() (tea.Model, tea.Cmd) {
 		}
 	}
 	model.screen = dashboardDeploy
-	model.deployResult = domain.DeploymentExecutionReport{}
-	model.deployPlan = domain.DeploymentPlanReport{}
-	model.deployProgress = domain.DeploymentProgress{}
-	model.deployRecent = nil
-	model.deployChosen = chosen
-	model.deployCursor = 0
-	model.deployContext = "Opened from a saved software change. The review deploys the complete current system configuration, not only that package."
+	model.deployment.result = domain.DeploymentExecutionReport{}
+	model.deployment.plan = domain.DeploymentPlanReport{}
+	model.deployment.progress = domain.DeploymentProgress{}
+	model.deployment.recent = nil
+	model.deployment.chosen = chosen
+	model.deployment.cursor = 0
+	model.deployment.context = "Opened from a saved software change. The review deploys the complete current system configuration, not only that package."
 	model.message = ""
 	if len(missing) > 0 {
 		model.message = "Affected computers no longer in the current inventory were not selected: " + strings.Join(missing, ", ") + ". Review the remaining selection."

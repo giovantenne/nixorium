@@ -102,6 +102,22 @@ const (
 	dashboardShutdownResult
 )
 
+// deploymentModel owns target selection and the lifecycle of one reviewed
+// client deployment. The dashboard root only routes its messages and effects.
+type deploymentModel struct {
+	cursor       int
+	chosen       map[string]bool
+	plan         domain.DeploymentPlanReport
+	result       domain.DeploymentExecutionReport
+	context      string
+	applying     bool
+	progress     domain.DeploymentProgress
+	recent       []string
+	started      time.Time
+	events       <-chan tea.Msg
+	confirmation string
+}
+
 type dashboardModel struct {
 	updateDetails          bool
 	returnAdmin            bool
@@ -141,16 +157,7 @@ type dashboardModel struct {
 	confirmation           string
 	startPlan              domain.PXELifecycleReport
 	hosts                  domain.HostsReport
-	deployCursor           int
-	deployChosen           map[string]bool
-	deployPlan             domain.DeploymentPlanReport
-	deployResult           domain.DeploymentExecutionReport
-	deployContext          string
-	deploying              bool
-	deployProgress         domain.DeploymentProgress
-	deployRecent           []string
-	deployStarted          time.Time
-	deployEvents           <-chan tea.Msg
+	deployment             deploymentModel
 	controllerPlan         domain.ControllerRebuildPlanReport
 	controllerResult       domain.ControllerRebuildExecutionReport
 	controllerApplying     bool
@@ -1919,8 +1926,8 @@ func (model dashboardModel) deployView() string {
 		path = []string{"Computers", "Restore", "Reapply"}
 	}
 	shell := tuiShell{path: path}
-	if model.deploying {
-		elapsed := time.Since(model.deployStarted).Truncate(time.Second)
+	if model.deployment.applying {
+		elapsed := time.Since(model.deployment.started).Truncate(time.Second)
 		if elapsed < 0 {
 			elapsed = 0
 		}
@@ -1944,19 +1951,19 @@ func (model dashboardModel) deployView() string {
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
-	if model.deployContext != "" {
-		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.deployContext})
+	if model.deployment.context != "" {
+		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.deployment.context})
 	}
 	if model.screen == dashboardDeployReview {
 		lines := []string{
 			tuiTitle("Distribute the system?", model.isDark),
 			"",
-			fmt.Sprintf("Affects  %s · %d computer(s)", model.deployPlan.ColmenaSelector, len(model.deployPlan.Targets)),
+			fmt.Sprintf("Affects  %s · %d computer(s)", model.deployment.plan.ColmenaSelector, len(model.deployment.plan.Targets)),
 			"",
-			tuiMuted("Reviewed revision  "+model.deployPlan.Revision, model.isDark),
+			tuiMuted("Reviewed revision  "+model.deployment.plan.Revision, model.isDark),
 		}
 		shell.body = strings.Join(lines, "\n")
-		shell.fixedBody = tuiSection("Type DEPLOY to continue:", model.isDark) + "\n> " + model.confirmation + "_"
+		shell.fixedBody = tuiSection("Type DEPLOY to continue:", model.isDark) + "\n> " + model.deployment.confirmation + "_"
 		shell.notices = append(shell.notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Target services may restart; unreachable computers may remain unchanged",
@@ -1969,8 +1976,8 @@ func (model dashboardModel) deployView() string {
 		return model.renderShell(shell)
 	}
 
-	if model.deployResult.Operation != "" {
-		success := !model.deployResult.HasErrors()
+	if model.deployment.result.Operation != "" {
+		success := !model.deployment.result.HasErrors()
 		resultTitle := "Deployment needs attention"
 		if success {
 			resultTitle = "Deployment completed and verified"
@@ -1978,14 +1985,14 @@ func (model dashboardModel) deployView() string {
 		lines := []string{
 			tuiResult(resultTitle, success, model.isDark),
 			"",
-			fmt.Sprintf("State: %s   Phase: %s", model.deployResult.State, model.deployResult.Phase),
-			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployResult.BuildCompleted, model.deployResult.ApplyCompleted),
+			fmt.Sprintf("State: %s   Phase: %s", model.deployment.result.State, model.deployment.result.Phase),
+			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployment.result.BuildCompleted, model.deployment.result.ApplyCompleted),
 		}
-		if model.deployResult.Verification.Attempted > 0 {
-			lines = append(lines, fmt.Sprintf("Authenticated: %d/%d   Recorded: %d", model.deployResult.Verification.Verified, model.deployResult.Verification.Attempted, model.deployResult.Verification.Recorded))
+		if model.deployment.result.Verification.Attempted > 0 {
+			lines = append(lines, fmt.Sprintf("Authenticated: %d/%d   Recorded: %d", model.deployment.result.Verification.Verified, model.deployment.result.Verification.Attempted, model.deployment.result.Verification.Recorded))
 		}
-		if model.deployResult.LogPath != "" {
-			lines = append(lines, "Detailed log: "+model.deployResult.LogPath)
+		if model.deployment.result.LogPath != "" {
+			lines = append(lines, "Detailed log: "+model.deployment.result.LogPath)
 		}
 		if model.message != "" {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
@@ -2003,19 +2010,19 @@ func (model dashboardModel) deployView() string {
 	hosts := model.report.Meta.Clients.Hosts
 	selected := 0
 	for _, host := range hosts {
-		if model.deployChosen[host.Name] {
+		if model.deployment.chosen[host.Name] {
 			selected++
 		}
 	}
 	lines = append(lines, "Choose where to apply the saved configuration.", "", fmt.Sprintf("%d of %d computers selected", selected, len(hosts)), "")
-	start, end := listWindow(len(hosts), model.deployCursor, max(3, model.height-20))
+	start, end := listWindow(len(hosts), model.deployment.cursor, max(3, model.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
 		checked := " "
-		if model.deployChosen[host.Name] {
+		if model.deployment.chosen[host.Name] {
 			checked = "x"
 		}
-		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s", checked, host.Name, host.IP), index == model.deployCursor, model.isDark))
+		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s", checked, host.Name, host.IP), index == model.deployment.cursor, model.isDark))
 	}
 	if len(hosts) > end || start > 0 {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d", start+1, end, len(hosts)), model.isDark))
@@ -2032,7 +2039,7 @@ func (model dashboardModel) deployView() string {
 }
 
 func (model dashboardModel) deploymentProgressView() []string {
-	progressState := model.deployProgress
+	progressState := model.deployment.progress
 	if progressState.Phase == "" {
 		return []string{"", "  Waiting for deployment progress…"}
 	}
@@ -2082,9 +2089,9 @@ func (model dashboardModel) deploymentProgressView() []string {
 	if progressState.TargetTotal > 0 {
 		lines = append(lines, fmt.Sprintf("  Computers checked: %d/%d", progressState.TargetCurrent, progressState.TargetTotal))
 	}
-	if len(model.deployRecent) > 0 {
+	if len(model.deployment.recent) > 0 {
 		lines = append(lines, "  Recent activity:")
-		for _, activity := range model.deployRecent {
+		for _, activity := range model.deployment.recent {
 			lines = append(lines, "    • "+activity)
 		}
 	}

@@ -175,8 +175,8 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	r.command(r.key(demoCode(tea.KeyEnter)))
 
 	r.model.screen = dashboardDeploy
-	r.model.deployResult = domain.DeploymentExecutionReport{}
-	r.model.deployChosen = map[string]bool{"pc01": true, "pc02": true, "pc03": true, "pc04": true, "pc05": true}
+	r.model.deployment.result = domain.DeploymentExecutionReport{}
+	r.model.deployment.chosen = map[string]bool{"pc01": true, "pc02": true, "pc03": true, "pc04": true, "pc05": true}
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Review deployment to all five current clients", 2100)
 	r.typeAndCapture("DEPLOY", "Type the one-word deployment confirmation")
@@ -187,17 +187,17 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	}
 
 	r.model.screen = dashboardDeploy
-	r.model.deploying = true
+	r.model.deployment.applying = true
 	r.model.busy = "Building and applying the reviewed deployment"
-	r.model.deployStarted = time.Now()
-	r.model.deployProgress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Completed: 2, Total: 4, Activity: "Building all five clients from the reviewed revision"}
-	r.model.deployRecent = []string{"Validated clean revision", "Building all five clients from the reviewed revision"}
+	r.model.deployment.started = time.Now()
+	r.model.deployment.progress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Completed: 2, Total: 4, Activity: "Building all five clients from the reviewed revision"}
+	r.model.deployment.recent = []string{"Validated clean revision", "Building all five clients from the reviewed revision"}
 	r.capture("Build the selected configuration", 1900)
-	r.model.deployProgress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 3, Total: 4, TargetCurrent: 3, TargetTotal: 5, Activity: "Activating pc03 over SSH"}
-	r.model.deployRecent = append(r.model.deployRecent, "Activating clients over SSH · 3 of 5")
+	r.model.deployment.progress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 3, Total: 4, TargetCurrent: 3, TargetTotal: 5, Activity: "Activating pc03 over SSH"}
+	r.model.deployment.recent = append(r.model.deployment.recent, "Activating clients over SSH · 3 of 5")
 	r.capture("Apply to every selected client", 1900)
-	r.model.deployProgress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseVerify, Completed: 4, Total: 4, TargetCurrent: 5, TargetTotal: 5, Activity: "Authenticated all five client system states"}
-	r.model.deployRecent = append(r.model.deployRecent, "Authenticated all five client system states")
+	r.model.deployment.progress = domain.DeploymentProgress{Phase: domain.DeploymentPhaseVerify, Completed: 4, Total: 4, TargetCurrent: 5, TargetTotal: 5, Activity: "Authenticated all five client system states"}
+	r.model.deployment.recent = append(r.model.deployment.recent, "Authenticated all five client system states")
 	r.capture("Verify the observed client state", 2000)
 	r.message(dashboardDeploymentResultMsg{report: domain.DeploymentExecutionReport{
 		SchemaVersion: domain.SchemaVersion, Operation: "deploy-apply", State: "completed", Repository: "/demo/lab", Requested: "@lab", Revision: revision, ColmenaSelector: "@lab",

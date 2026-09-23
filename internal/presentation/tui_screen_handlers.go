@@ -34,11 +34,11 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.message = ""
 	case "d":
 		model.screen = dashboardDeploy
-		model.deployResult = domain.DeploymentExecutionReport{}
-		model.deployContext = ""
+		model.deployment.result = domain.DeploymentExecutionReport{}
+		model.deployment.context = ""
 		model.message = ""
-		model.deployChosen = map[string]bool{}
-		model.deployCursor = 0
+		model.deployment.chosen = map[string]bool{}
+		model.deployment.cursor = 0
 	case "h":
 		model.hostDetail = false
 		model.hostTechnical = false
@@ -215,10 +215,10 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			if model.restoreCursor == 0 {
 				model.restoreMode = true
 				model.screen = dashboardDeploy
-				model.deployResult = domain.DeploymentExecutionReport{}
-				model.deployContext = ""
-				model.deployChosen = map[string]bool{}
-				model.deployCursor = 0
+				model.deployment.result = domain.DeploymentExecutionReport{}
+				model.deployment.context = ""
+				model.deployment.chosen = map[string]bool{}
+				model.deployment.cursor = 0
 			} else {
 				model.restoreMode = true
 				model.screen = dashboardPXE
@@ -584,10 +584,10 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			hosts := model.filteredHosts()
 			if len(hosts) > 0 {
 				model.screen = dashboardDeploy
-				model.deployResult = domain.DeploymentExecutionReport{}
-				model.deployContext = ""
-				model.deployChosen = map[string]bool{hosts[min(model.hostCursor, len(hosts)-1)].Name: true}
-				model.deployCursor = 0
+				model.deployment.result = domain.DeploymentExecutionReport{}
+				model.deployment.context = ""
+				model.deployment.chosen = map[string]bool{hosts[min(model.hostCursor, len(hosts)-1)].Name: true}
+				model.deployment.cursor = 0
 			}
 		case "r":
 			model.busy = "Refreshing computer status"
@@ -610,107 +610,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		return model.updateSoftware(key)
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		return model.updateShutdown(key)
-	case dashboardDeploy:
-		if model.deployResult.Operation != "" {
-			switch key.String() {
-			case "enter", "esc", "left":
-				model.screen = dashboardComputersArea
-				model.message = ""
-			case "l":
-				model.busy = "Loading operation logs"
-				model.message = ""
-				return model, func() tea.Msg {
-					return dashboardLogsMsg{report: model.actions.LoadLogs()}
-				}
-			case "r":
-				model.deployResult = domain.DeploymentExecutionReport{}
-				model.deployProgress = domain.DeploymentProgress{}
-				model.deployRecent = nil
-				model.message = ""
-			}
-			return model, nil
-		}
-		hosts := model.report.Meta.Clients.Hosts
-		switch key.String() {
-		case "esc", "left":
-			if model.restoreMode {
-				model.screen = dashboardRestore
-				model.restoreMode = false
-			} else if model.deployContext != "" {
-				model.screen = dashboardSoftware
-				model.deployContext = ""
-			} else {
-				model.screen = dashboardHome
-			}
-			model.message = ""
-		case "up", "k":
-			if model.deployCursor > 0 {
-				model.deployCursor--
-			}
-		case "down", "j":
-			if model.deployCursor+1 < len(hosts) {
-				model.deployCursor++
-			}
-		case "space":
-			if len(hosts) > 0 {
-				if model.deployChosen == nil {
-					model.deployChosen = map[string]bool{}
-				}
-				name := hosts[model.deployCursor].Name
-				model.deployChosen[name] = !model.deployChosen[name]
-			}
-		case "a":
-			model.deployChosen = toggleAllDeploymentTargets(hosts, model.deployChosen)
-		case "enter":
-			requested := selectedDeploymentTargets(hosts, model.deployChosen)
-			if model.deployContext != "" {
-				requested = strings.Join(selectedDeploymentTargetNames(hosts, model.deployChosen), ",")
-			}
-			if requested == "" {
-				model.message = "Select at least one computer before reviewing a deployment."
-				return model, nil
-			}
-			model.busy = "Validating revision and selected computers"
-			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardDeploymentPlanMsg{report: model.actions.PlanDeployment(requested)}
-			}
-		}
-	case dashboardDeployReview:
-		switch key.String() {
-		case "esc":
-			model.screen = dashboardDeploy
-			model.confirmation = ""
-			model.message = "Deployment cancelled; no build or apply was started."
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
-		case "enter":
-			if model.confirmation != "DEPLOY" {
-				model.confirmation = ""
-				model.message = "Confirmation did not match; no build or apply was started."
-				return model, nil
-			}
-			model.busy = "Building and applying the reviewed deployment"
-			model.deploying = true
-			model.deployProgress = domain.DeploymentProgress{}
-			model.deployRecent = nil
-			model.deployStarted = time.Now()
-			model.confirmation = ""
-			model.message = ""
-			plan := model.deployPlan
-			events := make(chan tea.Msg)
-			model.deployEvents = events
-			return model, startDeployment(model.actions.ApplyDeployment, plan, events)
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
-			}
-		}
+	case dashboardDeploy, dashboardDeployReview:
+		return model.updateDeployment(key)
 	case dashboardController:
 		if key.String() == "esc" || key.String() == "left" || (key.String() == "enter" && model.controllerResult.Operation != "") {
 			if model.setupMode {
