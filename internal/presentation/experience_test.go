@@ -154,8 +154,9 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 			{
 				name: "scope",
 				model: dashboardModel{
-					screen: dashboardSoftwareScope,
+					screen: dashboardSoftware,
 					software: softwareModel{
+						stage:        softwareScope,
 						catalog:      catalog,
 						selected:     "gimp",
 						scopeCursor:  len((softwareModel{catalog: catalog}).scopeOptions()) - 1,
@@ -168,8 +169,9 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 			{
 				name: "review",
 				model: dashboardModel{
-					screen: dashboardSoftwareReview,
+					screen: dashboardSoftware,
 					software: softwareModel{
+						stage:   softwareReview,
 						catalog: catalog,
 						plan: domain.SoftwareChangePlanReport{
 							Request:     domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
@@ -182,8 +184,9 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 			{
 				name: "partial result",
 				model: dashboardModel{
-					screen: dashboardSoftwareResult,
+					screen: dashboardSoftware,
 					software: softwareModel{
+						stage: softwareResult,
 						result: domain.SoftwareChangeApplyReport{
 							State: "partial", Message: "Durability could not be confirmed.",
 							Issues: []domain.ValidationIssue{{Field: "durability", Message: "directory sync failed"}},
@@ -514,7 +517,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardRestore, dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardSetupKeys, dashboardUpdate, dashboardAdministration} {
+		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardRestore, dashboardSoftware, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardSetupKeys, dashboardUpdate, dashboardAdministration} {
 			m := experienceFixture(200)
 			m.width = size[0]
 			m.height = size[1]
@@ -547,7 +550,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 				t.Fatalf("%dx%d screen %d overflow: %dx%d", size[0], size[1], screen, lipgloss.Width(view), lipgloss.Height(view))
 			}
-			if screen == dashboardHosts || screen == dashboardDeploy || screen == dashboardSoftwareScope || screen == dashboardShutdown {
+			if screen == dashboardHosts || screen == dashboardDeploy || screen == dashboardShutdown {
 				if !strings.Contains(view, "pc200") {
 					t.Fatalf("focused row hidden screen %d size %v", screen, size)
 				}
@@ -555,11 +558,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			if screen == dashboardShutdown && (!strings.Contains(view, "No request is queued") || !strings.Contains(view, "Space") || !strings.Contains(view, "Select")) {
 				t.Fatalf("shutdown guidance/footer hidden at size %v:\n%s", size, view)
 			}
-			if screen == dashboardSoftwareReview {
-				if !strings.Contains(view, "Enter") || !strings.Contains(view, "Save") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Scope") {
-					t.Fatalf("software save action hidden screen %d size %v:\n%s", screen, size, view)
-				}
-			} else if screen == dashboardDeployReview {
+			if screen == dashboardDeployReview {
 				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Selection") {
 					t.Fatalf("deployment confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
@@ -833,22 +832,26 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.screen = dashboardSoftware
 			m.software.catalog = testSoftwareCatalogReport()
 		case "software-scope":
-			m.screen = dashboardSoftwareScope
+			m.screen = dashboardSoftware
+			m.software.stage = softwareScope
 			m.software.catalog = testSoftwareCatalogReport()
 			m.software.selected = "gimp"
 			m.software.clients = map[string]bool{}
 		case "software-confirmation":
-			m.screen = dashboardSoftwareReview
+			m.screen = dashboardSoftware
+			m.software.stage = softwareReview
 			m.software.plan = domain.SoftwareChangePlanReport{
 				State: "ready", ManagedFile: "lab-software.json",
 				Request:         domain.SoftwareChangeRequest{Package: "gimp", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
 				AffectedClients: []string{"pc01", "pc02", "pc03"}, Confirmation: "SAVE",
 			}
 		case "software-result":
-			m.screen = dashboardSoftwareResult
+			m.screen = dashboardSoftware
+			m.software.stage = softwareResult
 			m.software.result = domain.SoftwareChangeApplyReport{State: "saved", ManagedFile: "lab-software.json"}
 		case "software-partial":
-			m.screen = dashboardSoftwareResult
+			m.screen = dashboardSoftware
+			m.software.stage = softwareResult
 			m.software.result = domain.SoftwareChangeApplyReport{
 				State:   "partial",
 				Message: "lab-software.json was replaced, but durable storage could not be confirmed.",

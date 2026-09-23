@@ -20,6 +20,15 @@ const (
 	softwareSuggested
 )
 
+type softwareStage int
+
+const (
+	softwareCatalog softwareStage = iota
+	softwareScope
+	softwareReview
+	softwareResult
+)
+
 type softwareScopeOption struct {
 	label string
 	scope domain.SoftwareScope
@@ -29,6 +38,7 @@ type softwareScopeOption struct {
 // dashboard keeps one named instance so feature state cannot be mistaken for
 // global navigation state.
 type softwareModel struct {
+	stage        softwareStage
 	catalog      domain.SoftwareCatalogReport
 	mode         softwareListMode
 	cursor       int
@@ -48,8 +58,8 @@ type softwareModel struct {
 }
 
 func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch model.screen {
-	case dashboardSoftware:
+	switch model.software.stage {
+	case softwareCatalog:
 		items := model.software.items()
 		switch key.String() {
 		case "esc", "left":
@@ -97,7 +107,7 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			model.software.clients = map[string]bool{}
 			model.software.plan = domain.SoftwareChangePlanReport{}
 			model.message = ""
-			model.screen = dashboardSoftwareScope
+			model.software.stage = softwareScope
 		case "r":
 			if len(items) == 0 {
 				return model, nil
@@ -111,12 +121,12 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			model.software.selected = item.ID
 			return model.startSoftwarePlan(domain.SoftwareChangeRequest{Package: item.ID, Present: false, Scope: entry.Scope})
 		}
-	case dashboardSoftwareScope:
+	case softwareScope:
 		options := model.software.scopeOptions()
 		clientOption := len(options) - 1
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardSoftware
+			model.software.stage = softwareCatalog
 			model.message = ""
 		case "up", "k":
 			if model.software.scopeCursor == clientOption && len(model.software.catalog.Clients) > 0 && model.software.clientCursor > 0 {
@@ -153,14 +163,14 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			}
 			return model.startSoftwarePlan(domain.SoftwareChangeRequest{Package: model.software.selected, Present: true, Scope: scope})
 		}
-	case dashboardSoftwareReview:
+	case softwareReview:
 		switch key.String() {
 		case "esc":
 			model.message = "Software change cancelled; no file changed."
 			if model.software.plan.Request.Present {
-				model.screen = dashboardSoftwareScope
+				model.software.stage = softwareScope
 			} else {
-				model.screen = dashboardSoftware
+				model.software.stage = softwareCatalog
 			}
 		case "enter":
 			if model.actions.SaveSoftware == nil {
@@ -172,7 +182,7 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			plan := model.software.plan
 			return model, func() tea.Msg { return dashboardSoftwareApplyMsg{report: model.actions.SaveSoftware(plan)} }
 		}
-	case dashboardSoftwareResult:
+	case softwareResult:
 		switch key.String() {
 		case "r":
 			if !model.software.result.RecoveryRequired || model.actions.SaveSoftware == nil {
@@ -225,11 +235,11 @@ func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeReque
 
 func (model dashboardModel) softwareView() string {
 	path := []string{"Software"}
-	if model.screen == dashboardSoftwareScope {
+	if model.software.stage == softwareScope {
 		path = append(path, "Scope")
-	} else if model.screen == dashboardSoftwareReview {
+	} else if model.software.stage == softwareReview {
 		path = append(path, "Review")
-	} else if model.screen == dashboardSoftwareResult {
+	} else if model.software.stage == softwareResult {
 		path = append(path, "Result")
 	}
 	lines := []string{}
@@ -241,12 +251,12 @@ func (model dashboardModel) softwareView() string {
 			actions: []tuiAction{{key: "F1", label: "Help"}},
 		})
 	}
-	switch model.screen {
-	case dashboardSoftwareScope:
+	switch model.software.stage {
+	case softwareScope:
 		lines = append(lines, model.softwareScopeView()...)
-	case dashboardSoftwareReview:
+	case softwareReview:
 		lines = append(lines, model.softwareReviewView()...)
-	case dashboardSoftwareResult:
+	case softwareResult:
 		lines = append(lines, model.softwareResultView()...)
 	default:
 		lines = append(lines, model.softwareCatalogView()...)
@@ -261,7 +271,7 @@ func (model dashboardModel) softwareView() string {
 }
 
 func (model dashboardModel) softwareActions() []tuiAction {
-	if model.screen == dashboardSoftwareScope {
+	if model.software.stage == softwareScope {
 		actions := []tuiAction{{key: "↑/↓", label: "Select"}}
 		options := model.software.scopeOptions()
 		if len(options) > 0 && options[min(model.software.scopeCursor, len(options)-1)].scope.Kind == domain.SoftwareScopeClients {
@@ -273,7 +283,7 @@ func (model dashboardModel) softwareActions() []tuiAction {
 			tuiAction{key: "F1", label: "Help"},
 		)
 	}
-	if model.screen == dashboardSoftwareReview {
+	if model.software.stage == softwareReview {
 		back := "Catalog"
 		primary := "Remove"
 		if model.software.plan.Request.Present {
@@ -282,7 +292,7 @@ func (model dashboardModel) softwareActions() []tuiAction {
 		}
 		return []tuiAction{{key: "Enter", label: primary}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
 	}
-	if model.screen == dashboardSoftwareResult {
+	if model.software.stage == softwareResult {
 		if model.software.result.State == "partial" {
 			return []tuiAction{{key: "r", label: "Retry save"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 		}
@@ -324,7 +334,7 @@ func (model dashboardModel) softwareNotices() []tuiNotice {
 	if model.message == "" {
 		return nil
 	}
-	if model.screen == dashboardSoftwareReview && model.message == model.software.plan.Message {
+	if model.software.stage == softwareReview && model.message == model.software.plan.Message {
 		return nil
 	}
 	return []tuiNotice{{kind: tuiStatusAttention, title: model.message}}

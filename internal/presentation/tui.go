@@ -93,9 +93,6 @@ const (
 	dashboardAdministration
 	dashboardDiagnostics
 	dashboardSoftware
-	dashboardSoftwareScope
-	dashboardSoftwareReview
-	dashboardSoftwareResult
 	dashboardShutdown
 	dashboardShutdownReview
 	dashboardShutdownResult
@@ -774,7 +771,7 @@ func (model dashboardModel) View() tea.View {
 		content = model.administrationView()
 	case dashboardDiagnostics:
 		content = model.diagnosticsView()
-	case dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult:
+	case dashboardSoftware:
 		content = model.softwareView()
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		content = model.shutdownView()

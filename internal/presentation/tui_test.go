@@ -64,8 +64,9 @@ func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 func TestSoftwareSaveAutomaticallyAppliesAffectedController(t *testing.T) {
 	planCalls, applyCalls := 0, 0
 	model := dashboardModel{
-		screen: dashboardSoftwareReview,
+		screen: dashboardSoftware,
 		software: softwareModel{
+			stage: softwareReview,
 			plan: domain.SoftwareChangePlanReport{
 				State: "ready", Repository: "/deployment", AffectedController: "pc99",
 				Request: domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
@@ -180,7 +181,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftwareScope || !strings.Contains(model.View().Content, "This is not the set of computers deployed today") {
+	if model.screen != dashboardSoftware || model.software.stage != softwareScope || !strings.Contains(model.View().Content, "This is not the set of computers deployed today") {
 		t.Fatalf("software scope missing:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -206,7 +207,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if plans != 1 || applies != 1 || model.screen != dashboardSoftwareResult || !strings.Contains(model.View().Content, "Software configuration saved") || strings.Contains(model.View().Content, "Git") || strings.Contains(model.View().Content, "distribution targets") {
+	if plans != 1 || applies != 1 || model.screen != dashboardSoftware || model.software.stage != softwareResult || !strings.Contains(model.View().Content, "Software configuration saved") || strings.Contains(model.View().Content, "Git") || strings.Contains(model.View().Content, "distribution targets") {
 		t.Fatalf("software result is not self-contained:\n%s", model.View().Content)
 	}
 }
@@ -335,7 +336,7 @@ func TestDashboardCancelsSupersededPackageSearch(t *testing.T) {
 }
 
 func TestDashboardSoftwareResultDistinguishesNoChangeAndUncertainSave(t *testing.T) {
-	model := dashboardModel{screen: dashboardSoftwareResult, width: 100, height: 30}
+	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, software: softwareModel{stage: softwareResult}}
 	model.software.result = domain.SoftwareChangeApplyReport{State: "unchanged", Message: "GIMP already has the requested declaration."}
 	view := model.View().Content
 	if !strings.Contains(view, "already current") || !strings.Contains(view, "No file changed") || strings.Contains(view, "declaration saved") {
@@ -477,7 +478,8 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 	}
 
 	model.busy = ""
-	model.screen = dashboardSoftwareScope
+	model.screen = dashboardSoftware
+	model.software.stage = softwareScope
 	model.software.selected = "gimp"
 	model.software.scopeCursor = len(model.software.scopeOptions()) - 1
 	view := model.View().Content

@@ -148,6 +148,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.message = ""
 		case "w":
 			model.screen = dashboardSoftware
+			model.software.stage = softwareCatalog
 			model.software.result = domain.SoftwareChangeApplyReport{}
 			model.controllerPlan = domain.ControllerRebuildPlanReport{}
 			model.controllerResult = domain.ControllerRebuildExecutionReport{}
@@ -601,7 +602,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 
 func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
-	case dashboardSoftware, dashboardSoftwareScope, dashboardSoftwareReview, dashboardSoftwareResult:
+	case dashboardSoftware:
 		return model.updateSoftware(key)
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		return model.updateShutdown(key)
