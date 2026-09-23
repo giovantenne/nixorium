@@ -13,8 +13,12 @@ type fakeSoftwareSource struct {
 	definition    domain.SoftwareDefinition
 	data          []byte
 	definitionErr error
+	presets       *domain.SoftwarePresetCatalog
+	presetErr     error
 	validationErr error
 	writeErr      error
+	resolved      map[string]domain.SoftwareCatalogItem
+	resolveErr    map[string]error
 	validations   int
 	writes        int
 }
@@ -33,6 +37,12 @@ func (f *fakeSoftwareSource) SearchSoftwarePackages(_ context.Context, _ string,
 }
 
 func (f *fakeSoftwareSource) ResolveSoftwarePackage(_ context.Context, _ string, packageID string) (domain.SoftwareCatalogItem, error) {
+	if err := f.resolveErr[packageID]; err != nil {
+		return domain.SoftwareCatalogItem{}, err
+	}
+	if item, found := f.resolved[packageID]; found {
+		return item, nil
+	}
 	for _, item := range f.definition.Catalog {
 		if item.ID == packageID {
 			return item, nil
@@ -46,6 +56,9 @@ func (f *fakeSoftwareSource) ResolveSoftwarePackage(_ context.Context, _ string,
 
 func (f *fakeSoftwareSource) SoftwareDefinition(context.Context, string) (domain.SoftwareDefinition, error) {
 	return f.definition, f.definitionErr
+}
+func (f *fakeSoftwareSource) SoftwarePresetCatalog(context.Context, string) (*domain.SoftwarePresetCatalog, error) {
+	return f.presets, f.presetErr
 }
 func (f *fakeSoftwareSource) ReadSoftware(string) ([]byte, error) {
 	return append([]byte(nil), f.data...), nil
@@ -76,7 +89,7 @@ func softwareManagerFixture(t *testing.T) (*fakeSoftwareSource, SoftwareManager)
 	if err != nil {
 		t.Fatal(err)
 	}
-	source := &fakeSoftwareSource{data: data, definition: domain.SoftwareDefinition{
+	source := &fakeSoftwareSource{data: data, resolved: map[string]domain.SoftwareCatalogItem{}, resolveErr: map[string]error{}, definition: domain.SoftwareDefinition{
 		SchemaVersion: domain.SoftwareSchemaVersion,
 		ManagedFile:   "lab-software.json",
 		Clients:       []string{"pc01", "pc02"},

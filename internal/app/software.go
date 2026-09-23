@@ -14,6 +14,7 @@ import (
 
 type SoftwareSource interface {
 	SoftwareDefinition(context.Context, string) (domain.SoftwareDefinition, error)
+	SoftwarePresetCatalog(context.Context, string) (*domain.SoftwarePresetCatalog, error)
 	SearchSoftwarePackages(context.Context, string, string, int) ([]domain.SoftwareCatalogItem, error)
 	ResolveSoftwarePackage(context.Context, string, string) (domain.SoftwareCatalogItem, error)
 	ReadSoftware(string) ([]byte, error)

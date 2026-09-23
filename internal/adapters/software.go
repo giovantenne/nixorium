@@ -43,10 +43,31 @@ let
 in deployment.nixoriumResolveSoftwarePackage package
 `
 
+const softwarePresetExpression = `
+let
+  deployment = builtins.getFlake (builtins.getEnv "NIXORIUM_DEPLOYMENT_FLAKE");
+in deployment.nixoriumSoftwarePresets or null
+`
+
 func (Local) SoftwareDefinition(ctx context.Context, repository string) (domain.SoftwareDefinition, error) {
 	var definition domain.SoftwareDefinition
 	err := nixJSON(ctx, repository, "nixoriumSoftware", &definition)
 	return definition, err
+}
+
+func (Local) SoftwarePresetCatalog(ctx context.Context, repository string) (*domain.SoftwarePresetCatalog, error) {
+	var raw json.RawMessage
+	if err := nixSoftwareExpressionJSON(ctx, repository, softwarePresetExpression, "", "", &raw); err != nil {
+		return nil, err
+	}
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil, nil
+	}
+	catalog, err := domain.DecodeSoftwarePresetCatalog(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &catalog, nil
 }
 
 func (Local) SearchSoftwarePackages(ctx context.Context, repository, query string, limit int) ([]domain.SoftwareCatalogItem, error) {
@@ -88,7 +109,10 @@ func nixSoftwareExpressionJSON(ctx context.Context, repository, expression, vari
 		return err
 	}
 	command := exec.CommandContext(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--expr", expression)
-	command.Env = append(os.Environ(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake, variable+"="+value)
+	command.Env = append(os.Environ(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake)
+	if variable != "" {
+		command.Env = append(command.Env, variable+"="+value)
+	}
 	output := &boundedCommandBuffer{limit: 1024 * 1024}
 	diagnostics := &boundedCommandBuffer{limit: 64 * 1024}
 	command.Stdout = output

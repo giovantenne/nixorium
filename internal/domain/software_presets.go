@@ -30,6 +30,73 @@ type SoftwarePresetCatalog struct {
 	Presets       []SoftwarePreset `json:"presets"`
 }
 
+type SoftwarePresetCatalogReport struct {
+	SchemaVersion int                    `json:"schemaVersion"`
+	Operation     string                 `json:"operation"`
+	State         string                 `json:"state"`
+	Repository    string                 `json:"repository"`
+	Catalog       *SoftwarePresetCatalog `json:"catalog,omitempty"`
+	Fingerprint   string                 `json:"fingerprint,omitempty"`
+	Issues        []ValidationIssue      `json:"issues"`
+	Message       string                 `json:"message,omitempty"`
+}
+
+func (r SoftwarePresetCatalogReport) HasErrors() bool {
+	return r.State == "failed" || len(r.Issues) > 0
+}
+
+type SoftwarePresetRequest struct {
+	Preset  string        `json:"preset"`
+	Scope   SoftwareScope `json:"scope"`
+	Exclude []string      `json:"exclude"`
+}
+
+type SoftwarePresetPlanReport struct {
+	SchemaVersion      int                   `json:"schemaVersion"`
+	Operation          string                `json:"operation"`
+	State              string                `json:"state"`
+	Repository         string                `json:"repository"`
+	ManagedFile        string                `json:"managedFile"`
+	Request            SoftwarePresetRequest `json:"request"`
+	Preset             SoftwarePreset        `json:"preset"`
+	SelectedPackages   []SoftwareCatalogItem `json:"selectedPackages"`
+	Existing           []SoftwareDeclaration `json:"existing"`
+	Additions          []SoftwareDeclaration `json:"additions"`
+	Candidate          LabSoftwareFile       `json:"candidate"`
+	CatalogFingerprint string                `json:"catalogFingerprint,omitempty"`
+	BaseFingerprint    string                `json:"baseFingerprint,omitempty"`
+	ReviewToken        string                `json:"reviewToken,omitempty"`
+	Confirmation       string                `json:"confirmation,omitempty"`
+	AffectedController string                `json:"affectedController,omitempty"`
+	AffectedClients    []string              `json:"affectedClients"`
+	Issues             []ValidationIssue     `json:"issues"`
+	Message            string                `json:"message,omitempty"`
+}
+
+func (r SoftwarePresetPlanReport) HasErrors() bool {
+	return r.State == "invalid" || r.State == "failed" || r.State == "conflict" || len(r.Issues) > 0
+}
+
+type SoftwarePresetApplyReport struct {
+	SchemaVersion      int                   `json:"schemaVersion"`
+	Operation          string                `json:"operation"`
+	State              string                `json:"state"`
+	Repository         string                `json:"repository"`
+	ManagedFile        string                `json:"managedFile"`
+	Request            SoftwarePresetRequest `json:"request"`
+	Preset             SoftwarePreset        `json:"preset"`
+	Existing           []SoftwareDeclaration `json:"existing"`
+	Additions          []SoftwareDeclaration `json:"additions"`
+	AffectedController string                `json:"affectedController,omitempty"`
+	AffectedClients    []string              `json:"affectedClients"`
+	Issues             []ValidationIssue     `json:"issues"`
+	Message            string                `json:"message,omitempty"`
+}
+
+func (r SoftwarePresetApplyReport) HasErrors() bool {
+	return r.State == "invalid" || r.State == "failed" || r.State == "conflict" || r.State == "partial" || len(r.Issues) > 0
+}
+
 func DecodeSoftwarePresetCatalog(data []byte) (SoftwarePresetCatalog, error) {
 	var catalog SoftwarePresetCatalog
 	decoder := json.NewDecoder(bytes.NewReader(data))
