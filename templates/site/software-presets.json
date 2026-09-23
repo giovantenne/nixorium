@@ -5,10 +5,11 @@
     {
       "id": "essential",
       "label": "Essential",
-      "description": "A browser, terminal, fonts, lab screensaver, npm and system-managed Pi and OpenCode CLIs for a small workstation.",
+      "description": "A browser, terminal, Git, fonts, lab screensaver, npm and system-managed Pi and OpenCode CLIs for a small workstation.",
       "packages": [
         "chromium",
         "ghostty",
+        "git",
         "liberation_ttf",
         "nodejs",
         "opencode",
@@ -23,6 +24,7 @@
       "packages": [
         "chromium",
         "ghostty",
+        "git",
         "hunspell",
         "hunspellDicts.en_US",
         "hunspellDicts.it_IT",
@@ -69,6 +71,7 @@
       "packages": [
         "chromium",
         "ghostty",
+        "git",
         "gimp",
         "hunspell",
         "hunspellDicts.en_US",
@@ -92,6 +95,7 @@
         "audacity",
         "chromium",
         "ghostty",
+        "git",
         "hunspell",
         "hunspellDicts.en_US",
         "hunspellDicts.it_IT",
@@ -115,6 +119,7 @@
         "chromium",
         "freecad",
         "ghostty",
+        "git",
         "hunspell",
         "hunspellDicts.en_US",
         "hunspellDicts.it_IT",
@@ -135,6 +140,7 @@
         "R",
         "chromium",
         "ghostty",
+        "git",
         "gnuplot",
         "hunspell",
         "hunspellDicts.en_US",

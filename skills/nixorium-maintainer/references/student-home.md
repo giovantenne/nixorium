@@ -70,8 +70,8 @@ reproducible project dependencies need their lockfile and a verified offline
 packaging strategy. The default profile creates an npm prefix, not a
 prepopulated package set.
 
-The supplied site profiles provide system-managed Pi and OpenCode plus Node/npm
-to every user. A user may install `@mariozechner/pi-coding-agent` or
+The supplied site profiles provide Git, system-managed Pi and OpenCode, plus
+Node/npm to every user. A user may install `@mariozechner/pi-coding-agent` or
 `opencode-ai` globally without `sudo`; `NPM_CONFIG_PREFIX=$HOME/.local/npm`
 makes that version user-owned and earlier on PATH than the Nix baseline. Such
 an override persists for admin and teacher. For the reset student account,

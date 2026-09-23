@@ -13,10 +13,13 @@ Use the quick validation during the normal edit-test cycle:
 
 This is equivalent to `--quick`. It checks shell syntax, Git whitespace,
 client-installer shell tests, skill distribution and discovery, configuration
-and settings schemas, and the packaged Go command with its unit tests. The
-schema and Go derivations use `tests/source-checks.nix`, which imports the exact
-locked `nixpkgs` directly and avoids constructing the full laboratory graph.
-It does not evaluate `mkLab`, build NixOS systems, or run VM tests.
+and settings schemas, and the packaged Go command with its unit tests. An
+isolated runtime check also exercises a real Git-backed command with an
+otherwise empty `PATH`, proving the installed wrapper supplies its external
+dependency fallback. The schema and Go derivations use
+`tests/source-checks.nix`, which imports the exact locked `nixpkgs` directly and
+avoids constructing the full laboratory graph. It does not evaluate `mkLab`,
+build NixOS systems, or run VM tests.
 
 For repeated Go edits, enter the lightweight locked toolchain once with
 `nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell`
@@ -90,11 +93,11 @@ fresh deployment and its installer bundle without building system closures.
 It intentionally skips the other generated clients because they share the
 same module graph and their address generation is covered by `mk-lab` tests.
 The CI mode disables import-from-derivation so evaluation cannot trigger hidden
-builds. A separate CI job builds the same direct-source `nixorium` check used by
-the fast gate, which also runs the Go unit tests, without constructing the
-laboratory graph or building NixOS system closures. Keep the full matrix off
-GitHub-hosted runners; it is a local prerequisite for changes that affect
-builds and for release preparation.
+builds. A separate CI job builds the same direct-source `nixorium` and isolated
+runtime checks used by the fast gate, including the Go unit tests, without
+constructing the laboratory graph or building NixOS system closures. Keep the
+full matrix off GitHub-hosted runners; it is a local prerequisite for changes
+that affect builds and for release preparation.
 
 Build modes use `--no-link`; the full mode's one installer result link exists
 only inside its automatically removed temporary directory. Validation therefore

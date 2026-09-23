@@ -19,8 +19,10 @@ development command.
 
 The default gate checks whitespace, shell syntax, shell regression tests,
 generated documentation, allowlisted canonical-copy coherence, the Nix data
-schemas, and the Go package with its unit tests. Its Nix expression imports the exact `nixpkgs`
-revision from `flake.lock` directly. It deliberately avoids evaluating
+schemas, and the Go package with its unit tests. It also runs the packaged
+command with an otherwise empty `PATH` to prove that required external tools
+have a wrapper fallback. Its Nix expression imports the exact `nixpkgs` revision
+from `flake.lock` directly. It deliberately avoids evaluating
 `defaultLab`, so a warm run remains suitable for frequent use.
 
 It also runs `bash scripts/check-agent-guidance.sh`: a cached Go test binary
@@ -88,7 +90,8 @@ level should be reproduced with the narrowest command that still exercises it.
 The default gate uses `tests/source-checks.nix` instead of resolving checks
 through the public Flake output. This avoids constructing the full laboratory
 graph merely to test schemas or compile Go. Nix still verifies the locked
-`nixpkgs` source and `buildGoModule` still runs the Go unit tests.
+`nixpkgs` source, `buildGoModule` still runs the Go unit tests, and the isolated
+runtime check exercises a real Git-backed command through the installed wrapper.
 The package source contains only Go sources, module metadata, `VERSION`, and the
 JSON fixtures consumed by Go tests, so documentation or unrelated Nix edits do
 not invalidate Go compilation.

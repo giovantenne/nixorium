@@ -26,8 +26,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   is the deterministic default for new sites; all profile package IDs are
   evaluated against the pinned package set for laboratory and controller-only
   deployments, and the offline installer preserves the profile metadata.
-  Every profile includes the Ghostty/TTE lab screensaver, Node/npm plus
-  system-managed Pi and OpenCode CLIs; VS Code remains specific to Programming.
+  Every profile includes Git, the Ghostty/TTE lab screensaver, Node/npm plus
+  system-managed Pi and OpenCode CLIs; the controller and management-command
+  runtime also carry Git independently of profile selection, while VS Code
+  remains specific to Programming.
   Per-user npm overrides persist for
   staff, while the reset student account discards npm globals and AI-agent
   credentials/state before snapshots and restores an empty managed prefix.

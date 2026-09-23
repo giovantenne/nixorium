@@ -233,10 +233,14 @@ Release from the matching changelog section.
   equal for that default, validate every profile against the locked package
   set in laboratory and controller-only modes, and serialize the optional
   catalog into the offline installer without changing existing deployments.
-  Every template profile includes Node/npm, Pi and OpenCode; VS Code remains a
-  Programming choice. Keep npm globals user-owned under `~/.local/npm`. Student
-  npm globals and Pi/OpenCode state/credentials are ephemeral and excluded from
-  pre-reset snapshots; never seed credentials into the shared home template.
+  Every template profile includes Git, Node/npm, Pi and OpenCode; VS Code
+  remains a Programming choice. The controller management module and packaged
+  command must both carry Git so interactive administration and Nixorium
+  operations never depend on the selected deployment profile. Keep npm globals
+  user-owned under `~/.local/npm`.
+  Student npm globals and Pi/OpenCode state/credentials are ephemeral and
+  excluded from pre-reset snapshots; never seed credentials into the shared
+  home template.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.

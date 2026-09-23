@@ -586,6 +586,7 @@ in
     environment.systemPackages = [
       nixoriumPackage
       pkgs.colmena
+      pkgs.git
     ];
 
     security.polkit.enable = true;

@@ -1,4 +1,4 @@
-{ buildGoModule, lib, makeWrapper, openssh, openssl, whois }:
+{ buildGoModule, git, lib, makeWrapper, openssh, openssl, whois }:
 
 let
   version = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ../VERSION);
@@ -28,7 +28,8 @@ buildGoModule {
 
   postFixup = ''
     wrapProgram "$out/bin/nixorium" \
-      --prefix PATH : ${lib.makeBinPath [ openssh openssl whois ]}
+      --prefix PATH : ${lib.makeBinPath [ openssh openssl whois ]} \
+      --suffix PATH : ${lib.makeBinPath [ git ]}
   '';
 
   ldflags = [ "-s" "-w" "-X main.nixoriumVersion=${version}" ];

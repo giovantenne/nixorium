@@ -284,10 +284,11 @@ is used by the audio/video profile. `lab-software.json` initially matches
 Essential at `shared` scope; this default affects newly generated repositories
 only and does not migrate existing deployments.
 
-Every profile includes the Ghostty/TTE lab screensaver, Node.js (and npm), Pi
-and OpenCode. The screensaver therefore remains active in Essential as well as
-the larger profiles. These commands have a reproducible system version
-available to every user. npm global installs use
+Every profile includes Git, the Ghostty/TTE lab screensaver, Node.js (and npm),
+Pi and OpenCode. Git is available to every user and is also a runtime
+dependency of the controller management workflows. The screensaver therefore
+remains active in Essential as well as the larger profiles. These commands have
+a reproducible system version available to every user. npm global installs use
 `~/.local/npm` and take precedence in the user's shell, so admin or teacher can
 try a newer upstream CLI without `sudo`:
 

@@ -6,6 +6,10 @@ the common NixOS, GNOME, firmware and classroom-management base. It is not the
 sum of package archive sizes and does not predict disk usage outside the Nix
 store.
 
+These figures are a reproducible snapshot of the source revision below. Git
+became part of every built-in profile after that revision, so repeat the
+documented procedure before using the table to size a current deployment.
+
 ## Reference measurement
 
 The measurement was recorded on 2026-09-23 from Nixorium commit

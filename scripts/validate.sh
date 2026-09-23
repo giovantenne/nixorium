@@ -86,6 +86,7 @@ run_quick_checks() {
     software-preset-schema \
     documentation-check \
     nixorium \
+    nixorium-runtime \
     --no-write-lock-file \
     --no-link
   bash scripts/check-agent-guidance.sh
