@@ -44,6 +44,9 @@
         inherit (nixpkgs) lib;
         inherit pkgs;
       };
+      softwarePresetSchemaTest = import ./tests/eval-software-presets.nix {
+        inherit (nixpkgs) lib;
+      };
       mkLabTest = import ./tests/mk-lab.nix {
         inherit mkLab;
         deploymentSelf = self;
@@ -81,6 +84,7 @@
         configSchemaVersion = 2;
         settingsSchemaVersion = 1;
         softwareSchemaVersion = 1;
+        softwarePresetSchemaVersion = 1;
         packageBase = {
           schemaVersion = 2;
           source = "github:NixOS/nixpkgs";
@@ -103,6 +107,9 @@
           touch "$out"
         '';
         software-schema = assert softwareSchemaTest; pkgs.runCommand "nixorium-software-schema-test" {} ''
+          touch "$out"
+        '';
+        software-preset-schema = assert softwarePresetSchemaTest; pkgs.runCommand "nixorium-software-preset-schema-test" {} ''
           touch "$out"
         '';
         mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''

@@ -12,6 +12,7 @@ args@{
   updateValidationHosts ? [],
   labSoftware ? { schemaVersion = 1; packages = []; },
   softwareCatalog ? [],
+  softwarePresets ? null,
   clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
@@ -375,6 +376,12 @@ let
     softwareCatalog;
   resolvedSoftwareCatalog = builtins.filter (item: item != null)
     (lib.imap0 normalizeSoftwareCatalogItem softwareCatalog);
+  softwarePresetsConfig =
+    if softwarePresets == null then null
+    else import ./eval-software-presets.nix {
+      inherit lib;
+      validPackage = softwarePackageTools.validPath;
+    } softwarePresets;
   labSoftwareConfig = import ./eval-lab-software.nix {
     inherit lib;
     pkgs = softwarePkgs;
@@ -692,6 +699,8 @@ rec {
     catalog = resolvedSoftwareCatalog;
     packages = map (entry: entry // { origin = "managed"; }) labSoftwareConfig.packages;
   };
+
+  nixoriumSoftwarePresets = softwarePresetsConfig;
 
   nixoriumSearchSoftwarePackages = softwarePackageTools.search;
   nixoriumResolveSoftwarePackage = softwarePackageTools.describe;

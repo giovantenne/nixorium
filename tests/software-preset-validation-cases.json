@@ -1,0 +1,86 @@
+{
+  "valid": [
+    {
+      "name": "two-profiles",
+      "catalog": {
+        "schemaVersion": 1,
+        "defaultPreset": "essential",
+        "presets": [
+          {
+            "id": "essential",
+            "label": "Essential",
+            "description": "Browser, terminal, and common fonts",
+            "packages": ["liberation_ttf", "chromium", "ghostty"]
+          },
+          {
+            "id": "graphics",
+            "label": "Graphics and illustration",
+            "description": "Raster, vector, and digital painting tools",
+            "packages": ["krita", "gimp", "inkscape"]
+          }
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "unknown-schema",
+      "catalog": {
+        "schemaVersion": 2,
+        "defaultPreset": "essential",
+        "presets": [{"id": "essential", "label": "Essential", "description": "Base", "packages": ["chromium"]}]
+      }
+    },
+    {
+      "name": "unknown-field",
+      "catalog": {
+        "schemaVersion": 1,
+        "defaultPreset": "essential",
+        "presets": [{"id": "essential", "label": "Essential", "description": "Base", "packages": ["chromium"], "active": true}]
+      }
+    },
+    {
+      "name": "duplicate-id",
+      "catalog": {
+        "schemaVersion": 1,
+        "defaultPreset": "essential",
+        "presets": [
+          {"id": "essential", "label": "Essential", "description": "Base", "packages": ["chromium"]},
+          {"id": "essential", "label": "Other", "description": "Other", "packages": ["ghostty"]}
+        ]
+      }
+    },
+    {
+      "name": "missing-default",
+      "catalog": {
+        "schemaVersion": 1,
+        "defaultPreset": "programming",
+        "presets": [{"id": "essential", "label": "Essential", "description": "Base", "packages": ["chromium"]}]
+      }
+    },
+    {
+      "name": "malformed-package",
+      "catalog": {
+        "schemaVersion": 1,
+        "defaultPreset": "essential",
+        "presets": [{"id": "essential", "label": "Essential", "description": "Base", "packages": ["bad package"]}]
+      }
+    },
+    {
+      "name": "duplicate-package",
+      "catalog": {
+        "schemaVersion": 1,
+        "defaultPreset": "essential",
+        "presets": [{"id": "essential", "label": "Essential", "description": "Base", "packages": ["chromium", "chromium"]}]
+      }
+    },
+    {
+      "name": "empty-description",
+      "catalog": {
+        "schemaVersion": 1,
+        "defaultPreset": "essential",
+        "presets": [{"id": "essential", "label": "Essential", "description": "", "packages": ["chromium"]}]
+      }
+    }
+  ]
+}

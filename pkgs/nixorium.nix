@@ -17,6 +17,7 @@ buildGoModule {
       ../templates/site/flake.nix
       ../templates/site/lab-settings.json
       ../tests/lab-settings-validation-cases.json
+      ../tests/software-preset-validation-cases.json
     ];
   };
 
