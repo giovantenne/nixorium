@@ -380,7 +380,7 @@ func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
 	}
 
 	view := model.View().Content
-	if !strings.Contains(view, "Distribute clients") || !strings.Contains(view, "Later") {
+	if !strings.Contains(view, "Distribute affected computers") || !strings.Contains(view, "Later") {
 		t.Fatalf("software result omits contextual deployment action:\n%s", view)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "d"})
@@ -390,6 +390,11 @@ func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
 	}
 	if view := model.View().Content; !strings.Contains(view, "complete current system") || !strings.Contains(view, "not only that package") {
 		t.Fatalf("deployment scope is unclear:\n%s", model.View().Content)
+	}
+	cancelled, cancelCommand := model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	cancelledModel := cancelled.(dashboardModel)
+	if cancelCommand != nil || cancelledModel.screen != dashboardSoftware || cancelledModel.software.stage != softwareResult {
+		t.Fatalf("contextual cancellation lost software result: command=%v screen=%d stage=%d", cancelCommand != nil, cancelledModel.screen, cancelledModel.software.stage)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
@@ -445,7 +450,7 @@ func TestSoftwareDeploymentWaitsForControllerActivation(t *testing.T) {
 		},
 	}
 
-	if strings.Contains(model.View().Content, "Distribute clients") {
+	if strings.Contains(model.View().Content, "Distribute affected computers") {
 		t.Fatalf("client deployment was offered before controller activation:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "d"})

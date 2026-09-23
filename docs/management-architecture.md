@@ -47,7 +47,13 @@ see [ADR 0020](adr/0020-autonomous-package-base-updates.md) and
 [the complete operator journey](updates.md).
 Guided software changes now use a curated pinned catalog, evaluated client
 scopes, candidate validation, and a token-bound atomic `lab-software.json`
-writer; Git recording and client deployment remain separate operations.
+writer. A successful TUI save can continue into the ordinary client selector
+with the exact affected identities, but client deployment still has its own
+fresh revision-bound plan and confirmation. Software also exposes an explicit
+state snapshot: controller evidence comes from the matching durable activation
+record and active closure, while client currency comes from authenticated live
+observations. Historical deployment records are never promoted to current
+state. Git recording and client deployment remain separate operations.
 Reviewed client shutdown now uses the same CLI/TUI application service,
 evaluated identities, session observations, expiring review, shared client
 operation lock, and fixed SSH request without claiming physical power state.

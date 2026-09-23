@@ -614,7 +614,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 			return []tuiAction{{key: "a", label: "Retry controller"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
 		}
 		if model.canDistribute(context.controllerResult) {
-			return []tuiAction{{key: "d", label: "Distribute clients"}, {key: "v", label: "Check systems"}, {key: "Enter", label: "Later"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "d", label: "Distribute affected computers"}, {key: "v", label: "Check systems"}, {key: "Enter", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canInspectState() {
 			return []tuiAction{{key: "v", label: "Check systems"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
