@@ -100,6 +100,11 @@ and the optional screensaver only when their packages apply to that host.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 
+The [reference profile measurement](profile-closure-measurements.md) compares
+complete Essential and Programming client closures under one documented lock.
+Closure size, transfer estimates and elapsed build time have different cache
+semantics and are reported separately.
+
 ## Network interfaces
 
 `lab.ifaceName` is the compatibility fallback for every host. Deployments may

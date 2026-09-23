@@ -230,6 +230,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   allowlisted canonical-copy synchronizer that detects missing/extra files and
   refuses symlinks, plus a human contributor guide for setup, ownership, gates
   and pull-request preparation.
+- Recorded a reproducible full-client closure comparison for the Essential and
+  Programming profiles, with one template lock and separate closure, transfer
+  and elapsed-time semantics.
 
 - Corrected the official `cache.nixos.org` public key used by both controller
   bootstrap stages. Signed substitutes are accepted again instead of being

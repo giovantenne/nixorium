@@ -219,6 +219,7 @@ the versioned operational and contributor references.
 | Understand the management interface | [TUI tour](docs/tui-renders.md), [generated renderer gallery](docs/tui-gallery.md) |
 | Diagnose a failure or restore a backup | [Troubleshooting](docs/troubleshooting.md) |
 | Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
+| Compare reference software-profile closure sizes | [Profile closure measurements](docs/profile-closure-measurements.md) |
 | Update the core, NixOS or packages; adopt older deployments | [Update and recovery guide](docs/updates.md) |
 | Understand architecture and security | [Management architecture](docs/management-architecture.md), [ADRs](docs/adr/) |
 | Report a suspected vulnerability | [Security policy](SECURITY.md) |
