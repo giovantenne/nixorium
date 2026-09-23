@@ -9,6 +9,7 @@ Internet access for installation or system deployment.
 
 [Website](https://nixorium.org/) ·
 [Documentation](#documentation) ·
+[Contributing](CONTRIBUTING.md) ·
 [Releases](https://github.com/giovantenne/nixorium/releases)
 
 > **Status: beta.** The current development line is intended for evaluation and
@@ -215,7 +216,7 @@ the versioned operational and contributor references.
 | Understand the product and lab use cases | [Website](https://nixorium.org/) |
 | Evaluate one controller, one client, and one change | [Isolated VM recipe](docs/evaluation-environment.md), then [quick start](#quick-start) |
 | Set up and manage a lab | [Administrator guide](templates/site/README.md) |
-| Understand the management interface | [TUI tour and renders](docs/tui-renders.md) |
+| Understand the management interface | [TUI tour](docs/tui-renders.md), [generated renderer gallery](docs/tui-gallery.md) |
 | Diagnose a failure or restore a backup | [Troubleshooting](docs/troubleshooting.md) |
 | Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
 | Update the core, NixOS or packages; adopt older deployments | [Update and recovery guide](docs/updates.md) |
@@ -224,7 +225,7 @@ the versioned operational and contributor references.
 | Review operator responsibilities and limitations | [Operational disclaimer](DISCLAIMER.md) |
 | Evaluate firmware and physical hardware | [Hardware validation plan](docs/hardware-validation.md) |
 | Evaluate with disposable virtual machines | [Evaluation environment](docs/evaluation-environment.md) |
-| Develop and validate changes | [Contributor instructions](AGENTS.md), [development validation](docs/development-validation.md) |
+| Develop and validate changes | [Contributor guide](CONTRIBUTING.md), [agent instructions](AGENTS.md), [development validation](docs/development-validation.md) |
 | Work with a coding agent | [Agent skills](#agent-skills) |
 | Review release changes | [Changelog](CHANGELOG.md), [Releases](https://github.com/giovantenne/nixorium/releases) |
 
@@ -257,7 +258,8 @@ changes and explicitly authorize the operations you want performed.
 ## Development
 
 Work on the public framework here; keep site-specific changes in a private
-deployment. Read [AGENTS.md](AGENTS.md) and the
+deployment. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then read
+[AGENTS.md](AGENTS.md) and the
 [`nixorium-developer` skill](skills/nixorium-developer/SKILL.md) before changing
 the API, modules, installers, or template.
 

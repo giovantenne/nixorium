@@ -1,9 +1,28 @@
 package presentation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
 )
+
+func TestDemoRendererFitsSupportedLayouts(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		bundle := RenderDemoBundleAtSize(strings.Repeat("a", 40), "2026-09-19", size[0], size[1])
+		if bundle.Terminal != fmt.Sprintf("%dx%d", size[0], size[1]) {
+			t.Fatalf("terminal metadata = %q", bundle.Terminal)
+		}
+		for _, scenario := range bundle.Scenarios {
+			for _, frame := range scenario.Frames {
+				if lipgloss.Width(frame.ANSI) > size[0] || lipgloss.Height(frame.ANSI) > size[1] {
+					t.Fatalf("%s/%s overflows %dx%d", scenario.ID, frame.Label, size[0], size[1])
+				}
+			}
+		}
+	}
+}
 
 func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-09-19")
