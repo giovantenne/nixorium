@@ -78,7 +78,7 @@ templates/site/            # Private deployment repository template
   software-catalog.nix     # Deployment-owned suggestions for the software UI
   assets/                  # Site branding, MIME and editor defaults
   modules/                 # Workstation, development and home-profile policy
-  scripts/                 # Optional site screensaver implementation
+  scripts/                 # Site screensaver implementation
 skills/nixorium-developer/ # Public upstream development and release workflow
 skills/nixorium-maintainer/ # Private laboratory maintenance workflow
 docs/management-architecture.md # Accepted management-system target design

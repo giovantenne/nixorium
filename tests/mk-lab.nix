@@ -105,7 +105,12 @@ let
   siteProfilePackages = builtins.concatLists
     (map (preset: preset.packages) sitePresetCatalog.presets);
   siteProfileResolved = map presetLab.nixoriumResolveSoftwarePackage siteProfilePackages;
-  commonProfilePackages = [ "nodejs" "opencode" "pi-coding-agent" ];
+  commonProfilePackages = [
+    "nodejs"
+    "opencode"
+    "pi-coding-agent"
+    "python3Packages.terminaltexteffects"
+  ];
   siteProfilesEvaluate = builtins.all
     (labs:
       labs.laboratory.nixoriumSoftwarePresets.defaultPreset == "essential"
