@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/list"
@@ -654,90 +653,58 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.screen = dashboardSettings
 		return model, nil
 	case dashboardSoftwareCatalogMsg:
-		if model.software.searchCancel != nil {
-			model.software.searchCancel()
-			model.software.searchCancel = nil
-		}
 		model.busy = ""
-		model.software.catalog = message.report
-		model.software.cursor = 0
-		model.software.query = ""
-		model.software.searching = false
-		model.software.search = domain.SoftwareSearchReport{}
-		model.software.searchBusy = false
-		model.software.searchID++
-		model.software.mode = softwareSuggested
-		if len(message.report.Packages) > 0 {
-			model.software.mode = softwareConfigured
-		}
-		model.message = message.report.Message
+		software, result := model.software.loadCatalog(message.report)
+		model.software = software
+		model.message = result.message
 		model.screen = dashboardSoftware
-		model.software.stage = softwareCatalog
 		return model, nil
 	case dashboardSoftwareSearchStartMsg:
-		if model.screen != dashboardSoftware || model.software.mode != softwareSearch || message.id != model.software.searchID || message.query != strings.TrimSpace(model.software.query) || model.actions.SearchSoftware == nil {
+		if model.screen != dashboardSoftware {
 			return model, nil
 		}
-		model.software.searchBusy = true
-		query := message.query
-		id := message.id
-		searchContext := message.ctx
-		return model, func() tea.Msg {
-			return dashboardSoftwareSearchMsg{id: id, report: model.actions.SearchSoftware(searchContext, query)}
+		software, result, command := model.software.startSearch(message, model.actions.SearchSoftware)
+		if !result.accepted {
+			return model, nil
 		}
+		model.software = software
+		return model, command
 	case dashboardSoftwareSearchMsg:
-		if model.screen != dashboardSoftware || model.software.mode != softwareSearch || message.id != model.software.searchID {
+		if model.screen != dashboardSoftware {
 			return model, nil
 		}
-		model.software.searchBusy = false
-		if model.software.searchCancel != nil {
-			model.software.searchCancel()
-			model.software.searchCancel = nil
+		software, result := model.software.finishSearch(message)
+		if !result.accepted {
+			return model, nil
 		}
-		model.software.search = message.report
-		model.software.cursor = 0
-		if message.report.HasErrors() {
-			model.message = message.report.Message
-		} else {
-			model.message = ""
-		}
+		model.software = software
+		model.message = result.message
 		return model, nil
 	case dashboardSoftwarePlanMsg:
 		model.busy = ""
-		model.software.plan = message.report
-		model.message = message.report.Message
-		if message.report.HasErrors() || message.report.State == "unchanged" {
-			if message.report.Request.Present {
-				model.software.stage = softwareScope
-			} else {
-				model.software.stage = softwareCatalog
-			}
-		} else {
+		software, result := model.software.finishPlan(message.report)
+		model.software = software
+		model.message = result.message
+		if model.software.reviewing() {
 			model.confirmation = ""
-			model.software.stage = softwareReview
 		}
 		return model, nil
 	case dashboardSoftwareApplyMsg:
 		model.busy = ""
-		model.software.applying = false
-		model.software.result = message.report
-		model.message = message.report.Message
-		model.software.stage = softwareResult
-		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
+		software, result := model.software.finishApply(message.report)
+		model.software = software
+		model.message = result.message
+		if result.startController {
 			return model.startSoftwareControllerApply()
 		}
 		return model, nil
 	case dashboardSoftwareControllerMsg:
 		model.busy = ""
-		model.software.applying = false
 		model.controllerPlan = message.plan
 		model.controllerResult = message.report
-		if message.plan.HasErrors() {
-			model.message = controllerPlanIssues(message.plan)
-		} else {
-			model.message = message.report.Message
-		}
-		model.software.stage = softwareResult
+		software, result := model.software.finishController(message.plan, message.report)
+		model.software = software
+		model.message = result.message
 		return model, nil
 	case dashboardShutdownPlanMsg:
 		model.busy = ""
@@ -876,45 +843,24 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.hostCursor = 0
 		return model, nil
 	}
-	if model.screen == dashboardSoftware && model.software.searching {
-		changed := false
-		switch key.String() {
-		case "tab":
-			model.software = model.software.changeMode(1)
-			model.message = ""
-			return model, nil
-		case "shift+tab":
-			model.software = model.software.changeMode(-1)
-			model.message = ""
-			return model, nil
-		case "esc":
-			model.software.searching = false
-		case "up", "down", "enter":
-			model.software.searching = false
-			return model.updateSoftware(key)
-		case "backspace":
-			value := []rune(model.software.query)
-			if len(value) > 0 {
-				model.software.query = string(value[:len(value)-1])
-				changed = true
+	if model.screen == dashboardSoftware {
+		software, input := model.software.updateSearchInput(key, model.actions.SearchSoftware)
+		model.software = software
+		if input.handled {
+			if input.clearMessage {
+				model.message = ""
 			}
-		default:
-			if key.Text != "" && len(model.software.query) < 80 {
-				model.software.query += key.Text
-				changed = true
+			if input.delegate {
+				return model.updateSoftware(key)
 			}
+			return model, input.command
 		}
-		model.software.cursor = 0
-		if changed {
-			return model, model.software.scheduleSearch(model.actions.SearchSoftware)
-		}
-		return model, nil
 	}
 	if key.String() == "l" && (model.deploying || model.controllerApplying || model.pxePreparing) {
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.software.applying || model.shutdownApplying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deploying || model.updating || model.settingsApplying || model.software.mutating() || model.shutdownApplying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -928,9 +874,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	if exitKey {
-		if model.software.searchCancel != nil {
-			model.software.searchCancel()
-		}
+		model.software.cancelSearch()
 		return model, tea.Quit
 	}
 	if model.busy != "" {

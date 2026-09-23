@@ -50,12 +50,12 @@ func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 		Request:            domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: options[0].scope},
 		AffectedController: "pc99",
 	}
-	review := strings.Join(model.softwareReviewView(), "\n")
+	review := strings.Join(model.software.reviewView(softwareViewContext{dark: model.isDark}), "\n")
 	if !strings.Contains(review, "rebuild pc99") || !strings.Contains(review, "this controller and all current or future clients") {
 		t.Fatalf("unclear review: %s", review)
 	}
 	model.software.result = domain.SoftwareChangeApplyReport{State: "saved", AffectedController: "pc99"}
-	result := strings.Join(model.softwareResultView(), "\n")
+	result := strings.Join(model.software.resultView(softwareViewContext{dark: model.isDark}), "\n")
 	if !strings.Contains(result, "controller needs attention") || !strings.Contains(result, "retrying the controller") {
 		t.Fatalf("pending activation lacks recovery: %s", result)
 	}
