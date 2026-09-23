@@ -101,6 +101,13 @@ The host report also shows the last successful post-apply verification stored
 locally. Treat it as history only: current/outdated/unknown always comes from
 the live authenticated observation.
 
+The TUI's Software system-state view combines that live client evidence with
+the controller's reviewed state. It calls the same controller reconciliation
+that requires the active closure and durable activation receipt to match the
+current Git revision. Its timestamp identifies one refreshable snapshot; if
+the repository revision changes while the snapshot is collected, the view is
+partial and must not be treated as verified.
+
 ## Client shutdown
 
 Use the reviewed client-only workflow:

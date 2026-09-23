@@ -35,6 +35,21 @@ it in Git and, when the controller is affected, builds and activates the
 controller. Neither path implicitly deploys clients. Do not use the TUI as a
 configuration-only workaround; review the current operation's stated effects.
 
+After a successful TUI save affecting clients, the contextual distribution
+action opens the existing selector with the exact old and new client identities
+preselected. It still requires a fresh deployment plan and confirmation and
+applies the complete current deployment configuration. A removed inventory
+identity is reported rather than replaced with `@lab`; returning to Software
+does not save the declaration again. If controller activation was required but
+did not verify, complete its recovery before distributing clients.
+
+Use the Software system-state action after reopening the TUI or when an
+`unchanged` result needs verification. It reads the repository's current
+revision, accepts controller state only from the matching activation receipt
+and closure, and labels clients from current authenticated observations.
+Deployment history is supporting context only. Unknown means current state was
+not proven; it is not equivalent to pending or successfully applied.
+
 ## “Update OpenCode to the latest version”
 
 First identify how this deployment provides OpenCode: managed Nix package,

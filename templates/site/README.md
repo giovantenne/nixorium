@@ -283,10 +283,22 @@ validation and checking the review token and source fingerprint. The ordinary
 TUI also records that one managed file locally without exposing Git. For
 `shared` and `controller` scopes, the same reviewed action then builds,
 activates, and verifies this controller. It never pushes, starts PXE, or
-distributes clients. Use **Distribute the prepared system** for the
-specific powered-on clients you intend to update. Packages supplied by private
-NixOS modules remain untouched and are edited through the advanced module
-workflow.
+distributes clients. After a successful save that affects clients, choose
+**Distribute affected computers** to open the ordinary deployment selector with
+exactly the old and new destinations preselected, or choose **Later**. This
+shortcut still creates a fresh deployment plan and review; it applies the whole
+current deployment configuration, not only the package just changed. Removed
+inventory identities are reported and never broaden the selection to the whole
+lab.
+
+Choose **Check systems** from Software to reconstruct a current snapshot after
+reopening the dashboard. It shows the desired Git revision and observation
+time, verifies the controller only when its durable activation receipt, active
+closure, and revision agree, and classifies clients only from authenticated
+live observations. A recorded past deployment remains history and does not turn
+an unavailable client into a verified one. The opening dashboard performs no
+client probes. Packages supplied by private NixOS modules remain untouched and
+are edited through the advanced module workflow.
 
 The software schema remains version 1 with two new explicit scope kinds; older
 upstreams reject them. Before downgrading, review and remove or deliberately

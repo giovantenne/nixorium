@@ -6,6 +6,19 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Successful guided software saves can continue directly to a fresh client
+  deployment review with exactly the affected computers preselected. The review
+  states that it applies the complete current configuration, reports removed
+  inventory targets without broadening the selection, and remains blocked behind
+  controller recovery when activation did not verify.
+- Software now offers an explicit, refreshable system-state snapshot. It shows
+  the desired revision and observation time, accepts controller state only from
+  a matching activation receipt and active closure, and classifies clients from
+  authenticated observations without treating deployment history as current
+  evidence.
+
 ## [2.0.0-beta.5] - 2026-09-22
 
 ### Changed

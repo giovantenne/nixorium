@@ -211,7 +211,12 @@ Release from the matching changelog section.
   ordinary TUI records it transparently and immediately invokes the typed
   controller plan/apply boundary when the reviewed scope affects the controller.
   It must not push, prepare PXE, deploy clients, or rewrite packages supplied by
-  private modules.
+  private modules. A successful client-affecting result may open a fresh ordinary
+  deployment review with exact affected identities; it never reuses the software
+  token or bypasses deployment planning and confirmation. Reconstructed state
+  uses the current Git revision, the controller activation receipt plus active
+  closure, and authenticated client observations; history alone is not current
+  evidence.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.

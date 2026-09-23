@@ -619,7 +619,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		if model.deployResult.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
-				model.screen = dashboardHome
+				model.screen = dashboardComputersArea
 				model.message = ""
 			case "l":
 				model.busy = "Loading operation logs"
@@ -641,6 +641,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			if model.restoreMode {
 				model.screen = dashboardRestore
 				model.restoreMode = false
+			} else if model.deployContext != "" {
+				model.screen = dashboardSoftware
+				model.deployContext = ""
 			} else {
 				model.screen = dashboardHome
 			}
