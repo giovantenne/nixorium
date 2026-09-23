@@ -168,6 +168,23 @@ type updateModel struct {
 	applying        bool
 }
 
+// maintenanceModel owns the read-only service/log/repository views and the
+// optional reviewed local commit state.
+type maintenanceModel struct {
+	services        domain.ServicesReport
+	serviceResult   domain.ServiceActionReport
+	logs            domain.OperationLogsReport
+	logDetail       domain.OperationLogReport
+	logCursor       int
+	logScroll       int
+	gitReview       domain.GitReviewReport
+	gitScroll       int
+	gitCommitCursor int
+	gitCommitChosen map[string]bool
+	gitCommitPlan   domain.GitCommitPlanReport
+	gitCommitResult domain.GitCommitReport
+}
+
 type dashboardModel struct {
 	updateDetails          bool
 	returnAdmin            bool
@@ -209,18 +226,7 @@ type dashboardModel struct {
 	hosts                  domain.HostsReport
 	deployment             deploymentModel
 	controller             controllerModel
-	services               domain.ServicesReport
-	serviceResult          domain.ServiceActionReport
-	logs                   domain.OperationLogsReport
-	logDetail              domain.OperationLogReport
-	logCursor              int
-	logScroll              int
-	gitReview              domain.GitReviewReport
-	gitScroll              int
-	gitCommitCursor        int
-	gitCommitChosen        map[string]bool
-	gitCommitPlan          domain.GitCommitPlanReport
-	gitCommitResult        domain.GitCommitReport
+	maintenance            maintenanceModel
 	updates                updateModel
 	settings               settingsModel
 	startingLabSetup       bool
@@ -1127,8 +1133,8 @@ func (model dashboardModel) gitReviewView() string {
 		lines = append(lines, model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
-	if model.gitCommitResult.Operation != "" {
-		success := !model.gitCommitResult.HasErrors() && model.gitCommitResult.Committed
+	if model.maintenance.gitCommitResult.Operation != "" {
+		success := !model.maintenance.gitCommitResult.HasErrors() && model.maintenance.gitCommitResult.Committed
 		title := "Git commit needs attention"
 		if success {
 			title = "Git changes committed locally"
@@ -1140,8 +1146,8 @@ func (model dashboardModel) gitReviewView() string {
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
 			"",
-			fmt.Sprintf("State: %s   Committed: %t", model.gitCommitResult.State, model.gitCommitResult.Committed),
-			"HEAD: "+model.gitCommitResult.Revision,
+			fmt.Sprintf("State: %s   Committed: %t", model.maintenance.gitCommitResult.State, model.maintenance.gitCommitResult.Committed),
+			"HEAD: "+model.maintenance.gitCommitResult.Revision,
 		)
 		notices := []tuiNotice{}
 		if model.message != "" {
@@ -1149,29 +1155,29 @@ func (model dashboardModel) gitReviewView() string {
 		}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "f", label: "Refresh review"}, {key: "F1", label: "Help"}}})
 	}
-	content := gitReviewContentLines(model.gitReview)
+	content := gitReviewContentLines(model.maintenance.gitReview)
 	height := model.gitReviewHeight()
-	maximum := maximumGitReviewScroll(model.gitReview, height)
-	if model.gitScroll > maximum {
-		model.gitScroll = maximum
+	maximum := maximumGitReviewScroll(model.maintenance.gitReview, height)
+	if model.maintenance.gitScroll > maximum {
+		model.maintenance.gitScroll = maximum
 	}
-	end := model.gitScroll + height
+	end := model.maintenance.gitScroll + height
 	if end > len(content) {
 		end = len(content)
 	}
 	lines = append(lines,
-		fmt.Sprintf("State: %s   paths: %d   staged/unstaged/untracked: %d/%d/%d", tuiStatus(model.gitReview.State, gitReviewStatusKind(model.gitReview), model.isDark), len(model.gitReview.Changes), model.gitReview.Summary.Staged, model.gitReview.Summary.Unstaged, model.gitReview.Summary.Untracked),
-		fmt.Sprintf("Managed/unexpected/private: %d/%d/%d", model.gitReview.Summary.Managed, model.gitReview.Summary.Unexpected, model.gitReview.Summary.Private),
-		fmt.Sprintf("Showing lines %d-%d of %d", displayedLineStart(model.gitScroll, len(content)), end, len(content)),
+		fmt.Sprintf("State: %s   paths: %d   staged/unstaged/untracked: %d/%d/%d", tuiStatus(model.maintenance.gitReview.State, gitReviewStatusKind(model.maintenance.gitReview), model.isDark), len(model.maintenance.gitReview.Changes), model.maintenance.gitReview.Summary.Staged, model.maintenance.gitReview.Summary.Unstaged, model.maintenance.gitReview.Summary.Untracked),
+		fmt.Sprintf("Managed/unexpected/private: %d/%d/%d", model.maintenance.gitReview.Summary.Managed, model.maintenance.gitReview.Summary.Unexpected, model.maintenance.gitReview.Summary.Private),
+		fmt.Sprintf("Showing lines %d-%d of %d", displayedLineStart(model.maintenance.gitScroll, len(content)), end, len(content)),
 		"",
 	)
-	lines = append(lines, content[model.gitScroll:end]...)
+	lines = append(lines, content[model.maintenance.gitScroll:end]...)
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
 	actions := []tuiAction{{key: "↑/↓/Pg", label: "Scroll"}}
-	if len(model.gitReview.Changes) > 0 && !model.gitReview.HasErrors() {
+	if len(model.maintenance.gitReview.Changes) > 0 && !model.maintenance.gitReview.HasErrors() {
 		actions = append(actions, tuiAction{key: "c", label: "Select commit paths"})
 	}
 	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
@@ -1185,18 +1191,18 @@ func (model dashboardModel) gitCommitSelectView() string {
 		lines = append(lines, model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
-	start, end := listWindow(len(model.gitReview.Changes), model.gitCommitCursor, model.rowCapacity())
+	start, end := listWindow(len(model.maintenance.gitReview.Changes), model.maintenance.gitCommitCursor, model.rowCapacity())
 	for index := start; index < end; index++ {
-		change := model.gitReview.Changes[index]
+		change := model.maintenance.gitReview.Changes[index]
 		chosen := "[ ]"
-		if model.gitCommitChosen[change.Path] {
+		if model.maintenance.gitCommitChosen[change.Path] {
 			chosen = "[x]"
 		}
 		if change.Private {
 			chosen = "[!]"
 		}
 		row := fmt.Sprintf("%s %-10s %-10s %-9s %s", chosen, gitChangeOwnership(change), gitChangeIndex(change), gitChangeWorktree(change), change.Path)
-		lines = append(lines, tuiSelection(row, index == model.gitCommitCursor, model.isDark))
+		lines = append(lines, tuiSelection(row, index == model.maintenance.gitCommitCursor, model.isDark))
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
@@ -1212,24 +1218,24 @@ func (model dashboardModel) gitCommitReviewView() string {
 		lines = append(lines, model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
-	diffLines := strings.Split(strings.TrimSuffix(model.gitCommitPlan.Diff.Content, "\n"), "\n")
+	diffLines := strings.Split(strings.TrimSuffix(model.maintenance.gitCommitPlan.Diff.Content, "\n"), "\n")
 	height := model.gitReviewHeight()
-	maximum := maximumGitCommitPlanScroll(model.gitCommitPlan, height)
-	if model.gitScroll > maximum {
-		model.gitScroll = maximum
+	maximum := maximumGitCommitPlanScroll(model.maintenance.gitCommitPlan, height)
+	if model.maintenance.gitScroll > maximum {
+		model.maintenance.gitScroll = maximum
 	}
-	end := model.gitScroll + height
+	end := model.maintenance.gitScroll + height
 	if end > len(diffLines) {
 		end = len(diffLines)
 	}
 	lines = append(lines,
-		"Paths: "+strings.Join(model.gitCommitPlan.Paths, ", "),
-		"Message: "+model.gitCommitPlan.CommitMessage,
+		"Paths: "+strings.Join(model.maintenance.gitCommitPlan.Paths, ", "),
+		"Message: "+model.maintenance.gitCommitPlan.CommitMessage,
 		"No hooks, signing actions, remote operations, or push will run.",
-		fmt.Sprintf("Diff lines %d-%d of %d", displayedLineStart(model.gitScroll, len(diffLines)), end, len(diffLines)),
+		fmt.Sprintf("Diff lines %d-%d of %d", displayedLineStart(model.maintenance.gitScroll, len(diffLines)), end, len(diffLines)),
 		"",
 	)
-	lines = append(lines, diffLines[model.gitScroll:end]...)
+	lines = append(lines, diffLines[model.maintenance.gitScroll:end]...)
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
@@ -1237,7 +1243,7 @@ func (model dashboardModel) gitCommitReviewView() string {
 	return model.renderShell(tuiShell{
 		path:      path,
 		body:      strings.Join(lines, "\n"),
-		fixedBody: tuiSection("Type "+model.gitCommitPlan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_",
+		fixedBody: tuiSection("Type "+model.maintenance.gitCommitPlan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_",
 		notices:   notices,
 		actions:   []tuiAction{{key: "↑/↓/Pg", label: "Scroll diff"}, {key: "Enter", label: "Create commit"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
 	})
@@ -1725,8 +1731,8 @@ func (model dashboardModel) servicesView() string {
 		lines = append(lines, "", model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
-	if model.serviceResult.Operation != "" {
-		success := !model.serviceResult.HasErrors() && model.serviceResult.Verified
+	if model.maintenance.serviceResult.Operation != "" {
+		success := !model.maintenance.serviceResult.HasErrors() && model.maintenance.serviceResult.Verified
 		title := "Service action needs attention"
 		if success {
 			title = "Binary cache restarted and verified"
@@ -1734,7 +1740,7 @@ func (model dashboardModel) servicesView() string {
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
 			"",
-			fmt.Sprintf("State: %s   Verified: %t   Retry safe: %t", model.serviceResult.State, model.serviceResult.Verified, model.serviceResult.RetrySafe),
+			fmt.Sprintf("State: %s   Verified: %t   Retry safe: %t", model.maintenance.serviceResult.State, model.maintenance.serviceResult.Verified, model.maintenance.serviceResult.RetrySafe),
 		)
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
@@ -1759,7 +1765,7 @@ func (model dashboardModel) servicesView() string {
 			actions:   []tuiAction{{key: "Enter", label: "Restart cache"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
 		})
 	}
-	for _, service := range model.services.Services {
+	for _, service := range model.maintenance.services.Services {
 		kind := tuiStatusAttention
 		if service.State == "healthy" || service.State == "active" || service.State == "standby" {
 			kind = tuiStatusSuccess
@@ -1792,7 +1798,7 @@ func (model dashboardModel) servicesView() string {
 }
 
 func (model dashboardModel) serviceRestartAvailable() bool {
-	return len(model.services.Services) > 0 && model.services.Services[0].ID == "cache" && len(model.services.Services[0].Units) > 0 && model.services.Services[0].Units[0].Loaded
+	return len(model.maintenance.services.Services) > 0 && model.maintenance.services.Services[0].ID == "cache" && len(model.maintenance.services.Services[0].Units) > 0 && model.maintenance.services.Services[0].Units[0].Loaded
 }
 
 func (model dashboardModel) logsView() string {
@@ -1803,25 +1809,25 @@ func (model dashboardModel) logsView() string {
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	lines = append(lines, tuiSection("Recent actions", model.isDark))
-	recordLimit := len(model.logs.Records)
+	recordLimit := len(model.maintenance.logs.Records)
 	if recordLimit > 3 {
 		recordLimit = 3
 	}
 	if recordLimit == 0 {
 		lines = append(lines, "  No recorded operation outcomes.")
 	}
-	for _, record := range model.logs.Records[:recordLimit] {
+	for _, record := range model.maintenance.logs.Records[:recordLimit] {
 		lines = append(lines, fmt.Sprintf("  %s  %-18s %-10s %s", record.RecordedAt.UTC().Format("2006-01-02 15:04Z"), record.Operation, record.State, record.Subject))
 	}
 	lines = append(lines, "", tuiSection("Deployment logs", model.isDark))
-	if len(model.logs.Logs) == 0 {
+	if len(model.maintenance.logs.Logs) == 0 {
 		lines = append(lines, "No deployment operation logs are available.")
 	}
-	start, end := listWindow(len(model.logs.Logs), model.logCursor, max(1, (model.height-16)/2))
+	start, end := listWindow(len(model.maintenance.logs.Logs), model.maintenance.logCursor, max(1, (model.height-16)/2))
 	for index := start; index < end; index++ {
-		entry := model.logs.Logs[index]
+		entry := model.maintenance.logs.Logs[index]
 		row := fmt.Sprintf("%s  %-10s %-11s %d bytes", entry.StartedAt.UTC().Format("2006-01-02 15:04Z"), entry.Kind, entry.State, entry.SizeBytes)
-		lines = append(lines, tuiSelection(row, index == model.logCursor, model.isDark))
+		lines = append(lines, tuiSelection(row, index == model.maintenance.logCursor, model.isDark))
 		lines = append(lines, "    "+entry.ID)
 	}
 	notices := []tuiNotice{}
@@ -1829,7 +1835,7 @@ func (model dashboardModel) logsView() string {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
 	actions := []tuiAction{}
-	if len(model.logs.Logs) > 0 {
+	if len(model.maintenance.logs.Logs) > 0 {
 		actions = append(actions, tuiAction{key: "↑/↓", label: "Select"}, tuiAction{key: "Enter", label: "View tail"})
 	}
 	back := "Maintenance"
@@ -1847,7 +1853,7 @@ func (model dashboardModel) logDetailView() string {
 		lines = append(lines, model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
-	if model.logDetail.Log == nil {
+	if model.maintenance.logDetail.Log == nil {
 		lines = append(lines, "The selected operation log could not be read safely.")
 		notices := []tuiNotice{}
 		if model.message != "" {
@@ -1855,19 +1861,19 @@ func (model dashboardModel) logDetailView() string {
 		}
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Esc", label: "History"}, {key: "F1", label: "Help"}}})
 	}
-	entry := model.logDetail.Log
-	contentLines := operationLogContentLines(model.logDetail.Content)
-	end := model.logScroll + model.logDetailHeight()
+	entry := model.maintenance.logDetail.Log
+	contentLines := operationLogContentLines(model.maintenance.logDetail.Content)
+	end := model.maintenance.logScroll + model.logDetailHeight()
 	if end > len(contentLines) {
 		end = len(contentLines)
 	}
 	lines = append(lines,
 		fmt.Sprintf("%s — %s", entry.StartedAt.UTC().Format("2006-01-02 15:04:05Z"), entry.State),
 		entry.ID,
-		fmt.Sprintf("Showing lines %d-%d of %d%s", displayedLineStart(model.logScroll, len(contentLines)), end, len(contentLines), truncatedLogLabel(model.logDetail.Truncated)),
+		fmt.Sprintf("Showing lines %d-%d of %d%s", displayedLineStart(model.maintenance.logScroll, len(contentLines)), end, len(contentLines), truncatedLogLabel(model.maintenance.logDetail.Truncated)),
 		"",
 	)
-	lines = append(lines, contentLines[model.logScroll:end]...)
+	lines = append(lines, contentLines[model.maintenance.logScroll:end]...)
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "↑/↓/Pg/Home/End", label: "Scroll"}, {key: "Esc", label: "History"}, {key: "F1", label: "Help"}}})
 }
 
