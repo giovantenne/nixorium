@@ -434,9 +434,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardUpdateCheckMsg:
 		model.busy = ""
-		model.updateCheck = message.report
-		model.updateCursor = 0
-		model.updateTarget = ""
+		model.updates.check = message.report
+		model.updates.cursor = 0
+		model.updates.target = ""
 		if message.report.HasErrors() {
 			model.message = operationLogIssues(message.report.Issues)
 		} else {
@@ -446,37 +446,37 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardPackageBaseMsg:
 		model.busy = ""
-		model.baseStatus = message.report
-		model.baseTarget = message.report.Channel
+		model.updates.baseStatus = message.report
+		model.updates.baseTarget = message.report.Channel
 		model.message = operationLogIssues(message.report.Issues)
 		return model, nil
 	case dashboardUpdatePlanProgressMsg:
-		if !model.updatePlanning || model.updatePlanEvents == nil {
+		if !model.updates.planning || model.updates.planEvents == nil {
 			return model, nil
 		}
-		model.updatePlanProgress = message.progress
+		model.updates.planProgress = message.progress
 		model.busy = message.progress.Detail
-		return model, waitForUpdatePlanEvent(model.updatePlanEvents)
+		return model, waitForUpdatePlanEvent(model.updates.planEvents)
 	case dashboardUpdatePlanMsg:
-		model.updatePlanning = false
-		model.updatePlanEvents = nil
+		model.updates.planning = false
+		model.updates.planEvents = nil
 		model.busy = ""
-		model.updatePlan = message.report
+		model.updates.plan = message.report
 		if message.report.HasErrors() {
 			model.message = operationLogIssues(message.report.Issues)
 			model.screen = dashboardUpdate
 			return model, nil
 		}
 		model.confirmation = ""
-		model.updateScroll = 0
+		model.updates.scroll = 0
 		model.message = ""
 		model.screen = dashboardUpdateReview
 		return model, nil
 	case dashboardUpdateResultMsg:
 		model.hosts = domain.HostsReport{}
 		model.busy = ""
-		model.updating = false
-		model.updateResult = message.report
+		model.updates.applying = false
+		model.updates.result = message.report
 		model.confirmation = ""
 		model.message = message.report.Message
 		model.screen = dashboardUpdate
@@ -486,7 +486,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardUpdateControllerMsg:
 		model.busy = ""
-		model.updating = false
+		model.updates.applying = false
 		model.controller.plan = message.plan
 		model.controller.result = message.report
 		if message.plan.HasErrors() {
@@ -762,8 +762,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		if model.screen == dashboardLogDetail && model.logScroll > maximumLogScroll(model.logDetail, model.logDetailHeight()) {
 			model.logScroll = maximumLogScroll(model.logDetail, model.logDetailHeight())
 		}
-		if model.screen == dashboardUpdateReview && model.updateScroll > maximumUpdateScroll(model.updatePlan, model.updateReviewHeight()) {
-			model.updateScroll = maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
+		if model.screen == dashboardUpdateReview && model.updates.scroll > maximumUpdateScroll(model.updates.plan, model.updateReviewHeight()) {
+			model.updates.scroll = maximumUpdateScroll(model.updates.plan, model.updateReviewHeight())
 		}
 		if model.screen == dashboardSettings {
 			model.settings.menu.setSize(model.width, model.height)
@@ -849,7 +849,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.pageScroll = max(0, model.pageScroll-1)
 		return model, nil
 	}
-	if model.baseUpdate && model.baseEditing && model.screen == dashboardUpdate && model.busy == "" && key.String() != "ctrl+c" {
+	if model.updates.packageBase && model.updates.baseEditing && model.screen == dashboardUpdate && model.busy == "" && key.String() != "ctrl+c" {
 		return model.updatePackageBaseKey(key)
 	}
 	if model.screen == dashboardHosts && model.hostSearching {
@@ -889,7 +889,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updating || model.settings.applying || model.software.mutating() || model.shutdown.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.software.mutating() || model.shutdown.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}

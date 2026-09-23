@@ -15,22 +15,22 @@ func TestPackageBaseRenderGallery(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
 		for _, dark := range []bool{false, true} {
 			for _, state := range []string{"pin", "migration", "review", "error", "recovery"} {
-				model := dashboardModel{screen: dashboardUpdate, baseUpdate: true, width: size[0], height: size[1], isDark: dark, baseStatus: domain.PackageBaseStatus{Channel: "nixos-26.05", Revision: strings.Repeat("a", 40)}}
+				model := dashboardModel{screen: dashboardUpdate, updates: updateModel{packageBase: true, baseStatus: domain.PackageBaseStatus{Channel: "nixos-26.05", Revision: strings.Repeat("a", 40)}}, width: size[0], height: size[1], isDark: dark}
 				required := []string{"Update system and packages", "Esc", "Help"}
 				switch state {
 				case "migration":
-					model.baseEditing = true
-					model.baseTarget = "nixos-26.11"
+					model.updates.baseEditing = true
+					model.updates.baseTarget = "nixos-26.11"
 					required = append(required, "unverified", "Space")
 				case "review":
 					model.screen = dashboardUpdateReview
-					model.updatePlan = domain.UpdatePlanReport{State: "ready", Kind: "package-base", CurrentRef: "nixos-26.05", Target: "nixos-26.11", Diff: domain.GitDiff{Content: strings.Repeat("+ reviewed change\n", 40)}}
+					model.updates.plan = domain.UpdatePlanReport{State: "ready", Kind: "package-base", CurrentRef: "nixos-26.05", Target: "nixos-26.11", Diff: domain.GitDiff{Content: strings.Repeat("+ reviewed change\n", 40)}}
 					required = append(required, "unverified", "Enter", "Cancel")
 				case "error":
-					model.baseStatus.Issues = []domain.ValidationIssue{{Field: "input", Message: "Review the legacy deployment migration"}}
+					model.updates.baseStatus.Issues = []domain.ValidationIssue{{Field: "input", Message: "Review the legacy deployment migration"}}
 					required = append(required, "legacy", "Refresh")
 				case "recovery":
-					model.updateResult = domain.UpdateApplyReport{Operation: "update-save", State: "partial", Updated: true, RecoveryRequired: true, Message: "Saving needs recovery"}
+					model.updates.result = domain.UpdateApplyReport{Operation: "update-save", State: "partial", Updated: true, RecoveryRequired: true, Message: "Saving needs recovery"}
 					required = []string{"Update system and packages", "recovery", "Complete save", "Enter", "Maintenance", "Help"}
 				}
 				view := model.View().Content
@@ -86,7 +86,7 @@ func TestSystemUpdateJourneyRequiresReviewAndUsesSeparateSave(t *testing.T) {
 	}
 	next, command := model.Update(tea.KeyPressMsg{Text: "b"})
 	model = next.(dashboardModel)
-	if command == nil || !model.baseUpdate {
+	if command == nil || !model.updates.packageBase {
 		t.Fatal("maintenance task unreachable")
 	}
 	next, _ = model.Update(command())
@@ -96,7 +96,7 @@ func TestSystemUpdateJourneyRequiresReviewAndUsesSeparateSave(t *testing.T) {
 	}
 	next, _ = model.Update(tea.KeyPressMsg{Text: "m"})
 	model = next.(dashboardModel)
-	model.baseTarget = "nixos-26.11"
+	model.updates.baseTarget = "nixos-26.11"
 	next, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = next.(dashboardModel)
 	if command != nil || planned != 0 || !strings.Contains(model.message, "Acknowledge") {
@@ -128,21 +128,21 @@ func TestSystemUpdateJourneyRequiresReviewAndUsesSeparateSave(t *testing.T) {
 }
 
 func TestSystemChannelFormCancelAndTextDoNotTriggerGlobalActions(t *testing.T) {
-	model := dashboardModel{screen: dashboardUpdate, baseUpdate: true, baseEditing: true, baseStatus: domain.PackageBaseStatus{Channel: "nixos-26.05"}}
+	model := dashboardModel{screen: dashboardUpdate, updates: updateModel{packageBase: true, baseEditing: true, baseStatus: domain.PackageBaseStatus{Channel: "nixos-26.05"}}}
 	next, command := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = next.(dashboardModel)
-	if command != nil || model.baseTarget != "q" {
+	if command != nil || model.updates.baseTarget != "q" {
 		t.Fatal("typing quit the form")
 	}
 	next, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	model = next.(dashboardModel)
-	if command != nil || model.baseEditing || model.baseTarget != "nixos-26.05" || model.screen != dashboardUpdate {
+	if command != nil || model.updates.baseEditing || model.updates.baseTarget != "nixos-26.05" || model.screen != dashboardUpdate {
 		t.Fatal("cancel did not restore channel")
 	}
 }
 
 func TestSystemPartialSaveDoesNotOfferOrStartControllerActivation(t *testing.T) {
-	model := dashboardModel{screen: dashboardUpdate, baseUpdate: true, updateResult: domain.UpdateApplyReport{Operation: "update-save", State: "partial", Updated: true, RecoveryRequired: true}}
+	model := dashboardModel{screen: dashboardUpdate, updates: updateModel{packageBase: true, result: domain.UpdateApplyReport{Operation: "update-save", State: "partial", Updated: true, RecoveryRequired: true}}}
 	if strings.Contains(model.View().Content, "Retry controller") || strings.Contains(model.View().Content, "saved safely") {
 		t.Fatal("partial save presented as complete")
 	}

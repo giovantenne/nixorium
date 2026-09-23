@@ -548,7 +548,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 				m.setupMode = true
 				m.report.PXE.Mode = "active"
 			}
-			m.updateCheck = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}
+			m.updates.check = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}
 			view := m.View().Content
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 				t.Fatalf("%dx%d screen %d overflow: %dx%d", size[0], size[1], screen, lipgloss.Width(view), lipgloss.Height(view))
@@ -593,10 +593,10 @@ func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 		model.height = size[1]
 		model.screen = dashboardUpdate
 		model.busy = "Building the controller"
-		model.updateTarget = "master"
-		model.updatePlanning = true
-		model.updatePlanStarted = time.Now().Add(-2 * time.Minute)
-		model.updatePlanProgress = domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5}
+		model.updates.target = "master"
+		model.updates.planning = true
+		model.updates.planStarted = time.Now().Add(-2 * time.Minute)
+		model.updates.planProgress = domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5}
 		view := model.View().Content
 		for _, expected := range []string{"Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "elapsed", "current deployment remains unchanged", "Help"} {
 			if !strings.Contains(view, expected) {
@@ -767,7 +767,7 @@ func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
 		}
 		m.controller.plan.Confirmation = "REBUILD"
 		m.gitCommitPlan.Confirmation = "COMMIT"
-		m.updatePlan.Confirmation = "UPDATE"
+		m.updates.plan.Confirmation = "UPDATE"
 		m.deployment.plan.ColmenaSelector = "@lab"
 		updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		m = updated.(dashboardModel)
@@ -879,7 +879,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.shutdown.result = domain.ShutdownApplyReport{State: "partial", Accepted: 1, NotSent: 1, Unconfirmed: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc01", State: "accepted", Detail: "the operating system accepted the power-off request"}, {Name: "pc02", State: "unconfirmed", Detail: "request result could not be confirmed; inspect the computer before retrying", TechnicalDetail: "connection closed during dispatch"}, {Name: "pc07", State: "not-sent", Detail: "not reachable"}}, Message: "Requests accepted for 1 computer; 1 not sent and 1 unconfirmed. Do not retry blindly."}
 		case "update":
 			m.screen = dashboardUpdate
-			m.updateCheck = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.1", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}
+			m.updates.check = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.1", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}
 		case "confirmation":
 			m.screen = dashboardPXEStartReview
 			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}

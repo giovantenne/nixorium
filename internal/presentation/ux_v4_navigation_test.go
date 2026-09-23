@@ -142,7 +142,7 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 
 func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 	model := experienceFixture(2)
-	model.updateResult = domain.UpdateApplyReport{Operation: "update-apply", State: "applied"}
+	model.updates.result = domain.UpdateApplyReport{Operation: "update-apply", State: "applied"}
 	model.actions.CheckUpdate = func() domain.UpdateCheckReport {
 		return domain.UpdateCheckReport{Operation: "update-check", State: "current", CurrentRef: "v2.0.0"}
 	}
@@ -150,7 +150,7 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, command := model.Update(tea.KeyPressMsg{Text: "u"})
 	model = updated.(dashboardModel)
-	if model.updateResult.Operation != "" || command == nil {
+	if model.updates.result.Operation != "" || command == nil {
 		t.Fatal("Update retained a result from the previous session")
 	}
 

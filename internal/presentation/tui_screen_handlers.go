@@ -75,16 +75,16 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 			return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
 		}
 	case "u":
-		model.baseUpdate = false
+		model.updates.packageBase = false
 		model.screen = dashboardUpdate
-		model.updateResult = domain.UpdateApplyReport{}
+		model.updates.result = domain.UpdateApplyReport{}
 		model.controller.plan = domain.ControllerRebuildPlanReport{}
 		model.controller.result = domain.ControllerRebuildExecutionReport{}
-		model.updatePlan = domain.UpdatePlanReport{}
-		model.updatePrerelease = false
-		model.updateCheck = domain.UpdateCheckReport{}
-		model.updateCursor = 0
-		model.updateTarget = ""
+		model.updates.plan = domain.UpdatePlanReport{}
+		model.updates.prerelease = false
+		model.updates.check = domain.UpdateCheckReport{}
+		model.updates.cursor = 0
+		model.updates.target = ""
 		model.message = ""
 		if model.actions.CheckUpdate == nil {
 			model.message = "Update discovery is not available in this session."
@@ -973,26 +973,26 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 		}
 	case dashboardUpdate:
-		if model.updateResult.Operation != "" {
+		if model.updates.result.Operation != "" {
 			switch key.String() {
 			case "enter", "esc":
 				model.screen = dashboardHome
 				model.message = ""
 			case "r":
-				if model.updateResult.RecoveryRequired {
+				if model.updates.result.RecoveryRequired {
 					model.busy = "Completing the local update save"
-					model.updating = true
+					model.updates.applying = true
 					model.message = ""
-					plan := model.updatePlan
+					plan := model.updates.plan
 					return model, func() tea.Msg {
 						return dashboardUpdateResultMsg{report: model.saveReviewedUpdate(plan)}
 					}
 				}
-				model.updateResult = domain.UpdateApplyReport{}
-				model.updateCheck = domain.UpdateCheckReport{}
-				model.updateTarget = ""
+				model.updates.result = domain.UpdateApplyReport{}
+				model.updates.check = domain.UpdateCheckReport{}
+				model.updates.target = ""
 				model.message = ""
-				if model.baseUpdate {
+				if model.updates.packageBase {
 					return model.openPackageBase()
 				}
 				if model.actions.CheckUpdate != nil {
@@ -1000,13 +1000,13 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 					return model, model.checkUpdates()
 				}
 			case "a":
-				if model.updateResult.Updated && !model.updateResult.HasErrors() && !model.updateResult.RecoveryRequired {
+				if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired {
 					return model.startUpdateControllerApply()
 				}
 			}
 			return model, nil
 		}
-		if model.baseUpdate {
+		if model.updates.packageBase {
 			return model.updatePackageBaseKey(key)
 		}
 		switch key.String() {
@@ -1014,35 +1014,35 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.screen = dashboardHome
 			model.message = ""
 		case "p", "f2":
-			model.updatePrerelease = !model.updatePrerelease
-			model.updateCursor = 0
+			model.updates.prerelease = !model.updates.prerelease
+			model.updates.cursor = 0
 			model.message = ""
 		case "r":
 			if model.actions.CheckUpdate == nil {
 				model.message = "Update discovery is not available in this session."
 				return model, nil
 			}
-			model.updateCheck = domain.UpdateCheckReport{}
-			model.updateTarget = ""
+			model.updates.check = domain.UpdateCheckReport{}
+			model.updates.target = ""
 			model.message = ""
 			model.busy = "Fetching available Nixorium updates"
 			return model, model.checkUpdates()
 		case "up", "k":
-			model.updateCursor = max(0, model.updateCursor-1)
+			model.updates.cursor = max(0, model.updates.cursor-1)
 		case "down", "j":
 			releases := model.availableUpdateReleases()
-			if model.updateCursor+1 < len(releases) {
-				model.updateCursor++
+			if model.updates.cursor+1 < len(releases) {
+				model.updates.cursor++
 			}
 		case "enter":
 			releases := model.availableUpdateReleases()
-			if model.updateCheck.HasErrors() || len(releases) == 0 {
+			if model.updates.check.HasErrors() || len(releases) == 0 {
 				model.message = "Fetch available updates before selecting a target."
 				return model, nil
 			}
-			selected := releases[min(model.updateCursor, len(releases)-1)]
+			selected := releases[min(model.updates.cursor, len(releases)-1)]
 			target := selected.Tag
-			if updateReleaseAlreadyCurrent(model.updateCheck, selected) {
+			if updateReleaseAlreadyCurrent(model.updates.check, selected) {
 				if selected.Channel == domain.UpdateChannelMoving {
 					model.message = target + " already points to the current upstream revision."
 				} else {
@@ -1050,16 +1050,16 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				}
 				return model, nil
 			}
-			model.updateTarget = target
+			model.updates.target = target
 			model.busy = "Starting candidate validation"
 			model.message = ""
 			allowPrerelease := selected.Channel == domain.UpdateChannelPrerelease
 			if model.actions.PlanUpdateWithProgress != nil {
-				model.updatePlanning = true
-				model.updatePlanProgress = domain.UpdatePlanProgress{}
-				model.updatePlanStarted = time.Now().UTC()
+				model.updates.planning = true
+				model.updates.planProgress = domain.UpdatePlanProgress{}
+				model.updates.planStarted = time.Now().UTC()
 				events := make(chan tea.Msg)
-				model.updatePlanEvents = events
+				model.updates.planEvents = events
 				return model, startUpdatePlan(model.actions.PlanUpdateWithProgress, target, allowPrerelease, false, events)
 			}
 			return model, func() tea.Msg {
@@ -1067,7 +1067,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 		}
 	case dashboardUpdateReview:
-		maximum := maximumUpdateScroll(model.updatePlan, model.updateReviewHeight())
+		maximum := maximumUpdateScroll(model.updates.plan, model.updateReviewHeight())
 		switch key.String() {
 		case "f4":
 			model.updateDetails = !model.updateDetails
@@ -1075,28 +1075,28 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.screen = dashboardUpdate
 			model.message = "Update cancelled; flake.nix and flake.lock were not changed."
 		case "up":
-			if model.updateScroll > 0 {
-				model.updateScroll--
+			if model.updates.scroll > 0 {
+				model.updates.scroll--
 			}
 		case "down":
-			if model.updateScroll < maximum {
-				model.updateScroll++
+			if model.updates.scroll < maximum {
+				model.updates.scroll++
 			}
 		case "pgup":
-			model.updateScroll -= model.updateReviewHeight()
-			if model.updateScroll < 0 {
-				model.updateScroll = 0
+			model.updates.scroll -= model.updateReviewHeight()
+			if model.updates.scroll < 0 {
+				model.updates.scroll = 0
 			}
 		case "pgdown":
-			model.updateScroll += model.updateReviewHeight()
-			if model.updateScroll > maximum {
-				model.updateScroll = maximum
+			model.updates.scroll += model.updateReviewHeight()
+			if model.updates.scroll > maximum {
+				model.updates.scroll = maximum
 			}
 		case "enter":
 			model.busy = "Saving the validated update"
-			model.updating = true
+			model.updates.applying = true
 			model.message = ""
-			plan := model.updatePlan
+			plan := model.updates.plan
 			return model, func() tea.Msg {
 				return dashboardUpdateResultMsg{report: model.saveReviewedUpdate(plan)}
 			}

@@ -146,6 +146,28 @@ type settingsModel struct {
 	collectPasswords bool
 }
 
+// updateModel owns both upstream and package-base update state because both
+// paths share the same reviewed plan, save result and controller follow-up.
+type updateModel struct {
+	check           domain.UpdateCheckReport
+	packageBase     bool
+	baseStatus      domain.PackageBaseStatus
+	baseEditing     bool
+	baseTarget      string
+	allowUnverified bool
+	cursor          int
+	target          string
+	prerelease      bool
+	plan            domain.UpdatePlanReport
+	result          domain.UpdateApplyReport
+	scroll          int
+	planning        bool
+	planProgress    domain.UpdatePlanProgress
+	planStarted     time.Time
+	planEvents      <-chan tea.Msg
+	applying        bool
+}
+
 type dashboardModel struct {
 	updateDetails          bool
 	returnAdmin            bool
@@ -199,23 +221,7 @@ type dashboardModel struct {
 	gitCommitChosen        map[string]bool
 	gitCommitPlan          domain.GitCommitPlanReport
 	gitCommitResult        domain.GitCommitReport
-	updateCheck            domain.UpdateCheckReport
-	baseUpdate             bool
-	baseStatus             domain.PackageBaseStatus
-	baseEditing            bool
-	baseTarget             string
-	baseAllowUnverified    bool
-	updateCursor           int
-	updateTarget           string
-	updatePrerelease       bool
-	updatePlan             domain.UpdatePlanReport
-	updateResult           domain.UpdateApplyReport
-	updateScroll           int
-	updatePlanning         bool
-	updatePlanProgress     domain.UpdatePlanProgress
-	updatePlanStarted      time.Time
-	updatePlanEvents       <-chan tea.Msg
-	updating               bool
+	updates                updateModel
 	settings               settingsModel
 	startingLabSetup       bool
 	installationFlow       bool
@@ -1277,48 +1283,48 @@ func (model dashboardModel) updateView() string {
 	path := []string{"Maintenance", model.updateTitle()}
 	lines := []string{tuiTitle(model.updateTitle(), model.isDark), ""}
 	if model.busy != "" {
-		if model.updatePlanning {
+		if model.updates.planning {
 			lines = append(lines,
-				"Target: "+model.updateTarget,
+				"Target: "+model.updates.target,
 				tuiMuted("Checking whether this version can replace the current one. Nothing is saved or activated yet.", model.isDark),
 			)
 			phaseLabels := updatePlanPhaseLabels()
-			phaseIndex := updatePlanPhaseIndex(model.updatePlanProgress.Phase)
+			phaseIndex := updatePlanPhaseIndex(model.updates.planProgress.Phase)
 			if model.height > 0 && model.height < 28 {
 				lines = append(lines, "", fmt.Sprintf("Phase %d/%d · %s", phaseIndex+1, len(phaseLabels), phaseLabels[phaseIndex]))
 			} else {
 				lines = append(lines, phaseSteps(phaseLabels, phaseIndex, false, model.isDark)...)
 			}
-			elapsed := time.Since(model.updatePlanStarted).Truncate(time.Second)
+			elapsed := time.Since(model.updates.planStarted).Truncate(time.Second)
 			if elapsed < 0 {
 				elapsed = 0
 			}
-			model.busy = updatePlanProgressDescription(model.updatePlanProgress)
-			if model.baseUpdate && model.updatePlanProgress.Phase == domain.UpdatePlanPhaseLock {
+			model.busy = updatePlanProgressDescription(model.updates.planProgress)
+			if model.updates.packageBase && model.updates.planProgress.Phase == domain.UpdatePlanPhaseLock {
 				model.busy = "Preparing the selected system and package base"
 			}
 			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
-			if model.updatePlanProgress.Total > 0 {
-				lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updatePlanProgress.Current, model.updatePlanProgress.Total))
+			if model.updates.planProgress.Total > 0 {
+				lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total))
 			}
 		} else {
 			lines = append(lines, model.busyView())
 		}
 		notices := []tuiNotice{}
-		if model.updating {
+		if model.updates.applying {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Update save is running", detail: "Wait for the atomic two-file result before closing Nixorium."})
 		} else {
 			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "No deployment files or running systems change during these checks. The controller may download or build software locally, so this can take several minutes."})
 		}
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
-	if model.updateResult.Operation != "" {
-		success := !model.updateResult.HasErrors() && model.updateResult.Updated && model.controller.result.Operation != "" && !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified
+	if model.updates.result.Operation != "" {
+		success := !model.updates.result.HasErrors() && model.updates.result.Updated && model.controller.result.Operation != "" && !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified
 		title := "Nixorium update needs attention"
 		if success {
 			title = "Nixorium and this controller are updated"
 		}
-		if model.baseUpdate {
+		if model.updates.packageBase {
 			title = "System update needs attention"
 			if success {
 				title = "Controller configuration activated and verified"
@@ -1327,19 +1333,19 @@ func (model dashboardModel) updateView() string {
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
 			"",
-			fmt.Sprintf("State: %s   Configuration updated: %t", model.updateResult.State, model.updateResult.Updated),
-			"Configured target: "+model.updateResult.Target,
+			fmt.Sprintf("State: %s   Configuration updated: %t", model.updates.result.State, model.updates.result.Updated),
+			"Configured target: "+model.updates.result.Target,
 			"Running interface: "+displayRunningVersion(model.actions.RunningVersion),
 			fmt.Sprintf("Controller activated and verified: %t", success),
 			"Client computers are unchanged until you distribute the prepared system.",
 		)
-		if success && model.baseUpdate {
+		if success && model.updates.packageBase {
 			lines = append(lines, "Check boot, networking, desktop and services before client distribution; a reboot may be needed.")
 		} else if success {
 			lines = append(lines, "Reopen Nixorium to use the updated interface.")
-		} else if model.updateResult.RecoveryRequired {
+		} else if model.updates.result.RecoveryRequired {
 			lines = append(lines, "Files were written but saving needs recovery. Complete the save before controller activation.")
-		} else if model.updateResult.Updated && !model.updateResult.HasErrors() {
+		} else if model.updates.result.Updated && !model.updates.result.HasErrors() {
 			lines = append(lines, "The update is saved safely. Retry controller activation after resolving the detail below.")
 		}
 		notices := []tuiNotice{}
@@ -1347,11 +1353,11 @@ func (model dashboardModel) updateView() string {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		retryLabel := "New update"
-		if model.updateResult.RecoveryRequired {
+		if model.updates.result.RecoveryRequired {
 			retryLabel = "Complete save"
 		}
 		actions := []tuiAction{}
-		if model.updateResult.Updated && !model.updateResult.HasErrors() && !model.updateResult.RecoveryRequired && !success {
+		if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired && !success {
 			actions = append(actions, tuiAction{key: "a", label: "Retry controller"})
 		}
 		actions = append(actions, tuiAction{key: "r", label: retryLabel}, tuiAction{key: "Enter", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
@@ -1360,11 +1366,11 @@ func (model dashboardModel) updateView() string {
 	if model.screen == dashboardUpdateReview {
 		return model.releaseReviewView()
 	}
-	if model.baseUpdate {
+	if model.updates.packageBase {
 		return model.packageBaseView()
 	}
-	if model.updateCheck.HasErrors() {
-		failureTitle, failureDetail := updateCheckFailureSummary(model.updateCheck)
+	if model.updates.check.HasErrors() {
+		failureTitle, failureDetail := updateCheckFailureSummary(model.updates.check)
 		lines = append(lines,
 			tuiResult(failureTitle, false, model.isDark),
 			"",
@@ -1380,20 +1386,20 @@ func (model dashboardModel) updateView() string {
 
 	releases := model.availableUpdateReleases()
 	lines = append(lines,
-		fmt.Sprintf("Configured target   %s", model.updateCheck.CurrentRef),
+		fmt.Sprintf("Configured target   %s", model.updates.check.CurrentRef),
 		"Running interface   "+displayRunningVersion(model.actions.RunningVersion),
-		tuiMuted("Source  "+model.updateCheck.Upstream, model.isDark),
+		tuiMuted("Source  "+model.updates.check.Upstream, model.isDark),
 		"",
 		tuiSection("Available updates", model.isDark),
 	)
-	start, end := listWindow(len(releases), model.updateCursor, max(4, model.height-15))
+	start, end := listWindow(len(releases), model.updates.cursor, max(4, model.height-15))
 	latestStable := ""
-	if len(model.updateCheck.Stable) > 0 {
-		latestStable = model.updateCheck.Stable[0].Tag
+	if len(model.updates.check.Stable) > 0 {
+		latestStable = model.updates.check.Stable[0].Tag
 	}
 	for index := start; index < end; index++ {
 		release := releases[index]
-		note := updateReleaseStatus(model.updateCheck, release)
+		note := updateReleaseStatus(model.updates.check, release)
 		if note == "" && release.Tag == latestStable {
 			note = "  Latest stable"
 		}
@@ -1402,16 +1408,16 @@ func (model dashboardModel) updateView() string {
 		} else if release.Channel == domain.UpdateChannelMoving {
 			note += "  Development branch"
 		}
-		lines = append(lines, tuiSelection(release.Tag, index == model.updateCursor, model.isDark)+tuiMuted(note, model.isDark))
+		lines = append(lines, tuiSelection(release.Tag, index == model.updates.cursor, model.isDark)+tuiMuted(note, model.isDark))
 	}
 	if len(releases) == 0 {
 		lines = append(lines, "No updates are available in the selected channel.")
 	}
-	if model.updateCheck.Truncated {
+	if model.updates.check.Truncated {
 		lines = append(lines, "", tuiMuted("The upstream result was safely limited to the newest releases.", model.isDark))
 	}
 	prereleaseLabel := "Show prereleases"
-	if model.updatePrerelease {
+	if model.updates.prerelease {
 		prereleaseLabel = "Hide prereleases"
 	}
 	lines = append(lines,
@@ -1539,10 +1545,10 @@ func updateReleaseStatus(report domain.UpdateCheckReport, release domain.UpdateR
 }
 
 func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
-	releases := append([]domain.UpdateRelease{}, model.updateCheck.Development...)
-	releases = append(releases, model.updateCheck.Stable...)
-	if model.updatePrerelease {
-		releases = append(releases, model.updateCheck.Prerelease...)
+	releases := append([]domain.UpdateRelease{}, model.updates.check.Development...)
+	releases = append(releases, model.updates.check.Stable...)
+	if model.updates.prerelease {
+		releases = append(releases, model.updates.check.Prerelease...)
 	}
 	return releases
 }
@@ -1559,7 +1565,7 @@ func (model dashboardModel) startUpdateControllerApply() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	model.busy = "Building, activating, and verifying the updated controller"
-	model.updating = true
+	model.updates.applying = true
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	return model, func() tea.Msg {
@@ -1576,11 +1582,11 @@ func (model dashboardModel) updateReviewHeight() int {
 		return 10
 	}
 	height := model.height - 21
-	if model.baseUpdate {
+	if model.updates.packageBase {
 		height -= 4
 	}
 	if model.updateDetails {
-		height -= len(model.updatePlan.Checks) + 2
+		height -= len(model.updates.plan.Checks) + 2
 	}
 	return max(1, height)
 }
