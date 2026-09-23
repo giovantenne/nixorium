@@ -9,7 +9,7 @@ store.
 ## Reference measurement
 
 The measurement was recorded on 2026-09-23 from Nixorium commit
-`0167abbc2ab28b47e2a32ced4a79054ebd1c0582`. A fresh `site` template supplied
+`8d273124614d4d2fe15e8fedec45f852b7623fe2`. A fresh `site` template supplied
 both configurations. The fixture used one generated `flake.lock`, one
 `lab-settings.json`, the `pc01` target on `x86_64-linux`, and `shared` package
 scope throughout.
@@ -19,32 +19,32 @@ scope throughout.
 | NixOS channel | `nixos-26.05` |
 | Locked nixpkgs revision | `1bc55b9def8165e82073919945c3239903fe4dc2` |
 | Locked nixpkgs source hash | `sha256-D2aaQetafdpHxbwA4ldAxs51UX0b11pXL+JL/5L8VrM=` |
-| Nixorium source hash | `sha256-6sba5Vw51NURBGE9bU26XArsp/EELqb+rVWcXscM/Z0=` |
+| Nixorium source hash | `sha256-pahFaPivCS14d9xo72gM8Y0RAeMH99PYxmNR1ByeOBg=` |
 | System target | `nixosConfigurations.pc01.config.system.build.toplevel` |
 
 | Profile | Exact closure bytes | GiB | Timed build |
 |---|---:|---:|---:|
-| Essential | 9,301,921,792 | 8.663 | 394 s |
-| Programming | 14,059,022,416 | 13.093 | 179 s |
+| Essential | 9,304,907,232 | 8.666 | 16 s |
+| Programming | 14,062,007,856 | 13.096 | 15 s |
 | Programming delta | 4,757,100,624 | 4.430 | not comparable |
 
-Essential includes Node.js/npm, Pi and OpenCode, so those tools are part of the
-common side of this comparison. Programming adds the general-education
-applications, VS Code and the configured Java, JavaScript, Python and C
-toolchains.
+Essential includes the Ghostty/TTE lab screensaver, Node.js/npm, Pi and
+OpenCode, so those tools are part of the common side of this comparison.
+Programming adds the general-education applications, VS Code and the configured
+Java, JavaScript, Python and C toolchains.
 
 The timed build is elapsed wall time for evaluation, substitution and local
-build work on this particular store. Essential started with a cold base and
-also built the patched Veyon package. Programming reused that base. The two
-times therefore describe the run conditions and must not be compared as profile
-installation times.
+build work on this particular warm store. Programming reused the Essential base
+and packages realized by an earlier comparison. The two times therefore
+describe the run conditions and must not be compared as profile installation
+times.
 
-Nix reported a pre-build estimate of 1.6 GiB download and 3.5 GiB unpacked for
-Programming after Essential was present. Exact transferred bytes were not
-captured, and the cold Essential transfer estimate was lost in the build log.
-The transfer field is consequently **not measured** rather than inferred from
-closure size. Downloads vary with the controller's existing store, the local
-Harmonia cache and upstream substitute availability.
+Nix reported one 400.0 KiB substitute (2.8 MiB unpacked) for TTE while building
+Essential and no additional paths to fetch for Programming in this warm-store
+run. Exact network traffic was not captured, so transferred bytes remain **not
+measured** rather than inferred from closure size or the pre-build estimate.
+Downloads vary with the controller's existing store, the local Harmonia cache
+and upstream substitute availability.
 
 ## Reproduction method
 
