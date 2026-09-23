@@ -216,7 +216,7 @@ func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || setupLoads != 0 || model.screen != dashboardSettings || !model.installationFlow {
+	if command == nil || setupLoads != 0 || model.screen != dashboardSettings || !model.installation.flow {
 		t.Fatalf("install did not open settings directly: setupLoads=%d screen=%d", setupLoads, model.screen)
 	}
 	updated, _ = model.Update(command())
@@ -246,7 +246,7 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || !model.startingLabSetup {
+	if command == nil || !model.installation.startingLabSetup {
 		t.Fatal("computer installation settings did not start")
 	}
 	updated, _ = model.Update(command())
@@ -271,9 +271,9 @@ func TestInstallComputersSavesValidatedSettingsWithoutReviewScreen(t *testing.T)
 	saves, setupLoads := 0, 0
 	candidate := wizardSettings()
 	model := dashboardModel{
-		screen:           dashboardSettingsEdit,
-		installationFlow: true,
-		settings:         settingsModel{candidate: candidate},
+		screen:       dashboardSettingsEdit,
+		installation: installationModel{flow: true},
+		settings:     settingsModel{candidate: candidate},
 		actions: DashboardActions{
 			SaveSettings: func(received domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
 				saves++
@@ -309,9 +309,9 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 	plans, applies, preparations, starts := 0, 0, 0, 0
 	revision := strings.Repeat("a", 40)
 	model := dashboardModel{
-		report:           testDashboardReport("stopped"),
-		screen:           dashboardPXE,
-		installationFlow: true,
+		report:       testDashboardReport("stopped"),
+		screen:       dashboardPXE,
+		installation: installationModel{flow: true},
 		actions: DashboardActions{
 			PlanController: func() domain.ControllerRebuildPlanReport {
 				plans++
@@ -362,7 +362,7 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 	updated, command = model.Update(command())
 	model = updated.(dashboardModel)
 	prepareBatch, ok := command().(tea.BatchMsg)
-	if !ok || len(prepareBatch) != 2 || !model.pxePreparing {
+	if !ok || len(prepareBatch) != 2 || !model.installation.pxePreparing {
 		t.Fatalf("client preparation was not started automatically")
 	}
 	updated, command = model.Update(prepareBatch[0]())
@@ -537,7 +537,7 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 func TestInstallComputersCreatesMissingKeysWithoutOpeningKeyChoices(t *testing.T) {
 	reconciles, saves, installs, setupLoads := 0, 0, 0, 0
 	model := experienceFixture(2)
-	model.installationFlow = true
+	model.installation.flow = true
 	model.screen = dashboardPXE
 	model.actions.ReconcileSetupKeys = func() (domain.KeyReconcileReport, error) {
 		reconciles++
@@ -667,7 +667,7 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 
 	updated, command := model.Update(model.loadInitial()())
 	model = updated.(dashboardModel)
-	if command == nil || loads != 1 || model.initializing || model.screen != dashboardSettings || !model.installationFlow {
+	if command == nil || loads != 1 || model.initializing || model.screen != dashboardSettings || !model.installation.flow {
 		t.Fatalf("initial result did not route to laboratory settings: loads=%d model=%+v", loads, model)
 	}
 	updated, _ = model.Update(command())

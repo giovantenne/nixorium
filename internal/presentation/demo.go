@@ -311,8 +311,8 @@ func renderInstallationDemo(revision string) DemoScenario {
 	r.capture("Configure five client computers", 2300)
 
 	r.model.screen = dashboardPXE
-	r.model.installationFlow = true
-	r.model.installationStage = 3
+	r.model.installation.flow = true
+	r.model.installation.stage = 3
 	r.model.controller.applying = true
 	r.model.controller.started = time.Now()
 	r.model.busy = "Building and activating the laboratory controller"
@@ -331,35 +331,35 @@ func renderInstallationDemo(revision string) DemoScenario {
 	for _, phase := range controllerPhases {
 		r.model.controller.progress = domain.OperationProgress{SchemaVersion: 1, Operation: "controller-apply", State: phase.state, Phase: phase.phase, Current: phase.current, Total: 4, Recent: []string{phase.activity}}
 		if phase.state == "completed" {
-			r.model.installationStage = 4
+			r.model.installation.stage = 4
 		}
 		r.capture(phase.label, 1200)
 	}
 
 	r.model.controller.applying = false
-	r.model.installationStage = 4
-	r.model.pxePreparing = true
-	r.model.pxeProgressStarted = time.Now()
+	r.model.installation.stage = 4
+	r.model.installation.pxePreparing = true
+	r.model.installation.pxeStarted = time.Now()
 	r.model.busy = "Preparing client systems and network installation files"
-	r.model.pxeProgress = domain.OperationProgress{SchemaVersion: 1, Operation: "pxe-prepare", State: "running", Phase: "clients", Current: 4, Total: 6, Recent: []string{"Building configured client systems from the reviewed revision"}}
+	r.model.installation.pxeProgress = domain.OperationProgress{SchemaVersion: 1, Operation: "pxe-prepare", State: "running", Phase: "clients", Current: 4, Total: 6, Recent: []string{"Building configured client systems from the reviewed revision"}}
 	r.capture("Prepare client systems and netboot files", 3000)
-	r.model.pxeProgress.Phase = "publish"
-	r.model.pxeProgress.Current = 5
-	r.model.pxeProgress.Recent = []string{"Publishing immutable artifacts for the LAN installer"}
+	r.model.installation.pxeProgress.Phase = "publish"
+	r.model.installation.pxeProgress.Current = 5
+	r.model.installation.pxeProgress.Recent = []string{"Publishing immutable artifacts for the LAN installer"}
 	r.capture("Publish the prepared LAN artifacts", 2200)
-	r.model.pxeProgress.State = "completed"
-	r.model.pxeProgress.Phase = "complete"
-	r.model.pxeProgress.Current = 6
-	r.model.pxeProgress.Recent = []string{"Client systems and network installation files are ready"}
+	r.model.installation.pxeProgress.State = "completed"
+	r.model.installation.pxeProgress.Phase = "complete"
+	r.model.installation.pxeProgress.Current = 6
+	r.model.installation.pxeProgress.Recent = []string{"Client systems and network installation files are ready"}
 	r.capture("Complete client and netboot preparation", 1500)
 
-	r.model.pxePreparing = false
+	r.model.installation.pxePreparing = false
 	r.model.busy = ""
-	r.model.installationStage = 5
+	r.model.installation.stage = 5
 	r.model.report.PXEPreparation.Ready = true
 	r.capture("Complete every preparation step", 1800)
 	r.model.screen = dashboardPXEStartReview
-	r.model.startPlan = domain.PXELifecycleReport{SchemaVersion: 1, Operation: "pxe-start-plan", State: "ready", Mode: "ready", Interface: "enp1s0", DHCPAddress: demoServiceAddress, StaticCIDR: "10.42.0.99/24"}
+	r.model.installation.startPlan = domain.PXELifecycleReport{SchemaVersion: 1, Operation: "pxe-start-plan", State: "ready", Mode: "ready", Interface: "enp1s0", DHCPAddress: demoServiceAddress, StaticCIDR: "10.42.0.99/24"}
 	r.capture("Review the temporary network impact", 3300)
 	r.typeAndCapture("START", "Type the one-word network-impact confirmation")
 	startCommand := r.key(demoCode(tea.KeyEnter))
@@ -370,12 +370,12 @@ func renderInstallationDemo(revision string) DemoScenario {
 
 	r.model.screen = dashboardPXE
 	r.model.busy = ""
-	r.model.installationStage = 6
+	r.model.installation.stage = 6
 	r.model.report.PXE.Mode = "active"
 	r.model.report.PXEPreparation.Ready = true
 	r.model.message = "Network installation is active."
 	r.capture("Complete every controller-side installation step", 1700)
-	r.model.installationFlow = false
+	r.model.installation.flow = false
 	r.capture("Follow the installation steps on each client", 4200)
 	return DemoScenario{ID: "installation", Title: "Prepare and start network installation", Description: "Review lab settings, prepare configured clients, inspect the controller network change, then start PXE. Disk identity and erasure are confirmed later on each client console.", Frames: r.frames}
 }

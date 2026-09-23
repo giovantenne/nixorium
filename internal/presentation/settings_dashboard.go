@@ -266,7 +266,7 @@ func (model dashboardModel) settingsView() string {
 		intro = "Complete the required laboratory settings here, then return to setup."
 		backLabel = "Setup"
 	}
-	if model.installationFlow {
+	if model.installation.flow {
 		path = []string{"Installation", "Laboratory settings"}
 		title = "Laboratory settings"
 		intro = "Review the laboratory values. Nixorium validates and saves them when the form is complete."
@@ -322,7 +322,7 @@ func (model dashboardModel) settingsView() string {
 }
 
 func (model dashboardModel) settingsPasswordsView() string {
-	if model.settings.returnScreen == dashboardSetup || model.installationFlow {
+	if model.settings.returnScreen == dashboardSetup || model.installation.flow {
 		lines := []string{
 			tuiTitle("Account passwords", model.isDark),
 			"Enter the administrator, teacher, and student passwords in one protected session.",
@@ -334,7 +334,7 @@ func (model dashboardModel) settingsPasswordsView() string {
 		}
 		path := []string{"Installation", "Setup", "Settings", "Passwords"}
 		cancelLabel := "Cancel setup settings"
-		if model.installationFlow {
+		if model.installation.flow {
 			path = []string{"Installation", "Laboratory settings", "Passwords"}
 			cancelLabel = "Cancel installation"
 		}
