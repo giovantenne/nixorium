@@ -76,6 +76,7 @@ const (
 	softwareSaveIntent
 	softwareControllerIntent
 	softwareDeployIntent
+	softwareStateIntent
 )
 
 type softwareIntent struct {
@@ -316,6 +317,8 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 			}
 			model.selected = item.ID
 			return model, softwareIntent{kind: softwarePlanIntent, request: domain.SoftwareChangeRequest{Package: item.ID, Present: false, Scope: entry.Scope}}
+		case "v":
+			return model, softwareIntent{kind: softwareStateIntent}
 		}
 	case softwareScope:
 		options := model.scopeOptions()
@@ -386,6 +389,10 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 			if model.result.State == "saved" && len(model.result.AffectedClients) > 0 {
 				return model, softwareIntent{kind: softwareDeployIntent}
 			}
+		case "v":
+			if model.canInspectState() {
+				return model, softwareIntent{kind: softwareStateIntent}
+			}
 		case "enter", "esc", "left":
 			return model, softwareIntent{kind: softwareCloseIntent, setMessage: true}
 		}
@@ -428,6 +435,8 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 			return model, nil
 		}
 		return model.openSoftwareDeployment()
+	case softwareStateIntent:
+		return model.openConfigurationState()
 	}
 	return model, nil
 }
@@ -440,6 +449,10 @@ func (model softwareModel) canDistribute(controller domain.ControllerRebuildExec
 		return true
 	}
 	return controller.Operation != "" && !controller.HasErrors() && controller.Applied && controller.Verified
+}
+
+func (model softwareModel) canInspectState() bool {
+	return model.result.State == "saved" || model.result.State == "unchanged"
 }
 
 func (model dashboardModel) startSoftwareControllerApply() (tea.Model, tea.Cmd) {
@@ -500,6 +513,24 @@ func (model dashboardModel) openSoftwareDeployment() (tea.Model, tea.Cmd) {
 		model.message = "None of the affected computers are in the current inventory. Return to Software or refresh the laboratory configuration before continuing."
 	}
 	return model, nil
+}
+
+func (model dashboardModel) openConfigurationState() (tea.Model, tea.Cmd) {
+	if model.actions.LoadConfigurationState == nil {
+		model.message = "Current system state is not available in this deployment."
+		return model, nil
+	}
+	model.screen = dashboardHosts
+	model.configurationState = domain.ConfigurationStateReport{}
+	model.hosts = domain.HostsReport{}
+	model.hostCursor = 0
+	model.hostQuery = ""
+	model.hostSearching = false
+	model.hostDetail = false
+	model.hostTechnical = false
+	model.busy = "Checking desired and observed system state"
+	model.message = ""
+	return model, model.loadConfigurationState()
 }
 
 func (model dashboardModel) softwareView() string {
@@ -583,7 +614,10 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 			return []tuiAction{{key: "a", label: "Retry controller"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
 		}
 		if model.canDistribute(context.controllerResult) {
-			return []tuiAction{{key: "d", label: "Distribute clients"}, {key: "Enter", label: "Later"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "d", label: "Distribute clients"}, {key: "v", label: "Check systems"}, {key: "Enter", label: "Later"}, {key: "F1", label: "Help"}}
+		}
+		if model.canInspectState() {
+			return []tuiAction{{key: "v", label: "Check systems"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
 		}
 		return []tuiAction{{key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
 	}
@@ -611,6 +645,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 	return append(actions,
 		tuiAction{key: "Tab", label: "Change view"},
 		tuiAction{key: "/", label: "Search"},
+		tuiAction{key: "v", label: "Check systems"},
 		tuiAction{key: "Esc", label: "Overview"},
 		tuiAction{key: "F1", label: "Help"},
 	)

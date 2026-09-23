@@ -40,6 +40,9 @@ func (m *ConfigurationStateManager) Load(ctx context.Context, repository string)
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "clients", Message: clientsErr.Error()})
 	} else {
 		report.Clients = clients
+		if clients.State != "available" {
+			report.State = "partial"
+		}
 		report.Repository = clients.Repository
 		report.DesiredRevision = clients.DesiredRevision
 		if !clients.GeneratedAt.IsZero() {

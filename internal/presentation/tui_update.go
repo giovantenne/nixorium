@@ -257,6 +257,14 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.screen = dashboardHosts
 		return model, nil
+	case dashboardConfigurationStateMsg:
+		model.busy = ""
+		model.configurationState = message.report
+		model.hosts = message.report.Clients
+		model.hostCursor = 0
+		model.message = ""
+		model.screen = dashboardHosts
+		return model, nil
 	case dashboardDeploymentPlanMsg:
 		model.busy = ""
 		model.deployPlan = message.report

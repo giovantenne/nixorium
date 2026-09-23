@@ -47,6 +47,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 	case "h":
 		model.hostDetail = false
 		model.hostTechnical = false
+		model.configurationState = domain.ConfigurationStateReport{}
 		model.screen = dashboardHosts
 		model.busy = "Checking configured computers"
 		model.message = ""
@@ -566,7 +567,11 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.hostCursor = 0
 				return model, nil
 			}
-			model.screen = dashboardHome
+			if model.configurationState.Operation != "" {
+				model.screen = dashboardSoftware
+			} else {
+				model.screen = dashboardHome
+			}
 			model.message = ""
 		case "/":
 			model.hostSearching = true
@@ -592,6 +597,10 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "r":
 			model.busy = "Refreshing computer status"
 			model.message = ""
+			if model.configurationState.Operation != "" {
+				model.busy = "Refreshing desired and observed system state"
+				return model, model.loadConfigurationState()
+			}
 			return model, model.loadHosts()
 		}
 	default:
