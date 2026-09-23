@@ -106,6 +106,9 @@ let
     (map (preset: preset.packages) sitePresetCatalog.presets);
   siteProfileResolved = map presetLab.nixoriumResolveSoftwarePackage siteProfilePackages;
   commonProfilePackages = [
+    "chromium"
+    "ghostty"
+    "liberation_ttf"
     "nodejs"
     "opencode"
     "pi-coding-agent"
