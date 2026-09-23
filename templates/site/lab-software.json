@@ -3,6 +3,7 @@
   "packages": [
     { "package": "chromium", "scope": { "kind": "shared" } },
     { "package": "ghostty", "scope": { "kind": "shared" } },
+    { "package": "git", "scope": { "kind": "shared" } },
     { "package": "liberation_ttf", "scope": { "kind": "shared" } },
     { "package": "nodejs", "scope": { "kind": "shared" } },
     { "package": "opencode", "scope": { "kind": "shared" } },

@@ -46,6 +46,26 @@ in
     touch "$out"
   '';
   nixorium = nixoriumPackage;
+  nixorium-runtime = pkgs.runCommand "nixorium-runtime-test" {} ''
+    mkdir -p repository "$TMPDIR/home"
+    ${pkgs.git}/bin/git -C repository init -q
+    ${pkgs.git}/bin/git -C repository config user.name Test
+    ${pkgs.git}/bin/git -C repository config user.email test@example.invalid
+    echo test > repository/README
+    echo '{ outputs = { self }: {}; }' > repository/flake.nix
+    ${pkgs.git}/bin/git -C repository add README flake.nix
+    ${pkgs.git}/bin/git -C repository commit -qm initial
+    ${pkgs.coreutils}/bin/env -i \
+      HOME="$TMPDIR/home" \
+      PATH=/nonexistent \
+      ${nixoriumPackage}/bin/nixorium git review \
+        --repo "$PWD/repository" \
+        --json > report.json
+    ${pkgs.jq}/bin/jq -e \
+      '.operation == "git-review" and .state == "clean"' \
+      report.json >/dev/null
+    touch "$out"
+  '';
   documentation-check = pkgs.runCommand "nixorium-documentation-check" {
     nativeBuildInputs = [ documentationGenerator ];
   } ''

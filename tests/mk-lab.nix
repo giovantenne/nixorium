@@ -108,6 +108,7 @@ let
   commonProfilePackages = [
     "chromium"
     "ghostty"
+    "git"
     "liberation_ttf"
     "nodejs"
     "opencode"
@@ -266,6 +267,7 @@ assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";
 assert subnetLab.packages.x86_64-linux.pxeFirmware.name == "nixorium-ipxe-firmware";
 assert hasNixorium subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert !(hasNixorium subnetLab.nixosConfigurations.pc01.config.environment.systemPackages);
+assert hasPackage subnetLab "pc99" "git";
 assert hasHostState subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert hasHostState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
 assert hasSessionState subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
