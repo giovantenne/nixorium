@@ -43,6 +43,12 @@ operation writes only `lab-software.json`, and repeated application is
 idempotent. An absent profile catalog leaves individual software management
 available; an invalid catalog must be fixed rather than bypassed.
 
+In the ordinary TUI, open Software and press `p` to add a profile. Review the
+description, toggle package exclusions with Space, select one scope, and inspect
+the single aggregated review. Existing declarations are labelled with their
+preserved scope. Esc from the catalog, package, scope or review stage makes no
+change. Do not reproduce this sequence as individual package applies.
+
 CLI software apply saves only the declaration. The ordinary TUI also records
 it in Git and, when the controller is affected, builds and activates the
 controller. Neither path implicitly deploys clients. Do not use the TUI as a

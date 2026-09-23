@@ -706,6 +706,27 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			return model.startSoftwareControllerApply()
 		}
 		return model, nil
+	case dashboardSoftwarePresetCatalogMsg:
+		model.busy = ""
+		software, result := model.software.loadProfiles(message.report)
+		model.software = software
+		model.message = result.message
+		return model, nil
+	case dashboardSoftwarePresetPlanMsg:
+		model.busy = ""
+		software, result := model.software.finishProfilePlan(message.report)
+		model.software = software
+		model.message = result.message
+		return model, nil
+	case dashboardSoftwarePresetApplyMsg:
+		model.busy = ""
+		software, result := model.software.finishProfileApply(message.report)
+		model.software = software
+		model.message = result.message
+		if result.startController {
+			return model.startSoftwareControllerApply()
+		}
+		return model, nil
 	case dashboardSoftwareControllerMsg:
 		model.busy = ""
 		model.controllerPlan = message.plan

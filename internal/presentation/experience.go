@@ -232,6 +232,8 @@ func (model dashboardModel) helpView() string {
 		}
 	case dashboardDiagnostics:
 		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")
+	case dashboardSoftware:
+		lines = append(lines, "p add a deployment-owned profile   Tab change package view   / search", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
 	default:
 		lines = append(lines, "Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help.")
 	}

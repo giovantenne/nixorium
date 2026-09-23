@@ -606,6 +606,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	baseSaveManager := app.NewUpdateSaveManager(baseManager, baseSource, gitReviewManager, configurationSaveManager)
 	softwareManager := app.NewSoftwareManager(local)
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
+	softwarePresetSaveManager := app.NewSoftwarePresetSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
@@ -676,6 +677,15 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 			return softwareSaveManager.Save(ctx, plan)
+		},
+		LoadSoftwarePresets: func() domain.SoftwarePresetCatalogReport {
+			return softwareManager.Presets(ctx, repository)
+		},
+		PlanSoftwarePreset: func(request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+			return softwareManager.PlanPreset(ctx, repository, request)
+		},
+		SaveSoftwarePreset: func(plan domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport {
+			return softwarePresetSaveManager.Save(ctx, plan)
 		},
 		PlanShutdown: func(requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 			return shutdownManager.Plan(ctx, repository, requested, policy)

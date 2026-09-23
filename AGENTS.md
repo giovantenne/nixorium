@@ -216,8 +216,10 @@ Release from the matching changelog section.
   explicit exclusions, reject the whole candidate on any invalid package, bind
   review to the normalized profile catalog and resolved package data, and never
   write the catalog, modules, or lock. CLI apply remains declaration-only; the
-  ordinary TUI records it transparently and immediately invokes the typed
-  controller plan/apply boundary when the reviewed scope affects the controller.
+  ordinary TUI exposes profile, package-exclusion, scope and aggregated-review
+  stages, records the whole batch transparently, and immediately invokes the
+  typed controller plan/apply boundary when the reviewed scope affects the
+  controller.
   It must not push, prepare PXE, deploy clients, or rewrite packages supplied by
   private modules. A successful client-affecting result may open a fresh ordinary
   deployment review with exact affected identities; it never reuses the software

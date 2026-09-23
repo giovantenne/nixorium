@@ -272,6 +272,15 @@ Staff overrides persist. The reset student profile recreates an empty prefix
 and excludes npm globals plus Pi/OpenCode credentials and state from snapshots,
 so no shared template or historical snapshot captures agent authentication.
 
+The Software TUI loads the optional catalog only when the operator chooses
+**Add profile**. Package inclusion, scope and the full additive candidate are
+separate stages; one review distinguishes additions from existing declarations
+whose scopes remain unchanged. The TUI saves and records the batch through the
+typed preset boundary, then reuses the ordinary controller recovery and fresh
+client-deployment review. Missing metadata leaves individual software
+management available, and controller-only results never offer a client
+distribution action when no client is affected.
+
 ## Public Flake outputs
 
 The upstream keeps its standalone example evaluable while private deployments

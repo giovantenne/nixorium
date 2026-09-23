@@ -27,6 +27,10 @@ const (
 	softwareScope
 	softwareReview
 	softwareResult
+	softwareProfiles
+	softwareProfilePackages
+	softwareProfileScope
+	softwareProfileReview
 )
 
 type softwareScopeOption struct {
@@ -38,23 +42,30 @@ type softwareScopeOption struct {
 // dashboard keeps one named instance so feature state cannot be mistaken for
 // global navigation state.
 type softwareModel struct {
-	stage        softwareStage
-	catalog      domain.SoftwareCatalogReport
-	mode         softwareListMode
-	cursor       int
-	query        string
-	searching    bool
-	search       domain.SoftwareSearchReport
-	searchID     uint64
-	searchBusy   bool
-	searchCancel context.CancelFunc
-	selected     string
-	scopeCursor  int
-	clientCursor int
-	clients      map[string]bool
-	plan         domain.SoftwareChangePlanReport
-	result       domain.SoftwareChangeApplyReport
-	applying     bool
+	stage                softwareStage
+	catalog              domain.SoftwareCatalogReport
+	mode                 softwareListMode
+	cursor               int
+	query                string
+	searching            bool
+	search               domain.SoftwareSearchReport
+	searchID             uint64
+	searchBusy           bool
+	searchCancel         context.CancelFunc
+	selected             string
+	scopeCursor          int
+	clientCursor         int
+	clients              map[string]bool
+	plan                 domain.SoftwareChangePlanReport
+	result               domain.SoftwareChangeApplyReport
+	applying             bool
+	presets              domain.SoftwarePresetCatalogReport
+	profileCursor        int
+	profilePackageCursor int
+	profileReviewCursor  int
+	profileExcluded      map[string]bool
+	profilePlan          domain.SoftwarePresetPlanReport
+	profileResult        domain.SoftwarePresetApplyReport
 }
 
 type softwareViewContext struct {
@@ -77,13 +88,17 @@ const (
 	softwareControllerIntent
 	softwareDeployIntent
 	softwareStateIntent
+	softwareProfilesIntent
+	softwarePresetPlanIntent
+	softwarePresetSaveIntent
 )
 
 type softwareIntent struct {
-	kind       softwareIntentKind
-	request    domain.SoftwareChangeRequest
-	message    string
-	setMessage bool
+	kind          softwareIntentKind
+	request       domain.SoftwareChangeRequest
+	presetRequest domain.SoftwarePresetRequest
+	message       string
+	setMessage    bool
 }
 
 type softwareSearchInput struct {
@@ -105,6 +120,7 @@ func (model softwareModel) open() softwareModel {
 	}
 	model.stage = softwareCatalog
 	model.result = domain.SoftwareChangeApplyReport{}
+	model.profileResult = domain.SoftwarePresetApplyReport{}
 	model.searchID++
 	model.searchCancel = nil
 	return model
@@ -149,6 +165,9 @@ func (model softwareModel) loadCatalog(report domain.SoftwareCatalogReport) (sof
 	model.searchID++
 	model.mode = softwareSuggested
 	model.stage = softwareCatalog
+	model.presets = domain.SoftwarePresetCatalogReport{}
+	model.profilePlan = domain.SoftwarePresetPlanReport{}
+	model.profileResult = domain.SoftwarePresetApplyReport{}
 	if len(report.Packages) > 0 {
 		model.mode = softwareConfigured
 	}
@@ -319,6 +338,8 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 			return model, softwareIntent{kind: softwarePlanIntent, request: domain.SoftwareChangeRequest{Package: item.ID, Present: false, Scope: entry.Scope}}
 		case "v":
 			return model, softwareIntent{kind: softwareStateIntent}
+		case "p":
+			return model, softwareIntent{kind: softwareProfilesIntent}
 		}
 	case softwareScope:
 		options := model.scopeOptions()
@@ -373,11 +394,22 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 		case "enter":
 			return model, softwareIntent{kind: softwareSaveIntent}
 		}
+	case softwareProfiles:
+		return model.updateProfiles(key)
+	case softwareProfilePackages:
+		return model.updateProfilePackages(key)
+	case softwareProfileScope:
+		return model.updateProfileScope(key)
+	case softwareProfileReview:
+		return model.updateProfileReview(key)
 	case softwareResult:
 		switch key.String() {
 		case "r":
 			if !model.result.RecoveryRequired {
 				return model, softwareIntent{}
+			}
+			if model.profileResult.Operation != "" {
+				return model, softwareIntent{kind: softwarePresetSaveIntent}
 			}
 			return model, softwareIntent{kind: softwareSaveIntent}
 		case "a":
@@ -437,6 +469,38 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 		return model.openSoftwareDeployment()
 	case softwareStateIntent:
 		return model.openConfigurationState()
+	case softwareProfilesIntent:
+		if model.actions.LoadSoftwarePresets == nil {
+			model.message = "Software profiles are not available in this deployment. Individual software management remains available."
+			return model, nil
+		}
+		model.busy = "Loading deployment software profiles"
+		model.message = ""
+		return model, func() tea.Msg { return dashboardSoftwarePresetCatalogMsg{report: model.actions.LoadSoftwarePresets()} }
+	case softwarePresetPlanIntent:
+		if model.actions.PlanSoftwarePreset == nil {
+			model.message = "Software profile planning is not available in this deployment."
+			return model, nil
+		}
+		model.busy = "Checking every profile package and its destination"
+		model.message = ""
+		request := intent.presetRequest
+		return model, func() tea.Msg {
+			return dashboardSoftwarePresetPlanMsg{report: model.actions.PlanSoftwarePreset(request)}
+		}
+	case softwarePresetSaveIntent:
+		if model.actions.SaveSoftwarePreset == nil {
+			model.message = "Software profile saving is not available in this deployment."
+			return model, nil
+		}
+		if model.software.profileResult.RecoveryRequired {
+			model.busy = "Recovering the local software profile save"
+		} else {
+			model.busy = "Saving the reviewed software profile"
+		}
+		model.software.applying = true
+		plan := model.software.profilePlan
+		return model, func() tea.Msg { return dashboardSoftwarePresetApplyMsg{report: model.actions.SaveSoftwarePreset(plan)} }
 	}
 	return model, nil
 }
@@ -554,6 +618,14 @@ func (model softwareModel) view(context softwareViewContext) tuiShell {
 		path = append(path, "Scope")
 	} else if model.stage == softwareReview {
 		path = append(path, "Review")
+	} else if model.stage == softwareProfiles {
+		path = append(path, "Profiles")
+	} else if model.stage == softwareProfilePackages {
+		path = append(path, "Profile packages")
+	} else if model.stage == softwareProfileScope {
+		path = append(path, "Profile scope")
+	} else if model.stage == softwareProfileReview {
+		path = append(path, "Profile review")
 	} else if model.stage == softwareResult {
 		path = append(path, "Result")
 	}
@@ -571,6 +643,14 @@ func (model softwareModel) view(context softwareViewContext) tuiShell {
 		lines = append(lines, model.scopeView(context)...)
 	case softwareReview:
 		lines = append(lines, model.reviewView(context)...)
+	case softwareProfiles:
+		lines = append(lines, model.profilesView(context)...)
+	case softwareProfilePackages:
+		lines = append(lines, model.profilePackagesView(context)...)
+	case softwareProfileScope:
+		lines = append(lines, model.profileScopeView(context)...)
+	case softwareProfileReview:
+		lines = append(lines, model.profileReviewView(context)...)
 	case softwareResult:
 		lines = append(lines, model.resultView(context)...)
 	default:
@@ -585,6 +665,9 @@ func (model softwareModel) view(context softwareViewContext) tuiShell {
 }
 
 func (model softwareModel) actions(context softwareViewContext) []tuiAction {
+	if model.stage == softwareProfiles || model.stage == softwareProfilePackages || model.stage == softwareProfileScope || model.stage == softwareProfileReview {
+		return model.profileActions(context)
+	}
 	if model.stage == softwareScope {
 		actions := []tuiAction{{key: "↑/↓", label: "Select"}}
 		options := model.scopeOptions()
@@ -643,6 +726,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		actions = append(actions, tuiAction{key: "Enter", label: primary})
 	}
 	return append(actions,
+		tuiAction{key: "p", label: "Add profile"},
 		tuiAction{key: "Tab", label: "Change view"},
 		tuiAction{key: "/", label: "Search"},
 		tuiAction{key: "v", label: "Check systems"},
@@ -655,7 +739,8 @@ func (model softwareModel) notices(context softwareViewContext) []tuiNotice {
 	if context.message == "" {
 		return nil
 	}
-	if model.stage == softwareReview && context.message == model.plan.Message {
+	if (model.stage == softwareReview && context.message == model.plan.Message) ||
+		(model.stage == softwareProfileReview && context.message == model.profilePlan.Message) {
 		return nil
 	}
 	return []tuiNotice{{kind: tuiStatusAttention, title: context.message}}
@@ -804,6 +889,9 @@ func (model softwareModel) reviewView(context softwareViewContext) []string {
 }
 
 func (model softwareModel) resultView(context softwareViewContext) []string {
+	if model.profileResult.Operation != "" {
+		return model.profileResultView(context)
+	}
 	result := model.result
 	switch result.State {
 	case "saved":
