@@ -148,6 +148,24 @@ func TestConfirmSoftwareRemovalRequiresRemove(t *testing.T) {
 	}
 }
 
+func TestConfirmSoftwarePresetRequiresExactPhrase(t *testing.T) {
+	report := domain.SoftwarePresetPlanReport{
+		Request: domain.SoftwarePresetRequest{Preset: "essential", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
+		Preset:  domain.SoftwarePreset{ID: "essential", Label: "Essential"}, Additions: []domain.SoftwareDeclaration{{Package: "vlc"}},
+		Existing: []domain.SoftwareDeclaration{{Package: "firefox"}}, Confirmation: "ADD PROFILE",
+	}
+	for _, test := range []struct {
+		input string
+		want  bool
+	}{{"ADD PROFILE\n", true}, {"add profile\n", false}, {"ADD\n", false}} {
+		var output bytes.Buffer
+		approved, err := ConfirmSoftwarePreset(strings.NewReader(test.input), &output, report)
+		if err != nil || approved != test.want || !strings.Contains(output.String(), "atomically update only lab-software.json") || !strings.Contains(output.String(), "complete current configuration") {
+			t.Fatalf("profile confirmation %q = %t, %v:\n%s", test.input, approved, err, output.String())
+		}
+	}
+}
+
 func TestConfirmShutdownRequiresSingleExactWord(t *testing.T) {
 	report := domain.ShutdownPlanReport{Eligible: 2, Targets: []domain.ShutdownTargetPlan{{Name: "pc01", Eligible: true, Session: domain.ShutdownSessionActive}, {Name: "pc02", Eligible: true, Session: domain.ShutdownSessionIdle}}, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN"}
 	for _, test := range []struct {

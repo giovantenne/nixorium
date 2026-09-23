@@ -542,6 +542,89 @@ func SoftwareSearchText(writer io.Writer, report domain.SoftwareSearchReport) {
 	}
 }
 
+func SoftwarePresetCatalogText(writer io.Writer, report domain.SoftwarePresetCatalogReport) {
+	fmt.Fprintf(writer, "Software profiles: %s\n", strings.ToUpper(report.State))
+	if report.Catalog != nil {
+		fmt.Fprintf(writer, "Default profile:   %s\n", report.Catalog.DefaultPreset)
+		for _, preset := range report.Catalog.Presets {
+			marker := ""
+			if preset.ID == report.Catalog.DefaultPreset {
+				marker = " (default)"
+			}
+			fmt.Fprintf(writer, "  %s%s — %s\n", preset.Label, marker, preset.Description)
+			fmt.Fprintf(writer, "    id: %s\n    packages: %s\n", preset.ID, strings.Join(preset.Packages, ", "))
+		}
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:            %s\n", report.Message)
+	}
+}
+
+func SoftwarePresetPlanText(writer io.Writer, report domain.SoftwarePresetPlanReport) {
+	fmt.Fprintf(writer, "Software profile proposal: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Profile:                  %s (%s)\n", report.Preset.Label, report.Request.Preset)
+	fmt.Fprintf(writer, "Managed file:             %s\n", report.ManagedFile)
+	fmt.Fprintf(writer, "Scope for new packages:   %s\n", softwareScopeText(report.Request.Scope))
+	if len(report.Request.Exclude) > 0 {
+		fmt.Fprintf(writer, "Excluded:                 %s\n", strings.Join(report.Request.Exclude, ", "))
+	}
+	if len(report.SelectedPackages) > 0 {
+		selected := make([]string, 0, len(report.SelectedPackages))
+		for _, item := range report.SelectedPackages {
+			selected = append(selected, item.ID)
+		}
+		fmt.Fprintf(writer, "Selected packages:        %s\n", strings.Join(selected, ", "))
+	}
+	if len(report.Existing) > 0 {
+		fmt.Fprintln(writer, "Existing declarations (scope preserved):")
+		for _, declaration := range report.Existing {
+			fmt.Fprintf(writer, "  %-24s %s\n", declaration.Package, softwareScopeText(declaration.Scope))
+		}
+	}
+	if len(report.Additions) > 0 {
+		fmt.Fprintln(writer, "New declarations:")
+		for _, declaration := range report.Additions {
+			fmt.Fprintf(writer, "  %-24s %s\n", declaration.Package, softwareScopeText(declaration.Scope))
+		}
+	}
+	if report.AffectedController != "" {
+		fmt.Fprintf(writer, "Controller:               %s (configuration only; not activated)\n", report.AffectedController)
+	}
+	if len(report.AffectedClients) > 0 {
+		fmt.Fprintf(writer, "Client configuration:     %s\n", strings.Join(report.AffectedClients, ", "))
+	}
+	if report.ReviewToken != "" {
+		fmt.Fprintf(writer, "Review token:             %s\nConfirmation:             %s\n", report.ReviewToken, report.Confirmation)
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:                   %s\n", report.Message)
+	}
+}
+
+func SoftwarePresetApplyText(writer io.Writer, report domain.SoftwarePresetApplyReport) {
+	fmt.Fprintf(writer, "Software profile change: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Profile:                 %s (%s)\n", report.Preset.Label, report.Request.Preset)
+	fmt.Fprintf(writer, "Managed file:            %s\n", report.ManagedFile)
+	if len(report.Additions) > 0 {
+		fmt.Fprintf(writer, "Added declarations:      %d\n", len(report.Additions))
+	}
+	if len(report.Existing) > 0 {
+		fmt.Fprintf(writer, "Existing declarations:   %d (scopes preserved)\n", len(report.Existing))
+	}
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "  ERROR %s: %s\n", issue.Field, issue.Message)
+	}
+	if report.Message != "" {
+		fmt.Fprintf(writer, "Detail:                  %s\n", report.Message)
+	}
+}
+
 func SoftwareChangePlanText(writer io.Writer, report domain.SoftwareChangePlanReport) {
 	fmt.Fprintf(writer, "Software proposal: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Package:           %s\n", report.Request.Package)

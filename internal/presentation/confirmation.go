@@ -142,6 +142,24 @@ func ConfirmSoftwareChange(input io.Reader, output io.Writer, report domain.Soft
 	return strings.TrimSpace(value) == report.Confirmation, nil
 }
 
+func ConfirmSoftwarePreset(input io.Reader, output io.Writer, report domain.SoftwarePresetPlanReport) (bool, error) {
+	fmt.Fprintln(output, "Software profile declaration review")
+	fmt.Fprintf(output, "Profile: %s (%s)\n", report.Preset.Label, report.Request.Preset)
+	fmt.Fprintf(output, "New declarations: %d with scope %s\n", len(report.Additions), softwareScopeText(report.Request.Scope))
+	if len(report.Existing) > 0 {
+		fmt.Fprintf(output, "Existing declarations: %d keep their current scopes\n", len(report.Existing))
+	}
+	fmt.Fprintln(output, "Action: atomically update only lab-software.json")
+	fmt.Fprintln(output, "Safety: no commit, build, controller activation, PXE action, or client deployment is performed")
+	fmt.Fprintln(output, "Afterward: review the complete current configuration before preparing or distributing systems")
+	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)
+	value, err := bufio.NewReader(input).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return false, err
+	}
+	return strings.TrimSpace(value) == report.Confirmation, nil
+}
+
 func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPlanReport) (bool, error) {
 	fmt.Fprintln(output, "Client shutdown review")
 	fmt.Fprintf(output, "Targets: %d eligible of %d selected computer(s)\n", report.Eligible, len(report.Targets))

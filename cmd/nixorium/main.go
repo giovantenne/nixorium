@@ -33,6 +33,8 @@ type options struct {
 	paths              string
 	target             string
 	softwarePackage    string
+	softwarePreset     string
+	softwareExclude    string
 	softwareQuery      string
 	softwareScope      string
 	json               bool
@@ -272,6 +274,76 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			}
 			if report.HasErrors() {
 				return 1
+			}
+		} else if options.subcommand == "presets" {
+			report := manager.Presets(ctx, repository)
+			if options.json {
+				err = presentation.JSON(stdout, report)
+			} else {
+				presentation.SoftwarePresetCatalogText(stdout, report)
+			}
+			if report.HasErrors() {
+				return 1
+			}
+		} else if options.subcommand == "preset-plan" || options.subcommand == "preset-apply" {
+			scope, scopeErr := parseSoftwareScope(options.softwareScope)
+			if scopeErr != nil {
+				fmt.Fprintln(stderr, "Error:", scopeErr)
+				return 2
+			}
+			exclude := []string{}
+			if options.softwareExclude != "" {
+				exclude = strings.Split(options.softwareExclude, ",")
+			}
+			request := domain.SoftwarePresetRequest{Preset: options.softwarePreset, Scope: scope, Exclude: exclude}
+			if options.subcommand == "preset-plan" {
+				report := manager.PlanPreset(ctx, repository, request)
+				if options.json {
+					err = presentation.JSON(stdout, report)
+				} else {
+					presentation.SoftwarePresetPlanText(stdout, report)
+				}
+				if report.HasErrors() {
+					return 1
+				}
+			} else {
+				plan := manager.PlanPreset(ctx, repository, request)
+				if plan.HasErrors() {
+					if options.json {
+						_ = presentation.JSON(stdout, plan)
+					} else {
+						presentation.SoftwarePresetPlanText(stderr, plan)
+					}
+					return 1
+				}
+				if !options.yes {
+					if !presentation.IsInteractive(os.Stdin) {
+						fmt.Fprintln(stderr, "Error: software preset apply requires an interactive terminal or explicit --yes")
+						return 2
+					}
+					confirmationOutput := stdout
+					if options.json {
+						confirmationOutput = stderr
+					}
+					approved, confirmErr := presentation.ConfirmSoftwarePreset(os.Stdin, confirmationOutput, plan)
+					if confirmErr != nil {
+						fmt.Fprintln(stderr, "Error: read confirmation:", confirmErr)
+						return 1
+					}
+					if !approved {
+						fmt.Fprintln(confirmationOutput, "Software profile cancelled; lab-software.json was not changed.")
+						return 0
+					}
+				}
+				report := manager.ApplyPresetPlan(ctx, plan, options.expect)
+				if options.json {
+					err = presentation.JSON(stdout, report)
+				} else {
+					presentation.SoftwarePresetApplyText(stdout, report)
+				}
+				if report.HasErrors() {
+					return 1
+				}
 			}
 		} else {
 			scope, scopeErr := parseSoftwareScope(options.softwareScope)
@@ -825,6 +897,18 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--package requires a catalog identifier")
 			}
 			result.softwarePackage = arguments[index]
+		case "--preset":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--preset requires a software profile id")
+			}
+			result.softwarePreset = arguments[index]
+		case "--exclude":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--exclude requires comma-separated package ids")
+			}
+			result.softwareExclude = arguments[index]
 		case "--query":
 			index++
 			if index >= len(arguments) || arguments[index] == "" {
@@ -886,6 +970,16 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("catalog must follow software")
 			}
 			result.subcommand = "catalog"
+		case "presets":
+			if result.command != "software" || result.subcommand != "" {
+				return options{}, errors.New("presets must follow software")
+			}
+			result.subcommand = "presets"
+		case "preset":
+			if result.command != "software" || result.subcommand != "" {
+				return options{}, errors.New("preset must follow software")
+			}
+			result.subcommand = "preset"
 		case "search":
 			if result.command != "software" || result.subcommand != "" {
 				return options{}, errors.New("search must follow software")
@@ -894,6 +988,10 @@ func parseArguments(arguments []string) (options, error) {
 		case "plan":
 			if result.command == "git" && result.subcommand == "commit" {
 				result.subcommand = "commit-plan"
+				continue
+			}
+			if result.command == "software" && result.subcommand == "preset" {
+				result.subcommand = "preset-plan"
 				continue
 			}
 			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "shutdown") || result.subcommand != "" {
@@ -918,6 +1016,10 @@ func parseArguments(arguments []string) (options, error) {
 		case "apply":
 			if result.command == "git" && result.subcommand == "commit" {
 				result.subcommand = "commit-apply"
+				continue
+			}
+			if result.command == "software" && result.subcommand == "preset" {
+				result.subcommand = "preset-apply"
 				continue
 			}
 			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "" {
@@ -977,7 +1079,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
 		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, shutdown apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
@@ -992,7 +1094,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
 		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, shutdown apply, or git commit apply")
 	}
 	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown") || (result.subcommand != "plan" && result.subcommand != "apply")) {
@@ -1025,8 +1127,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "update" && (result.subcommand == "plan" || result.subcommand == "apply") && result.target == "" {
 		return options{}, fmt.Errorf("update %s requires --target", result.subcommand)
 	}
-	if result.command == "software" && result.subcommand != "catalog" && result.subcommand != "search" && result.subcommand != "plan" && result.subcommand != "apply" {
-		return options{}, errors.New("software requires catalog, search, plan, or apply")
+	if result.command == "software" && result.subcommand != "catalog" && result.subcommand != "search" && result.subcommand != "presets" && result.subcommand != "plan" && result.subcommand != "apply" && result.subcommand != "preset-plan" && result.subcommand != "preset-apply" {
+		return options{}, errors.New("software requires catalog, search, presets, plan, apply, preset plan, or preset apply")
 	}
 	if result.command == "software" && result.subcommand == "search" && result.softwareQuery == "" {
 		return options{}, errors.New("software search requires --query")
@@ -1039,14 +1141,31 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, err
 		}
 	}
-	if (result.softwarePackage != "" || result.softwareScope != "" || result.remove) && (result.command != "software" || (result.subcommand != "plan" && result.subcommand != "apply")) {
-		return options{}, errors.New("software change flags are only valid with software plan or apply")
+	if result.command == "software" && (result.subcommand == "preset-plan" || result.subcommand == "preset-apply") && (result.softwarePreset == "" || result.softwareScope == "") {
+		return options{}, fmt.Errorf("software %s requires --preset and --scope", strings.ReplaceAll(result.subcommand, "-", " "))
+	}
+	if result.command == "software" && (result.subcommand == "preset-plan" || result.subcommand == "preset-apply") {
+		if _, err := parseSoftwareScope(result.softwareScope); err != nil {
+			return options{}, err
+		}
+	}
+	if (result.softwarePackage != "" || result.remove) && (result.command != "software" || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--package and --remove are only valid with software plan or apply")
+	}
+	if result.softwareScope != "" && (result.command != "software" || (result.subcommand != "plan" && result.subcommand != "apply" && result.subcommand != "preset-plan" && result.subcommand != "preset-apply")) {
+		return options{}, errors.New("--scope is only valid with software plan/apply or software preset plan/apply")
+	}
+	if (result.softwarePreset != "" || result.softwareExclude != "") && (result.command != "software" || (result.subcommand != "preset-plan" && result.subcommand != "preset-apply")) {
+		return options{}, errors.New("--preset and --exclude are only valid with software preset plan or apply")
 	}
 	if result.softwareQuery != "" && (result.command != "software" || result.subcommand != "search") {
 		return options{}, errors.New("--query is only valid with software search")
 	}
 	if result.command == "software" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("software apply requires --expect from software plan")
+	}
+	if result.command == "software" && result.subcommand == "preset-apply" && result.expect == "" {
+		return options{}, errors.New("software preset apply requires --expect from software preset plan")
 	}
 	if result.command == "shutdown" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("shutdown requires the plan or apply subcommand")
@@ -1176,9 +1295,12 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software search|software plan|software apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       software catalog")
 	fmt.Fprintln(writer, "       software search --query <package-name>")
+	fmt.Fprintln(writer, "       software presets")
+	fmt.Fprintln(writer, "       software preset plan --preset <id> --scope <scope> [--exclude <id[,id...]>]")
+	fmt.Fprintln(writer, "       software preset apply --preset <id> --scope <scope> [--exclude <ids>] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       software plan --package <id> --scope <shared|controller|all-clients|group:NAME|clients:pcNN,...> [--remove]")
 	fmt.Fprintln(writer, "       software apply --package <id> --scope <scope> [--remove] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")
