@@ -455,6 +455,89 @@ func TestSoftwareDeploymentWaitsForControllerActivation(t *testing.T) {
 	}
 }
 
+func TestSoftwareStateReconstructsCurrentSnapshot(t *testing.T) {
+	loads := 0
+	firstRevision := "0123456789abcdef0123456789abcdef01234567"
+	secondRevision := "89abcdef0123456789abcdef0123456789abcdef"
+	actions := DashboardActions{
+		LoadConfigurationState: func() domain.ConfigurationStateReport {
+			loads++
+			revision := firstRevision
+			controller := domain.ControllerRebuildPlanReport{
+				Operation: "controller-plan", State: "ready", Revision: revision,
+				CurrentDetail: "the activation receipt belongs to an older revision",
+			}
+			if loads > 1 {
+				revision = secondRevision
+				controller.State = "current"
+				controller.Revision = revision
+				controller.Current = true
+				controller.CurrentDetail = "active system and receipt match"
+			}
+			return domain.ConfigurationStateReport{
+				Operation:       "configuration-state",
+				State:           "partial",
+				GeneratedAt:     time.Date(2026, 9, 23, 10, 30, 0, 0, time.UTC),
+				DesiredRevision: revision,
+				Controller:      controller,
+				Clients: domain.HostsReport{
+					Operation: "hosts", State: "partial", DesiredRevision: revision,
+					Deployment: domain.HostDeploymentSummary{Current: 1, Unknown: 1},
+					Hosts: []domain.HostStatus{
+						{Name: "pc01", IP: "10.0.0.1", SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, CurrentRevision: revision, DesiredRevision: revision},
+						{
+							Name: "pc02", IP: "10.0.0.2", SSH: domain.SSHAvailable, Deployment: domain.DeploymentUnknown, DesiredRevision: revision,
+							LastSuccessfulDeploy: &domain.LastSuccessfulDeployment{Revision: revision, VerifiedAt: time.Date(2026, 9, 22, 10, 30, 0, 0, time.UTC)},
+						},
+					},
+				},
+			}
+		},
+	}
+	model := dashboardModel{
+		screen: dashboardSoftware,
+		software: softwareModel{
+			stage:   softwareCatalog,
+			catalog: domain.SoftwareCatalogReport{Operation: "software-catalog"},
+		},
+		actions: actions,
+		width:   120,
+		height:  30,
+	}
+
+	if !strings.Contains(model.View().Content, "Check systems") {
+		t.Fatalf("reconstructible state action is missing:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "v"})
+	model = updated.(dashboardModel)
+	if command == nil || loads != 0 || !strings.Contains(model.View().Content, "Checking desired and observed") {
+		t.Fatalf("state load was not explicit and deferred: command=%v loads=%d\n%s", command != nil, loads, model.View().Content)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	for _, expected := range []string{"Current system configuration", shortRevision(firstRevision), "Not verified for the desired revision", "1 up to date", "1 not verified", "Freshness", "2026-09-23", "Revision not verified"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("state view is missing %q:\n%s", expected, view)
+		}
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
+	model = updated.(dashboardModel)
+	if command == nil || loads != 1 {
+		t.Fatalf("state refresh was not deferred: command=%v loads=%d", command != nil, loads)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if loads != 2 || !strings.Contains(model.View().Content, shortRevision(secondRevision)) || !strings.Contains(model.View().Content, "Verified at the desired revision") {
+		t.Fatalf("state refresh did not use repository current state: loads=%d\n%s", loads, model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSoftware || model.software.stage != softwareCatalog {
+		t.Fatalf("state view did not return to software without replaying a result: screen=%d stage=%d", model.screen, model.software.stage)
+	}
+}
+
 func TestDashboardShutdownIncludesActiveSessionAndAcknowledgesUnknownSession(t *testing.T) {
 	plans := 0
 	applies := 0

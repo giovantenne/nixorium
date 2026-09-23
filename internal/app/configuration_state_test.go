@@ -32,6 +32,7 @@ func TestConfigurationStateUsesCurrentEvidence(t *testing.T) {
 	manager := NewConfigurationStateManager(
 		configurationHostsFake{report: domain.HostsReport{
 			Operation:       "hosts",
+			State:           "available",
 			GeneratedAt:     observedAt,
 			Repository:      "/lab",
 			DesiredRevision: revision,
@@ -65,7 +66,7 @@ func TestConfigurationStateRejectsMixedRevisionSnapshot(t *testing.T) {
 	clientRevision := "0123456789abcdef0123456789abcdef01234567"
 	controllerRevision := "89abcdef0123456789abcdef0123456789abcdef"
 	manager := NewConfigurationStateManager(
-		configurationHostsFake{report: domain.HostsReport{Operation: "hosts", DesiredRevision: clientRevision}},
+		configurationHostsFake{report: domain.HostsReport{Operation: "hosts", State: "available", DesiredRevision: clientRevision}},
 		configurationControllerFake{report: domain.ControllerRebuildPlanReport{
 			Operation: "controller-plan", State: "current", Revision: controllerRevision, Current: true,
 		}},

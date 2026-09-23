@@ -62,13 +62,49 @@ func (model dashboardModel) computerDetail(h domain.HostStatus) string {
 }
 
 func (model dashboardModel) computersView() string {
-	lines := []string{tuiTitle("Computer inventory", model.isDark), ""}
+	configurationView := model.configurationState.Operation != ""
+	title := "Computer inventory"
+	path := []string{"Computers", "Inventory"}
+	back := "Computers"
+	if configurationView {
+		title = "Current system configuration"
+		path = []string{"Software", "System status"}
+		back = "Software"
+	}
+	lines := []string{tuiTitle(title, model.isDark), ""}
 	if model.busy != "" {
 		return model.renderShell(tuiShell{
-			path:    []string{"Computers", "Inventory"},
+			path:    path,
 			body:    model.busyView(),
-			actions: []tuiAction{{key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}},
+			actions: []tuiAction{{key: "Esc", label: back}, {key: "F1", label: "Help"}},
 		})
+	}
+	if configurationView {
+		desired := model.configurationState.DesiredRevision
+		if desired == "" {
+			desired = "changed while this snapshot was collected"
+		} else {
+			desired = shortRevision(desired)
+		}
+		controllerLabel := "Not verified for the desired revision"
+		controllerKind := tuiStatusAttention
+		if model.configurationState.ControllerVerified() {
+			controllerLabel = "Verified at the desired revision"
+			controllerKind = tuiStatusSuccess
+		}
+		freshness := "not recorded"
+		if !model.configurationState.GeneratedAt.IsZero() {
+			freshness = model.configurationState.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST") + " · r refreshes this snapshot"
+		}
+		lines = append(lines,
+			tuiSection("Desired and observed state", model.isDark),
+			"Desired revision  "+desired,
+			"Controller        "+tuiStatus(controllerLabel, controllerKind, model.isDark),
+			fmt.Sprintf("Clients           %d up to date · %d update ready · %d not verified", model.hosts.Deployment.Current, model.hosts.Deployment.Outdated, model.hosts.Deployment.Unknown),
+			tuiMuted("Freshness         "+freshness, model.isDark),
+			"",
+			tuiSection("Client observations", model.isDark),
+		)
 	}
 	hosts := model.filteredHosts()
 	var actions []tuiAction
@@ -111,14 +147,23 @@ func (model dashboardModel) computersView() string {
 			body = lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", right)
 		}
 		lines = append(lines, body, "", tuiMuted(fmt.Sprintf("%d–%d of %d computers", displayedLineStart(start, len(hosts)), end, len(hosts)), model.isDark))
-		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Details"}, {key: "/", label: "Search"}, {key: "r", label: "Refresh"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}}
+		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Details"}, {key: "/", label: "Search"}, {key: "r", label: "Refresh"}, {key: "Esc", label: back}, {key: "?", label: "Help"}}
 	}
 	notices := []tuiNotice{}
+	if configurationView && model.configurationState.HasErrors() {
+		details := make([]string, 0, len(model.configurationState.Issues))
+		for _, issue := range model.configurationState.Issues {
+			details = append(details, issue.Field+": "+issue.Message)
+		}
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The state snapshot is incomplete", detail: strings.Join(details, "; ")})
+	} else if configurationView && !model.configurationState.ControllerVerified() && model.configurationState.Controller.CurrentDetail != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller is not verified for the desired revision", detail: model.configurationState.Controller.CurrentDetail})
+	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
 	return model.renderShell(tuiShell{
-		path:    []string{"Computers", "Inventory"},
+		path:    path,
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
 		actions: actions,

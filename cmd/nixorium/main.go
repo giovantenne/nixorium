@@ -519,6 +519,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	lifecycle := app.NewPXELifecycle(local)
 	deploymentManager := app.NewDeploymentManager(local)
 	controllerManager := app.NewControllerManager(local)
+	configurationStateManager := app.NewConfigurationStateManager(inspector, controllerManager)
 	serviceManager := app.NewServiceManager(local)
 	operationLogManager := app.NewOperationLogManager(local)
 	gitReviewManager := app.NewGitReviewManager(local)
@@ -590,6 +591,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		LoadHosts: func() (domain.HostsReport, error) {
 			return inspector.Hosts(ctx, repository)
+		},
+		LoadConfigurationState: func() domain.ConfigurationStateReport {
+			return configurationStateManager.Load(ctx, repository)
 		},
 		LoadSoftware: func() domain.SoftwareCatalogReport { return softwareManager.Catalog(ctx, repository) },
 		SearchSoftware: func(searchContext context.Context, query string) domain.SoftwareSearchReport {

@@ -375,7 +375,11 @@ func demoActions() DashboardActions {
 		},
 		InstallSetupSecrets: func() domain.ActionReport { fail("InstallSetupSecrets"); return domain.ActionReport{} },
 		LoadHosts:           func() (domain.HostsReport, error) { fail("LoadHosts"); return domain.HostsReport{}, nil },
-		LoadSoftware:        func() domain.SoftwareCatalogReport { fail("LoadSoftware"); return domain.SoftwareCatalogReport{} },
+		LoadConfigurationState: func() domain.ConfigurationStateReport {
+			fail("LoadConfigurationState")
+			return domain.ConfigurationStateReport{}
+		},
+		LoadSoftware: func() domain.SoftwareCatalogReport { fail("LoadSoftware"); return domain.SoftwareCatalogReport{} },
 		SearchSoftware: func(context.Context, string) domain.SoftwareSearchReport {
 			fail("SearchSoftware")
 			return domain.SoftwareSearchReport{}

@@ -23,6 +23,7 @@ type DashboardActions struct {
 	SaveSetupConfiguration func() domain.ConfigurationSaveReport
 	InstallSetupSecrets    func() domain.ActionReport
 	LoadHosts              func() (domain.HostsReport, error)
+	LoadConfigurationState func() domain.ConfigurationStateReport
 	LoadSoftware           func() domain.SoftwareCatalogReport
 	SearchSoftware         func(context.Context, string) domain.SoftwareSearchReport
 	PlanSoftware           func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
@@ -113,6 +114,7 @@ type dashboardModel struct {
 	hostSearching          bool
 	hostDetail             bool
 	hostTechnical          bool
+	configurationState     domain.ConfigurationStateReport
 	helpOpen               bool
 	pageScroll             int
 	setupDetails           bool
@@ -300,6 +302,10 @@ type dashboardPXEExitMsg struct {
 type dashboardHostsMsg struct {
 	report domain.HostsReport
 	err    error
+}
+
+type dashboardConfigurationStateMsg struct {
+	report domain.ConfigurationStateReport
 }
 
 type dashboardDeploymentPlanMsg struct {
@@ -689,6 +695,12 @@ func (model dashboardModel) loadHosts() tea.Cmd {
 	return func() tea.Msg {
 		report, err := model.actions.LoadHosts()
 		return dashboardHostsMsg{report: report, err: err}
+	}
+}
+
+func (model dashboardModel) loadConfigurationState() tea.Cmd {
+	return func() tea.Msg {
+		return dashboardConfigurationStateMsg{report: model.actions.LoadConfigurationState()}
 	}
 }
 
