@@ -71,6 +71,49 @@ let
       ];
     };
   });
+  sitePresetCatalog = builtins.fromJSON (builtins.readFile ../templates/site/software-presets.json);
+  siteDefaultSoftware = builtins.fromJSON (builtins.readFile ../templates/site/lab-software.json);
+  siteDefaultPreset = builtins.head
+    (builtins.filter (preset: preset.id == sitePresetCatalog.defaultPreset) sitePresetCatalog.presets);
+  softwareForPreset = preset: {
+    schemaVersion = 1;
+    packages = map (package: {
+      inherit package;
+      scope.kind = "shared";
+    }) preset.packages;
+  };
+  siteProfileLabs = map
+    (preset: {
+      laboratory = mkLab (baseArgs // {
+        softwarePresets = sitePresetCatalog;
+        labSoftware = softwareForPreset preset;
+      });
+      controller = mkLab (baseArgs // {
+        labConfig = labConfig // {
+          deploymentMode = "controller";
+          pcCount = 0;
+          teacherPassword = "$6$test$teacher";
+          studentPassword = "$6$test$student";
+          adminPassword = "$6$test$admin";
+        };
+        publicKeys = { cache = null; ssh = null; veyon = null; };
+        softwarePresets = sitePresetCatalog;
+        labSoftware = softwareForPreset preset;
+      });
+    })
+    sitePresetCatalog.presets;
+  siteProfilePackages = builtins.concatLists
+    (map (preset: preset.packages) sitePresetCatalog.presets);
+  siteProfileResolved = map presetLab.nixoriumResolveSoftwarePackage siteProfilePackages;
+  commonProfilePackages = [ "nodejs" "opencode" "pi-coding-agent" ];
+  siteProfilesEvaluate = builtins.all
+    (labs:
+      labs.laboratory.nixoriumSoftwarePresets.defaultPreset == "essential"
+      && builtins.length labs.laboratory.nixosConfigurations.pc99.config.environment.systemPackages > 0
+      && builtins.length labs.laboratory.nixosConfigurations.pc01.config.environment.systemPackages > 0
+      && labs.controller.nixoriumSoftwarePresets.defaultPreset == "essential"
+      && builtins.length labs.controller.nixosConfigurations.pc99.config.environment.systemPackages > 0)
+    siteProfileLabs;
   softwareSearch = softwareLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 20; };
   scopedSoftware = {
     schemaVersion = 1;
@@ -337,6 +380,26 @@ assert softwareLab.nixoriumSoftwarePresets == null;
 assert presetLab.nixoriumSoftwarePresets.defaultPreset == "essential";
 assert (builtins.head presetLab.nixoriumSoftwarePresets.presets).packages
   == [ "chromium" "ghostty" "liberation_ttf" ];
+assert map (preset: preset.id) sitePresetCatalog.presets == [
+  "essential"
+  "general-education"
+  "programming"
+  "graphics"
+  "multimedia"
+  "cad-3d"
+  "stem"
+];
+assert sitePresetCatalog.defaultPreset == "essential";
+assert map (entry: entry.package) siteDefaultSoftware.packages == siteDefaultPreset.packages;
+assert builtins.all (entry: entry.scope.kind == "shared") siteDefaultSoftware.packages;
+assert builtins.all
+  (preset: builtins.all (package: builtins.elem package preset.packages) commonProfilePackages)
+  sitePresetCatalog.presets;
+assert builtins.all
+  (preset: builtins.elem "vscode" preset.packages == (preset.id == "programming"))
+  sitePresetCatalog.presets;
+assert builtins.all (item: item != null && item.availability == "available") siteProfileResolved;
+assert siteProfilesEvaluate;
 assert builtins.any (item: item.id == "hello" && item.availability == "available") softwareSearch;
 assert nestedSoftware.id == "python3Packages.numpy";
 assert nestedSoftware.availability == "available";

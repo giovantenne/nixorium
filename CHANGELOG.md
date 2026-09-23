@@ -8,6 +8,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- New private site templates define seven deployment-owned software profiles:
+  Essential, General education, Programming, Graphics and illustration, Audio
+  and video, CAD and 3D modelling, and STEM and scientific computing. Essential
+  is the deterministic default for new sites; all profile package IDs are
+  evaluated against the pinned package set for laboratory and controller-only
+  deployments, and the offline installer preserves the profile metadata.
+  Every profile includes Node/npm plus system-managed Pi and OpenCode CLIs;
+  VS Code remains specific to Programming. Per-user npm overrides persist for
+  staff, while the reset student account discards npm globals and AI-agent
+  credentials/state before snapshots and restores an empty managed prefix.
 - Added an optional, deployment-owned `nixoriumSoftwarePresets` contract and
   `software presets` / `software preset plan` / `software preset apply` CLI
   workflow. A profile produces one reviewed, additive and atomic

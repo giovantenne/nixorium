@@ -112,7 +112,7 @@ one-time adoption for older deployments, independent packages and recovery.
 - `modules/clients.nix`: client PCs only
 - `lab-software.json`: guided packages with explicit shared, controller or client scopes
 - `software-catalog.nix`: optional deployment-owned suggestions shown before package search
-- `software-presets.json`: optional versioned software profiles whose packages can be added as one reviewed batch
+- `software-presets.json`: seven versioned software profiles whose packages can be added as one reviewed batch
 - `modules/workstation.nix`: GNOME application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
@@ -264,6 +264,38 @@ profile never removes packages. Edit these files to evolve the local choices
 without waiting for a Nixorium release. The catalog is convenience only:
 package search and pinned-package validation remain available for entries not
 listed.
+
+New sites provide **Essential** (the default), **General education**,
+**Programming**, **Graphics and illustration**, **Audio and video**, **CAD and
+3D modelling**, and **STEM and scientific computing**. The lists are expanded
+in the JSON file rather than inheriting from one another. The current package
+set exposes Kdenlive as `kdePackages.kdenlive`, so that exact pinned attribute
+is used by the audio/video profile. `lab-software.json` initially matches
+Essential at `shared` scope; this default affects newly generated repositories
+only and does not migrate existing deployments.
+
+Every profile includes Node.js (and npm), Pi and OpenCode. These commands have
+a reproducible system version available to every user. npm global installs use
+`~/.local/npm` and take precedence in the user's shell, so admin or teacher can
+try a newer upstream CLI without `sudo`:
+
+```sh
+npm install -g @mariozechner/pi-coding-agent@latest opencode-ai@latest
+hash -r
+```
+
+That override belongs only to the current user and requires Internet access.
+Removing it reveals the Nix-managed version again. Prefer a reviewed Nix
+package-base or deployment override when every computer must receive the same
+version. VS Code is not updated through npm and remains part of Programming.
+
+The student home has a stricter lifecycle. It receives an empty writable npm
+prefix from the clean template at every boot. Student npm globals, Pi/OpenCode
+configuration, conversations and stored credentials are removed before the
+rotating snapshot and are not restored; a student must authenticate again in a
+later session. Never seed API keys or OAuth files into the shared template.
+Admin and teacher homes are persistent, so their per-user npm overrides and
+credentials remain until they remove them.
 
 The same typed workflow is available from the CLI:
 
