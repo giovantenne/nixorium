@@ -71,9 +71,8 @@ bash tests/client-installer.sh
 bash tests/controller-bootstrap.sh
 bash tests/controller-installer.sh
 bash tests/software-profile-bootstrap.sh
-diff -qr skills/nixorium-maintainer templates/site/skills/nixorium-maintainer
-diff -u docs/troubleshooting.md templates/site/TROUBLESHOOTING.md
-diff -u docs/updates.md templates/site/UPDATES.md
+bash tests/canonical-copy-sync.sh
+bash scripts/sync-canonical-copies.sh --check
 test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md
 test -e .pi/skills/nixorium-developer/SKILL.md
@@ -85,6 +84,7 @@ run_quick_checks() {
     settings-schema \
     software-schema \
     software-preset-schema \
+    documentation-check \
     nixorium \
     --no-write-lock-file \
     --no-link
@@ -154,6 +154,7 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.management-vm.drvPath" --raw --no-write-lock-file >/dev/null
 else
   bash scripts/check-agent-guidance.sh
+  nix build --file "${REPO_ROOT}/tests/source-checks.nix" documentation-check --no-write-lock-file --no-link
   run_full_checks
 fi
 

@@ -20,6 +20,17 @@ let
     inherit (pkgs) lib;
   };
   nixoriumPackage = pkgs.callPackage ../pkgs/nixorium.nix {};
+  documentationGenerator = nixoriumPackage.overrideAttrs (_: {
+    pname = "nixorium-docs";
+    subPackages = [ "cmd/nixorium-docs" ];
+    doCheck = false;
+    ldflags = [];
+    postFixup = "";
+  });
+  documentationSource = pkgs.lib.fileset.toSource {
+    root = ../.;
+    fileset = ../docs/tui-gallery.md;
+  };
 in
 {
   config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
@@ -35,6 +46,14 @@ in
     touch "$out"
   '';
   nixorium = nixoriumPackage;
+  documentation-check = pkgs.runCommand "nixorium-documentation-check" {
+    nativeBuildInputs = [ documentationGenerator ];
+  } ''
+    cp -R ${documentationSource} source
+    chmod -R u+w source
+    nixorium-docs --check --repo source
+    touch "$out"
+  '';
   # Compile once from code only; inspect checkout guidance at runtime.
   guidance-check = nixoriumPackage.overrideAttrs {
     pname = "nixorium-guidance-check";

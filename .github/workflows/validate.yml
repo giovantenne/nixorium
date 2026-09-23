@@ -33,6 +33,11 @@ jobs:
       - name: Check agent guidance against the command parser
         run: bash scripts/check-agent-guidance.sh
 
+      - name: Check generated documentation and canonical copies
+        run: |
+          nix build --file tests/source-checks.nix documentation-check --no-link
+          bash scripts/sync-canonical-copies.sh --check
+
   validate:
     name: Evaluate source and deployment template
     runs-on: ubuntu-latest
