@@ -25,6 +25,28 @@ type softwareScopeOption struct {
 	scope domain.SoftwareScope
 }
 
+// softwareDashboardState owns the transient state of the Software feature.
+// Embedding it keeps the existing screen code readable while removing feature
+// details from the root model's global navigation and window state.
+type softwareDashboardState struct {
+	softwareCatalog      domain.SoftwareCatalogReport
+	softwareMode         softwareListMode
+	softwareCursor       int
+	softwareQuery        string
+	softwareSearching    bool
+	softwareSearch       domain.SoftwareSearchReport
+	softwareSearchID     uint64
+	softwareSearchBusy   bool
+	softwareSearchCancel context.CancelFunc
+	softwareSelected     string
+	softwareScopeCursor  int
+	softwareClientCursor int
+	softwareClients      map[string]bool
+	softwarePlan         domain.SoftwareChangePlanReport
+	softwareResult       domain.SoftwareChangeApplyReport
+	softwareApplying     bool
+}
+
 func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardSoftware:
@@ -211,11 +233,11 @@ func (model dashboardModel) softwareView() string {
 	lines := []string{}
 	if model.busy != "" {
 		lines = append(lines, tuiTitle("Software change", model.isDark), "", model.busyView())
-		return renderTUIShell(tuiShell{
+		return model.renderShell(tuiShell{
 			path:    path,
 			body:    strings.Join(lines, "\n"),
 			actions: []tuiAction{{key: "F1", label: "Help"}},
-		}, model.width, model.isDark)
+		})
 	}
 	switch model.screen {
 	case dashboardSoftwareScope:
@@ -228,12 +250,12 @@ func (model dashboardModel) softwareView() string {
 		lines = append(lines, model.softwareCatalogView()...)
 	}
 	notices := model.softwareNotices()
-	return renderTUIShell(tuiShell{
+	return model.renderShell(tuiShell{
 		path:    path,
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
 		actions: model.softwareActions(),
-	}, model.width, model.isDark)
+	})
 }
 
 func (model dashboardModel) softwareActions() []tuiAction {

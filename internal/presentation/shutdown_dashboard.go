@@ -141,11 +141,13 @@ func (model dashboardModel) shutdownView() string {
 			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Power-off requests are being dispatched", detail: "Closing is disabled until the reviewed operation returns."}}
 		}
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
-		return renderTUIShell(shell, model.width, model.isDark)
+		return model.renderShell(shell)
 	}
 	switch model.screen {
 	case dashboardShutdownReview:
-		shell.body = strings.Join(model.shutdownReviewView(), "\n")
+		body, fixedBody := model.shutdownReviewView()
+		shell.body = strings.Join(body, "\n")
+		shell.fixedBody = strings.Join(fixedBody, "\n")
 		if model.shutdownPlan.State == "ready" {
 			shell.actions = []tuiAction{{key: "Enter", label: "Send requests"}, {key: "u", label: "Unknown sessions"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 		} else {
@@ -165,7 +167,7 @@ func (model dashboardModel) shutdownView() string {
 	if model.message != "" && model.message != model.shutdownPlan.Message {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(shell, model.width, model.isDark)
+	return model.renderShell(shell)
 }
 
 func (model dashboardModel) shutdownSelectionView() []string {
@@ -196,7 +198,7 @@ func (model dashboardModel) shutdownSelectionView() []string {
 	return lines
 }
 
-func (model dashboardModel) shutdownReviewView() []string {
+func (model dashboardModel) shutdownReviewView() ([]string, []string) {
 	plan := model.shutdownPlan
 	lines := []string{tuiSection(fmt.Sprintf("Shut down %d eligible client(s)?", plan.Eligible), model.isDark), "", fmt.Sprintf("Selected  %d", len(plan.Targets)), fmt.Sprintf("Eligible  %d", plan.Eligible), "Controller  excluded", "Session safety  " + shutdownPolicyLabel(plan.Policy), ""}
 	start, end := listWindow(len(plan.Targets), 0, max(3, model.height-20))
@@ -223,11 +225,11 @@ func (model dashboardModel) shutdownReviewView() []string {
 		if shutdownActiveCount(plan) > 0 {
 			confirmationPrompt = "Type " + plan.Confirmation + " to confirm shutdown of active sessions:"
 		}
-		lines = append(lines, "", tuiSection(confirmationPrompt, model.isDark), "> "+model.confirmation+"_")
+		return lines, []string{tuiSection(confirmationPrompt, model.isDark), "> " + model.confirmation + "_"}
 	} else {
 		lines = append(lines, "", tuiStatus("No request can be sent from this plan", tuiStatusAttention, model.isDark), plan.Message)
 	}
-	return lines
+	return lines, nil
 }
 
 func (model dashboardModel) shutdownResultView() []string {

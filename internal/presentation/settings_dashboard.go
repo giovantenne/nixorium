@@ -273,7 +273,7 @@ func (model dashboardModel) settingsView() string {
 		backLabel = "Overview"
 	}
 	if model.busy != "" {
-		return renderTUIShell(tuiShell{path: path, body: tuiTitle(title, model.isDark) + "\n\n" + model.busyView(), actions: []tuiAction{{key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: tuiTitle(title, model.isDark) + "\n\n" + model.busyView(), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	switch model.screen {
 	case dashboardSettingsEdit:
@@ -308,7 +308,7 @@ func (model dashboardModel) settingsView() string {
 			actions = append(actions, tuiAction{key: "r", label: "Retry save"})
 		}
 		actions = append(actions, tuiAction{key: "Enter", label: returnLabel}, tuiAction{key: "F1", label: "Help"})
-		return renderTUIShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	lines = append(lines,
 		intro,
@@ -318,7 +318,7 @@ func (model dashboardModel) settingsView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "k", label: "Advanced keys"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "k", label: "Advanced keys"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) settingsPasswordsView() string {
@@ -338,7 +338,7 @@ func (model dashboardModel) settingsPasswordsView() string {
 			path = []string{"Installation", "Laboratory settings", "Passwords"}
 			cancelLabel = "Cancel installation"
 		}
-		return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Collect passwords"}, {key: "Esc", label: cancelLabel}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Collect passwords"}, {key: "Esc", label: cancelLabel}, {key: "F1", label: "Help"}}})
 	}
 	lines := []string{
 		tuiTitle("Change password", model.isDark),
@@ -351,7 +351,7 @@ func (model dashboardModel) settingsPasswordsView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return renderTUIShell(tuiShell{path: []string{"Maintenance", "Settings", "Passwords"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Change password"}, {key: "Esc", label: "Settings"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: []string{"Maintenance", "Settings", "Passwords"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Change password"}, {key: "Esc", label: "Settings"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) settingsReviewView() string {
@@ -384,7 +384,7 @@ func (model dashboardModel) settingsReviewView() string {
 	if model.settingsReturn == dashboardSetup {
 		path = []string{"Installation", "Setup", "Settings", "Review"}
 	}
-	return renderTUIShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Save"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}}, model.width, model.isDark)
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Save"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 }
 
 func settingsIssueMessage(issues []domain.ValidationIssue) string {
