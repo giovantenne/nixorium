@@ -158,10 +158,27 @@ a live multi-step mode. Its view derives one recommended next step and the
 available controls from typed preparation and lifecycle state; it does not
 advance the mode or infer client installation from presentation state.
 
+The Bubble Tea root owns terminal size/theme, global help, top-level
+navigation, message routing and the guard that prevents leaving a running
+mutation. Feature state is held by explicit models for Software, Computers,
+Deployment, Shutdown, Installation/PXE, Settings, Controller activation,
+Update/Package Base and Maintenance. Software, Deployment and Shutdown emit
+typed intents that the root maps to injected application callbacks; async
+controller and PXE progress identities stay inside their owning model so a
+message from an older job cannot update the current operation. Cross-feature
+continuations pass only typed reports or target identities, never cursors,
+scroll positions or confirmation text.
+
+The CLI composition root parses arguments, resolves the deployment and selects
+a command family. Family handlers live in `commands_software.go`,
+`commands_operations.go` and `commands_setup.go`; reviewed apply boundaries
+live in `command_apply.go`. These handlers select application managers and
+renderers, while adapters retain filesystem, process and privilege effects.
+
 The initial package layout is:
 
 ```text
-cmd/nixorium/           command parsing and renderer selection
+cmd/nixorium/           command parsing, family handlers and dependency composition
 internal/domain/        statuses, findings, plans, state transitions
 internal/app/           use cases and orchestration interfaces
 internal/adapters/      exec, filesystem, Git, Nix, systemd, network adapters
