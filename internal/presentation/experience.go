@@ -342,13 +342,13 @@ func (model dashboardModel) textEntry() bool {
 	}
 	switch model.screen {
 	case dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview,
-		dashboardGitCommitReview, dashboardUpdateReview, dashboardSoftwareReview, dashboardShutdownReview,
+		dashboardGitCommitReview, dashboardUpdateReview, dashboardShutdownReview,
 		dashboardSettingsEdit, dashboardPXEStartReview, dashboardPXELeaveReview:
 		return true
 	case dashboardHosts:
 		return model.hostSearching
 	case dashboardSoftware:
-		return model.software.searching
+		return model.software.searching || model.software.stage == softwareReview
 	default:
 		return false
 	}

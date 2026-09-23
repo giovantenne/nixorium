@@ -672,6 +672,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		model.message = message.report.Message
 		model.screen = dashboardSoftware
+		model.software.stage = softwareCatalog
 		return model, nil
 	case dashboardSoftwareSearchStartMsg:
 		if model.screen != dashboardSoftware || model.software.mode != softwareSearch || message.id != model.software.searchID || message.query != strings.TrimSpace(model.software.query) || model.actions.SearchSoftware == nil {
@@ -707,13 +708,13 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.message = message.report.Message
 		if message.report.HasErrors() || message.report.State == "unchanged" {
 			if message.report.Request.Present {
-				model.screen = dashboardSoftwareScope
+				model.software.stage = softwareScope
 			} else {
-				model.screen = dashboardSoftware
+				model.software.stage = softwareCatalog
 			}
 		} else {
 			model.confirmation = ""
-			model.screen = dashboardSoftwareReview
+			model.software.stage = softwareReview
 		}
 		return model, nil
 	case dashboardSoftwareApplyMsg:
@@ -721,7 +722,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.software.applying = false
 		model.software.result = message.report
 		model.message = message.report.Message
-		model.screen = dashboardSoftwareResult
+		model.software.stage = softwareResult
 		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
 			return model.startSoftwareControllerApply()
 		}
@@ -736,7 +737,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		} else {
 			model.message = message.report.Message
 		}
-		model.screen = dashboardSoftwareResult
+		model.software.stage = softwareResult
 		return model, nil
 	case dashboardShutdownPlanMsg:
 		model.busy = ""
