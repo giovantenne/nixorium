@@ -201,7 +201,7 @@ func (model dashboardModel) computersAreaView() string {
 		"Manage client computers",
 		"Observed state is loaded only by Computer inventory or an operation that needs it.",
 		computersAreaTasks,
-		model.computersAreaCursor,
+		model.computers.areaCursor,
 	)
 }
 

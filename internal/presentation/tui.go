@@ -199,22 +199,29 @@ type installationModel struct {
 	pxeProgressID    uint64
 }
 
+// computersModel owns inventory, filtering, detail and restore navigation.
+// Deployment and shutdown remain separate because they have independent jobs.
+type computersModel struct {
+	areaCursor         int
+	restoreMode        bool
+	restoreCursor      int
+	hostCursor         int
+	hostQuery          string
+	hostSearching      bool
+	hostDetail         bool
+	hostTechnical      bool
+	configurationState domain.ConfigurationStateReport
+	hosts              domain.HostsReport
+}
+
 type dashboardModel struct {
 	updateDetails          bool
 	returnAdmin            bool
-	restoreMode            bool
-	restoreCursor          int
-	computersAreaCursor    int
+	computers              computersModel
 	installationAreaCursor int
 	areaReturn             dashboardScreen
 	diagnosticReturn       dashboardScreen
 	adminCursor            int
-	hostCursor             int
-	hostQuery              string
-	hostSearching          bool
-	hostDetail             bool
-	hostTechnical          bool
-	configurationState     domain.ConfigurationStateReport
 	helpOpen               bool
 	pageScroll             int
 	setupDetails           bool
@@ -237,7 +244,6 @@ type dashboardModel struct {
 	message                string
 	confirmation           string
 	installation           installationModel
-	hosts                  domain.HostsReport
 	deployment             deploymentModel
 	controller             controllerModel
 	maintenance            maintenanceModel
@@ -1951,7 +1957,7 @@ func gitReviewStatusKind(report domain.GitReviewReport) tuiStatusKind {
 
 func (model dashboardModel) deployView() string {
 	path := []string{"Computers", "Distribute"}
-	if model.restoreMode {
+	if model.computers.restoreMode {
 		path = []string{"Computers", "Restore", "Reapply"}
 	}
 	shell := tuiShell{path: path}
@@ -2145,7 +2151,7 @@ func (model dashboardModel) pxeView() string {
 	} else if model.setupMode {
 		path = []string{"Installation", "Install computers"}
 		title = "Install computers"
-	} else if model.restoreMode {
+	} else if model.computers.restoreMode {
 		path = []string{"Computers", "Restore", "Reinstall"}
 		title = "Reinstall computers"
 	}
@@ -2331,7 +2337,7 @@ func (model dashboardModel) pxeActions() []tuiAction {
 		actions = append(actions, tuiAction{key: "x", label: "Stop PXE"})
 	}
 	backLabel := "Installation"
-	if model.restoreMode {
+	if model.computers.restoreMode {
 		backLabel = "Computers"
 	}
 	if recovery {
@@ -2348,7 +2354,7 @@ func (model dashboardModel) pxeNextStepView() []string {
 	switch model.report.PXE.Mode {
 	case "active":
 		title := "Next: install computers"
-		if model.restoreMode {
+		if model.computers.restoreMode {
 			title = "Next: reinstall computers"
 		}
 		lines := []string{
@@ -2356,7 +2362,7 @@ func (model dashboardModel) pxeNextStepView() []string {
 			"  1. Boot one configured computer using UEFI network boot.",
 			"  2. In the downloaded installer, run /installer/setup.sh.",
 		}
-		if model.restoreMode {
+		if model.computers.restoreMode {
 			lines = append(lines, "  3. Choose its configured identity and confirm the target disk locally.")
 		} else {
 			lines = append(lines, "  3. Choose its configured identity and inspect the target disk.")

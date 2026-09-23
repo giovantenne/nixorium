@@ -35,7 +35,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.err == nil {
 			model.report = message.report
 		} else {
-			model.hosts = domain.HostsReport{}
+			model.computers.hosts = domain.HostsReport{}
 			model.message = "Status refresh failed. Check the laboratory again."
 		}
 		return model, nil
@@ -251,17 +251,17 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.err != nil {
 			model.message = "Computer status refresh failed: " + message.err.Error()
 		} else {
-			model.hosts = message.report
-			model.hostCursor = 0
+			model.computers.hosts = message.report
+			model.computers.hostCursor = 0
 			model.message = ""
 		}
 		model.screen = dashboardHosts
 		return model, nil
 	case dashboardConfigurationStateMsg:
 		model.busy = ""
-		model.configurationState = message.report
-		model.hosts = message.report.Clients
-		model.hostCursor = 0
+		model.computers.configurationState = message.report
+		model.computers.hosts = message.report.Clients
+		model.computers.hostCursor = 0
 		model.message = ""
 		model.screen = dashboardHosts
 		return model, nil
@@ -278,7 +278,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardDeployReview
 		return model, nil
 	case dashboardDeploymentResultMsg:
-		model.hosts = domain.HostsReport{}
+		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.deployment.applying = false
 		model.deployment.events = nil
@@ -331,7 +331,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardControllerReview
 		return model, nil
 	case dashboardControllerResultMsg:
-		model.hosts = domain.HostsReport{}
+		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.controller.applying = false
 		model.controller.result = message.report
@@ -423,7 +423,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardGitCommitReview
 		return model, nil
 	case dashboardGitCommitResultMsg:
-		model.hosts = domain.HostsReport{}
+		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.maintenance.gitCommitResult = message.report
 		model.maintenance.gitReview = message.review
@@ -473,7 +473,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardUpdateReview
 		return model, nil
 	case dashboardUpdateResultMsg:
-		model.hosts = domain.HostsReport{}
+		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.updates.applying = false
 		model.updates.result = message.report
@@ -617,7 +617,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
 		}
 	case dashboardSettingsApplyMsg:
-		model.hosts = domain.HostsReport{}
+		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.settings.applying = false
 		model.settings.result = message.report
@@ -852,24 +852,24 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	if model.updates.packageBase && model.updates.baseEditing && model.screen == dashboardUpdate && model.busy == "" && key.String() != "ctrl+c" {
 		return model.updatePackageBaseKey(key)
 	}
-	if model.screen == dashboardHosts && model.hostSearching {
+	if model.screen == dashboardHosts && model.computers.hostSearching {
 		switch key.String() {
 		case "esc":
-			model.hostSearching = false
-			model.hostQuery = ""
+			model.computers.hostSearching = false
+			model.computers.hostQuery = ""
 		case "enter":
-			model.hostSearching = false
+			model.computers.hostSearching = false
 		case "backspace":
-			value := []rune(model.hostQuery)
+			value := []rune(model.computers.hostQuery)
 			if len(value) > 0 {
-				model.hostQuery = string(value[:len(value)-1])
+				model.computers.hostQuery = string(value[:len(value)-1])
 			}
 		default:
-			if key.Text != "" && len(model.hostQuery) < 128 {
-				model.hostQuery += key.Text
+			if key.Text != "" && len(model.computers.hostQuery) < 128 {
+				model.computers.hostQuery += key.Text
 			}
 		}
-		model.hostCursor = 0
+		model.computers.hostCursor = 0
 		return model, nil
 	}
 	if model.screen == dashboardSoftware {

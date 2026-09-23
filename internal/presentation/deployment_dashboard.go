@@ -110,7 +110,7 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 }
 
 func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	deployment, intent := model.deployment.update(model.screen, key, model.report.Meta.Clients.Hosts, model.restoreMode)
+	deployment, intent := model.deployment.update(model.screen, key, model.report.Meta.Clients.Hosts, model.computers.restoreMode)
 	model.deployment = deployment
 	if intent.message != "" {
 		model.message = intent.message
@@ -122,7 +122,7 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 			model.message = ""
 		}
 		if intent.destination == dashboardRestore {
-			model.restoreMode = false
+			model.computers.restoreMode = false
 		}
 	case deploymentPlanIntent:
 		if model.actions.PlanDeployment == nil {
