@@ -114,166 +114,23 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			presentation.HostsText(stdout, report)
 		}
 	case "deploy":
-		if options.subcommand == "apply" {
-			return runDeploymentApply(ctx, repository, stdout, stderr, options.on, options.expect, options.yes, options.json)
-		} else {
-			report := app.NewDeploymentManager(local).Plan(ctx, repository, options.on)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.DeploymentPlanText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		}
+		return runDeploymentCommand(ctx, repository, options, stdout, stderr)
 	case "controller":
-		manager := app.NewControllerManager(local)
-		if options.subcommand == "apply" {
-			return runControllerApply(ctx, manager, repository, stdout, stderr, options.expect, options.yes, options.json)
-		}
-		report := manager.Plan(ctx, repository)
-		if options.json {
-			err = presentation.JSON(stdout, report)
-		} else {
-			presentation.ControllerRebuildPlanText(stdout, report)
-		}
-		if report.HasErrors() {
-			return 1
-		}
+		return runControllerCommand(ctx, repository, options, stdout, stderr)
 	case "services":
-		manager := app.NewServiceManager(local)
-		if options.subcommand == "restart" {
-			return runServiceRestart(ctx, manager, repository, stdout, stderr, options.service, options.yes, options.json)
-		}
-		report := manager.Status(ctx, repository)
-		if options.json {
-			err = presentation.JSON(stdout, report)
-		} else {
-			presentation.ServicesText(stdout, report)
-		}
-		if report.HasErrors() {
-			return 1
-		}
+		return runServicesCommand(ctx, repository, options, stdout, stderr)
 	case "logs":
-		manager := app.NewOperationLogManager(local)
-		if options.subcommand == "show" {
-			report := manager.Show(options.logID)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.OperationLogText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		} else {
-			report := manager.List()
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.OperationLogsText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		}
+		return runLogsCommand(options, stdout, stderr)
 	case "git":
-		if options.subcommand == "review" {
-			report := app.NewGitReviewManager(local).Review(ctx, repository)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.GitReviewText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		} else if options.subcommand == "commit-plan" {
-			report := app.NewGitCommitManager(local).Plan(ctx, repository, options.paths)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.GitCommitPlanText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		} else {
-			return runGitCommitApply(ctx, app.NewGitCommitManager(local), repository, stdout, stderr, options.paths, options.expect, options.yes, options.json)
-		}
+		return runGitCommand(ctx, repository, options, stdout, stderr)
 	case "package-base":
-		manager := app.NewPackageBaseManager(adapters.PackageBase{})
-		switch options.subcommand {
-		case "status":
-			report := manager.PackageBaseStatus(repository)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.PackageBaseStatusText(stdout, report)
-			}
-			if len(report.Issues) > 0 {
-				return 1
-			}
-		case "plan":
-			report := manager.Plan(ctx, repository, options.target, options.allowUnverified, false)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.UpdatePlanText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		case "apply":
-			return runUpdateApply(ctx, manager, repository, stdout, stderr, options.target, options.expect, options.allowUnverified, false, options.yes, options.json)
-		}
+		return runPackageBaseCommand(ctx, repository, options, stdout, stderr)
 	case "update":
-		manager := app.NewUpdateManager(local)
-		if options.subcommand == "check" {
-			report := manager.Check(ctx, repository)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.UpdateCheckText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		} else if options.subcommand == "plan" {
-			report := manager.Plan(ctx, repository, options.target, options.allowPrerelease, options.allowDowngrade)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.UpdatePlanText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		} else {
-			return runUpdateApply(ctx, manager, repository, stdout, stderr, options.target, options.expect, options.allowPrerelease, options.allowDowngrade, options.yes, options.json)
-		}
+		return runUpdateCommand(ctx, repository, options, stdout, stderr)
 	case "software":
 		return runSoftwareCommand(ctx, repository, options, stdout, stderr)
 	case "shutdown":
-		manager := app.NewShutdownManager(local)
-		policy := domain.ShutdownProtectUnknown
-		if options.acknowledgeUnknown {
-			policy = domain.ShutdownAcknowledgeUnknown
-		}
-		if options.subcommand == "plan" {
-			report := manager.Plan(ctx, repository, options.on, policy)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.ShutdownPlanText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		} else {
-			return runShutdownApply(ctx, manager, repository, stdout, stderr, options.on, policy, options.expect, options.yes, options.json)
-		}
+		return runShutdownCommand(ctx, repository, options, stdout, stderr)
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
 		if inspectErr != nil {
@@ -293,138 +150,13 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			return 1
 		}
 	case "config":
-		manager := app.NewSettingsManager(adapters.Local{})
-		switch options.subcommand {
-		case "validate":
-			report := manager.Validate(ctx, repository)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.ConfigValidationText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		case "plan", "apply":
-			candidate, readErr := readCandidateSettings(options.file)
-			if readErr != nil {
-				fmt.Fprintln(stderr, "Error: read candidate settings:", readErr)
-				return 1
-			}
-			if options.subcommand == "plan" {
-				report := manager.Plan(ctx, repository, candidate)
-				if options.json {
-					err = presentation.JSON(stdout, report)
-				} else {
-					presentation.ConfigPlanText(stdout, report)
-				}
-				if report.HasErrors() {
-					return 1
-				}
-			} else {
-				report := manager.Apply(ctx, repository, candidate, options.expect)
-				recordOperationWarning(stderr, report)
-				if options.json {
-					err = presentation.JSON(stdout, report)
-				} else {
-					presentation.ConfigApplyText(stdout, report)
-				}
-				if report.HasErrors() {
-					return 1
-				}
-			}
-		}
+		return runConfigCommand(ctx, repository, options, stdout, stderr)
 	case "setup":
-		manager := app.NewSetupManager(adapters.Local{})
-		if options.subcommand == "configure" {
-			if !options.guided {
-				return runSetupConfigure(ctx, repository, stdout, stderr, false)
-			}
-			return runDashboardProgram(ctx, repository, true, stderr)
-		} else if options.subcommand == "apply" {
-			return runSetupApply(ctx, repository, stdout, stderr, options.yes, options.json)
-		} else if options.subcommand == "install-secrets" {
-			report := app.NewSystemActions(adapters.Local{}).InstallSecrets(ctx)
-			report.Message = operationRecordMessage(report.Message, report)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.ActionText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		} else if options.subcommand == "keys" {
-			var report domain.KeyReconcileReport
-			var reconcileErr error
-			if options.verifyOnly {
-				report = manager.VerifyKeys(ctx, repository)
-			} else {
-				report, reconcileErr = manager.ReconcileKeys(ctx, repository)
-				recordOperationWarning(stderr, report)
-			}
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.KeyReconcileText(stdout, report)
-			}
-			if err == nil && reconcileErr != nil {
-				err = reconcileErr
-			}
-			if report.State != "ready" && err == nil {
-				return 1
-			}
-		} else {
-			report := manager.Status(ctx, repository)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.SetupText(stdout, report)
-			}
-		}
+		return runSetupCommand(ctx, repository, options, stdout, stderr)
 	case "bootstrap":
 		return runBootstrapConfigure(ctx, repository, stdout, stderr)
 	case "pxe":
-		switch options.subcommand {
-		case "prepare":
-			writePXEPreparationActivity(stderr)
-			local := adapters.Local{}
-			report := runWithManagedProgress(
-				func() domain.ActionReport { return app.NewSystemActions(local).PreparePXE(ctx) },
-				func() (domain.OperationProgress, error) {
-					return app.NewOperationProgressManager(local).Current("pxe-prepare")
-				},
-				stderr,
-			)
-			report.Message = operationRecordMessage(report.Message, report)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.ActionText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		case "start":
-			return runPXEStart(ctx, repository, stdout, stderr, options.yes, options.json)
-		case "stop", "recover":
-			manager := app.NewPXELifecycle(adapters.Local{})
-			report := domain.PXELifecycleReport{}
-			if options.subcommand == "stop" {
-				report = manager.Stop(ctx, repository)
-			} else {
-				report = manager.Recover(ctx, repository)
-			}
-			report.Message = operationRecordMessage(report.Message, report)
-			if options.json {
-				err = presentation.JSON(stdout, report)
-			} else {
-				presentation.PXELifecycleText(stdout, report)
-			}
-			if report.HasErrors() {
-				return 1
-			}
-		}
+		return runPXECommand(ctx, repository, options, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "Error: unknown command %q\n", options.command)
 		usage(stderr)
