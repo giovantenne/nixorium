@@ -177,6 +177,9 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	r.model.screen = dashboardDeploy
 	r.model.deployment.result = domain.DeploymentExecutionReport{}
 	r.model.deployment.chosen = map[string]bool{"pc01": true, "pc02": true, "pc03": true, "pc04": true, "pc05": true}
+	r.model.deployment.context = "Opened from a saved software change. Review deploys the complete current configuration."
+	r.capture("Open contextual client selection", 1800)
+	r.model.deployment.context = ""
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Review deployment to all five current clients", 2100)
 	r.typeAndCapture("DEPLOY", "Type the one-word deployment confirmation")
