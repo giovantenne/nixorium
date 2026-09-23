@@ -83,6 +83,7 @@ run_quick_checks() {
     config-schema \
     settings-schema \
     software-schema \
+    software-preset-schema \
     nixorium \
     --no-write-lock-file \
     --no-link
@@ -101,6 +102,7 @@ run_full_checks() {
     "path:${REPO_ROOT}#checks.x86_64-linux.config-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.software-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.software-preset-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer" \
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm" \
@@ -144,6 +146,7 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.config-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.software-schema.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.software-preset-schema.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null

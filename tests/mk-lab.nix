@@ -57,6 +57,20 @@ let
       { id = "vlc"; label = "Video"; summary = "Play classroom media"; }
     ];
   });
+  presetLab = mkLab (baseArgs // {
+    softwarePresets = {
+      schemaVersion = 1;
+      defaultPreset = "essential";
+      presets = [
+        {
+          id = "essential";
+          label = "Essential";
+          description = "Browser, terminal, and common fonts";
+          packages = [ "liberation_ttf" "chromium" "ghostty" ];
+        }
+      ];
+    };
+  });
   softwareSearch = softwareLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 20; };
   scopedSoftware = {
     schemaVersion = 1;
@@ -319,6 +333,10 @@ assert (builtins.head softwareLab.nixoriumSoftware.packages).origin == "managed"
 assert softwareLab.nixoriumSoftware.catalog == [];
 assert (builtins.head catalogLab.nixoriumSoftware.catalog).label == "Video";
 assert (builtins.head catalogLab.nixoriumSoftware.catalog).id == "vlc";
+assert softwareLab.nixoriumSoftwarePresets == null;
+assert presetLab.nixoriumSoftwarePresets.defaultPreset == "essential";
+assert (builtins.head presetLab.nixoriumSoftwarePresets.presets).packages
+  == [ "chromium" "ghostty" "liberation_ttf" ];
 assert builtins.any (item: item.id == "hello" && item.availability == "available") softwareSearch;
 assert nestedSoftware.id == "python3Packages.numpy";
 assert nestedSoftware.availability == "available";

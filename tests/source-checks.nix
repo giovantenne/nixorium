@@ -16,6 +16,9 @@ let
     inherit (pkgs) lib;
     inherit pkgs;
   };
+  softwarePresetSchemaTest = import ./eval-software-presets.nix {
+    inherit (pkgs) lib;
+  };
   nixoriumPackage = pkgs.callPackage ../pkgs/nixorium.nix {};
 in
 {
@@ -26,6 +29,9 @@ in
     touch "$out"
   '';
   software-schema = assert softwareSchemaTest; pkgs.runCommand "nixorium-software-schema-test" {} ''
+    touch "$out"
+  '';
+  software-preset-schema = assert softwarePresetSchemaTest; pkgs.runCommand "nixorium-software-preset-schema-test" {} ''
     touch "$out"
   '';
   nixorium = nixoriumPackage;
