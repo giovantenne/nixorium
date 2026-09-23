@@ -89,6 +89,8 @@ type SoftwarePresetApplyReport struct {
 	Additions          []SoftwareDeclaration `json:"additions"`
 	AffectedController string                `json:"affectedController,omitempty"`
 	AffectedClients    []string              `json:"affectedClients"`
+	Revision           string                `json:"revision,omitempty"`
+	RecoveryRequired   bool                  `json:"recoveryRequired,omitempty"`
 	Issues             []ValidationIssue     `json:"issues"`
 	Message            string                `json:"message,omitempty"`
 }
