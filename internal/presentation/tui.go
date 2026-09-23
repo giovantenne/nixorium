@@ -208,13 +208,7 @@ type dashboardModel struct {
 	pxeProgressStarted time.Time
 	pxeProgressID      uint64
 	software           softwareModel
-	shutdownCursor     int
-	shutdownChosen     map[string]bool
-	shutdownPolicy     domain.ShutdownSessionPolicy
-	shutdownPlan       domain.ShutdownPlanReport
-	shutdownResult     domain.ShutdownApplyReport
-	shutdownApplying   bool
-	shutdownTechnical  bool
+	shutdown           shutdownModel
 	width              int
 	height             int
 	isDark             bool
@@ -455,7 +449,7 @@ func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, act
 	}
 	return dashboardModel{
 		report: report, setup: setup, setupMode: setupMode, screen: screen, actions: actions,
-		homeMenu: newDashboardTaskMenu(false, 80, 24), activitySpinner: newTUISpinner(false),
+		homeMenu: newDashboardTaskMenu(false, 80, 24), activitySpinner: newTUISpinner(false), shutdown: newShutdownModel(),
 	}
 }
 

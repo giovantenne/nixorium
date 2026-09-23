@@ -30,12 +30,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.message = ""
 	case "x":
 		model.screen = dashboardShutdown
-		model.shutdownCursor = 0
-		model.shutdownChosen = map[string]bool{}
-		model.shutdownPolicy = domain.ShutdownProtectUnknown
-		model.shutdownPlan = domain.ShutdownPlanReport{}
-		model.shutdownResult = domain.ShutdownApplyReport{}
-		model.shutdownTechnical = false
+		model.shutdown = newShutdownModel()
 		model.message = ""
 	case "d":
 		model.screen = dashboardDeploy
