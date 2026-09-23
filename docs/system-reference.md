@@ -96,7 +96,9 @@ suggestions in `software-catalog.nix`, desktop and shell policy under
 `mkLab` passes each host's effective managed package IDs to downstream modules
 as `hostSoftwarePackages`. The template uses this list to enable Docker, npm
 setup, application favorites, shortcuts, browser policy, VS Code extensions,
-and the optional screensaver only when their packages apply to that host.
+and the site screensaver only when their packages apply to that host. Every
+built-in profile, including Essential, declares the Ghostty and TTE dependencies
+required by the screensaver.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 

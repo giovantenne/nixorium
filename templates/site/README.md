@@ -119,7 +119,7 @@ one-time adoption for older deployments, independent packages and recovery.
 - `modules/workstation.nix`: GNOME application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
-- `modules/screensaver.nix`: optional Ghostty/TTE screensaver
+- `modules/screensaver.nix`: Ghostty/TTE lab screensaver supplied by every built-in profile
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `hostModules` in `flake.nix`: individual hosts
 - `updateValidationHosts` in `mkLab`: extra validation hosts when private shared
@@ -284,8 +284,10 @@ is used by the audio/video profile. `lab-software.json` initially matches
 Essential at `shared` scope; this default affects newly generated repositories
 only and does not migrate existing deployments.
 
-Every profile includes Node.js (and npm), Pi and OpenCode. These commands have
-a reproducible system version available to every user. npm global installs use
+Every profile includes the Ghostty/TTE lab screensaver, Node.js (and npm), Pi
+and OpenCode. The screensaver therefore remains active in Essential as well as
+the larger profiles. These commands have a reproducible system version
+available to every user. npm global installs use
 `~/.local/npm` and take precedence in the user's shell, so admin or teacher can
 try a newer upstream CLI without `sudo`:
 

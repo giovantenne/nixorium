@@ -57,6 +57,11 @@ policy affects student only or staff too, and whether it supplies initial
 defaults or reapplies settings at login. Avoid blindly copying an entire
 dconf database or overwriting unrelated desktop settings.
 
+Every supplied software profile includes Ghostty and
+`python3Packages.terminaltexteffects`, so the site screensaver is present even
+with Essential. Preserve both declarations when editing the built-in profiles;
+the screensaver module deliberately follows their effective host scope.
+
 ## npm and project content
 
 Distinguish a globally available CLI, a starter project with dependencies,

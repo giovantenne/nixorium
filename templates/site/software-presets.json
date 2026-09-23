@@ -5,14 +5,15 @@
     {
       "id": "essential",
       "label": "Essential",
-      "description": "A browser, terminal, fonts, npm and system-managed Pi and OpenCode CLIs for a small workstation.",
+      "description": "A browser, terminal, fonts, lab screensaver, npm and system-managed Pi and OpenCode CLIs for a small workstation.",
       "packages": [
         "chromium",
         "ghostty",
         "liberation_ttf",
         "nodejs",
         "opencode",
-        "pi-coding-agent"
+        "pi-coding-agent",
+        "python3Packages.terminaltexteffects"
       ]
     },
     {
@@ -30,6 +31,7 @@
         "nodejs",
         "opencode",
         "pi-coding-agent",
+        "python3Packages.terminaltexteffects",
         "vlc"
       ]
     },
@@ -54,6 +56,7 @@
         "pi-coding-agent",
         "python3",
         "python3Packages.pip",
+        "python3Packages.terminaltexteffects",
         "python3Packages.virtualenv",
         "vlc",
         "vscode"
@@ -77,6 +80,7 @@
         "nodejs",
         "opencode",
         "pi-coding-agent",
+        "python3Packages.terminaltexteffects",
         "vlc"
       ]
     },
@@ -98,6 +102,7 @@
         "obs-studio",
         "opencode",
         "pi-coding-agent",
+        "python3Packages.terminaltexteffects",
         "vlc"
       ]
     },
@@ -118,6 +123,7 @@
         "nodejs",
         "opencode",
         "pi-coding-agent",
+        "python3Packages.terminaltexteffects",
         "vlc"
       ]
     },
@@ -140,6 +146,7 @@
         "octave",
         "opencode",
         "pi-coding-agent",
+        "python3Packages.terminaltexteffects",
         "vlc"
       ]
     }
