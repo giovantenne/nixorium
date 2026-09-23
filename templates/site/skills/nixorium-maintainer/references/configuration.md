@@ -10,6 +10,7 @@ The deployment passes these values to `nixorium.lib.mkLab`:
 - `assets`: logo, backgrounds, MIME defaults, and VS Code settings
 - `labSoftware`: package declarations loaded from `lab-software.json`
 - `softwareCatalog`: local suggestions loaded from `software-catalog.nix`
+- `softwarePresets`: optional versioned profiles loaded from `software-presets.json`
 - `sharedModules`: every installed host
 - `controllerModules`: controller only
 - `clientModules`: student PCs only

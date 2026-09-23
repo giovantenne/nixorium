@@ -14,6 +14,11 @@
         (builtins.fromJSON (builtins.readFile ./lab-settings.json));
       labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
       softwareCatalog = import ./software-catalog.nix;
+      softwarePresets =
+        if builtins.pathExists ./software-presets.json then
+          builtins.fromJSON (builtins.readFile ./software-presets.json)
+        else
+          null;
       clientGroups = {
         # graphics = [ "pc01" "pc02" ];
       };
@@ -23,6 +28,7 @@
           labConfig = candidateLabConfig;
           labSoftware = candidateLabSoftware;
           inherit softwareCatalog;
+          inherit softwarePresets;
           inherit clientGroups;
           homeResetEphemeralPaths = [
             ".local/share/docker"

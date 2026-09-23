@@ -51,8 +51,10 @@ describes the site; the controller supplies the systems over the local network.
 - GNOME workstations with Veyon integration; student sessions cannot change
   NetworkManager state, and their homes reset from a clean template at boot
   while retaining up to five local home snapshots.
-- Private, deployment-owned software presets, assets, and extension modules,
-  separate from the reusable public framework.
+- Private, deployment-owned software profiles, suggestions, assets, and
+  extension modules, separate from the reusable public framework. Optional
+  profiles can be added as one reviewed declaration batch and then customized
+  through the ordinary software workflow.
 - Independent, reviewed framework and NixOS/package-base updates, including
   explicitly acknowledged channel migrations. See [the update guide](docs/updates.md)
   for validation, deployment adoption and recovery.
@@ -167,7 +169,7 @@ provides deeper firmware, network, and recovery checks beyond this first trial.
 | `flake.nix`, `lib/`, `modules/`, `pkgs/` | Public `lib.mkLab` API, settings validation, generated hosts, NixOS modules, and packaging |
 | `cmd/nixorium/`, `internal/` | Go CLI/TUI, application workflows, domain rules, and system adapters |
 | `install.sh`, `setup.sh`, `scripts/` | Controller bootstrap, client installation, operational helpers, and validation entry points |
-| `templates/site/` | Private deployment template: settings, software catalog, assets, and local policy modules |
+| `templates/site/` | Private deployment template: settings, software catalog and optional profiles, assets, and local policy modules |
 | `docs/` | Architecture decisions, system reference, troubleshooting, and validation guides |
 | `tests/`, `.github/workflows/` | Schema, shell, and VM tests; CI and release automation |
 | `AGENTS.md`, `skills/` | Contributor instructions and separate upstream-development and lab-maintenance agent workflows |

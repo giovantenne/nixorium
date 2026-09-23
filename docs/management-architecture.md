@@ -47,7 +47,12 @@ see [ADR 0020](adr/0020-autonomous-package-base-updates.md) and
 [the complete operator journey](updates.md).
 Guided software changes now use a curated pinned catalog, evaluated client
 scopes, candidate validation, and a token-bound atomic `lab-software.json`
-writer. A successful TUI save can continue into the ordinary client selector
+writer. An optional deployment-owned `nixoriumSoftwarePresets` output supplies
+versioned software profiles. The application resolves every selected package,
+preserves existing scopes, and creates one additive candidate and one
+content-bound review; catalog, package-resolution, declaration-file, or token
+drift rejects apply. The CLI remains declaration-only and never writes the
+catalog, modules, or lock. A successful TUI save can continue into the ordinary client selector
 with the exact affected identities, but client deployment still has its own
 fresh revision-bound plan and confirmation. Software also exposes an explicit
 state snapshot: controller evidence comes from the matching durable activation

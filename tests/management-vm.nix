@@ -325,6 +325,18 @@
             packages = map (entry: entry // { origin = "managed"; })
               (builtins.fromJSON (builtins.readFile ./lab-software.json)).packages;
           };
+          nixoriumSoftwarePresets = {
+            schemaVersion = 1;
+            defaultPreset = "essential";
+            presets = [
+              {
+                id = "essential";
+                label = "Essential";
+                description = "Common software for everyday work";
+                packages = [ "gimp" "vlc" ];
+              }
+            ];
+          };
           nixoriumSearchSoftwarePackages = request:
             if request.query == "hell" then [
               { id = "hello"; label = "hello"; summary = "A friendly greeting program"; version = "2.12"; availability = "available"; }
@@ -366,7 +378,7 @@
     controller.succeed("systemctl show nixorium-harmonia.service -p LoadState --value | grep -Fx loaded")
     controller.wait_until_fails("systemctl is-active --quiet nixorium-harmonia.service")
     controller.succeed("journalctl -u harmonia.service --no-pager | grep -F 'Failed to set up credentials'")
-    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'; nixorium --help | grep -F 'update check'; nixorium --help | grep -F 'software catalog'; nixorium --help | grep -F 'shutdown plan'")
+    controller.succeed("nixorium --help | grep -F 'setup keys'; nixorium --help | grep -F 'git review'; nixorium --help | grep -F 'git commit plan'; nixorium --help | grep -F 'update check'; nixorium --help | grep -F 'software catalog'; nixorium --help | grep -F 'software preset plan'; nixorium --help | grep -F 'shutdown plan'")
     controller.succeed("mkdir -p /tmp/deployment")
     controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
     controller.succeed("cp /etc/nixorium-test/lab-settings.json /tmp/deployment/lab-settings.json")
@@ -402,6 +414,10 @@
     controller.succeed("cp /tmp/deployment/admin-ssh /tmp/existing-admin-key; chmod 0600 /tmp/existing-admin-key; sha256sum /tmp/existing-admin-key > /tmp/existing-admin-key.sha256; rm /tmp/deployment/admin-ssh /tmp/deployment/keys/admin-ssh.pub; ((sleep 8; printf a; sleep 1; printf e; sleep 4; printf k; sleep 4; printf j; printf i; sleep 1; printf '/tmp/existing-admin-key\\r'; sleep 6; printf '\\r'; sleep 6) | TERM=xterm timeout 35s script -qefc 'stty rows 40 cols 120; nixorium --repo /tmp/deployment' /tmp/nixorium-key-import-tui.log) || test $? = 124")
     controller.succeed("sha256sum -c /tmp/existing-admin-key.sha256; cmp /tmp/existing-admin-key /tmp/deployment/admin-ssh; test \"$(stat -c '%a' /tmp/deployment/admin-ssh)\" = 600; nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'; ! git -C /tmp/deployment status --porcelain=v1 | grep -F 'keys/admin-ssh.pub'")
     controller.succeed("nixorium software catalog --repo /tmp/deployment --json > /tmp/software-catalog.json; jq -e '.operation == \"software-catalog\" and .state == \"ready\" and .managedFile == \"lab-software.json\" and (.catalog | length) == 2 and (.packages | length) == 0 and .groups.graphics == [\"pc01\"]' /tmp/software-catalog.json")
+    controller.succeed("cp -a /tmp/deployment /tmp/preset-deployment; nixorium software presets --repo /tmp/preset-deployment --json > /tmp/software-presets.json; jq -e '.operation == \"software-presets\" and .state == \"ready\" and .catalog.defaultPreset == \"essential\" and .catalog.presets[0].packages == [\"gimp\",\"vlc\"] and (.fingerprint | startswith(\"sha256:\"))' /tmp/software-presets.json")
+    controller.succeed("nixorium software preset plan --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --json > /tmp/software-preset-plan.json; jq -e '.operation == \"software-preset-plan\" and .state == \"ready\" and .request.exclude == [\"vlc\"] and (.selectedPackages | map(.id)) == [\"gimp\"] and (.additions | length) == 1 and .affectedClients == [\"pc01\"] and .confirmation == \"ADD PROFILE\" and (.reviewToken | startswith(\"sha256:\"))' /tmp/software-preset-plan.json")
+    controller.succeed("before=$(sha256sum /tmp/preset-deployment/lab-software.json); nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect sha256:stale --yes --json > /tmp/software-preset-stale.json || test $? = 1; after=$(sha256sum /tmp/preset-deployment/lab-software.json); test \"$before\" = \"$after\"; jq -e '.operation == \"software-preset-apply\" and .state == \"conflict\" and any(.issues[]; .field == \"reviewToken\")' /tmp/software-preset-stale.json")
+    controller.succeed("token=$(jq -r .reviewToken /tmp/software-preset-plan.json); nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect \"$token\" --yes --json > /tmp/software-preset-apply.json; jq -e '.operation == \"software-preset-apply\" and .state == \"applied\" and (.additions | length) == 1 and .affectedClients == [\"pc01\"]' /tmp/software-preset-apply.json; jq -e '.packages == [{\"package\":\"gimp\",\"scope\":{\"kind\":\"all-clients\"}}]' /tmp/preset-deployment/lab-software.json; nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect \"$token\" --yes --json | jq -e '.state == \"unchanged\"'")
     controller.succeed("nixorium software search --repo /tmp/deployment --query hell --json > /tmp/software-search.json; jq -e '.operation == \"software-search\" and .state == \"ready\" and .query == \"hell\" and .results == [{\"id\":\"hello\",\"label\":\"hello\",\"summary\":\"A friendly greeting program\",\"version\":\"2.12\",\"availability\":\"available\"}]' /tmp/software-search.json")
     controller.succeed("nixorium software plan --repo /tmp/deployment --package vlc --scope group:graphics --json > /tmp/software-plan.json; jq -e '.operation == \"software-change-plan\" and .state == \"ready\" and .request.package == \"vlc\" and .request.scope.group == \"graphics\" and .affectedClients == [\"pc01\"] and (.reviewToken | startswith(\"sha256:\")) and .confirmation == \"SAVE\"' /tmp/software-plan.json")
     controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); token=$(jq -r .reviewToken /tmp/software-plan.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect \"$token\" </dev/null >/tmp/software-noninteractive.out 2>/tmp/software-noninteractive.err || test $? = 2; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; grep -F 'requires an interactive terminal or explicit --yes' /tmp/software-noninteractive.err")

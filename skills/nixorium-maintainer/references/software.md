@@ -21,6 +21,9 @@ not guess host names or use new scopes on legacy releases.
 ```sh
 nixorium software catalog
 nixorium software search --query libreoffice
+nixorium software presets
+nixorium software preset plan --preset essential --scope shared --exclude vlc
+nixorium software preset apply --preset essential --scope shared --exclude vlc --expect REVIEW_TOKEN
 nixorium software plan --package vlc --scope shared
 nixorium software apply --package vlc --scope shared --expect REVIEW_TOKEN
 ```
@@ -29,6 +32,16 @@ Use the exact proposal's token and arguments. Removal requires `--remove` in
 both plan and apply. Scope changes must review both old and new destinations.
 Keep related local favorites, shortcuts, and home policy conditional on the
 effective `hostSoftwarePackages`.
+
+Software profiles are optional deployment-owned starting selections. Applying
+one adds its missing package declarations in a single atomic candidate. It does
+not replace the current configuration, remove packages, alter existing scopes,
+or remain active as policy. Review exclusions and every existing declaration
+shown by the plan. One invalid or policy-blocked package rejects the whole
+proposal; do not split the profile into unchecked individual applies. The
+operation writes only `lab-software.json`, and repeated application is
+idempotent. An absent profile catalog leaves individual software management
+available; an invalid catalog must be fixed rather than bypassed.
 
 CLI software apply saves only the declaration. The ordinary TUI also records
 it in Git and, when the controller is affected, builds and activates the
