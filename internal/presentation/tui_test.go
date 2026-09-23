@@ -2101,13 +2101,15 @@ func TestDashboardPXEHidesAndIgnoresRecoveryInNormalStates(t *testing.T) {
 func TestDashboardPXEProgressShowsPhaseBarAndRecentActivity(t *testing.T) {
 	started := time.Now().UTC().Add(-3 * time.Second)
 	model := dashboardModel{
-		report:             testDashboardReport("ready"),
-		screen:             dashboardPXE,
-		busy:               "Preparing netboot artifacts and client closures",
-		pxePreparing:       true,
-		pxeProgressStarted: started,
-		pxeProgressID:      7,
-		width:              100,
+		report: testDashboardReport("ready"),
+		screen: dashboardPXE,
+		busy:   "Preparing netboot artifacts and client closures",
+		installation: installationModel{
+			pxePreparing:  true,
+			pxeStarted:    started,
+			pxeProgressID: 7,
+		},
+		width: 100,
 		actions: DashboardActions{
 			LoadPXEProgress: func() (domain.OperationProgress, error) {
 				return domain.OperationProgress{}, nil
@@ -2149,9 +2151,11 @@ func TestDashboardPXEProgressShowsPhaseBarAndRecentActivity(t *testing.T) {
 func TestDashboardPXEProgressIgnoresRecordFromPreviousRun(t *testing.T) {
 	started := time.Now().UTC()
 	model := dashboardModel{
-		pxePreparing:       true,
-		pxeProgressStarted: started,
-		pxeProgressID:      9,
+		installation: installationModel{
+			pxePreparing:  true,
+			pxeStarted:    started,
+			pxeProgressID: 9,
+		},
 		actions: DashboardActions{LoadPXEProgress: func() (domain.OperationProgress, error) {
 			return domain.OperationProgress{}, nil
 		}},
@@ -2166,8 +2170,8 @@ func TestDashboardPXEProgressIgnoresRecordFromPreviousRun(t *testing.T) {
 		},
 	})
 	model = updated.(dashboardModel)
-	if model.pxeProgress.Operation != "" {
-		t.Fatalf("stale progress was rendered: %+v", model.pxeProgress)
+	if model.installation.pxeProgress.Operation != "" {
+		t.Fatalf("stale progress was rendered: %+v", model.installation.pxeProgress)
 	}
 	if command == nil {
 		t.Fatal("stale progress stopped polling for the current run")

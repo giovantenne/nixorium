@@ -283,16 +283,16 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case domain.SetupStageArtifacts:
 			model.screen = dashboardPXE
 			model.busy = "Preparing netboot artifacts and client closures"
-			model.pxePreparing = true
-			model.pxeProgress = domain.OperationProgress{}
-			model.pxeProgressStarted = time.Now().UTC()
-			model.pxeProgressID++
+			model.installation.pxePreparing = true
+			model.installation.pxeProgress = domain.OperationProgress{}
+			model.installation.pxeStarted = time.Now().UTC()
+			model.installation.pxeProgressID++
 			model.message = ""
 			operation := model.runAction(func() string {
 				report := model.actions.PreparePXE()
 				return report.Message
 			}, dashboardPXE)
-			return model, tea.Batch(operation, schedulePXEProgressTick(model.pxeProgressID))
+			return model, tea.Batch(operation, schedulePXEProgressTick(model.installation.pxeProgressID))
 		case "":
 			model.screen = dashboardPXE
 			model.message = ""
@@ -446,9 +446,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		model.settings.editor = updated.(settingsWizardModel)
 		if model.settings.editor.cancelled {
 			model.settings.editor = settingsWizardModel{}
-			if model.installationFlow {
-				model.installationFlow = false
-				model.installationFailed = false
+			if model.installation.flow {
+				model.installation.flow = false
+				model.installation.failed = false
 				model.settings.returnScreen = dashboardHome
 				model.screen = dashboardHome
 				model.message = "Computer installation cancelled; no setting was changed."
@@ -460,7 +460,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		}
 		if model.settings.editor.accepted {
 			model.settings.candidate = model.settings.editor.settings
-			if (model.settings.returnScreen == dashboardSetup || model.installationFlow) && model.settings.collectPasswords {
+			if (model.settings.returnScreen == dashboardSetup || model.installation.flow) && model.settings.collectPasswords {
 				if model.actions.ChangePassword == nil {
 					model.message = "Password setup is not available in this deployment."
 					return model, nil
@@ -482,14 +482,14 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		}
 		return model, command
 	case dashboardSettingsPasswords:
-		if model.settings.returnScreen == dashboardSetup || model.installationFlow {
+		if model.settings.returnScreen == dashboardSetup || model.installation.flow {
 			switch key.String() {
 			case "esc", "left":
 				model.settings.editor = settingsWizardModel{}
 				model.settings.candidate = domain.LabSettingsFile{}
-				if model.installationFlow {
-					model.installationFlow = false
-					model.installationFailed = false
+				if model.installation.flow {
+					model.installation.flow = false
+					model.installation.failed = false
 					model.screen = dashboardHome
 				} else {
 					model.screen = dashboardSetup
@@ -1112,9 +1112,9 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 	case dashboardPXE:
 		switch key.String() {
 		case "esc", "left":
-			if model.installationFlow && model.installationFailed {
-				model.installationFlow = false
-				model.installationFailed = false
+			if model.installation.flow && model.installation.failed {
+				model.installation.flow = false
+				model.installation.failed = false
 				model.screen = dashboardHome
 				model.message = ""
 				return model, nil
@@ -1134,16 +1134,16 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			}
 		case "p":
 			model.busy = "Preparing netboot artifacts and client closures"
-			model.pxePreparing = true
-			model.pxeProgress = domain.OperationProgress{}
-			model.pxeProgressStarted = time.Now().UTC()
-			model.pxeProgressID++
+			model.installation.pxePreparing = true
+			model.installation.pxeProgress = domain.OperationProgress{}
+			model.installation.pxeStarted = time.Now().UTC()
+			model.installation.pxeProgressID++
 			model.message = ""
 			operation := model.runAction(func() string {
 				report := model.actions.PreparePXE()
 				return report.Message
 			}, dashboardPXE)
-			return model, tea.Batch(operation, schedulePXEProgressTick(model.pxeProgressID))
+			return model, tea.Batch(operation, schedulePXEProgressTick(model.installation.pxeProgressID))
 		case "s":
 			model.busy = "Checking PXE readiness"
 			model.message = ""

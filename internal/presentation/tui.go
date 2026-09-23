@@ -185,6 +185,20 @@ type maintenanceModel struct {
 	gitCommitResult domain.GitCommitReport
 }
 
+// installationModel owns guided installation and PXE lifecycle state,
+// including progress identity for delayed service messages.
+type installationModel struct {
+	startPlan        domain.PXELifecycleReport
+	startingLabSetup bool
+	flow             bool
+	stage            int
+	failed           bool
+	pxePreparing     bool
+	pxeProgress      domain.OperationProgress
+	pxeStarted       time.Time
+	pxeProgressID    uint64
+}
+
 type dashboardModel struct {
 	updateDetails          bool
 	returnAdmin            bool
@@ -222,28 +236,19 @@ type dashboardModel struct {
 	busy                   string
 	message                string
 	confirmation           string
-	startPlan              domain.PXELifecycleReport
+	installation           installationModel
 	hosts                  domain.HostsReport
 	deployment             deploymentModel
 	controller             controllerModel
 	maintenance            maintenanceModel
 	updates                updateModel
 	settings               settingsModel
-	startingLabSetup       bool
-	installationFlow       bool
-	installationStage      int
-	installationFailed     bool
-
-	pxePreparing       bool
-	pxeProgress        domain.OperationProgress
-	pxeProgressStarted time.Time
-	pxeProgressID      uint64
-	software           softwareModel
-	shutdown           shutdownModel
-	width              int
-	height             int
-	isDark             bool
-	activitySpinner    spinner.Model
+	software               softwareModel
+	shutdown               shutdownModel
+	width                  int
+	height                 int
+	isDark                 bool
+	activitySpinner        spinner.Model
 
 	initializing bool
 	initialError bool
@@ -552,11 +557,11 @@ func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
 		model.message = "Laboratory settings are not available in this session."
 		return model, nil
 	}
-	model.installationFlow = true
-	model.installationStage = 0
-	model.installationFailed = false
+	model.installation.flow = true
+	model.installation.stage = 0
+	model.installation.failed = false
 	model.setupMode = false
-	model.startingLabSetup = true
+	model.installation.startingLabSetup = true
 	model.settings.returnScreen = dashboardHome
 	model.settings.collectPasswords = false
 	model.settings.result = domain.ConfigurationSaveReport{}
@@ -564,7 +569,7 @@ func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
 	model.settings.candidate = domain.LabSettingsFile{}
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
-	model.pxeProgress = domain.OperationProgress{}
+	model.installation.pxeProgress = domain.OperationProgress{}
 	model.areaReturn = dashboardHome
 	model.screen = dashboardSettings
 	model.busy = "Loading laboratory settings"
@@ -577,9 +582,9 @@ func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
 
 func (model dashboardModel) failComputerInstallation(message string) (tea.Model, tea.Cmd) {
 	model.busy = ""
-	model.installationFailed = true
+	model.installation.failed = true
 	model.controller.applying = false
-	model.pxePreparing = false
+	model.installation.pxePreparing = false
 	model.message = message
 	model.screen = dashboardPXE
 	return model, nil
@@ -594,14 +599,14 @@ func (model dashboardModel) continueComputerInstallation(report domain.SetupRepo
 		if !model.setupKeyActionsAvailable() {
 			return model.failComputerInstallation("Controller key preparation is not available in this session.")
 		}
-		model.installationStage = 2
+		model.installation.stage = 2
 		model.busy = "Preparing and installing controller keys"
 		return model, model.prepareSetupKeys()
 	case domain.SetupStageReview:
 		if model.actions.SaveSetupConfiguration == nil {
 			return model.failComputerInstallation("Local configuration saving is not available in this session.")
 		}
-		model.installationStage = 1
+		model.installation.stage = 1
 		model.busy = "Saving generated laboratory files locally"
 		return model, func() tea.Msg {
 			return dashboardSetupSaveMsg{report: model.actions.SaveSetupConfiguration()}
@@ -610,7 +615,7 @@ func (model dashboardModel) continueComputerInstallation(report domain.SetupRepo
 		if model.actions.PlanController == nil || model.actions.ApplyController == nil {
 			return model.failComputerInstallation("Controller activation is not available in this session.")
 		}
-		model.installationStage = 3
+		model.installation.stage = 3
 		model.busy = "Checking the controller configuration"
 		return model, func() tea.Msg {
 			return dashboardControllerPlanMsg{report: model.actions.PlanController()}
@@ -621,7 +626,7 @@ func (model dashboardModel) continueComputerInstallation(report domain.SetupRepo
 		if model.actions.PlanPXEStart == nil {
 			return model.failComputerInstallation("PXE start validation is not available in this session.")
 		}
-		model.installationStage = 4
+		model.installation.stage = 4
 		model.busy = "Checking PXE readiness"
 		return model, func() tea.Msg {
 			return dashboardPlanMsg{report: model.actions.PlanPXEStart()}
@@ -635,12 +640,12 @@ func (model dashboardModel) startComputerInstallationPreparation() (tea.Model, t
 	if model.actions.PreparePXE == nil {
 		return model.failComputerInstallation("Client preparation is not available in this session.")
 	}
-	model.installationStage = 4
+	model.installation.stage = 4
 	model.busy = "Preparing client systems and network installation files"
-	model.pxePreparing = true
-	model.pxeProgress = domain.OperationProgress{}
-	model.pxeProgressStarted = time.Now().UTC()
-	model.pxeProgressID++
+	model.installation.pxePreparing = true
+	model.installation.pxeProgress = domain.OperationProgress{}
+	model.installation.pxeStarted = time.Now().UTC()
+	model.installation.pxeProgressID++
 	model.message = ""
 	operation := func() tea.Msg {
 		report := model.actions.PreparePXE()
@@ -651,7 +656,7 @@ func (model dashboardModel) startComputerInstallationPreparation() (tea.Model, t
 		}
 		return dashboardInstallationPrepareMsg{report: report, status: status, statusErr: err}
 	}
-	return model, tea.Batch(operation, schedulePXEProgressTick(model.pxeProgressID))
+	return model, tea.Batch(operation, schedulePXEProgressTick(model.installation.pxeProgressID))
 }
 
 func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
@@ -2134,7 +2139,7 @@ func (model dashboardModel) pxeView() string {
 	}
 	path := []string{"Installation", "Network installation"}
 	title := "Network installation"
-	if model.installationFlow {
+	if model.installation.flow {
 		path = []string{"Installation", "Install computers"}
 		title = "Install computers"
 	} else if model.setupMode {
@@ -2151,11 +2156,11 @@ func (model dashboardModel) pxeView() string {
 		fmt.Sprintf("Interface:          %s", model.report.Meta.Network.Interface),
 		fmt.Sprintf("Service address:    %s", model.report.Meta.Controller.DHCPIP),
 	}
-	if model.installationFlow {
+	if model.installation.flow {
 		steps := []string{"Laboratory settings", "Save configuration", "Controller keys", "Activate controller", "Prepare clients", "Start PXE"}
 		lines = append(lines, "")
 		lines = append(lines, model.computerInstallationSteps(steps)...)
-		if model.installationFailed {
+		if model.installation.failed {
 			return model.renderShell(tuiShell{
 				path:    path,
 				body:    strings.Join(lines, "\n"),
@@ -2186,9 +2191,9 @@ func (model dashboardModel) pxeView() string {
 			actions: model.pxeActions(),
 		})
 	}
-	if model.pxePreparing {
-		if model.pxeProgress.State != "completed" {
-			elapsed := time.Since(model.pxeProgressStarted).Truncate(time.Second)
+	if model.installation.pxePreparing {
+		if model.installation.pxeProgress.State != "completed" {
+			elapsed := time.Since(model.installation.pxeStarted).Truncate(time.Second)
 			if elapsed < 0 {
 				elapsed = 0
 			}
@@ -2196,13 +2201,13 @@ func (model dashboardModel) pxeView() string {
 		} else {
 			lines = append(lines, "")
 		}
-		lines = append(lines, model.operationProgressView(model.pxeProgress, "Current progress")...)
+		lines = append(lines, model.operationProgressView(model.installation.pxeProgress, "Current progress")...)
 		notice := tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Preparation continues if this view closes",
 			detail: "The systemd-owned operation is recorded and can be inspected again later.",
 		}
-		if model.pxeProgress.State == "completed" {
+		if model.installation.pxeProgress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Client preparation completed", detail: "The client systems and network installation files are ready."}
 		}
 		return model.renderShell(tuiShell{
@@ -2221,7 +2226,7 @@ func (model dashboardModel) pxeView() string {
 		})
 	}
 	if model.screen == dashboardPXEStartReview {
-		scope := model.startPlan.Interface + " · controller network"
+		scope := model.installation.startPlan.Interface + " · controller network"
 		body := strings.Join([]string{
 			tuiTitle("Start network installation?", model.isDark),
 			"",
@@ -2229,8 +2234,8 @@ func (model dashboardModel) pxeView() string {
 		}, "\n")
 		notices := []tuiNotice{{
 			kind:   tuiStatusAttention,
-			title:  "Temporarily remove " + model.startPlan.StaticCIDR + "; remote connections may be interrupted",
-			detail: "Serve ProxyDHCP, TFTP, HTTP and cache via " + model.startPlan.DHCPAddress + ". Institutional DHCP remains authoritative; stop or reboot recovery restores normal addressing.",
+			title:  "Temporarily remove " + model.installation.startPlan.StaticCIDR + "; remote connections may be interrupted",
+			detail: "Serve ProxyDHCP, TFTP, HTTP and cache via " + model.installation.startPlan.DHCPAddress + ". Institutional DHCP remains authoritative; stop or reboot recovery restores normal addressing.",
 		}}
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
@@ -2267,9 +2272,9 @@ func (model dashboardModel) pxeView() string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, model.pxeNextStepView()...)
-	if model.pxeProgress.Operation != "" {
+	if model.installation.pxeProgress.Operation != "" {
 		lines = append(lines, "")
-		lines = append(lines, model.operationProgressView(model.pxeProgress, "Last preparation")...)
+		lines = append(lines, model.operationProgressView(model.installation.pxeProgress, "Last preparation")...)
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
@@ -2282,11 +2287,11 @@ func (model dashboardModel) computerInstallationSteps(labels []string) []string 
 	lines := []string{""}
 	for index, label := range labels {
 		switch {
-		case index < model.installationStage:
+		case index < model.installation.stage:
 			lines = append(lines, tuiStatus(label, tuiStatusSuccess, model.isDark))
-		case index == model.installationStage && model.screen == dashboardPXEStartReview:
+		case index == model.installation.stage && model.screen == dashboardPXEStartReview:
 			lines = append(lines, tuiMuted("○ "+label+" · Awaiting confirmation", model.isDark))
-		case index == model.installationStage:
+		case index == model.installation.stage:
 			lines = append(lines, tuiTitle("● "+label+" · Running", model.isDark))
 		default:
 			lines = append(lines, tuiMuted("○ "+label+" · Waiting", model.isDark))
@@ -2302,7 +2307,7 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	if model.screen == dashboardPXELeaveReview {
 		return []tuiAction{{key: "x", label: "Stop and exit"}, {key: "Enter", label: "Leave active"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	}
-	if model.pxePreparing {
+	if model.installation.pxePreparing {
 		return []tuiAction{{key: "l", label: "Progress details"}, {key: "q", label: "Close view"}, {key: "F1", label: "Help"}}
 	}
 	if model.controller.applying {
@@ -2311,7 +2316,7 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	if model.busy != "" {
 		return []tuiAction{{key: "q", label: "Close view"}, {key: "F1", label: "Help"}}
 	}
-	if model.installationFlow && model.installationFailed {
+	if model.installation.flow && model.installation.failed {
 		return []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 	}
 	actions := []tuiAction{}

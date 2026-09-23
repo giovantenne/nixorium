@@ -56,7 +56,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardSetupMsg:
 		model.busy = ""
 		model.setup = message.report
-		if model.installationFlow {
+		if model.installation.flow {
 			return model.continueComputerInstallation(message.report)
 		}
 		model.screen = dashboardSetup
@@ -80,7 +80,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardSetupKeysMsg:
 		model.busy = ""
-		if model.installationFlow {
+		if model.installation.flow {
 			switch {
 			case message.keyErr != nil:
 				return model.failComputerInstallation("Controller key preparation failed: " + message.keyErr.Error())
@@ -131,7 +131,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardSetupSaveMsg:
 		model.busy = ""
-		if model.installationFlow {
+		if model.installation.flow {
 			if message.report.HasErrors() || (message.report.State != "saved" && message.report.State != "unchanged") {
 				return model.failComputerInstallation(message.report.Message)
 			}
@@ -147,9 +147,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardPlanMsg:
 		model.busy = ""
-		model.startPlan = message.report
+		model.installation.startPlan = message.report
 		if message.report.HasErrors() {
-			if model.installationFlow {
+			if model.installation.flow {
 				return model.failComputerInstallation(message.report.Message)
 			}
 			model.message = message.report.Message
@@ -159,7 +159,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.report.Mode == "active" {
 			model.message = "PXE installation mode is already active."
 			model.screen = dashboardPXE
-			model.installationFlow = false
+			model.installation.flow = false
 			return model, nil
 		}
 		model.confirmation = ""
@@ -168,7 +168,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardInstallationPrepareMsg:
 		model.busy = ""
-		model.pxePreparing = false
+		model.installation.pxePreparing = false
 		if message.statusErr == nil {
 			model.report = message.status
 		}
@@ -176,7 +176,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model.failComputerInstallation("Client preparation failed: " + message.report.Message)
 		}
 		model.message = message.report.Message
-		model.installationStage = 5
+		model.installation.stage = 5
 		if model.actions.PlanPXEStart == nil {
 			return model.failComputerInstallation("PXE start validation is not available in this session.")
 		}
@@ -185,14 +185,14 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return dashboardPlanMsg{report: model.actions.PlanPXEStart()}
 		}
 		if model.actions.LoadPXEProgress != nil {
-			return model, tea.Batch(model.loadPXEProgress(model.pxeProgressID), plan)
+			return model, tea.Batch(model.loadPXEProgress(model.installation.pxeProgressID), plan)
 		}
 		return model, plan
 	case dashboardOperationMsg:
-		preparationFinished := model.pxePreparing && message.screen == dashboardPXE
+		preparationFinished := model.installation.pxePreparing && message.screen == dashboardPXE
 		model.busy = ""
 		if preparationFinished {
-			model.pxePreparing = false
+			model.installation.pxePreparing = false
 		}
 		model.message = message.message
 		if message.err != nil {
@@ -201,29 +201,29 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.report = message.report
 		}
 		model.screen = message.screen
-		if model.installationFlow && message.screen == dashboardPXE && model.report.PXE.Mode == "active" {
-			model.installationFlow = false
-			model.installationFailed = false
+		if model.installation.flow && message.screen == dashboardPXE && model.report.PXE.Mode == "active" {
+			model.installation.flow = false
+			model.installation.failed = false
 			model.setupMode = false
 			model.areaReturn = dashboardHome
 		}
 		if preparationFinished && model.actions.LoadPXEProgress != nil {
-			return model, model.loadPXEProgress(model.pxeProgressID)
+			return model, model.loadPXEProgress(model.installation.pxeProgressID)
 		}
 		return model, nil
 	case dashboardPXEProgressTickMsg:
-		if !model.pxePreparing || message.id != model.pxeProgressID || model.actions.LoadPXEProgress == nil {
+		if !model.installation.pxePreparing || message.id != model.installation.pxeProgressID || model.actions.LoadPXEProgress == nil {
 			return model, nil
 		}
 		return model, model.loadPXEProgress(message.id)
 	case dashboardPXEProgressMsg:
-		if message.id != model.pxeProgressID {
+		if message.id != model.installation.pxeProgressID {
 			return model, nil
 		}
-		if message.err == nil && (model.pxeProgressStarted.IsZero() || !message.progress.StartedAt.Before(model.pxeProgressStarted)) {
-			model.pxeProgress = message.progress
+		if message.err == nil && (model.installation.pxeStarted.IsZero() || !message.progress.StartedAt.Before(model.installation.pxeStarted)) {
+			model.installation.pxeProgress = message.progress
 		}
-		if model.pxePreparing {
+		if model.installation.pxePreparing {
 			return model, schedulePXEProgressTick(message.id)
 		}
 		return model, nil
@@ -296,7 +296,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardControllerPlanMsg:
 		model.busy = ""
 		model.controller.plan = message.report
-		if model.installationFlow {
+		if model.installation.flow {
 			if message.report.HasErrors() {
 				return model.failComputerInstallation(controllerPlanIssues(message.report))
 			}
@@ -342,7 +342,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			model.report = message.status
 		}
-		if model.installationFlow {
+		if model.installation.flow {
 			model.screen = dashboardPXE
 			if message.report.HasErrors() || !message.report.Applied || !message.report.Verified {
 				return model.failComputerInstallation("Controller activation failed: " + message.report.Message)
@@ -507,9 +507,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = ""
 		if message.err != nil {
 			model.message = "Settings could not be loaded: " + message.err.Error()
-			if model.installationFlow {
-				model.installationFlow = false
-				model.installationFailed = false
+			if model.installation.flow {
+				model.installation.flow = false
+				model.installation.failed = false
 			}
 			if model.settings.returnScreen == dashboardSetup {
 				model.screen = dashboardSetup
@@ -520,8 +520,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		model.settings.current = message.settings
 		model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
-		if model.startingLabSetup {
-			model.startingLabSetup = false
+		if model.installation.startingLabSetup {
+			model.installation.startingLabSetup = false
 			model.settings.current.Lab.DeploymentMode = "laboratory"
 			if model.settings.current.Lab.PCCount == 0 {
 				model.settings.current.Lab.PCCount = 20
@@ -555,13 +555,13 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settings.plan = message.report
 		if message.report.HasErrors() {
 			model.message = "Candidate validation failed: " + settingsIssueMessage(message.report.Issues)
-			if model.settings.returnScreen == dashboardSetup || model.installationFlow {
+			if model.settings.returnScreen == dashboardSetup || model.installation.flow {
 				title := "Nixorium — First setup / Laboratory settings"
-				if model.installationFlow {
+				if model.installation.flow {
 					title = "Nixorium — Install computers / Laboratory settings"
 				}
 				fields := settingsFields
-				if model.installationFlow {
+				if model.installation.flow {
 					fields = installationSettingsFields
 				}
 				model.settings.editor = newSettingsEditorModel(model.settings.candidate, fields, title)
@@ -575,11 +575,11 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			}
 			return model, nil
 		}
-		if model.installationFlow {
+		if model.installation.flow {
 			if model.actions.SaveSettings == nil {
 				return model.failComputerInstallation("Laboratory settings cannot be saved in this session.")
 			}
-			model.installationStage = 1
+			model.installation.stage = 1
 			model.busy = "Saving the validated laboratory settings"
 			model.settings.applying = true
 			model.message = ""
@@ -601,7 +601,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = ""
 		if message.err != nil {
 			model.message = "Password change failed: " + message.err.Error()
-			if (model.settings.returnScreen == dashboardSetup || model.installationFlow) && message.candidate.SchemaVersion != 0 {
+			if (model.settings.returnScreen == dashboardSetup || model.installation.flow) && message.candidate.SchemaVersion != 0 {
 				model.settings.candidate = message.candidate
 			}
 			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
@@ -632,7 +632,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				model.message = "Configuration save failed: " + settingsIssueMessage(message.report.Issues)
 			}
 		}
-		if model.installationFlow {
+		if model.installation.flow {
 			if message.report.HasErrors() || (message.report.State != "saved" && message.report.State != "unchanged") {
 				return model.failComputerInstallation(message.report.Message)
 			}
@@ -885,7 +885,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			return model, input.command
 		}
 	}
-	if key.String() == "l" && (model.deployment.applying || model.controller.applying || model.pxePreparing) {
+	if key.String() == "l" && (model.deployment.applying || model.controller.applying || model.installation.pxePreparing) {
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}

@@ -98,9 +98,9 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 			{
 				name: "start review",
 				model: dashboardModel{
-					report:    testDashboardReport("ready"),
-					screen:    dashboardPXEStartReview,
-					startPlan: domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"},
+					report:       testDashboardReport("ready"),
+					screen:       dashboardPXEStartReview,
+					installation: installationModel{startPlan: domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}},
 				},
 				expected: []string{"Type START to continue", "Enter", "Start PXE", "Esc", "Cancel", "Help"},
 			},
@@ -543,7 +543,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 			m.shutdown.plan = domain.ShutdownPlanReport{State: "ready", Eligible: 1, Policy: domain.ShutdownProtectUnknown, Confirmation: "SHUTDOWN", Targets: []domain.ShutdownTargetPlan{{Name: "pc200", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}}}
 			m.shutdown.result = domain.ShutdownApplyReport{State: "completed", Accepted: 1, Targets: []domain.ShutdownTargetOutcome{{Name: "pc200", State: "accepted", Detail: "request accepted"}}}
 			m.controller.plan = domain.ControllerRebuildPlanReport{Controller: "pc99", Revision: strings.Repeat("a", 40), Confirmation: "REBUILD"}
-			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
+			m.installation.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 			if screen == dashboardPXELeaveReview {
 				m.setupMode = true
 				m.report.PXE.Mode = "active"
@@ -715,7 +715,7 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 		t.Fatalf("installation area did not open: screen=%d", m.screen)
 	}
 	m = press(m, "enter")
-	if m.screen != dashboardSettings || m.areaReturn != dashboardHome || !m.installationFlow {
+	if m.screen != dashboardSettings || m.areaReturn != dashboardHome || !m.installation.flow {
 		t.Fatalf("installation task did not start the direct flow: screen=%d return=%d", m.screen, m.areaReturn)
 	}
 	updated, command := m.Update(dashboardSettingsMsg{settings: wizardSettings()})
@@ -724,7 +724,7 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 		t.Fatalf("installation settings did not open: screen=%d", m.screen)
 	}
 	m = press(m, "esc")
-	if m.screen != dashboardHome || m.installationFlow {
+	if m.screen != dashboardHome || m.installation.flow {
 		t.Fatalf("cancelled installation returned to %d", m.screen)
 	}
 }
@@ -882,7 +882,7 @@ func TestExperienceRenderGallery(t *testing.T) {
 			m.updates.check = domain.UpdateCheckReport{Operation: "update-check", State: "available", CurrentRef: "v2.2.0", Upstream: "github:giovantenne/nixorium", Stable: []domain.UpdateRelease{{Tag: "v2.3.0", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.1", Channel: domain.UpdateChannelStable}, {Tag: "v2.2.0", Channel: domain.UpdateChannelStable}}}
 		case "confirmation":
 			m.screen = dashboardPXEStartReview
-			m.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
+			m.installation.startPlan = domain.PXELifecycleReport{Interface: "eth0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.168.1.10"}
 		case "setup":
 			m.screen = dashboardSetup
 			m.setup = testSetupReport(true, false, false, false)
