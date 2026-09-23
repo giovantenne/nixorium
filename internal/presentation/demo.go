@@ -162,10 +162,10 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	r.key(demoText("/"))
 	r.capture("Open Software directly in Search", 900)
 	r.typeAndCapture("inkscape", "Type the package name")
-	r.message(dashboardSoftwareSearchMsg{id: r.model.software.searchID, report: actions.SearchSoftware(context.Background(), "inkscape")})
+	r.message(dashboardSoftwareSearchMsg{id: r.model.software.searchToken(), report: actions.SearchSoftware(context.Background(), "inkscape")})
 	r.capture("Find Inkscape in the pinned package set", 1900)
 	r.pressAndCapture(demoCode(tea.KeyEnter), "Choose Inkscape from Search", 1900)
-	for r.model.software.scopeOptions()[r.model.software.scopeCursor].scope.Kind != domain.SoftwareScopeAllClients {
+	for r.model.software.currentScopeKind() != domain.SoftwareScopeAllClients {
 		r.pressAndCapture(demoCode(tea.KeyDown), "Move through declaration scopes", 550)
 	}
 	r.capture("Choose all current and future clients", 2400)

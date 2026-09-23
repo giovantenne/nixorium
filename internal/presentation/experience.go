@@ -348,7 +348,7 @@ func (model dashboardModel) textEntry() bool {
 	case dashboardHosts:
 		return model.hostSearching
 	case dashboardSoftware:
-		return model.software.searching || model.software.stage == softwareReview
+		return model.software.acceptsText()
 	default:
 		return false
 	}
