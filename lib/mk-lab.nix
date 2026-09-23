@@ -284,6 +284,7 @@ let
   labConfigJson = builtins.toFile "lab-config.json" (builtins.toJSON config);
   labSoftwareJson = builtins.toFile "lab-software.json" (builtins.toJSON labSoftwareConfig);
   softwareCatalogJson = builtins.toFile "software-catalog.json" (builtins.toJSON softwareCatalog);
+  softwarePresetsJson = builtins.toFile "software-presets.json" (builtins.toJSON softwarePresetsConfig);
   homeResetEphemeralPathsJson = builtins.toFile "home-reset-ephemeral-paths.json"
     (builtins.toJSON homeResetEphemeralPaths);
   clientGroupsJson = builtins.toFile "client-groups.json" (builtins.toJSON clientGroups);
@@ -486,6 +487,7 @@ let
           labConfig = builtins.fromJSON (builtins.readFile ./lab-config.json);
           labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
           softwareCatalog = builtins.fromJSON (builtins.readFile ./software-catalog.json);
+          softwarePresets = builtins.fromJSON (builtins.readFile ./software-presets.json);
           homeResetEphemeralPaths = builtins.fromJSON (builtins.readFile ./home-reset-ephemeral-paths.json);
           clientGroups = builtins.fromJSON (builtins.readFile ./client-groups.json);
           publicKeys = {
@@ -522,6 +524,7 @@ let
     install -m 0644 ${labSoftwareJson} "$out/lab-software.json"
     install -m 0644 ${labMetaJson} "$out/lab-meta.json"
     install -m 0644 ${softwareCatalogJson} "$out/software-catalog.json"
+    install -m 0644 ${softwarePresetsJson} "$out/software-presets.json"
     install -m 0644 ${homeResetEphemeralPathsJson} "$out/home-reset-ephemeral-paths.json"
     install -m 0644 ${clientGroupsJson} "$out/client-groups.json"
     install -m 0755 ${upstreamRoot}/setup.sh "$out/setup.sh"

@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "defaultPreset": "essential",
+  "presets": [
+    {
+      "id": "essential",
+      "label": "Essential",
+      "description": "A browser, terminal, fonts, npm and system-managed Pi and OpenCode CLIs for a small workstation.",
+      "packages": [
+        "chromium",
+        "ghostty",
+        "liberation_ttf",
+        "nodejs",
+        "opencode",
+        "pi-coding-agent"
+      ]
+    },
+    {
+      "id": "general-education",
+      "label": "General education",
+      "description": "Everyday classroom tools for documents, spelling, web access and media playback.",
+      "packages": [
+        "chromium",
+        "ghostty",
+        "hunspell",
+        "hunspellDicts.en_US",
+        "hunspellDicts.it_IT",
+        "liberation_ttf",
+        "libreoffice-qt",
+        "nodejs",
+        "opencode",
+        "pi-coding-agent",
+        "vlc"
+      ]
+    },
+    {
+      "id": "programming",
+      "label": "Programming",
+      "description": "General classroom software plus editors and common Java, JavaScript, Python and C toolchains.",
+      "packages": [
+        "chromium",
+        "gcc",
+        "ghostty",
+        "git",
+        "hunspell",
+        "hunspellDicts.en_US",
+        "hunspellDicts.it_IT",
+        "jdk21",
+        "liberation_ttf",
+        "libreoffice-qt",
+        "maven",
+        "nodejs",
+        "opencode",
+        "pi-coding-agent",
+        "python3",
+        "python3Packages.pip",
+        "python3Packages.virtualenv",
+        "vlc",
+        "vscode"
+      ]
+    },
+    {
+      "id": "graphics",
+      "label": "Graphics and illustration",
+      "description": "General classroom software plus tools for raster editing, vector drawing and digital painting.",
+      "packages": [
+        "chromium",
+        "ghostty",
+        "gimp",
+        "hunspell",
+        "hunspellDicts.en_US",
+        "hunspellDicts.it_IT",
+        "inkscape",
+        "krita",
+        "liberation_ttf",
+        "libreoffice-qt",
+        "nodejs",
+        "opencode",
+        "pi-coding-agent",
+        "vlc"
+      ]
+    },
+    {
+      "id": "multimedia",
+      "label": "Audio and video",
+      "description": "General classroom software plus audio editing, screen recording and video production tools.",
+      "packages": [
+        "audacity",
+        "chromium",
+        "ghostty",
+        "hunspell",
+        "hunspellDicts.en_US",
+        "hunspellDicts.it_IT",
+        "kdePackages.kdenlive",
+        "liberation_ttf",
+        "libreoffice-qt",
+        "nodejs",
+        "obs-studio",
+        "opencode",
+        "pi-coding-agent",
+        "vlc"
+      ]
+    },
+    {
+      "id": "cad-3d",
+      "label": "CAD and 3D modelling",
+      "description": "General classroom software plus parametric CAD and 3D modelling, animation and rendering.",
+      "packages": [
+        "blender",
+        "chromium",
+        "freecad",
+        "ghostty",
+        "hunspell",
+        "hunspellDicts.en_US",
+        "hunspellDicts.it_IT",
+        "liberation_ttf",
+        "libreoffice-qt",
+        "nodejs",
+        "opencode",
+        "pi-coding-agent",
+        "vlc"
+      ]
+    },
+    {
+      "id": "stem",
+      "label": "STEM and scientific computing",
+      "description": "General classroom software plus numerical, statistical, plotting and computer-algebra tools.",
+      "packages": [
+        "R",
+        "chromium",
+        "ghostty",
+        "gnuplot",
+        "hunspell",
+        "hunspellDicts.en_US",
+        "hunspellDicts.it_IT",
+        "liberation_ttf",
+        "libreoffice-qt",
+        "maxima",
+        "nodejs",
+        "octave",
+        "opencode",
+        "pi-coding-agent",
+        "vlc"
+      ]
+    }
+  ]
+}

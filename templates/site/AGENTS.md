@@ -27,6 +27,11 @@ configuration, software, home customization, diagnostics, and operations.
   starting selections. Apply a profile through one reviewed preset plan/apply;
   preserve existing declarations and scopes, and do not treat the profile as
   persistent policy after its packages enter `lab-software.json`.
+  New templates start with the Essential profile at `shared` scope; changing
+  that template default must keep the catalog and initial declarations equal.
+  Node/npm, Pi and OpenCode are common to all supplied profiles. Per-user npm
+  overrides persist for staff but are reset for students; keep student agent
+  credentials and state out of both the template and rotating snapshots.
 - Keep the direct `nixpkgs` input and
   `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together when present.
   Updating Nixorium must preserve that package-base lock node. Do not change

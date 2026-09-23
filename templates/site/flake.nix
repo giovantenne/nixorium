@@ -31,9 +31,14 @@
           inherit softwarePresets;
           inherit clientGroups;
           homeResetEphemeralPaths = [
+            ".cache/opencode"
+            ".config/opencode"
             ".local/share/docker"
+            ".local/share/opencode"
             ".local/npm"
             ".npm"
+            ".opencode"
+            ".pi"
           ];
 
           publicKeys = {
