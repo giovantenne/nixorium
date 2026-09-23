@@ -1,9 +1,9 @@
 # TUI render gallery
 
-These are plain-text versions of Bubble Tea views at the 120×30 reference size.
-The core screens come from deterministic presentation fixtures; release data is
-synthetic. No real computer was contacted or changed. ANSI styling and trailing
-whitespace are removed here.
+This hand-maintained tour explains the decisions and transitions in the
+management interface. See the [generated TUI gallery](tui-gallery.md) for
+byte-checked 120×30 screens produced by the real Bubble Tea renderer. Its data
+is synthetic; no real computer is contacted or changed.
 
 ## Overview
 

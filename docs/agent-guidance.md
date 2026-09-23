@@ -20,6 +20,8 @@ an explicit product decision.
 | Input ownership and updates | Update adapters/tests, Flake/template contract | Maintainer software/framework-update guidance; deployment AGENTS |
 | Bootstrap prompts, sequencing, and netboot keyboard | `install.sh`, bootstrap CLI, `lib/mk-lab.nix`, controller-bootstrap and mkLab tests | Root README; deployment README; system reference; controller-first ADR; changelog |
 | Validation or skill distribution | `scripts/validate.sh`, `tests/source-checks.nix`, package source fileset | Both AGENTS files; developer validation reference |
+| Generated TUI gallery | `cmd/nixorium-docs`, real fixtures in `internal/presentation/demo.go`, `scripts/generate-docs.sh` | TUI tour, README and contributor guide |
+| Canonical upstream/template copies | `scripts/sync-canonical-copies.sh` allowlist and `tests/canonical-copy-sync.sh` | Source documents, template copies and contributor guide |
 
 Keep root `AGENTS.md` focused on upstream work. The template's `AGENTS.md`
 orients a private-deployment agent; the maintainer skill routes to task-specific

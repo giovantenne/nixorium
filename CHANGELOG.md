@@ -225,6 +225,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   feature models, including job identity for delayed progress messages. Split
   CLI family dispatch and reviewed apply boundaries out of the composition
   root while preserving parser, text/JSON output and exit-code behavior.
+- Added a deterministic real-renderer TUI gallery with non-mutating drift
+  checks, explicit regeneration, and a separate code-only generator. Added an
+  allowlisted canonical-copy synchronizer that detects missing/extra files and
+  refuses symlinks, plus a human contributor guide for setup, ownership, gates
+  and pull-request preparation.
 
 - Corrected the official `cache.nixos.org` public key used by both controller
   bootstrap stages. Signed substitutes are accepted again instead of being

@@ -26,7 +26,7 @@ func guidanceRoot(t *testing.T) string {
 
 func guidanceFiles(t *testing.T, root string) []string {
 	t.Helper()
-	files := []string{"AGENTS.md", "templates/site/AGENTS.md", "docs/agent-guidance.md"}
+	files := []string{"AGENTS.md", "CONTRIBUTING.md", "templates/site/AGENTS.md", "docs/agent-guidance.md"}
 	err := filepath.WalkDir(filepath.Join(root, "skills"), func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -44,6 +44,27 @@ func guidanceFiles(t *testing.T, root string) []string {
 		t.Fatal(err)
 	}
 	return files
+}
+
+func TestAgentGuidanceContributorGeneratorExamples(t *testing.T) {
+	root := guidanceRoot(t)
+	body := string(guidanceRead(t, filepath.Join(root, "CONTRIBUTING.md")))
+	for _, command := range []string{
+		"scripts/generate-docs.sh --write",
+		"scripts/generate-docs.sh --check",
+		"scripts/sync-canonical-copies.sh --write",
+		"scripts/sync-canonical-copies.sh --check",
+	} {
+		if !strings.Contains(body, command) {
+			t.Errorf("CONTRIBUTING.md omits %q", command)
+		}
+	}
+	for _, path := range []string{"scripts/generate-docs.sh", "scripts/sync-canonical-copies.sh"} {
+		info, err := os.Stat(filepath.Join(root, path))
+		if err != nil || !info.Mode().IsRegular() || info.Mode()&0o111 == 0 {
+			t.Errorf("documented helper is not executable: %s: %v", path, err)
+		}
+	}
 }
 
 func guidanceRead(t *testing.T, path string) []byte {

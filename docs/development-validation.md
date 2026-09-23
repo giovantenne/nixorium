@@ -17,9 +17,9 @@ development command.
 | `./scripts/validate.sh --full` | Complete build, VM, template, and offline-equivalence checkpoint | Before a milestone or release, and after cross-cutting changes that can affect several built roles |
 | `nix develop --file tests/source-checks.nix security-shell --command ./scripts/security-check.sh` | Pinned Go static and known-vulnerability analysis | Security-sensitive Go changes and the dedicated security workflow |
 
-The default gate checks whitespace, shell syntax, shell regression tests, skill
-and troubleshooting-copy coherence, the three Nix data schemas, and the Go
-package with its unit tests. Its Nix expression imports the exact `nixpkgs`
+The default gate checks whitespace, shell syntax, shell regression tests,
+generated documentation, allowlisted canonical-copy coherence, the Nix data
+schemas, and the Go package with its unit tests. Its Nix expression imports the exact `nixpkgs`
 revision from `flake.lock` directly. It deliberately avoids evaluating
 `defaultLab`, so a warm run remains suitable for frequent use.
 
@@ -96,6 +96,9 @@ not invalidate Go compilation.
 The guidance checker also compiles from code-only sources and reads instruction
 files at runtime. Editing skills or AGENTS files therefore reruns a small check
 without rebuilding the management application or any system closure.
+The documentation generator is a separate code-only command; its check reads
+`docs/tui-gallery.md` in a small derivation. Editing narrative or generated
+prose does not invalidate the packaged management application.
 
 The complete gate submits related upstream outputs to one `nix build`
 invocation, allowing one Flake evaluation and normal Nix parallel scheduling.

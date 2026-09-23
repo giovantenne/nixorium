@@ -44,17 +44,23 @@ var demoANSI = regexp.MustCompile(`(?:\x1b\][^\x07]*(?:\x07|\x1b\\))|(?:\x1b\[[0
 const demoServiceAddress = "192.168.1.123"
 
 func RenderDemoBundle(sourceCommit, sourceDate string) DemoBundle {
+	return RenderDemoBundleAtSize(sourceCommit, sourceDate, 120, 30)
+}
+
+// RenderDemoBundleAtSize renders the deterministic fixture at a supported
+// terminal size. Documentation uses 120x30; tests cover all supported layouts.
+func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) DemoBundle {
 	return DemoBundle{
 		SchemaVersion: 2,
 		SourceCommit:  sourceCommit,
 		SourceDate:    sourceDate,
-		Terminal:      "120x30",
+		Terminal:      fmt.Sprintf("%dx%d", width, height),
 		Synthetic:     true,
 		Scenarios: []DemoScenario{
-			renderSoftwareDeploymentDemo(sourceCommit),
-			renderInstallationDemo(sourceCommit),
-			renderShutdownDemo(sourceCommit),
-			renderSoftwareProfileDemo(sourceCommit),
+			renderSoftwareDeploymentDemo(sourceCommit, width, height),
+			renderInstallationDemo(sourceCommit, width, height),
+			renderShutdownDemo(sourceCommit, width, height),
+			renderSoftwareProfileDemo(sourceCommit, width, height),
 		},
 	}
 }
@@ -64,9 +70,9 @@ type demoRecorder struct {
 	frames []DemoFrame
 }
 
-func newDemoRecorder(actions DashboardActions, revision string) demoRecorder {
+func newDemoRecorder(actions DashboardActions, revision string, width, height int) demoRecorder {
 	model := newDashboardModel(demoStatus("ready", revision), demoSetupReady(), actions, false)
-	model.width, model.height, model.isDark = 120, 30, true
+	model.width, model.height, model.isDark = width, height, true
 	model.homeMenu = newDashboardTaskMenu(true, model.width, model.height)
 	model.ensureActivitySpinner()
 	return demoRecorder{model: model}
@@ -121,7 +127,7 @@ func (r *demoRecorder) typeAndCapture(value, label string) {
 	}
 }
 
-func renderSoftwareDeploymentDemo(revision string) DemoScenario {
+func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	catalog := demoSoftwareCatalog()
 	actions.LoadSoftware = func() domain.SoftwareCatalogReport { return catalog }
@@ -155,7 +161,7 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 		}
 	}
 
-	r := newDemoRecorder(actions, revision)
+	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1200)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Installation", 550)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Software", 750)
@@ -212,7 +218,7 @@ func renderSoftwareDeploymentDemo(revision string) DemoScenario {
 	return DemoScenario{ID: "software-all-clients", Title: "Add one package to every client", Description: "Search the pinned package set for Inkscape, save it for every current and future client, then explicitly deploy and verify all five configured PCs.", Frames: r.frames}
 }
 
-func renderSoftwareProfileDemo(revision string) DemoScenario {
+func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	catalog := demoSoftwareCatalog()
 	catalog.Controller = "pc99"
@@ -268,7 +274,7 @@ func renderSoftwareProfileDemo(revision string) DemoScenario {
 		return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Controller: plan.Controller, Revision: plan.Revision, Applied: true, Verified: true, Issues: []domain.ValidationIssue{}}
 	}
 
-	r := newDemoRecorder(actions, revision)
+	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Installation", 450)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Software", 650)
@@ -300,10 +306,10 @@ func demoDeploymentTargets() []domain.DeploymentTarget {
 	}
 }
 
-func renderInstallationDemo(revision string) DemoScenario {
+func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	actions.LoadSettings = func() (domain.LabSettingsFile, error) { return demoSettings(), nil }
-	r := newDemoRecorder(actions, revision)
+	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1100)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Installation", 700)
 	r.key(demoCode(tea.KeyEnter))
@@ -383,7 +389,7 @@ func renderInstallationDemo(revision string) DemoScenario {
 	return DemoScenario{ID: "installation", Title: "Prepare and start network installation", Description: "Review lab settings, prepare configured clients, inspect the controller network change, then start PXE. Disk identity and erasure are confirmed later on each client console.", Frames: r.frames}
 }
 
-func renderShutdownDemo(revision string) DemoScenario {
+func renderShutdownDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	actions.PlanShutdown = func(requested string, _ domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 		return domain.ShutdownPlanReport{
@@ -404,7 +410,7 @@ func renderShutdownDemo(revision string) DemoScenario {
 		}
 	}
 
-	r := newDemoRecorder(actions, revision)
+	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1200)
 	r.key(demoText("c"))
 	r.capture("Open Computers", 1300)
