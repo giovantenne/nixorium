@@ -55,7 +55,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - The public controller bootstrap now separates settings, input prompts,
   reviews, preparation output, and installation logs in an ASCII-only console
   interface. Time zone is requested immediately after the selected keyboard is
-  activated, before account details and passwords.
+  activated, before account details and passwords. Its initial software-profile
+  step installs the complete selected profile without exposing package IDs or
+  asking for technical exclusions.
 
 ## [2.0.0-beta.5] - 2026-09-22
 

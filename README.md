@@ -117,8 +117,9 @@ inspect it first if required by your local policy. Select a published beta to
 evaluate the current workflow, rather than the moving `master` branch. Follow
 the prompts for regional settings, accounts, passwords, the initial software
 profile, and the controller disk. The software choice is reviewed after the
-account settings and before any disk change. Confirm disk erasure only after
-checking the selected device.
+account settings and before any disk change. Bootstrap installs the complete
+selected profile; individual applications can be changed later from Nixorium.
+Confirm disk erasure only after checking the selected device.
 Keyboard layout is the first controller-setting prompt. The bootstrap applies
 its console keymap immediately, asks for the time zone next, and stops if the
 keymap cannot be activated. This ensures all remaining input, especially

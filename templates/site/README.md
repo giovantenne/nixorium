@@ -31,7 +31,8 @@ Existing deployments are not migrated automatically. New controller bootstrap
 sets this mode after collecting keyboard, time zone, accounts, and passwords,
 then asks for the initial software profile before the first build or disk
 change. The selected profile becomes ordinary `shared` declarations in
-`lab-software.json`; it does not remain an active policy.
+`lab-software.json`; bootstrap includes the complete profile without asking for
+package IDs, and it does not remain an active policy.
 Use the official [NixOS Minimal ISO](https://nixos.org/download/#nixos-iso) in
 UEFI mode for controller bootstrap. It provides the expected Linux text
 console: keyboard is the first settings prompt, the selected console keymap is

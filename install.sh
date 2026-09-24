@@ -47,19 +47,19 @@ EOF
 
 ui_section() {
   local TITLE="$1"
-  printf '\n%s\n  %s\n%s\n' "$UI_RULE" "$TITLE" "$UI_RULE"
+  printf '\n%s\n  %s\n%s\n\n' "$UI_RULE" "$TITLE" "$UI_RULE"
 }
 
 ui_log() {
-  printf '[....] %s\n' "$1"
+  printf '  [....] %s\n' "$1"
 }
 
 ui_success() {
-  printf '[ OK ] %s\n' "$1"
+  printf '  [ OK ] %s\n' "$1"
 }
 
 ui_note() {
-  printf '       %s\n' "$1"
+  printf '  %s\n' "$1"
 }
 
 ui_feedback() {
@@ -226,6 +226,7 @@ collect_bootstrap_configuration() {
   done
 
   activate_bootstrap_keyboard
+  echo
   while true; do
     if ! prompt_bootstrap_value "Time zone" "$BOOTSTRAP_TIME_ZONE" BOOTSTRAP_TIME_ZONE; then
       return 1
@@ -240,12 +241,15 @@ collect_bootstrap_configuration() {
 
   ui_section "2 / 4  ACCOUNTS"
   prompt_bootstrap_user "Teacher username" "$BOOTSTRAP_TEACHER_USER" "" BOOTSTRAP_TEACHER_USER
+  echo
   prompt_bootstrap_user "Student username" "$BOOTSTRAP_STUDENT_USER" "$BOOTSTRAP_TEACHER_USER" BOOTSTRAP_STUDENT_USER
 
   ui_section "3 / 4  PASSWORDS"
   ui_note "Each password must contain at least 8 bytes. Input remains hidden."
   prompt_bootstrap_password "Administrator password" BOOTSTRAP_ADMIN_HASH
+  echo
   prompt_bootstrap_password "Teacher password" BOOTSTRAP_TEACHER_HASH
+  echo
   prompt_bootstrap_password "Student password" BOOTSTRAP_STUDENT_HASH
 
   ui_section "4 / 4  REVIEW"
@@ -256,6 +260,7 @@ collect_bootstrap_configuration() {
   echo "  Keyboard:      $BOOTSTRAP_KEYBOARD"
   echo "  Passwords:     set locally and hidden"
   echo "  Client setup:  available later from Nixorium"
+  echo
   while true; do
     printf '  > Continue with these settings? [Y/n]: '
     if ! IFS= read -r -u "$BOOTSTRAP_INPUT_FD" CONFIRMATION; then
@@ -333,8 +338,8 @@ choose_release() {
   local -a AVAILABLE_RELEASES=("master")
   local -a STABLE_RELEASES=()
 
-  printf '\n%s\n  VERSION\n%s\n' "$UI_RULE" "$UI_RULE" >&3
-  printf '[....] Fetching published Nixorium releases...\n' >&3
+  printf '\n%s\n  VERSION\n%s\n\n' "$UI_RULE" "$UI_RULE" >&3
+  printf '  [....] Fetching published Nixorium releases...\n' >&3
   if API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
     API_SUCCEEDED=true
     while IFS= read -r TAG; do
@@ -422,7 +427,7 @@ choose_release() {
     echo "  ! Invalid selection. Enter a number from 1 to ${#AVAILABLE_RELEASES[@]}, or press Enter for ${MENU_DEFAULT}." >&3
   done
 
-  echo "[ OK ] Selected ${RELEASE}." >&3
+  echo "  [ OK ] Selected ${RELEASE}." >&3
   echo >&3
 }
 
