@@ -633,6 +633,13 @@ in
     users.groups.nixorium-operations = { };
     users.users.admin.extraGroups = [ "nixorium-operations" ];
 
+    environment.etc."nixorium/deployment-path" = {
+      text = "${cfg.deploymentPath}\n";
+      mode = "0444";
+      user = "root";
+      group = "root";
+    };
+
     environment.systemPackages = [
       nixoriumPackage
       pkgs.colmena
@@ -810,6 +817,7 @@ in
 
     systemd.services.nixorium-remote-install = {
       description = "Coordinate reviewed Nixorium USB SSH client installations";
+      path = [ pkgs.git pkgs.nix pkgs.openssh ];
       serviceConfig = {
         Type = "simple";
         ExecStart = "${nixoriumPackage}/bin/nixorium-remote-worker";
@@ -827,7 +835,7 @@ in
         PrivateTmp = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
-        ReadOnlyPaths = [ cfg.deploymentPath "/home/admin/.ssh/id_ed25519" ];
+        ReadOnlyPaths = [ cfg.deploymentPath "/etc/nixorium/deployment-path" "/home/admin/.ssh/id_ed25519" "/home/admin/.ssh/id_ed25519.pub" ];
         ReadWritePaths = [
           "/run/nixorium/remote-install"
           "/var/lib/nixorium/remote-install"

@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type RemoteInstallOperation string
@@ -27,6 +28,8 @@ type RemoteInstallRequest struct {
 	Operation     RemoteInstallOperation `json:"operation"`
 	OperationID   string                 `json:"operationId,omitempty"`
 	Host          string                 `json:"host,omitempty"`
+	Address       string                 `json:"address,omitempty"`
+	Fingerprint   string                 `json:"fingerprint,omitempty"`
 }
 
 type RemoteInstallResponse struct {
@@ -58,6 +61,13 @@ func DecodeRemoteInstallRequest(data []byte) (RemoteInstallRequest, error) {
 	if request.Operation == RemoteInstallPrepareOperation && request.Host == "" {
 		return request, errors.New("remote installation prepare requires an inventory host")
 	}
+	if request.Operation == RemoteInstallBootstrapOperation {
+		if request.Host == "" || request.OperationID != "" || validateRemoteIPv4(request.Address) != nil || !remoteFingerprintPattern.MatchString(request.Fingerprint) {
+			return request, errors.New("remote installation bootstrap identity is invalid")
+		}
+	} else if request.Address != "" || request.Fingerprint != "" {
+		return request, errors.New("remote installation endpoint is only valid for bootstrap")
+	}
 	if remoteOperationNeedsID(request.Operation) && request.OperationID == "" {
 		return request, errors.New("remote installation operation requires an operation ID")
 	}
@@ -83,8 +93,26 @@ func DecodeRemoteInstallSession(data []byte) (RemoteInstallSession, error) {
 			return session, err
 		}
 	}
+	if session.Preparation != nil {
+		if session.Preparation.OperationID != session.OperationID {
+			return session, errors.New("remote installation session preparation identity differs")
+		}
+		if err := ValidateRemoteInstallPreparation(*session.Preparation); err != nil {
+			return session, err
+		}
+	}
 	if session.Receipt != nil && session.Receipt.OperationID != session.OperationID {
 		return session, errors.New("remote installation session receipt identity differs")
+	}
+	if session.Bootstrap != nil {
+		if !remoteHostPattern.MatchString(session.Bootstrap.Host) || validateRemoteIPv4(session.Bootstrap.Address) != nil ||
+			!remotePublicKeyPattern.MatchString(session.Bootstrap.HostPublicKey) || !remoteFingerprintPattern.MatchString(session.Bootstrap.HostFingerprint) ||
+			!strings.HasPrefix(session.Bootstrap.AuthorizedKeyLine, "restrict ") || !remotePublicKeyPattern.MatchString(strings.TrimPrefix(session.Bootstrap.AuthorizedKeyLine, "restrict ")) {
+			return session, errors.New("remote installation bootstrap record is invalid")
+		}
+		if err := ValidateRemoteMachineFacts(session.Bootstrap.Facts); err != nil {
+			return session, err
+		}
 	}
 	return session, nil
 }
@@ -122,8 +150,9 @@ func validRemoteInstallOperation(operation RemoteInstallOperation) bool {
 
 func remoteOperationNeedsID(operation RemoteInstallOperation) bool {
 	switch operation {
-	case RemoteInstallStatusOperation, RemoteInstallCancelOperation, RemoteInstallRebootOperation, RemoteInstallVerifyOperation,
-		RemoteInstallCloseOperation, RemoteInstallReconcileOperation, RemoteInstallPlanOperation, RemoteInstallApplyOperation:
+	case RemoteInstallPrepareOperation, RemoteInstallStatusOperation, RemoteInstallCancelOperation, RemoteInstallRebootOperation,
+		RemoteInstallVerifyOperation, RemoteInstallCloseOperation, RemoteInstallReconcileOperation, RemoteInstallPlanOperation,
+		RemoteInstallApplyOperation:
 		return true
 	default:
 		return false

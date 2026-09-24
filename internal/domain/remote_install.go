@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -215,15 +216,26 @@ func (r RemoteInstallExecutionReport) HasErrors() bool {
 }
 
 type RemoteInstallSession struct {
-	SchemaVersion     int                     `json:"schemaVersion"`
-	OperationID       string                  `json:"operationId"`
-	State             string                  `json:"state"`
-	Plan              RemoteInstallPlan       `json:"plan"`
-	ReviewTokenDigest string                  `json:"reviewTokenDigest,omitempty"`
-	TokenConsumed     bool                    `json:"tokenConsumed"`
-	DispatchUncertain bool                    `json:"dispatchUncertain"`
-	Receipt           *RemoteInstallReceipt   `json:"receipt,omitempty"`
-	Events            []RemoteInstallProgress `json:"events"`
+	SchemaVersion     int                           `json:"schemaVersion"`
+	OperationID       string                        `json:"operationId"`
+	State             string                        `json:"state"`
+	Plan              RemoteInstallPlan             `json:"plan"`
+	Preparation       *RemoteInstallPreparation     `json:"preparation,omitempty"`
+	ReviewTokenDigest string                        `json:"reviewTokenDigest,omitempty"`
+	TokenConsumed     bool                          `json:"tokenConsumed"`
+	DispatchUncertain bool                          `json:"dispatchUncertain"`
+	Receipt           *RemoteInstallReceipt         `json:"receipt,omitempty"`
+	Events            []RemoteInstallProgress       `json:"events"`
+	Bootstrap         *RemoteInstallBootstrapRecord `json:"bootstrap,omitempty"`
+}
+
+type RemoteInstallBootstrapRecord struct {
+	Host              string             `json:"host"`
+	Address           string             `json:"address"`
+	HostPublicKey     string             `json:"hostPublicKey"`
+	HostFingerprint   string             `json:"hostFingerprint"`
+	AuthorizedKeyLine string             `json:"authorizedKeyLine"`
+	Facts             RemoteMachineFacts `json:"facts"`
 }
 
 var (
@@ -267,6 +279,19 @@ func DecodeRemoteMachineFacts(data []byte) (RemoteMachineFacts, error) {
 		return facts, err
 	}
 	return facts, nil
+}
+
+// ValidateStrictRemoteJSON applies the bounded duplicate-key and trailing-data
+// checks used by the remote protocol before an adapter decodes tool-specific
+// JSON whose complete schema is owned by that tool.
+func ValidateStrictRemoteJSON(data []byte, maximum int) error {
+	if len(data) == 0 || len(data) > maximum {
+		return fmt.Errorf("JSON size must be between 1 and %d bytes", maximum)
+	}
+	if !utf8.Valid(data) {
+		return errors.New("JSON is not valid UTF-8")
+	}
+	return rejectDuplicateJSONKeys(data)
 }
 
 func DecodeRemoteInstallReceipt(data []byte) (RemoteInstallReceipt, error) {
@@ -350,6 +375,51 @@ func ValidateRemoteMachineFacts(facts RemoteMachineFacts) error {
 		}
 		if disk.Eligible != (len(disk.ExclusionReasons) == 0) {
 			return errors.New("remote disk eligibility disagrees with exclusion reasons")
+		}
+	}
+	return nil
+}
+
+func ValidateRemoteInstallPreparation(preparation RemoteInstallPreparation) error {
+	if !remoteOperationIDPattern.MatchString(preparation.OperationID) {
+		return errors.New("remote installation preparation identity is invalid")
+	}
+	if !filepath.IsAbs(preparation.Repository) || filepath.Clean(preparation.Repository) != preparation.Repository {
+		return errors.New("remote installation preparation repository is not canonical")
+	}
+	if !gitRevisionPattern.MatchString(preparation.DeploymentRevision) {
+		return errors.New("remote installation preparation revision is invalid")
+	}
+	if !validStorePath(preparation.BundlePath) || !validStorePath(preparation.SystemPath) {
+		return errors.New("remote installation preparation store paths are invalid")
+	}
+	if preparation.BundleClosureBytes == 0 || preparation.SystemClosureBytes == 0 || preparation.PreparedAt.IsZero() {
+		return errors.New("remote installation preparation measurements are incomplete")
+	}
+	if err := validateRemoteHost(preparation.Host); err != nil {
+		return err
+	}
+	if !strings.Contains(preparation.SystemPath, "-nixos-system-"+preparation.Host.Name+"-") {
+		return errors.New("remote installation preparation system does not match the host")
+	}
+	if err := validateRemoteCache(preparation.Cache); err != nil {
+		return err
+	}
+	if !remotePublicKeyPattern.MatchString(preparation.AdminPublicKey) ||
+		!remotePublicKeyPattern.MatchString(preparation.HostKeyPublic) ||
+		!remoteFingerprintPattern.MatchString(preparation.HostFingerprint) {
+		return errors.New("remote installation preparation keys are invalid")
+	}
+	if err := ValidateRemoteMachineFacts(preparation.Facts); err != nil {
+		return err
+	}
+	if len(preparation.Issues) != 0 || len(preparation.Endpoints) > RemoteInstallMaximumNICs {
+		return errors.New("remote installation preparation contains unresolved or excessive data")
+	}
+	for _, endpoint := range preparation.Endpoints {
+		if err := validateRemoteIPv4(endpoint.Address); err != nil || endpoint.Port < 1 || endpoint.Port > 65535 ||
+			!remoteFingerprintPattern.MatchString(endpoint.Fingerprint) {
+			return errors.New("remote installation preparation endpoint is invalid")
 		}
 	}
 	return nil
@@ -503,6 +573,10 @@ func validateRemoteCache(cache RemoteInstallCache) error {
 	return nil
 }
 
+func ValidateRemoteInstallCache(cache RemoteInstallCache) error {
+	return validateRemoteCache(cache)
+}
+
 func validateRemoteDisk(disk RemoteDisk) error {
 	if !remoteDevicePattern.MatchString(disk.Path) || !remoteKNamePattern.MatchString(disk.KName) || disk.Path != "/dev/"+disk.KName || !remoteMajorMinorPattern.MatchString(disk.MajorMinor) {
 		return errors.New("remote disk device identity is invalid")
@@ -532,4 +606,12 @@ func validateRemoteDisk(disk RemoteDisk) error {
 
 func ValidRemoteFingerprint(value string) bool {
 	return remoteFingerprintPattern.MatchString(value)
+}
+
+func ValidRemoteInterfaceName(value string) bool {
+	return remoteInterfacePattern.MatchString(value)
+}
+
+func ValidRemoteHostName(value string) bool {
+	return remoteHostPattern.MatchString(value)
 }

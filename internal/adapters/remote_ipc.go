@@ -3,6 +3,7 @@ package adapters
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +17,7 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-type RemoteInstallRequestHandler func(context.Context, domain.RemoteInstallRequest) domain.RemoteInstallResponse
+type RemoteInstallRequestHandler func(context.Context, domain.RemoteInstallRequest, *LivePassword) domain.RemoteInstallResponse
 
 type RemoteInstallIPCServer struct {
 	socketPath string
@@ -84,7 +85,8 @@ func (server *RemoteInstallIPCServer) serveConnection(ctx context.Context, conne
 		return
 	}
 	_ = connection.SetDeadline(time.Now().Add(30 * time.Second))
-	frame, err := readRemoteIPCFrame(connection, domain.RemoteInstallPlanMaxBytes)
+	reader := bufio.NewReaderSize(connection, 4096)
+	frame, err := readRemoteIPCFrameBuffered(reader, domain.RemoteInstallPlanMaxBytes)
 	if err != nil {
 		return
 	}
@@ -92,7 +94,15 @@ func (server *RemoteInstallIPCServer) serveConnection(ctx context.Context, conne
 	if err != nil {
 		return
 	}
-	response := server.handler(ctx, request)
+	var secret *LivePassword
+	if request.Operation == domain.RemoteInstallBootstrapOperation {
+		secret, err = readRemoteIPCSecret(reader)
+		if err != nil {
+			return
+		}
+		defer secret.Destroy()
+	}
+	response := server.handler(ctx, request, secret)
 	response.SchemaVersion = domain.RemoteInstallSchemaVersion
 	response.RequestID = request.RequestID
 	content, err := json.Marshal(response)
@@ -104,6 +114,29 @@ func (server *RemoteInstallIPCServer) serveConnection(ctx context.Context, conne
 }
 
 func RemoteInstallIPCRequest(ctx context.Context, socketPath string, request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+	if request.Operation == domain.RemoteInstallBootstrapOperation {
+		return domain.RemoteInstallResponse{}, errors.New("bootstrap requires the distinct secret IPC frame")
+	}
+	return remoteInstallIPCRequest(ctx, socketPath, request, nil)
+}
+
+func RemoteInstallIPCSecretRequest(ctx context.Context, socketPath string, request domain.RemoteInstallRequest, secret *LivePassword) (domain.RemoteInstallResponse, error) {
+	if request.Operation != domain.RemoteInstallBootstrapOperation || secret == nil {
+		if secret != nil {
+			secret.Destroy()
+		}
+		return domain.RemoteInstallResponse{}, errors.New("secret IPC frame is only valid for bootstrap")
+	}
+	value, err := secret.snapshot()
+	secret.Destroy()
+	if err != nil {
+		return domain.RemoteInstallResponse{}, err
+	}
+	defer zeroBytes(value)
+	return remoteInstallIPCRequest(ctx, socketPath, request, value)
+}
+
+func remoteInstallIPCRequest(ctx context.Context, socketPath string, request domain.RemoteInstallRequest, secret []byte) (domain.RemoteInstallResponse, error) {
 	var response domain.RemoteInstallResponse
 	content, err := json.Marshal(request)
 	if err != nil || len(content) > domain.RemoteInstallPlanMaxBytes {
@@ -120,10 +153,17 @@ func RemoteInstallIPCRequest(ctx context.Context, socketPath string, request dom
 	} else {
 		_ = connection.SetDeadline(time.Now().Add(30 * time.Second))
 	}
-	if _, err := connection.Write(append(content, '\n')); err != nil {
+	frame := append(content, '\n')
+	if secret != nil {
+		length := make([]byte, 2)
+		binary.BigEndian.PutUint16(length, uint16(len(secret)))
+		frame = append(frame, length...)
+		frame = append(frame, secret...)
+	}
+	if _, err := connection.Write(frame); err != nil {
 		return response, fmt.Errorf("send remote installation request: %w", err)
 	}
-	frame, err := readRemoteIPCFrame(connection, domain.RemoteInstallPlanMaxBytes)
+	frame, err = readRemoteIPCFrame(connection, domain.RemoteInstallPlanMaxBytes)
 	if err != nil {
 		return response, fmt.Errorf("read remote installation response: %w", err)
 	}
@@ -138,7 +178,10 @@ func RemoteInstallIPCRequest(ctx context.Context, socketPath string, request dom
 }
 
 func readRemoteIPCFrame(reader io.Reader, maximum int) ([]byte, error) {
-	buffered := bufio.NewReaderSize(reader, 4096)
+	return readRemoteIPCFrameBuffered(bufio.NewReaderSize(reader, 4096), maximum)
+}
+
+func readRemoteIPCFrameBuffered(buffered *bufio.Reader, maximum int) ([]byte, error) {
 	result := make([]byte, 0, 4096)
 	for {
 		fragment, err := buffered.ReadSlice('\n')
@@ -156,6 +199,23 @@ func readRemoteIPCFrame(reader io.Reader, maximum int) ([]byte, error) {
 			return nil, err
 		}
 	}
+}
+
+func readRemoteIPCSecret(reader io.Reader) (*LivePassword, error) {
+	lengthBytes := make([]byte, 2)
+	if _, err := io.ReadFull(reader, lengthBytes); err != nil {
+		return nil, errors.New("read remote installation secret frame length")
+	}
+	length := int(binary.BigEndian.Uint16(lengthBytes))
+	if length < 1 || length > 1024 {
+		return nil, errors.New("remote installation secret frame has an invalid size")
+	}
+	value := make([]byte, length)
+	if _, err := io.ReadFull(reader, value); err != nil {
+		zeroBytes(value)
+		return nil, errors.New("read remote installation secret frame")
+	}
+	return NewLivePassword(value)
 }
 
 func requireSameUIDPeer(connection *net.UnixConn) error {

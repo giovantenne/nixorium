@@ -21,7 +21,7 @@ buildGoModule {
     ];
   };
 
-  vendorHash = "sha256-wtmeoJiq2DEa/ZHY1JUFIs4A87Vi0khXNQEgmT0MkMA=";
+  vendorHash = "sha256-yeHLh7vZyFssX4AsvMfvxiX0j3/rK5VNpR36iMLoENU=";
   subPackages = [ "cmd/nixorium" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
 
   nativeBuildInputs = [ makeWrapper ];
