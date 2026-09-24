@@ -11,6 +11,8 @@ INSTALL_HEADROOM_BYTES=2147483648
 
 # shellcheck source=/home/admin/nixorium/scripts/lib/lab-meta.sh
 source "${REPO_ROOT}/scripts/lib/lab-meta.sh"
+# shellcheck source=/home/admin/nixorium/scripts/lib/client-installer.sh
+source "${REPO_ROOT}/scripts/lib/client-installer.sh"
 
 usage() {
   echo "Usage: ./setup.sh [pc-number-or-name] [disk]" >&2
@@ -103,11 +105,7 @@ display_hardware() {
 }
 
 collect_available_disks() {
-  mapfile -t AVAILABLE_DISKS < <(
-    lsblk -bdnpo PATH,TYPE,RO,SIZE | awk -v minimum="$MINIMUM_DISK_BYTES" '
-      $2 == "disk" && $3 == "0" && $4 >= minimum { print $1 }
-    '
-  )
+  mapfile -t AVAILABLE_DISKS < <(nixorium_collect_available_disks "$MINIMUM_DISK_BYTES")
 }
 
 list_disks() {
@@ -139,7 +137,7 @@ is_available_disk() {
 }
 
 disk_identity() {
-  lsblk -dnro MAJ:MIN -- "$1"
+  nixorium_disk_identity_json "$1"
 }
 
 disk_size() {
@@ -294,8 +292,7 @@ revalidate_disk() {
 }
 
 partition_disk() {
-  sudo env NIXORIUM_INSTALL_DISK="${SELECTED_DISK#/dev/}" \
-    "$DISKO_INSTALL_SCRIPT" --yes-wipe-all-disks
+  nixorium_run_disko "$DISKO_INSTALL_SCRIPT" "$SELECTED_DISK"
 }
 
 resolve_system() {
@@ -336,8 +333,7 @@ install_system() {
 }
 
 verify_installation() {
-  sudo test -e /mnt/nix/var/nix/profiles/system
-  sync
+  nixorium_verify_installed_profile "$SELECTED_SYSTEM_PATH" "$SELECTED_DISK"
 }
 
 reboot_system() {
