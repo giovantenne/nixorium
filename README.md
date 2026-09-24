@@ -52,7 +52,8 @@ describes the site; the controller supplies the systems over the local network.
   controller updates, client deployment and shutdown, diagnostics, and logs.
 - GNOME workstations with Veyon integration; student sessions cannot change
   NetworkManager state, and their homes reset from a clean template at boot
-  while retaining up to five local home snapshots.
+  while retaining up to five local home snapshots. Desktop files remain visible
+  and the application dock remains available outside the GNOME overview.
 - Private, deployment-owned software profiles, suggestions, assets, and
   extension modules, separate from the reusable public framework. Optional
   profiles can be added as one reviewed declaration batch and then customized

@@ -57,6 +57,13 @@ policy affects student only or staff too, and whether it supplies initial
 defaults or reapplies settings at login. Avoid blindly copying an entire
 dconf database or overwriting unrelated desktop settings.
 
+The supplied workstation module always installs and enables Desktop Icons NG
+and Dash to Dock, with a fixed visible dock, independently of the application
+profile. Keep these baseline extensions system-managed and preserve the login
+repair that enables each required UUID without replacing unrelated enabled
+extensions. Application favorites remain conditional on effective package
+scope.
+
 Every supplied software profile includes Ghostty and
 `python3Packages.terminaltexteffects`, so the site screensaver is present even
 with Essential. Preserve both declarations when editing the built-in profiles;
