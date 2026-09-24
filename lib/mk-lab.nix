@@ -451,6 +451,7 @@ let
       export NIXORIUM_INSTALLER_LIB=${upstreamRoot}/scripts/lib/client-installer.sh
       export NIXORIUM_DISKO_SCRIPT=${installerDiskoScript}/bin/disko-destroy-format-mount
       export NIXORIUM_BUNDLE_SHARE=${remoteInstallerMetadata}
+      export NIXORIUM_PLAN_VALIDATOR=${nixoriumPackage}/bin/nixorium-remote-validator
       exec ${upstreamRoot}/scripts/remote-client-installer.sh "$@"
     '';
   };

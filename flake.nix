@@ -129,7 +129,9 @@
         } ''
           NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/client-installer.sh}
           NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/client-installer-library.sh}
-          NIXORIUM_TEST_REPO_ROOT=${self} bash ${./tests/remote-client-installer.sh}
+          NIXORIUM_TEST_REPO_ROOT=${self} \
+            NIXORIUM_PLAN_VALIDATOR=${defaultLab.packages.${system}.nixorium}/bin/nixorium-remote-validator \
+            bash ${./tests/remote-client-installer.sh}
           touch "$out"
         '';
         client-installer-vm = clientInstallerVmTest;

@@ -137,7 +137,7 @@ nixorium_disk_exclusion_reasons_json() {
       break
     fi
   done < <(nixorium_backing_disks_for_mount)
-  printf '%s\n' "$reason_json"
+  jq -c 'sort' <<< "$reason_json"
 }
 
 nixorium_collect_disks_json() {

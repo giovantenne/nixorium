@@ -205,3 +205,17 @@ func TestSetupStatusCompletesWhenInstallationArtifactsArePrepared(t *testing.T) 
 		t.Fatalf("artifact stage = %+v", artifacts)
 	}
 }
+
+func TestRemoteInstallCapabilitiesDoNotRequirePXEArtifacts(t *testing.T) {
+	data, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
+	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	source := fakeSetupSource{data: data, applied: true, preparation: domain.PXEPreparationState{Ready: false, Detail: "PXE artifacts are absent"}}
+	capabilities := NewSetupManager(source).RemoteInstallCapabilities(context.Background(), "/deployment")
+	if !capabilities.Ready || len(capabilities.Issues) != 0 || capabilities.Method != domain.RemoteInstallUSBSSH {
+		t.Fatalf("capabilities = %+v", capabilities)
+	}
+}

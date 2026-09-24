@@ -6,7 +6,7 @@ let
   lastSessionFile = "/var/lib/nixorium/pxe/last-session.json";
   networkAction = pkgs.writeShellApplication {
     name = "nixorium-pxe-network-action";
-    runtimeInputs = [ pkgs.coreutils pkgs.gawk pkgs.iproute2 pkgs.jq ];
+    runtimeInputs = [ pkgs.coreutils pkgs.gawk pkgs.iproute2 pkgs.jq pkgs.util-linux ];
     text = ''
       ACTION="''${1:-}"
       [[ $# -eq 1 && "$ACTION" =~ ^(start|stop|recover)$ ]] \
@@ -20,11 +20,37 @@ let
       CONFIGURED_PREFIX=${lib.escapeShellArg (toString labSettings.networkPrefixLength)}
       CONFIGURED_STATIC_CIDR="$CONFIGURED_STATIC_IP/$CONFIGURED_PREFIX"
       PREPARED_DHCP_IP=""
+      COORDINATION_DIRECTORY=/var/lib/nixorium/coordination
+      COORDINATION_LOCK="$COORDINATION_DIRECTORY/operation.lock"
+      USB_RESERVATION="$COORDINATION_DIRECTORY/usb-reservation.json"
 
       fail() {
         echo "Error: $*" >&2
         exit 1
       }
+
+      [[ -d "$COORDINATION_DIRECTORY" && ! -L "$COORDINATION_DIRECTORY" \
+          && "$(stat -c '%U:%G:%a' "$COORDINATION_DIRECTORY")" == root:nixorium-operations:770 ]] \
+        || fail "managed operation coordination directory is unsafe"
+      [[ -f "$COORDINATION_LOCK" && ! -L "$COORDINATION_LOCK" \
+          && "$(stat -c '%U:%G:%a' "$COORDINATION_LOCK")" == root:nixorium-operations:660 ]] \
+        || fail "managed operation lock is unsafe"
+      exec 9<>"$COORDINATION_LOCK"
+      flock -n 9 \
+        || fail "another Nixorium controller or client operation is already running"
+      if [[ "$ACTION" == start ]]; then
+        [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
+          || fail "a USB installation remains reserved; PXE start is blocked"
+      fi
+      LEGACY_LOCK=/home/admin/.local/state/nixorium/operations/deploy.lock
+      if [[ -e "$LEGACY_LOCK" || -L "$LEGACY_LOCK" ]]; then
+        [[ -f "$LEGACY_LOCK" && ! -L "$LEGACY_LOCK" \
+            && "$(stat -c '%U:%G:%a' "$LEGACY_LOCK")" == admin:users:600 ]] \
+          || fail "legacy deployment lock is unsafe; close old Nixorium processes before migration"
+        exec 8<>"$LEGACY_LOCK"
+        flock -n 8 \
+          || fail "a legacy Nixorium deployment is still running"
+      fi
 
       address_present() {
         local iface="$1"
@@ -453,7 +479,7 @@ in
         ProtectSystem = "strict";
         ProtectHome = "read-only";
         ReadOnlyPaths = [ preparationFile ];
-        ReadWritePaths = [ "-/var/lib/nixorium/pxe" ];
+        ReadWritePaths = [ "-/var/lib/nixorium/pxe" "/var/lib/nixorium/coordination" ];
         NoNewPrivileges = true;
         CapabilityBoundingSet = [ "CAP_NET_ADMIN" ];
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
@@ -477,7 +503,7 @@ in
         PrivateTmp = true;
         ProtectSystem = "strict";
         ProtectHome = true;
-        ReadWritePaths = [ "-/var/lib/nixorium/pxe" ];
+        ReadWritePaths = [ "-/var/lib/nixorium/pxe" "/var/lib/nixorium/coordination" ];
         NoNewPrivileges = true;
         CapabilityBoundingSet = [ "CAP_NET_ADMIN" ];
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];

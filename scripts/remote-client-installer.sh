@@ -124,14 +124,24 @@ validate_plan_semantics() {
 }
 
 read_and_validate_plan() {
-  local destination=$1
+  local destination=$1 canonical
   head -c "$((MAX_PLAN_BYTES + 1))" > "$destination"
   (( $(stat -c %s -- "$destination") <= MAX_PLAN_BYTES )) || {
     echo "plan exceeds size limit" >&2
     return 2
   }
-  validate_plan "$destination" || { echo "invalid remote installation plan" >&2; return 2; }
-  validate_plan_semantics "$destination"
+  if [[ -n "${NIXORIUM_PLAN_VALIDATOR:-}" ]]; then
+    [[ -x "$NIXORIUM_PLAN_VALIDATOR" ]] || { echo "remote plan validator is unavailable" >&2; return 2; }
+    canonical="${destination}.validated"
+    if ! "$NIXORIUM_PLAN_VALIDATOR" < "$destination" > "$canonical"; then
+      rm -f -- "$canonical"
+      return 2
+    fi
+    mv -fT -- "$canonical" "$destination"
+  else
+    validate_plan "$destination" || { echo "invalid remote installation plan" >&2; return 2; }
+    validate_plan_semantics "$destination"
+  fi
 }
 
 validate_plan_command() {

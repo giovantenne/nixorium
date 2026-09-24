@@ -2,9 +2,36 @@
 let
   isController = hostName == labSettings.masterHostName;
   cfg = config.services.nixorium;
+  operationGate = ''
+    COORDINATION_DIRECTORY=/var/lib/nixorium/coordination
+    COORDINATION_LOCK="$COORDINATION_DIRECTORY/operation.lock"
+    USB_RESERVATION="$COORDINATION_DIRECTORY/usb-reservation.json"
+    [[ -d "$COORDINATION_DIRECTORY" && ! -L "$COORDINATION_DIRECTORY" \
+        && "$(stat -c '%U:%G:%a' "$COORDINATION_DIRECTORY")" == root:nixorium-operations:770 ]] \
+      || fail "managed operation coordination directory is unsafe"
+    [[ -f "$COORDINATION_LOCK" && ! -L "$COORDINATION_LOCK" \
+        && "$(stat -c '%U:%G:%a' "$COORDINATION_LOCK")" == root:nixorium-operations:660 ]] \
+      || fail "managed operation lock is unsafe"
+    [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
+      || fail "a USB installation remains reserved; reconcile it before starting another operation"
+    exec 9<>"$COORDINATION_LOCK"
+    flock -n 9 \
+      || fail "another Nixorium controller or client operation is already running"
+    [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
+      || fail "a USB installation became reserved while acquiring the operation lock"
+    LEGACY_LOCK=/home/admin/.local/state/nixorium/operations/deploy.lock
+    if [[ -e "$LEGACY_LOCK" || -L "$LEGACY_LOCK" ]]; then
+      [[ -f "$LEGACY_LOCK" && ! -L "$LEGACY_LOCK" \
+          && "$(stat -c '%U:%G:%a' "$LEGACY_LOCK")" == admin:users:600 ]] \
+        || fail "legacy deployment lock is unsafe; close old Nixorium processes before migration"
+      exec 8<>"$LEGACY_LOCK"
+      flock -n 8 \
+        || fail "a legacy Nixorium deployment is still running"
+    fi
+  '';
   installSecrets = pkgs.writeShellApplication {
     name = "nixorium-install-secrets";
-    runtimeInputs = [ pkgs.coreutils pkgs.diffutils pkgs.git pkgs.nix nixoriumPackage ];
+    runtimeInputs = [ pkgs.coreutils pkgs.diffutils pkgs.git pkgs.nix pkgs.util-linux nixoriumPackage ];
     text = ''
       REPOSITORY=${lib.escapeShellArg cfg.deploymentPath}
 
@@ -12,6 +39,8 @@ let
         echo "Error: $*" >&2
         exit 1
       }
+
+      ${operationGate}
 
       [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
         || fail "configured deployment path is not a real directory"
@@ -139,6 +168,8 @@ let
         echo "Error: $message" >&2
         exit 1
       }
+
+      ${operationGate}
 
       publish_progress running starting "Starting controller apply" 0
       publish_progress running validate "Validating the reviewed controller configuration" 0
@@ -309,6 +340,7 @@ let
       pkgs.iproute2
       pkgs.jq
       pkgs.nix
+      pkgs.util-linux
       nixoriumPackage
     ];
     text = ''
@@ -387,6 +419,8 @@ let
         echo "Error: $message" >&2
         exit 1
       }
+
+      ${operationGate}
 
       publish_progress running starting "Starting PXE preparation" 0 0
       publish_progress running validate "Validating the reviewed deployment" 0 0
@@ -574,6 +608,19 @@ let
       echo "Prepared PXE artifacts at revision $REVISION"
     '';
   };
+  restartCache = pkgs.writeShellApplication {
+    name = "nixorium-restart-cache";
+    runtimeInputs = [ pkgs.coreutils pkgs.systemd pkgs.util-linux ];
+    text = ''
+      fail() {
+        echo "Error: $*" >&2
+        exit 1
+      }
+
+      ${operationGate}
+      systemctl restart harmonia.service
+    '';
+  };
 in
 {
   options.services.nixorium.deploymentPath = lib.mkOption {
@@ -583,6 +630,9 @@ in
   };
 
   config = lib.mkIf isController {
+    users.groups.nixorium-operations = { };
+    users.users.admin.extraGroups = [ "nixorium-operations" ];
+
     environment.systemPackages = [
       nixoriumPackage
       pkgs.colmena
@@ -600,6 +650,7 @@ in
                unit == "nixorium-apply-controller.service" ||
                /^nixorium-apply-controller@[0-9a-f]{40}\.service$/.test(unit) ||
                unit == "nixorium-prepare-pxe.service" ||
+               unit == "nixorium-remote-install.service" ||
                unit == "nixorium-restart-cache.service" ||
                unit == "nixorium-pxe-recover.service")) ||
              (unit == "nixorium-pxe.service" &&
@@ -616,6 +667,10 @@ in
       "d /etc/veyon/keys/private/teacher 0750 root veyon-master -"
       "d /var/lib/nixorium/keys 0700 root root -"
       "d /var/cache/nixorium/admin 0700 admin users -"
+      "d /var/lib/nixorium/coordination 0770 root nixorium-operations -"
+      "f /var/lib/nixorium/coordination/operation.lock 0660 root nixorium-operations -"
+      "d /var/lib/nixorium/remote-install 0700 admin users -"
+      "d /var/lib/nixorium/remote-install/logs 0700 admin users -"
     ];
 
     systemd.services.nixorium-install-secrets = {
@@ -637,6 +692,7 @@ in
           "-/etc/veyon/keys/private/teacher"
           "-/var/lib/nixorium/keys"
           "-/var/cache/nixorium"
+          "/var/lib/nixorium/coordination"
         ];
         NoNewPrivileges = true;
         CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
@@ -667,7 +723,7 @@ in
         # ProtectHome, which also makes /run/user read-only.
         ProtectHome = false;
         ReadOnlyPaths = [ cfg.deploymentPath ];
-        ReadWritePaths = [ "-/var/cache/nixorium" ];
+        ReadWritePaths = [ "-/var/cache/nixorium" "/var/lib/nixorium/coordination" ];
         Nice = 10;
         IOSchedulingClass = "best-effort";
         NoNewPrivileges = true;
@@ -697,7 +753,7 @@ in
         # explicit read-only deployment mount remain the security boundary.
         ProtectHome = false;
         ReadOnlyPaths = [ cfg.deploymentPath ];
-        ReadWritePaths = [ "-/var/cache/nixorium" ];
+        ReadWritePaths = [ "-/var/cache/nixorium" "/var/lib/nixorium/coordination" ];
         Nice = 10;
         IOSchedulingClass = "best-effort";
         NoNewPrivileges = true;
@@ -709,7 +765,7 @@ in
       description = "Restart the Nixorium binary cache";
       serviceConfig = {
         Type = "oneshot";
-        ExecStart = "${pkgs.systemd}/bin/systemctl restart harmonia.service";
+        ExecStart = "${restartCache}/bin/nixorium-restart-cache";
         User = "root";
         Group = "root";
         CapabilityBoundingSet = "";
@@ -717,6 +773,7 @@ in
         PrivateTmp = true;
         ProtectHome = true;
         ProtectSystem = "strict";
+        ReadWritePaths = [ "/var/lib/nixorium/coordination" ];
       };
     };
 
@@ -740,6 +797,7 @@ in
         ReadWritePaths = [
           "-/var/cache/nixorium"
           "-/var/lib/nixorium/prepared"
+          "/var/lib/nixorium/coordination"
         ];
         Nice = 10;
         IOSchedulingClass = "best-effort";
@@ -747,6 +805,41 @@ in
         CapabilityBoundingSet = "";
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
         TimeoutStartSec = "4h";
+      };
+    };
+
+    systemd.services.nixorium-remote-install = {
+      description = "Coordinate reviewed Nixorium USB SSH client installations";
+      serviceConfig = {
+        Type = "simple";
+        ExecStart = "${nixoriumPackage}/bin/nixorium-remote-worker";
+        User = "admin";
+        Group = "users";
+        SupplementaryGroups = [ "nixorium-operations" ];
+        UMask = "0077";
+        RuntimeDirectory = "nixorium/remote-install";
+        RuntimeDirectoryMode = "0700";
+        StateDirectory = "nixorium/remote-install";
+        StateDirectoryMode = "0700";
+        CacheDirectory = "nixorium/admin";
+        CacheDirectoryMode = "0700";
+        Environment = "XDG_CACHE_HOME=/var/cache/nixorium/admin";
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ProtectHome = "read-only";
+        ReadOnlyPaths = [ cfg.deploymentPath "/home/admin/.ssh/id_ed25519" ];
+        ReadWritePaths = [
+          "/run/nixorium/remote-install"
+          "/var/lib/nixorium/remote-install"
+          "/var/lib/nixorium/coordination"
+          "-/var/cache/nixorium/admin"
+        ];
+        NoNewPrivileges = true;
+        CapabilityBoundingSet = "";
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+        LimitCORE = 0;
+        Restart = "on-failure";
+        RestartSec = "2s";
       };
     };
   };

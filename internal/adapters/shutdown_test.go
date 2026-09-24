@@ -13,12 +13,15 @@ import (
 
 func TestClientOperationLockConflictsWithDeploymentLock(t *testing.T) {
 	stateRoot := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", stateRoot)
-	lease, err := (Local{}).AcquireClientOperation()
+	coordinationDirectory, err := ensureTestCoordinationDirectory(stateRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if active, err := (Local{}).ClientOperationActive(); err != nil || !active {
+	lease, err := acquireOperationGateAt(coordinationDirectory, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if active, err := operationActiveAt(coordinationDirectory, false); err != nil || !active {
 		t.Fatalf("active=%t error=%v", active, err)
 	}
 	if _, err := openDeploymentOperation(stateRoot, time.Now()); err == nil {
@@ -32,7 +35,7 @@ func TestClientOperationLockConflictsWithDeploymentLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer operation.Close()
-	if _, err := (Local{}).AcquireClientOperation(); err == nil {
+	if _, err := acquireOperationGateAt(coordinationDirectory, false); err == nil {
 		t.Fatal("shutdown started while deployment held the client-operation lock")
 	}
 }
