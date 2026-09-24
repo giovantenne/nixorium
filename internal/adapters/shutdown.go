@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -31,79 +30,11 @@ func (lease *clientOperationLease) Close() error {
 }
 
 func (Local) ClientOperationActive() (bool, error) {
-	stateRoot, err := userStateRoot()
-	if err != nil {
-		return false, err
-	}
-	directory, err := openOperationLogDirectory(stateRoot)
-	if errors.Is(err, syscall.ENOENT) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	defer directory.Close()
-	descriptor, err := syscall.Openat(int(directory.Fd()), "deploy.lock", syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
-	if errors.Is(err, syscall.ENOENT) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("open client operation lock: %w", err)
-	}
-	lock := os.NewFile(uintptr(descriptor), "deploy.lock")
-	defer lock.Close()
-	if err := validatePrivateOwnedFile(lock, syscall.S_IFREG, 0600); err != nil {
-		return false, fmt.Errorf("inspect client operation lock: %w", err)
-	}
-	if err := syscall.Flock(descriptor, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
-			return true, nil
-		}
-		return false, fmt.Errorf("inspect client operation lock: %w", err)
-	}
-	_ = syscall.Flock(descriptor, syscall.LOCK_UN)
-	return false, nil
+	return managedOperationActive()
 }
 
 func (Local) AcquireClientOperation() (io.Closer, error) {
-	stateRoot, err := userStateRoot()
-	if err != nil {
-		return nil, err
-	}
-	productDirectory := filepath.Join(stateRoot, "nixorium")
-	if err := os.MkdirAll(productDirectory, 0700); err != nil {
-		return nil, fmt.Errorf("create operation state directory: %w", err)
-	}
-	if err := requirePrivateDirectory(productDirectory); err != nil {
-		return nil, err
-	}
-	directoryPath := filepath.Join(productDirectory, "operations")
-	if err := os.Mkdir(directoryPath, 0700); err != nil && !os.IsExist(err) {
-		return nil, fmt.Errorf("create operation log directory: %w", err)
-	}
-	directory, err := openOperationLogDirectory(stateRoot)
-	if err != nil {
-		return nil, err
-	}
-	defer directory.Close()
-	descriptor, err := syscall.Openat(int(directory.Fd()), "deploy.lock", syscall.O_RDWR|syscall.O_CREAT|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("open client operation lock: %w", err)
-	}
-	lock := os.NewFile(uintptr(descriptor), "deploy.lock")
-	if err := lock.Chmod(0600); err != nil {
-		lock.Close()
-		return nil, fmt.Errorf("secure client operation lock: %w", err)
-	}
-	if err := validatePrivateOwnedFile(lock, syscall.S_IFREG, 0600); err != nil {
-		lock.Close()
-		return nil, fmt.Errorf("inspect client operation lock: %w", err)
-	}
-	if err := syscall.Flock(descriptor, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		lock.Close()
-		return nil, errors.New("another Nixorium client operation is already running")
-	}
-	return &clientOperationLease{file: lock}, nil
+	return acquireManagedOperationGate()
 }
 
 func (Local) ShutdownObservations(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.ShutdownObservation {

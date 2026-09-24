@@ -29,6 +29,11 @@ test_unknown_and_trailing_fields_are_rejected() {
   ! { valid_plan; printf '%s\n' '{}'; } | "$HELPER" validate-plan >/dev/null 2>&1
 }
 
+test_duplicate_fields_are_rejected_by_compiled_validator() {
+  [[ -n "${NIXORIUM_PLAN_VALIDATOR:-}" ]] || return 0
+  ! valid_plan | sed 's/"schemaVersion":1/"schemaVersion":1,"schemaVersion":1/' | "$HELPER" validate-plan >/dev/null 2>&1
+}
+
 test_noncanonical_or_unsafe_addresses_are_rejected() {
   ! valid_plan | jq '.host.liveIp = "192.0.2.020"' | "$HELPER" validate-plan >/dev/null 2>&1
   ! valid_plan | jq '.host.liveIp = "169.254.1.2"' | "$HELPER" validate-plan >/dev/null 2>&1
@@ -51,6 +56,7 @@ test_status_id_is_not_a_path() {
 
 test_valid_plan
 test_unknown_and_trailing_fields_are_rejected
+test_duplicate_fields_are_rejected_by_compiled_validator
 test_noncanonical_or_unsafe_addresses_are_rejected
 test_cross_field_mismatch_is_rejected
 test_size_limit_precedes_parsing

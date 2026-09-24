@@ -121,6 +121,10 @@ func DecodePXEPreparation(data []byte) (PXEPreparationRecord, error) {
 }
 
 func validStorePath(path string) bool {
+	return ValidStorePath(path)
+}
+
+func ValidStorePath(path string) bool {
 	return storePathPattern.MatchString(path)
 }
 

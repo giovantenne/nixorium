@@ -29,6 +29,28 @@ func NewSetupManager(source SetupSource) SetupManager {
 	return SetupManager{source: source}
 }
 
+// RemoteInstallCapabilities reports only prerequisites shared by installation
+// methods. PXE artifacts are deliberately excluded from USB-over-SSH readiness.
+func (m SetupManager) RemoteInstallCapabilities(ctx context.Context, repository string) domain.RemoteInstallCapabilities {
+	setup := m.Status(ctx, repository)
+	capabilities := domain.RemoteInstallCapabilities{
+		SchemaVersion: domain.SchemaVersion,
+		Method:        domain.RemoteInstallUSBSSH,
+		Ready:         true,
+		Issues:        []domain.ValidationIssue{},
+	}
+	for _, stage := range setup.Stages {
+		if stage.ID == domain.SetupStageArtifacts {
+			continue
+		}
+		if stage.State != domain.SetupStageComplete {
+			capabilities.Ready = false
+			capabilities.Issues = append(capabilities.Issues, domain.ValidationIssue{Field: stage.ID, Message: stage.Detail})
+		}
+	}
+	return capabilities
+}
+
 func (m SetupManager) ReconcileKeys(ctx context.Context, repository string) (domain.KeyReconcileReport, error) {
 	reconcileErr := m.source.ReconcileKeyMaterial(ctx, repository)
 	return m.keyReport(ctx, repository, "setup-keys"), reconcileErr
