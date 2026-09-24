@@ -56,9 +56,10 @@ to `lab-software.json` before Git initialization, Nix evaluation, or disk
 changes. Version 1 remains supported without a software prompt. The supported
 bootstrap environment is the official NixOS Minimal ISO booted in UEFI mode,
 which starts in the required Linux text console. Keyboard is collected and
-activated first, so subsequent input uses the installed controller layout. The
-PXE environment later applies that same console keymap before local client
-enrollment. The destructive confirmation precedes partitioning, locking, or
+activated first, then time zone is collected before account details, so all
+subsequent input uses the installed controller layout. The PXE environment
+later applies that same console keymap before local client enrollment. The
+destructive confirmation precedes partitioning, locking, or
 controller-system transfer. Once Disko has mounted the target, the bootstrap
 places its evaluation cache and temporary swap there; `nixos-install` builds
 directly into the target store with one Nix job and one core per build.

@@ -115,14 +115,15 @@ curl -fsSL https://nixorium.org/install.sh | bash
 The command downloads and executes the public [bootstrap script](install.sh);
 inspect it first if required by your local policy. Select a published beta to
 evaluate the current workflow, rather than the moving `master` branch. Follow
-the prompts for accounts, regional settings, passwords, the initial software
+the prompts for regional settings, accounts, passwords, the initial software
 profile, and the controller disk. The software choice is reviewed after the
 account settings and before any disk change. Confirm disk erasure only after
 checking the selected device.
 Keyboard layout is the first controller-setting prompt. The bootstrap applies
-its console keymap immediately and stops if it cannot do so. This ensures all
-remaining input, especially passwords, uses the same layout that will be active
-after reboot. Do not run the command from a terminal inside the Graphical ISO:
+its console keymap immediately, asks for the time zone next, and stops if the
+keymap cannot be activated. This ensures all remaining input, especially
+passwords, uses the same layout that will be active after reboot. Do not run
+the command from a terminal inside the Graphical ISO:
 its compositor layout cannot be verified portably. Switching that image to a
 real Linux TTY may work, but the Minimal ISO is the supported bootstrap path.
 
