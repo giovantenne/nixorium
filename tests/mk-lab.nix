@@ -265,6 +265,7 @@ assert builtins.elem "-Dvnc=true" (clientGnomeRemoteDesktop.mesonFlags or [ ]);
 assert subnetLab.apps.x86_64-linux.nixorium.type == "app";
 assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";
 assert subnetLab.packages.x86_64-linux.pxeFirmware.name == "nixorium-ipxe-firmware";
+assert subnetLab.packages.x86_64-linux.remoteInstallerBundle.name == "nixorium-remote-installer-pc99";
 assert hasNixorium subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert !(hasNixorium subnetLab.nixosConfigurations.pc01.config.environment.systemPackages);
 assert hasPackage subnetLab "pc99" "git";

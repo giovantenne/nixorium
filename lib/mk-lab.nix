@@ -417,6 +417,51 @@ let
       inherit studentUser;
     };
   } bootstrapPkgs;
+  remoteInstallerMetadata = bootstrapPkgs.runCommand "nixorium-remote-installer-metadata" {} ''
+    install -d -m 0755 "$out"
+    install -m 0644 ${labMetaJson} "$out/lab-meta.json"
+    ${lib.optionalString (cachePublicKeyFile != null) ''
+      install -m 0644 ${cachePublicKeyFile} "$out/cache-public-key"
+    ''}
+    ${lib.optionalString (adminSshKeyFile != null) ''
+      install -m 0644 ${adminSshKeyFile} "$out/admin-ssh.pub"
+    ''}
+    printf '%s\n' 1 > "$out/protocol-version"
+  '';
+  remoteInstallerProgram = bootstrapPkgs.writeShellApplication {
+    name = "nixorium-remote-client-installer";
+    runtimeInputs = [
+      bootstrapPkgs.bash
+      bootstrapPkgs.btrfs-progs
+      bootstrapPkgs.coreutils
+      bootstrapPkgs.dosfstools
+      bootstrapPkgs.findutils
+      bootstrapPkgs.gawk
+      bootstrapPkgs.gnugrep
+      bootstrapPkgs.gptfdisk
+      bootstrapPkgs.iproute2
+      bootstrapPkgs.jq
+      bootstrapPkgs.nix
+      bootstrapPkgs.nixos-install-tools
+      bootstrapPkgs.parted
+      bootstrapPkgs.systemd
+      bootstrapPkgs.util-linux
+    ] ++ installerDiskoRuntimePackages;
+    text = ''
+      export NIXORIUM_INSTALLER_LIB=${upstreamRoot}/scripts/lib/client-installer.sh
+      export NIXORIUM_DISKO_SCRIPT=${installerDiskoScript}/bin/disko-destroy-format-mount
+      export NIXORIUM_BUNDLE_SHARE=${remoteInstallerMetadata}
+      exec ${upstreamRoot}/scripts/remote-client-installer.sh "$@"
+    '';
+  };
+  remoteInstallerBundle = bootstrapPkgs.runCommand "nixorium-remote-installer-${masterHostName}" {} ''
+    install -d -m 0755 "$out/bin" "$out/share/nixorium"
+    ln -s ${remoteInstallerProgram}/bin/nixorium-remote-client-installer \
+      "$out/bin/nixorium-remote-client-installer"
+    ln -s ${installerDiskoScript}/bin/disko-destroy-format-mount \
+      "$out/bin/disko-destroy-format-mount"
+    cp -a ${remoteInstallerMetadata}/. "$out/share/nixorium/"
+  '';
   nixoriumPackage = bootstrapPkgs.callPackage (upstreamRoot + "/pkgs/nixorium.nix") {};
   hostState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-host-state";
@@ -531,6 +576,7 @@ let
     install -m 0755 ${installerDiskoScript}/bin/disko-destroy-format-mount "$out/disko-install"
     install -m 0644 ${upstreamRoot}/lib/disko-layout.nix "$out/lib/disko-layout.nix"
     install -m 0644 ${upstreamRoot}/scripts/lib/lab-meta.sh "$out/scripts/lib/lab-meta.sh"
+    install -m 0644 ${upstreamRoot}/scripts/lib/client-installer.sh "$out/scripts/lib/client-installer.sh"
     ${lib.optionalString (cachePublicKeyFile != null) ''
       install -m 0644 ${cachePublicKeyFile} "$out/public-key"
     ''}
@@ -775,7 +821,7 @@ rec {
   };
 
   packages.${system} = {
-    inherit installerBundle pxeFirmware;
+    inherit installerBundle pxeFirmware remoteInstallerBundle;
     disko = runDisko;
     nixorium = nixoriumPackage;
   };

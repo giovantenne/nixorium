@@ -68,6 +68,8 @@ echo "Reusable Nix evaluation cache: ${CACHE_DIR}"
 git diff --check
 bash -n install.sh setup.sh scripts/*.sh scripts/lib/*.sh
 bash tests/client-installer.sh
+bash tests/client-installer-library.sh
+bash tests/remote-client-installer.sh
 bash tests/controller-bootstrap.sh
 bash tests/controller-installer.sh
 bash tests/software-profile-bootstrap.sh
@@ -168,6 +170,7 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#packages.x86_64-linux.disko.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#packages.x86_64-linux.installerBundle.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.remoteInstallerBundle.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#packages.x86_64-linux.pxeFirmware.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-harmonia.program" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-pxe-proxy.program" --raw --no-write-lock-file >/dev/null
@@ -184,6 +187,7 @@ else
     "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk" \
     "path:${REPO_ROOT}#disko" \
     "path:${REPO_ROOT}#installerBundle" \
+    "path:${REPO_ROOT}#remoteInstallerBundle" \
     "path:${REPO_ROOT}#pxeFirmware" \
     "path:${REPO_ROOT}#nixorium" \
     --no-write-lock-file \
@@ -332,6 +336,9 @@ nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
   --raw \
   --no-write-lock-file >/dev/null
 nix eval "path:${SITE_DIR}#packages.x86_64-linux.pxeFirmware.drvPath" \
+  --raw \
+  --no-write-lock-file >/dev/null
+nix eval "path:${SITE_DIR}#packages.x86_64-linux.remoteInstallerBundle.drvPath" \
   --raw \
   --no-write-lock-file >/dev/null
 
