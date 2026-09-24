@@ -125,7 +125,7 @@ printf '%s\n' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
-  '' '3' 'vlc' '' > "$BOOTSTRAP_INPUT"
+  '' '3' '' > "$BOOTSTRAP_INPUT"
 
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_INSTALLER_REF="v2.0.0" \
@@ -190,7 +190,7 @@ printf '%s\n' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
-  '' '' '' 'n' > "${TEST_ROOT}/profile-cancel-input"
+  '' '' 'n' > "${TEST_ROOT}/profile-cancel-input"
 rm -f "$INSTALLER_LOG"
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/profile-cancel-input" \
@@ -256,6 +256,10 @@ grep -F "> Keyboard layout" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "> Time zone" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "[....] Resolving master to one immutable revision" \
   "${TEST_ROOT}/install.out" >/dev/null
+if grep -F 'package IDs' "${TEST_ROOT}/install.out" >/dev/null; then
+  echo "bootstrap exposed package IDs to the operator" >&2
+  exit 1
+fi
 grep -F "commits/master" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/install-controller.sh" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$CALL_LOG" >/dev/null
@@ -329,7 +333,7 @@ jq -e '
   any(.packages[]; .package == "opencode") and
   any(.packages[]; .package == "pi-coding-agent") and
   any(.packages[]; .package == "vscode") and
-  (any(.packages[]; .package == "vlc") | not)
+  any(.packages[]; .package == "vlc")
 ' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-software.json" >/dev/null
 test -f "${TARGET_ROOT}/home/admin/nixorium-deployment/software-presets.json"
 for path in \

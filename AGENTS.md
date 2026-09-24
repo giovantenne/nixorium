@@ -177,8 +177,9 @@ Release from the matching changelog section.
   authorize PXE or client deployment. Bootstrap capability version 2 collects
   the keyboard first, applies it, then collects the time zone, controller
   identity, and password hashes; it then reviews an initial deployment-owned
-  software profile before Git initialization, Nix evaluation, or disk
-  installation. Version 1
+  software profile and includes it completely, without package-level
+  exclusions, before Git initialization, Nix evaluation, or disk installation.
+  Version 1
   keeps the settings-only sequence. Both defer lab networking. Apply
   the selected console keymap before any later input, fail closed when the live
   input layout cannot be verified, document the official NixOS Minimal ISO as

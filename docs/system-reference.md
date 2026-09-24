@@ -52,8 +52,9 @@ For bootstrap-capability version 1, account and regional input is collected by
 the small shell launcher before it invokes Nix. Version 2 keeps that sequence,
 then selects and reviews the initial deployment-owned software profile from the
 same immutable template revision. It writes only ordinary `shared` declarations
-to `lab-software.json` before Git initialization, Nix evaluation, or disk
-changes. Version 1 remains supported without a software prompt. The supported
+for the complete selected profile to `lab-software.json` before Git
+initialization, Nix evaluation, or disk changes. Version 1 remains supported
+without a software prompt. The supported
 bootstrap environment is the official NixOS Minimal ISO booted in UEFI mode,
 which starts in the required Linux text console. Keyboard is collected and
 activated first, then time zone is collected before account details, so all
