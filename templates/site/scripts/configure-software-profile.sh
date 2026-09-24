@@ -65,10 +65,8 @@ configure_site_software_profile() {
 
   DEFAULT_PRESET="$(jq -r '.defaultPreset' "$CATALOG_FILE")"
   PRESET_COUNT="$(jq -r '.presets | length' "$CATALOG_FILE")"
-  echo
-  echo "Software profile"
-  echo "Choose the initial applications before the controller is built."
-  echo "You can add or remove ordinary software declarations later."
+  echo "       Choose the initial applications before the controller is built."
+  echo "       You can add or remove ordinary software declarations later."
   for ((INDEX = 0; INDEX < PRESET_COUNT; INDEX++)); do
     PRESET_ID="$(jq -r ".presets[$INDEX].id" "$CATALOG_FILE")"
     PRESET_LABEL="$(jq -r ".presets[$INDEX].label" "$CATALOG_FILE")"
@@ -82,7 +80,7 @@ configure_site_software_profile() {
   done
 
   while true; do
-    printf 'Profile [%s]: ' "$DEFAULT_PRESET"
+    printf '  > Profile [%s]: ' "$DEFAULT_PRESET"
     if ! IFS= read -r -u "$INPUT_FD" CHOICE; then
       echo >&2
       echo "Error: controller setup input ended during software profile selection." >&2
@@ -102,14 +100,14 @@ configure_site_software_profile() {
       SELECTED_ID="$CHOICE"
       break
     fi
-    echo "Choose a listed number or profile ID."
+    echo "  ! Choose a listed number or profile ID."
   done
 
   PRESET_LABEL="$(jq -r --arg id "$SELECTED_ID" '.presets[] | select(.id == $id) | .label' "$CATALOG_FILE")"
   PRESET_PACKAGES="$(jq -r --arg id "$SELECTED_ID" '.presets[] | select(.id == $id) | .packages | join(", ")' "$CATALOG_FILE")"
-  echo "Packages in ${PRESET_LABEL}: ${PRESET_PACKAGES}"
+  echo "       Packages in ${PRESET_LABEL}: ${PRESET_PACKAGES}"
   while true; do
-    printf 'Exclude package IDs (comma-separated, Enter keeps all): '
+    printf '  > Exclude package IDs (comma-separated, Enter keeps all): '
     if ! IFS= read -r -u "$INPUT_FD" EXCLUSION_INPUT; then
       echo >&2
       echo "Error: controller setup input ended during software exclusions." >&2
@@ -127,7 +125,7 @@ configure_site_software_profile() {
       PACKAGE="${PACKAGE%"${PACKAGE##*[![:space:]]}"}"
       if [[ -z "$PACKAGE" ]] || ! jq -e --arg id "$SELECTED_ID" --arg package "$PACKAGE" \
         'any(.presets[] | select(.id == $id) | .packages[]; . == $package)' "$CATALOG_FILE" >/dev/null; then
-        echo "Package '${PACKAGE}' is not part of ${PRESET_LABEL}."
+        echo "  ! Package '${PACKAGE}' is not part of ${PRESET_LABEL}."
         VALID_EXCLUSIONS=false
         break
       fi
@@ -144,7 +142,8 @@ configure_site_software_profile() {
 
   EXCLUSIONS_JSON="$(jq -cn '$ARGS.positional | sort' --args -- "${EXCLUSIONS[@]}")"
   echo
-  echo "Software profile review"
+  echo "  Software profile review"
+  echo "  -----------------------"
   echo "  Profile:    ${PRESET_LABEL} (${SELECTED_ID})"
   echo "  Scope:      controller and present/future clients (shared)"
   if (( ${#EXCLUSIONS[@]} == 0 )); then
@@ -155,7 +154,7 @@ configure_site_software_profile() {
   echo "  Effect:     write ordinary declarations to lab-software.json before the first build"
   echo "  Later:      profiles do not remain active; manage each package normally"
   while true; do
-    printf 'Use this software profile? [Y/n]: '
+    printf '  > Use this software profile? [Y/n]: '
     if ! IFS= read -r -u "$INPUT_FD" CONFIRMATION; then
       echo >&2
       echo "Error: controller setup input ended before software confirmation." >&2
@@ -167,7 +166,7 @@ configure_site_software_profile() {
         echo "Controller installation cancelled; the disk was not changed." >&2
         return 1
         ;;
-      *) echo "Enter y or n." ;;
+      *) echo "  ! Enter y or n." ;;
     esac
   done
 
@@ -190,7 +189,7 @@ configure_site_software_profile() {
   fi
   chmod 0644 "$TEMPORARY_FILE"
   mv -- "$TEMPORARY_FILE" "$SOFTWARE_FILE"
-  echo "Selected ${PRESET_LABEL}; software declarations are ready for the first controller build."
+  echo "[ OK ] Selected ${PRESET_LABEL}; software declarations are ready for the first controller build."
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

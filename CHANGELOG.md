@@ -50,6 +50,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   authenticated observations without treating deployment history as current
   evidence.
 
+### Changed
+
+- The public controller bootstrap now separates settings, input prompts,
+  reviews, preparation output, and installation logs in an ASCII-only console
+  interface. Time zone is requested immediately after the selected keyboard is
+  activated, before account details and passwords.
+
 ## [2.0.0-beta.5] - 2026-09-22
 
 ### Changed

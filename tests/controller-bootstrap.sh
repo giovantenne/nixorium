@@ -121,7 +121,7 @@ export BOOTSTRAP_REVISION="$REVISION"
 export BOOTSTRAP_TEMPLATE="${REPO_ROOT}/templates/site"
 
 printf '%s\n' \
-  'it' '' '' '' \
+  'it' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -148,7 +148,7 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
 fi
 grep -F "cannot be verified safely from a graphical terminal" \
   "${TEST_ROOT}/graphical.out" >/dev/null
-if grep -F "Set account passwords" "${TEST_ROOT}/graphical.out" >/dev/null; then
+if grep -F "3 / 4  PASSWORDS" "${TEST_ROOT}/graphical.out" >/dev/null; then
   echo "bootstrap requested passwords in an unverified graphical layout" >&2
   exit 1
 fi
@@ -178,7 +178,7 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
 fi
 grep -F "could not activate console keymap 'it2'" \
   "${TEST_ROOT}/keymap-failure.out" >/dev/null
-if grep -F "Set account passwords" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
+if grep -F "3 / 4  PASSWORDS" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
   grep -F "mkpasswd" "$CALL_LOG" >/dev/null; then
   echo "bootstrap requested or hashed a password before keyboard activation" >&2
   exit 1
@@ -186,7 +186,7 @@ fi
 : > "$CALL_LOG"
 
 printf '%s\n' \
-  'it' '' '' '' \
+  'it' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -240,6 +240,22 @@ grep -F "Resolving master to one immutable revision" "${TEST_ROOT}/install.out" 
 grep -F "Preparing Nixorium master at ${REVISION}" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "Recommended environment: official NixOS Minimal ISO in UEFI mode." \
   "${TEST_ROOT}/install.out" >/dev/null
+for UI_TEXT in \
+  "NixOS lab controller bootstrap" \
+  "CONTROLLER SETUP" \
+  "1 / 4  REGIONAL SETTINGS" \
+  "2 / 4  ACCOUNTS" \
+  "3 / 4  PASSWORDS" \
+  "4 / 4  REVIEW" \
+  "PREPARATION LOG" \
+  "INSTALLATION LOG" \
+  "COMPLETE"; do
+  grep -F "$UI_TEXT" "${TEST_ROOT}/install.out" >/dev/null
+done
+grep -F "> Keyboard layout" "${TEST_ROOT}/install.out" >/dev/null
+grep -F "> Time zone" "${TEST_ROOT}/install.out" >/dev/null
+grep -F "[....] Resolving master to one immutable revision" \
+  "${TEST_ROOT}/install.out" >/dev/null
 grep -F "commits/master" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/install-controller.sh" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$CALL_LOG" >/dev/null
@@ -247,9 +263,10 @@ grep -F "flake init -t github:giovantenne/nixorium/${REVISION}#site" "$CALL_LOG"
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/flake.nix" "$CALL_LOG" >/dev/null
 grep -F "loadkeys it2" "$CALL_LOG" >/dev/null
 KEYBOARD_PROMPT_LINE="$(grep -n -m1 -F 'Keyboard layout' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+TIME_ZONE_PROMPT_LINE="$(grep -n -m1 -F 'Time zone' "${TEST_ROOT}/install.out" | cut -d: -f1)"
 TEACHER_PROMPT_LINE="$(grep -n -m1 -F 'Teacher username' "${TEST_ROOT}/install.out" | cut -d: -f1)"
-if (( KEYBOARD_PROMPT_LINE >= TEACHER_PROMPT_LINE )); then
-  echo "bootstrap did not ask for the keyboard before account settings" >&2
+if (( KEYBOARD_PROMPT_LINE >= TIME_ZONE_PROMPT_LINE || TIME_ZONE_PROMPT_LINE >= TEACHER_PROMPT_LINE )); then
+  echo "bootstrap did not ask for keyboard and time zone before account settings" >&2
   exit 1
 fi
 LOADKEYS_LINE="$(grep -n -m1 -F 'loadkeys it2' "$CALL_LOG" | cut -d: -f1)"
@@ -294,11 +311,14 @@ grep -F '"keyboardLayout": "it"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 grep -F '"consoleKeyMap": "it2"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
+grep -F '"timeZone": "Europe/Rome"' \
+  "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 grep -F '"adminPassword": "$6$testsalt$hash12"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 jq -e '
   .lab.deploymentMode == "controller" and
   .lab.pcCount == 0 and
+  .lab.timeZone == "Europe/Rome" and
   .lab.keyboardLayout == "it" and
   .lab.consoleKeyMap == "it2"
 ' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null

@@ -50,8 +50,8 @@ typed controller plan/apply boundary.
 
 ## Bootstrap and workflow contracts
 
-Bootstrap capability `lib.controllerBootstrapVersion = 1` collects teacher and
-student identities, timezone, keyboard, and all three passwords before disk
+Bootstrap capability `lib.controllerBootstrapVersion = 1` collects keyboard,
+time zone, teacher and student identities, and all three passwords before disk
 installation. Capability version 2 adds a reviewed initial software-profile
 choice after those settings. The profile catalog and helper come from the same
 resolved template revision; the launcher writes only `lab-software.json` before
@@ -62,7 +62,8 @@ revisions remain on their legacy workflow rather than invoking an unsupported
 command.
 
 Keyboard is the first controller-setting prompt, and bootstrap must activate
-the selected console keymap successfully before collecting any other value. It
+the selected console keymap successfully before collecting any other value.
+Time zone follows immediately, before account details and passwords. Bootstrap
 fails closed from graphical terminals whose compositor layout cannot be
 verified portably, and when `loadkeys` is unavailable or fails. This keeps all
 subsequent input, especially passwords, aligned with the installed console/login
