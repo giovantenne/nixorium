@@ -104,6 +104,13 @@ required by the screensaver.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 
+Desktop Icons NG and Dash to Dock are baseline workstation components rather
+than application-profile choices. The template installs and enables both for
+every role, keeps the dock visible outside the GNOME overview, and reapplies the
+required extension state at login without disabling unrelated user extensions.
+This keeps files under the XDG Desktop directory visible for reset student
+homes and persistent staff homes alike.
+
 The [reference profile measurement](profile-closure-measurements.md) compares
 complete Essential and Programming client closures under one documented lock.
 Closure size, transfer estimates and elapsed build time have different cache

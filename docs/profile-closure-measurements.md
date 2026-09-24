@@ -6,9 +6,10 @@ the common NixOS, GNOME, firmware and classroom-management base. It is not the
 sum of package archive sizes and does not predict disk usage outside the Nix
 store.
 
-These figures are a reproducible snapshot of the source revision below. Git
-became part of every built-in profile after that revision, so repeat the
-documented procedure before using the table to size a current deployment.
+These figures are a reproducible snapshot of the source revision below. Git and
+the baseline GNOME desktop-icon/dock extensions became part of every built-in
+workstation after that revision, so repeat the documented procedure before
+using the table to size a current deployment.
 
 ## Reference measurement
 
@@ -78,7 +79,7 @@ Use the template's own profile helper to produce the Programming declaration
 set, then build the same target with the same lock and settings:
 
 ```sh
-printf 'programming\n\n\n' | bash scripts/configure-software-profile.sh \
+printf 'programming\n\n' | bash scripts/configure-software-profile.sh \
   software-presets.json lab-software.json
 git add lab-software.json
 PROGRAMMING_SYSTEM=$(nix build \

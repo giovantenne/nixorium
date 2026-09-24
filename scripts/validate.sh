@@ -217,8 +217,21 @@ profile_state() {
     let
       deployment = builtins.getFlake ("path:" + builtins.getEnv "NIXORIUM_PROFILE_SITE");
       config = deployment.nixosConfigurations.pc01.config;
+      pkgs = deployment.nixosConfigurations.pc01.pkgs;
     in {
       chromiumPolicy = config.environment.etc ? "chromium/policies/managed/homepage.json";
+      desktopExtensions =
+        builtins.elem pkgs.gnomeExtensions.dash-to-dock config.environment.systemPackages
+        && builtins.elem pkgs.gnomeExtensions.desktop-icons-ng-ding config.environment.systemPackages;
+      desktopExtensionDefaults =
+        pkgs.lib.hasInfix "ding@rastersoft.com" config.services.desktopManager.gnome.extraGSettingsOverrides
+        && pkgs.lib.hasInfix "dash-to-dock@micxgx.gmail.com" config.services.desktopManager.gnome.extraGSettingsOverrides
+        && pkgs.lib.hasInfix "dock-fixed=true" config.services.desktopManager.gnome.extraGSettingsOverrides;
+      desktopExtensionRepair =
+        pkgs.lib.hasInfix "gnome-extensions enable \"ding@rastersoft.com\""
+          config.environment.etc."lab/gnome-user-setup.sh".text
+        && pkgs.lib.hasInfix "gnome-extensions enable \"dash-to-dock@micxgx.gmail.com\""
+          config.environment.etc."lab/gnome-user-setup.sh".text;
       docker = config.virtualisation.docker.rootless.enable;
       screensaver = config.systemd.user.services ? lab-screensaver;
       vscodeHome = builtins.match ".*vscjava[.]vscode-java-pack.*"
@@ -236,7 +249,8 @@ profile_state() {
 
 PROFILE_STATE=$(profile_state)
 jq -e '
-  .chromiumPolicy and .screensaver and
+  .chromiumPolicy and .screensaver and .desktopExtensions and
+  .desktopExtensionDefaults and .desktopExtensionRepair and
   ((.docker or .vscodeHome or .vscodeHomeOwnership) | not) and
   .homeOwnershipOrdering
 ' <<<"$PROFILE_STATE" >/dev/null
@@ -248,7 +262,8 @@ jq '.packages += [
   "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
 PROFILE_STATE=$(profile_state)
 jq -e '
-  .chromiumPolicy and .docker and .screensaver and .vscodeHome and
+  .chromiumPolicy and .docker and .screensaver and .desktopExtensions and
+  .desktopExtensionDefaults and .desktopExtensionRepair and .vscodeHome and
   .vscodeHomeOwnership and .homeOwnershipOrdering
 ' <<<"$PROFILE_STATE" >/dev/null
 jq '.packages |= map(select(.package as $package | [
@@ -260,7 +275,11 @@ jq '.packages |= map(select(.package as $package | [
   "vscode"
 ] | index($package) | not))' "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
 PROFILE_STATE=$(profile_state)
-jq -e '((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and .homeOwnershipOrdering' <<<"$PROFILE_STATE" >/dev/null
+jq -e '
+  .desktopExtensions and .desktopExtensionDefaults and .desktopExtensionRepair and
+  ((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and
+  .homeOwnershipOrdering
+' <<<"$PROFILE_STATE" >/dev/null
 cp "$TEMP_DIR/lab-software-profile.json" "$SITE_DIR/lab-software.json"
 
 if [[ "${MODE}" == "--ci" ]]; then

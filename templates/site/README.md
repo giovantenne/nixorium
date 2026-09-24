@@ -118,7 +118,7 @@ one-time adoption for older deployments, independent packages and recovery.
 - `lab-software.json`: guided packages with explicit shared, controller or client scopes
 - `software-catalog.nix`: optional deployment-owned suggestions shown before package search
 - `software-presets.json`: seven versioned software profiles whose packages can be added as one reviewed batch
-- `modules/workstation.nix`: GNOME application policy, favorites and shortcuts
+- `modules/workstation.nix`: GNOME desktop icons, persistent dock, application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
 - `modules/screensaver.nix`: Ghostty/TTE lab screensaver supplied by every built-in profile
@@ -289,10 +289,14 @@ only and does not migrate existing deployments.
 Every profile includes Git, the Ghostty/TTE lab screensaver, Node.js (and npm),
 Pi and OpenCode. Git is available to every user and is also a runtime
 dependency of the controller management workflows. The screensaver therefore
-remains active in Essential as well as the larger profiles. These commands have
-a reproducible system version available to every user. npm global installs use
-`~/.local/npm` and take precedence in the user's shell, so admin or teacher can
-try a newer upstream CLI without `sudo`:
+remains active in Essential as well as the larger profiles. Desktop Icons NG
+and Dash to Dock are installed separately as workstation basics for every
+profile. Files saved in the Desktop directory appear on the desktop, and the
+dock remains visible outside the GNOME overview.
+
+Pi and OpenCode have a reproducible system version available to every user. npm
+global installs use `~/.local/npm` and take precedence in the user's shell, so
+admin or teacher can try a newer upstream CLI without `sudo`:
 
 ```sh
 npm install -g @mariozechner/pi-coding-agent@latest opencode-ai@latest

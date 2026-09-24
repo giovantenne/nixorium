@@ -52,6 +52,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- New private deployments now install and enable Desktop Icons NG and Dash to
+  Dock as baseline workstation policy, independently of the application
+  profile. Files created in the Desktop directory are visible on the desktop,
+  and the dock remains visible outside the GNOME overview. Login setup repairs
+  these two required extensions for existing staff accounts without removing
+  other enabled extensions.
 - The public controller bootstrap now separates settings, input prompts,
   reviews, preparation output, and installation logs in an ASCII-only console
   interface. Time zone is requested immediately after the selected keyboard is
