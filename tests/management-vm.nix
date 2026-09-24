@@ -373,6 +373,7 @@
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
     controller.succeed("id -nG admin | tr ' ' '\n' | grep -Fx nixorium-operations; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination)\" = root:nixorium-operations:770; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/operation.lock)\" = root:nixorium-operations:660")
+    controller.succeed("test \"$(cat /etc/nixorium/deployment-path)\" = /home/admin/nixorium-deployment; test \"$(stat -c '%U:%G:%a' /etc/nixorium/deployment-path)\" = root:root:444; systemctl cat nixorium-remote-install.service | grep -F '/etc/nixorium/deployment-path'; systemctl show nixorium-remote-install.service -p LimitCORE --value | grep -Fx 0")
     controller.succeed("su - admin -c 'systemctl start nixorium-remote-install.service'")
     controller.wait_for_unit("nixorium-remote-install.service")
     controller.succeed("test \"$(stat -c '%U:%G:%a' /run/nixorium/remote-install/control.sock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/remote-install)\" = admin:users:700")

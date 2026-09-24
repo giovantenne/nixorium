@@ -1,6 +1,6 @@
 module github.com/giovantenne/nixorium
 
-go 1.25.0
+go 1.26.0
 
 require (
 	charm.land/bubbles/v2 v2.2.1
@@ -8,6 +8,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/term v0.2.2
+	golang.org/x/crypto v0.56.0
 )
 
 require (

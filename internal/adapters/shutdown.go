@@ -5,29 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 const shutdownSessionCommand = "nixorium-session-state"
-
-type clientOperationLease struct{ file *os.File }
-
-func (lease *clientOperationLease) Close() error {
-	if lease == nil || lease.file == nil {
-		return nil
-	}
-	_ = syscall.Flock(int(lease.file.Fd()), syscall.LOCK_UN)
-	err := lease.file.Close()
-	lease.file = nil
-	return err
-}
 
 func (Local) ClientOperationActive() (bool, error) {
 	return managedOperationActive()

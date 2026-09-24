@@ -284,6 +284,13 @@ func (Local) ReserveRemoteInstall(_ context.Context, plan domain.RemoteInstallPl
 	return reserveRemoteInstallAt(managedCoordinationDirectory, true, plan, reviewToken)
 }
 
+func (Local) ReserveRemoteSession(operationID string) (domain.RemoteInstallReservation, error) {
+	if !remoteStateID(operationID) {
+		return nil, errors.New("remote installation operation ID is invalid")
+	}
+	return createRemoteReservationAt(managedCoordinationDirectory, true, operationID, "")
+}
+
 func reserveRemoteInstallAt(directoryPath string, managed bool, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
 	if err := domain.ValidateRemoteInstallPlan(plan); err != nil {
 		return nil, err
@@ -291,6 +298,11 @@ func reserveRemoteInstallAt(directoryPath string, managed bool, plan domain.Remo
 	if len(reviewToken) != len("sha256:")+64 || !stringsHasHexDigest(reviewToken[len("sha256:"):]) {
 		return nil, errors.New("remote installation review token is invalid")
 	}
+	digest := sha256.Sum256([]byte(reviewToken))
+	return createRemoteReservationAt(directoryPath, managed, plan.OperationID, "sha256:"+hex.EncodeToString(digest[:]))
+}
+
+func createRemoteReservationAt(directoryPath string, managed bool, operationID, tokenDigest string) (domain.RemoteInstallReservation, error) {
 	var gate *operationGate
 	var err error
 	if managed {
@@ -313,13 +325,12 @@ func reserveRemoteInstallAt(directoryPath string, managed bool, plan domain.Remo
 		return nil, fmt.Errorf("create USB installation reservation: %w", err)
 	}
 	file := os.NewFile(uintptr(descriptor), filepath.Join(directoryPath, remoteReservationName))
-	digest := sha256.Sum256([]byte(reviewToken))
 	record := struct {
 		SchemaVersion int    `json:"schemaVersion"`
 		OperationID   string `json:"operationId"`
 		StatePath     string `json:"statePath"`
 		TokenDigest   string `json:"tokenDigest"`
-	}{1, plan.OperationID, filepath.Join("/var/lib/nixorium/remote-install", plan.OperationID+".json"), "sha256:" + hex.EncodeToString(digest[:])}
+	}{1, operationID, filepath.Join("/var/lib/nixorium/remote-install", operationID+".json"), tokenDigest}
 	content, _ := json.Marshal(record)
 	content = append(content, '\n')
 	if _, err := file.Write(content); err != nil {
@@ -337,7 +348,7 @@ func reserveRemoteInstallAt(directoryPath string, managed bool, plan domain.Remo
 		gate.Close()
 		return nil, err
 	}
-	return &remoteInstallReservation{directoryPath: directoryPath, operationID: plan.OperationID, gate: gate}, nil
+	return &remoteInstallReservation{directoryPath: directoryPath, operationID: operationID, gate: gate}, nil
 }
 
 func (reservation *remoteInstallReservation) ReleaseResolved() error {

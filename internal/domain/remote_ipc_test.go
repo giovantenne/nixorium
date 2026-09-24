@@ -6,7 +6,7 @@ import (
 )
 
 func TestDecodeRemoteInstallRequestIsStrictAndBounded(t *testing.T) {
-	valid := `{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"prepare","host":"pc01"}`
+	valid := `{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"prepare","operationId":"abcdefabcdefabcdefabcdefabcdefab","host":"pc01"}`
 	request, err := DecodeRemoteInstallRequest([]byte(valid))
 	if err != nil || request.Host != "pc01" {
 		t.Fatalf("request=%+v error=%v", request, err)
