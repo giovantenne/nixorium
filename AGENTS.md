@@ -210,6 +210,9 @@ Release from the matching changelog section.
   observation. Never replay apply or reboot after uncertain dispatch. Recovery
   may reattach only to the exact host, address, fingerprint, and live boot ID;
   a verified pre-apply reattachment must remain safely cancellable.
+  A confirmed remote failure with no disk mutation must likewise remain
+  cancellable so it cannot strand the controller reservation; uncertain or
+  post-mutation failures remain reconciliation-only.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.

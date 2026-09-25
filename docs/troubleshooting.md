@@ -174,12 +174,14 @@ reattaches only when the fingerprint and live boot ID also match, then performs
 status reconciliation only. A different boot remains blocked and the recovered
 operation key is revoked.
 
-Use `cancel` only before apply. Use `reboot` only after status reports the
-installation ready, remove the USB first, and verify the installed revision
-after disk boot. `close` releases a completed or deliberately abandoned record;
-it does not make an uncertain disk safe. If the live ISO is gone or the receipt
-cannot prove completion, inspect/reinitialize only the explicitly dedicated
-target under a new destructive review.
+Use `cancel` before apply, or after a failed remote receipt explicitly reports
+that disk mutation did not start; the TUI offers **Cancel safely** only for
+those states. Do not cancel an uncertain or post-mutation failure. Use `reboot`
+only after status reports the installation ready, remove the USB first, and
+verify the installed revision after disk boot. `close` releases a completed or
+deliberately abandoned record; it does not make an uncertain disk safe. If the
+live ISO is gone or the receipt cannot prove completion, inspect/reinitialize
+only the explicitly dedicated target under a new destructive review.
 
 For a reinstall, a different key at the configured static address is expected
 only after proving the old machine is the selected physical client. Approve

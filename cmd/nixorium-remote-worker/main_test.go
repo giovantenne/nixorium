@@ -205,6 +205,51 @@ func TestRemoteWorkerPreparationPersistsNonSecretVerifiedFacts(t *testing.T) {
 	}
 }
 
+func TestRemoteWorkerConfirmedFailureBeforeMutationCanBeCancelled(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	live := validWorkerLiveSession()
+	preparation := validWorkerPreparation()
+	preparation.OperationID = operationID
+	receipt := domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePreflight,
+	}
+	session := domain.RemoteInstallSession{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", TokenConsumed: true, Receipt: &receipt, Preparation: &preparation,
+		Bootstrap: &domain.RemoteInstallBootstrapRecord{
+			Host: "pc01", Address: "192.0.2.20", HostPublicKey: live.HostPublicKey,
+			HostFingerprint:   "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			AuthorizedKeyLine: live.PublicKeyLine, Facts: live.Facts,
+		},
+		Events: []domain.RemoteInstallProgress{},
+	}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{operationID: session}}
+	bootstrap := &fakeWorkerBootstrap{session: live}
+	preparer := &fakeWorkerPreparer{}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{
+		state: state, bootstrap: bootstrap, preparer: preparer,
+		operationID: operationID, liveSession: &live, reservation: reservation,
+	}
+	response := worker.handle(context.Background(), domain.RemoteInstallRequest{
+		Operation: domain.RemoteInstallCancelOperation, OperationID: operationID,
+	}, nil)
+	if response.State != "cancelled" || !bootstrap.closed || !preparer.discarded || !reservation.released || worker.operationID != "" {
+		t.Fatalf("confirmed pre-mutation failure cancellation=%+v worker=%+v", response, worker)
+	}
+
+	unsafe := session
+	unsafe.Receipt = &domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePartition,
+		MutationStarted: true, DiskMayBeModified: true,
+	}
+	if remoteSessionSafelyCancellable(unsafe) {
+		t.Fatal("a failure after disk mutation was marked safely cancellable")
+	}
+}
+
 func TestRemoteWorkerPreparesArtifactsBeforeTargetAndReusesThem(t *testing.T) {
 	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{}}
 	bootstrap := &fakeWorkerBootstrap{session: validWorkerLiveSession()}

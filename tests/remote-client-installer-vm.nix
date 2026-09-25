@@ -91,7 +91,9 @@ in
     excluded = [item for item in facts["disks"] if not item.get("eligible", False)]
     assert any("live-media" in item.get("exclusionReasons", []) or "mounted" in item.get("exclusionReasons", []) for item in excluded), facts
     disk = next(item for item in facts["disks"] if item["path"] == "/dev/vdb")
-    host_key = installer.succeed("tr -d '\\n' < /etc/ssh/ssh_host_ed25519_key.pub").strip()
+    host_key_file = installer.succeed("tr -d '\\n' < /etc/ssh/ssh_host_ed25519_key.pub").strip()
+    assert len(host_key_file.split()) >= 3, host_key_file
+    host_key = " ".join(host_key_file.split()[:2])
     plan = {
       "schemaVersion": 1,
       "operationId": "0123456789abcdef0123456789abcdef",

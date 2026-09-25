@@ -300,7 +300,8 @@ func (model dashboardModel) remoteInstallResultLines() []string {
 }
 
 func (model dashboardModel) remoteInstallResultActions() []tuiAction {
-	state := model.installation.remote.response.State
+	response := model.installation.remote.response
+	state := response.State
 	actions := []tuiAction{{key: "r", label: "Refresh status"}}
 	if state == "ready-to-reboot" {
 		actions = append(actions, tuiAction{key: "b", label: "Reboot"}, tuiAction{key: "c", label: "Close without reboot"})
@@ -311,11 +312,24 @@ func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 	if state == "reconciliation-required" {
 		actions = append(actions, tuiAction{key: "n", label: "Reconcile remote receipt"}, tuiAction{key: "a", label: "Restore live recovery access"})
 	}
-	if state == "artifacts-ready" || state == "bootstrapped" || state == "bootstrapped-artifacts" || state == "prepared" || state == "review-ready" {
-		actions = append(actions, tuiAction{key: "x", label: "Cancel before apply"})
+	if remoteInstallSafelyCancellable(response) {
+		actions = append(actions, tuiAction{key: "x", label: "Cancel safely"})
 	}
 	actions = append(actions, tuiAction{key: "Esc", label: "Detach"}, tuiAction{key: "F1", label: "Help"})
 	return actions
+}
+
+func remoteInstallSafelyCancellable(response domain.RemoteInstallResponse) bool {
+	switch response.State {
+	case "artifacts-ready", "bootstrapped", "bootstrapped-artifacts", "prepared", "review-ready":
+		return true
+	}
+	if response.State != "failed" || response.Session == nil || response.Session.DispatchUncertain || response.Session.Receipt == nil {
+		return false
+	}
+	receipt := response.Session.Receipt
+	return receipt.OperationID == response.OperationID && receipt.State == "failed" &&
+		!receipt.MutationStarted && !receipt.DiskMayBeModified && !receipt.Installed
 }
 
 func remoteInstallResponseFailed(response domain.RemoteInstallResponse) bool {
@@ -524,7 +538,7 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 				remote.confirmation = ""
 			}
 		case "x":
-			if remote.response.State == "artifacts-ready" || remote.response.State == "bootstrapped" || remote.response.State == "bootstrapped-artifacts" || remote.response.State == "prepared" || remote.response.State == "review-ready" {
+			if remoteInstallSafelyCancellable(remote.response) {
 				return model.cancelRemoteInstall()
 			}
 		}
@@ -615,7 +629,7 @@ func (model dashboardModel) cancelRemoteInstall() (tea.Model, tea.Cmd) {
 		model.screen = dashboardInstallMethod
 		return model, nil
 	}
-	model.busy = "Cancelling before apply and confirming credential and GC-root cleanup"
+	model.busy = "Confirming safe cancellation, credential cleanup, and GC-root cleanup"
 	return model.remoteInstallCommand("cancel", domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: model.installation.remote.operationID})
 }
 

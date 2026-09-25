@@ -80,6 +80,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- USB/SSH live-host revalidation now compares the canonical Ed25519 key
+  material rather than the non-cryptographic comment in the public-key file,
+  and a confirmed remote failure before disk mutation can be cancelled safely
+  instead of stranding the controller reservation.
 - USB/SSH temporary-password entry now treats printable `q` and `?`
   characters as masked secret input instead of global quit/help shortcuts.
 - The USB/SSH worker sandbox now permits read-only netlink route queries, so
