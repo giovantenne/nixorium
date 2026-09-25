@@ -393,6 +393,22 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
+		PrepareRemoteInstall: func(host string) (domain.RemoteInstallResponse, error) {
+			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{
+				Operation: domain.RemoteInstallPrepareOperation, Host: host,
+			}, nil)
+		},
+		BootstrapRemoteInstall: func(host, address, fingerprint string, password []byte) (domain.RemoteInstallResponse, error) {
+			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{
+				Operation: domain.RemoteInstallBootstrapOperation, Host: host, Address: address, Fingerprint: fingerprint,
+			}, password)
+		},
+		RemoteInstallRequest: func(request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+			return dashboardRemoteInstallRequest(ctx, repository, request, nil)
+		},
+		LoadRemoteInstall: func() (domain.RemoteInstallResponse, error) {
+			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation}, nil)
+		},
 	}
 	tuiErr := presentation.RunLoadingDashboard(actions, setupMode)
 	if tuiErr != nil {

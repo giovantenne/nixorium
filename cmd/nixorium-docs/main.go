@@ -118,6 +118,8 @@ func renderGallery() string {
 		{title: "Client deployment review", scenarioID: "software-all-clients", label: "Review deployment to all five current clients"},
 		{title: "Verified deployment result", scenarioID: "software-all-clients", label: "Deployment completed and verified"},
 		{title: "PXE network-impact review", scenarioID: "installation", label: "Review the temporary network impact"},
+		{title: "USB SSH disk review", scenarioID: "installation-usb", label: "Review physical identity, logical identity and disk"},
+		{title: "USB SSH verified result", scenarioID: "installation-usb", label: "Verify the installed identity after reboot"},
 		{title: "Shutdown with active sessions", scenarioID: "shutdown", label: "Active sessions will shut down; unreachable clients are not sent"},
 	}
 	var output strings.Builder

@@ -22,7 +22,7 @@ func (task dashboardTask) FilterValue() string { return task.title + " " + task.
 
 var dashboardTasks = []dashboardTask{
 	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, distribute, restore or shut down client computers"},
-	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab, prepare netboot and guide computer installation"},
+	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab and install computers by PXE or the official USB ISO over SSH"},
 	{id: "software", shortcut: "w", title: "Software", description: "Review configured choices or search this lab's pinned packages"},
 	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
 }
@@ -35,7 +35,7 @@ var computersAreaTasks = []dashboardTask{
 }
 
 var installationAreaTasks = []dashboardTask{
-	{id: "install", shortcut: "n", title: "Install computers", description: "Validate laboratory settings, prepare every configured client and start network installation"},
+	{id: "install", shortcut: "n", title: "Install computers", description: "Validate shared prerequisites, then choose PXE or USB over SSH"},
 	{id: "pxe", shortcut: "p", title: "PXE mode and network recovery", description: "Advanced controls for network boot and interrupted controller networking"},
 }
 
@@ -209,7 +209,7 @@ func (model dashboardModel) installationAreaView() string {
 	return model.areaView(
 		"Installation",
 		"Install client computers",
-		"Prepare and control network installation without mixing it with routine distribution.",
+		"Choose PXE for many computers or USB over SSH for one physically identified client.",
 		installationAreaTasks,
 		model.installationAreaCursor,
 	)

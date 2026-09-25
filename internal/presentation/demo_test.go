@@ -26,7 +26,7 @@ func TestDemoRendererFitsSupportedLayouts(t *testing.T) {
 
 func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-09-19")
-	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 4 {
+	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 5 {
 		t.Fatalf("unexpected bundle metadata: %+v", bundle)
 	}
 	for _, scenario := range bundle.Scenarios {
@@ -127,6 +127,22 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	}
 	if !demoFramesContain(shutdown.Frames, "Move the cursor to pc04") || !demoFramesContain(shutdown.Frames, "Type the one-word confirmation") || !demoFramesContain(shutdown.Frames, "Press Enter to send the reviewed requests") {
 		t.Fatal("shutdown demo does not expose cursor movement and typing")
+	}
+	usb := bundle.Scenarios[4]
+	if usb.ID != "installation-usb" || len(usb.Frames) < 10 {
+		t.Fatalf("USB installation scenario = %+v", usb)
+	}
+	usbText := ""
+	for _, frame := range usb.Frames {
+		usbText += frame.Text
+	}
+	for _, expected := range []string{"USB over SSH", "official NixOS Minimal 26.05 ISO", "SHA256:AAAAAAAA", "/dev/sda", "boot-media", "/dev/nvme0n1", "ERASE /dev/nvme0n1 FOR pc01", "Remove or deprioritize the USB medium", "Boot verified:       true"} {
+		if !strings.Contains(usbText, expected) {
+			t.Fatalf("USB installation demo omits %q", expected)
+		}
+	}
+	if strings.Contains(usbText, strings.Repeat("x", 12)) || !demoFramesContain(usb.Frames, "Authorize reboot separately") || !demoFramesContain(usb.Frames, "Verify the installed identity after reboot") {
+		t.Fatal("USB installation demo exposes a secret or omits the separate reboot/verification boundary")
 	}
 }
 

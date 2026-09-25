@@ -12,6 +12,8 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case dashboardRemoteInstallMsg:
+		return model.handleRemoteInstallMessage(message)
 	case dashboardInitialMsg:
 		model.busy = ""
 		model.initializing = false
@@ -25,7 +27,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.report = message.report
 		model.setup = message.setup
 		if model.setupMode || setupNeedsImmediateAttention(message.setup) {
-			return model.startComputerInstallation()
+			return model.beginComputerInstallation("")
 		} else {
 			model.screen = dashboardHome
 		}
@@ -894,6 +896,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	exitKey := key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry())
+	if exitKey && model.screen == dashboardUSBInstall {
+		model.installation.remote.password = ""
+	}
 	if exitKey && model.report.PXE.Mode == "active" {
 		if model.screen != dashboardPXELeaveReview {
 			model.screen = dashboardPXELeaveReview

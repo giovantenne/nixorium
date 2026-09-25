@@ -191,6 +191,10 @@ func TestRemoteWorkerPreparesArtifactsBeforeTargetAndReusesThem(t *testing.T) {
 	if prepared.State != "artifacts-ready" || prepared.OperationID == "" || prepared.Session == nil || prepared.Session.Artifacts == nil || prepared.Session.Bootstrap != nil {
 		t.Fatalf("artifact preparation=%+v", prepared)
 	}
+	probe := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation}, nil)
+	if probe.OperationID != prepared.OperationID || probe.State != "artifacts-ready" || probe.Session == nil {
+		t.Fatalf("worker probe did not expose its resumable operation: %+v", probe)
+	}
 	secret, _ := adapters.NewLivePassword([]byte("temporary-secret"))
 	bootstrapped := worker.handle(context.Background(), domain.RemoteInstallRequest{
 		Operation: domain.RemoteInstallBootstrapOperation, Host: "pc01", Address: "192.0.2.20",

@@ -908,7 +908,7 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "target disk locally") || !strings.Contains(view, "does not erase or reserve") {
+	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "PXE or USB over SSH") || !strings.Contains(view, "does not erase a disk") {
 		t.Fatalf("restore choice is ambiguous:\n%s", view)
 	}
 
@@ -928,8 +928,8 @@ func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	view = model.View().Content
-	if model.screen != dashboardPXE || !model.computers.restoreMode || !strings.Contains(view, "Reinstall computers") || strings.Contains(view, "Choose a computer") {
-		t.Fatalf("reinstall did not open generic network installation: %s", view)
+	if model.screen != dashboardInstallMethod || !model.computers.restoreMode || !strings.Contains(view, "Network boot (PXE)") || !strings.Contains(view, "USB over SSH") {
+		t.Fatalf("reinstall did not offer both installation methods: %s", view)
 	}
 }
 

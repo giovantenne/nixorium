@@ -715,10 +715,15 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 		t.Fatalf("installation area did not open: screen=%d", m.screen)
 	}
 	m = press(m, "enter")
-	if m.screen != dashboardSettings || m.areaReturn != dashboardHome || !m.installation.flow {
-		t.Fatalf("installation task did not start the direct flow: screen=%d return=%d", m.screen, m.areaReturn)
+	if m.screen != dashboardInstallMethod || !m.installation.flow {
+		t.Fatalf("installation task did not open method selection: screen=%d", m.screen)
 	}
-	updated, command := m.Update(dashboardSettingsMsg{settings: wizardSettings()})
+	updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(dashboardModel)
+	if command == nil || m.screen != dashboardSettings || m.areaReturn != dashboardHome {
+		t.Fatalf("PXE method did not start the common settings flow: screen=%d return=%d", m.screen, m.areaReturn)
+	}
+	updated, command = m.Update(dashboardSettingsMsg{settings: wizardSettings()})
 	m = updated.(dashboardModel)
 	if command != nil || m.screen != dashboardSettingsEdit {
 		t.Fatalf("installation settings did not open: screen=%d", m.screen)

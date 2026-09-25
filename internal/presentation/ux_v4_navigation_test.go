@@ -216,8 +216,13 @@ func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command == nil || setupLoads != 0 || model.screen != dashboardSettings || !model.installation.flow {
-		t.Fatalf("install did not open settings directly: setupLoads=%d screen=%d", setupLoads, model.screen)
+	if command != nil || setupLoads != 0 || model.screen != dashboardInstallMethod || !model.installation.flow {
+		t.Fatalf("install did not open method selection: setupLoads=%d screen=%d", setupLoads, model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.screen != dashboardSettings {
+		t.Fatalf("PXE selection did not open common settings: screen=%d", model.screen)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -243,6 +248,11 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	model = updated.(dashboardModel)
 	if command != nil || model.screen != dashboardInstallationArea {
 		t.Fatalf("installation area did not open: screen=%d", model.screen)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardInstallMethod {
+		t.Fatal("computer installation method selection did not start")
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
@@ -272,7 +282,7 @@ func TestInstallComputersSavesValidatedSettingsWithoutReviewScreen(t *testing.T)
 	candidate := wizardSettings()
 	model := dashboardModel{
 		screen:       dashboardSettingsEdit,
-		installation: installationModel{flow: true},
+		installation: installationModel{flow: true, method: "pxe"},
 		settings:     settingsModel{candidate: candidate},
 		actions: DashboardActions{
 			SaveSettings: func(received domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
@@ -311,7 +321,7 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 	model := dashboardModel{
 		report:       testDashboardReport("stopped"),
 		screen:       dashboardPXE,
-		installation: installationModel{flow: true},
+		installation: installationModel{flow: true, method: "pxe"},
 		actions: DashboardActions{
 			PlanController: func() domain.ControllerRebuildPlanReport {
 				plans++

@@ -201,9 +201,13 @@ func (model dashboardModel) helpView() string {
 	case dashboardComputersArea:
 		lines = append(lines, "Choose inventory, distribute, restore or shut down.", "Observed state is loaded only by the task that needs it.")
 	case dashboardInstallationArea:
-		lines = append(lines, "Install computers validates and saves laboratory settings, prepares every configured client, then asks once before starting PXE.", "PXE mode and network recovery is the advanced controller-side view.")
+		lines = append(lines, "Install computers validates shared laboratory prerequisites, then offers PXE or USB over SSH.", "PXE mode and network recovery is the advanced controller-side view.")
+	case dashboardInstallMethod:
+		lines = append(lines, "Choose PXE for many computers or USB over SSH for one physically identified client.", "An existing USB operation can be reattached without repeating apply.")
+	case dashboardUSBInstall:
+		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.", "Use r for status, n for reconciliation, b for reviewed reboot, c to close without reboot, and v for post-boot verification when visible.")
 	case dashboardRestore:
-		lines = append(lines, "Choose reapply to keep the disk, or reinstall to start PXE.", "Identity and disk erasure are confirmed locally on each computer.")
+		lines = append(lines, "Choose reapply to keep the disk, or reinstall with PXE or USB over SSH.", "Each method keeps its own explicit identity and disk-erasure confirmation boundary.")
 	case dashboardAdministration:
 		lines = append(lines, "u update Nixorium   e settings   c controller", "s controller services   g changes   l history   i diagnostics")
 	case dashboardHosts:
@@ -287,7 +291,7 @@ func (model dashboardModel) restoreView() string {
 		description string
 	}{
 		{"Reapply the intended system", "Keeps the disk and deploys the declared configuration again."},
-		{"Reinstall from scratch", "Starts PXE; each computer chooses its configured identity and target disk locally."},
+		{"Reinstall from scratch", "Choose PXE or USB over SSH; disk erasure always requires an explicit reviewed confirmation."},
 	}
 	lines := []string{tuiTitle("Restore computers", model.isDark), tuiMuted("Choose whether to keep or replace the installed system.", model.isDark), ""}
 	for index, option := range options {
@@ -299,7 +303,7 @@ func (model dashboardModel) restoreView() string {
 		notices: []tuiNotice{{
 			kind:   tuiStatusNeutral,
 			title:  "Disk erasure is always confirmed locally",
-			detail: "Starting PXE does not erase or reserve a computer. The downloaded installer asks for identity and disk confirmation on each machine.",
+			detail: "Choosing a method does not erase a disk. PXE confirms locally; USB over SSH binds the physical fingerprint, identity and disk in the controller review.",
 		}},
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}},
 	})
@@ -381,6 +385,12 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 }
 
 func (model dashboardModel) textEntry() bool {
+	if model.screen == dashboardUSBInstall {
+		switch model.installation.remote.stage {
+		case remoteInstallConsole, remoteInstallRotateHostKey, remoteInstallReview, remoteInstallConfirmReboot, remoteInstallConfirmClose:
+			return true
+		}
+	}
 	if model.screen == dashboardUpdate && model.updates.packageBase && model.updates.baseEditing {
 		return true
 	}
