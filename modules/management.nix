@@ -856,7 +856,7 @@ in
         ];
         NoNewPrivileges = true;
         CapabilityBoundingSet = "";
-        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
         LimitCORE = 0;
         Restart = "on-failure";
         RestartSec = "2s";
