@@ -96,6 +96,12 @@ func (model dashboardModel) remoteInstallView() string {
 		}
 		actions = []tuiAction{{key: "↑/↓", label: "Select identity"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Method"}, {key: "F1", label: "Help"}}
 	case remoteInstallConsole:
+		consoleTitle := "Verify the fingerprint on the local console"
+		consoleDetail := "The password is used once in memory, then replaced by an ephemeral key and cleared."
+		if remote.recovery {
+			consoleTitle = "Restore access only to reconcile the reserved operation"
+			consoleDetail = "Re-enter the original live address and fingerprint. This cannot create or replay an apply."
+		}
 		lines = append(lines,
 			"On the physical client, boot the official NixOS Minimal 26.05 ISO in UEFI mode and use:",
 			"  passwd",
@@ -108,7 +114,7 @@ func (model dashboardModel) remoteInstallView() string {
 			remoteInstallField("Ed25519 fingerprint", remote.fingerprint, remote.formField == 1, false),
 			remoteInstallField("Temporary password", remote.password, remote.formField == 2, true),
 		)
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Verify the fingerprint on the local console", detail: "The password is used once in memory, then replaced by an ephemeral key and cleared."})
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: consoleTitle, detail: consoleDetail})
 		actions = []tuiAction{{key: "Tab/↑/↓", label: "Field"}, {key: "Enter", label: "Connect"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallSelectDisk:
 		lines = append(lines,
@@ -279,7 +285,7 @@ func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 		actions = append(actions, tuiAction{key: "v", label: "Verify installed system"})
 	}
 	if state == "reconciliation-required" {
-		actions = append(actions, tuiAction{key: "n", label: "Reconcile remote receipt"})
+		actions = append(actions, tuiAction{key: "n", label: "Reconcile remote receipt"}, tuiAction{key: "a", label: "Restore live recovery access"})
 	}
 	if state == "artifacts-ready" || state == "bootstrapped" || state == "bootstrapped-artifacts" || state == "prepared" || state == "review-ready" {
 		actions = append(actions, tuiAction{key: "x", label: "Cancel before apply"})
@@ -335,6 +341,11 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 		switch key.String() {
 		case "esc":
 			remote.password = ""
+			if remote.recovery {
+				remote.recovery = false
+				remote.stage = remoteInstallResult
+				return model, nil
+			}
 			return model.cancelRemoteInstall()
 		case "tab", "down":
 			remote.formField = min(2, remote.formField+1)
@@ -428,6 +439,17 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			if remote.response.State == "reconciliation-required" {
 				model.busy = "Reconciling the recorded operation with the remote receipt"
 				return model.remoteInstallCommand("reconcile", domain.RemoteInstallRequest{Operation: domain.RemoteInstallReconcileOperation, OperationID: remote.operationID})
+			}
+		case "a":
+			if remote.response.State == "reconciliation-required" && remote.response.Session != nil && remote.response.Session.Bootstrap != nil {
+				remote.host = remote.response.Session.Bootstrap.Host
+				remote.address = ""
+				remote.fingerprint = ""
+				remote.password = ""
+				remote.formField = 0
+				remote.recovery = true
+				remote.stage = remoteInstallConsole
+				model.message = "Read the original address and Ed25519 fingerprint again from the live console."
 			}
 		case "b":
 			if remote.response.State == "ready-to-reboot" {
@@ -585,6 +607,11 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		remote.stage = remoteInstallConsole
 		remote.formField = 0
 	case "bootstrap":
+		if message.response.State == "recovery-attached" {
+			remote.recovery = false
+			model.busy = "Reconciling the reserved operation without replaying apply"
+			return model.remoteInstallCommand("reconcile", domain.RemoteInstallRequest{Operation: domain.RemoteInstallReconcileOperation, OperationID: remote.operationID})
+		}
 		remote.stage = remoteInstallBootstrap
 		model.busy = "Verifying signed cache access, importing the installer bundle and probing disks"
 		return model.remoteInstallCommand("finalize", domain.RemoteInstallRequest{Operation: domain.RemoteInstallPrepareOperation, OperationID: remote.operationID, Host: remote.host})

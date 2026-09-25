@@ -46,6 +46,19 @@ func (bootstrap *fakeWorkerBootstrap) Establish(_ context.Context, operationID, 
 	return bootstrap.session, bootstrap.err
 }
 
+func (bootstrap *fakeWorkerBootstrap) RecoverSession(operationID string, record domain.RemoteInstallBootstrapRecord) (adapters.VerifiedLiveSession, error) {
+	if bootstrap.err != nil {
+		return adapters.VerifiedLiveSession{}, bootstrap.err
+	}
+	bootstrap.session.OperationID = operationID
+	bootstrap.session.Address = record.Address
+	bootstrap.session.HostPublicKey = record.HostPublicKey
+	bootstrap.session.HostFingerprint = record.HostFingerprint
+	bootstrap.session.PublicKeyLine = record.AuthorizedKeyLine
+	bootstrap.session.Facts = record.Facts
+	return bootstrap.session, nil
+}
+
 func (bootstrap *fakeWorkerBootstrap) CloseSession(context.Context, adapters.VerifiedLiveSession) error {
 	bootstrap.closed = true
 	return nil
@@ -66,6 +79,7 @@ func (reservation *fakeWorkerReservation) ReleaseResolved() error {
 type fakeWorkerReservations struct {
 	reservation *fakeWorkerReservation
 	err         error
+	recoverID   string
 }
 
 type fakeWorkerPreparer struct {
@@ -99,6 +113,17 @@ func (source *fakeWorkerReservations) ReserveRemoteSession(string) (domain.Remot
 	}
 	source.reservation = &fakeWorkerReservation{}
 	return source.reservation, nil
+}
+
+func (source *fakeWorkerReservations) RecoverRemoteSession() (string, domain.RemoteInstallReservation, bool, error) {
+	if source.err != nil {
+		return "", nil, false, source.err
+	}
+	if source.recoverID == "" {
+		return "", nil, false, nil
+	}
+	source.reservation = &fakeWorkerReservation{}
+	return source.recoverID, source.reservation, true, nil
 }
 
 func TestRemoteWorkerBootstrapPersistsNonSecretStateAndCancelCleansUp(t *testing.T) {
@@ -206,6 +231,113 @@ func TestRemoteWorkerPreparesArtifactsBeforeTargetAndReusesThem(t *testing.T) {
 	cancelled := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: prepared.OperationID}, nil)
 	if cancelled.State != "cancelled" || !preparer.discarded || !bootstrap.closed || !reservations.reservation.released {
 		t.Fatalf("prepared session cleanup=%+v", cancelled)
+	}
+}
+
+func TestRemoteWorkerRecoversReservedLiveSessionWithoutReplayingDispatch(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	live := validWorkerLiveSession()
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{
+		operationID: {
+			SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+			LogID: "usb-install-" + operationID + ".log", State: "dispatching", TokenConsumed: true,
+			Bootstrap: &domain.RemoteInstallBootstrapRecord{
+				Host: "pc01", Address: "192.0.2.20", HostPublicKey: live.HostPublicKey,
+				HostFingerprint:   "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				AuthorizedKeyLine: live.PublicKeyLine, Facts: live.Facts,
+			},
+			Events: []domain.RemoteInstallProgress{},
+		},
+	}}
+	bootstrap := &fakeWorkerBootstrap{session: live}
+	reservations := &fakeWorkerReservations{recoverID: operationID}
+	worker := &remoteWorker{state: state, bootstrap: bootstrap, reservations: reservations}
+	if err := worker.recover(); err != nil {
+		t.Fatal(err)
+	}
+	stored := state.sessions[operationID]
+	if worker.operationID != operationID || worker.reservation == nil || worker.liveSession == nil ||
+		stored.State != "reconciliation-required" || !stored.DispatchUncertain || len(stored.Events) != 1 {
+		t.Fatalf("worker=%+v stored=%+v", worker, stored)
+	}
+	probe := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation}, nil)
+	if probe.OperationID != operationID || probe.State != "reconciliation-required" {
+		t.Fatalf("recovered probe=%+v", probe)
+	}
+}
+
+func TestRemoteWorkerRecoveryWithoutRuntimeCredentialFailsClosed(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	live := validWorkerLiveSession()
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{
+		operationID: {
+			SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID, State: "prepared",
+			Bootstrap: &domain.RemoteInstallBootstrapRecord{
+				Host: "pc01", Address: "192.0.2.20", HostPublicKey: live.HostPublicKey,
+				HostFingerprint:   "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				AuthorizedKeyLine: live.PublicKeyLine, Facts: live.Facts,
+			},
+			Events: []domain.RemoteInstallProgress{},
+		},
+	}}
+	worker := &remoteWorker{
+		state: state, bootstrap: &fakeWorkerBootstrap{err: errors.New("runtime key missing")},
+		reservations: &fakeWorkerReservations{recoverID: operationID},
+	}
+	if err := worker.recover(); err != nil {
+		t.Fatal(err)
+	}
+	stored := state.sessions[operationID]
+	if worker.reservation == nil || worker.liveSession != nil || stored.State != "reconciliation-required" {
+		t.Fatalf("worker=%+v stored=%+v", worker, stored)
+	}
+	bootstrap := worker.bootstrap.(*fakeWorkerBootstrap)
+	bootstrap.err = nil
+	bootstrap.session = live
+	secret, _ := adapters.NewLivePassword([]byte("new-console-password"))
+	response := worker.handle(context.Background(), domain.RemoteInstallRequest{
+		Operation: domain.RemoteInstallBootstrapOperation, Host: "pc01", Address: "192.0.2.20",
+		Fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	}, secret)
+	if response.State != "recovery-attached" || worker.liveSession == nil || state.sessions[operationID].State != "reconciliation-required" {
+		t.Fatalf("recovery bootstrap response=%+v worker=%+v", response, worker)
+	}
+}
+
+func TestRemoteWorkerRecoveryRejectsDifferentBootWithoutReplaying(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	live := validWorkerLiveSession()
+	oldBoot := live.Facts.BootID
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{
+		operationID: {
+			SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+			State: "reconciliation-required", TokenConsumed: true, DispatchUncertain: true,
+			Bootstrap: &domain.RemoteInstallBootstrapRecord{
+				Host: "pc01", Address: "192.0.2.20", HostPublicKey: live.HostPublicKey,
+				HostFingerprint:   "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				AuthorizedKeyLine: live.PublicKeyLine, Facts: live.Facts,
+			}, Events: []domain.RemoteInstallProgress{},
+		},
+	}}
+	live.Facts.BootID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	bootstrap := &fakeWorkerBootstrap{session: live, err: errors.New("runtime key missing")}
+	worker := &remoteWorker{
+		state: state, bootstrap: bootstrap, reservations: &fakeWorkerReservations{recoverID: operationID},
+	}
+	if err := worker.recover(); err != nil {
+		t.Fatal(err)
+	}
+	bootstrap.err = nil
+	secret, _ := adapters.NewLivePassword([]byte("new-console-password"))
+	response := worker.handle(context.Background(), domain.RemoteInstallRequest{
+		Operation: domain.RemoteInstallBootstrapOperation, Host: "pc01", Address: "192.0.2.20",
+		Fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	}, secret)
+	if response.State != "reconciliation-required" || !strings.Contains(response.Message, "boot ID changed") || !bootstrap.closed || worker.liveSession != nil {
+		t.Fatalf("changed-boot response=%+v worker=%+v", response, worker)
+	}
+	if state.sessions[operationID].Bootstrap.Facts.BootID != oldBoot || !state.sessions[operationID].TokenConsumed {
+		t.Fatal("changed boot replaced or reauthorized the persisted operation")
 	}
 }
 

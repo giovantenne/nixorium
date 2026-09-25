@@ -67,6 +67,19 @@ in
     live = json.loads(installer.succeed("ip -j -4 address show dev eth1"))[0]
     live_iface = live["ifname"]
     live_ip = live["addr_info"][0]["local"]
+    installer.fail(
+      "nix --extra-experimental-features 'nix-command' copy "
+      f"--from http://{cache_ip}:5999 ${remoteInstallerBundle} "
+      f"--option substituters http://{cache_ip}:5999 --option trusted-public-keys '${cachePublicKey}' "
+      "--option connect-timeout 1 --option require-sigs true --option fallback false"
+    )
+    installer.fail(
+      "nix --extra-experimental-features 'nix-command' copy "
+      f"--from http://{cache_ip}:5000 ${remoteInstallerBundle} "
+      f"--option substituters http://{cache_ip}:5000 --option trusted-public-keys 'wrong-cache:YWJjZA==' "
+      "--option require-sigs true --option fallback false"
+    )
+    installer.fail("test -e ${remoteInstallerBundle}")
     installer.succeed(
       "nix --extra-experimental-features 'nix-command' copy "
       f"--from http://{cache_ip}:5000 ${remoteInstallerBundle} "
@@ -75,6 +88,8 @@ in
     )
     installer.succeed("test -e ${remoteInstallerBundle}; test ! -e ${clientSystem}")
     facts = json.loads(installer.succeed("${remoteInstallerBundle}/bin/nixorium-remote-client-installer probe"))
+    excluded = [item for item in facts["disks"] if not item.get("eligible", False)]
+    assert any("live-media" in item.get("exclusionReasons", []) or "mounted" in item.get("exclusionReasons", []) for item in excluded), facts
     disk = next(item for item in facts["disks"] if item["path"] == "/dev/vdb")
     host_key = installer.succeed("tr -d '\\n' < /etc/ssh/ssh_host_ed25519_key.pub").strip()
     plan = {
@@ -90,8 +105,56 @@ in
       "hostKeyPublic": host_key,
       "hostKeyRotation": False,
     }
-    encoded_plan = base64.b64encode(json.dumps(plan).encode()).decode()
-    installer.succeed(f"printf '%s' '{encoded_plan}' | base64 -d > /tmp/remote-plan.json")
+
+    def write_plan(value, name):
+      encoded = base64.b64encode(json.dumps(value).encode()).decode()
+      installer.succeed(f"printf '%s' '{encoded}' | base64 -d > /tmp/{name}.json")
+
+    def rejected_plan(value, name, expected_phase):
+      write_plan(value, name)
+      operation_id = value["operationId"]
+      accepted = json.loads(installer.succeed(f"${remoteInstallerBundle}/bin/nixorium-remote-client-installer apply < /tmp/{name}.json"))
+      assert accepted["state"] == "accepted" and not accepted["mutationStarted"], accepted
+      installer.wait_until_fails(f"systemctl is-active --quiet nixorium-remote-install-{operation_id}.service", timeout=120)
+      result = json.loads(installer.succeed(f"${remoteInstallerBundle}/bin/nixorium-remote-client-installer status {operation_id}"))
+      assert result["state"] == "failed" and result["phase"] == expected_phase and not result["mutationStarted"] and not result["diskMayBeModified"], result
+
+    wrong_nic = json.loads(json.dumps(plan))
+    wrong_nic["operationId"] = "1" * 32
+    wrong_nic["host"]["interface"] = "missing0"
+    rejected_plan(wrong_nic, "wrong-nic-plan", "preflight")
+
+    changed_disk = json.loads(json.dumps(plan))
+    changed_disk["operationId"] = "2" * 32
+    changed_disk["disk"]["serial"] = "replacement-disk"
+    rejected_plan(changed_disk, "changed-disk-plan", "preflight")
+
+    wrong_cache_key = json.loads(json.dumps(plan))
+    wrong_cache_key["operationId"] = "3" * 32
+    wrong_cache_key["cache"]["publicKey"] = "wrong-cache:YWJjZA=="
+    rejected_plan(wrong_cache_key, "wrong-cache-key-plan", "preflight")
+
+    unreachable_cache = json.loads(json.dumps(plan))
+    unreachable_cache["operationId"] = "4" * 32
+    unreachable_cache["cache"]["url"] = f"http://{cache_ip}:5999"
+    rejected_plan(unreachable_cache, "unreachable-cache-plan", "revalidate")
+    installer.succeed("test $(lsblk -nrno NAME /dev/vdb | wc -l) -eq 1")
+
+    interrupted = json.loads(json.dumps(plan))
+    interrupted["operationId"] = "5" * 32
+    write_plan(interrupted, "interrupted-plan")
+    interrupted_receipt = json.loads(installer.succeed("${remoteInstallerBundle}/bin/nixorium-remote-client-installer apply < /tmp/interrupted-plan.json"))
+    assert interrupted_receipt["state"] == "accepted" and not interrupted_receipt["mutationStarted"]
+    installer.wait_until_succeeds("${remoteInstallerBundle}/bin/nixorium-remote-client-installer status " + interrupted["operationId"] + " | jq -e '.mutationStarted == true'", timeout=300)
+    cache.succeed("systemctl stop harmonia.socket harmonia.service")
+    installer.wait_until_fails("systemctl is-active --quiet nixorium-remote-install-" + interrupted["operationId"] + ".service", timeout=300)
+    interrupted_receipt = json.loads(installer.succeed("${remoteInstallerBundle}/bin/nixorium-remote-client-installer status " + interrupted["operationId"]))
+    assert interrupted_receipt["state"] == "failed" and interrupted_receipt["diskMayBeModified"] and not interrupted_receipt["installed"], interrupted_receipt
+    installer.succeed("umount -R /mnt; rmdir /mnt; test ! -e /mnt; sync")
+    cache.succeed("systemctl start harmonia.socket")
+    cache.wait_for_unit("harmonia.socket")
+
+    write_plan(plan, "remote-plan")
     receipt = json.loads(installer.succeed("${remoteInstallerBundle}/bin/nixorium-remote-client-installer apply < /tmp/remote-plan.json"))
     assert receipt["state"] == "accepted" and not receipt["mutationStarted"]
     installer.wait_until_fails("systemctl is-active --quiet nixorium-remote-install-0123456789abcdef0123456789abcdef.service", timeout=900)
@@ -101,6 +164,8 @@ in
       journal = installer.succeed("journalctl -u nixorium-remote-install-0123456789abcdef0123456789abcdef.service --no-pager")
       raise Exception(f"remote installer failed: {receipt!r}\n{operation_log}\n{journal}")
     installer.succeed("${remoteInstallerBundle}/bin/nixorium-remote-client-installer log 0123456789abcdef0123456789abcdef > /tmp/remote-operation.log; test $(stat -c %s /tmp/remote-operation.log) -le 1048576")
+    replay = json.loads(installer.succeed("${remoteInstallerBundle}/bin/nixorium-remote-client-installer apply < /tmp/remote-plan.json"))
+    assert replay["state"] == "ready-to-reboot" and replay["sequence"] == receipt["sequence"], replay
     installer.succeed("test -L /mnt/nix/var/nix/profiles/system; test \"$(readlink -f /mnt/nix/var/nix/profiles/system)\" = ${clientSystem}")
     installer.succeed("umount -R /mnt; sync")
     installer.shutdown()

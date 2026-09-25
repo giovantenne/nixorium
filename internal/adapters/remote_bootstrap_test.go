@@ -16,17 +16,20 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type bootstrapSSHServer struct {
-	listener   net.Listener
-	signer     ssh.Signer
-	mutex      sync.Mutex
-	password   string
-	locked     bool
-	rejectRoot bool
-	authorized map[string]bool
-	closed     chan struct{}
+	listener         net.Listener
+	signer           ssh.Signer
+	mutex            sync.Mutex
+	password         string
+	passwordAttempts int
+	locked           bool
+	rejectRoot       bool
+	authorized       map[string]bool
+	closed           chan struct{}
 }
 
 func newBootstrapSSHServer(t *testing.T) *bootstrapSSHServer {
@@ -76,6 +79,7 @@ func (server *bootstrapSSHServer) serveConnection(connection net.Conn) {
 		PasswordCallback: func(metadata ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 			server.mutex.Lock()
 			defer server.mutex.Unlock()
+			server.passwordAttempts++
 			if metadata.User() == "nixos" && !server.locked && string(password) == server.password {
 				return nil, nil
 			}
@@ -220,6 +224,48 @@ func TestLiveBootstrapPinsHostTransitionsCredentialAndKeepsOnlyRuntimeKey(t *tes
 	}
 }
 
+func TestLiveBootstrapRecoversOnlyExactlyBoundRuntimeCredentials(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
+	if err := os.Mkdir(runtimeRoot, 0700); err != nil {
+		t.Fatal(err)
+	}
+	bootstrap := NewLiveBootstrap()
+	bootstrap.runtimeRoot = runtimeRoot
+	privateKey, publicLine, err := generateEphemeralSSHKey(operationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, hostPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostKey, err := ssh.NewPublicKey(hostPrivate.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, knownHostsPath, err := bootstrap.writeSessionFiles(operationID, "192.0.2.20", hostKey, privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := domain.RemoteInstallBootstrapRecord{
+		Host: "pc01", Address: "192.0.2.20",
+		HostPublicKey:   strings.TrimSpace(string(ssh.MarshalAuthorizedKey(hostKey))),
+		HostFingerprint: ssh.FingerprintSHA256(hostKey), AuthorizedKeyLine: "restrict " + publicLine,
+		Facts: domain.RemoteMachineFacts{SchemaVersion: domain.RemoteInstallSchemaVersion},
+	}
+	session, err := bootstrap.RecoverSession(operationID, record)
+	if err != nil || session.OperationID != operationID || session.Address != record.Address {
+		t.Fatalf("session=%+v error=%v", session, err)
+	}
+	if err := os.WriteFile(knownHostsPath, []byte("tampered\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bootstrap.RecoverSession(operationID, record); err == nil || !strings.Contains(err.Error(), "known-hosts differs") {
+		t.Fatalf("tampered known-hosts recovery error=%v", err)
+	}
+}
+
 func TestLiveBootstrapRejectsWrongFingerprintBeforeAuthorization(t *testing.T) {
 	server := newBootstrapSSHServer(t)
 	runtimeRoot := filepath.Join(t.TempDir(), "runtime")
@@ -236,7 +282,7 @@ func TestLiveBootstrapRejectsWrongFingerprintBeforeAuthorization(t *testing.T) {
 	}
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
-	if len(server.authorized) != 0 || server.locked {
+	if len(server.authorized) != 0 || server.locked || server.passwordAttempts != 0 {
 		t.Fatal("wrong host key modified the live credential state")
 	}
 }
@@ -256,7 +302,7 @@ func TestLiveBootstrapRejectsWrongPasswordWithoutAuthorization(t *testing.T) {
 	}
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
-	if len(server.authorized) != 0 || server.locked {
+	if len(server.authorized) != 0 || server.locked || server.passwordAttempts == 0 {
 		t.Fatal("wrong password modified live authorization state")
 	}
 }

@@ -90,6 +90,54 @@ func TestRemoteReservationRequiresMatchingOperationToRelease(t *testing.T) {
 	_ = reservation.gate.Close()
 }
 
+func TestRemoteReservationRecoveryReacquiresOrphanedGate(t *testing.T) {
+	directory, err := ensureTestCoordinationDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := createRemoteReservationAt(directory, false, "0123456789abcdef0123456789abcdef", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orphan := created.(*remoteInstallReservation)
+	if err := orphan.gate.Close(); err != nil {
+		t.Fatal(err)
+	}
+	orphan.gate = nil
+
+	operationID, recoveredValue, present, err := recoverRemoteReservationAt(directory, false)
+	if err != nil || !present || operationID != "0123456789abcdef0123456789abcdef" {
+		t.Fatalf("recover id=%q present=%t error=%v", operationID, present, err)
+	}
+	if _, _, _, err := recoverRemoteReservationAt(directory, false); err == nil || !strings.Contains(err.Error(), "already running") {
+		t.Fatalf("second worker acquired recovered reservation: %v", err)
+	}
+	if err := recoveredValue.ReleaseResolved(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(directory, remoteReservationName)); !os.IsNotExist(err) {
+		t.Fatalf("resolved recovered marker still exists: %v", err)
+	}
+}
+
+func TestRemoteReservationRecoveryRejectsMismatchedStateBinding(t *testing.T) {
+	directory, err := ensureTestCoordinationDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(directory, remoteReservationName)
+	content := []byte(`{"schemaVersion":1,"operationId":"0123456789abcdef0123456789abcdef","statePath":"/tmp/attacker.json","tokenDigest":""}` + "\n")
+	if err := os.WriteFile(marker, content, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, present, err := recoverRemoteReservationAt(directory, false); !present || err == nil {
+		t.Fatalf("unsafe marker present=%t error=%v", present, err)
+	}
+	if _, err := os.Lstat(marker); err != nil {
+		t.Fatalf("unsafe marker was removed: %v", err)
+	}
+}
+
 func validRemoteReservationPlan() domain.RemoteInstallPlan {
 	return domain.RemoteInstallPlan{
 		SchemaVersion:      domain.RemoteInstallSchemaVersion,
