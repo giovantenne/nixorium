@@ -338,6 +338,11 @@ Release from the matching changelog section.
 - `modules/firewall.nix` enables the firewall everywhere, disables implicit
   all-interface SSH/Avahi openings, scopes SSH/mDNS/Veyon/optional VNC to the
   configured interface, and adds Harmonia/PXE ports only on the controller.
+- Native Veyon hosts persist per-user tokens and portal grants under
+  `/var/lib/nixorium/veyon-session`; never copy these into templates, snapshots,
+  Git, or other machines. GNOME initial consent stays explicit. The user-only
+  state link is required because Veyon reconstructs server environment from the
+  login session; a service-only XDG_STATE_HOME does not propagate.
 - `Veyon.conf` is a build-time derivation: evaluation must never read a derivation output to encode its network objects. GitHub CI disables import-from-derivation to enforce this boundary.
 - The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
 - `modules/common.nix` is only the composition point for core desktop, firewall,

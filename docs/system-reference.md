@@ -218,7 +218,7 @@ installed by the reset student account are intentionally ephemeral.
 
 ## Veyon classroom management
 
-Nixorium pins Veyon 4.11 from its official Flake and supplies the NixOS overlay
+Nixorium pins Veyon 4.11.3 from its official Flake and supplies the NixOS overlay
 and wrappers required for PipeWire, authentication, and Wayland input. Every
 graphical host runs `veyon-service`; the generated configuration maps all
 configured clients under the `Lab` location.
@@ -232,9 +232,27 @@ configured clients under the `Lab` location.
 - Hosts selected by `veyonNativeHosts` use the native PipeWire/portal backend
   and do not open port 5900.
 
-GNOME cannot currently pre-authorize the native portal unattended, so pilot
-hosts display a screen-sharing consent dialog. Keep `veyonNativeHosts` empty in
-production unless that interaction is acceptable.
+Native hosts include upstream commit `22218d772dba639819938911b47ab80924c6c87f`
+and enable `PipeWireVnc/PersistRestoreToken`. GNOME still requires initial
+interactive approval of screen sharing and input access. Subsequent starts can
+restore that grant; revocation or a changed monitor can require approval again.
+
+Veyon's token and the PermissionStore service's portal grants live under
+`/var/lib/nixorium/veyon-session/<user>/`, with separate mode-0700 directories
+for each managed desktop user. A user-service startup link exposes only Veyon's
+state in the home. The permission service alone receives a persistent
+`XDG_DATA_HOME`; application data and other student-home content still reset.
+Portal permissions (including grants for other applications) therefore persist
+on native hosts, outside home templates and snapshots. Initial rollout uses a
+fresh permission store and can require reapproval of existing portal grants.
+Never clone this state between users or machines or place tokens in Git.
+
+Enable a canary with `veyonNativeHosts = [ "pc01" ];`, deploy it, approve the
+initial GNOME dialog locally, then test monitoring, input, lock/unlock, demo,
+service restart, logout/login and reboot/home reset. Remove the fallback only
+after this evidence, including the controller when its screen is broadcast.
+Changing the declaration back disables native capture; persistent grants are
+retained so rollback does not silently erase authorization state.
 
 ## Private deployment customization
 

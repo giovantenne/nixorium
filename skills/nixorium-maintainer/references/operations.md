@@ -412,3 +412,19 @@ keys, clear host identity records, or manipulate interface addresses to bypass
 a refusal. A failed deployment can be partial; a disconnected host is not proof
 of shutdown or rollback. Ask for direction when recovery requires a new
 destructive action or uncertain target.
+
+## Native Veyon pilot
+
+`veyonNativeHosts` opts selected hosts into native PipeWire/Wayland capture.
+Deploy a canary before extending it. GNOME needs one local approval of screen
+sharing and input access; token persistence does not bypass initial consent.
+Validate monitoring, control, locking, demo, service restart, logout/login and
+reboot/home reset before removing the VNC fallback from other hosts.
+
+Native hosts keep each user's Veyon token and portal permission database in
+`/var/lib/nixorium/veyon-session/<user>`, outside the reset home and snapshots.
+Portal grants for other applications also persist; normal student files do not.
+First enablement uses a fresh permission store and may ask to reapprove grants.
+Do not print tokens, copy them into templates, or reuse them on another host.
+Revocation or display changes can require fresh approval. Rollback to the
+fallback preserves this state; do not delete it to diagnose a connection error.

@@ -1,0 +1,2 @@
+# Preserve upstream patch context verbatim (including space-prefixed tabs).
+pkgs/patches/*.patch -whitespace
