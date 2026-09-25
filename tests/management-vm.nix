@@ -43,6 +43,7 @@
       #!${pkgs.runtimeShell}
       [[ "''${1:-}" == switch ]] || exit 2
       SYSTEM_PATH="$(${pkgs.coreutils}/bin/dirname "$(${pkgs.coreutils}/bin/dirname "$(${pkgs.coreutils}/bin/readlink -f "$0")")")"
+      [[ "$(${pkgs.coreutils}/bin/readlink -f /nix/var/nix/profiles/system)" == "$SYSTEM_PATH" ]] || exit 5
       if ${pkgs.coreutils}/bin/touch /home/admin/nixorium-deployment/activation-must-not-write 2>/dev/null; then
         exit 3
       fi
@@ -802,5 +803,6 @@
       controller.succeed("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium controller apply --repo ~/nixorium-deployment --expect \"$revision\" --yes --json' | jq -e '.state == \"completed\" and .verified'")
       controller.wait_until_succeeds("systemctl is-active --quiet nixorium-remote-install.service; test -S /run/nixorium/remote-install/control.sock")
       controller.succeed(f"cmp /etc/nixorium-test/usb-completed-session.json {completed_path}; test -f /var/lib/nixorium/coordination/usb-reservation.json; test -f /run/nixorium/remote-install/preserved-during-controller-rebuild")
+      controller.succeed('test "$(readlink -f /nix/var/nix/profiles/system)" = "$(jq -r .systemPath /var/lib/nixorium/controller/applied.json)"')
   '';
 }

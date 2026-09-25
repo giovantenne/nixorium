@@ -314,10 +314,18 @@ let
       # update /run/current-system before a later activation snippet fails, so
       # the active symlink alone is not durable evidence of completion.
       rm -f -- "$ACTIVATION_RECORD"
+      # Match nixos-rebuild switch: register the generation before activation
+      # so boot entries, rollback history, and GC retention use this system.
+      nix-env --profile /nix/var/nix/profiles/system --set "$SYSTEM_PATH" \
+        || fail "could not register the controller system generation"
+      [[ "$(readlink -f /nix/var/nix/profiles/system)" == "$SYSTEM_PATH" ]] \
+        || fail "persistent system profile differs before controller activation"
       "$SYSTEM_PATH/bin/switch-to-configuration" switch
       ACTIVE_SYSTEM="$(readlink -f /run/current-system)"
       [[ "$ACTIVE_SYSTEM" == "$SYSTEM_PATH" ]] \
         || fail "active system differs after controller activation"
+      [[ "$(readlink -f /nix/var/nix/profiles/system)" == "$SYSTEM_PATH" ]] \
+        || fail "persistent system profile differs after controller activation"
 
       # A controller-only installation already has a live interface when the
       # first laboratory configuration is activated. The generated NixOS
