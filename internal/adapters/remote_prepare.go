@@ -55,7 +55,7 @@ func NewRemoteInstallPreparer(repository, stateRoot string) (*RemoteInstallPrepa
 		repository: repository, stateRoot: stateRoot,
 		installedPrivateKey: "/home/admin/.ssh/id_ed25519",
 		installedPublicKey:  "/home/admin/.ssh/id_ed25519.pub",
-		knownHostsPath:      "/home/admin/.ssh/known_hosts",
+		knownHostsPath:      ManagedKnownHostsPath,
 		now:                 time.Now,
 		interfaceAddresses:  (Local{}).InterfaceAddresses,
 		httpClient: &http.Client{

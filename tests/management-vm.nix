@@ -2,8 +2,21 @@
 {
   name = "nixorium-management";
 
-  nodes.controller = { lib, pkgs, ... }:
+  nodes.controller = { config, lib, pkgs, ... }:
   let
+    sandboxCheck = nixoriumPackage.overrideAttrs {
+      pname = "nixorium-worker-sandbox-check";
+      doCheck = false;
+      buildPhase = ''
+        runHook preBuild
+        go test -c -o sandbox-check ./internal/adapters
+        runHook postBuild
+      '';
+      installPhase = ''
+        install -D -m 0755 sandbox-check "$out/bin/sandbox-check"
+      '';
+      postFixup = "";
+    };
     fakeRuntime = pkgs.buildEnv {
       name = "nixorium-test-system-path";
       paths = [
@@ -231,6 +244,15 @@
       '';
     };
     services.openssh.enable = true;
+    systemd.services.nixorium-worker-sandbox-check.serviceConfig =
+      config.systemd.services.nixorium-remote-install.serviceConfig // {
+        Type = "oneshot";
+        ExecStart = "${sandboxCheck}/bin/sandbox-check -test.run ^TestRemoteWorkerFilesystemSandbox$ -test.v";
+        RuntimeDirectory = "nixorium/worker-sandbox-check";
+        Environment = config.systemd.services.nixorium-remote-install.serviceConfig.Environment
+          ++ [ "NIXORIUM_TEST_WORKER_SANDBOX=1" ];
+        Restart = "no";
+      };
     environment.etc."nixorium-test/controller-only.nix".text = ''
       {
         inputs.fakeSystem = {
@@ -374,8 +396,8 @@
     controller.succeed("command -v colmena")
     controller.succeed("id -nG admin | tr ' ' '\n' | grep -Fx nixorium-operations; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination)\" = root:nixorium-operations:770; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/operation.lock)\" = root:nixorium-operations:660")
     controller.succeed("test \"$(cat /etc/nixorium/deployment-path)\" = /home/admin/nixorium-deployment; test \"$(stat -c '%U:%G:%a' /etc/nixorium/deployment-path)\" = root:root:444; systemctl cat nixorium-remote-install.service | grep -F '/etc/nixorium/deployment-path'; systemctl show nixorium-remote-install.service -p LimitCORE --value | grep -Fx 0; systemctl show nixorium-remote-install.service -p RestrictAddressFamilies --value | grep -Fw AF_NETLINK")
-    controller.succeed("test \"$(stat -c '%U:%G:%a' /home/admin/.ssh/known_hosts)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /home/admin/.ssh/.nixorium-known-hosts.lock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /home/admin/.local/state/nixorium/operations)\" = admin:users:700")
-    controller.succeed("systemctl show nixorium-remote-install.service -p Environment --value | grep -F 'XDG_STATE_HOME=/home/admin/.local/state'; systemctl cat nixorium-remote-install.service | grep -F -- '-/home/admin/.ssh/known_hosts'; systemctl cat nixorium-remote-install.service | grep -F -- '-/home/admin/.local/state/nixorium/operations'")
+    controller.succeed("test -L /home/admin/.ssh/known_hosts; test \"$(stat -Lc '%U:%G:%a' /home/admin/.ssh/known_hosts)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /home/admin/.ssh/nixorium-known-hosts/.nixorium-known-hosts.lock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /home/admin/.local/state/nixorium/operations)\" = admin:users:700")
+    controller.succeed("systemctl show nixorium-remote-install.service -p Environment --value | grep -F 'XDG_STATE_HOME=/home/admin/.local/state'; systemctl show nixorium-remote-install.service -p ReadWritePaths --value | grep -F '/home/admin/.ssh/nixorium-known-hosts'; systemctl cat nixorium-remote-install.service | grep -F -- '-/home/admin/.local/state/nixorium/operations'")
     controller.succeed("su - admin -c 'systemctl start nixorium-remote-install.service'")
     controller.wait_for_unit("nixorium-remote-install.service")
     controller.succeed("test \"$(stat -c '%U:%G:%a' /run/nixorium/remote-install/control.sock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/remote-install)\" = admin:users:700")
@@ -616,6 +638,8 @@
     controller.succeed("cmp /home/admin/nixorium-deployment/veyon-private-key.pem /etc/veyon/keys/private/teacher/key")
     controller.succeed("cmp /home/admin/nixorium-deployment/secret-key /var/lib/nixorium/keys/harmonia-secret-key")
     controller.succeed("test $(stat -c '%a' /home/admin/.ssh/id_ed25519 /var/lib/nixorium/keys/harmonia-secret-key | sort -u) = 600")
+    controller.succeed("systemctl start nixorium-worker-sandbox-check.service")
+    controller.succeed("journalctl -u nixorium-worker-sandbox-check.service --no-pager | grep -F -- '--- PASS: TestRemoteWorkerFilesystemSandbox'")
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")
     controller.succeed("systemctl reset-failed harmonia.service harmonia.socket; systemctl restart harmonia.socket nixorium-harmonia.service")
     controller.wait_for_unit("nixorium-harmonia.service")

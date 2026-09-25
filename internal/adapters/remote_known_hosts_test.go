@@ -73,3 +73,62 @@ func testKnownHostKey(t *testing.T) ssh.PublicKey {
 	}
 	return key
 }
+
+func TestVerifiedKnownHostRetryPreservesExistingBackup(t *testing.T) {
+	for _, scenario := range []string{"empty", "matching", "different", "symlink", "public"} {
+		t.Run(scenario, func(t *testing.T) {
+			directory := t.TempDir()
+			if err := os.Chmod(directory, 0700); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(directory, "known_hosts")
+			backupRoot := filepath.Join(directory, "backups")
+			if err := os.Mkdir(backupRoot, 0700); err != nil {
+				t.Fatal(err)
+			}
+			id := "0123456789abcdef0123456789abcdef"
+			backup := filepath.Join(backupRoot, "known_hosts-"+id+".bak")
+			content := []byte("# retained original\n")
+			if scenario == "empty" {
+				content = []byte{}
+			}
+			if err := os.WriteFile(path, content, 0600); err != nil {
+				t.Fatal(err)
+			}
+			saved := content
+			if scenario == "different" {
+				saved = []byte("different recovery evidence\n")
+			}
+			if scenario == "symlink" {
+				if err := os.Symlink(path, backup); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := os.WriteFile(backup, saved, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "public" {
+					if err := os.Chmod(backup, 0644); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			key := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(testKnownHostKey(t))))
+			err := MergeVerifiedKnownHost(path, backupRoot, "10.0.0.1", key, id, false)
+			wantSuccess := scenario == "empty" || scenario == "matching"
+			if (err == nil) != wantSuccess {
+				t.Fatalf("retry error = %v", err)
+			}
+			if !wantSuccess {
+				current, readErr := os.ReadFile(path)
+				if readErr != nil || string(current) != string(content) {
+					t.Fatal("failed retry changed known_hosts")
+				}
+			}
+			retained, readErr := os.ReadFile(backup)
+			if readErr != nil || string(retained) != string(saved) {
+				t.Fatal("retry changed recovery evidence")
+			}
+		})
+	}
+}

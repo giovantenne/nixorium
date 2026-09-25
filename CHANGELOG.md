@@ -80,6 +80,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- USB/SSH post-boot verification can now publish host trust atomically inside
+  the worker sandbox and release the installation reservation that blocks
+  controller rebuilds. Controller activation preserves existing known hosts
+  in a dedicated writable subdirectory, retaining the standard OpenSSH path
+  through a symlink while leaving SSH keys and configuration read-only.
+  Retries reuse only an identical private backup, and operation-log publishing
+  no longer attempts to chmod already-private read-only parent directories.
+  Verification also resumes after a controller reboot using the persisted
+  reviewed identity and administrator key, without requiring old ISO credentials.
 - Explicit USB/SSH session closure now releases a never-dispatched operation
   after its live ISO has rebooted or disappeared. Closure durably records the
   intent, discards only local operation credentials, and reports remote key
