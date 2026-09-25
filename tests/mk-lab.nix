@@ -329,6 +329,7 @@ assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-prep
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-network";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe-network".serviceConfig.CapabilityBoundingSet == [ "CAP_NET_ADMIN" ];
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-recover";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe-recover".unitConfig.ConditionPathExists == "/var/lib/nixorium/pxe/session.json";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe".serviceConfig.CapabilityBoundingSet == [
   "CAP_KILL"

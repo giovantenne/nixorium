@@ -436,6 +436,7 @@
     controller.wait_for_unit("nixorium-remote-install.service")
     controller.succeed("systemd-run --quiet --unit=nixorium-test-operation-holder --uid=admin /run/current-system/sw/bin/flock /var/lib/nixorium/coordination/operation.lock /run/current-system/sw/bin/sleep infinity; systemctl is-active --quiet nixorium-test-operation-holder.service")
     controller.wait_until_succeeds("! flock -n /var/lib/nixorium/coordination/operation.lock true")
+    controller.succeed("test ! -e /var/lib/nixorium/pxe/session.json; systemctl start nixorium-pxe-recover.service")
     controller.fail("su - admin -c 'systemctl start nixorium-restart-cache.service'")
     controller.succeed("journalctl -u nixorium-restart-cache.service --no-pager | grep -F 'another Nixorium controller or client operation is already running'; systemctl reset-failed nixorium-restart-cache.service")
     controller.fail("systemctl start nixorium-pxe-network.service")

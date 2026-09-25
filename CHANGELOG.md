@@ -78,6 +78,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   step installs the complete selected profile without exposing package IDs or
   asking for technical exclusions.
 
+### Fixed
+
+- Controller activation no longer fails by starting session-free PXE recovery
+  while the same reviewed controller operation holds the global coordination
+  lock. Boot recovery still validates and restores every recorded interrupted
+  PXE transition.
+
 ## [2.0.0-beta.5] - 2026-09-22
 
 ### Changed

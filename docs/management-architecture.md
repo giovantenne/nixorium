@@ -692,7 +692,10 @@ writes a root-owned mode-0600 session containing the original observed
 addresses and prepared artifacts, then removes only that static CIDR. Stop and
 `nixorium-pxe-recover.service` restore only the recorded address, preserve
 unrelated addresses, verify live state, and archive the result. Malformed or
-unowned session records fail closed. The listener is ordered after both this
+unowned session records fail closed. The automatic recovery unit is conditioned
+on the durable session record, so a normal controller activation with no PXE
+transition to recover does not contend for the controller operation lock. The
+listener is ordered after both this
 boundary and Harmonia. Public start repeats the unprivileged preflight after
 confirmation, starts only the listener unit, and verifies both service and
 address state. A failure triggers synchronous listener/network cleanup. Public
