@@ -32,6 +32,47 @@ type bootstrapSSHServer struct {
 	closed           chan struct{}
 }
 
+func TestDiscardLocalSessionAfterLostISOIsBoundedAndIdempotent(t *testing.T) {
+	root := t.TempDir()
+	id := "0123456789abcdef0123456789abcdef"
+	directory := filepath.Join(root, id)
+	if err := os.Mkdir(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"id_ed25519", "known_hosts", "installed_known_hosts"} {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte("fixture"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bootstrap := LiveBootstrap{runtimeRoot: root}
+	session := VerifiedLiveSession{OperationID: id}
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := bootstrap.DiscardLocalSession(session); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := os.Stat(directory); !os.IsNotExist(err) {
+		t.Fatal("credentials remain")
+	}
+	outside := t.TempDir()
+	key := filepath.Join(outside, "id_ed25519")
+	if err := os.WriteFile(key, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, directory); err != nil {
+		t.Fatal(err)
+	}
+	if err := bootstrap.DiscardLocalSession(session); err == nil {
+		t.Fatal("followed an operation-directory symlink")
+	}
+	if data, err := os.ReadFile(key); err != nil || string(data) != "keep" {
+		t.Fatal("removed unrelated key")
+	}
+	if err := bootstrap.DiscardLocalSession(VerifiedLiveSession{OperationID: "../escape"}); err == nil {
+		t.Fatal("accepted traversal")
+	}
+}
+
 func newBootstrapSSHServer(t *testing.T) *bootstrapSSHServer {
 	t.Helper()
 	_, private, err := ed25519.GenerateKey(rand.Reader)

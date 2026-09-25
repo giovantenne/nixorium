@@ -432,8 +432,13 @@
     controller.wait_until_succeeds("systemctl is-active --quiet nixorium-remote-install.service && test -S /run/nixorium/remote-install/control.sock && " + orphan_probe_command)
     controller.succeed("test -f /var/lib/nixorium/coordination/usb-reservation.json")
     controller.fail("systemctl start nixorium-pxe-network.service")
-    controller.succeed("journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'USB installation remains reserved'; systemctl reset-failed nixorium-pxe-network.service; systemctl stop nixorium-remote-install.service; rm /var/lib/nixorium/coordination/usb-reservation.json /var/lib/nixorium/remote-install/" + orphan_id + ".json; systemctl start nixorium-remote-install.service")
+    controller.succeed("journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'USB installation remains reserved'; systemctl reset-failed nixorium-pxe-network.service")
+    orphan_close = f'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium/remote-install/control.sock"); s.sendall((json.dumps({{"schemaVersion":1,"requestId":"fedcba9876543210fedcba9876543210","operation":"close","operationId":"{orphan_id}"}})+chr(10)).encode()); value=json.loads(s.makefile().readline()); assert value["state"] == "closed-before-apply" and "revocation unconfirmed" in value["message"]'
+    controller.succeed("su - admin -c " + shlex.quote("python3 -c " + shlex.quote(orphan_close)))
+    controller.succeed(f"test ! -e /var/lib/nixorium/coordination/usb-reservation.json; jq -e '.state == \"closed-before-apply\" and (.tokenConsumed | not)' /var/lib/nixorium/remote-install/{orphan_id}.json")
+    controller.succeed("systemctl restart nixorium-remote-install.service")
     controller.wait_for_unit("nixorium-remote-install.service")
+    controller.succeed("su - admin -c " + shlex.quote("python3 -c " + shlex.quote(ipc_probe)))
     resolved_id = "1234567890abcdef1234567890abcdef"
     resolved_session = {
       "schemaVersion": 1,

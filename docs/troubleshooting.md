@@ -187,8 +187,14 @@ files by hand. Do not cancel an uncertain or post-mutation failure. Use `reboot`
 only after status reports the installation ready, remove the USB first, and
 verify the installed revision after disk boot. `close` releases a completed or
 deliberately abandoned record; it does not make an uncertain disk safe. If the
-live ISO is gone or the receipt cannot prove completion, inspect/reinitialize
-only the explicitly dedicated target under a new destructive review.
+live ISO is gone before any apply was dispatched, explicitly use
+`nixorium install usb close --id OPERATION_ID` and review the `CLOSE` prompt.
+This discards the operation's local access credentials and releases its
+reservation without claiming remote key revocation. The old record is retained;
+a new installation must establish identity and review the disk again. Any
+consumed apply token, remote receipt, uncertain dispatch, or reboot evidence
+blocks this abandonment path. If apply was dispatched and completion cannot
+be proved, retain the reservation for reconciliation.
 
 For a reinstall, a different key at the configured static address is expected
 only after proving the old machine is the selected physical client. Approve
