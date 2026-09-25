@@ -2,6 +2,11 @@
 let
   isController = hostName == labSettings.masterHostName;
   cfg = config.services.nixorium;
+  migrateKnownHosts = pkgs.writeShellApplication {
+    name = "nixorium-migrate-known-hosts";
+    runtimeInputs = [ pkgs.coreutils pkgs.diffutils pkgs.util-linux ];
+    text = builtins.readFile ../scripts/migrate-known-hosts.sh;
+  };
   operationGate = ''
     COORDINATION_DIRECTORY=/var/lib/nixorium/coordination
     COORDINATION_LOCK="$COORDINATION_DIRECTORY/operation.lock"
@@ -630,6 +635,12 @@ in
   };
 
   config = lib.mkIf isController {
+    system.activationScripts.nixoriumKnownHosts = {
+      deps = [ "users" ];
+      text = ''
+        ${migrateKnownHosts}/bin/nixorium-migrate-known-hosts /home/admin/.ssh "$(id -u admin)" "$(id -g admin)"
+      '';
+    };
     users.groups.nixorium-operations = { };
     users.users.admin.extraGroups = [ "nixorium-operations" ];
 
@@ -671,8 +682,6 @@ in
 
     systemd.tmpfiles.rules = [
       "d /home/admin/.ssh 0700 admin users -"
-      "f /home/admin/.ssh/known_hosts 0600 admin users -"
-      "f /home/admin/.ssh/.nixorium-known-hosts.lock 0600 admin users -"
       "d /etc/veyon/keys/private/teacher 0750 root veyon-master -"
       "d /var/lib/nixorium/keys 0700 root root -"
       "d /var/cache/nixorium/admin 0700 admin users -"
@@ -849,8 +858,8 @@ in
           "/run/nixorium/remote-install"
           "/var/lib/nixorium/remote-install"
           "/var/lib/nixorium/coordination"
-          "-/home/admin/.ssh/known_hosts"
-          "-/home/admin/.ssh/.nixorium-known-hosts.lock"
+          # Only host trust data needs atomic replacement, never SSH keys/config.
+          "/home/admin/.ssh/nixorium-known-hosts"
           "-/home/admin/.local/state/nixorium/operations"
           "-/var/cache/nixorium/admin"
         ];

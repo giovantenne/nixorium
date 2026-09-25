@@ -14,13 +14,13 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func TestVerifyInstalledRemotePinsPreservedHostKeyAndExactIdentity(t *testing.T) {
+func TestVerifyInstalledRemoteRecreatesPinAfterControllerRestart(t *testing.T) {
 	runtimeRoot := t.TempDir()
-	operationID := "0123456789abcdef0123456789abcdef"
-	operationDirectory := filepath.Join(runtimeRoot, operationID)
-	if err := os.Mkdir(operationDirectory, 0700); err != nil {
+	if err := os.Chmod(runtimeRoot, 0700); err != nil {
 		t.Fatal(err)
 	}
+	operationID := "0123456789abcdef0123456789abcdef"
+	operationDirectory := filepath.Join(runtimeRoot, operationID)
 	privateKey := filepath.Join(t.TempDir(), "id_ed25519")
 	if err := os.WriteFile(privateKey, []byte("fixture"), 0600); err != nil {
 		t.Fatal(err)
@@ -53,6 +53,9 @@ func TestVerifyInstalledRemotePinsPreservedHostKeyAndExactIdentity(t *testing.T)
 
 func TestVerifyInstalledRemoteRejectsIdentityMismatch(t *testing.T) {
 	runtimeRoot := t.TempDir()
+	if err := os.Chmod(runtimeRoot, 0700); err != nil {
+		t.Fatal(err)
+	}
 	operationID := "0123456789abcdef0123456789abcdef"
 	if err := os.Mkdir(filepath.Join(runtimeRoot, operationID), 0700); err != nil {
 		t.Fatal(err)

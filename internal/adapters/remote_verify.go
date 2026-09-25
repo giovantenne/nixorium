@@ -47,6 +47,14 @@ func verifyInstalledRemoteWithExecutable(ctx context.Context, runtimeRoot, insta
 		return result, errors.New("preserved installed-system host key is invalid")
 	}
 	operationDirectory := filepath.Join(runtimeRoot, preparation.OperationID)
+	// Only the administrator key and persisted host pin are needed after boot.
+	// Recreate this public pin directory when a controller reboot cleared /run.
+	if err := ensurePrivateOwnedDirectory(runtimeRoot); err != nil {
+		return result, fmt.Errorf("inspect remote verification root: %w", err)
+	}
+	if err := os.Mkdir(operationDirectory, 0700); err != nil && !os.IsExist(err) {
+		return result, fmt.Errorf("create remote verification runtime: %w", err)
+	}
 	if err := ensurePrivateOwnedDirectory(operationDirectory); err != nil {
 		return result, fmt.Errorf("inspect remote verification runtime: %w", err)
 	}

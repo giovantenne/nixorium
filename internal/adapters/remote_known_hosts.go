@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/subtle"
@@ -16,6 +17,8 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+const ManagedKnownHostsPath = "/home/admin/.ssh/nixorium-known-hosts/known_hosts"
 
 func KnownHostConflict(path, host, expectedPublicKey string) (bool, error) {
 	content, err := readOptionalKnownHosts(path)
@@ -123,7 +126,7 @@ func MergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operation
 			}
 		}
 		backup := filepath.Join(backupRoot, "known_hosts-"+operationID+".bak")
-		if err := writeExclusivePrivateFile(backup, content); err != nil {
+		if err := preserveKnownHostsBackup(backup, content); err != nil {
 			return fmt.Errorf("create private known-hosts backup: %w", err)
 		}
 	}
@@ -161,6 +164,31 @@ func MergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operation
 		_ = directory.Close()
 	}
 	return err
+}
+
+func preserveKnownHostsBackup(path string, content []byte) error {
+	err := writeExclusivePrivateFile(path, content)
+	if !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	// Retry after a failed replacement without overwriting recovery evidence.
+	descriptor, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return err
+	}
+	file := os.NewFile(uintptr(descriptor), path)
+	defer file.Close()
+	if err := validatePrivateOwnedFile(file, syscall.S_IFREG, 0600); err != nil {
+		return err
+	}
+	previous, err := io.ReadAll(io.LimitReader(file, 1024*1024+1))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(previous, content) {
+		return errors.New("existing known-hosts backup differs from the current file")
+	}
+	return nil
 }
 
 func readOptionalKnownHosts(path string) ([]byte, error) {

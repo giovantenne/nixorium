@@ -280,6 +280,17 @@ key revocation remains unconfirmed. A new install needs fresh identity and disk
 review. Consumed apply tokens, any remote receipt, uncertain dispatch, and
 reboot evidence prohibit this path. Never remove coordination files manually.
 
+Post-boot verification must succeed before the shared reservation is released.
+If an older worker cannot publish known hosts or logs in its sandbox, preserve
+the reservation and operation credentials while applying the corrected worker
+and service configuration together, then repeat verification. Host trust lives
+in `.ssh/nixorium-known-hosts`; the standard `known_hosts` path is a preserved
+symlink. Never make the entire `.ssh` writable to the worker or overwrite
+conflicting migration/backup evidence to unblock a rebuild.
+After an authorized client reboot, verification uses the administrator key and
+persisted exact host identity; it can resume even if a controller reboot cleared
+the old ISO credentials. This never authorizes replaying install or reboot.
+
 ## PXE preparation
 
 Before changing controller addresses or starting the PXE proxy, prepare the

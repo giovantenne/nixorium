@@ -96,6 +96,61 @@ func TestRemoteWorkerClosesNeverDispatchedSessionWithoutRemoteAccess(t *testing.
 	}
 }
 
+func TestRemoteWorkerVerifiesAfterLosingLiveCredentials(t *testing.T) {
+	for _, failure := range []string{"", "no-reboot", "wrong-operation", "identity", "known-hosts", "save", "cleanup"} {
+		t.Run(failure, func(t *testing.T) {
+			id := "0123456789abcdef0123456789abcdef"
+			preparation := validWorkerPreparation()
+			preparation.OperationID = id
+			if failure == "wrong-operation" {
+				preparation.OperationID = "abcdefabcdefabcdefabcdefabcdefab"
+			}
+			session := domain.RemoteInstallSession{OperationID: id, State: "reconciliation-required", Preparation: &preparation, RebootRequested: failure != "no-reboot", TokenConsumed: true, DispatchUncertain: true}
+			state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: session}}
+			bootstrap := &fakeWorkerBootstrap{}
+			reservation := &fakeWorkerReservation{}
+			worker := &remoteWorker{state: state, bootstrap: bootstrap, preparer: &fakeWorkerPreparer{}, operationID: id, reservation: reservation}
+			verified := false
+			worker.verifyInstalledRemote = func(_ context.Context, root, key string, got domain.RemoteInstallPreparation) (adapters.InstalledRemoteState, error) {
+				verified = true
+				if root != "/run/nixorium/remote-install" || key != "/home/admin/.ssh/id_ed25519" || got.OperationID != id {
+					t.Fatal("verification identity changed")
+				}
+				if failure == "identity" {
+					return adapters.InstalledRemoteState{}, errors.New("identity mismatch")
+				}
+				return adapters.InstalledRemoteState{Hostname: "pc01"}, nil
+			}
+			worker.mergeVerifiedKnownHost = func(path, _, host, key, operationID string, rotate bool) error {
+				if !verified || path != adapters.ManagedKnownHostsPath || host != preparation.Host.StaticIP || key != preparation.HostKeyPublic || operationID != id || rotate {
+					t.Fatal("host trust updated outside the reviewed identity")
+				}
+				if failure == "known-hosts" {
+					return errors.New("read-only filesystem")
+				}
+				return nil
+			}
+			if failure == "save" {
+				state.saveErr = errors.New("disk full")
+			}
+			if failure == "cleanup" {
+				bootstrap.discardErr = errors.New("cleanup failed")
+			}
+			response := worker.handleVerify(context.Background(), domain.RemoteInstallRequest{OperationID: id})
+			if failure == "" {
+				if response.State != "verified" || !state.sessions[id].BootVerified || !reservation.released || !bootstrap.discarded {
+					t.Fatalf("verification did not release reservation: %+v", response)
+				}
+			} else if reservation.released || response.State == "verified" {
+				t.Fatalf("failed verification released reservation: %+v", response)
+			}
+			if (failure == "no-reboot" || failure == "wrong-operation") && verified {
+				t.Fatal("verification ran without matching persisted authorization")
+			}
+		})
+	}
+}
+
 func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
 	for _, field := range []string{"consumed", "uncertain", "receipt", "reboot", "verified", "dispatching", "unknown"} {
 		t.Run(field, func(t *testing.T) {

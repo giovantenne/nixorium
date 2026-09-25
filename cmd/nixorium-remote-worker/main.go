@@ -87,16 +87,18 @@ type remoteStatusConnectionFactory func(adapters.VerifiedLiveSession) (remoteSta
 type remoteOperationLogPublisher func(string, []byte, string) (string, error)
 
 type remoteWorker struct {
-	mutex            sync.Mutex
-	state            remoteState
-	bootstrap        liveBootstrapper
-	preparer         remotePreparer
-	reservations     remoteReservationSource
-	statusConnection remoteStatusConnectionFactory
-	publishRemoteLog remoteOperationLogPublisher
-	operationID      string
-	liveSession      *adapters.VerifiedLiveSession
-	reservation      domain.RemoteInstallReservation
+	mutex                  sync.Mutex
+	state                  remoteState
+	bootstrap              liveBootstrapper
+	preparer               remotePreparer
+	reservations           remoteReservationSource
+	statusConnection       remoteStatusConnectionFactory
+	publishRemoteLog       remoteOperationLogPublisher
+	verifyInstalledRemote  func(context.Context, string, string, domain.RemoteInstallPreparation) (adapters.InstalledRemoteState, error)
+	mergeVerifiedKnownHost func(string, string, string, string, string, bool) error
+	operationID            string
+	liveSession            *adapters.VerifiedLiveSession
+	reservation            domain.RemoteInstallReservation
 }
 
 func (worker *remoteWorker) newStatusConnection(session adapters.VerifiedLiveSession) (remoteStatusConnection, error) {
@@ -300,24 +302,32 @@ func (worker *remoteWorker) handleVerify(ctx context.Context, request domain.Rem
 	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "blocked"}
 	worker.mutex.Lock()
 	defer worker.mutex.Unlock()
-	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
+	if worker.operationID != request.OperationID || worker.reservation == nil {
 		response.Message = "worker does not own the rebooted installation session"
 		return response
 	}
 	session, err := worker.state.Load(request.OperationID)
-	if err != nil || session.Preparation == nil || !session.RebootRequested {
+	if err != nil || session.Preparation == nil || !session.RebootRequested || session.Preparation.OperationID != request.OperationID {
 		response.Message = "remote installation has no persisted reboot authorization"
 		return response
 	}
-	installed, err := adapters.VerifyInstalledRemote(ctx, "/run/nixorium/remote-install", "/home/admin/.ssh/id_ed25519", *session.Preparation)
+	verify := worker.verifyInstalledRemote
+	if verify == nil {
+		verify = adapters.VerifyInstalledRemote
+	}
+	installed, err := verify(ctx, "/run/nixorium/remote-install", "/home/admin/.ssh/id_ed25519", *session.Preparation)
 	if err != nil {
 		response.State = session.State
 		response.Session = &session
 		response.Message = err.Error()
 		return response
 	}
-	if err := adapters.MergeVerifiedKnownHost(
-		"/home/admin/.ssh/known_hosts", "/var/lib/nixorium/remote-install/known-hosts-backups",
+	merge := worker.mergeVerifiedKnownHost
+	if merge == nil {
+		merge = adapters.MergeVerifiedKnownHost
+	}
+	if err := merge(
+		adapters.ManagedKnownHostsPath, "/var/lib/nixorium/remote-install/known-hosts-backups",
 		session.Preparation.Host.StaticIP, session.Preparation.HostKeyPublic, session.OperationID, session.Plan.HostKeyRotation,
 	); err != nil {
 		response.State = "reconciliation-required"
@@ -334,7 +344,7 @@ func (worker *remoteWorker) handleVerify(ctx context.Context, request domain.Rem
 		response.Message = "post-boot identity was verified but persistent state could not be updated"
 		return response
 	}
-	if err := worker.bootstrap.DiscardLocalSession(*worker.liveSession); err != nil {
+	if err := worker.bootstrap.DiscardLocalSession(adapters.VerifiedLiveSession{OperationID: session.OperationID}); err != nil {
 		response.State = "reconciliation-required"
 		response.Message = "post-boot identity was verified but local ephemeral credentials could not be removed"
 		return response

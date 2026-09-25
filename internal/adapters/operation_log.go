@@ -173,8 +173,15 @@ func requirePrivateDirectory(path string) error {
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("operation path must be a directory and not a symlink")
 	}
-	if err := os.Chmod(path, 0700); err != nil {
-		return fmt.Errorf("secure operation directory: %w", err)
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat.Uid != uint32(os.Geteuid()) {
+		return errors.New("operation directory must belong to the current user")
+	}
+	// Already-private ancestors may be read-only in the worker sandbox.
+	if info.Mode().Perm() != 0700 {
+		if err := os.Chmod(path, 0700); err != nil {
+			return fmt.Errorf("secure operation directory: %w", err)
+		}
 	}
 	return nil
 }
