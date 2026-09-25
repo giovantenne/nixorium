@@ -797,8 +797,10 @@ installation methods cannot cross at startup.
 The controller state machine separates artifact preparation, live-boot
 verification, hardware probe, content-bound plan, apply dispatch, receipt
 observation, reboot dispatch, post-boot verification, and close. Cancellation
-is allowed only before apply. Once Disko may have started, an absent response is
-`reconciliation-required`, not permission to retry. Worker or controller
+is allowed before dispatch and after a definitive failed receipt proves that
+disk mutation did not start. Once Disko may have started, or a response is
+absent, the state is `reconciliation-required`, not permission to retry or
+cancel. Worker or controller
 restart recovers the durable marker and state; credentials may be physically
 re-pinned only after the controller re-observes and the operator reconfirms the
 same address, fingerprint, host and live boot ID. Recovery

@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 
-# Shared disk and installation primitives. Callers own UI, authorization and
-# operation state; this file owns the safety checks immediately around disks.
+# Shared identity, disk and installation primitives. Callers own UI,
+# authorization and operation state; this file owns the safety checks used by
+# the live installers.
 
 NIXORIUM_INSTALLER_SCHEMA_VERSION=1
 NIXORIUM_MAX_DISKS=128
+
+nixorium_canonical_ed25519_public_key() {
+  local value=$1 key_type key_data remainder
+  [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || return 1
+  read -r key_type key_data remainder <<< "$value"
+  [[ "$key_type" == ssh-ed25519 && "$key_data" =~ ^[A-Za-z0-9+/=]+$ ]] || return 1
+  printf '%s %s\n' "$key_type" "$key_data"
+}
 
 nixorium_valid_unicast_ipv4() {
   local address=$1 octet normalized first second

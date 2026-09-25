@@ -71,9 +71,18 @@ test_exact_profile_and_parent_are_required() (
   ! nixorium_verify_installed_profile "$expected" /dev/sdy "$fixture/root" >/dev/null 2>&1
 )
 
+test_ed25519_key_identity_ignores_only_the_comment() {
+  local canonical="ssh-ed25519 YWJjZA=="
+  test "$(nixorium_canonical_ed25519_public_key "$canonical root@nixos")" = "$canonical"
+  test "$(nixorium_canonical_ed25519_public_key "$canonical")" = "$canonical"
+  ! nixorium_canonical_ed25519_public_key "ssh-rsa YWJjZA== root@nixos" >/dev/null
+  ! nixorium_canonical_ed25519_public_key $'ssh-ed25519 YWJjZA== root@nixos\nssh-ed25519 YWJjZA==' >/dev/null
+}
+
 test_identity_is_content_bound
 test_exclusions_are_additive
 test_safe_disk_has_no_exclusion
 test_exact_profile_and_parent_are_required
+test_ed25519_key_identity_ignores_only_the_comment
 
 echo "Client installer library tests passed."

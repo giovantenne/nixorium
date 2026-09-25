@@ -943,9 +943,8 @@ func (worker *remoteWorker) handleCancel(ctx context.Context, request domain.Rem
 		return response
 	}
 	session, err := worker.state.Load(request.OperationID)
-	if err != nil || session.TokenConsumed || session.DispatchUncertain ||
-		(session.State != "artifacts-ready" && session.State != "bootstrapped" && session.State != "bootstrapped-artifacts" && session.State != "prepared" && session.State != "review-ready") {
-		response.Message = "session is not safely cancellable before apply"
+	if err != nil || !remoteSessionSafelyCancellable(session) || (session.Bootstrap != nil && worker.liveSession == nil) {
+		response.Message = "session is not in a safely cancellable state"
 		return response
 	}
 	if worker.liveSession != nil {
@@ -958,6 +957,9 @@ func (worker *remoteWorker) handleCancel(ctx context.Context, request domain.Rem
 	detail := "cancelled artifact preparation before a live client was connected"
 	if worker.liveSession != nil {
 		detail = "cancelled before apply; ephemeral live key revoked"
+		if session.Receipt != nil {
+			detail = "cancelled after a confirmed remote failure before disk mutation; ephemeral live key revoked"
+		}
 	}
 	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePreflight, Detail: detail})
 	if err := worker.state.Save(session); err != nil {
@@ -983,8 +985,23 @@ func (worker *remoteWorker) handleCancel(ctx context.Context, request domain.Rem
 	worker.reservation = nil
 	response.State = session.State
 	response.Session = &session
-	response.Message = "remote installation cancelled before apply"
+	response.Message = "remote installation cancelled with no disk mutation"
 	return response
+}
+
+func remoteSessionSafelyCancellable(session domain.RemoteInstallSession) bool {
+	if session.DispatchUncertain {
+		return false
+	}
+	if !session.TokenConsumed {
+		switch session.State {
+		case "artifacts-ready", "bootstrapped", "bootstrapped-artifacts", "prepared", "review-ready":
+			return true
+		}
+	}
+	receipt := session.Receipt
+	return session.State == "failed" && receipt != nil && receipt.OperationID == session.OperationID && receipt.State == "failed" &&
+		!receipt.MutationStarted && !receipt.DiskMayBeModified && !receipt.Installed
 }
 
 func readFixedDeploymentPath(path string) (string, error) {

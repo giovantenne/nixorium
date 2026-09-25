@@ -282,6 +282,45 @@ func TestUSBInstallEscapeCancelsBeforeApplyAndClearsSecret(t *testing.T) {
 	}
 }
 
+func TestUSBInstallConfirmedFailureBeforeMutationOffersCancellation(t *testing.T) {
+	response := remoteTUITestPreparedResponse("failed")
+	response.Session.TokenConsumed = true
+	response.Session.Receipt = &domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: remoteTUITestOperationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePreflight,
+	}
+	cancelled := false
+	model := dashboardModel{
+		screen: dashboardUSBInstall,
+		installation: installationModel{remote: remoteInstallationModel{
+			stage: remoteInstallResult, operationID: remoteTUITestOperationID, response: response,
+		}},
+		actions: DashboardActions{RemoteInstallRequest: func(request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+			cancelled = request.Operation == domain.RemoteInstallCancelOperation
+			return domain.RemoteInstallResponse{State: "cancelled", OperationID: remoteTUITestOperationID}, nil
+		}},
+	}
+	if !strings.Contains(model.View().Content, "Cancel safely") {
+		t.Fatal("confirmed pre-mutation failure did not offer safe cancellation")
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	model = updated.(dashboardModel)
+	if command == nil {
+		t.Fatal("safe cancellation did not dispatch a request")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if !cancelled || model.installation.remote.response.State != "cancelled" {
+		t.Fatal("confirmed pre-mutation failure was not cancelled")
+	}
+
+	response.Session.Receipt.MutationStarted = true
+	response.Session.Receipt.DiskMayBeModified = true
+	if remoteInstallSafelyCancellable(response) {
+		t.Fatal("post-mutation failure was exposed as safely cancellable")
+	}
+}
+
 func TestUSBInstallRecoveryAccessReturnsToSameOperation(t *testing.T) {
 	response := remoteTUITestPreparedResponse("reconciliation-required")
 	response.Session.Bootstrap = &domain.RemoteInstallBootstrapRecord{Host: "pc01", Address: "192.0.2.20"}

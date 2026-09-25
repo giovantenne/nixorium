@@ -240,7 +240,7 @@ dispatch_plan() {
 run_plan() {
   local plan_file operation_id operation_dir boot_id selected_disk expected_identity
   local cache_url cache_key system_path host_name host_interface static_ip live_ip
-  local admin_key host_key deployment_revision current_boot current_host_key bundle_admin bundle_cache
+  local admin_key host_key deployment_revision current_boot current_host_key planned_host_key bundle_admin bundle_cache
   local admin_key_found authorized_keys_path
   local reasons
 
@@ -296,8 +296,15 @@ run_plan() {
   ip -j -4 address show dev "$host_interface" | jq -e --arg address "$live_ip" \
     'any(.[]?.addr_info[]?; .local == $address)' >/dev/null
 
-  current_host_key=$(tr -d '\n' < /etc/ssh/ssh_host_ed25519_key.pub)
-  [[ "$current_host_key" == "$host_key" ]] || { echo "live host key changed" >&2; return 1; }
+  current_host_key=$(nixorium_canonical_ed25519_public_key "$(< /etc/ssh/ssh_host_ed25519_key.pub)") || {
+    echo "live host key is invalid" >&2
+    return 1
+  }
+  planned_host_key=$(nixorium_canonical_ed25519_public_key "$host_key") || {
+    echo "reviewed live host key is invalid" >&2
+    return 1
+  }
+  [[ "$current_host_key" == "$planned_host_key" ]] || { echo "live host key changed" >&2; return 1; }
   bundle_admin=$(tr -d '\n' < "${NIXORIUM_BUNDLE_SHARE:-/nonexistent}/admin-ssh.pub" 2>/dev/null || true)
   bundle_cache=$(tr -d '\n' < "${NIXORIUM_BUNDLE_SHARE:-/nonexistent}/cache-public-key" 2>/dev/null || true)
   [[ -n "$bundle_admin" && "$bundle_admin" == "$admin_key" ]] || { echo "admin key is absent from or differs from bundle" >&2; return 1; }
