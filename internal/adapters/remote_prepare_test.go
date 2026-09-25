@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -78,5 +80,30 @@ func TestStrictLiveSSHRejectsUnsafeInterfaceBeforeExecution(t *testing.T) {
 	connection := strictLiveSSHFixture(t)
 	if err := connection.VerifyWiredInterface(context.Background(), "eth0;reboot"); err == nil {
 		t.Fatal("unsafe interface reached strict SSH")
+	}
+}
+
+func TestRemotePreparationDiscardRemovesOnlySelectedGCRoots(t *testing.T) {
+	stateRoot := t.TempDir()
+	preparer := &RemoteInstallPreparer{stateRoot: stateRoot}
+	base := filepath.Join(stateRoot, "roots")
+	selected := filepath.Join(base, "0123456789abcdef0123456789abcdef")
+	other := filepath.Join(base, "ffffffffffffffffffffffffffffffff")
+	for _, directory := range []string{selected, other} {
+		if err := os.MkdirAll(directory, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := preparer.Discard("0123456789abcdef0123456789abcdef"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(selected); !os.IsNotExist(err) {
+		t.Fatalf("selected roots remain: %v", err)
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Fatalf("unrelated roots were removed: %v", err)
+	}
+	if err := preparer.Discard("0123456789abcdef0123456789abcdef"); err != nil {
+		t.Fatalf("idempotent discard: %v", err)
 	}
 }

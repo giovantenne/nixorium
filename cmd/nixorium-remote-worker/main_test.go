@@ -51,6 +51,11 @@ func (bootstrap *fakeWorkerBootstrap) CloseSession(context.Context, adapters.Ver
 	return nil
 }
 
+func (bootstrap *fakeWorkerBootstrap) DiscardLocalSession(adapters.VerifiedLiveSession) error {
+	bootstrap.closed = true
+	return nil
+}
+
 type fakeWorkerReservation struct{ released bool }
 
 func (reservation *fakeWorkerReservation) ReleaseResolved() error {
@@ -66,6 +71,7 @@ type fakeWorkerReservations struct {
 type fakeWorkerPreparer struct {
 	preparation domain.RemoteInstallPreparation
 	err         error
+	discarded   bool
 }
 
 func (preparer *fakeWorkerPreparer) Prepare(_ context.Context, operationID, host string, live adapters.VerifiedLiveSession) (domain.RemoteInstallPreparation, error) {
@@ -73,6 +79,11 @@ func (preparer *fakeWorkerPreparer) Prepare(_ context.Context, operationID, host
 	preparer.preparation.Host.Name = host
 	preparer.preparation.Host.LiveIP = live.Address
 	return preparer.preparation, preparer.err
+}
+
+func (preparer *fakeWorkerPreparer) Discard(string) error {
+	preparer.discarded = true
+	return nil
 }
 
 func (source *fakeWorkerReservations) ReserveRemoteSession(string) (domain.RemoteInstallReservation, error) {
@@ -157,7 +168,7 @@ func TestRemoteWorkerPreparationPersistsNonSecretVerifiedFacts(t *testing.T) {
 		t.Fatalf("stored preparation=%+v", stored)
 	}
 	cancel := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: bootstrapResponse.OperationID}, nil)
-	if cancel.State != "cancelled" || !bootstrap.closed || !reservations.reservation.released {
+	if cancel.State != "cancelled" || !bootstrap.closed || !preparer.discarded || !reservations.reservation.released {
 		t.Fatalf("prepared cancel=%+v", cancel)
 	}
 }

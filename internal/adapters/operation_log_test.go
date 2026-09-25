@@ -80,6 +80,51 @@ func TestDeploymentOperationRejectsSymlinkLock(t *testing.T) {
 	}
 }
 
+func TestPublishRemoteOperationLogCreatesSanitizedIdempotentHistory(t *testing.T) {
+	stateRoot := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateRoot)
+	id := "0123456789abcdef0123456789abcdef"
+	name, err := PublishRemoteOperationLog(id, []byte("partition\x1b[31m\rchanged"), "partial")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "usb-install-"+id+".log" {
+		t.Fatalf("name = %q", name)
+	}
+	path := filepath.Join(stateRoot, "nixorium", "operations", name)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.ContainsAny(string(content), "\x1b\r") || !strings.Contains(string(content), "Result: partial\n") {
+		t.Fatalf("unsafe or incomplete content = %q", content)
+	}
+	if second, err := PublishRemoteOperationLog(id, []byte("replacement"), "completed"); err != nil || second != name {
+		t.Fatalf("idempotent publish = %q, %v", second, err)
+	}
+	unchanged, err := os.ReadFile(path)
+	if err != nil || string(unchanged) != string(content) {
+		t.Fatalf("existing log was replaced: %q, %v", unchanged, err)
+	}
+}
+
+func TestPublishRemoteOperationLogRejectsUnsafeExistingFile(t *testing.T) {
+	stateRoot := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateRoot)
+	directory := filepath.Join(stateRoot, "nixorium", "operations")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	id := "0123456789abcdef0123456789abcdef"
+	path := filepath.Join(directory, "usb-install-"+id+".log")
+	if err := os.WriteFile(path, []byte("unsafe"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PublishRemoteOperationLog(id, nil, "failed"); err == nil {
+		t.Fatal("unsafe existing USB operation log was accepted")
+	}
+}
+
 func TestOperationLogsListsNewestRecognizedPrivateFiles(t *testing.T) {
 	stateRoot := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", stateRoot)
@@ -88,8 +133,9 @@ func TestOperationLogsListsNewestRecognizedPrivateFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"deploy-20260914T103000.000000000Z-10.log": "old\nResult: failed\n",
-		"deploy-20260914T113000.000000000Z-11.log": "new\nResult: completed\n",
+		"deploy-20260914T103000.000000000Z-10.log":         "old\nResult: failed\n",
+		"deploy-20260914T113000.000000000Z-11.log":         "new\nResult: completed\n",
+		"usb-install-0123456789abcdef0123456789abcdef.log": "remote\nResult: partial\n",
 		"notes.log": "not a Nixorium operation",
 	}
 	for name, content := range files {
@@ -97,11 +143,15 @@ func TestOperationLogsListsNewestRecognizedPrivateFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	remotePath := filepath.Join(directory, "usb-install-0123456789abcdef0123456789abcdef.log")
+	if err := os.Chtimes(remotePath, time.Date(2026, 9, 14, 12, 30, 0, 0, time.UTC), time.Date(2026, 9, 14, 12, 30, 0, 0, time.UTC)); err != nil {
+		t.Fatal(err)
+	}
 	logs, err := (Local{}).OperationLogs(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(logs) != 1 || logs[0].ID != "deploy-20260914T113000.000000000Z-11.log" || logs[0].State != "completed" || !logs[0].Available || logs[0].Kind != "deployment" {
+	if len(logs) != 1 || logs[0].ID != filepath.Base(remotePath) || logs[0].State != "partial" || !logs[0].Available || logs[0].Kind != "usb-install" {
 		t.Fatalf("logs = %+v", logs)
 	}
 }

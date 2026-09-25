@@ -10,6 +10,8 @@ Modes:
   --eval                 Quick checks plus the complete mkLab evaluation
   --management-vm        Quick checks plus the management VM test
   --client-installer-vm  Quick checks plus the client installer VM test
+  --remote-client-installer-vm
+                         Quick checks plus the remote installer VM test
   --full                 Complete release and milestone validation
   --ci                   Evaluation-only CI validation
 EOF
@@ -22,7 +24,7 @@ fi
 
 MODE="${1:---quick}"
 case "$MODE" in
-  --quick | --eval | --management-vm | --client-installer-vm | --full | --ci) ;;
+  --quick | --eval | --management-vm | --client-installer-vm | --remote-client-installer-vm | --full | --ci) ;;
   --help | -h)
     usage
     exit 0
@@ -110,6 +112,7 @@ run_full_checks() {
     "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer" \
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.remote-client-installer-vm" \
     "path:${REPO_ROOT}#checks.x86_64-linux.management-vm" \
     "path:${REPO_ROOT}#nixoriumOfflineCheck" \
     --no-write-lock-file \
@@ -144,6 +147,14 @@ case "$MODE" in
     echo "Client installer VM validation completed successfully."
     exit 0
     ;;
+  --remote-client-installer-vm)
+    run_quick_checks
+    nix build "path:${REPO_ROOT}#checks.x86_64-linux.remote-client-installer-vm" \
+      --no-write-lock-file \
+      --no-link
+    echo "Remote client installer VM validation completed successfully."
+    exit 0
+    ;;
 esac
 
 if [[ "${MODE}" == "--ci" ]]; then
@@ -154,6 +165,7 @@ if [[ "${MODE}" == "--ci" ]]; then
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
+  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.remote-client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
   nix eval "path:${REPO_ROOT}#checks.x86_64-linux.management-vm.drvPath" --raw --no-write-lock-file >/dev/null
 else
   bash scripts/check-agent-guidance.sh

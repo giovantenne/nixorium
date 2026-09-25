@@ -438,6 +438,7 @@ let
       bootstrapPkgs.findutils
       bootstrapPkgs.gawk
       bootstrapPkgs.gnugrep
+      bootstrapPkgs.gnused
       bootstrapPkgs.gptfdisk
       bootstrapPkgs.iproute2
       bootstrapPkgs.jq
@@ -452,6 +453,12 @@ let
       export NIXORIUM_DISKO_SCRIPT=${installerDiskoScript}/bin/disko-destroy-format-mount
       export NIXORIUM_BUNDLE_SHARE=${remoteInstallerMetadata}
       export NIXORIUM_PLAN_VALIDATOR=${nixoriumPackage}/bin/nixorium-remote-validator
+      NIXORIUM_REMOTE_PROGRAM="$(${bootstrapPkgs.coreutils}/bin/readlink -f -- "$0")"
+      export NIXORIUM_REMOTE_PROGRAM
+      export NIXORIUM_OPERATION_ROOT=/run/nixorium-remote-install
+      export NIXORIUM_SYSTEMD_RUN=/run/current-system/sw/bin/systemd-run
+      export NIXORIUM_OPERATION_OWNER=0:0
+      unset NIXORIUM_TESTING
       exec ${upstreamRoot}/scripts/remote-client-installer.sh "$@"
     '';
   };

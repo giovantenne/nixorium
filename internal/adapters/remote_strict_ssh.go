@@ -3,6 +3,7 @@ package adapters
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -160,6 +161,110 @@ func (connection *StrictLiveSSH) Status(ctx context.Context, bundlePath, operati
 		return domain.RemoteInstallReceipt{}, err
 	}
 	return domain.DecodeRemoteInstallReceipt(output)
+}
+
+func (connection *StrictLiveSSH) Reboot(ctx context.Context, bundlePath, operationID string) (domain.RemoteInstallReceipt, error) {
+	if !domain.ValidStorePath(bundlePath) || !remoteStateID(operationID) {
+		return domain.RemoteInstallReceipt{}, errors.New("remote installation reboot selector is invalid")
+	}
+	command := bundlePath + "/bin/nixorium-remote-client-installer reboot " + operationID
+	output, err := connection.run(ctx, command, nil, domain.RemoteInstallPlanMaxBytes)
+	if err != nil {
+		return domain.RemoteInstallReceipt{}, err
+	}
+	return domain.DecodeRemoteInstallReceipt(output)
+}
+
+func (connection *StrictLiveSSH) OperationLog(ctx context.Context, bundlePath, operationID string) ([]byte, error) {
+	if !domain.ValidStorePath(bundlePath) || !remoteStateID(operationID) {
+		return nil, errors.New("remote installation log selector is invalid")
+	}
+	command := bundlePath + "/bin/nixorium-remote-client-installer log " + operationID
+	output, err := connection.run(ctx, command, nil, 1024*1024)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(sanitizeOperationLog(output)), nil
+}
+
+func (connection *StrictLiveSSH) Revalidate(ctx context.Context, preparation domain.RemoteInstallPreparation, plan domain.RemoteInstallPlan) error {
+	if err := domain.ValidateRemoteInstallPreparation(preparation); err != nil {
+		return err
+	}
+	if err := domain.ValidateRemoteInstallPlan(plan); err != nil {
+		return err
+	}
+	if preparation.OperationID != plan.OperationID || preparation.DeploymentRevision != plan.DeploymentRevision ||
+		preparation.SystemPath != plan.SystemPath || preparation.Cache != plan.Cache || preparation.Host != plan.Host ||
+		preparation.HostKeyPublic != plan.HostKeyPublic || preparation.AdminPublicKey != plan.AdminPublicKey {
+		return errors.New("remote installation plan differs from its immutable preparation")
+	}
+	if err := connection.CheckCacheEndpoint(ctx, plan.Cache); err != nil {
+		return fmt.Errorf("revalidate remote cache endpoint: %w", err)
+	}
+	for _, storePath := range []string{preparation.BundlePath, plan.SystemPath} {
+		if err := connection.VerifySignedClosure(ctx, plan.Cache, storePath); err != nil {
+			return err
+		}
+	}
+	if err := connection.VerifyWiredInterface(ctx, plan.Host.Interface); err != nil {
+		return err
+	}
+	facts, err := connection.Probe(ctx, preparation.BundlePath)
+	if err != nil {
+		return fmt.Errorf("revalidate remote machine inventory: %w", err)
+	}
+	if facts.BootID != plan.BootID || !remoteFactsHaveAddress(facts, plan.Host.Interface, plan.Host.LiveIP) {
+		return errors.New("remote boot identity or declared live network changed after review")
+	}
+	matching := false
+	for _, disk := range facts.Disks {
+		if disk.Path != plan.Disk.Path {
+			continue
+		}
+		matching = disk.Eligible && len(disk.ExclusionReasons) == 0 && remoteDiskIdentityEqual(disk, plan.Disk)
+		break
+	}
+	if !matching {
+		return errors.New("reviewed disk identity or eligibility changed before dispatch")
+	}
+	planJSON, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	return connection.ValidatePlan(ctx, preparation.BundlePath, planJSON)
+}
+
+func (connection *StrictLiveSSH) Dispatch(ctx context.Context, bundlePath string, plan domain.RemoteInstallPlan) (domain.RemoteInstallReceipt, error) {
+	if !domain.ValidStorePath(bundlePath) {
+		return domain.RemoteInstallReceipt{}, errors.New("remote installer bundle path is invalid")
+	}
+	content, err := json.Marshal(plan)
+	if err != nil {
+		return domain.RemoteInstallReceipt{}, err
+	}
+	if _, err := domain.DecodeRemoteInstallPlan(content); err != nil {
+		return domain.RemoteInstallReceipt{}, err
+	}
+	command := bundlePath + "/bin/nixorium-remote-client-installer apply"
+	output, err := connection.run(ctx, command, content, domain.RemoteInstallPlanMaxBytes)
+	if err != nil {
+		return domain.RemoteInstallReceipt{}, err
+	}
+	receipt, err := domain.DecodeRemoteInstallReceipt(output)
+	if err != nil {
+		return receipt, err
+	}
+	if receipt.OperationID != plan.OperationID {
+		return receipt, errors.New("remote apply acknowledgement identity differs")
+	}
+	return receipt, nil
+}
+
+func remoteDiskIdentityEqual(observed, reviewed domain.RemoteDisk) bool {
+	return observed.Path == reviewed.Path && observed.KName == reviewed.KName && observed.MajorMinor == reviewed.MajorMinor &&
+		observed.SizeBytes == reviewed.SizeBytes && observed.Serial == reviewed.Serial && observed.WWN == reviewed.WWN &&
+		observed.Model == reviewed.Model && observed.Transport == reviewed.Transport && observed.DiskSeq == reviewed.DiskSeq
 }
 
 func (connection *StrictLiveSSH) run(ctx context.Context, remoteCommand string, input []byte, maximum int) ([]byte, error) {

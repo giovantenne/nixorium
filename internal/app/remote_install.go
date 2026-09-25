@@ -42,6 +42,22 @@ func NewRemoteInstallManager(source RemoteInstallSource) *RemoteInstallManager {
 }
 
 func (m *RemoteInstallManager) Plan(ctx context.Context, preparation domain.RemoteInstallPreparation, diskPath string) domain.RemoteInstallPlanReport {
+	return m.plan(ctx, preparation, diskPath, false, false)
+}
+
+// PlanReserved validates a session whose persistent global reservation is
+// already owned by the long-running worker.
+func (m *RemoteInstallManager) PlanReserved(ctx context.Context, preparation domain.RemoteInstallPreparation, diskPath string) domain.RemoteInstallPlanReport {
+	return m.plan(ctx, preparation, diskPath, true, false)
+}
+
+// PlanReservedWithHostKeyRotation creates a destructive plan only after the
+// caller has separately confirmed replacement of a conflicting static host key.
+func (m *RemoteInstallManager) PlanReservedWithHostKeyRotation(ctx context.Context, preparation domain.RemoteInstallPreparation, diskPath string, allowHostKeyRotation bool) domain.RemoteInstallPlanReport {
+	return m.plan(ctx, preparation, diskPath, true, allowHostKeyRotation)
+}
+
+func (m *RemoteInstallManager) plan(ctx context.Context, preparation domain.RemoteInstallPreparation, diskPath string, alreadyReserved, allowHostKeyRotation bool) domain.RemoteInstallPlanReport {
 	report := domain.RemoteInstallPlanReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "usb-install-plan",
@@ -69,6 +85,12 @@ func (m *RemoteInstallManager) Plan(ctx context.Context, preparation domain.Remo
 	}
 	if preparation.PreparedAt.IsZero() || preparation.OperationID == "" || preparation.Facts.BootID == "" {
 		return remotePlanIssue(report, "preparation", "remote installation preparation is incomplete")
+	}
+	if preparation.KnownHostConflict && !allowHostKeyRotation {
+		return remotePlanIssue(report, "hostKeyRotation", "the static address has a different known host key; explicit rotation review is required")
+	}
+	if allowHostKeyRotation && !preparation.KnownHostConflict {
+		return remotePlanIssue(report, "hostKeyRotation", "host-key rotation was requested without a detected conflict")
 	}
 	if err := domain.ValidateRemoteMachineFacts(preparation.Facts); err != nil {
 		return remotePlanIssue(report, "facts", err.Error())
@@ -106,12 +128,14 @@ func (m *RemoteInstallManager) Plan(ctx context.Context, preparation domain.Remo
 	if err != nil || revision != preparation.DeploymentRevision {
 		return remotePlanIssue(report, "revision", "deployment revision differs from the immutable preparation")
 	}
-	active, err := m.source.ClientOperationActive()
-	if err != nil {
-		return remotePlanIssue(report, "operation", "inspect controller operation gate: "+err.Error())
-	}
-	if active {
-		return remotePlanIssue(report, "operation", "another controller or client operation is active or reserved")
+	if !alreadyReserved {
+		active, err := m.source.ClientOperationActive()
+		if err != nil {
+			return remotePlanIssue(report, "operation", "inspect controller operation gate: "+err.Error())
+		}
+		if active {
+			return remotePlanIssue(report, "operation", "another controller or client operation is active or reserved")
+		}
 	}
 	if conflict := remotePXEConflict(m.source, ctx); conflict != "" {
 		return remotePlanIssue(report, "installation", conflict)
@@ -145,11 +169,13 @@ func (m *RemoteInstallManager) Plan(ctx context.Context, preparation domain.Remo
 		Disk:               remotePlanDisk(disk),
 		AdminPublicKey:     preparation.AdminPublicKey,
 		HostKeyPublic:      preparation.HostKeyPublic,
+		HostKeyRotation:    allowHostKeyRotation,
 	}
 	if err := domain.ValidateRemoteInstallPlan(report.Plan); err != nil {
 		return remotePlanIssue(report, "plan", err.Error())
 	}
 	report.State = "ready"
+	report.HostKeyRotation = allowHostKeyRotation
 	report.ExpiresAt = m.now().UTC().Add(domain.RemoteInstallReviewWindow)
 	report.ReviewToken = domain.RemoteInstallReviewToken(report)
 	report.Confirmation = fmt.Sprintf("ERASE %s FOR %s", disk.Path, preparation.Host.Name)
@@ -158,6 +184,17 @@ func (m *RemoteInstallManager) Plan(ctx context.Context, preparation domain.Remo
 }
 
 func (m *RemoteInstallManager) Apply(ctx context.Context, plan domain.RemoteInstallPlanReport, expectedToken string) domain.RemoteInstallExecutionReport {
+	return m.apply(ctx, plan, expectedToken, false)
+}
+
+// ApplyReserved dispatches through a worker that already owns the persistent
+// reservation. The worker, rather than this call, decides when it is safe to
+// release that reservation.
+func (m *RemoteInstallManager) ApplyReserved(ctx context.Context, plan domain.RemoteInstallPlanReport, expectedToken string) domain.RemoteInstallExecutionReport {
+	return m.apply(ctx, plan, expectedToken, true)
+}
+
+func (m *RemoteInstallManager) apply(ctx context.Context, plan domain.RemoteInstallPlanReport, expectedToken string, alreadyReserved bool) domain.RemoteInstallExecutionReport {
 	report := domain.RemoteInstallExecutionReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "usb-install-apply",
@@ -194,16 +231,19 @@ func (m *RemoteInstallManager) Apply(ctx context.Context, plan domain.RemoteInst
 		return remoteExecutionIssue(report, "host.staticIp", "static client identity can no longer be proven unused")
 	}
 
-	reservation, err := m.source.ReserveRemoteInstall(ctx, plan.Plan, expectedToken)
-	if err != nil {
-		return remoteExecutionIssue(report, "operation", err.Error())
-	}
+	var reservation domain.RemoteInstallReservation
 	resolved := false
-	defer func() {
-		if resolved {
-			_ = reservation.ReleaseResolved()
+	if !alreadyReserved {
+		reservation, err = m.source.ReserveRemoteInstall(ctx, plan.Plan, expectedToken)
+		if err != nil {
+			return remoteExecutionIssue(report, "operation", err.Error())
 		}
-	}()
+		defer func() {
+			if resolved {
+				_ = reservation.ReleaseResolved()
+			}
+		}()
+	}
 	if err := m.source.RevalidateRemoteInstall(ctx, plan.Preparation, plan.Plan); err != nil {
 		resolved = true
 		return remoteExecutionIssue(report, "revalidate", err.Error())

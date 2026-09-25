@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -56,6 +60,7 @@ type remoteState interface {
 type liveBootstrapper interface {
 	Establish(context.Context, string, string, string, *adapters.LivePassword) (adapters.VerifiedLiveSession, error)
 	CloseSession(context.Context, adapters.VerifiedLiveSession) error
+	DiscardLocalSession(adapters.VerifiedLiveSession) error
 }
 
 type remoteReservationSource interface {
@@ -64,6 +69,7 @@ type remoteReservationSource interface {
 
 type remotePreparer interface {
 	Prepare(context.Context, string, string, adapters.VerifiedLiveSession) (domain.RemoteInstallPreparation, error)
+	Discard(string) error
 }
 
 type remoteWorker struct {
@@ -93,22 +99,36 @@ func (worker *remoteWorker) handle(ctx context.Context, request domain.RemoteIns
 			secret.Destroy()
 		}
 		return worker.handlePrepare(ctx, request)
+	case domain.RemoteInstallPlanOperation:
+		if secret != nil {
+			secret.Destroy()
+		}
+		return worker.handlePlan(ctx, request)
+	case domain.RemoteInstallApplyOperation:
+		if secret != nil {
+			secret.Destroy()
+		}
+		return worker.handleApply(ctx, request)
+	case domain.RemoteInstallRebootOperation:
+		if secret != nil {
+			secret.Destroy()
+		}
+		return worker.handleReboot(ctx, request)
+	case domain.RemoteInstallVerifyOperation:
+		if secret != nil {
+			secret.Destroy()
+		}
+		return worker.handleVerify(ctx, request)
+	case domain.RemoteInstallCloseOperation:
+		if secret != nil {
+			secret.Destroy()
+		}
+		return worker.handleClose(ctx, request)
 	case domain.RemoteInstallStatusOperation, domain.RemoteInstallReconcileOperation:
 		if secret != nil {
 			secret.Destroy()
 		}
-		session, err := worker.state.Load(request.OperationID)
-		if err != nil {
-			response.State = "unavailable"
-			if errors.Is(err, os.ErrNotExist) {
-				response.Message = "remote installation operation does not exist"
-			} else {
-				response.Message = "remote installation state is unavailable or unsafe"
-			}
-			break
-		}
-		response.State = session.State
-		response.Session = &session
+		return worker.handleStatus(ctx, request)
 	case domain.RemoteInstallCancelOperation:
 		if secret != nil {
 			secret.Destroy()
@@ -122,6 +142,425 @@ func (worker *remoteWorker) handle(ctx context.Context, request domain.RemoteIns
 		response.Message = "operation is not enabled before verified live-session preparation"
 	}
 	return response
+}
+
+func (worker *remoteWorker) handleReboot(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "blocked"}
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
+	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
+		response.Message = "worker does not own the installed live session"
+		return response
+	}
+	session, err := worker.state.Load(request.OperationID)
+	if err != nil || session.Preparation == nil {
+		response.Message = "installed remote session state is unavailable"
+		return response
+	}
+	connection, err := adapters.NewStrictLiveSSH(*worker.liveSession)
+	if err != nil {
+		response.Message = err.Error()
+		return response
+	}
+	receipt, err := connection.Status(ctx, session.Preparation.BundlePath, request.OperationID)
+	if err != nil || receipt.State != "ready-to-reboot" || !receipt.Installed {
+		response.Message = "remote installation is not confirmed ready for an explicit reboot"
+		return response
+	}
+	session.Receipt = &receipt
+	session.RebootRequested = true
+	session.State = "reboot-dispatching"
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseReboot, Detail: "explicit reboot authorization persisted before dispatch"})
+	if err := worker.state.Save(session); err != nil {
+		response.Message = "could not persist reboot authorization before dispatch"
+		return response
+	}
+	rebootReceipt, err := connection.Reboot(ctx, session.Preparation.BundlePath, request.OperationID)
+	if err != nil {
+		session.State = "reconciliation-required"
+		session.DispatchUncertain = true
+		_ = worker.state.Save(session)
+		response.State = session.State
+		response.Session = &session
+		response.Message = "reboot dispatch may have reached the live client; verify the reviewed static identity before retrying"
+		return response
+	}
+	session.Receipt = &rebootReceipt
+	session.State = "reboot-requested"
+	session.DispatchUncertain = false
+	if err := worker.state.Save(session); err != nil {
+		response.State = "reconciliation-required"
+		response.Message = "reboot was requested but its state could not be persisted"
+		return response
+	}
+	response.State = session.State
+	response.Session = &session
+	response.Message = rebootReceipt.Message
+	return response
+}
+
+func (worker *remoteWorker) handleVerify(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "blocked"}
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
+	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
+		response.Message = "worker does not own the rebooted installation session"
+		return response
+	}
+	session, err := worker.state.Load(request.OperationID)
+	if err != nil || session.Preparation == nil || !session.RebootRequested {
+		response.Message = "remote installation has no persisted reboot authorization"
+		return response
+	}
+	installed, err := adapters.VerifyInstalledRemote(ctx, "/run/nixorium/remote-install", "/home/admin/.ssh/id_ed25519", *session.Preparation)
+	if err != nil {
+		response.State = session.State
+		response.Session = &session
+		response.Message = err.Error()
+		return response
+	}
+	if err := adapters.MergeVerifiedKnownHost(
+		"/home/admin/.ssh/known_hosts", "/var/lib/nixorium/remote-install/known-hosts-backups",
+		session.Preparation.Host.StaticIP, session.Preparation.HostKeyPublic, session.OperationID, session.Plan.HostKeyRotation,
+	); err != nil {
+		response.State = "reconciliation-required"
+		response.Session = &session
+		response.Message = "installed identity verified but persistent known-host update requires reconciliation: " + err.Error()
+		return response
+	}
+	session.BootVerified = true
+	session.State = "verified"
+	session.DispatchUncertain = false
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePostBootVerify, Detail: "verified hostname, exact system closure, revision, and preserved host key at the static address"})
+	if err := worker.state.Save(session); err != nil {
+		response.State = "reconciliation-required"
+		response.Message = "post-boot identity was verified but persistent state could not be updated"
+		return response
+	}
+	if err := worker.bootstrap.DiscardLocalSession(*worker.liveSession); err != nil {
+		response.State = "reconciliation-required"
+		response.Message = "post-boot identity was verified but local ephemeral credentials could not be removed"
+		return response
+	}
+	if worker.preparer == nil {
+		response.State = "reconciliation-required"
+		response.Message = "post-boot identity was verified but preparation cleanup is unavailable"
+		return response
+	}
+	if err := worker.preparer.Discard(session.OperationID); err != nil {
+		response.State = "reconciliation-required"
+		response.Message = "post-boot identity was verified but preparation GC roots could not be removed"
+		return response
+	}
+	if err := worker.reservation.ReleaseResolved(); err != nil {
+		response.State = "reconciliation-required"
+		response.Message = "post-boot identity was verified but the controller reservation could not be released"
+		return response
+	}
+	worker.operationID = ""
+	worker.liveSession = nil
+	worker.reservation = nil
+	response.State = session.State
+	response.Session = &session
+	response.Execution = &domain.RemoteInstallExecutionReport{
+		SchemaVersion: domain.SchemaVersion, Operation: "usb-install-verify", State: "verified", OperationID: session.OperationID,
+		Phase: domain.RemoteInstallPhasePostBootVerify, MutationStarted: true, DiskMayBeModified: true, Installed: true,
+		RebootRequested: true, BootVerified: true, Message: fmt.Sprintf("verified %s at %s", installed.Hostname, session.Preparation.Host.StaticIP),
+	}
+	response.Message = response.Execution.Message
+	return response
+}
+
+func (worker *remoteWorker) handleClose(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "reconciliation-required"}
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
+	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
+		response.Message = "worker no longer owns the live credentials; reconcile the persistent reservation"
+		return response
+	}
+	session, err := worker.state.Load(request.OperationID)
+	if err != nil || session.Receipt == nil || !session.Receipt.Installed || session.RebootRequested || session.DispatchUncertain {
+		response.Message = "only a confirmed installed session before reboot can be closed"
+		return response
+	}
+	if err := worker.bootstrap.CloseSession(ctx, *worker.liveSession); err != nil {
+		response.Message = "live key cleanup was not confirmed; reservation retained"
+		return response
+	}
+	session.State = "closed-installed"
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseReadyToReboot, Detail: "session closed without reboot; ephemeral live key revoked"})
+	if err := worker.state.Save(session); err != nil {
+		response.Message = "cleanup succeeded but persistent state could not be updated; reservation retained"
+		return response
+	}
+	if worker.preparer == nil {
+		response.Message = "cleanup succeeded but preparation cleanup is unavailable; reservation retained"
+		return response
+	}
+	if err := worker.preparer.Discard(session.OperationID); err != nil {
+		response.Message = "cleanup succeeded but preparation GC roots could not be removed; reservation retained"
+		return response
+	}
+	if err := worker.reservation.ReleaseResolved(); err != nil {
+		response.Message = "cleanup succeeded but the controller reservation could not be released"
+		return response
+	}
+	worker.operationID = ""
+	worker.liveSession = nil
+	worker.reservation = nil
+	response.State = session.State
+	response.Session = &session
+	response.Message = "installed session closed without reboot; remove local media before starting the target"
+	return response
+}
+
+func (worker *remoteWorker) handlePlan(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "blocked"}
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
+	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
+		response.Message = "worker does not own the prepared live session"
+		return response
+	}
+	session, err := worker.state.Load(request.OperationID)
+	if err != nil || session.Preparation == nil || (session.State != "prepared" && session.State != "review-ready") || session.DispatchUncertain {
+		response.Message = "remote installation session is not ready for disk review"
+		return response
+	}
+	source, err := worker.installSource(session.Preparation.BundlePath)
+	if err != nil {
+		response.Message = err.Error()
+		return response
+	}
+	manager := app.NewRemoteInstallManager(source)
+	report := manager.PlanReservedWithHostKeyRotation(ctx, *session.Preparation, request.Disk, request.HostKeyRotation)
+	response.Plan = &report
+	if report.HasErrors() {
+		response.Message = report.Message
+		if response.Message == "" && len(report.Issues) > 0 {
+			response.Message = report.Issues[0].Message
+		}
+		return response
+	}
+	session.Plan = report.Plan
+	session.ReviewTokenDigest = domain.RemoteInstallTokenDigest(report.ReviewToken)
+	session.ReviewExpiresAt = report.ExpiresAt
+	session.TokenConsumed = false
+	session.State = "review-ready"
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseReview, Detail: "published content-bound destructive disk review"})
+	if err := worker.state.Save(session); err != nil {
+		response.Plan = nil
+		response.Message = "could not persist the reviewed remote installation plan"
+		return response
+	}
+	response.State = session.State
+	response.Session = &session
+	response.Message = report.Message
+	return response
+}
+
+func (worker *remoteWorker) handleApply(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "blocked"}
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
+	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
+		response.Message = "worker does not own the reviewed live session"
+		return response
+	}
+	session, err := worker.state.Load(request.OperationID)
+	if err != nil || session.Preparation == nil || session.State != "review-ready" || session.TokenConsumed || session.ReviewExpiresAt.IsZero() {
+		response.Message = "remote installation review is absent, consumed, or no longer applicable"
+		return response
+	}
+	expectedDigest := domain.RemoteInstallTokenDigest(request.ReviewToken)
+	if subtle.ConstantTimeCompare([]byte(expectedDigest), []byte(session.ReviewTokenDigest)) != 1 {
+		response.Message = "remote installation review token differs"
+		return response
+	}
+	expectedConfirmation := fmt.Sprintf("ERASE %s FOR %s", session.Plan.Disk.Path, session.Plan.Host.Name)
+	if request.Confirmation != expectedConfirmation {
+		response.Message = "destructive confirmation text differs from the reviewed disk"
+		return response
+	}
+	report := frozenWorkerPlan(session, request.ReviewToken)
+	if domain.RemoteInstallReviewToken(report) != request.ReviewToken {
+		response.Message = "persistent review no longer matches its content-bound token"
+		return response
+	}
+	session.TokenConsumed = true
+	session.State = "dispatching"
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseRevalidate, Detail: "review token consumed before final revalidation and dispatch"})
+	if err := worker.state.Save(session); err != nil {
+		response.Message = "could not persist review consumption before dispatch"
+		return response
+	}
+	source, err := worker.installSource(session.Preparation.BundlePath)
+	if err != nil {
+		response.Message = err.Error()
+		return response
+	}
+	execution := app.NewRemoteInstallManager(source).ApplyReserved(ctx, report, request.ReviewToken)
+	response.Execution = &execution
+	session.DispatchUncertain = execution.DispatchUncertain
+	if execution.DispatchUncertain {
+		session.State = "reconciliation-required"
+		session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseReconciliationRequired, Detail: "apply response was uncertain; automatic retry is forbidden"})
+	} else if execution.State == "blocked" || execution.State == "failed" {
+		session.State = "prepared"
+		session.ReviewTokenDigest = ""
+		session.ReviewExpiresAt = time.Time{}
+		session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: execution.Phase, Detail: "apply stopped before a confirmed independent job acceptance"})
+	} else {
+		session.State = execution.State
+		receipt := domain.RemoteInstallReceipt{
+			SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: session.OperationID, State: execution.State,
+			Phase: execution.Phase, MutationStarted: execution.MutationStarted, DiskMayBeModified: execution.DiskMayBeModified,
+			Installed: execution.Installed, Message: execution.Message,
+		}
+		session.Receipt = &receipt
+		session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: execution.Phase, Detail: "independent live installer job accepted"})
+	}
+	if err := worker.state.Save(session); err != nil {
+		response.State = "reconciliation-required"
+		response.Message = "apply result could not be persisted; reconcile the same operation ID"
+		return response
+	}
+	response.State = session.State
+	response.Session = &session
+	response.Message = execution.Message
+	return response
+}
+
+func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "unavailable"}
+	session, err := worker.state.Load(request.OperationID)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			response.Message = "remote installation operation does not exist"
+		} else {
+			response.Message = "remote installation state is unavailable or unsafe"
+		}
+		return response
+	}
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
+	if worker.operationID == request.OperationID && worker.liveSession != nil && session.Preparation != nil &&
+		(session.TokenConsumed || session.DispatchUncertain || session.Receipt != nil) {
+		connection, connectionErr := adapters.NewStrictLiveSSH(*worker.liveSession)
+		if connectionErr == nil {
+			receipt, statusErr := connection.Status(ctx, session.Preparation.BundlePath, request.OperationID)
+			if statusErr == nil {
+				session.Receipt = &receipt
+				session.DispatchUncertain = receipt.State == "unknown"
+				if receipt.State == "unknown" {
+					session.State = "reconciliation-required"
+				} else {
+					session.State = receipt.State
+				}
+				if receipt.State == "failed" || receipt.State == "ready-to-reboot" || receipt.State == "reboot-requested" {
+					if remoteLog, logErr := connection.OperationLog(ctx, session.Preparation.BundlePath, request.OperationID); logErr == nil {
+						result := "completed"
+						if receipt.State == "failed" {
+							result = "failed"
+							if receipt.MutationStarted || receipt.DiskMayBeModified {
+								result = "partial"
+							}
+						}
+						if logID, publishErr := adapters.PublishRemoteOperationLog(request.OperationID, remoteLog, result); publishErr == nil {
+							session.LogID = logID
+						}
+					}
+				}
+				_ = worker.state.Save(session)
+			}
+		}
+	}
+	response.State = session.State
+	response.Session = &session
+	response.Message = "remote installation state loaded"
+	return response
+}
+
+func frozenWorkerPlan(session domain.RemoteInstallSession, token string) domain.RemoteInstallPlanReport {
+	preparation := *session.Preparation
+	return domain.RemoteInstallPlanReport{
+		SchemaVersion: domain.SchemaVersion, Operation: "usb-install-plan", State: "ready", Repository: preparation.Repository,
+		Method: domain.RemoteInstallUSBSSH, OperationID: session.OperationID, Host: session.Plan.Host, Disk: session.Plan.Disk,
+		Revision: session.Plan.DeploymentRevision, BundlePath: preparation.BundlePath, SystemPath: session.Plan.SystemPath,
+		CacheURL: session.Plan.Cache.URL, HostKeyRotation: session.Plan.HostKeyRotation,
+		ExpiresAt: session.ReviewExpiresAt, ReviewToken: token,
+		Confirmation: fmt.Sprintf("ERASE %s FOR %s", session.Plan.Disk.Path, session.Plan.Host.Name),
+		Plan:         session.Plan, Preparation: preparation, Issues: []domain.ValidationIssue{},
+	}
+}
+
+type workerInstallSource struct {
+	local      adapters.Local
+	connection *adapters.StrictLiveSSH
+	bundlePath string
+}
+
+func (worker *remoteWorker) installSource(bundlePath string) (*workerInstallSource, error) {
+	if worker.liveSession == nil {
+		return nil, errors.New("verified live SSH session is unavailable")
+	}
+	connection, err := adapters.NewStrictLiveSSH(*worker.liveSession)
+	if err != nil {
+		return nil, err
+	}
+	if !domain.ValidStorePath(bundlePath) {
+		return nil, errors.New("prepared remote installer bundle path is invalid")
+	}
+	return &workerInstallSource{local: adapters.Local{}, connection: connection, bundlePath: bundlePath}, nil
+}
+
+func (source *workerInstallSource) LabMeta(ctx context.Context, repository string) (domain.LabMeta, error) {
+	return source.local.LabMeta(ctx, repository)
+}
+
+func (source *workerInstallSource) CurrentRevision(ctx context.Context, repository string) (string, error) {
+	state, err := source.local.GitState(ctx, repository)
+	if err != nil || state.Dirty {
+		return "", errors.New("deployment worktree is not clean")
+	}
+	return source.local.GitRevision(ctx, repository)
+}
+
+func (source *workerInstallSource) ClientOperationActive() (bool, error) {
+	return source.local.ClientOperationActive()
+}
+
+func (source *workerInstallSource) ServiceState(ctx context.Context, name string) domain.ServiceState {
+	return source.local.ServiceState(ctx, name)
+}
+
+func (*workerInstallSource) RemoteIdentityReachable(ctx context.Context, address string) (bool, error) {
+	probeContext, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	connection, err := (&net.Dialer{}).DialContext(probeContext, "tcp4", net.JoinHostPort(address, "22"))
+	if err != nil {
+		return false, nil
+	}
+	_ = connection.Close()
+	return true, nil
+}
+
+func (*workerInstallSource) ReserveRemoteInstall(context.Context, domain.RemoteInstallPlan, string) (domain.RemoteInstallReservation, error) {
+	return nil, errors.New("worker already owns the remote installation reservation")
+}
+
+func (source *workerInstallSource) RevalidateRemoteInstall(ctx context.Context, preparation domain.RemoteInstallPreparation, plan domain.RemoteInstallPlan) error {
+	return source.connection.Revalidate(ctx, preparation, plan)
+}
+
+func (source *workerInstallSource) DispatchRemoteInstall(ctx context.Context, plan domain.RemoteInstallPlan) (app.RemoteInstallDispatch, error) {
+	logID := "usb-install-" + plan.OperationID + ".log"
+	receipt, err := source.connection.Dispatch(ctx, source.bundlePath, plan)
+	if err != nil {
+		return app.RemoteInstallDispatch{Uncertain: true, LogID: logID}, err
+	}
+	return app.RemoteInstallDispatch{Accepted: receipt.State != "unknown" && receipt.State != "failed", LogID: logID, Receipt: receipt}, nil
 }
 
 func (worker *remoteWorker) handlePrepare(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
@@ -203,6 +642,7 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 	}
 	session := domain.RemoteInstallSession{
 		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID, State: "bootstrapped",
+		LogID:  "usb-install-" + operationID + ".log",
 		Events: []domain.RemoteInstallProgress{{Phase: domain.RemoteInstallPhasePreflight, Detail: "verified supported live installer and replaced temporary password authentication"}},
 		Bootstrap: &domain.RemoteInstallBootstrapRecord{
 			Host: request.Host, Address: request.Address, HostPublicKey: liveSession.HostPublicKey,
@@ -256,6 +696,16 @@ func (worker *remoteWorker) handleCancel(ctx context.Context, request domain.Rem
 	if err := worker.state.Save(session); err != nil {
 		response.Message = "cleanup succeeded but persistent state could not be updated; reservation retained"
 		return response
+	}
+	if session.Preparation != nil {
+		if worker.preparer == nil {
+			response.Message = "cleanup succeeded but preparation GC root ownership is unavailable; reservation retained"
+			return response
+		}
+		if err := worker.preparer.Discard(session.OperationID); err != nil {
+			response.Message = "cleanup succeeded but preparation GC roots could not be removed; reservation retained"
+			return response
+		}
 	}
 	if err := worker.reservation.ReleaseResolved(); err != nil {
 		response.Message = "cleanup succeeded but the controller reservation could not be released"
