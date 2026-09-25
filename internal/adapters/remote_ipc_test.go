@@ -12,6 +12,18 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+type partialIPCWriter struct {
+	buffer bytes.Buffer
+	limit  int
+}
+
+func (writer *partialIPCWriter) Write(value []byte) (int, error) {
+	if len(value) > writer.limit {
+		value = value[:writer.limit]
+	}
+	return writer.buffer.Write(value)
+}
+
 func TestRemoteInstallIPCAuthenticatesPeerAndBindsResponse(t *testing.T) {
 	temporary, err := os.MkdirTemp("/tmp", "nixorium-ipc-test-")
 	if err != nil {
@@ -55,6 +67,16 @@ func TestRemoteInstallIPCAuthenticatesPeerAndBindsResponse(t *testing.T) {
 func TestRemoteInstallIPCRejectsOversizedFrame(t *testing.T) {
 	if _, err := readRemoteIPCFrame(strings.NewReader(strings.Repeat("x", domain.RemoteInstallPlanMaxBytes+1)+"\n"), domain.RemoteInstallPlanMaxBytes); err == nil {
 		t.Fatal("oversized IPC frame was accepted")
+	}
+}
+
+func TestRemoteInstallIPCFrameWriteHandlesPartialWrites(t *testing.T) {
+	writer := &partialIPCWriter{limit: 3}
+	if err := writeRemoteIPCFrame(writer, []byte("complete-frame")); err != nil {
+		t.Fatal(err)
+	}
+	if writer.buffer.String() != "complete-frame" {
+		t.Fatalf("partial frame=%q", writer.buffer.String())
 	}
 }
 

@@ -102,6 +102,7 @@ func (server *RemoteInstallIPCServer) serveConnection(ctx context.Context, conne
 		}
 		defer secret.Destroy()
 	}
+	_ = connection.SetDeadline(time.Time{})
 	response := server.handler(ctx, request, secret)
 	response.SchemaVersion = domain.RemoteInstallSchemaVersion
 	response.RequestID = request.RequestID
@@ -110,7 +111,7 @@ func (server *RemoteInstallIPCServer) serveConnection(ctx context.Context, conne
 		return
 	}
 	content = append(content, '\n')
-	_, _ = connection.Write(content)
+	_ = writeRemoteIPCFrame(connection, content)
 }
 
 func RemoteInstallIPCRequest(ctx context.Context, socketPath string, request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
@@ -151,7 +152,7 @@ func remoteInstallIPCRequest(ctx context.Context, socketPath string, request dom
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = connection.SetDeadline(deadline)
 	} else {
-		_ = connection.SetDeadline(time.Now().Add(30 * time.Second))
+		_ = connection.SetDeadline(time.Now().Add(remoteIPCOperationTimeout(request.Operation)))
 	}
 	frame := append(content, '\n')
 	if secret != nil {
@@ -159,8 +160,9 @@ func remoteInstallIPCRequest(ctx context.Context, socketPath string, request dom
 		binary.BigEndian.PutUint16(length, uint16(len(secret)))
 		frame = append(frame, length...)
 		frame = append(frame, secret...)
+		defer zeroBytes(frame)
 	}
-	if _, err := connection.Write(frame); err != nil {
+	if err := writeRemoteIPCFrame(connection, frame); err != nil {
 		return response, fmt.Errorf("send remote installation request: %w", err)
 	}
 	frame, err = readRemoteIPCFrame(connection, domain.RemoteInstallPlanMaxBytes)
@@ -175,6 +177,31 @@ func remoteInstallIPCRequest(ctx context.Context, socketPath string, request dom
 		return response, errors.New("remote installation response identity is invalid")
 	}
 	return response, nil
+}
+
+func writeRemoteIPCFrame(writer io.Writer, frame []byte) error {
+	for len(frame) > 0 {
+		written, err := writer.Write(frame)
+		if err != nil {
+			return err
+		}
+		if written < 1 || written > len(frame) {
+			return io.ErrShortWrite
+		}
+		frame = frame[written:]
+	}
+	return nil
+}
+
+func remoteIPCOperationTimeout(operation domain.RemoteInstallOperation) time.Duration {
+	switch operation {
+	case domain.RemoteInstallPrepareOperation, domain.RemoteInstallApplyOperation:
+		return 4 * time.Hour
+	case domain.RemoteInstallVerifyOperation:
+		return 12 * time.Minute
+	default:
+		return 2 * time.Minute
+	}
 }
 
 func readRemoteIPCFrame(reader io.Reader, maximum int) ([]byte, error) {

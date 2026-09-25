@@ -261,6 +261,18 @@ func TestLiveBootstrapRejectsWrongPasswordWithoutAuthorization(t *testing.T) {
 	}
 }
 
+func TestLivePasswordWipesRejectedInput(t *testing.T) {
+	input := []byte{'b', 'a', 'd', 0, 's', 'e', 'c', 'r', 'e', 't'}
+	if _, err := NewLivePassword(input); err == nil {
+		t.Fatal("NUL-containing live password was accepted")
+	}
+	for _, value := range input {
+		if value != 0 {
+			t.Fatal("rejected password input was not wiped")
+		}
+	}
+}
+
 func TestLiveBootstrapRevokesKeyWhenRootVerificationFails(t *testing.T) {
 	server := newBootstrapSSHServer(t)
 	server.rejectRoot = true

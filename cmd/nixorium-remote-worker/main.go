@@ -68,7 +68,8 @@ type remoteReservationSource interface {
 }
 
 type remotePreparer interface {
-	Prepare(context.Context, string, string, adapters.VerifiedLiveSession) (domain.RemoteInstallPreparation, error)
+	PrepareArtifacts(context.Context, string, string) (domain.RemoteInstallArtifacts, error)
+	Finalize(context.Context, domain.RemoteInstallArtifacts, adapters.VerifiedLiveSession) (domain.RemoteInstallPreparation, error)
 	Discard(string) error
 }
 
@@ -567,16 +568,39 @@ func (worker *remoteWorker) handlePrepare(ctx context.Context, request domain.Re
 	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "blocked"}
 	worker.mutex.Lock()
 	defer worker.mutex.Unlock()
-	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil || worker.preparer == nil {
+	if worker.preparer == nil {
+		response.Message = "remote installation preparation is unavailable"
+		return response
+	}
+	if request.OperationID == "" {
+		return worker.handleArtifactPreparationLocked(ctx, request)
+	}
+	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
 		response.Message = "worker does not own the verified live session"
 		return response
 	}
 	session, err := worker.state.Load(request.OperationID)
-	if err != nil || session.Bootstrap == nil || session.Bootstrap.Host != request.Host || session.State != "bootstrapped" {
+	if err != nil || session.Bootstrap == nil || session.Bootstrap.Host != request.Host || (session.State != "bootstrapped" && session.State != "bootstrapped-artifacts") {
 		response.Message = "verified bootstrap state does not match the preparation request"
 		return response
 	}
-	preparation, err := worker.preparer.Prepare(ctx, request.OperationID, request.Host, *worker.liveSession)
+	artifacts := session.Artifacts
+	if artifacts == nil {
+		prepared, prepareErr := worker.preparer.PrepareArtifacts(ctx, request.OperationID, request.Host)
+		if prepareErr != nil {
+			response.Message = prepareErr.Error()
+			return response
+		}
+		artifacts = &prepared
+		session.Artifacts = artifacts
+		session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePrepare, Detail: "built pinned client and installer closures with persistent GC roots"})
+		if err := worker.state.Save(session); err != nil {
+			response.State = "reconciliation-required"
+			response.Message = "artifacts were prepared but persistent state could not be published"
+			return response
+		}
+	}
+	preparation, err := worker.preparer.Finalize(ctx, *artifacts, *worker.liveSession)
 	if err != nil {
 		response.Message = err.Error()
 		return response
@@ -584,7 +608,6 @@ func (worker *remoteWorker) handlePrepare(ctx context.Context, request domain.Re
 	session.Preparation = &preparation
 	session.State = "prepared"
 	session.Events = append(session.Events,
-		domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePrepare, Detail: "built pinned client and installer closures with persistent GC roots"},
 		domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseTransfer, Detail: "verified signed cache metadata and imported the immutable installer bundle"},
 		domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseProbe, Detail: "completed final wired-NIC, resource, and disk inventory probe"},
 	)
@@ -599,16 +622,19 @@ func (worker *remoteWorker) handlePrepare(ctx context.Context, request domain.Re
 	return response
 }
 
-func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.RemoteInstallRequest, secret *adapters.LivePassword) domain.RemoteInstallResponse {
+func (worker *remoteWorker) handleArtifactPreparationLocked(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {
 	response := domain.RemoteInstallResponse{State: "blocked"}
-	if secret == nil {
-		response.Message = "bootstrap password frame is missing"
-		return response
-	}
-	defer secret.Destroy()
-	worker.mutex.Lock()
-	defer worker.mutex.Unlock()
-	if worker.operationID != "" || worker.reservation != nil {
+	if worker.operationID != "" || worker.reservation != nil || worker.liveSession != nil {
+		if worker.operationID != "" {
+			if session, err := worker.state.Load(worker.operationID); err == nil && session.Artifacts != nil &&
+				session.Artifacts.HostName == request.Host && session.Bootstrap == nil && session.State == "artifacts-ready" {
+				response.OperationID = session.OperationID
+				response.State = session.State
+				response.Session = &session
+				response.Message = "target-independent installation artifacts are already prepared"
+				return response
+			}
+		}
 		response.Message = "another remote installation session is already owned by this worker"
 		return response
 	}
@@ -622,7 +648,103 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 		response.Message = err.Error()
 		return response
 	}
-	keepReservation := false
+	session := domain.RemoteInstallSession{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		LogID: "usb-install-" + operationID + ".log", State: "preparing-artifacts",
+		Events: []domain.RemoteInstallProgress{{Phase: domain.RemoteInstallPhasePrepare, Detail: "started target-independent client and installer artifact preparation"}},
+	}
+	if err := worker.state.Save(session); err != nil {
+		if releaseErr := reservation.ReleaseResolved(); releaseErr != nil {
+			worker.operationID = operationID
+			worker.reservation = reservation
+			response.OperationID = operationID
+			response.State = "reconciliation-required"
+			response.Message = "artifact preparation state and reservation cleanup both failed"
+			return response
+		}
+		response.Message = "could not publish artifact preparation state"
+		return response
+	}
+	worker.operationID = operationID
+	worker.reservation = reservation
+	artifacts, err := worker.preparer.PrepareArtifacts(ctx, operationID, request.Host)
+	if err != nil {
+		session.State = "artifact-preparation-failed"
+		session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePrepare, Detail: "target-independent artifact preparation failed before a live client was connected"})
+		stateErr := worker.state.Save(session)
+		discardErr := worker.preparer.Discard(operationID)
+		releaseErr := reservation.ReleaseResolved()
+		if stateErr != nil || discardErr != nil || releaseErr != nil {
+			response.OperationID = operationID
+			response.State = "reconciliation-required"
+			response.Session = &session
+			response.Message = "artifact preparation failed and cleanup could not be fully confirmed"
+			return response
+		}
+		worker.operationID = ""
+		worker.reservation = nil
+		response.OperationID = operationID
+		response.State = session.State
+		response.Session = &session
+		response.Message = err.Error()
+		return response
+	}
+	session.State = "artifacts-ready"
+	session.Artifacts = &artifacts
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePrepare, Detail: "built target-independent pinned client and installer closures with persistent GC roots"})
+	if err := worker.state.Save(session); err != nil {
+		response.State = "reconciliation-required"
+		response.OperationID = operationID
+		response.Message = "artifacts were prepared but persistent state could not be published"
+		return response
+	}
+	response.OperationID = operationID
+	response.State = session.State
+	response.Session = &session
+	response.Message = "target-independent installation artifacts are prepared; no client endpoint or disk has been accepted"
+	return response
+}
+
+func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.RemoteInstallRequest, secret *adapters.LivePassword) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{State: "blocked"}
+	if secret == nil {
+		response.Message = "bootstrap password frame is missing"
+		return response
+	}
+	defer secret.Destroy()
+	worker.mutex.Lock()
+	defer worker.mutex.Unlock()
+	var session domain.RemoteInstallSession
+	operationID := worker.operationID
+	reservation := worker.reservation
+	reusingArtifacts := false
+	if operationID != "" || reservation != nil {
+		stored, err := worker.state.Load(operationID)
+		if err != nil || reservation == nil || worker.liveSession != nil || stored.Artifacts == nil || stored.Bootstrap != nil ||
+			stored.State != "artifacts-ready" || stored.Artifacts.HostName != request.Host {
+			response.Message = "another remote installation session is already owned by this worker"
+			return response
+		}
+		session = stored
+		reusingArtifacts = true
+	} else {
+		var err error
+		operationID, err = domain.NewRemoteOperationID()
+		if err != nil {
+			response.Message = "could not create remote installation identity"
+			return response
+		}
+		reservation, err = worker.reservations.ReserveRemoteSession(operationID)
+		if err != nil {
+			response.Message = err.Error()
+			return response
+		}
+		session = domain.RemoteInstallSession{
+			SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+			LogID: "usb-install-" + operationID + ".log", Events: []domain.RemoteInstallProgress{},
+		}
+	}
+	keepReservation := reusingArtifacts
 	defer func() {
 		if !keepReservation {
 			_ = reservation.ReleaseResolved()
@@ -637,17 +759,21 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 			response.State = "reconciliation-required"
 			response.OperationID = operationID
 		}
+		if reusingArtifacts {
+			response.OperationID = operationID
+			response.State = session.State
+		}
 		response.Message = err.Error()
 		return response
 	}
-	session := domain.RemoteInstallSession{
-		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID, State: "bootstrapped",
-		LogID:  "usb-install-" + operationID + ".log",
-		Events: []domain.RemoteInstallProgress{{Phase: domain.RemoteInstallPhasePreflight, Detail: "verified supported live installer and replaced temporary password authentication"}},
-		Bootstrap: &domain.RemoteInstallBootstrapRecord{
-			Host: request.Host, Address: request.Address, HostPublicKey: liveSession.HostPublicKey,
-			HostFingerprint: liveSession.HostFingerprint, AuthorizedKeyLine: liveSession.PublicKeyLine, Facts: liveSession.Facts,
-		},
+	session.State = "bootstrapped"
+	if session.Artifacts != nil {
+		session.State = "bootstrapped-artifacts"
+	}
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePreflight, Detail: "verified supported live installer and replaced temporary password authentication"})
+	session.Bootstrap = &domain.RemoteInstallBootstrapRecord{
+		Host: request.Host, Address: request.Address, HostPublicKey: liveSession.HostPublicKey,
+		HostFingerprint: liveSession.HostFingerprint, AuthorizedKeyLine: liveSession.PublicKeyLine, Facts: liveSession.Facts,
 	}
 	if err := worker.state.Save(session); err != nil {
 		if cleanupErr := worker.bootstrap.CloseSession(ctx, liveSession); cleanupErr != nil {
@@ -658,6 +784,12 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 			response.State = "reconciliation-required"
 			response.OperationID = operationID
 			response.Message = "persistent state failed and live key cleanup was not confirmed; reservation retained"
+			return response
+		}
+		if reusingArtifacts {
+			response.OperationID = operationID
+			response.State = "artifacts-ready"
+			response.Message = "live bootstrap state could not be published; prepared artifacts remain reserved"
 			return response
 		}
 		response.Message = "could not publish verified bootstrap state"
@@ -671,6 +803,9 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 	response.OperationID = operationID
 	response.Session = &session
 	response.Message = "live installer identity verified; password authentication is locked"
+	if reusingArtifacts {
+		response.Message = "live installer identity verified and attached to the prepared artifacts; password authentication is locked"
+	}
 	return response
 }
 
@@ -678,26 +813,33 @@ func (worker *remoteWorker) handleCancel(ctx context.Context, request domain.Rem
 	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "reconciliation-required"}
 	worker.mutex.Lock()
 	defer worker.mutex.Unlock()
-	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
-		response.Message = "worker no longer owns the live credentials; reconcile the persistent reservation"
+	if worker.operationID != request.OperationID || worker.reservation == nil {
+		response.Message = "worker no longer owns the remote installation reservation"
 		return response
 	}
 	session, err := worker.state.Load(request.OperationID)
-	if err != nil || session.TokenConsumed || session.DispatchUncertain || (session.State != "bootstrapped" && session.State != "prepared") {
+	if err != nil || session.TokenConsumed || session.DispatchUncertain ||
+		(session.State != "artifacts-ready" && session.State != "bootstrapped" && session.State != "bootstrapped-artifacts" && session.State != "prepared" && session.State != "review-ready") {
 		response.Message = "session is not safely cancellable before apply"
 		return response
 	}
-	if err := worker.bootstrap.CloseSession(ctx, *worker.liveSession); err != nil {
-		response.Message = "live key cleanup was not confirmed; reservation retained"
-		return response
+	if worker.liveSession != nil {
+		if err := worker.bootstrap.CloseSession(ctx, *worker.liveSession); err != nil {
+			response.Message = "live key cleanup was not confirmed; reservation retained"
+			return response
+		}
 	}
 	session.State = "cancelled"
-	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePreflight, Detail: "cancelled before apply; ephemeral live key revoked"})
+	detail := "cancelled artifact preparation before a live client was connected"
+	if worker.liveSession != nil {
+		detail = "cancelled before apply; ephemeral live key revoked"
+	}
+	session.Events = append(session.Events, domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhasePreflight, Detail: detail})
 	if err := worker.state.Save(session); err != nil {
 		response.Message = "cleanup succeeded but persistent state could not be updated; reservation retained"
 		return response
 	}
-	if session.Preparation != nil {
+	if session.Artifacts != nil || session.Preparation != nil {
 		if worker.preparer == nil {
 			response.Message = "cleanup succeeded but preparation GC root ownership is unavailable; reservation retained"
 			return response
