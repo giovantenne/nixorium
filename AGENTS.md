@@ -214,6 +214,12 @@ Release from the matching changelog section.
   and release the controller reservation automatically, with safe cancellation
   retained as a cleanup fallback; uncertain or post-mutation failures remain
   reconciliation-only.
+  Explicit `install usb close` may abandon a never-dispatched session after
+  the ISO is lost: persist the close intent before discarding only that
+  operation's local credentials and releasing its reservation. Report remote
+  key revocation as unconfirmed. Consumed review tokens, any remote receipt,
+  uncertain dispatch, and reboot evidence forbid this path; never reuse the
+  old authorization or accept a replacement identity for recovery.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.

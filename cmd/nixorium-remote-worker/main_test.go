@@ -34,11 +34,13 @@ func (state *fakeWorkerState) Save(session domain.RemoteInstallSession) error {
 }
 
 type fakeWorkerBootstrap struct {
-	session  adapters.VerifiedLiveSession
-	err      error
-	closeErr error
-	closed   bool
-	trace    *[]string
+	session    adapters.VerifiedLiveSession
+	err        error
+	closeErr   error
+	closed     bool
+	discardErr error
+	discarded  bool
+	trace      *[]string
 }
 
 func (bootstrap *fakeWorkerBootstrap) Establish(_ context.Context, operationID, address, fingerprint string, secret *adapters.LivePassword) (adapters.VerifiedLiveSession, error) {
@@ -70,8 +72,108 @@ func (bootstrap *fakeWorkerBootstrap) CloseSession(context.Context, adapters.Ver
 }
 
 func (bootstrap *fakeWorkerBootstrap) DiscardLocalSession(adapters.VerifiedLiveSession) error {
-	bootstrap.closed = true
-	return nil
+	bootstrap.discarded = true
+	return bootstrap.discardErr
+}
+
+func TestRemoteWorkerClosesNeverDispatchedSessionWithoutRemoteAccess(t *testing.T) {
+	for _, stateName := range []string{"bootstrapped-artifacts", "review-ready", "reconciliation-required"} {
+		t.Run(stateName, func(t *testing.T) {
+			id := "0123456789abcdef0123456789abcdef"
+			session := domain.RemoteInstallSession{OperationID: id, State: stateName}
+			state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: session}}
+			bootstrap := &fakeWorkerBootstrap{err: errors.New("old ISO is gone"), closeErr: errors.New("host key changed")}
+			reservation := &fakeWorkerReservation{}
+			worker := &remoteWorker{state: state, bootstrap: bootstrap, operationID: id, reservation: reservation}
+			response := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: id}, nil)
+			if response.State != "closed-before-apply" || !bootstrap.discarded || bootstrap.closed || !reservation.released || worker.operationID != "" {
+				t.Fatalf("response=%+v bootstrap=%+v worker=%+v", response, bootstrap, worker)
+			}
+			if !strings.Contains(response.Message, "revocation unconfirmed") || state.sessions[id].State != "closed-before-apply" {
+				t.Fatal("closure must persist and must not claim remote revocation")
+			}
+		})
+	}
+}
+
+func TestRemoteWorkerCloseRejectsAnyPossibleDispatch(t *testing.T) {
+	for _, field := range []string{"consumed", "uncertain", "receipt", "reboot", "verified", "dispatching", "unknown"} {
+		t.Run(field, func(t *testing.T) {
+			id := "0123456789abcdef0123456789abcdef"
+			session := domain.RemoteInstallSession{OperationID: id, State: "reconciliation-required"}
+			switch field {
+			case "consumed":
+				session.TokenConsumed = true
+			case "uncertain":
+				session.DispatchUncertain = true
+			case "receipt":
+				session.Receipt = &domain.RemoteInstallReceipt{OperationID: id}
+			case "reboot":
+				session.RebootRequested = true
+			case "verified":
+				session.BootVerified = true
+			default:
+				session.State = field
+			}
+			state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: session}}
+			bootstrap := &fakeWorkerBootstrap{}
+			reservation := &fakeWorkerReservation{}
+			worker := &remoteWorker{state: state, bootstrap: bootstrap, operationID: id, reservation: reservation}
+			response := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: id}, nil)
+			if response.State != "reconciliation-required" || bootstrap.discarded || reservation.released {
+				t.Fatalf("unsafe closure: %+v", response)
+			}
+		})
+	}
+}
+
+func TestRemoteWorkerCloseRetainsReservationOnFailureAndResumesCleanup(t *testing.T) {
+	for _, failure := range []string{"save", "credentials", "artifacts"} {
+		t.Run(failure, func(t *testing.T) {
+			id := "0123456789abcdef0123456789abcdef"
+			artifacts := validWorkerArtifacts()
+			artifacts.OperationID = id
+			state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{id: {OperationID: id, State: "bootstrapped-artifacts", Artifacts: &artifacts}}}
+			bootstrap := &fakeWorkerBootstrap{}
+			preparer := &fakeWorkerPreparer{}
+			reservation := &fakeWorkerReservation{}
+			err := errors.New("fixture failure")
+			switch failure {
+			case "save":
+				state.saveErr = err
+			case "credentials":
+				bootstrap.discardErr = err
+			case "artifacts":
+				preparer.discardErr = err
+			}
+			worker := &remoteWorker{state: state, bootstrap: bootstrap, preparer: preparer, operationID: id, reservation: reservation}
+			request := domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: id}
+			response := worker.handle(context.Background(), request, nil)
+			if response.State != "reconciliation-required" || reservation.released {
+				t.Fatalf("lost reservation: %+v", response)
+			}
+			if failure == "save" && bootstrap.discarded {
+				t.Fatal("credentials discarded before durable close intent")
+			}
+			state.saveErr, bootstrap.discardErr, preparer.discardErr = nil, nil, nil
+			if failure == "save" {
+				response = worker.handle(context.Background(), request, nil)
+				if response.State != "closed-before-apply" {
+					t.Fatalf("retry failed: %+v", response)
+				}
+			} else {
+				reservations := &fakeWorkerReservations{recoverID: id}
+				worker.reservations = reservations
+				if err := worker.recover(); err != nil {
+					t.Fatal(err)
+				}
+				reservation = reservations.reservation
+			}
+			if !reservation.released || worker.operationID != "" {
+				t.Fatal("closed session cleanup did not finish")
+			}
+		})
+	}
 }
 
 type fakeWorkerReservation struct {

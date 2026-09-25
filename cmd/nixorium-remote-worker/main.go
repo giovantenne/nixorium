@@ -127,6 +127,9 @@ func (worker *remoteWorker) recover() error {
 	}
 	worker.operationID = operationID
 	worker.reservation = reservation
+	if session.State == "closed-before-apply" && remoteSessionNeverDispatched(session) {
+		return worker.releaseClosedBeforeApplyLocked(session)
+	}
 	if session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
 		if err := worker.releaseResolvedFailureLocked(&session); err != nil {
 			return fmt.Errorf("finish resolved USB failure cleanup: %w", err)
@@ -369,12 +372,33 @@ func (worker *remoteWorker) handleClose(ctx context.Context, request domain.Remo
 	response := domain.RemoteInstallResponse{OperationID: request.OperationID, State: "reconciliation-required"}
 	worker.mutex.Lock()
 	defer worker.mutex.Unlock()
-	if worker.operationID != request.OperationID || worker.liveSession == nil || worker.reservation == nil {
+	if worker.operationID != request.OperationID || worker.reservation == nil {
 		response.Message = "worker no longer owns the live credentials; reconcile the persistent reservation"
 		return response
 	}
 	session, err := worker.state.Load(request.OperationID)
-	if err != nil || session.Receipt == nil || !session.Receipt.Installed || session.RebootRequested || session.DispatchUncertain {
+	if err == nil && remoteSessionNeverDispatched(session) {
+		if session.State != "closed-before-apply" {
+			session.State = "closed-before-apply"
+			session.Events = append(session.Events, domain.RemoteInstallProgress{
+				Phase:  domain.RemoteInstallPhasePreflight,
+				Detail: "operator closed a never-dispatched session; discard local credentials without claiming remote key revocation",
+			})
+			if err := worker.state.Save(session); err != nil {
+				response.Message = "could not persist session closure; reservation retained"
+				return response
+			}
+		}
+		if err := worker.releaseClosedBeforeApplyLocked(session); err != nil {
+			response.Message = err.Error()
+			return response
+		}
+		response.State = session.State
+		response.Session = &session
+		response.Message = "never-dispatched session closed; local credentials discarded, remote key revocation unconfirmed; a new installation requires a new review"
+		return response
+	}
+	if err != nil || worker.liveSession == nil || session.Receipt == nil || !session.Receipt.Installed || session.RebootRequested || session.DispatchUncertain {
 		response.Message = "only a confirmed installed session before reboot can be closed"
 		return response
 	}
@@ -407,6 +431,41 @@ func (worker *remoteWorker) handleClose(ctx context.Context, request domain.Remo
 	response.Session = &session
 	response.Message = "installed session closed without reboot; remove local media before starting the target"
 	return response
+}
+
+func remoteSessionNeverDispatched(session domain.RemoteInstallSession) bool {
+	if session.TokenConsumed || session.DispatchUncertain || session.Receipt != nil || session.RebootRequested || session.BootVerified {
+		return false
+	}
+	switch session.State {
+	case "artifacts-ready", "bootstrapped", "bootstrapped-artifacts", "prepared", "review-ready", "reconciliation-required", "closed-before-apply":
+		return true
+	}
+	return false
+}
+
+func (worker *remoteWorker) releaseClosedBeforeApplyLocked(session domain.RemoteInstallSession) error {
+	if session.State != "closed-before-apply" || !remoteSessionNeverDispatched(session) || worker.reservation == nil {
+		return errors.New("never-dispatched session closure is incomplete; reservation retained")
+	}
+	if err := worker.bootstrap.DiscardLocalSession(adapters.VerifiedLiveSession{OperationID: session.OperationID}); err != nil {
+		return fmt.Errorf("discard closed session credentials; reservation retained: %w", err)
+	}
+	if session.Artifacts != nil || session.Preparation != nil {
+		if worker.preparer == nil {
+			return errors.New("closed session preparation cleanup unavailable; reservation retained")
+		}
+		if err := worker.preparer.Discard(session.OperationID); err != nil {
+			return fmt.Errorf("discard closed session preparation; reservation retained: %w", err)
+		}
+	}
+	if err := worker.reservation.ReleaseResolved(); err != nil {
+		return fmt.Errorf("release closed session reservation: %w", err)
+	}
+	worker.operationID = ""
+	worker.liveSession = nil
+	worker.reservation = nil
+	return nil
 }
 
 func (worker *remoteWorker) handlePlan(ctx context.Context, request domain.RemoteInstallRequest) domain.RemoteInstallResponse {

@@ -74,10 +74,19 @@ func (bootstrap LiveBootstrap) DiscardLocalSession(session VerifiedLiveSession) 
 		return errors.New("live session cleanup identity is invalid")
 	}
 	directory := filepath.Join(bootstrap.runtimeRoot, session.OperationID)
-	for _, path := range []string{session.PrivateKeyPath, session.KnownHostsPath, filepath.Join(directory, "installed_known_hosts")} {
-		if path == "" || filepath.Dir(path) != directory {
-			continue
-		}
+	info, err := os.Lstat(directory)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0700 {
+		return errors.New("live session runtime directory is unavailable or unsafe")
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat.Uid != uint32(os.Geteuid()) {
+		return errors.New("live session runtime directory belongs to another user")
+	}
+	for _, name := range []string{"id_ed25519", "known_hosts", "installed_known_hosts"} {
+		path := filepath.Join(directory, name)
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return err
 		}

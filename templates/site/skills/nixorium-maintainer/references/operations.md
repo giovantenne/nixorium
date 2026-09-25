@@ -273,6 +273,13 @@ post-mutation failures; `close` does not prove an uncertain disk safe. Approve
 a reinstall's `ROTATE HOST KEY` only after the physical host and disk are
 independently established; the entry changes after verification.
 
+If the live ISO disappears before apply was ever dispatched, explicitly close
+the operation with `install usb close --id OPERATION_ID`. Review `CLOSE`: it
+discards only local operation credentials and releases the reservation; remote
+key revocation remains unconfirmed. A new install needs fresh identity and disk
+review. Consumed apply tokens, any remote receipt, uncertain dispatch, and
+reboot evidence prohibit this path. Never remove coordination files manually.
+
 ## PXE preparation
 
 Before changing controller addresses or starting the PXE proxy, prepare the
