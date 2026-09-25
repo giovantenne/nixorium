@@ -73,7 +73,9 @@ journalctl -u nixorium-pxe.service -b
   start a second dnsmasq/HTTP process as a workaround.
 - If a prior session was interrupted, run `nixorium pxe recover`, then prepare
   and start again. Boot-time recovery also reconciles an unfinished controller
-  network transition.
+  network transition when its durable PXE session record exists; with no
+  recorded transition it is skipped and cannot interfere with controller
+  activation.
 
 ## The PXE menu appears but boot fails
 

@@ -365,7 +365,9 @@ Use `nixorium pxe start`, `nixorium pxe stop`, and `nixorium pxe recover`
 through their managed boundaries. Start requires the reviewed network transition
 and can interrupt static-address connections; stop restores normal networking.
 Recovery is for interrupted PXE state, not a general fix for unapplied network
-configuration. Never start the internal network unit directly.
+configuration. Automatic boot recovery runs only when the durable PXE session
+record exists, so an ordinary controller activation does not start it. Never
+start the internal network unit directly.
 
 After a failure, inspect the operation report, `nixorium doctor`, and the named
 journal/log before retrying. Do not loosen permissions, delete receipts, rotate

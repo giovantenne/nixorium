@@ -432,7 +432,9 @@ set -euo pipefail
   canonical-store-path, and managed-GC-root checks intact
 - `nixorium-pxe-network.service` is an internal root boundary with only
   `CAP_NET_ADMIN`; preserve its root-owned session-before-mutation ordering,
-  exact static-address restoration, and boot-time recovery semantics
+  exact static-address restoration, and boot-time recovery semantics. The
+  automatic recovery unit must be conditioned on the durable PXE session so a
+  session-free controller activation never contends for its own operation lock
 - `nixorium-pxe.service` must validate the prepared revision, root-owned active
   session, live DHCP address, and absent static CIDR before binding; preserve
   its systemd readiness protocol and unprivileged listener identities

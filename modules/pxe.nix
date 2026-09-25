@@ -496,6 +496,7 @@ in
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
       before = [ "nixorium-pxe-network.service" ];
+      unitConfig.ConditionPathExists = sessionFile;
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${networkAction}/bin/nixorium-pxe-network-action recover";
