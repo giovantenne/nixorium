@@ -201,6 +201,32 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.screen = dashboardPXE
 			model.message = ""
 		}
+	case dashboardInstallMethod:
+		switch key.String() {
+		case "esc", "left":
+			model.installation.flow = false
+			if model.computers.restoreMode {
+				model.screen = dashboardRestore
+			} else {
+				model.screen = dashboardInstallationArea
+			}
+		case "up", "k":
+			model.installation.methodCursor = max(0, model.installation.methodCursor-1)
+		case "down", "j":
+			model.installation.methodCursor = min(len(installMethods)-1, model.installation.methodCursor+1)
+		case "enter":
+			method := installMethods[model.installation.methodCursor].method
+			return model.beginComputerInstallation(method)
+		case "r":
+			if model.installation.remote.operationID != "" {
+				model.screen = dashboardUSBInstall
+				model.installation.method = domain.RemoteInstallUSBSSH
+				model.busy = "Reattaching to the recorded remote installation operation"
+				return model.remoteInstallCommand("status", domain.RemoteInstallRequest{Operation: domain.RemoteInstallStatusOperation, OperationID: model.installation.remote.operationID})
+			}
+		}
+	case dashboardUSBInstall:
+		return model.updateRemoteInstallKey(key)
 	case dashboardRestore:
 		switch key.String() {
 		case "esc", "left":
@@ -221,7 +247,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.deployment.cursor = 0
 			} else {
 				model.computers.restoreMode = true
-				model.screen = dashboardPXE
+				return model.startComputerInstallation()
 			}
 		}
 	case dashboardSetup:

@@ -61,6 +61,7 @@ func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) 
 			renderInstallationDemo(sourceCommit, width, height),
 			renderShutdownDemo(sourceCommit, width, height),
 			renderSoftwareProfileDemo(sourceCommit, width, height),
+			renderUSBInstallationDemo(sourceCommit, width, height),
 		},
 	}
 }
@@ -315,6 +316,8 @@ func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	r.key(demoCode(tea.KeyEnter))
 	r.capture("Open Installation", 1500)
 	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Choose network boot", 1500)
+	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Review laboratory network settings", 2300)
 	r.model.settings.editor = r.model.settings.editor.moveToField(4)
 	r.capture("Configure five client computers", 2300)
@@ -387,6 +390,92 @@ func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	r.model.installation.flow = false
 	r.capture("Follow the installation steps on each client", 4200)
 	return DemoScenario{ID: "installation", Title: "Prepare and start network installation", Description: "Review lab settings, prepare configured clients, inspect the controller network change, then start PXE. Disk identity and erasure are confirmed later on each client console.", Frames: r.frames}
+}
+
+func renderUSBInstallationDemo(revision string, width, height int) DemoScenario {
+	r := newDemoRecorder(demoActions(), revision, width, height)
+	r.capture("Overview", 900)
+	r.model.screen = dashboardInstallMethod
+	r.model.installation = installationModel{flow: true, methodCursor: 1}
+	r.capture("Choose USB over SSH", 1800)
+	r.model.screen = dashboardUSBInstall
+	r.model.installation.method = domain.RemoteInstallUSBSSH
+	r.model.installation.remote = remoteInstallationModel{stage: remoteInstallSelectHost}
+	r.capture("Choose the Nixorium client identity", 1800)
+	r.model.installation.remote.host = "pc01"
+	r.model.installation.remote.stage = remoteInstallPreparing
+	r.model.busy = "Building the selected client closure and immutable installer bundle"
+	r.capture("Prepare only the selected client", 2200)
+	r.model.busy = ""
+	r.model.installation.remote.stage = remoteInstallConsole
+	r.model.installation.remote.address = "192.168.1.141"
+	r.model.installation.remote.fingerprint = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	r.model.installation.remote.password = strings.Repeat("x", 12)
+	r.model.installation.remote.formField = 2
+	r.capture("Enter console-observed identity and masked password", 2600)
+
+	preparation := domain.RemoteInstallPreparation{
+		OperationID: "0123456789abcdef0123456789abcdef", DeploymentRevision: revision,
+		BundlePath:      "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-remote-installer-bundle",
+		SystemPath:      "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo",
+		Host:            domain.RemoteInstallHost{Name: "pc01", Interface: "enp1s0", LiveIP: "192.168.1.141", StaticIP: "10.42.0.11"},
+		Cache:           domain.RemoteInstallCache{URL: "http://10.42.0.99:5000"},
+		HostFingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Facts: domain.RemoteMachineFacts{Disks: []domain.RemoteDisk{
+			{Path: "/dev/sda", SizeBytes: 8 << 30, Model: "USB ISO", Serial: "USB-DEMO", ExclusionReasons: []string{"boot-media"}},
+			{Path: "/dev/nvme0n1", SizeBytes: 128 << 30, Model: "Demo NVMe", Serial: "NVME-DEMO", WWN: "demo-wwn", Eligible: true},
+		}},
+	}
+	r.model.installation.remote.password = ""
+	r.model.installation.remote.operationID = preparation.OperationID
+	r.model.installation.remote.stage = remoteInstallBootstrap
+	r.model.busy = "Verifying signed cache access, importing the installer bundle and probing disks"
+	r.capture("Verify the ISO fingerprint and signed cache", 2400)
+	r.model.busy = ""
+	r.model.installation.remote.stage = remoteInstallSelectDisk
+	r.model.installation.remote.diskCursor = 1
+	r.model.installation.remote.response = domain.RemoteInstallResponse{
+		State: "prepared", OperationID: preparation.OperationID,
+		Session: &domain.RemoteInstallSession{OperationID: preparation.OperationID, State: "prepared", Preparation: &preparation},
+	}
+	r.capture("Select an eligible disk explicitly", 2600)
+
+	plan := domain.RemoteInstallPlanReport{
+		State: "ready", OperationID: preparation.OperationID, Host: preparation.Host, Disk: preparation.Facts.Disks[1],
+		Revision: revision, BundlePath: preparation.BundlePath, SystemPath: preparation.SystemPath, CacheURL: preparation.Cache.URL,
+		ReviewToken: "sha256:" + strings.Repeat("c", 64), Confirmation: "ERASE /dev/nvme0n1 FOR pc01",
+	}
+	r.model.installation.remote.stage = remoteInstallReview
+	r.model.installation.remote.plan = plan
+	r.capture("Review physical identity, logical identity and disk", 3200)
+	r.model.installation.remote.confirmation = plan.Confirmation
+	r.capture("Type the disk-bound destructive confirmation", 2200)
+	r.model.installation.remote.confirmation = ""
+	r.model.installation.remote.stage = remoteInstallApplying
+	r.model.busy = "Revalidating the reviewed identity and dispatching the independent installer job"
+	r.capture("Dispatch the independent installer job", 2400)
+	r.model.busy = ""
+	r.model.installation.remote.stage = remoteInstallResult
+	r.model.installation.remote.response = domain.RemoteInstallResponse{
+		State: "ready-to-reboot", OperationID: preparation.OperationID,
+		Execution: &domain.RemoteInstallExecutionReport{OperationID: preparation.OperationID, Phase: domain.RemoteInstallPhaseReadyToReboot, MutationStarted: true, DiskMayBeModified: true, Installed: true, LogID: "usb-install-0123456789abcdef0123456789abcdef.log"},
+		Message:   "installation completed; remove or deprioritize the USB medium before reboot",
+	}
+	r.capture("Show installed state before reboot", 3000)
+	r.model.installation.remote.stage = remoteInstallConfirmReboot
+	r.capture("Authorize reboot separately", 2400)
+	r.model.installation.remote.stage = remoteInstallResult
+	r.model.installation.remote.response = domain.RemoteInstallResponse{
+		State: "verified", OperationID: preparation.OperationID,
+		Execution: &domain.RemoteInstallExecutionReport{OperationID: preparation.OperationID, Phase: domain.RemoteInstallPhasePostBootVerify, MutationStarted: true, DiskMayBeModified: true, Installed: true, RebootRequested: true, BootVerified: true},
+		Message:   "verified pc01 at 10.42.0.11 with the reviewed revision and system closure",
+	}
+	r.capture("Verify the installed identity after reboot", 3400)
+	return DemoScenario{
+		ID: "installation-usb", Title: "Install one computer from the official USB ISO",
+		Description: "Pin the fingerprint observed on the physical console, select one Nixorium identity and disk, install from the signed controller cache, then authorize reboot and verify the exact system.",
+		Frames:      r.frames,
+	}
 }
 
 func renderShutdownDemo(revision string, width, height int) DemoScenario {
@@ -559,6 +648,21 @@ func demoActions() DashboardActions {
 		StartPXE:     func() domain.PXELifecycleReport { fail("StartPXE"); return domain.PXELifecycleReport{} },
 		StopPXE:      func() domain.PXELifecycleReport { fail("StopPXE"); return domain.PXELifecycleReport{} },
 		RecoverPXE:   func() domain.PXELifecycleReport { fail("RecoverPXE"); return domain.PXELifecycleReport{} },
+		PrepareRemoteInstall: func(string) (domain.RemoteInstallResponse, error) {
+			fail("PrepareRemoteInstall")
+			return domain.RemoteInstallResponse{}, nil
+		},
+		BootstrapRemoteInstall: func(string, string, string, []byte) (domain.RemoteInstallResponse, error) {
+			fail("BootstrapRemoteInstall")
+			return domain.RemoteInstallResponse{}, nil
+		},
+		RemoteInstallRequest: func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+			fail("RemoteInstallRequest")
+			return domain.RemoteInstallResponse{}, nil
+		},
+		LoadRemoteInstall: func() (domain.RemoteInstallResponse, error) {
+			return domain.RemoteInstallResponse{State: "ready"}, nil
+		},
 	}
 }
 

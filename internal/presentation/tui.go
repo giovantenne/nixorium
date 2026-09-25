@@ -62,6 +62,10 @@ type DashboardActions struct {
 	StartPXE               func() domain.PXELifecycleReport
 	StopPXE                func() domain.PXELifecycleReport
 	RecoverPXE             func() domain.PXELifecycleReport
+	PrepareRemoteInstall   func(string) (domain.RemoteInstallResponse, error)
+	BootstrapRemoteInstall func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
+	RemoteInstallRequest   func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
+	LoadRemoteInstall      func() (domain.RemoteInstallResponse, error)
 }
 
 type dashboardScreen int
@@ -94,6 +98,8 @@ const (
 	dashboardPXE
 	dashboardPXEStartReview
 	dashboardPXELeaveReview
+	dashboardInstallMethod
+	dashboardUSBInstall
 	dashboardAdministration
 	dashboardDiagnostics
 	dashboardSoftware
@@ -197,6 +203,40 @@ type installationModel struct {
 	pxeProgress      domain.OperationProgress
 	pxeStarted       time.Time
 	pxeProgressID    uint64
+	method           domain.RemoteInstallMethod
+	methodCursor     int
+	remote           remoteInstallationModel
+}
+
+type remoteInstallationStage int
+
+const (
+	remoteInstallSelectHost remoteInstallationStage = iota
+	remoteInstallPreparing
+	remoteInstallConsole
+	remoteInstallBootstrap
+	remoteInstallSelectDisk
+	remoteInstallRotateHostKey
+	remoteInstallReview
+	remoteInstallApplying
+	remoteInstallResult
+	remoteInstallConfirmReboot
+	remoteInstallConfirmClose
+)
+
+type remoteInstallationModel struct {
+	stage        remoteInstallationStage
+	hostCursor   int
+	host         string
+	operationID  string
+	address      string
+	fingerprint  string
+	password     string
+	formField    int
+	diskCursor   int
+	confirmation string
+	response     domain.RemoteInstallResponse
+	plan         domain.RemoteInstallPlanReport
 }
 
 // computersModel owns inventory, filtering, detail and restore navigation.
@@ -336,6 +376,12 @@ type dashboardPXEExitMsg struct {
 	lifecycle domain.PXELifecycleReport
 	status    domain.StatusReport
 	statusErr error
+}
+
+type dashboardRemoteInstallMsg struct {
+	action   string
+	response domain.RemoteInstallResponse
+	err      error
 }
 
 type dashboardHostsMsg struct {
@@ -559,11 +605,28 @@ func (model dashboardModel) openSetupSettings() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
+	remote := model.installation.remote
+	model.installation = installationModel{flow: true, remote: remote}
+	model.screen = dashboardInstallMethod
+	model.message = ""
+	model.busy = ""
+	if model.actions.LoadRemoteInstall == nil {
+		return model, nil
+	}
+	model.busy = "Checking for an existing USB installation operation"
+	return model, func() tea.Msg {
+		response, err := model.actions.LoadRemoteInstall()
+		return dashboardRemoteInstallMsg{action: "probe", response: response, err: err}
+	}
+}
+
+func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstallMethod) (tea.Model, tea.Cmd) {
 	if model.actions.LoadSettings == nil {
 		model.message = "Laboratory settings are not available in this session."
 		return model, nil
 	}
 	model.installation.flow = true
+	model.installation.method = method
 	model.installation.stage = 0
 	model.installation.failed = false
 	model.setupMode = false
@@ -593,6 +656,13 @@ func (model dashboardModel) failComputerInstallation(message string) (tea.Model,
 	model.installation.pxePreparing = false
 	model.message = message
 	model.screen = dashboardPXE
+	if model.installation.method == domain.RemoteInstallUSBSSH {
+		model.screen = dashboardUSBInstall
+		model.installation.remote.stage = remoteInstallResult
+		model.installation.remote.response = domain.RemoteInstallResponse{
+			OperationID: model.installation.remote.operationID, State: "failed", Message: message,
+		}
+	}
 	return model, nil
 }
 
@@ -627,8 +697,20 @@ func (model dashboardModel) continueComputerInstallation(report domain.SetupRepo
 			return dashboardControllerPlanMsg{report: model.actions.PlanController()}
 		}
 	case domain.SetupStageArtifacts:
+		if model.installation.method == "" {
+			return model.startComputerInstallation()
+		}
+		if model.installation.method == domain.RemoteInstallUSBSSH {
+			return model.openRemoteInstallHostSelection()
+		}
 		return model.startComputerInstallationPreparation()
 	case "":
+		if model.installation.method == "" {
+			return model.startComputerInstallation()
+		}
+		if model.installation.method == domain.RemoteInstallUSBSSH {
+			return model.openRemoteInstallHostSelection()
+		}
 		if model.actions.PlanPXEStart == nil {
 			return model.failComputerInstallation("PXE start validation is not available in this session.")
 		}
@@ -854,6 +936,10 @@ func (model dashboardModel) View() tea.View {
 		content = model.settingsView()
 	case dashboardPXE, dashboardPXEStartReview, dashboardPXELeaveReview:
 		content = model.pxeView()
+	case dashboardInstallMethod:
+		content = model.installMethodView()
+	case dashboardUSBInstall:
+		content = model.remoteInstallView()
 	default:
 		content = model.homeView()
 	}

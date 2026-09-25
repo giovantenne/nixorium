@@ -18,7 +18,7 @@ Choose an area. Observed state is loaded only when the selected task needs it.
 › Computers
     Inventory, distribute, restore or shut down client computers
   Installation
-    Configure the lab, prepare netboot and guide computer installation
+    Configure the lab and install computers by PXE or the official USB ISO over SSH
   Software
     Review configured choices or search this lab's pinned packages
   Maintenance
@@ -158,6 +158,55 @@ NOTICE
 reboot recovery restores normal addressing.
 
 Enter Start PXE  ·  Esc Cancel  ·  F1 Help
+```
+
+## USB SSH disk review
+
+```text
+Nixorium  /  Installation  /  USB over SSH
+
+Install one computer from USB over SSH
+Logical identity:    pc01
+Physical session:   192.168.1.141 · SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Installed address:  10.42.0.11 on enp1s0
+Disk to erase:      /dev/nvme0n1 · 137438953472 bytes
+Disk serial / WWN:  NVME-DEMO / demo-wwn
+Revision:           0123456789abcdef0123456789abcdef01234567
+System closure:     /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo
+Signed cache:       http://10.42.0.99:5000
+Host-key rotation:  false
+
+Type exactly
+  ERASE /dev/nvme0n1 FOR pc01
+> _
+
+NOTICE
+× This permanently erases only the reviewed disk
+  Type the exact confirmation below. The worker rechecks identity, cache, revision and disk before mutation.
+
+Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
+```
+
+## USB SSH verified result
+
+```text
+Nixorium  /  Installation  /  USB over SSH
+
+Install one computer from USB over SSH
+State:               verified
+Operation ID:        0123456789abcdef0123456789abcdef
+Phase:               post-boot-verify
+Disk may be changed: true
+Installed:           true
+Reboot requested:    true
+Boot verified:       true
+Dispatch uncertain:  false
+Cleanup unconfirmed: false
+
+NOTICE
+✓ verified pc01 at 10.42.0.11 with the reviewed revision and system closure
+
+r Refresh status  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
 ```
 
 ## Shutdown with active sessions

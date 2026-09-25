@@ -93,6 +93,16 @@ func (worker *remoteWorker) handle(ctx context.Context, request domain.RemoteIns
 		}
 		response.State = "ready"
 		response.Message = "remote installation worker protocol is ready"
+		worker.mutex.Lock()
+		if worker.operationID != "" {
+			if session, err := worker.state.Load(worker.operationID); err == nil {
+				response.OperationID = worker.operationID
+				response.State = session.State
+				response.Session = &session
+				response.Message = "remote installation worker owns an existing operation"
+			}
+		}
+		worker.mutex.Unlock()
 	case domain.RemoteInstallBootstrapOperation:
 		return worker.handleBootstrap(ctx, request, secret)
 	case domain.RemoteInstallPrepareOperation:

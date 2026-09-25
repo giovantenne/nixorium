@@ -235,7 +235,7 @@ func ensureRemoteInstallWorker(ctx context.Context) error {
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		response, err := remoteInstallRequest(ctx, domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation})
-		if err == nil && response.State == "ready" {
+		if err == nil && (response.State == "ready" || response.OperationID != "") {
 			return nil
 		}
 		if time.Now().After(deadline) {
@@ -255,6 +255,37 @@ func remoteInstallRequest(ctx context.Context, request domain.RemoteInstallReque
 		return domain.RemoteInstallResponse{}, err
 	}
 	return adapters.RemoteInstallIPCRequest(ctx, remoteInstallSocketPath, validated)
+}
+
+func dashboardRemoteInstallRequest(ctx context.Context, repository string, request domain.RemoteInstallRequest, password []byte) (domain.RemoteInstallResponse, error) {
+	if err := requireManagedRemoteInstallClient(repository); err != nil {
+		zeroSecretBytes(password)
+		return domain.RemoteInstallResponse{}, err
+	}
+	if err := ensureRemoteInstallWorker(ctx); err != nil {
+		zeroSecretBytes(password)
+		return domain.RemoteInstallResponse{}, err
+	}
+	validated, err := newRemoteInstallRequest(request)
+	if err != nil {
+		zeroSecretBytes(password)
+		return domain.RemoteInstallResponse{}, err
+	}
+	if request.Operation != domain.RemoteInstallBootstrapOperation {
+		zeroSecretBytes(password)
+		return adapters.RemoteInstallIPCRequest(ctx, remoteInstallSocketPath, validated)
+	}
+	secret, err := adapters.NewLivePassword(password)
+	if err != nil {
+		return domain.RemoteInstallResponse{}, err
+	}
+	return adapters.RemoteInstallIPCSecretRequest(ctx, remoteInstallSocketPath, validated, secret)
+}
+
+func zeroSecretBytes(value []byte) {
+	for index := range value {
+		value[index] = 0
+	}
 }
 
 func newRemoteInstallRequest(request domain.RemoteInstallRequest) (domain.RemoteInstallRequest, error) {
