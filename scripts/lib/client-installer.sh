@@ -107,7 +107,7 @@ nixorium_disk_has_holders() {
     for holder in "/sys/class/block/$child/holders/"*; do
       [[ -e "$holder" ]] && return 0
     done
-  done < <(lsblk -lnro KNAME -- "$1")
+  done < <(lsblk -nro KNAME -- "$1")
   kname=$(nixorium_disk_kname "$1") || return 0
   [[ -n "$kname" ]] || return 0
   return 1
@@ -199,7 +199,7 @@ nixorium_require_unique_target_labels() {
 }
 
 nixorium_verify_installed_profile() {
-  local expected_system=$1 selected_disk=$2 install_root=${3:-/mnt} profile root_source root_parent
+  local expected_system=$1 selected_disk=$2 install_root=${3:-/mnt} profile root_source root_device root_parent
   profile=$(readlink -f "$install_root/nix/var/nix/profiles/system" 2>/dev/null || true)
   [[ "$profile" == "$expected_system" ]] || {
     echo "installed profile does not match the reviewed system" >&2
@@ -210,7 +210,8 @@ nixorium_verify_installed_profile() {
     echo "installed root mount is unavailable" >&2
     return 1
   }
-  root_parent=$(lsblk -snpo PATH,TYPE -- "$root_source" | awk '$2 == "disk" { print $1; exit }')
+  root_device=${root_source%%\[*}
+  root_parent=$(lsblk -snpo PATH,TYPE -- "$root_device" | awk '$2 == "disk" { print $1; exit }')
   [[ "$root_parent" == "$selected_disk" ]] || {
     echo "installed root is not backed by the reviewed disk" >&2
     return 1

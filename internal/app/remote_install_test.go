@@ -132,6 +132,42 @@ func TestRemoteInstallPlanBindsVerifiedPreparation(t *testing.T) {
 	}
 }
 
+func TestRemoteInstallReservedPlanAndApplyReuseWorkerReservation(t *testing.T) {
+	preparation, source := remoteTestPreparation()
+	source.active = true
+	manager := NewRemoteInstallManager(source)
+	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
+	plan := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+	if plan.HasErrors() {
+		t.Fatalf("owned reservation blocked its own plan: %#v", plan)
+	}
+	report := manager.ApplyReserved(context.Background(), plan, plan.ReviewToken)
+	if report.HasErrors() || source.reservedToken != "" || source.reservation != nil {
+		t.Fatalf("reserved apply acquired a second reservation: report=%#v source=%#v", report, source)
+	}
+}
+
+func TestRemoteInstallPlanRequiresExplicitKnownHostRotation(t *testing.T) {
+	preparation, source := remoteTestPreparation()
+	preparation.KnownHostConflict = true
+	manager := NewRemoteInstallManager(source)
+	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
+
+	blocked := manager.PlanReserved(context.Background(), preparation, "/dev/sda")
+	if !blocked.HasErrors() || len(blocked.Issues) == 0 || blocked.Issues[0].Field != "hostKeyRotation" {
+		t.Fatalf("known-host conflict did not require separate review: %#v", blocked)
+	}
+	plan := manager.PlanReservedWithHostKeyRotation(context.Background(), preparation, "/dev/sda", true)
+	if plan.HasErrors() || !plan.HostKeyRotation || !plan.Plan.HostKeyRotation {
+		t.Fatalf("explicitly reviewed known-host rotation was not bound to the plan: %#v", plan)
+	}
+	changed := plan
+	changed.HostKeyRotation = false
+	if domain.RemoteInstallReviewToken(changed) == plan.ReviewToken {
+		t.Fatal("host-key rotation display state was not bound to the review token")
+	}
+}
+
 func TestRemoteInstallPlanRejectsUnsafeStateWithoutMutation(t *testing.T) {
 	tests := map[string]func(*domain.RemoteInstallPreparation, *fakeRemoteInstallSource){
 		"active":    func(_ *domain.RemoteInstallPreparation, source *fakeRemoteInstallSource) { source.active = true },

@@ -68,6 +68,25 @@ func (bootstrap LiveBootstrap) CloseSession(ctx context.Context, session Verifie
 	return err
 }
 
+func (bootstrap LiveBootstrap) DiscardLocalSession(session VerifiedLiveSession) error {
+	if !remoteStateID(session.OperationID) {
+		return errors.New("live session cleanup identity is invalid")
+	}
+	directory := filepath.Join(bootstrap.runtimeRoot, session.OperationID)
+	for _, path := range []string{session.PrivateKeyPath, session.KnownHostsPath, filepath.Join(directory, "installed_known_hosts")} {
+		if path == "" || filepath.Dir(path) != directory {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if err := os.Remove(directory); err != nil {
+		return fmt.Errorf("remove resolved live session runtime: %w", err)
+	}
+	return nil
+}
+
 func NewLivePassword(value []byte) (*LivePassword, error) {
 	if len(value) == 0 || len(value) > 1024 || bytes.IndexByte(value, 0) >= 0 {
 		return nil, errors.New("live password must contain between 1 and 1024 non-NUL bytes")

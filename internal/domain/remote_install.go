@@ -109,6 +109,7 @@ type RemoteInstallPlan struct {
 	Disk               RemoteDisk         `json:"disk"`
 	AdminPublicKey     string             `json:"adminPublicKey"`
 	HostKeyPublic      string             `json:"hostKeyPublic"`
+	HostKeyRotation    bool               `json:"hostKeyRotation"`
 }
 
 type RemoteInstallPreparation struct {
@@ -124,6 +125,7 @@ type RemoteInstallPreparation struct {
 	AdminPublicKey     string                    `json:"adminPublicKey"`
 	HostKeyPublic      string                    `json:"hostKeyPublic"`
 	HostFingerprint    string                    `json:"hostFingerprint"`
+	KnownHostConflict  bool                      `json:"knownHostConflict"`
 	Facts              RemoteMachineFacts        `json:"facts"`
 	PreparedAt         time.Time                 `json:"preparedAt"`
 	Issues             []ValidationIssue         `json:"issues"`
@@ -131,25 +133,26 @@ type RemoteInstallPreparation struct {
 }
 
 type RemoteInstallPlanReport struct {
-	SchemaVersion int                      `json:"schemaVersion"`
-	Operation     string                   `json:"operation"`
-	State         string                   `json:"state"`
-	Repository    string                   `json:"repository"`
-	Method        RemoteInstallMethod      `json:"method"`
-	OperationID   string                   `json:"operationId"`
-	Host          RemoteInstallHost        `json:"host"`
-	Disk          RemoteDisk               `json:"disk"`
-	Revision      string                   `json:"revision"`
-	BundlePath    string                   `json:"bundlePath"`
-	SystemPath    string                   `json:"systemPath"`
-	CacheURL      string                   `json:"cacheUrl"`
-	ExpiresAt     time.Time                `json:"expiresAt,omitempty"`
-	ReviewToken   string                   `json:"reviewToken,omitempty"`
-	Confirmation  string                   `json:"confirmation,omitempty"`
-	Message       string                   `json:"message,omitempty"`
-	Issues        []ValidationIssue        `json:"issues"`
-	Plan          RemoteInstallPlan        `json:"-"`
-	Preparation   RemoteInstallPreparation `json:"-"`
+	SchemaVersion   int                      `json:"schemaVersion"`
+	Operation       string                   `json:"operation"`
+	State           string                   `json:"state"`
+	Repository      string                   `json:"repository"`
+	Method          RemoteInstallMethod      `json:"method"`
+	OperationID     string                   `json:"operationId"`
+	Host            RemoteInstallHost        `json:"host"`
+	Disk            RemoteDisk               `json:"disk"`
+	Revision        string                   `json:"revision"`
+	BundlePath      string                   `json:"bundlePath"`
+	SystemPath      string                   `json:"systemPath"`
+	CacheURL        string                   `json:"cacheUrl"`
+	HostKeyRotation bool                     `json:"hostKeyRotation"`
+	ExpiresAt       time.Time                `json:"expiresAt,omitempty"`
+	ReviewToken     string                   `json:"reviewToken,omitempty"`
+	Confirmation    string                   `json:"confirmation,omitempty"`
+	Message         string                   `json:"message,omitempty"`
+	Issues          []ValidationIssue        `json:"issues"`
+	Plan            RemoteInstallPlan        `json:"-"`
+	Preparation     RemoteInstallPreparation `json:"-"`
 }
 
 func (r RemoteInstallPlanReport) HasErrors() bool {
@@ -218,12 +221,16 @@ func (r RemoteInstallExecutionReport) HasErrors() bool {
 type RemoteInstallSession struct {
 	SchemaVersion     int                           `json:"schemaVersion"`
 	OperationID       string                        `json:"operationId"`
+	LogID             string                        `json:"logId,omitempty"`
 	State             string                        `json:"state"`
 	Plan              RemoteInstallPlan             `json:"plan"`
 	Preparation       *RemoteInstallPreparation     `json:"preparation,omitempty"`
 	ReviewTokenDigest string                        `json:"reviewTokenDigest,omitempty"`
+	ReviewExpiresAt   time.Time                     `json:"reviewExpiresAt,omitempty"`
 	TokenConsumed     bool                          `json:"tokenConsumed"`
 	DispatchUncertain bool                          `json:"dispatchUncertain"`
+	RebootRequested   bool                          `json:"rebootRequested"`
+	BootVerified      bool                          `json:"bootVerified"`
 	Receipt           *RemoteInstallReceipt         `json:"receipt,omitempty"`
 	Events            []RemoteInstallProgress       `json:"events"`
 	Bootstrap         *RemoteInstallBootstrapRecord `json:"bootstrap,omitempty"`
@@ -304,6 +311,21 @@ func DecodeRemoteInstallReceipt(data []byte) (RemoteInstallReceipt, error) {
 	}
 	if receipt.DiskMayBeModified != receipt.MutationStarted {
 		return receipt, errors.New("remote installation receipt has inconsistent disk risk")
+	}
+	validState := map[string]bool{"unknown": true, "accepted": true, "running": true, "failed": true, "ready-to-reboot": true, "reboot-requested": true}
+	validPhase := map[RemoteInstallPhase]bool{
+		RemoteInstallPhasePreflight: true, RemoteInstallPhaseRevalidate: true, RemoteInstallPhasePartition: true,
+		RemoteInstallPhaseInstall: true, RemoteInstallPhaseVerify: true, RemoteInstallPhaseReadyToReboot: true,
+		RemoteInstallPhaseReboot: true, RemoteInstallPhaseReconciliationRequired: true,
+	}
+	if !validState[receipt.State] || !validPhase[receipt.Phase] || len(receipt.Message) > 4096 {
+		return receipt, errors.New("remote installation receipt state is invalid")
+	}
+	if receipt.Installed && !receipt.MutationStarted {
+		return receipt, errors.New("installed receipt must report disk mutation")
+	}
+	if receipt.State == "ready-to-reboot" && (!receipt.Installed || receipt.Phase != RemoteInstallPhaseReadyToReboot) {
+		return receipt, errors.New("ready-to-reboot receipt is inconsistent")
 	}
 	return receipt, nil
 }
@@ -427,16 +449,22 @@ func ValidateRemoteInstallPreparation(preparation RemoteInstallPreparation) erro
 
 func RemoteInstallReviewToken(report RemoteInstallPlanReport) string {
 	bound := struct {
-		Repository  string
-		Method      RemoteInstallMethod
-		OperationID string
-		Plan        RemoteInstallPlan
-		BundlePath  string
-		ExpiresAt   time.Time
-	}{report.Repository, report.Method, report.OperationID, report.Plan, report.BundlePath, report.ExpiresAt.UTC()}
+		Repository      string
+		Method          RemoteInstallMethod
+		OperationID     string
+		Plan            RemoteInstallPlan
+		BundlePath      string
+		HostKeyRotation bool
+		ExpiresAt       time.Time
+	}{report.Repository, report.Method, report.OperationID, report.Plan, report.BundlePath, report.HostKeyRotation, report.ExpiresAt.UTC()}
 	content, _ := json.Marshal(bound)
 	digest := sha256.Sum256(content)
 	return "sha256:" + hex.EncodeToString(digest[:])
+}
+
+func RemoteInstallTokenDigest(token string) string {
+	digest := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(digest[:])
 }
 
 func decodeRemoteJSON(data []byte, maximum int, destination any) error {

@@ -22,6 +22,7 @@ const (
 )
 
 var deploymentLogName = regexp.MustCompile(`^deploy-(\d{8}T\d{6}\.\d{9}Z)-(\d+)\.log$`)
+var remoteInstallLogName = regexp.MustCompile(`^usb-install-([0-9a-f]{32})\.log$`)
 
 func (Local) OperationLogs(limit int) ([]domain.OperationLogEntry, error) {
 	if limit < 1 || limit > 1000 {
@@ -53,6 +54,11 @@ func (Local) OperationLogs(limit int) ([]domain.OperationLogEntry, error) {
 			parsed, ok := parseOperationLogName(entry.Name())
 			if !ok {
 				continue
+			}
+			if parsed.StartedAt.IsZero() {
+				if info, infoErr := entry.Info(); infoErr == nil {
+					parsed.StartedAt = info.ModTime().UTC()
+				}
 			}
 			matched++
 			if matched > maximumOperationLogScan {
@@ -123,14 +129,17 @@ func (Local) OperationLog(id string, maximumBytes int64) (domain.OperationLogRep
 
 func parseOperationLogName(name string) (domain.OperationLogEntry, bool) {
 	match := deploymentLogName.FindStringSubmatch(name)
-	if match == nil {
-		return domain.OperationLogEntry{}, false
+	if match != nil {
+		startedAt, err := time.Parse(operationLogTimestampLayout, match[1])
+		if err != nil {
+			return domain.OperationLogEntry{}, false
+		}
+		return domain.OperationLogEntry{ID: name, Kind: "deployment", StartedAt: startedAt.UTC(), State: "unknown"}, true
 	}
-	startedAt, err := time.Parse(operationLogTimestampLayout, match[1])
-	if err != nil {
-		return domain.OperationLogEntry{}, false
+	if remoteInstallLogName.MatchString(name) {
+		return domain.OperationLogEntry{ID: name, Kind: "usb-install", State: "unknown"}, true
 	}
-	return domain.OperationLogEntry{ID: name, Kind: "deployment", StartedAt: startedAt.UTC(), State: "unknown"}, true
+	return domain.OperationLogEntry{}, false
 }
 
 func sortOperationLogs(logs []domain.OperationLogEntry) {

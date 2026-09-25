@@ -38,6 +38,7 @@ type RemoteInstallPreparer struct {
 	stateRoot           string
 	installedPrivateKey string
 	installedPublicKey  string
+	knownHostsPath      string
 	now                 func() time.Time
 	interfaceAddresses  func(string) ([]string, error)
 	httpClient          *http.Client
@@ -54,6 +55,7 @@ func NewRemoteInstallPreparer(repository, stateRoot string) (*RemoteInstallPrepa
 		repository: repository, stateRoot: stateRoot,
 		installedPrivateKey: "/home/admin/.ssh/id_ed25519",
 		installedPublicKey:  "/home/admin/.ssh/id_ed25519.pub",
+		knownHostsPath:      "/home/admin/.ssh/known_hosts",
 		now:                 time.Now,
 		interfaceAddresses:  (Local{}).InterfaceAddresses,
 		httpClient: &http.Client{
@@ -79,6 +81,35 @@ func (preparer *RemoteInstallPreparer) Prepare(ctx context.Context, operationID,
 		return domain.RemoteInstallPreparation{}, err
 	}
 	return preparer.prepare(ctx, operationID, hostName, session, connection)
+}
+
+func (preparer *RemoteInstallPreparer) Discard(operationID string) error {
+	if !remoteStateID(operationID) {
+		return errors.New("remote preparation operation ID is invalid")
+	}
+	base := filepath.Join(preparer.stateRoot, "roots")
+	if err := ensurePrivateOwnedDirectory(base); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	target := filepath.Join(base, operationID)
+	if err := ensurePrivateOwnedDirectory(target); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if err := os.RemoveAll(target); err != nil {
+		return fmt.Errorf("remove remote preparation GC roots: %w", err)
+	}
+	directory, err := os.Open(base)
+	if err == nil {
+		err = directory.Sync()
+		_ = directory.Close()
+	}
+	return err
 }
 
 func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID, hostName string, session VerifiedLiveSession, connection remotePreparationSSH) (result domain.RemoteInstallPreparation, resultErr error) {
@@ -125,6 +156,10 @@ func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID,
 	cachePublicKey, err := preparer.readPublicKey(filepath.Join(preparer.repository, "keys", "cache-public-key"))
 	if err != nil {
 		return result, fmt.Errorf("read deployment cache public key: %w", err)
+	}
+	knownHostConflict, err := KnownHostConflict(preparer.knownHostsPath, host.IP, session.HostPublicKey)
+	if err != nil {
+		return result, fmt.Errorf("inspect existing static known-host entry: %w", err)
 	}
 
 	rootsDirectory, err := preparer.createRootsDirectory(operationID)
@@ -201,7 +236,8 @@ func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID,
 		BundlePath: bundlePath, BundleClosureBytes: bundleBytes, SystemPath: systemPath, SystemClosureBytes: systemBytes,
 		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: host.Interface, LiveIP: session.Address, StaticIP: host.IP},
 		Cache: cache, AdminPublicKey: adminPublicKey, HostKeyPublic: session.HostPublicKey,
-		HostFingerprint: session.HostFingerprint, Facts: facts, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
+		HostFingerprint: session.HostFingerprint, KnownHostConflict: knownHostConflict,
+		Facts: facts, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
 		Endpoints: []domain.RemoteInstallerEndpoint{{Address: session.Address, Port: session.Port, Fingerprint: session.HostFingerprint}},
 	}
 	if err := domain.ValidateRemoteInstallPreparation(result); err != nil {

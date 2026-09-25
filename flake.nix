@@ -85,6 +85,22 @@
           };
         } pkgs;
       });
+      remoteInstallerDeploymentRevision = "0123456789abcdef0123456789abcdef01234567";
+      remoteInstallerTestLab = mkLab {
+        deploymentSelf = self;
+        deploymentRevision = remoteInstallerDeploymentRevision;
+        labConfig = import ./lab-config.nix;
+        publicKeys = {
+          cache = ./tests/fixtures/remote-vm-cache-public-key;
+          ssh = ./tests/fixtures/remote-vm-admin.pub;
+        };
+        hostModules.pc01 = [ ./tests/client-installer-instrumentation.nix ];
+      };
+      remoteClientInstallerVmTest = pkgs.testers.runNixOSTest (import ./tests/remote-client-installer-vm.nix {
+        remoteInstallerBundle = remoteInstallerTestLab.packages.${system}.remoteInstallerBundle;
+        clientSystem = remoteInstallerTestLab.nixosConfigurations.pc01.config.system.build.toplevel;
+        deploymentRevision = remoteInstallerDeploymentRevision;
+      });
     in
     defaultLab // {
       lib = {
@@ -135,6 +151,7 @@
           touch "$out"
         '';
         client-installer-vm = clientInstallerVmTest;
+        remote-client-installer-vm = remoteClientInstallerVmTest;
         management-vm = managementVmTest;
       };
       templates.site = {

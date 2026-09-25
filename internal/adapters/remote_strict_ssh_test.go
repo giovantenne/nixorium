@@ -92,6 +92,34 @@ func TestStrictLiveSSHValidatesPlanBeforeTransfer(t *testing.T) {
 	}
 }
 
+func TestStrictLiveSSHDispatchesPlanOnStdinAndDecodesAcknowledgement(t *testing.T) {
+	connection := strictLiveSSHFixture(t)
+	plan := validRemoteReservationPlan()
+	bundle := "/nix/store/11111111111111111111111111111111-remote-installer"
+	directory := t.TempDir()
+	stdinPath := filepath.Join(directory, "stdin")
+	executable := filepath.Join(directory, "ssh")
+	receipt := `{"schemaVersion":1,"operationId":"0123456789abcdef0123456789abcdef","state":"accepted","phase":"preflight","sequence":1,"mutationStarted":false,"diskMayBeModified":false,"installed":false,"message":"accepted"}`
+	script := "#!/bin/sh\ncat >\"$NIXORIUM_TEST_STDIN\"\nprintf '%s\\n' '" + receipt + "'\n"
+	if err := os.WriteFile(executable, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	connection.sshExecutable = executable
+	t.Setenv("NIXORIUM_TEST_STDIN", stdinPath)
+	acknowledgement, err := connection.Dispatch(context.Background(), bundle, plan)
+	if err != nil || acknowledgement.State != "accepted" || acknowledgement.Sequence != 1 {
+		t.Fatalf("acknowledgement=%+v error=%v", acknowledgement, err)
+	}
+	content, err := os.ReadFile(stdinPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := domain.DecodeRemoteInstallPlan(content)
+	if err != nil || decoded.OperationID != plan.OperationID {
+		t.Fatalf("dispatched plan=%+v error=%v", decoded, err)
+	}
+}
+
 func strictLiveSSHFixture(t *testing.T) *StrictLiveSSH {
 	t.Helper()
 	directory := t.TempDir()

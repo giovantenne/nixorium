@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,70 @@ import (
 	"syscall"
 	"time"
 )
+
+func PublishRemoteOperationLog(operationID string, content []byte, result string) (string, error) {
+	if !remoteStateID(operationID) || len(content) > 1024*1024 {
+		return "", errors.New("remote operation log identity or size is invalid")
+	}
+	switch result {
+	case "completed", "failed", "partial", "blocked":
+	default:
+		return "", errors.New("remote operation log result is invalid")
+	}
+	stateRoot, err := userStateRoot()
+	if err != nil {
+		return "", err
+	}
+	productDirectory := filepath.Join(stateRoot, "nixorium")
+	operationsDirectory := filepath.Join(productDirectory, "operations")
+	for _, directory := range []string{stateRoot, productDirectory, operationsDirectory} {
+		if err := os.Mkdir(directory, 0700); err != nil && !os.IsExist(err) {
+			return "", err
+		}
+		if err := requirePrivateDirectory(directory); err != nil {
+			return "", err
+		}
+	}
+	name := "usb-install-" + operationID + ".log"
+	path := filepath.Join(operationsDirectory, name)
+	descriptor, err := syscall.Open(path, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_EXCL|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
+	if errors.Is(err, syscall.EEXIST) {
+		existingDescriptor, openErr := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+		if openErr != nil {
+			return "", fmt.Errorf("inspect existing remote operation log: %w", openErr)
+		}
+		existing := os.NewFile(uintptr(existingDescriptor), path)
+		defer existing.Close()
+		var stat syscall.Stat_t
+		if err := syscall.Fstat(existingDescriptor, &stat); err != nil {
+			return "", fmt.Errorf("inspect existing remote operation log: %w", err)
+		}
+		if stat.Mode&syscall.S_IFMT != syscall.S_IFREG || stat.Mode&0777 != 0600 || stat.Uid != uint32(os.Geteuid()) {
+			return "", errors.New("existing remote operation log is unsafe")
+		}
+		return name, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	file := os.NewFile(uintptr(descriptor), path)
+	defer file.Close()
+	sanitized := []byte(sanitizeOperationLog(content))
+	var output bytes.Buffer
+	fmt.Fprintf(&output, "Operation: USB SSH client installation\nID: %s\n", operationID)
+	output.Write(sanitized)
+	if output.Len() > 0 && output.Bytes()[output.Len()-1] != '\n' {
+		output.WriteByte('\n')
+	}
+	fmt.Fprintf(&output, "Result: %s\n", result)
+	if _, err := file.Write(output.Bytes()); err != nil {
+		return "", err
+	}
+	if err := file.Sync(); err != nil {
+		return "", err
+	}
+	return name, nil
+}
 
 type DeploymentOperation struct {
 	Path         string

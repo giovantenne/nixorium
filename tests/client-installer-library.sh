@@ -17,7 +17,7 @@ mock_lsblk() {
     "-dnro WWN -- /dev/sdz") echo WWN-1 ;;
     "-dnro MODEL -- /dev/sdz") echo "Fixture Disk" ;;
     "-dnro TRAN -- /dev/sdz") echo sata ;;
-    "-lnro KNAME -- /dev/sdz") echo sdz ;;
+    "-nro KNAME -- /dev/sdz") echo sdz ;;
     "-snpo PATH,TYPE -- /dev/sdz2") printf '%s\n' "/dev/sdz2 part" "/dev/sdz disk" ;;
     *) echo "unexpected lsblk arguments: $*" >&2; return 99 ;;
   esac
@@ -63,7 +63,7 @@ test_exact_profile_and_parent_are_required() (
   mkdir -p "$expected" "$fixture/root/nix/var/nix/profiles" "$fixture/root/boot/EFI/NixOS-boot"
   ln -s "$expected" "$fixture/root/nix/var/nix/profiles/system"
   touch "$fixture/root/boot/EFI/NixOS-boot/grubx64.efi"
-  findmnt() { echo /dev/sdz2; }
+  findmnt() { echo '/dev/sdz2[/@root]'; }
   lsblk() { mock_lsblk "$@"; }
   sync() { :; }
   nixorium_verify_installed_profile "$expected" /dev/sdz "$fixture/root"

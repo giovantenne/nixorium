@@ -671,6 +671,8 @@ in
 
     systemd.tmpfiles.rules = [
       "d /home/admin/.ssh 0700 admin users -"
+      "f /home/admin/.ssh/known_hosts 0600 admin users -"
+      "f /home/admin/.ssh/.nixorium-known-hosts.lock 0600 admin users -"
       "d /etc/veyon/keys/private/teacher 0750 root veyon-master -"
       "d /var/lib/nixorium/keys 0700 root root -"
       "d /var/cache/nixorium/admin 0700 admin users -"
@@ -678,6 +680,10 @@ in
       "f /var/lib/nixorium/coordination/operation.lock 0660 root nixorium-operations -"
       "d /var/lib/nixorium/remote-install 0700 admin users -"
       "d /var/lib/nixorium/remote-install/logs 0700 admin users -"
+      "d /home/admin/.local 0700 admin users -"
+      "d /home/admin/.local/state 0700 admin users -"
+      "d /home/admin/.local/state/nixorium 0700 admin users -"
+      "d /home/admin/.local/state/nixorium/operations 0700 admin users -"
     ];
 
     systemd.services.nixorium-install-secrets = {
@@ -831,7 +837,10 @@ in
         StateDirectoryMode = "0700";
         CacheDirectory = "nixorium/admin";
         CacheDirectoryMode = "0700";
-        Environment = "XDG_CACHE_HOME=/var/cache/nixorium/admin";
+        Environment = [
+          "XDG_CACHE_HOME=/var/cache/nixorium/admin"
+          "XDG_STATE_HOME=/home/admin/.local/state"
+        ];
         PrivateTmp = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
@@ -840,6 +849,9 @@ in
           "/run/nixorium/remote-install"
           "/var/lib/nixorium/remote-install"
           "/var/lib/nixorium/coordination"
+          "-/home/admin/.ssh/known_hosts"
+          "-/home/admin/.ssh/.nixorium-known-hosts.lock"
+          "-/home/admin/.local/state/nixorium/operations"
           "-/var/cache/nixorium/admin"
         ];
         NoNewPrivileges = true;
