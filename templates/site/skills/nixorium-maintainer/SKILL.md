@@ -34,7 +34,8 @@ in ordinary language, especially student-home resets and controller networking.
   [software](references/software.md).
 - Student-home defaults, VS Code extensions, dock/background, or npm content:
   [student home](references/student-home.md).
-- Validation, controller/client application, PXE, diagnostics, or framework updates:
+- Validation, controller/client application, PXE or USB/SSH installation,
+  diagnostics, or framework updates:
   [operations](references/operations.md).
 
 Read only the references needed for the request. Keep installed behavior

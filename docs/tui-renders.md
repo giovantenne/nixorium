@@ -37,7 +37,7 @@ Selecting **Installation → Install computers** opens the complete Laboratory
 settings form directly, reusing the controller's existing time zone and
 keyboard rather than asking for them again. `Esc` returns to the overview.
 Completing the form validates and saves it without a second review screen, then
-shows one continuous progress view:
+shows the common prerequisite progress before method selection:
 
 ```text
 Nixorium  /  Installation  /  Install computers
@@ -48,8 +48,7 @@ Install computers
   ✓ Save configuration
   ✓ Controller keys
   ● Activate controller
-  ○ Prepare clients
-  ○ Start PXE
+  ○ Choose installation method
 
 ⣾ Building and activating the laboratory controller  elapsed 1m12s
 
@@ -58,10 +57,13 @@ l progress details  •  F1 help
 
 Missing controller keys are generated, verified, saved, and installed
 automatically. Importing an existing key is deliberately outside this ordinary
-flow under **Maintenance → Change settings → Advanced keys**.
+flow under **Maintenance → Change settings → Advanced keys**. The next screen
+offers **Network boot (PXE)** for one or many clients and **USB over SSH** for
+one physically identified client. Choosing USB does not prepare every PXE
+closure or change controller networking.
 
-After every configured client closure and the immutable netboot artifacts are
-prepared, the flow stops at its only confirmation:
+On the PXE branch, after every configured client closure and the immutable
+netboot artifacts are prepared, the flow stops at its network confirmation:
 
 ```text
 Nixorium  /  Installation  /  Install computers
@@ -85,6 +87,36 @@ computer may boot the installer; identity selection and destructive disk
 confirmation happen locally on that computer. Attempting to quit while PXE is
 active still requires stopping it or explicitly confirming that it should stay
 active.
+
+Choosing **USB over SSH** instead keeps PXE stopped and selects one configured
+identity on the controller. The form asks for the address and Ed25519
+fingerprint read from the physical Minimal-ISO console, then reads the temporary
+password without echo. Hardware inspection leads to a content-bound review:
+
+```text
+Nixorium  /  Installation  /  USB over SSH
+
+Install one computer from USB over SSH
+Logical identity:    pc01
+Physical session:    192.168.1.141 · SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Installed address:   10.42.0.11 on enp1s0
+Disk to erase:       /dev/nvme0n1 · 137438953472 bytes
+Revision:            0123456789abcdef0123456789abcdef01234567
+Signed cache:        http://10.42.0.99:5000
+
+Type exactly
+  ERASE /dev/nvme0n1 FOR pc01
+> _
+
+Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
+```
+
+After dispatch, leaving the view does not cancel the systemd-owned operation.
+The result retains its operation ID, reports whether the disk may have changed,
+and exposes only state-valid actions: refresh/reconcile, a separately confirmed
+reboot, installed-system verification, or close. An interrupted dispatch is
+shown as requiring reconciliation and is never offered as an automatic retry.
+The generated gallery includes the full disk-review and verified-result frames.
 
 ## Restore choice
 

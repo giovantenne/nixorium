@@ -8,6 +8,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added a reviewed USB/SSH client-installation path for systems without usable
+  UEFI network boot. It pins the official Minimal ISO's physical-console host
+  fingerprint before password use, installs an ephemeral operation key, builds
+  an exact signed-cache closure, excludes the boot medium, and requires a
+  content-bound host/disk confirmation before dispatching an independent remote
+  systemd job. Durable operation IDs support fail-closed restart reconciliation,
+  separate reboot and post-boot verification, and reviewed host-key rotation
+  without ever replaying an uncertain disk mutation. PXE, deployment, and USB
+  installation share one atomic controller coordination boundary.
 - Added GitHub Sponsors metadata and a public support link so users can fund
   project infrastructure, test hardware, documentation, and maintainer time.
 - Software now exposes **Add profile** in the ordinary TUI. It presents the

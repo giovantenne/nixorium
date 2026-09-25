@@ -78,14 +78,14 @@ configured client closure. The existing controller time zone and keyboard are
 reused rather than requested again. Importing an existing key is an advanced
 action under **Maintenance → Change settings → Advanced keys**.
 
-The same screen shows progress through configuration, controller activation,
-and client preparation. The only confirmation in this path appears immediately
-before PXE starts, because that operation temporarily removes the controller's
-static laboratory address. After confirmation, boot any configured client from
-UEFI network boot. Its text console uses the controller's configured keyboard
-layout. The downloaded installer asks for that computer's identity and confirms
-the target disk locally before erasing it. Nixorium stores no pilot/test-computer
-selection or installation-verification session.
+The same screen shows progress through configuration and controller activation,
+then offers PXE or USB over SSH. PXE prepares every configured client and asks
+for confirmation immediately before temporarily changing the controller's
+network. The downloaded installer asks for identity and confirms the disk on
+the client console. USB/SSH instead selects one configured identity on the
+controller, verifies a live Minimal ISO and its physical-console fingerprint,
+and requires a content-bound disk review before dispatching an independent
+systemd-owned install.
 
 You can press `q` at any safe point. While PXE is active, leaving it active is a
 separate exact-confirmation choice; stopping PXE restores normal controller
@@ -217,7 +217,7 @@ spinner and the current plain-language action.
 | Area | Purpose |
 |---|---|
 | **Computers** | Inspect, distribute, restore/reinstall, or shut down selected clients |
-| **Installation** | Run the continuous Install computers flow or use advanced PXE recovery controls |
+| **Installation** | Configure the lab, install through PXE or USB/SSH, and recover interrupted installation state |
 | **Software** | Review configured packages, search the pin, choose scope, and save/apply changes |
 | **Maintenance** | Change settings, update/rebuild the controller, inspect services, Git, logs, and diagnostics |
 
@@ -647,6 +647,64 @@ shows the exact client identity and disk. The installer reports partition, insta
 then offers a separately confirmed reboot. There is no unattended mode and no
 client-side fallback fetch.
 
+### Install one computer from USB over SSH
+
+Use this path when UEFI network boot is unavailable. On the selected computer,
+boot the official **NixOS 26.05 Minimal ISO** for `x86_64-linux` in UEFI mode
+with wired Ethernet. At its physical console run:
+
+```sh
+passwd
+systemctl is-active sshd
+ip -4 -br address
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+Keep that console visible. From **Installation → Install computers**, choose
+**USB over SSH**, select one configured identity, and enter the live IPv4
+address, the exact displayed Ed25519 `SHA256:` fingerprint, and the temporary
+password. Nixorium verifies the fingerprint before attempting password
+authentication, installs an operation-specific ephemeral key, probes hardware,
+and shows only eligible non-boot disks. Enter the exact disk path and the
+content-bound confirmation shown by the review. Do not remove the USB, reboot,
+or reuse the address while the install is running.
+
+The controller prepares only target-independent installer content before it
+contacts the live ISO; the target closure is then built and served by the
+signed Harmonia cache. This is different from `deploy`: installation may erase
+and partition a disk, while deployment updates an already installed system.
+The live-ISO password is accepted only from a controlling terminal and is held
+under `/run`; it is not stored in the operation record or installed system.
+
+The equivalent CLI workflow is:
+
+```sh
+nixorium install usb prepare --host pc01
+nixorium install usb start --host pc01
+nixorium install usb status --id 0123456789abcdef0123456789abcdef --json
+nixorium install usb reconcile --id 0123456789abcdef0123456789abcdef
+nixorium install usb reboot --id 0123456789abcdef0123456789abcdef
+nixorium install usb verify --id 0123456789abcdef0123456789abcdef
+nixorium install usb cancel --id 0123456789abcdef0123456789abcdef
+nixorium install usb close --id 0123456789abcdef0123456789abcdef
+```
+
+`start`, `reboot`, and `close` require an interactive controlling terminal and
+do not accept `--json`; there is no `--yes` path. `prepare` is optional and
+safe to run early. `cancel` is pre-dispatch cleanup only. After a dispatched
+install, use `status` and `reconcile`: the controller never repeats Disko or an
+uncertain reboot automatically. If the worker or controller restarted, invoke
+`start` again for the same host and physically re-enter the same address,
+fingerprint, and password. A matching live boot can be reattached for status
+reconciliation only; a different boot is blocked and the old key is revoked.
+
+On a reinstall, an expected SSH host-key difference for the configured static
+address is shown separately. Authorize `ROTATE HOST KEY` only after checking
+that the selected identity, live fingerprint, and disk are the intended
+machine. The stored key changes only after the installed host boots and passes
+post-install verification. Remove the USB when the operation says it is ready,
+then use the separately confirmed reboot and verification actions.
+
 <details>
 <summary>Complete CLI command reference</summary>
 
@@ -681,6 +739,14 @@ nix run .#nixorium -- setup apply
 nix run .#nixorium -- config validate
 nix run .#nixorium -- config plan --file candidate.json
 nix run .#nixorium -- config apply --file candidate.json --expect FINGERPRINT
+nix run .#nixorium -- install usb prepare --host pc01
+nix run .#nixorium -- install usb start --host pc01
+nix run .#nixorium -- install usb status --id 0123456789abcdef0123456789abcdef --json
+nix run .#nixorium -- install usb reconcile --id 0123456789abcdef0123456789abcdef
+nix run .#nixorium -- install usb reboot --id 0123456789abcdef0123456789abcdef
+nix run .#nixorium -- install usb verify --id 0123456789abcdef0123456789abcdef
+nix run .#nixorium -- install usb cancel --id 0123456789abcdef0123456789abcdef
+nix run .#nixorium -- install usb close --id 0123456789abcdef0123456789abcdef
 nix run .#nixorium -- pxe prepare
 nix run .#nixorium -- pxe start
 nix run .#nixorium -- pxe stop

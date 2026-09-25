@@ -89,6 +89,17 @@ Before testing, identify the switch recovery path and confirm that stopping PXE
 cannot remove ordinary DHCP service. Keep console access to the controller in
 case the laboratory interface transition interrupts SSH.
 
+### USB/SSH topology
+
+For each VirtualBox and physical family, repeat installation from the official
+NixOS 26.05 Minimal ISO for `x86_64-linux`, in UEFI mode over wired Ethernet.
+Keep the physical/local console visible so the address and Ed25519 fingerprint
+are independent evidence. Attach exactly one disposable SATA/SCSI or NVMe
+target plus the boot medium; include a multi-disk case to prove that the review
+does not infer a target. Clients must reach the controller's SSH and signed
+Harmonia endpoints but need no Internet route. PXE must remain stopped during
+this scenario.
+
 ## Baseline capture
 
 From a clean private deployment revision:
@@ -163,6 +174,39 @@ and the client reboots from disk with the chosen hostname and mounted root.
 Repeat on a different disk/NIC/firmware family for physical coverage. An
 interrupted real disk installation is not blindly retry-safe: inspect and
 reinitialize only the dedicated test disk before repeating.
+
+## Scenario 4B: reviewed USB/SSH installation and recovery
+
+Boot the supported Minimal ISO, set its temporary password, and record the live
+IPv4 address, Ed25519 fingerprint, boot ID, NIC, boot medium, and all disks from
+the local console. From the controller start USB/SSH installation for one
+configured unused identity. Exercise each refusal in a fresh disposable run:
+
+- alter one fingerprint character and prove password authentication and key
+  installation do not occur;
+- use a wrong password after the correct fingerprint and prove no operation key
+  remains;
+- make Harmonia unreachable or present a wrong cache key and prove Disko does
+  not start;
+- select the ISO boot medium, an ineligible disk, the wrong NIC, and an unknown
+  disk path;
+- interrupt the cable before apply, after apply dispatch, and after Disko has
+  reported mutation started;
+- restart the controller worker before apply and the controller after dispatch;
+- change the DHCP lease or boot a new ISO instance before attempting recovery;
+- reinstall an existing identity with a reviewed host-key rotation; and
+- repeat with two eligible target disks, SATA/SCSI-style naming, and NVMe.
+
+Pass when the physical fingerprint is checked before password use, only the
+explicitly reviewed non-boot disk can mutate, closure transfer remains signed
+and offline, PXE cannot start concurrently, and status survives the initiating
+terminal. Pre-apply cancellation must cleanly release the reservation. Once
+dispatch is uncertain, reconciliation must retain the same operation ID and
+same live boot, report disk risk, and never run Disko a second time. A new boot
+or lease/address mismatch must fail closed. Successful completion requires USB
+removal, a separately confirmed reboot, installed-host revision verification,
+ephemeral-key removal, and any approved static-address host-key rotation only
+after verification.
 
 ## Scenario 5: client visibility and single-client deployment
 
@@ -260,6 +304,7 @@ is outside this plan.
 | UEFI PXE boot / clean stop | VirtualBox / physical | NOT TESTED | |
 | Controller power-loss recovery | VirtualBox / physical | NOT TESTED | |
 | Client disk install / reboot | VirtualBox / physical | NOT TESTED | |
+| USB/SSH install / interruption / recovery | VirtualBox / physical | NOT TESTED | |
 | Client visibility / single deploy | VirtualBox / physical | NOT TESTED | |
 | Offline and changed-key diagnostics | VirtualBox / physical | NOT TESTED | |
 | Multi-client deploy / mixed-state retry | VirtualBox / physical | NOT TESTED | |

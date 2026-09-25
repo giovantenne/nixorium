@@ -13,6 +13,7 @@ development command.
 | `./scripts/validate.sh --eval` | Complete `mkLab` contract evaluation | Nix schemas, Flake API, host composition, package scopes, or module wiring changed |
 | `./scripts/validate.sh --management-vm` | Controller and management integration | Operational adapters, privileged boundaries, controller lifecycle, or end-to-end TUI/CLI flows changed |
 | `./scripts/validate.sh --client-installer-vm` | Installer integration | Enrollment, Disko installation, or installer runtime behavior changed |
+| `./scripts/validate.sh --remote-client-installer-vm` | USB/SSH live-client boundary | Remote helper, signed cache transfer, live-session identity, disk/reboot receipts, or resume semantics changed |
 | `./scripts/validate.sh --ci` | Evaluation-only source and template graph | CI and release-source evaluation |
 | `./scripts/validate.sh --full` | Complete build, VM, template, and offline-equivalence checkpoint | Before a milestone or release, and after cross-cutting changes that can affect several built roles |
 | `nix develop --file tests/source-checks.nix security-shell --command ./scripts/security-check.sh` | Pinned Go static and known-vulnerability analysis | Security-sensitive Go changes and the dedicated security workflow |
@@ -62,9 +63,12 @@ the changed state transitions. Use the management VM when behavior crosses the
 terminal, process, filesystem, network, privilege, or systemd boundary.
 
 The VM modes include the fast gate. They are intentionally not part of
-`--eval`: the management VM contains end-to-end terminal flows and the client
-installer VM exercises a real installation path, so both have materially
-higher fixed cost.
+`--eval`: the management VM contains end-to-end terminal flows, the PXE client
+installer VM exercises its local installation path, and the remote-client VM
+uses a real signed Harmonia closure across the SSH/systemd/disk boundary. All
+have materially higher fixed cost. The remote VM simulates the supported live
+ISO contract; it does not certify the official ISO, VirtualBox networking, or
+physical firmware and storage.
 
 ## Selecting the smallest sound gate
 
@@ -77,6 +81,10 @@ higher fixed cost.
   controller build.
 - Disko or client installer runtime: `--client-installer-vm` and the affected
   installer/client build.
+- USB/SSH worker/helper, credentials, signed transfer, remote Disko receipt, or
+  resume/reboot behavior: `--management-vm` for the controller side and
+  `--remote-client-installer-vm` for the remote side, plus the controller,
+  representative client, and remote-installer bundle builds.
 - Netboot, PXE firmware, assets embedded in systems, inputs, or offline bundle
   plumbing: use the complete checkpoint because several outputs must agree.
 - Release preparation: always use `--full` after the focused gates are green.
@@ -124,6 +132,10 @@ New regression tests belong at the lowest level that proves the invariant:
 3. complete `mkLab` evaluation;
 4. one targeted VM or real closure build;
 5. full release checkpoint.
+
+After the automated milestone, follow the documented VirtualBox recipe with
+the official Minimal ISO. Keep that result separate from physical-hardware
+evidence; neither is replaced by a simulated NixOS VM pass.
 
 Do not move a test upward merely because a higher level can exercise it. When a
 new integration scenario requires fixed sleeps or a full desktop closure,

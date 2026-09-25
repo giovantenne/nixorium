@@ -108,6 +108,79 @@ only the public-key change, then `nixorium setup install-secrets`. A public/
 private mismatch or a different installed secret fails closed; do not overwrite
 either side until its provenance is understood.
 
+## A USB/SSH live client cannot be verified
+
+Use only the official NixOS 26.05 Minimal ISO for `x86_64-linux`, booted in
+UEFI mode with wired Ethernet. Keep its physical console visible and recheck:
+
+```sh
+passwd
+systemctl is-active sshd
+ip -4 -br address
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+Enter the canonical address and the complete Ed25519 `SHA256:` fingerprint
+shown there. Do not copy a fingerprint from DNS, an earlier boot, or
+`known_hosts`. A mismatch is rejected before password authentication and no
+operation key is installed. A correct fingerprint with a wrong temporary
+password also leaves no operation key. Correct the console value and start a
+fresh reviewed attempt; do not disable host-key checking or enable persistent
+root password access.
+
+If the address cannot be reached, confirm the live ISO and controller are on
+the same routed wired segment and that the address is not the controller or a
+configured static client address. USB/SSH does not need PXE, ProxyDHCP, or a
+controller address transition, but it still needs access to controller SSH and
+the signed Harmonia cache. Do not bridge an isolated trial onto an institutional
+LAN as a troubleshooting shortcut.
+
+## USB installation refuses the disk or cache
+
+The hardware probe excludes the live ISO's boot medium, read-only/removable
+media, mounted/active disks, and unsuitable devices. Compare the reviewed
+canonical path, model, serial, size, and boot-medium evidence with `lsblk` on
+the physical console. Do not detach the boot medium or alter mounts to force a
+disk into the eligible list; reboot the supported ISO with only the intended
+disposable target attached.
+
+An unreachable cache, wrong signing key, missing target closure, changed
+network interface, or changed deployment revision is a hard refusal before
+Disko. Check `nixorium services`, `nixorium doctor`, and the operation status;
+repair the cache through its managed workflow, then make a fresh plan. Never
+add a public substituter or set signature checking/fallback to false on the
+client.
+
+## A USB installation was interrupted
+
+First inspect the exact operation without starting another install:
+
+```sh
+nixorium install usb status --id 0123456789abcdef0123456789abcdef --json
+nixorium install usb reconcile --id 0123456789abcdef0123456789abcdef
+```
+
+If apply may have been dispatched, assume the selected disk may be partially
+partitioned. Reconciliation reads the remote receipt and service state; it does
+not rerun Disko. After a worker/controller restart, run `install usb start` for
+the same host and physically re-enter the same live address, fingerprint, and
+password. Nixorium reattaches only when the live boot ID also matches, then
+performs status reconciliation only. A different boot remains blocked and the
+recovered operation key is revoked.
+
+Use `cancel` only before apply. Use `reboot` only after status reports the
+installation ready, remove the USB first, and verify the installed revision
+after disk boot. `close` releases a completed or deliberately abandoned record;
+it does not make an uncertain disk safe. If the live ISO is gone or the receipt
+cannot prove completion, inspect/reinitialize only the explicitly dedicated
+target under a new destructive review.
+
+For a reinstall, a different key at the configured static address is expected
+only after proving the old machine is the selected physical client. Approve
+`ROTATE HOST KEY` during the review; Nixorium replaces just that entry after
+the newly installed host passes verification. Never delete the entire
+`known_hosts` file or accept a changed key merely because the address matches.
+
 ## One client is offline or unknown
 
 Run `nixorium hosts`. `unreachable` means the bounded network probe received no
@@ -214,6 +287,7 @@ Update never commits, pushes, activates, starts PXE, or deploys clients.
 | PXE preparation | Publishes a new manifest only after success and retains the prior valid one on failure. |
 | PXE start/stop | Start rolls back synchronous failure; durable session state enables explicit and boot recovery. |
 | Client disk install | Destructive after exact disk/host confirmation; inspect the disk before retrying after interruption. |
+| USB/SSH live install | Pre-apply cancel is safe; post-dispatch state is reconciled by operation ID and exact live boot, never replayed automatically. |
 | Client deployment | May leave mixed generations; inspect logs/hosts and retry a fresh convergent plan. |
 | Upstream update | Plan is read-only; apply rolls back when possible and reports an unsafe partial pair explicitly. |
 
