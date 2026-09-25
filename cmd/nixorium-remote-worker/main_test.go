@@ -291,6 +291,10 @@ func TestRemoteWorkerRecoveryWithoutRuntimeCredentialFailsClosed(t *testing.T) {
 	if worker.reservation == nil || worker.liveSession != nil || stored.State != "reconciliation-required" {
 		t.Fatalf("worker=%+v stored=%+v", worker, stored)
 	}
+	blockedCancel := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: operationID}, nil)
+	if blockedCancel.State != "reconciliation-required" || worker.reservation == nil {
+		t.Fatalf("unverified recovery cancellation=%+v worker=%+v", blockedCancel, worker)
+	}
 	bootstrap := worker.bootstrap.(*fakeWorkerBootstrap)
 	bootstrap.err = nil
 	bootstrap.session = live
@@ -299,8 +303,12 @@ func TestRemoteWorkerRecoveryWithoutRuntimeCredentialFailsClosed(t *testing.T) {
 		Operation: domain.RemoteInstallBootstrapOperation, Host: "pc01", Address: "192.0.2.20",
 		Fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 	}, secret)
-	if response.State != "recovery-attached" || worker.liveSession == nil || state.sessions[operationID].State != "reconciliation-required" {
+	if response.State != "recovery-attached" || worker.liveSession == nil || state.sessions[operationID].State != "bootstrapped" {
 		t.Fatalf("recovery bootstrap response=%+v worker=%+v", response, worker)
+	}
+	cancelled := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: operationID}, nil)
+	if cancelled.State != "cancelled" || !bootstrap.closed || !worker.reservations.(*fakeWorkerReservations).reservation.released || worker.operationID != "" {
+		t.Fatalf("verified recovery cancellation=%+v worker=%+v", cancelled, worker)
 	}
 }
 

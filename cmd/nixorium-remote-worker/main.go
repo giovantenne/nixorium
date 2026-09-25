@@ -905,9 +905,19 @@ func (worker *remoteWorker) handleRecoveryBootstrapLocked(ctx context.Context, r
 		Host: request.Host, Address: request.Address, HostPublicKey: liveSession.HostPublicKey,
 		HostFingerprint: liveSession.HostFingerprint, AuthorizedKeyLine: liveSession.PublicKeyLine, Facts: liveSession.Facts,
 	}
+	preApplyRecovery := !session.TokenConsumed && !session.DispatchUncertain && session.Receipt == nil
+	if preApplyRecovery {
+		session.State = "bootstrapped"
+		if session.Artifacts != nil {
+			session.State = "bootstrapped-artifacts"
+		}
+		if session.Preparation != nil {
+			session.State = "prepared"
+		}
+	}
 	session.Events = append(session.Events, domain.RemoteInstallProgress{
 		Phase:  domain.RemoteInstallPhaseReconciliationRequired,
-		Detail: "restored private live-session access after a physical re-pin; only status reconciliation is authorized",
+		Detail: "restored private live-session access after a physical re-pin",
 	})
 	if err := worker.state.Save(session); err != nil {
 		_ = worker.bootstrap.CloseSession(ctx, liveSession)
@@ -918,6 +928,9 @@ func (worker *remoteWorker) handleRecoveryBootstrapLocked(ctx context.Context, r
 	response.State = "recovery-attached"
 	response.Session = &session
 	response.Message = "live recovery access restored for status reconciliation; apply remains consumed and cannot be replayed"
+	if preApplyRecovery {
+		response.Message = "live recovery access restored; the verified pre-apply session may be cancelled or reviewed again"
+	}
 	return response
 }
 
