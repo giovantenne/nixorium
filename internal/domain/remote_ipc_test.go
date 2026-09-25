@@ -5,6 +5,20 @@ import (
 	"testing"
 )
 
+func TestRemoteBootstrapRequiresExplicitSuccess(t *testing.T) {
+	for _, state := range []string{"bootstrapped", "bootstrapped-artifacts", "artifacts-ready", "blocked", "reconciliation-required", "recovery-attached", "ready", "", "future-state"} {
+		response := RemoteInstallResponse{State: state, OperationID: "0123456789abcdef0123456789abcdef"}
+		want := state == "bootstrapped" || state == "bootstrapped-artifacts"
+		if response.BootstrapVerified() != want {
+			t.Fatalf("state %q bootstrap success=%t, want %t", state, response.BootstrapVerified(), want)
+		}
+		response.OperationID = ""
+		if response.BootstrapVerified() {
+			t.Fatalf("state %q accepted without operation identity", state)
+		}
+	}
+}
+
 func TestDecodeRemoteInstallRequestIsStrictAndBounded(t *testing.T) {
 	valid := `{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"prepare","operationId":"abcdefabcdefabcdefabcdefabcdefab","host":"pc01"}`
 	request, err := DecodeRemoteInstallRequest([]byte(valid))

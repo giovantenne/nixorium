@@ -51,6 +51,13 @@ type RemoteInstallResponse struct {
 	Execution     *RemoteInstallExecutionReport `json:"execution,omitempty"`
 }
 
+// BootstrapVerified is an explicit success gate, not the absence of a failure
+// state: artifacts-ready can also be returned after an unsuccessful bootstrap.
+func (response RemoteInstallResponse) BootstrapVerified() bool {
+	return remoteOperationIDPattern.MatchString(response.OperationID) &&
+		(response.State == "bootstrapped" || response.State == "bootstrapped-artifacts")
+}
+
 func DecodeRemoteInstallRequest(data []byte) (RemoteInstallRequest, error) {
 	var request RemoteInstallRequest
 	if err := decodeRemoteJSON(data, RemoteInstallPlanMaxBytes, &request); err != nil {

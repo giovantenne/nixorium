@@ -210,6 +210,10 @@ Release from the matching changelog section.
   observation. Never replay apply or reboot after uncertain dispatch. Recovery
   may reattach only to the exact host, address, fingerprint, and live boot ID;
   a verified pre-apply reattachment must remain safely cancellable.
+  CLI/TUI finalization requires explicit successful live bootstrap, never just
+  a non-failure state: artifacts-ready can accompany a connection error. Keep
+  that error visible across TUI status refreshes and require fresh physical
+  key confirmation before a connection retry with the reserved artifacts.
   A confirmed remote failure with no disk mutation must revoke the live key
   and release the controller reservation automatically, with safe cancellation
   retained as a cleanup fallback; uncertain or post-mutation failures remain

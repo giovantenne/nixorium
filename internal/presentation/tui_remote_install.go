@@ -219,6 +219,9 @@ func (model dashboardModel) remoteInstallView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: sanitizeRemoteInstallText(model.message)})
 	}
+	if remote.bootstrapError != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Live connection failed", detail: remote.bootstrapError})
+	}
 	return model.renderShell(tuiShell{path: []string{"Installation", "USB over SSH"}, body: strings.Join(lines, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
 }
 
@@ -303,6 +306,9 @@ func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 	response := model.installation.remote.response
 	state := response.State
 	actions := []tuiAction{{key: "r", label: "Refresh status"}}
+	if remoteInstallCanConnect(response) {
+		actions = append(actions, tuiAction{key: "a", label: "Connect live client"})
+	}
 	if state == "ready-to-reboot" {
 		actions = append(actions, tuiAction{key: "b", label: "Reboot"}, tuiAction{key: "c", label: "Close without reboot"})
 	}
@@ -330,6 +336,14 @@ func remoteInstallSafelyCancellable(response domain.RemoteInstallResponse) bool 
 	receipt := response.Session.Receipt
 	return receipt.OperationID == response.OperationID && receipt.State == "failed" &&
 		!receipt.MutationStarted && !receipt.DiskMayBeModified && !receipt.Installed
+}
+
+func remoteInstallCanConnect(response domain.RemoteInstallResponse) bool {
+	session := response.Session
+	return response.State == "artifacts-ready" && session != nil &&
+		session.OperationID == response.OperationID && session.State == "artifacts-ready" &&
+		session.Artifacts != nil && session.Bootstrap == nil &&
+		!session.TokenConsumed && !session.DispatchUncertain
 }
 
 func remoteInstallResponseFailed(response domain.RemoteInstallResponse) bool {
@@ -517,6 +531,18 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 				return model.remoteInstallCommand("reconcile", domain.RemoteInstallRequest{Operation: domain.RemoteInstallReconcileOperation, OperationID: remote.operationID})
 			}
 		case "a":
+			if remoteInstallCanConnect(remote.response) {
+				remote.host = remote.response.Session.Artifacts.HostName
+				remote.address = ""
+				remote.fingerprint = ""
+				remote.password = ""
+				remote.confirmation = ""
+				remote.formField = 0
+				remote.recovery = false
+				remote.stage = remoteInstallConsole
+				model.message = ""
+				return model, nil
+			}
 			if remote.response.State == "reconciliation-required" && remote.response.Session != nil && remote.response.Session.Bootstrap != nil {
 				remote.host = remote.response.Session.Bootstrap.Host
 				remote.address = ""
@@ -677,6 +703,9 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 			return model, nil
 		}
 		if message.response.OperationID != "" && message.response.Session != nil {
+			if remote.operationID != message.response.OperationID {
+				remote.bootstrapError = ""
+			}
 			remote.operationID = message.response.OperationID
 			remote.response = message.response
 			remote.stage = remoteInstallResult
@@ -686,6 +715,9 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		return model, nil
 	}
 	if message.err != nil {
+		if message.action == "bootstrap" {
+			remote.bootstrapError = sanitizeRemoteInstallText(message.err.Error())
+		}
 		remote.stage = remoteInstallResult
 		remote.response = domain.RemoteInstallResponse{OperationID: remote.operationID, State: "failed", Message: sanitizeRemoteInstallText(message.err.Error())}
 		model.message = ""
@@ -693,7 +725,31 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 	}
 	remote.response = message.response
 	if message.response.OperationID != "" {
+		if remote.operationID != message.response.OperationID {
+			remote.bootstrapError = ""
+		}
 		remote.operationID = message.response.OperationID
+	}
+	if message.action == "bootstrap" {
+		if message.response.BootstrapVerified() || message.response.State == "recovery-attached" {
+			remote.bootstrapError = ""
+		} else {
+			remote.bootstrapError = sanitizeRemoteInstallText(message.response.Message)
+			if remote.bootstrapError == "" {
+				remote.bootstrapError = "The worker did not confirm a verified live session."
+			}
+			remote.stage = remoteInstallResult
+			model.message = ""
+			// Older workers omit Session on a failed bootstrap. Return to
+			// physical verification directly; do not infer finalization success.
+			if message.response.State == "artifacts-ready" {
+				remote.stage = remoteInstallConsole
+				remote.formField = 0
+				remote.fingerprint = ""
+				remote.confirmation = ""
+			}
+			return model, nil
+		}
 	}
 	if remoteInstallResponseFailed(message.response) {
 		remote.stage = remoteInstallResult
@@ -737,6 +793,7 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 	case "cancel":
 		remote.stage = remoteInstallResult
 		if message.response.State == "cancelled" {
+			remote.bootstrapError = ""
 			model.message = "Cancellation and pre-apply cleanup were confirmed."
 		}
 	}

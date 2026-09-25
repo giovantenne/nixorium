@@ -99,7 +99,7 @@ func runUSBInstallStart(ctx context.Context, host string, stdout, stderr io.Writ
 		})
 		return renderRemoteInstallResponse(reconciled, reconcileErr, false, stdout, stderr)
 	}
-	if remoteInstallResponseFailed(bootstrap) || bootstrap.OperationID == "" {
+	if !bootstrap.BootstrapVerified() {
 		return 1
 	}
 	prepared, err := remoteInstallRequest(ctx, domain.RemoteInstallRequest{

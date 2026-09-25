@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -12,6 +13,134 @@ import (
 )
 
 const remoteTUITestOperationID = "0123456789abcdef0123456789abcdef"
+
+func TestUSBInstallFailedBootstrapDoesNotFinalizeOrLoseErrorOnRefresh(t *testing.T) {
+	for _, state := range []string{"artifacts-ready", "blocked", "reconciliation-required", "future-state", "transport-error"} {
+		t.Run(state, func(t *testing.T) {
+			const failure = "SSH authentication rejected"
+			requests := 0
+			response := domain.RemoteInstallResponse{State: state, OperationID: remoteTUITestOperationID, Message: failure}
+			model := dashboardModel{
+				screen: dashboardUSBInstall,
+				installation: installationModel{remote: remoteInstallationModel{
+					stage: remoteInstallPassword, host: "pc01", operationID: remoteTUITestOperationID,
+					address: "192.0.2.20", fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					password: "temporary-secret", formField: 2,
+				}},
+				actions: DashboardActions{
+					BootstrapRemoteInstall: func(_, _, _ string, _ []byte) (domain.RemoteInstallResponse, error) {
+						if state == "transport-error" {
+							return domain.RemoteInstallResponse{}, errors.New(failure)
+						}
+						return response, nil
+					},
+					RemoteInstallRequest: func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+						requests++
+						return domain.RemoteInstallResponse{}, nil
+					},
+				},
+			}
+			updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			model = updated.(dashboardModel)
+			if command == nil {
+				t.Fatal("password submission did not dispatch bootstrap")
+			}
+			updated, command = model.Update(command())
+			model = updated.(dashboardModel)
+			if command != nil || requests != 0 || model.busy != "" || model.installation.remote.password != "" {
+				t.Fatal("failed bootstrap continued finalization or retained the password")
+			}
+			if !strings.Contains(model.View().Content, failure) {
+				t.Fatal("bootstrap failure was hidden")
+			}
+			if state == "artifacts-ready" && (model.installation.remote.stage != remoteInstallConsole || model.installation.remote.fingerprint != "" || model.installation.remote.formField != 0) {
+				t.Fatal("retry did not require physical host-key verification again")
+			}
+			// A later status response must not erase the last action's error.
+			status := domain.RemoteInstallResponse{
+				State: "artifacts-ready", OperationID: remoteTUITestOperationID, Message: "remote installation state loaded",
+				Session: &domain.RemoteInstallSession{
+					State: "artifacts-ready", OperationID: remoteTUITestOperationID,
+					Artifacts: &domain.RemoteInstallArtifacts{HostName: "pc01"},
+				},
+			}
+			updated, command = model.Update(dashboardRemoteInstallMsg{action: "status", response: status})
+			model = updated.(dashboardModel)
+			view := model.View().Content
+			if command != nil || !strings.Contains(view, failure) || !strings.Contains(view, "Connect live client") || !strings.Contains(view, "Cancel safely") {
+				t.Fatalf("status erased the error or omitted recovery actions:\n%s", view)
+			}
+			updated, command = model.Update(tea.KeyPressMsg{Text: "a"})
+			model = updated.(dashboardModel)
+			remote := model.installation.remote
+			if command != nil || remote.stage != remoteInstallConsole || remote.host != "pc01" || remote.address != "" || remote.fingerprint != "" || remote.password != "" || remote.recovery {
+				t.Fatal("reconnect did not reset physical verification inputs")
+			}
+			// Only an explicitly successful new bootstrap permits finalization.
+			updated, command = model.Update(dashboardRemoteInstallMsg{action: "bootstrap", response: remoteTUITestPreparedResponse("bootstrapped-artifacts")})
+			model = updated.(dashboardModel)
+			if command == nil || model.installation.remote.bootstrapError != "" {
+				t.Fatal("successful retry did not clear the error and permit finalization")
+			}
+			command()
+			if requests != 1 {
+				t.Fatalf("finalization requests=%d, want 1", requests)
+			}
+		})
+	}
+}
+
+func TestUSBInstallReconnectRequiresUnconsumedArtifacts(t *testing.T) {
+	for _, state := range []string{"prepared", "accepted", "failed", "reconciliation-required", "artifacts-ready"} {
+		response := domain.RemoteInstallResponse{
+			State: state, OperationID: remoteTUITestOperationID,
+			Session: &domain.RemoteInstallSession{State: state, OperationID: remoteTUITestOperationID, Artifacts: &domain.RemoteInstallArtifacts{HostName: "pc01"}},
+		}
+		if remoteInstallCanConnect(response) != (state == "artifacts-ready") {
+			t.Fatalf("unexpected reconnect eligibility for %s", state)
+		}
+		response.Session.TokenConsumed = true
+		if remoteInstallCanConnect(response) {
+			t.Fatal("consumed operation offered a fresh connection")
+		}
+		response.Session.TokenConsumed = false
+		response.Session.DispatchUncertain = true
+		if remoteInstallCanConnect(response) {
+			t.Fatal("uncertain operation offered a fresh connection")
+		}
+	}
+}
+
+func TestUSBInstallBootstrapFailureFitsSupportedLayouts(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		for _, stage := range []remoteInstallationStage{remoteInstallConsole, remoteInstallResult} {
+			model := dashboardModel{
+				width: size[0], height: size[1], isDark: size[0] != 120, screen: dashboardUSBInstall,
+				installation: installationModel{remote: remoteInstallationModel{
+					stage: stage, operationID: remoteTUITestOperationID, host: "pc01",
+					bootstrapError: "SSH authentication rejected",
+					response: domain.RemoteInstallResponse{
+						State: "artifacts-ready", OperationID: remoteTUITestOperationID,
+						Session: &domain.RemoteInstallSession{
+							State: "artifacts-ready", OperationID: remoteTUITestOperationID,
+							Artifacts: &domain.RemoteInstallArtifacts{HostName: "pc01"},
+						},
+					},
+				}},
+			}
+			view := model.View().Content
+			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+				t.Fatalf("bootstrap failure overflows %dx%d", size[0], size[1])
+			}
+			if !strings.Contains(view, "SSH authentication rejected") || !strings.Contains(view, "Cancel safely") {
+				t.Fatalf("bootstrap failure lost error or cancellation at %dx%d:\n%s", size[0], size[1], view)
+			}
+			if stage == remoteInstallResult && !strings.Contains(view, "Connect live client") {
+				t.Fatalf("bootstrap failure lost reconnect action at %dx%d:\n%s", size[0], size[1], view)
+			}
+		}
+	}
+}
 
 func remoteTUITestPreparation() domain.RemoteInstallPreparation {
 	return domain.RemoteInstallPreparation{
