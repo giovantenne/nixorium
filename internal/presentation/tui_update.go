@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/list"
@@ -269,6 +270,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = ""
 		model.screen = dashboardHosts
 		return model, nil
+	case dashboardDeploymentUSBMsg:
+		return model.handleDeploymentUSBMessage(message)
 	case dashboardDeploymentPlanMsg:
 		model.busy = ""
 		model.deployment.plan = message.report
@@ -289,6 +292,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.deployment.result = message.report
 		model.message = message.report.Message
 		model.screen = dashboardDeploy
+		if message.report.HasErrors() && message.report.Phase == domain.DeploymentPhasePreflight &&
+			!message.report.BuildCompleted && !message.report.ApplyCompleted && model.actions.LoadRemoteInstall != nil {
+			names := make([]string, 0, len(message.report.Targets))
+			for _, target := range message.report.Targets {
+				names = append(names, target.Name)
+			}
+			if len(names) > 0 {
+				return model.checkDeploymentUSB(strings.Join(names, ","), true)
+			}
+		}
 		return model, nil
 	case dashboardDeploymentProgressMsg:
 		if !model.deployment.applying || model.deployment.events == nil {

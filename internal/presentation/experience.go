@@ -214,6 +214,13 @@ func (model dashboardModel) helpView() string {
 	case dashboardHosts:
 		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail   i diagnostics", "d review a deployment for the focused computer", "Search owns all text keys until Enter or Esc.")
 	case dashboardDeploy:
+		if model.deployment.usbRecovery != nil {
+			lines = append(lines, "Enter runs the visible recovery action; it never starts deployment.",
+				"For an installed computer awaiting its final check: turn it on, boot from its disk, and connect the network cable.",
+				"r checks installation status again; d shows technical details; i opens the existing installation when available.",
+				"Esc keeps your selection. Successful recovery creates a fresh review requiring DEPLOY again.")
+			break
+		}
 		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l progress details; q cannot interrupt", "After result: l logs   r new review   Enter overview")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		lines = append(lines, "Space select   a select/deselect all   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state.")

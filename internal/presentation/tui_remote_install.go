@@ -321,7 +321,11 @@ func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 	if remoteInstallSafelyCancellable(response) {
 		actions = append(actions, tuiAction{key: "x", label: "Cancel safely"})
 	}
-	actions = append(actions, tuiAction{key: "Esc", label: "Detach"}, tuiAction{key: "F1", label: "Help"})
+	back := "Detach"
+	if model.installation.remote.returnToDeployment {
+		back = "Deployment"
+	}
+	actions = append(actions, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
 	return actions
 }
 
@@ -516,6 +520,10 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 	case remoteInstallResult:
 		switch key.String() {
 		case "esc", "left":
+			if remote.returnToDeployment && model.deployment.usbRecovery != nil {
+				remote.returnToDeployment = false
+				return model.checkDeploymentUSB(model.deployment.usbRecovery.requested, false)
+			}
 			model.screen = dashboardInstallationArea
 			model.installation.flow = false
 			model.message = "Remote installation remains available by its operation ID."

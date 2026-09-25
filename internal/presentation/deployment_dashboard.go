@@ -110,6 +110,9 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 }
 
 func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.deployment.usbRecovery != nil {
+		return model.updateDeploymentUSBRecovery(key)
+	}
 	deployment, intent := model.deployment.update(model.screen, key, model.report.Meta.Clients.Hosts, model.computers.restoreMode)
 	model.deployment = deployment
 	if intent.message != "" {
@@ -125,14 +128,13 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 			model.computers.restoreMode = false
 		}
 	case deploymentPlanIntent:
-		if model.actions.PlanDeployment == nil {
-			model.message = "Deployment planning is not available in this deployment."
-			return model, nil
+		if model.actions.LoadRemoteInstall != nil {
+			// Keep exactly the selected identities if the inventory changes
+			// while an unfinished installation is being recovered.
+			requested := strings.Join(selectedDeploymentTargetNames(model.report.Meta.Clients.Hosts, model.deployment.chosen), ",")
+			return model.checkDeploymentUSB(requested, false)
 		}
-		model.busy = "Validating revision and selected computers"
-		model.message = ""
-		requested := intent.requested
-		return model, func() tea.Msg { return dashboardDeploymentPlanMsg{report: model.actions.PlanDeployment(requested)} }
+		return model.planSelectedDeployment(intent.requested)
 	case deploymentApplyIntent:
 		if model.actions.ApplyDeployment == nil {
 			model.deployment.applying = false

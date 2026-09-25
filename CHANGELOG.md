@@ -80,6 +80,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Client deployment now checks for unfinished USB installations before review.
+  An installed computer awaiting its final check offers verification and a
+  return to a fresh deployment review, preserving the selected computers.
+  Failed verification offers retry, connection guidance, and technical details;
+  active or uncertain installations open their existing recovery flow. A USB
+  reservation appearing after review also leads to this guided recovery.
 - Controller rebuilds register the reviewed system in the persistent NixOS
   system profile before activation and verify it afterward. The activated
   generation now participates in boot configuration, rollback history, and

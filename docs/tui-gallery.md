@@ -107,7 +107,7 @@ Nixorium  /  Computers  /  Distribute
 
 Distribute the system?
 
-Affects  @lab · 5 computer(s)
+Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 

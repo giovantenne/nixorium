@@ -47,7 +47,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range main.Frames {
 		joined += frame.Text
 	}
-	for _, expected := range []string{"all clients, including future clients", "Affects  @lab · 5 computer(s)", "Reviewed revision  " + bundle.SourceCommit, "Authenticated: 5/5", "Deployment completed and verified"} {
+	for _, expected := range []string{"all clients, including future clients", "Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)", "Reviewed revision  " + bundle.SourceCommit, "Authenticated: 5/5", "Deployment completed and verified"} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("main demo omits %q", expected)
 		}

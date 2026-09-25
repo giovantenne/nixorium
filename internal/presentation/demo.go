@@ -187,7 +187,7 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 	r.model.deployment.context = "Opened from a saved software change. Review deploys the complete current configuration."
 	r.capture("Open contextual client selection", 1800)
 	r.model.deployment.context = ""
-	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.command(r.command(r.key(demoCode(tea.KeyEnter))))
 	r.capture("Review deployment to all five current clients", 2100)
 	r.typeAndCapture("DEPLOY", "Type the one-word deployment confirmation")
 	deployCommand := r.key(demoCode(tea.KeyEnter))
