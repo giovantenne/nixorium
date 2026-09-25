@@ -123,6 +123,8 @@ type deploymentModel struct {
 	started      time.Time
 	events       <-chan tea.Msg
 	confirmation string
+	usbRecovery  *deploymentUSBRecovery
+	usbRequestID uint64
 }
 
 // controllerModel is the shared activation boundary used after settings,
@@ -228,20 +230,21 @@ const (
 )
 
 type remoteInstallationModel struct {
-	stage          remoteInstallationStage
-	hostCursor     int
-	host           string
-	operationID    string
-	address        string
-	fingerprint    string
-	password       string
-	formField      int
-	diskCursor     int
-	confirmation   string
-	recovery       bool
-	bootstrapError string
-	response       domain.RemoteInstallResponse
-	plan           domain.RemoteInstallPlanReport
+	returnToDeployment bool
+	stage              remoteInstallationStage
+	hostCursor         int
+	host               string
+	operationID        string
+	address            string
+	fingerprint        string
+	password           string
+	formField          int
+	diskCursor         int
+	confirmation       string
+	recovery           bool
+	bootstrapError     string
+	response           domain.RemoteInstallResponse
+	plan               domain.RemoteInstallPlanReport
 }
 
 // computersModel owns inventory, filtering, detail and restore navigation.
@@ -2057,6 +2060,9 @@ func (model dashboardModel) deployView() string {
 		path = []string{"Computers", "Restore", "Reapply"}
 	}
 	shell := tuiShell{path: path}
+	if model.deployment.usbRecovery != nil {
+		return model.deploymentUSBRecoveryView(shell)
+	}
 	if model.deployment.applying {
 		elapsed := time.Since(model.deployment.started).Truncate(time.Second)
 		if elapsed < 0 {

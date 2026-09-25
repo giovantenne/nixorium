@@ -81,7 +81,12 @@ journal survive closing the dashboard. Keep `setup apply` for first-run
 compatibility, not as a replacement for routine reviewed controller plans.
 
 The TUI's client distribution task invokes the same plan/apply
-operations. Select the intended computers, review the resolved revision and
+operations. Before review it checks for an unfinished USB installation. The
+guided recovery can verify a completed installation or open its existing
+recovery screen. It preserves selected identities, never clears an uncertain
+reservation, and returns to fresh planning and confirmation after recovery.
+The same recovery is offered when a USB reservation appears after review.
+Select the intended computers, review the resolved revision and
 targets, and enter the exact phrase shown. Do not close the controller terminal
 until the final result, authenticated/recorded counts, and log path appear.
 

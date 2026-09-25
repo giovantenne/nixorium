@@ -213,6 +213,17 @@ only after proving the old machine is the selected physical client. Approve
 the newly installed host passes verification. Never delete the entire
 `known_hosts` file or accept a changed key merely because the address matches.
 
+If **Computers → Distribute** finds an unfinished USB installation, it opens
+**Finish installation** before asking you to confirm deployment. For an
+installed computer awaiting its final check, choose **Verify … and resume**.
+Turn on that computer, boot from the installed disk, and check its network
+cable. Failed verification keeps the operation protected and offers retry and
+technical details. Active or uncertain installations offer **Open installation**
+instead; return with Esc after resolving the existing operation. Do not start
+a replacement installation to clear this block. Successful recovery returns to
+a fresh deployment review with the same selected computers and requires a new
+deployment confirmation. It never starts deployment automatically.
+
 Controller rebuild may proceed while a completed USB installation still awaits
 reboot or verification, even if the client is offline. The controller validates
 the persisted disk-completion receipt, pauses the worker without deleting its
