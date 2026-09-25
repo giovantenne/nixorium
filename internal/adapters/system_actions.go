@@ -18,6 +18,7 @@ func (Local) ControlSystemUnit(ctx context.Context, verb, unit string) error {
 		"nixorium-install-secrets.service":  {"start": true},
 		"nixorium-apply-controller.service": {"start": true},
 		"nixorium-prepare-pxe.service":      {"start": true},
+		"nixorium-remote-install.service":   {"start": true},
 		"nixorium-pxe.service":              {"start": true, "stop": true},
 		"nixorium-pxe-network.service":      {"stop": true},
 		"nixorium-pxe-recover.service":      {"start": true},

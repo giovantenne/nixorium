@@ -505,6 +505,8 @@
     controller.succeed("mkdir -p /home/admin/nixorium-deployment")
     controller.succeed("cp -a /tmp/deployment/. /home/admin/nixorium-deployment/")
     controller.succeed("chown -R admin:users /home/admin/nixorium-deployment")
+    controller.succeed("su - admin -c 'cd /home/admin/nixorium-deployment && nixorium install usb status --id 0123456789abcdef0123456789abcdef --json' >/tmp/usb-status.json || test $? = 1; jq -e '.operationId == \"0123456789abcdef0123456789abcdef\" and .state == \"unavailable\"' /tmp/usb-status.json")
+    controller.fail("cd /home/admin/nixorium-deployment && nixorium install usb status --id 0123456789abcdef0123456789abcdef --json")
     controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '192.0.2.10/24'; ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'")
     controller.succeed("su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json > /tmp/pxe-prepare-failed.json' || test $? = 1")
     controller.succeed("jq -e '.operation == \"pxe-prepare\" and .state == \"failed\" and .unit == \"nixorium-prepare-pxe.service\"' /tmp/pxe-prepare-failed.json")

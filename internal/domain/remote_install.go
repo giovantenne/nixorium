@@ -96,6 +96,27 @@ type RemoteInstallCache struct {
 	PublicKey string `json:"publicKey"`
 }
 
+// RemoteInstallArtifacts is the target-independent, GC-rooted preparation
+// produced before a live installer is connected. It intentionally contains no
+// observed endpoint, disk inventory, host key, or review decision.
+type RemoteInstallArtifacts struct {
+	SchemaVersion      int               `json:"schemaVersion"`
+	OperationID        string            `json:"operationId"`
+	Repository         string            `json:"repository"`
+	DeploymentRevision string            `json:"deploymentRevision"`
+	BundlePath         string            `json:"bundlePath"`
+	BundleClosureBytes uint64            `json:"bundleClosureBytes"`
+	SystemPath         string            `json:"systemPath"`
+	SystemClosureBytes uint64            `json:"systemClosureBytes"`
+	HostName           string            `json:"hostName"`
+	HostInterface      string            `json:"hostInterface"`
+	HostStaticIP       string            `json:"hostStaticIp"`
+	CachePublicKey     string            `json:"cachePublicKey"`
+	AdminPublicKey     string            `json:"adminPublicKey"`
+	PreparedAt         time.Time         `json:"preparedAt"`
+	Issues             []ValidationIssue `json:"issues"`
+}
+
 // RemoteInstallPlan is the exact non-secret payload consumed by the immutable
 // remote helper. Passwords and private keys intentionally have no field here.
 type RemoteInstallPlan struct {
@@ -224,6 +245,7 @@ type RemoteInstallSession struct {
 	LogID             string                        `json:"logId,omitempty"`
 	State             string                        `json:"state"`
 	Plan              RemoteInstallPlan             `json:"plan"`
+	Artifacts         *RemoteInstallArtifacts       `json:"artifacts,omitempty"`
 	Preparation       *RemoteInstallPreparation     `json:"preparation,omitempty"`
 	ReviewTokenDigest string                        `json:"reviewTokenDigest,omitempty"`
 	ReviewExpiresAt   time.Time                     `json:"reviewExpiresAt,omitempty"`
@@ -357,6 +379,35 @@ func ValidateRemoteInstallPlan(plan RemoteInstallPlan) error {
 	}
 	if !remotePublicKeyPattern.MatchString(plan.AdminPublicKey) || !remotePublicKeyPattern.MatchString(plan.HostKeyPublic) {
 		return errors.New("remote installation requires canonical Ed25519 public keys")
+	}
+	return nil
+}
+
+func ValidateRemoteInstallArtifacts(artifacts RemoteInstallArtifacts) error {
+	if artifacts.SchemaVersion != RemoteInstallSchemaVersion || !remoteOperationIDPattern.MatchString(artifacts.OperationID) {
+		return errors.New("remote installation artifact identity is invalid")
+	}
+	if !filepath.IsAbs(artifacts.Repository) || filepath.Clean(artifacts.Repository) != artifacts.Repository {
+		return errors.New("remote installation artifact repository is not canonical")
+	}
+	if !gitRevisionPattern.MatchString(artifacts.DeploymentRevision) {
+		return errors.New("remote installation artifact revision is invalid")
+	}
+	if !validStorePath(artifacts.BundlePath) || !validStorePath(artifacts.SystemPath) ||
+		!strings.Contains(artifacts.SystemPath, "-nixos-system-"+artifacts.HostName+"-") {
+		return errors.New("remote installation artifact store paths are invalid")
+	}
+	if artifacts.BundleClosureBytes == 0 || artifacts.SystemClosureBytes == 0 || artifacts.PreparedAt.IsZero() {
+		return errors.New("remote installation artifact measurements are incomplete")
+	}
+	if !remoteHostPattern.MatchString(artifacts.HostName) || !remoteInterfacePattern.MatchString(artifacts.HostInterface) || validateRemoteIPv4(artifacts.HostStaticIP) != nil {
+		return errors.New("remote installation artifact host is invalid")
+	}
+	if !remoteCacheKeyPattern.MatchString(artifacts.CachePublicKey) || !remotePublicKeyPattern.MatchString(artifacts.AdminPublicKey) {
+		return errors.New("remote installation artifact public keys are invalid")
+	}
+	if len(artifacts.Issues) != 0 {
+		return errors.New("remote installation artifacts contain unresolved issues")
 	}
 	return nil
 }

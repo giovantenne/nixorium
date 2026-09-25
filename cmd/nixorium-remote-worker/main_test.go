@@ -70,13 +70,20 @@ type fakeWorkerReservations struct {
 
 type fakeWorkerPreparer struct {
 	preparation domain.RemoteInstallPreparation
+	artifacts   domain.RemoteInstallArtifacts
 	err         error
 	discarded   bool
 }
 
-func (preparer *fakeWorkerPreparer) Prepare(_ context.Context, operationID, host string, live adapters.VerifiedLiveSession) (domain.RemoteInstallPreparation, error) {
-	preparer.preparation.OperationID = operationID
-	preparer.preparation.Host.Name = host
+func (preparer *fakeWorkerPreparer) PrepareArtifacts(_ context.Context, operationID, host string) (domain.RemoteInstallArtifacts, error) {
+	preparer.artifacts.OperationID = operationID
+	preparer.artifacts.HostName = host
+	return preparer.artifacts, preparer.err
+}
+
+func (preparer *fakeWorkerPreparer) Finalize(_ context.Context, artifacts domain.RemoteInstallArtifacts, live adapters.VerifiedLiveSession) (domain.RemoteInstallPreparation, error) {
+	preparer.preparation.OperationID = artifacts.OperationID
+	preparer.preparation.Host.Name = artifacts.HostName
 	preparer.preparation.Host.LiveIP = live.Address
 	return preparer.preparation, preparer.err
 }
@@ -150,7 +157,7 @@ func TestRemoteWorkerPreparationPersistsNonSecretVerifiedFacts(t *testing.T) {
 	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{}}
 	bootstrap := &fakeWorkerBootstrap{session: validWorkerLiveSession()}
 	reservations := &fakeWorkerReservations{}
-	preparer := &fakeWorkerPreparer{preparation: validWorkerPreparation()}
+	preparer := &fakeWorkerPreparer{artifacts: validWorkerArtifacts(), preparation: validWorkerPreparation()}
 	worker := &remoteWorker{state: state, bootstrap: bootstrap, preparer: preparer, reservations: reservations}
 	secret, _ := adapters.NewLivePassword([]byte("temporary-secret"))
 	bootstrapResponse := worker.handle(context.Background(), domain.RemoteInstallRequest{
@@ -170,6 +177,31 @@ func TestRemoteWorkerPreparationPersistsNonSecretVerifiedFacts(t *testing.T) {
 	cancel := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: bootstrapResponse.OperationID}, nil)
 	if cancel.State != "cancelled" || !bootstrap.closed || !preparer.discarded || !reservations.reservation.released {
 		t.Fatalf("prepared cancel=%+v", cancel)
+	}
+}
+
+func TestRemoteWorkerPreparesArtifactsBeforeTargetAndReusesThem(t *testing.T) {
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{}}
+	bootstrap := &fakeWorkerBootstrap{session: validWorkerLiveSession()}
+	reservations := &fakeWorkerReservations{}
+	preparer := &fakeWorkerPreparer{artifacts: validWorkerArtifacts(), preparation: validWorkerPreparation()}
+	worker := &remoteWorker{state: state, bootstrap: bootstrap, preparer: preparer, reservations: reservations}
+
+	prepared := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallPrepareOperation, Host: "pc01"}, nil)
+	if prepared.State != "artifacts-ready" || prepared.OperationID == "" || prepared.Session == nil || prepared.Session.Artifacts == nil || prepared.Session.Bootstrap != nil {
+		t.Fatalf("artifact preparation=%+v", prepared)
+	}
+	secret, _ := adapters.NewLivePassword([]byte("temporary-secret"))
+	bootstrapped := worker.handle(context.Background(), domain.RemoteInstallRequest{
+		Operation: domain.RemoteInstallBootstrapOperation, Host: "pc01", Address: "192.0.2.20",
+		Fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	}, secret)
+	if bootstrapped.OperationID != prepared.OperationID || bootstrapped.State != "bootstrapped-artifacts" || bootstrapped.Session.Artifacts == nil {
+		t.Fatalf("prepared artifacts were not reused: prepared=%+v bootstrap=%+v", prepared, bootstrapped)
+	}
+	cancelled := worker.handle(context.Background(), domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: prepared.OperationID}, nil)
+	if cancelled.State != "cancelled" || !preparer.discarded || !bootstrap.closed || !reservations.reservation.released {
+		t.Fatalf("prepared session cleanup=%+v", cancelled)
 	}
 }
 
@@ -197,5 +229,16 @@ func validWorkerPreparation() domain.RemoteInstallPreparation {
 		HostFingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", Facts: validWorkerLiveSession().Facts,
 		PreparedAt: time.Unix(1, 0).UTC(), Issues: []domain.ValidationIssue{},
 		Endpoints: []domain.RemoteInstallerEndpoint{{Address: "192.0.2.20", Port: 22, Fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},
+	}
+}
+
+func validWorkerArtifacts() domain.RemoteInstallArtifacts {
+	return domain.RemoteInstallArtifacts{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, Repository: "/home/admin/nixorium-deployment",
+		DeploymentRevision: "0123456789abcdef0123456789abcdef01234567",
+		BundlePath:         "/nix/store/11111111111111111111111111111111-remote-installer", BundleClosureBytes: 1024,
+		SystemPath: "/nix/store/22222222222222222222222222222222-nixos-system-pc01-test", SystemClosureBytes: 2048,
+		HostInterface: "enp0s2", HostStaticIP: "192.0.2.101", CachePublicKey: "cache.example:YWJjZA==",
+		AdminPublicKey: "ssh-ed25519 YWJjZA== admin@test", PreparedAt: time.Unix(1, 0).UTC(), Issues: []domain.ValidationIssue{},
 	}
 }

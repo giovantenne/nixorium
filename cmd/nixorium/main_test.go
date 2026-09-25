@@ -335,6 +335,54 @@ func TestParseArgumentsAcceptsHosts(t *testing.T) {
 	}
 }
 
+func TestParseArgumentsAcceptsUSBInstallSurface(t *testing.T) {
+	id := "0123456789abcdef0123456789abcdef"
+	tests := []struct {
+		arguments   []string
+		action      string
+		host        string
+		operationID string
+		json        bool
+	}{
+		{[]string{"install", "usb", "prepare", "--host", "pc01", "--json"}, "usb-prepare", "pc01", "", true},
+		{[]string{"install", "usb", "start", "--host", "pc02"}, "usb-start", "pc02", "", false},
+		{[]string{"install", "usb", "status", "--id", id, "--json"}, "usb-status", "", id, true},
+		{[]string{"install", "usb", "reconcile", "--id", id}, "usb-reconcile", "", id, false},
+		{[]string{"install", "usb", "reboot", "--id", id}, "usb-reboot", "", id, false},
+		{[]string{"install", "usb", "verify", "--id", id, "--json"}, "usb-verify", "", id, true},
+		{[]string{"install", "usb", "cancel", "--id", id}, "usb-cancel", "", id, false},
+		{[]string{"install", "usb", "close", "--id", id}, "usb-close", "", id, false},
+	}
+	for _, test := range tests {
+		parsed, err := parseArguments(test.arguments)
+		if err != nil || parsed.command != "install" || parsed.subcommand != test.action || parsed.host != test.host || parsed.operationID != test.operationID || parsed.json != test.json {
+			t.Fatalf("arguments %v parsed as %+v, error=%v", test.arguments, parsed, err)
+		}
+	}
+}
+
+func TestParseArgumentsRejectsUnsafeUSBInstallShortcuts(t *testing.T) {
+	id := "0123456789abcdef0123456789abcdef"
+	for _, arguments := range [][]string{
+		{"install"},
+		{"install", "usb"},
+		{"install", "usb", "prepare"},
+		{"install", "usb", "prepare", "--host", "../../pc01"},
+		{"install", "usb", "start", "--host", "pc01", "--json"},
+		{"install", "usb", "start", "--host", "pc01", "--yes"},
+		{"install", "usb", "status"},
+		{"install", "usb", "status", "--id", "../state"},
+		{"install", "usb", "reboot", "--id", id, "--json"},
+		{"install", "usb", "close", "--id", id, "--json"},
+		{"install", "usb", "verify", "--host", "pc01", "--id", id},
+		{"status", "--id", id},
+	} {
+		if _, err := parseArguments(arguments); err == nil {
+			t.Fatalf("unsafe or incomplete USB installation arguments were accepted: %v", arguments)
+		}
+	}
+}
+
 func TestParseArgumentsAcceptsDeploymentPlan(t *testing.T) {
 	options, err := parseArguments([]string{"deploy", "plan", "--on", "pc01,pc02", "--json"})
 	if err != nil || options.command != "deploy" || options.subcommand != "plan" || options.on != "pc01,pc02" || !options.json {

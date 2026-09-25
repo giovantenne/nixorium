@@ -89,6 +89,7 @@ func (bootstrap LiveBootstrap) DiscardLocalSession(session VerifiedLiveSession) 
 
 func NewLivePassword(value []byte) (*LivePassword, error) {
 	if len(value) == 0 || len(value) > 1024 || bytes.IndexByte(value, 0) >= 0 {
+		zeroBytes(value)
 		return nil, errors.New("live password must contain between 1 and 1024 non-NUL bytes")
 	}
 	secret := &LivePassword{value: append([]byte(nil), value...)}

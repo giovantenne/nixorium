@@ -76,11 +76,24 @@ func NewRemoteInstallPreparer(repository, stateRoot string) (*RemoteInstallPrepa
 }
 
 func (preparer *RemoteInstallPreparer) Prepare(ctx context.Context, operationID, hostName string, session VerifiedLiveSession) (domain.RemoteInstallPreparation, error) {
+	artifacts, err := preparer.PrepareArtifacts(ctx, operationID, hostName)
+	if err != nil {
+		return domain.RemoteInstallPreparation{}, err
+	}
+	preparation, err := preparer.Finalize(ctx, artifacts, session)
+	if err != nil {
+		_ = preparer.Discard(operationID)
+		return domain.RemoteInstallPreparation{}, err
+	}
+	return preparation, nil
+}
+
+func (preparer *RemoteInstallPreparer) Finalize(ctx context.Context, artifacts domain.RemoteInstallArtifacts, session VerifiedLiveSession) (domain.RemoteInstallPreparation, error) {
 	connection, err := NewStrictLiveSSH(session)
 	if err != nil {
 		return domain.RemoteInstallPreparation{}, err
 	}
-	return preparer.prepare(ctx, operationID, hostName, session, connection)
+	return preparer.finalize(ctx, artifacts, session, connection)
 }
 
 func (preparer *RemoteInstallPreparer) Discard(operationID string) error {
@@ -112,12 +125,12 @@ func (preparer *RemoteInstallPreparer) Discard(operationID string) error {
 	return err
 }
 
-func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID, hostName string, session VerifiedLiveSession, connection remotePreparationSSH) (result domain.RemoteInstallPreparation, resultErr error) {
-	if !remoteStateID(operationID) || session.OperationID != operationID || session.Address == "" || session.Facts.BootID == "" {
-		return result, errors.New("remote preparation does not match the verified live session")
+func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, operationID, hostName string) (result domain.RemoteInstallArtifacts, resultErr error) {
+	if !remoteStateID(operationID) {
+		return result, errors.New("remote artifact preparation operation ID is invalid")
 	}
 	if !domain.ValidRemoteHostName(hostName) {
-		return result, errors.New("remote preparation host is invalid")
+		return result, errors.New("remote artifact preparation host is invalid")
 	}
 	if err := preparer.validateRepository(ctx); err != nil {
 		return result, err
@@ -157,10 +170,6 @@ func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID,
 	if err != nil {
 		return result, fmt.Errorf("read deployment cache public key: %w", err)
 	}
-	knownHostConflict, err := KnownHostConflict(preparer.knownHostsPath, host.IP, session.HostPublicKey)
-	if err != nil {
-		return result, fmt.Errorf("inspect existing static known-host entry: %w", err)
-	}
 
 	rootsDirectory, err := preparer.createRootsDirectory(operationID)
 	if err != nil {
@@ -191,6 +200,62 @@ func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID,
 	if err != nil {
 		return result, err
 	}
+	result = domain.RemoteInstallArtifacts{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID, Repository: preparer.repository,
+		DeploymentRevision: revision, BundlePath: bundlePath, BundleClosureBytes: bundleBytes,
+		SystemPath: systemPath, SystemClosureBytes: systemBytes, HostName: host.Name,
+		HostInterface: host.Interface, HostStaticIP: host.IP, CachePublicKey: cachePublicKey,
+		AdminPublicKey: adminPublicKey, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
+	}
+	if err := domain.ValidateRemoteInstallArtifacts(result); err != nil {
+		return domain.RemoteInstallArtifacts{}, err
+	}
+	complete = true
+	return result, nil
+}
+
+func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts domain.RemoteInstallArtifacts, session VerifiedLiveSession, connection remotePreparationSSH) (result domain.RemoteInstallPreparation, resultErr error) {
+	if err := domain.ValidateRemoteInstallArtifacts(artifacts); err != nil {
+		return result, err
+	}
+	if session.OperationID != artifacts.OperationID || session.Address == "" || session.Facts.BootID == "" {
+		return result, errors.New("remote preparation does not match the verified live session")
+	}
+	if err := preparer.validateRepository(ctx); err != nil {
+		return result, err
+	}
+	revisionOutput, err := preparer.run(ctx, "git", "-c", "safe.directory="+preparer.repository, "-C", preparer.repository, "rev-parse", "HEAD")
+	if err != nil || strings.TrimSpace(string(revisionOutput)) != artifacts.DeploymentRevision {
+		return result, errors.New("deployment revision changed after artifact preparation")
+	}
+	if err := preparer.validateArtifactRoots(artifacts); err != nil {
+		return result, err
+	}
+	reference, err := deploymentFlakeReference(preparer.repository)
+	if err != nil {
+		return result, err
+	}
+	reference += "?rev=" + artifacts.DeploymentRevision
+	meta, err := preparer.evalLabMeta(ctx, reference)
+	if err != nil {
+		return result, err
+	}
+	host, found := remotePreparationHost(meta, artifacts.HostName)
+	if !found || host.Interface != artifacts.HostInterface || host.IP != artifacts.HostStaticIP {
+		return result, errors.New("prepared client identity differs from the pinned inventory")
+	}
+	adminPublicKey, err := preparer.verifiedAdminPublicKey(ctx)
+	if err != nil || adminPublicKey != artifacts.AdminPublicKey {
+		return result, errors.New("deployment admin public key changed after artifact preparation")
+	}
+	cachePublicKey, err := preparer.readPublicKey(filepath.Join(preparer.repository, "keys", "cache-public-key"))
+	if err != nil || cachePublicKey != artifacts.CachePublicKey {
+		return result, errors.New("deployment cache public key changed after artifact preparation")
+	}
+	knownHostConflict, err := KnownHostConflict(preparer.knownHostsPath, host.IP, session.HostPublicKey)
+	if err != nil {
+		return result, fmt.Errorf("inspect existing static known-host entry: %w", err)
+	}
 
 	controllerInterface := meta.Controller.Interface
 	if controllerInterface == "" {
@@ -200,42 +265,43 @@ func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID,
 	if err != nil {
 		return result, fmt.Errorf("observe controller interface addresses: %w", err)
 	}
-	cache, err := preparer.selectCache(ctx, meta, addresses, cachePublicKey, connection)
+	cache, err := preparer.selectCache(ctx, meta, addresses, artifacts.CachePublicKey, connection)
 	if err != nil {
 		return result, err
 	}
-	if err := connection.VerifySignedClosure(ctx, cache, bundlePath); err != nil {
+	if err := connection.VerifySignedClosure(ctx, cache, artifacts.BundlePath); err != nil {
 		return result, err
 	}
-	if err := connection.VerifySignedClosure(ctx, cache, systemPath); err != nil {
+	if err := connection.VerifySignedClosure(ctx, cache, artifacts.SystemPath); err != nil {
 		return result, err
 	}
-	if err := connection.PullBundle(ctx, cache, bundlePath); err != nil {
+	if err := connection.PullBundle(ctx, cache, artifacts.BundlePath); err != nil {
 		return result, err
 	}
 	if err := connection.VerifyWiredInterface(ctx, host.Interface); err != nil {
 		return result, err
 	}
-	facts, err := connection.Probe(ctx, bundlePath)
+	facts, err := connection.Probe(ctx, artifacts.BundlePath)
 	if err != nil {
 		return result, fmt.Errorf("run final remote inventory probe: %w", err)
 	}
 	if facts.BootID != session.Facts.BootID || !remoteFactsHaveAddress(facts, host.Interface, session.Address) {
 		return result, errors.New("live boot identity, declared NIC, or DHCP address changed during preparation")
 	}
-	if bundleBytes > ^uint64(0)/2 {
+	if artifacts.BundleClosureBytes > ^uint64(0)/2 {
 		return result, errors.New("installer bundle resource requirement overflows")
 	}
-	requiredLiveBytes := bundleBytes * 2
+	requiredLiveBytes := artifacts.BundleClosureBytes * 2
 	if facts.MemoryAvailableBytes < requiredLiveBytes || facts.StoreAvailableBytes < requiredLiveBytes {
 		return result, fmt.Errorf("live installer needs at least %d bytes free in memory and store for the installer bundle", requiredLiveBytes)
 	}
 
 	result = domain.RemoteInstallPreparation{
-		OperationID: operationID, Repository: preparer.repository, DeploymentRevision: revision,
-		BundlePath: bundlePath, BundleClosureBytes: bundleBytes, SystemPath: systemPath, SystemClosureBytes: systemBytes,
+		OperationID: artifacts.OperationID, Repository: artifacts.Repository, DeploymentRevision: artifacts.DeploymentRevision,
+		BundlePath: artifacts.BundlePath, BundleClosureBytes: artifacts.BundleClosureBytes,
+		SystemPath: artifacts.SystemPath, SystemClosureBytes: artifacts.SystemClosureBytes,
 		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: host.Interface, LiveIP: session.Address, StaticIP: host.IP},
-		Cache: cache, AdminPublicKey: adminPublicKey, HostKeyPublic: session.HostPublicKey,
+		Cache: cache, AdminPublicKey: artifacts.AdminPublicKey, HostKeyPublic: session.HostPublicKey,
 		HostFingerprint: session.HostFingerprint, KnownHostConflict: knownHostConflict,
 		Facts: facts, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
 		Endpoints: []domain.RemoteInstallerEndpoint{{Address: session.Address, Port: session.Port, Fingerprint: session.HostFingerprint}},
@@ -243,8 +309,21 @@ func (preparer *RemoteInstallPreparer) prepare(ctx context.Context, operationID,
 	if err := domain.ValidateRemoteInstallPreparation(result); err != nil {
 		return domain.RemoteInstallPreparation{}, err
 	}
-	complete = true
 	return result, nil
+}
+
+func (preparer *RemoteInstallPreparer) validateArtifactRoots(artifacts domain.RemoteInstallArtifacts) error {
+	directory := filepath.Join(preparer.stateRoot, "roots", artifacts.OperationID)
+	if err := ensurePrivateOwnedDirectory(directory); err != nil {
+		return fmt.Errorf("inspect remote preparation GC roots: %w", err)
+	}
+	for name, expected := range map[string]string{"bundle": artifacts.BundlePath, "system": artifacts.SystemPath} {
+		resolved, err := filepath.EvalSymlinks(filepath.Join(directory, name))
+		if err != nil || resolved != expected {
+			return fmt.Errorf("remote preparation %s GC root differs from the recorded store path", name)
+		}
+	}
+	return nil
 }
 
 func (preparer *RemoteInstallPreparer) createRootsDirectory(operationID string) (string, error) {

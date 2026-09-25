@@ -55,6 +55,25 @@ func TestDecodeRemoteInstallPlanStrict(t *testing.T) {
 	}
 }
 
+func TestValidateRemoteInstallArtifactsRejectsTargetObservations(t *testing.T) {
+	artifacts := RemoteInstallArtifacts{
+		SchemaVersion: RemoteInstallSchemaVersion, OperationID: "0123456789abcdef0123456789abcdef",
+		Repository: "/deployment", DeploymentRevision: "0123456789abcdef0123456789abcdef01234567",
+		BundlePath: "/nix/store/11111111111111111111111111111111-remote-installer", BundleClosureBytes: 1024,
+		SystemPath: "/nix/store/22222222222222222222222222222222-nixos-system-pc01-test", SystemClosureBytes: 2048,
+		HostName: "pc01", HostInterface: "enp0s2", HostStaticIP: "10.0.0.1",
+		CachePublicKey: "cache.example:YWJjZA==", AdminPublicKey: "ssh-ed25519 YWJjZA== admin@test",
+		PreparedAt: time.Unix(1, 0).UTC(), Issues: []ValidationIssue{},
+	}
+	if err := ValidateRemoteInstallArtifacts(artifacts); err != nil {
+		t.Fatalf("valid target-independent artifacts rejected: %v", err)
+	}
+	artifacts.HostStaticIP = "192.0.2.999"
+	if err := ValidateRemoteInstallArtifacts(artifacts); err == nil {
+		t.Fatal("invalid static identity was accepted")
+	}
+}
+
 func TestValidateRemoteInstallPlanRejectsChangedBindings(t *testing.T) {
 	tests := map[string]func(*RemoteInstallPlan){
 		"operation":       func(plan *RemoteInstallPlan) { plan.OperationID = "../escape" },

@@ -28,6 +28,13 @@ func TestDecodeRemoteInstallRequestIsStrictAndBounded(t *testing.T) {
 	}
 }
 
+func TestDecodeRemoteInstallPrepareAllowsTargetIndependentStart(t *testing.T) {
+	request, err := DecodeRemoteInstallRequest([]byte(`{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"prepare","host":"pc01"}`))
+	if err != nil || request.OperationID != "" || request.Host != "pc01" {
+		t.Fatalf("target-independent prepare request=%+v error=%v", request, err)
+	}
+}
+
 func TestDecodeRemoteInstallRequestValidatesReviewFields(t *testing.T) {
 	operationID := "abcdefabcdefabcdefabcdefabcdefab"
 	requestID := "0123456789abcdef0123456789abcdef"

@@ -120,6 +120,14 @@ func DecodeRemoteInstallSession(data []byte) (RemoteInstallSession, error) {
 			return session, err
 		}
 	}
+	if session.Artifacts != nil {
+		if session.Artifacts.OperationID != session.OperationID {
+			return session, errors.New("remote installation session artifact identity differs")
+		}
+		if err := ValidateRemoteInstallArtifacts(*session.Artifacts); err != nil {
+			return session, err
+		}
+	}
 	if session.Preparation != nil {
 		if session.Preparation.OperationID != session.OperationID {
 			return session, errors.New("remote installation session preparation identity differs")
@@ -219,7 +227,7 @@ func validRemoteInstallOperation(operation RemoteInstallOperation) bool {
 
 func remoteOperationNeedsID(operation RemoteInstallOperation) bool {
 	switch operation {
-	case RemoteInstallPrepareOperation, RemoteInstallStatusOperation, RemoteInstallCancelOperation, RemoteInstallRebootOperation,
+	case RemoteInstallStatusOperation, RemoteInstallCancelOperation, RemoteInstallRebootOperation,
 		RemoteInstallVerifyOperation, RemoteInstallCloseOperation, RemoteInstallReconcileOperation, RemoteInstallPlanOperation,
 		RemoteInstallApplyOperation:
 		return true

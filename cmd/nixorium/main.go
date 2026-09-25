@@ -30,6 +30,8 @@ type options struct {
 	on                 string
 	service            string
 	logID              string
+	host               string
+	operationID        string
 	paths              string
 	target             string
 	softwarePackage    string
@@ -131,6 +133,8 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		return runSoftwareCommand(ctx, repository, options, stdout, stderr)
 	case "shutdown":
 		return runShutdownCommand(ctx, repository, options, stdout, stderr)
+	case "install":
+		return runInstallCommand(ctx, repository, options, stdout, stderr)
 	case "doctor":
 		report, inspectErr := inspector.Doctor(ctx, repository, app.DoctorOptions{Full: options.full})
 		if inspectErr != nil {
@@ -474,6 +478,18 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--on requires a client or @lab")
 			}
 			result.on = arguments[index]
+		case "--host":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--host requires an inventory client name")
+			}
+			result.host = arguments[index]
+		case "--id":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--id requires a remote installation operation ID")
+			}
+			result.operationID = arguments[index]
 		case "--paths":
 			index++
 			if index >= len(arguments) || arguments[index] == "" {
@@ -537,6 +553,10 @@ func parseArguments(arguments []string) (options, error) {
 		case "-h", "--help", "help":
 			result.help = true
 		case "status":
+			if result.command == "install" && result.subcommand == "usb" {
+				result.subcommand = "usb-status"
+				continue
+			}
 			if (result.command == "setup" || result.command == "package-base") && result.subcommand == "" {
 				result.subcommand = "status"
 				continue
@@ -545,11 +565,16 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "shutdown":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "shutdown", "install":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
+		case "usb":
+			if result.command != "install" || result.subcommand != "" {
+				return options{}, errors.New("usb must follow install")
+			}
+			result.subcommand = "usb"
 		case "validate":
 			if result.command != "config" || result.subcommand != "" {
 				return options{}, errors.New("validate must follow config")
@@ -651,15 +676,33 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.service = "cache"
 		case "prepare":
+			if result.command == "install" && result.subcommand == "usb" {
+				result.subcommand = "usb-prepare"
+				continue
+			}
 			if result.command != "pxe" || result.subcommand != "" {
 				return options{}, errors.New("prepare must follow pxe")
 			}
 			result.subcommand = "prepare"
-		case "start", "stop", "recover":
+		case "start":
+			if result.command == "install" && result.subcommand == "usb" {
+				result.subcommand = "usb-start"
+				continue
+			}
+			if result.command != "pxe" || result.subcommand != "" {
+				return options{}, errors.New("start must follow pxe or install usb")
+			}
+			result.subcommand = "start"
+		case "stop", "recover":
 			if result.command != "pxe" || result.subcommand != "" {
 				return options{}, fmt.Errorf("%s must follow pxe", arguments[index])
 			}
 			result.subcommand = arguments[index]
+		case "reconcile", "reboot", "verify", "cancel", "close":
+			if result.command != "install" || result.subcommand != "usb" {
+				return options{}, fmt.Errorf("%s must follow install usb", arguments[index])
+			}
+			result.subcommand = "usb-" + arguments[index]
 		default:
 			if result.command == "logs" && result.subcommand == "show" && result.logID == "" {
 				result.logID = arguments[index]
@@ -826,6 +869,37 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "setup" && result.subcommand == "configure" && result.json {
 		return options{}, errors.New("--json is not valid with interactive setup configure")
 	}
+	if result.command == "install" {
+		valid := map[string]bool{
+			"usb-prepare": true, "usb-start": true, "usb-status": true, "usb-reconcile": true,
+			"usb-reboot": true, "usb-verify": true, "usb-cancel": true, "usb-close": true,
+		}
+		if !valid[result.subcommand] {
+			return options{}, errors.New("install requires usb prepare, start, status, reconcile, reboot, verify, cancel, or close")
+		}
+		if (result.subcommand == "usb-prepare" || result.subcommand == "usb-start") != (result.host != "") {
+			return options{}, errors.New("install usb prepare/start require --host; other USB operations do not accept it")
+		}
+		if result.host != "" && !domain.ValidRemoteHostName(result.host) {
+			return options{}, errors.New("--host must be a canonical pcNN inventory name")
+		}
+		needsID := result.subcommand != "usb-prepare" && result.subcommand != "usb-start"
+		if needsID != (result.operationID != "") {
+			return options{}, errors.New("install usb status/reconcile/reboot/verify/cancel/close require --id; prepare/start do not accept it")
+		}
+		if result.operationID != "" && !remoteInstallOperationIDPattern.MatchString(result.operationID) {
+			return options{}, errors.New("--id must contain exactly 32 lowercase hexadecimal characters")
+		}
+		if result.json && (result.subcommand == "usb-start" || result.subcommand == "usb-reboot" || result.subcommand == "usb-close") {
+			return options{}, errors.New("--json is not valid with interactive install usb start, reboot, or close")
+		}
+	}
+	if result.host != "" && result.command != "install" {
+		return options{}, errors.New("--host is only valid with install usb prepare or start")
+	}
+	if result.operationID != "" && result.command != "install" {
+		return options{}, errors.New("--id is only valid with install usb status, reconcile, reboot, verify, cancel, or close")
+	}
 	return result, nil
 }
 
@@ -890,7 +964,10 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "       install usb prepare --host <pcNN> builds only pinned target-independent artifacts")
+	fmt.Fprintln(writer, "       install usb start --host <pcNN> interactively verifies the live ISO, disk, and destructive review")
+	fmt.Fprintln(writer, "       install usb {status|reconcile|reboot|verify|cancel|close} --id <operation-id>")
 	fmt.Fprintln(writer, "       software catalog")
 	fmt.Fprintln(writer, "       software search --query <package-name>")
 	fmt.Fprintln(writer, "       software presets")
@@ -1019,6 +1096,7 @@ func applyDetectedNetworkDefaults(settings domain.LabSettingsFile, detected doma
 }
 
 var bootstrapUserNamePattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
+var remoteInstallOperationIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 func runBootstrapConfigure(ctx context.Context, repository string, stdout, stderr io.Writer) int {
 	local := adapters.Local{}
