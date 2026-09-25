@@ -387,7 +387,7 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 func (model dashboardModel) textEntry() bool {
 	if model.screen == dashboardUSBInstall {
 		switch model.installation.remote.stage {
-		case remoteInstallConsole, remoteInstallRotateHostKey, remoteInstallReview, remoteInstallConfirmReboot, remoteInstallConfirmClose:
+		case remoteInstallConsole, remoteInstallRotateHostKey, remoteInstallPassword, remoteInstallReview, remoteInstallConfirmReboot, remoteInstallConfirmClose:
 			return true
 		}
 	}

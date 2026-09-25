@@ -202,7 +202,8 @@ Release from the matching changelog section.
 - USB/SSH installation supports only the official NixOS 26.05 Minimal ISO on
   `x86_64-linux`, UEFI, and wired Ethernet. Preserve physical-console
   credential-free host-key observation, physical-console fingerprint
-  confirmation and pinning before password use, terminal-only secret input,
+  confirmation and pinning before password use, terminal-only masked secret
+  input that consumes printable characters before global shortcuts,
   operation-specific keys, signed-cache-only transfer, boot-medium exclusion,
   exact disk/revision revalidation, and separate reboot/verification. Never
   replay apply or reboot after uncertain dispatch. Recovery may reattach only
