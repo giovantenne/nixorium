@@ -210,6 +210,27 @@ func TestUSBInstallEscapeCancelsBeforeApplyAndClearsSecret(t *testing.T) {
 	}
 }
 
+func TestUSBInstallRecoveryAccessReturnsToSameOperation(t *testing.T) {
+	response := remoteTUITestPreparedResponse("reconciliation-required")
+	response.Session.Bootstrap = &domain.RemoteInstallBootstrapRecord{Host: "pc01", Address: "192.0.2.20"}
+	model := dashboardModel{
+		screen: dashboardUSBInstall,
+		installation: installationModel{remote: remoteInstallationModel{
+			stage: remoteInstallResult, operationID: remoteTUITestOperationID, response: response,
+		}},
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	model = updated.(dashboardModel)
+	if command != nil || model.installation.remote.stage != remoteInstallConsole || !model.installation.remote.recovery || model.installation.remote.host != "pc01" {
+		t.Fatalf("recovery console model=%+v command=%v", model.installation.remote, command)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	model = updated.(dashboardModel)
+	if command != nil || model.installation.remote.stage != remoteInstallResult || model.installation.remote.recovery {
+		t.Fatalf("recovery detach model=%+v command=%v", model.installation.remote, command)
+	}
+}
+
 func TestUSBInstallReviewFitsSupportedLayoutsAndSanitizesControlText(t *testing.T) {
 	plan := remoteTUITestPlan()
 	response := remoteTUITestPreparedResponse("review-ready")

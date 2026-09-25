@@ -93,6 +93,12 @@ func runUSBInstallStart(ctx context.Context, host string, stdout, stderr io.Writ
 		return 1
 	}
 	presentation.RemoteInstallResponseText(terminal, bootstrap)
+	if bootstrap.State == "recovery-attached" && bootstrap.OperationID != "" {
+		reconciled, reconcileErr := remoteInstallRequest(ctx, domain.RemoteInstallRequest{
+			Operation: domain.RemoteInstallReconcileOperation, OperationID: bootstrap.OperationID,
+		})
+		return renderRemoteInstallResponse(reconciled, reconcileErr, false, stdout, stderr)
+	}
 	if remoteInstallResponseFailed(bootstrap) || bootstrap.OperationID == "" {
 		return 1
 	}

@@ -235,6 +235,7 @@ type remoteInstallationModel struct {
 	formField    int
 	diskCursor   int
 	confirmation string
+	recovery     bool
 	response     domain.RemoteInstallResponse
 	plan         domain.RemoteInstallPlanReport
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -153,6 +154,86 @@ func BootstrapCleanupUnconfirmed(err error) bool {
 
 func NewLiveBootstrap() LiveBootstrap {
 	return LiveBootstrap{runtimeRoot: "/run/nixorium/remote-install", port: 22, timeout: remoteBootstrapTimeout}
+}
+
+// RecoverSession reconstructs only the non-secret in-memory handle for a
+// previously verified live session. The private key and known-hosts file must
+// still be the exact private runtime artifacts bound by the persistent record;
+// this method never creates replacement credentials.
+func (bootstrap LiveBootstrap) RecoverSession(operationID string, record domain.RemoteInstallBootstrapRecord) (VerifiedLiveSession, error) {
+	var result VerifiedLiveSession
+	if !remoteStateID(operationID) || bootstrap.port != 22 || canonicalRemoteIPv4(record.Address) == "" ||
+		!validSSHFingerprint(record.HostFingerprint) || !strings.HasPrefix(record.AuthorizedKeyLine, "restrict ") {
+		return result, errors.New("persisted live session identity is invalid")
+	}
+	directory := filepath.Join(bootstrap.runtimeRoot, operationID)
+	info, err := os.Lstat(directory)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0700 {
+		return result, errors.New("live session runtime directory is unavailable or unsafe")
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat.Uid != uint32(os.Geteuid()) {
+		return result, errors.New("live session runtime directory belongs to another user")
+	}
+	privatePath := filepath.Join(directory, "id_ed25519")
+	knownHostsPath := filepath.Join(directory, "known_hosts")
+	result = VerifiedLiveSession{
+		OperationID: operationID, Address: record.Address, Port: bootstrap.port,
+		HostPublicKey: record.HostPublicKey, HostFingerprint: record.HostFingerprint,
+		PrivateKeyPath: privatePath, KnownHostsPath: knownHostsPath,
+		PublicKeyLine: record.AuthorizedKeyLine, Facts: record.Facts,
+	}
+	if _, err := NewStrictLiveSSH(result); err != nil {
+		return VerifiedLiveSession{}, err
+	}
+
+	privateKey, err := readPrivateRuntimeFile(privatePath, 64*1024)
+	if err != nil {
+		return VerifiedLiveSession{}, fmt.Errorf("recover ephemeral live key: %w", err)
+	}
+	defer zeroBytes(privateKey)
+	signer, err := ssh.ParsePrivateKey(privateKey)
+	if err != nil {
+		return VerifiedLiveSession{}, errors.New("ephemeral live key is invalid")
+	}
+	authorizedKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(strings.TrimPrefix(record.AuthorizedKeyLine, "restrict ")))
+	if err != nil || !bytes.Equal(signer.PublicKey().Marshal(), authorizedKey.Marshal()) {
+		return VerifiedLiveSession{}, errors.New("ephemeral live key differs from the persisted authorization")
+	}
+	hostKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(record.HostPublicKey))
+	if err != nil || hostKey.Type() != ssh.KeyAlgoED25519 || ssh.FingerprintSHA256(hostKey) != record.HostFingerprint {
+		return VerifiedLiveSession{}, errors.New("persisted live host key binding is invalid")
+	}
+	knownHosts, err := readPrivateRuntimeFile(knownHostsPath, 16*1024)
+	if err != nil {
+		return VerifiedLiveSession{}, fmt.Errorf("recover live known-hosts: %w", err)
+	}
+	expectedKnownHosts := knownhosts.Line([]string{record.Address}, hostKey) + "\n"
+	if !bytes.Equal(knownHosts, []byte(expectedKnownHosts)) {
+		return VerifiedLiveSession{}, errors.New("live known-hosts differs from the persisted host identity")
+	}
+	return result, nil
+}
+
+func readPrivateRuntimeFile(path string, maximum int) ([]byte, error) {
+	descriptor, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	file := os.NewFile(uintptr(descriptor), path)
+	defer file.Close()
+	if err := validatePrivateOwnedFile(file, syscall.S_IFREG, 0600); err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil || info.Size() < 1 || info.Size() > int64(maximum) {
+		return nil, errors.New("private runtime file has an invalid size")
+	}
+	content, err := io.ReadAll(io.LimitReader(file, int64(maximum)+1))
+	if err != nil || len(content) > maximum {
+		return nil, errors.New("read bounded private runtime file")
+	}
+	return content, nil
 }
 
 func (bootstrap LiveBootstrap) Establish(ctx context.Context, operationID, address, expectedFingerprint string, password *LivePassword) (result VerifiedLiveSession, resultErr error) {

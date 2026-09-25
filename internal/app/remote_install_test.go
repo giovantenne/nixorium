@@ -193,6 +193,9 @@ func TestRemoteInstallPlanRejectsUnsafeStateWithoutMutation(t *testing.T) {
 		"resources": func(preparation *domain.RemoteInstallPreparation, _ *fakeRemoteInstallSource) {
 			preparation.Facts.StoreAvailableBytes = 1
 		},
+		"memory": func(preparation *domain.RemoteInstallPreparation, _ *fakeRemoteInstallSource) {
+			preparation.Facts.MemoryAvailableBytes = 1
+		},
 		"pxe": func(_ *domain.RemoteInstallPreparation, source *fakeRemoteInstallSource) {
 			source.services[PXEListenerUnit] = domain.ServiceState{Name: PXEListenerUnit, Loaded: true, Active: true, State: "active"}
 			source.services[PXENetworkUnit] = domain.ServiceState{Name: PXENetworkUnit, Loaded: true, Active: true, State: "active"}

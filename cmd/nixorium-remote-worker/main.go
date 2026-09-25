@@ -48,6 +48,9 @@ func run() error {
 		return err
 	}
 	worker := &remoteWorker{state: state, bootstrap: adapters.NewLiveBootstrap(), preparer: preparer, reservations: adapters.Local{}}
+	if err := worker.recover(); err != nil {
+		return err
+	}
 	server := adapters.NewRemoteInstallIPCServer(workerSocketPath, worker.handle)
 	return server.Serve(ctx)
 }
@@ -59,12 +62,14 @@ type remoteState interface {
 
 type liveBootstrapper interface {
 	Establish(context.Context, string, string, string, *adapters.LivePassword) (adapters.VerifiedLiveSession, error)
+	RecoverSession(string, domain.RemoteInstallBootstrapRecord) (adapters.VerifiedLiveSession, error)
 	CloseSession(context.Context, adapters.VerifiedLiveSession) error
 	DiscardLocalSession(adapters.VerifiedLiveSession) error
 }
 
 type remoteReservationSource interface {
 	ReserveRemoteSession(string) (domain.RemoteInstallReservation, error)
+	RecoverRemoteSession() (string, domain.RemoteInstallReservation, bool, error)
 }
 
 type remotePreparer interface {
@@ -82,6 +87,54 @@ type remoteWorker struct {
 	operationID  string
 	liveSession  *adapters.VerifiedLiveSession
 	reservation  domain.RemoteInstallReservation
+}
+
+func (worker *remoteWorker) recover() error {
+	operationID, reservation, present, err := worker.reservations.RecoverRemoteSession()
+	if err != nil {
+		return fmt.Errorf("recover persistent reservation: %w", err)
+	}
+	if !present {
+		return nil
+	}
+	session, err := worker.state.Load(operationID)
+	if err != nil {
+		return fmt.Errorf("recover reserved operation state: %w", err)
+	}
+	worker.operationID = operationID
+	worker.reservation = reservation
+
+	changed := false
+	if session.State == "dispatching" || session.State == "reboot-dispatching" {
+		session.State = "reconciliation-required"
+		session.DispatchUncertain = true
+		session.Events = append(session.Events, domain.RemoteInstallProgress{
+			Phase:  domain.RemoteInstallPhaseReconciliationRequired,
+			Detail: "worker restarted after a persisted dispatch boundary; automatic replay is forbidden",
+		})
+		changed = true
+	}
+	if session.Bootstrap != nil {
+		liveSession, recoveryErr := worker.bootstrap.RecoverSession(operationID, *session.Bootstrap)
+		if recoveryErr != nil {
+			if session.State != "reconciliation-required" {
+				session.State = "reconciliation-required"
+				session.Events = append(session.Events, domain.RemoteInstallProgress{
+					Phase:  domain.RemoteInstallPhaseReconciliationRequired,
+					Detail: "worker restarted without a valid private live-session credential; destructive actions remain blocked",
+				})
+				changed = true
+			}
+		} else {
+			worker.liveSession = &liveSession
+		}
+	}
+	if changed {
+		if err := worker.state.Save(session); err != nil {
+			return fmt.Errorf("publish recovered operation state: %w", err)
+		}
+	}
+	return nil
 }
 
 func (worker *remoteWorker) handle(ctx context.Context, request domain.RemoteInstallRequest, secret *adapters.LivePassword) domain.RemoteInstallResponse {
@@ -730,6 +783,9 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 	reusingArtifacts := false
 	if operationID != "" || reservation != nil {
 		stored, err := worker.state.Load(operationID)
+		if err == nil && reservation != nil && worker.liveSession == nil && stored.State == "reconciliation-required" && stored.Bootstrap != nil {
+			return worker.handleRecoveryBootstrapLocked(ctx, request, secret, stored)
+		}
 		if err != nil || reservation == nil || worker.liveSession != nil || stored.Artifacts == nil || stored.Bootstrap != nil ||
 			stored.State != "artifacts-ready" || stored.Artifacts.HostName != request.Host {
 			response.Message = "another remote installation session is already owned by this worker"
@@ -816,6 +872,52 @@ func (worker *remoteWorker) handleBootstrap(ctx context.Context, request domain.
 	if reusingArtifacts {
 		response.Message = "live installer identity verified and attached to the prepared artifacts; password authentication is locked"
 	}
+	return response
+}
+
+func (worker *remoteWorker) handleRecoveryBootstrapLocked(ctx context.Context, request domain.RemoteInstallRequest, secret *adapters.LivePassword, session domain.RemoteInstallSession) domain.RemoteInstallResponse {
+	response := domain.RemoteInstallResponse{OperationID: session.OperationID, State: "reconciliation-required", Session: &session}
+	previous := session.Bootstrap
+	if request.Host != previous.Host || request.Address != previous.Address || request.Fingerprint != previous.HostFingerprint {
+		response.Message = "recovery endpoint differs from the reserved physical session; recheck the original live address and fingerprint"
+		return response
+	}
+	liveSession, err := worker.bootstrap.Establish(ctx, session.OperationID, request.Address, request.Fingerprint, secret)
+	if err != nil {
+		response.Message = err.Error()
+		return response
+	}
+	if liveSession.Facts.BootID != previous.Facts.BootID {
+		cleanupErr := worker.bootstrap.CloseSession(ctx, liveSession)
+		session.Events = append(session.Events, domain.RemoteInstallProgress{
+			Phase:  domain.RemoteInstallPhaseReconciliationRequired,
+			Detail: "physical recovery observed a different live boot ID; prior destructive authorization remains invalid",
+		})
+		_ = worker.state.Save(session)
+		response.Session = &session
+		response.Message = "live installer boot ID changed; no prior apply authorization can be resumed"
+		if cleanupErr != nil {
+			response.Message += "; recovery key cleanup was not confirmed"
+		}
+		return response
+	}
+	session.Bootstrap = &domain.RemoteInstallBootstrapRecord{
+		Host: request.Host, Address: request.Address, HostPublicKey: liveSession.HostPublicKey,
+		HostFingerprint: liveSession.HostFingerprint, AuthorizedKeyLine: liveSession.PublicKeyLine, Facts: liveSession.Facts,
+	}
+	session.Events = append(session.Events, domain.RemoteInstallProgress{
+		Phase:  domain.RemoteInstallPhaseReconciliationRequired,
+		Detail: "restored private live-session access after a physical re-pin; only status reconciliation is authorized",
+	})
+	if err := worker.state.Save(session); err != nil {
+		_ = worker.bootstrap.CloseSession(ctx, liveSession)
+		response.Message = "recovery access was verified but its non-secret binding could not be persisted"
+		return response
+	}
+	worker.liveSession = &liveSession
+	response.State = "recovery-attached"
+	response.Session = &session
+	response.Message = "live recovery access restored for status reconciliation; apply remains consumed and cannot be replayed"
 	return response
 }
 

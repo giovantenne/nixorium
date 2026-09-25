@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -280,6 +281,13 @@ type remoteInstallReservation struct {
 	gate          *operationGate
 }
 
+type remoteReservationRecord struct {
+	SchemaVersion int    `json:"schemaVersion"`
+	OperationID   string `json:"operationId"`
+	StatePath     string `json:"statePath"`
+	TokenDigest   string `json:"tokenDigest"`
+}
+
 func (Local) ReserveRemoteInstall(_ context.Context, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
 	return reserveRemoteInstallAt(managedCoordinationDirectory, true, plan, reviewToken)
 }
@@ -289,6 +297,113 @@ func (Local) ReserveRemoteSession(operationID string) (domain.RemoteInstallReser
 		return nil, errors.New("remote installation operation ID is invalid")
 	}
 	return createRemoteReservationAt(managedCoordinationDirectory, true, operationID, "")
+}
+
+// RecoverRemoteSession reacquires the process-scoped flock for the one
+// persistent USB reservation left behind by a terminated worker. It never
+// creates, replaces, or removes the marker: callers must reconcile the bound
+// state before they may release it.
+func (Local) RecoverRemoteSession() (string, domain.RemoteInstallReservation, bool, error) {
+	return recoverRemoteReservationAt(managedCoordinationDirectory, true)
+}
+
+func recoverRemoteReservationAt(directoryPath string, managed bool) (string, domain.RemoteInstallReservation, bool, error) {
+	directory, err := openCoordinationDirectory(directoryPath, managed)
+	if err != nil {
+		return "", nil, false, err
+	}
+	record, present, err := readRemoteReservationAt(directory)
+	_ = directory.Close()
+	if !present {
+		return "", nil, false, nil
+	}
+	if err != nil {
+		return "", nil, true, fmt.Errorf("recover USB installation reservation: %w", err)
+	}
+
+	gate, err := acquireRecoveryGateAt(directoryPath, managed)
+	if err != nil {
+		return "", nil, true, err
+	}
+	directory, err = openCoordinationDirectory(directoryPath, managed)
+	if err != nil {
+		gate.Close()
+		return "", nil, true, err
+	}
+	confirmed, stillPresent, readErr := readRemoteReservationAt(directory)
+	_ = directory.Close()
+	if readErr != nil || !stillPresent || confirmed != record {
+		gate.Close()
+		return "", nil, true, errors.New("USB installation reservation changed while it was being recovered")
+	}
+	return record.OperationID, &remoteInstallReservation{directoryPath: directoryPath, operationID: record.OperationID, gate: gate}, true, nil
+}
+
+func acquireRecoveryGateAt(directoryPath string, managed bool) (*operationGate, error) {
+	directory, err := openCoordinationDirectory(directoryPath, managed)
+	if err != nil {
+		return nil, err
+	}
+	defer directory.Close()
+	descriptor, err := syscall.Openat(int(directory.Fd()), coordinationLockName, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, fmt.Errorf("open managed operation lock: %w", err)
+	}
+	lock := os.NewFile(uintptr(descriptor), filepath.Join(directoryPath, coordinationLockName))
+	if err := validateCoordinationLock(lock, managed); err != nil {
+		lock.Close()
+		return nil, err
+	}
+	if err := syscall.Flock(descriptor, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		lock.Close()
+		return nil, errors.New("another Nixorium controller or client operation is already running")
+	}
+	gate := &operationGate{file: lock}
+	if managed {
+		legacy, legacyErr := acquireLegacyDeploymentLock()
+		if legacyErr != nil {
+			gate.Close()
+			return nil, legacyErr
+		}
+		gate.legacy = legacy
+	}
+	return gate, nil
+}
+
+func readRemoteReservationAt(directory *os.File) (remoteReservationRecord, bool, error) {
+	var record remoteReservationRecord
+	descriptor, err := syscall.Openat(int(directory.Fd()), remoteReservationName, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	if errors.Is(err, syscall.ENOENT) {
+		return record, false, nil
+	}
+	if err != nil {
+		return record, true, fmt.Errorf("reservation is unsafe or unreadable: %w", err)
+	}
+	file := os.NewFile(uintptr(descriptor), remoteReservationName)
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() < 2 || info.Size() > domain.RemoteInstallPlanMaxBytes {
+		return record, true, errors.New("reservation is not a private bounded regular file")
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat.Uid != uint32(os.Geteuid()) {
+		return record, true, errors.New("reservation belongs to another user")
+	}
+	data, err := io.ReadAll(io.LimitReader(file, domain.RemoteInstallPlanMaxBytes+1))
+	if err != nil || domain.ValidateStrictRemoteJSON(data, domain.RemoteInstallPlanMaxBytes) != nil {
+		return record, true, errors.New("reservation record is invalid")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&record); err != nil {
+		return record, true, errors.New("reservation record is invalid")
+	}
+	if record.SchemaVersion != 1 || !remoteStateID(record.OperationID) ||
+		record.StatePath != filepath.Join("/var/lib/nixorium/remote-install", record.OperationID+".json") ||
+		(record.TokenDigest != "" && (len(record.TokenDigest) != len("sha256:")+64 || record.TokenDigest[:len("sha256:")] != "sha256:" || !stringsHasHexDigest(record.TokenDigest[len("sha256:"):]))) {
+		return record, true, errors.New("reservation record does not bind valid state")
+	}
+	return record, true, nil
 }
 
 func reserveRemoteInstallAt(directoryPath string, managed bool, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
@@ -325,12 +440,7 @@ func createRemoteReservationAt(directoryPath string, managed bool, operationID, 
 		return nil, fmt.Errorf("create USB installation reservation: %w", err)
 	}
 	file := os.NewFile(uintptr(descriptor), filepath.Join(directoryPath, remoteReservationName))
-	record := struct {
-		SchemaVersion int    `json:"schemaVersion"`
-		OperationID   string `json:"operationId"`
-		StatePath     string `json:"statePath"`
-		TokenDigest   string `json:"tokenDigest"`
-	}{1, operationID, filepath.Join("/var/lib/nixorium/remote-install", operationID+".json"), tokenDigest}
+	record := remoteReservationRecord{1, operationID, filepath.Join("/var/lib/nixorium/remote-install", operationID+".json"), tokenDigest}
 	content, _ := json.Marshal(record)
 	content = append(content, '\n')
 	if _, err := file.Write(content); err != nil {

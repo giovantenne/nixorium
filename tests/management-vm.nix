@@ -381,6 +381,59 @@
     controller.succeed("test \"$(stat -c '%U:%G:%a' /run/nixorium/remote-install/control.sock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/remote-install)\" = admin:users:700")
     ipc_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium/remote-install/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"worker-probe"}\\n\'); value=json.loads(s.makefile().readline()); assert value["requestId"] == "0123456789abcdef0123456789abcdef" and value["state"] == "ready"'
     controller.succeed("su - admin -c " + shlex.quote("python3 -c " + shlex.quote(ipc_probe)))
+    orphan_id = "abcdefabcdefabcdefabcdefabcdefab"
+    orphan_session = {
+      "schemaVersion": 1,
+      "operationId": orphan_id,
+      "logId": f"usb-install-{orphan_id}.log",
+      "state": "artifacts-ready",
+      "plan": {},
+      "artifacts": {
+        "schemaVersion": 1,
+        "operationId": orphan_id,
+        "repository": "/home/admin/nixorium-deployment",
+        "deploymentRevision": "0" * 40,
+        "bundlePath": "/nix/store/11111111111111111111111111111111-remote-installer",
+        "bundleClosureBytes": 1024,
+        "systemPath": "/nix/store/22222222222222222222222222222222-nixos-system-pc01-test",
+        "systemClosureBytes": 2048,
+        "hostName": "pc01",
+        "hostInterface": "lab0",
+        "hostStaticIp": "10.0.0.1",
+        "cachePublicKey": "cache.example:YWJjZA==",
+        "adminPublicKey": "ssh-ed25519 YWJjZA== admin@test",
+        "preparedAt": "2026-01-01T00:00:00Z",
+        "issues": [],
+      },
+      "tokenConsumed": False,
+      "dispatchUncertain": False,
+      "rebootRequested": False,
+      "bootVerified": False,
+      "events": [],
+    }
+    orphan_marker = {
+      "schemaVersion": 1,
+      "operationId": orphan_id,
+      "statePath": f"/var/lib/nixorium/remote-install/{orphan_id}.json",
+      "tokenDigest": "",
+    }
+    write_orphan = (
+      "import json,pathlib; "
+      f"pathlib.Path('/var/lib/nixorium/remote-install/{orphan_id}.json').write_text({json.dumps(json.dumps(orphan_session) + chr(10))}); "
+      f"pathlib.Path('/var/lib/nixorium/coordination/usb-reservation.json').write_text({json.dumps(json.dumps(orphan_marker) + chr(10))})"
+    )
+    controller.succeed("systemctl stop nixorium-remote-install.service; su - admin -c " + shlex.quote("python3 -c " + shlex.quote(write_orphan)))
+    controller.succeed(f"chmod 0600 /var/lib/nixorium/remote-install/{orphan_id}.json /var/lib/nixorium/coordination/usb-reservation.json; systemctl start nixorium-remote-install.service")
+    controller.wait_for_unit("nixorium-remote-install.service")
+    orphan_probe = f'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium/remote-install/control.sock"); s.sendall(b\'{{"schemaVersion":1,"requestId":"fedcba9876543210fedcba9876543210","operation":"worker-probe"}}\\n\'); value=json.loads(s.makefile().readline()); assert value["operationId"] == "{orphan_id}" and value["state"] == "artifacts-ready"'
+    orphan_probe_command = "su - admin -c " + shlex.quote("python3 -c " + shlex.quote(orphan_probe))
+    controller.succeed(orphan_probe_command)
+    controller.succeed("systemctl kill --kill-who=main --signal=SIGKILL nixorium-remote-install.service")
+    controller.wait_until_succeeds("systemctl is-active --quiet nixorium-remote-install.service && test -S /run/nixorium/remote-install/control.sock && " + orphan_probe_command)
+    controller.succeed("test -f /var/lib/nixorium/coordination/usb-reservation.json")
+    controller.fail("systemctl start nixorium-pxe-network.service")
+    controller.succeed("journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'USB installation remains reserved'; systemctl reset-failed nixorium-pxe-network.service; systemctl stop nixorium-remote-install.service; rm /var/lib/nixorium/coordination/usb-reservation.json /var/lib/nixorium/remote-install/" + orphan_id + ".json; systemctl start nixorium-remote-install.service")
+    controller.wait_for_unit("nixorium-remote-install.service")
     controller.succeed("systemd-run --quiet --unit=nixorium-test-operation-holder --uid=admin /run/current-system/sw/bin/flock /var/lib/nixorium/coordination/operation.lock /run/current-system/sw/bin/sleep infinity; systemctl is-active --quiet nixorium-test-operation-holder.service")
     controller.wait_until_succeeds("! flock -n /var/lib/nixorium/coordination/operation.lock true")
     controller.fail("su - admin -c 'systemctl start nixorium-restart-cache.service'")
