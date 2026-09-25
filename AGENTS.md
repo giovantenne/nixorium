@@ -208,7 +208,8 @@ Release from the matching changelog section.
   exact disk/revision revalidation, and separate reboot/verification. The
   controller worker sandbox must retain `AF_NETLINK` for interface address
   observation. Never replay apply or reboot after uncertain dispatch. Recovery
-  may reattach only to the exact host, address, fingerprint, and live boot ID.
+  may reattach only to the exact host, address, fingerprint, and live boot ID;
+  a verified pre-apply reattachment must remain safely cancellable.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.

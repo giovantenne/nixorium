@@ -84,6 +84,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   characters as masked secret input instead of global quit/help shortcuts.
 - The USB/SSH worker sandbox now permits read-only netlink route queries, so
   controller interface discovery works during cache endpoint selection.
+- A physically re-pinned USB/SSH session interrupted before apply now returns
+  to a cancellable pre-apply state instead of permanently retaining the global
+  controller-operation reservation.
 - Controller activation no longer fails by starting session-free PXE recovery
   while the same reviewed controller operation holds the global coordination
   lock. Boot recovery still validates and restores every recorded interrupted
