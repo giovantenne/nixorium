@@ -126,6 +126,29 @@ func TestUSBInstallPasswordIsMaskedAndClearedBeforeCallbackResult(t *testing.T) 
 	}
 }
 
+func TestUSBInstallPasswordConsumesGlobalShortcutCharacters(t *testing.T) {
+	model := dashboardModel{
+		screen: dashboardUSBInstall,
+		installation: installationModel{method: domain.RemoteInstallUSBSSH, remote: remoteInstallationModel{
+			stage: remoteInstallPassword, host: "pc01", operationID: remoteTUITestOperationID,
+			address: "192.0.2.20", fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", formField: 2,
+		}},
+	}
+	for _, character := range "q?" {
+		updated, command := model.Update(tea.KeyPressMsg{Text: string(character)})
+		model = updated.(dashboardModel)
+		if command != nil {
+			t.Fatalf("password character %q produced a command", character)
+		}
+	}
+	if model.screen != dashboardUSBInstall || model.installation.remote.stage != remoteInstallPassword {
+		t.Fatal("password shortcut characters left the password form")
+	}
+	if model.helpOpen || model.installation.remote.password != "q?" {
+		t.Fatalf("help open=%t password=%q", model.helpOpen, model.installation.remote.password)
+	}
+}
+
 func TestUSBInstallObservesFingerprintBeforePasswordEntry(t *testing.T) {
 	observedAddress := ""
 	bootstrapCalls := 0
