@@ -1,0 +1,484 @@
+From 22218d772dba639819938911b47ab80924c6c87f Mon Sep 17 00:00:00 2001
+From: Adrien Techer <15943226+AdrienTecher@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 22:34:03 +0200
+Subject: [PATCH] pipewire-vnc-server: optionally keep the portal restore token
+
+PortalSession asks the RemoteDesktop portal for persist_mode 2 and
+presents the restore_token it got back, but keeps the token only in a
+member of an object PipeWireVncServer creates per server run. So every
+boot, login, service restart or killed server asks the user to share
+the screen again, and a user can simply cancel that dialog.
+
+Add the advanced option PipeWireVnc/PersistRestoreToken, off by
+default, with a configuration widget. When enabled, the token is loaded
+from $XDG_STATE_HOME/veyon/portal-restore-token when the session is
+created, only if it is a bare UUID (xdg-desktop-portal fails the whole
+SelectDevices call for anything else), and written there atomically
+with mode 0600 whenever the portal returns one. When disabled, a token
+file left from earlier is removed.
+
+The token lets any process of the same user restore a screen sharing
+session without a dialog, since the portal keys the grant by the token
+and an application ID that is empty for processes outside an app
+scope; the widget says so. Also stop logging the token.
+---
+ plugins/vncserver/pipewire/CMakeLists.txt     |  4 ++
+ .../pipewire/PipeWireVncConfiguration.h       | 32 +++++++++
+ .../PipeWireVncConfigurationWidget.cpp        | 53 ++++++++++++++
+ .../pipewire/PipeWireVncConfigurationWidget.h | 48 +++++++++++++
+ .../PipeWireVncConfigurationWidget.ui         | 42 +++++++++++
+ .../vncserver/pipewire/PipeWireVncServer.cpp  | 15 +++-
+ .../vncserver/pipewire/PipeWireVncServer.h    |  8 +--
+ plugins/vncserver/pipewire/PortalSession.cpp  | 69 ++++++++++++++++++-
+ plugins/vncserver/pipewire/PortalSession.h    | 11 ++-
+ 9 files changed, 274 insertions(+), 8 deletions(-)
+ create mode 100644 plugins/vncserver/pipewire/PipeWireVncConfiguration.h
+ create mode 100644 plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.cpp
+ create mode 100644 plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.h
+ create mode 100644 plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.ui
+
+diff --git a/plugins/vncserver/pipewire/CMakeLists.txt b/plugins/vncserver/pipewire/CMakeLists.txt
+index 1f033bd37..7f2017b85 100644
+--- a/plugins/vncserver/pipewire/CMakeLists.txt
++++ b/plugins/vncserver/pipewire/CMakeLists.txt
+@@ -27,6 +27,10 @@ if(PipeWire_FOUND AND Qt${QT_MAJOR_VERSION}DBus_FOUND)
+ 		SOURCES
+ 		PipeWireVncServer.cpp
+ 		PipeWireVncServer.h
++		PipeWireVncConfiguration.h
++		PipeWireVncConfigurationWidget.cpp
++		PipeWireVncConfigurationWidget.h
++		PipeWireVncConfigurationWidget.ui
+ 		PipeWireFramebuffer.cpp
+ 		PipeWireFramebuffer.h
+ 		PortalSession.cpp
+diff --git a/plugins/vncserver/pipewire/PipeWireVncConfiguration.h b/plugins/vncserver/pipewire/PipeWireVncConfiguration.h
+new file mode 100644
+index 000000000..659dddd4d
+--- /dev/null
++++ b/plugins/vncserver/pipewire/PipeWireVncConfiguration.h
+@@ -0,0 +1,32 @@
++/*
++ * PipeWireVncConfiguration.h - PipeWire VNC server specific configuration values
++ *
++ * Copyright (c) 2026 Tobias Junghans <tobydox@veyon.io>
++ *
++ * This file is part of Veyon - https://veyon.io
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public
++ * License along with this program (see COPYING); if not, write to the
++ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++ * Boston, MA 02111-1307, USA.
++ *
++ */
++
++#pragma once
++
++#include "Configuration/Proxy.h"
++
++#define FOREACH_PIPEWIREVNC_CONFIG_PROPERTY(OP) \
++	OP( PipeWireVncConfiguration, m_configuration, bool, persistRestoreToken, setPersistRestoreToken, "PersistRestoreToken", "PipeWireVnc", false, Configuration::Property::Flag::Advanced )
++
++DECLARE_CONFIG_PROXY(PipeWireVncConfiguration, FOREACH_PIPEWIREVNC_CONFIG_PROPERTY)
+diff --git a/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.cpp b/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.cpp
+new file mode 100644
+index 000000000..933cc48fe
+--- /dev/null
++++ b/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.cpp
+@@ -0,0 +1,53 @@
++/*
++ * PipeWireVncConfigurationWidget.cpp - implementation of the PipeWireVncConfigurationWidget class
++ *
++ * Copyright (c) 2026 Tobias Junghans <tobydox@veyon.io>
++ *
++ *
++ * This file is part of Veyon - https://veyon.io
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public
++ * License along with this program (see COPYING); if not, write to the
++ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++ * Boston, MA 02111-1307, USA.
++ *
++ */
++
++#include "Configuration/UiMapping.h"
++#include "PipeWireVncConfiguration.h"
++#include "PipeWireVncConfigurationWidget.h"
++
++#include "ui_PipeWireVncConfigurationWidget.h"
++
++PipeWireVncConfigurationWidget::PipeWireVncConfigurationWidget(PipeWireVncConfiguration& configuration, QWidget* parent) :
++	QWidget(parent),
++	ui(new Ui::PipeWireVncConfigurationWidget),
++	m_configuration(configuration)
++{
++	ui->setupUi(this);
++
++	// all properties of this widget are advanced - mark the whole widget as
++	// advanced so its static labels are hidden together with the input fields
++	// in standard view mode
++	Configuration::UiMapping::setFlags(this, Configuration::Property::Flag::Advanced);
++
++	FOREACH_PIPEWIREVNC_CONFIG_PROPERTY(INIT_WIDGET_FROM_PROPERTY);
++	FOREACH_PIPEWIREVNC_CONFIG_PROPERTY(CONNECT_WIDGET_TO_PROPERTY);
++}
++
++
++
++PipeWireVncConfigurationWidget::~PipeWireVncConfigurationWidget()
++{
++	delete ui;
++}
+diff --git a/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.h b/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.h
+new file mode 100644
+index 000000000..e2b767968
+--- /dev/null
++++ b/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.h
+@@ -0,0 +1,48 @@
++/*
++ * PipeWireVncConfigurationWidget.h - header for the PipeWireVncConfigurationWidget class
++ *
++ * Copyright (c) 2026 Tobias Junghans <tobydox@veyon.io>
++ *
++ *
++ * This file is part of Veyon - https://veyon.io
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public
++ * License along with this program (see COPYING); if not, write to the
++ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++ * Boston, MA 02111-1307, USA.
++ *
++ */
++
++#pragma once
++
++#include <QWidget>
++
++namespace Ui {
++class PipeWireVncConfigurationWidget;
++}
++
++class PipeWireVncConfiguration;
++
++class PipeWireVncConfigurationWidget : public QWidget
++{
++	Q_OBJECT
++
++public:
++	explicit PipeWireVncConfigurationWidget(PipeWireVncConfiguration& configuration, QWidget* parent = nullptr);
++	~PipeWireVncConfigurationWidget() override;
++
++private:
++	Ui::PipeWireVncConfigurationWidget *ui;
++	PipeWireVncConfiguration& m_configuration;
++
++};
+diff --git a/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.ui b/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.ui
+new file mode 100644
+index 000000000..c4c021107
+--- /dev/null
++++ b/plugins/vncserver/pipewire/PipeWireVncConfigurationWidget.ui
+@@ -0,0 +1,42 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>PipeWireVncConfigurationWidget</class>
++ <widget class="QWidget" name="PipeWireVncConfigurationWidget">
++  <property name="windowTitle">
++   <string>PipeWire VNC server configuration</string>
++  </property>
++  <layout class="QVBoxLayout" name="verticalLayout">
++   <property name="leftMargin">
++    <number>0</number>
++   </property>
++   <property name="topMargin">
++    <number>0</number>
++   </property>
++   <property name="rightMargin">
++    <number>0</number>
++   </property>
++   <property name="bottomMargin">
++    <number>0</number>
++   </property>
++   <item>
++    <widget class="QCheckBox" name="persistRestoreToken">
++     <property name="text">
++      <string>Remember the screen sharing approval across restarts</string>
++     </property>
++    </widget>
++   </item>
++   <item>
++    <widget class="QLabel" name="persistRestoreTokenNote">
++     <property name="text">
++      <string>The approval token is stored in the user's state directory. Any program running as the same user can read it and share the screen without asking.</string>
++     </property>
++     <property name="wordWrap">
++      <bool>true</bool>
++     </property>
++    </widget>
++   </item>
++  </layout>
++ </widget>
++ <resources/>
++ <connections/>
++</ui>
+diff --git a/plugins/vncserver/pipewire/PipeWireVncServer.cpp b/plugins/vncserver/pipewire/PipeWireVncServer.cpp
+index f751f9a32..cac8fe2fd 100644
+--- a/plugins/vncserver/pipewire/PipeWireVncServer.cpp
++++ b/plugins/vncserver/pipewire/PipeWireVncServer.cpp
+@@ -24,8 +24,10 @@
+ 
+ #include "PipeWireVncServer.h"
+ #include "PipeWireFramebuffer.h"
++#include "PipeWireVncConfigurationWidget.h"
+ #include "PortalSession.h"
+ 
++#include "VeyonConfiguration.h"
+ #include "VeyonCore.h"
+ #include "PlatformCoreFunctions.h"
+ #include "PlatformInputDeviceFunctions.h"
+@@ -45,9 +47,17 @@ static constexpr int EventLoopTickMs = 25;
+ 
+ PipeWireVncServer::PipeWireVncServer(QObject* parent)
+ 	: QObject(parent)
++	, m_configuration(&VeyonCore::config())
+ {
+ }
+ 
++
++
++QWidget* PipeWireVncServer::configurationWidget()
++{
++	return new PipeWireVncConfigurationWidget(m_configuration);
++}
++
+ PipeWireVncServer::~PipeWireVncServer()
+ {
+ 	cleanupVncServer();
+@@ -82,7 +92,7 @@ bool PipeWireVncServer::runServer(int serverPort, const Password& password)
+ 	// Created with nullptr parent to avoid the cross-thread QObject parent warning:
+ 	// runServer() is called from the VncServer thread while PipeWireVncServer itself
+ 	// lives on a different thread. Ownership is transferred to cleanupVncServer().
+-	m_portalSession = new PortalSession(nullptr);
++	m_portalSession = new PortalSession(m_configuration.persistRestoreToken(), nullptr);
+ 	connect(m_portalSession, &PortalSession::started, this, &PipeWireVncServer::onPortalStarted,
+ 			Qt::QueuedConnection);
+ 	connect(m_portalSession, &PortalSession::failed,  this, &PipeWireVncServer::onPortalFailed,
+@@ -297,3 +307,6 @@ void PipeWireVncServer::onPtrAddEvent(int buttonMask, int x, int y, rfbClientRec
+ 		self->m_portalSession->notifyPointer(buttonMask, x, y);
+ 	}
+ }
++
++
++IMPLEMENT_CONFIG_PROXY(PipeWireVncConfiguration)
+diff --git a/plugins/vncserver/pipewire/PipeWireVncServer.h b/plugins/vncserver/pipewire/PipeWireVncServer.h
+index 3b8405637..40192851f 100644
+--- a/plugins/vncserver/pipewire/PipeWireVncServer.h
++++ b/plugins/vncserver/pipewire/PipeWireVncServer.h
+@@ -28,6 +28,7 @@
+ 
+ #include <QMutex>
+ 
++#include "PipeWireVncConfiguration.h"
+ #include "PluginInterface.h"
+ #include "VncServerPluginInterface.h"
+ 
+@@ -102,10 +103,7 @@ class PipeWireVncServer : public QObject, VncServerPluginInterface, PluginInterf
+ 		return { QStringLiteral("wayland") };
+ 	}
+ 
+-	QWidget* configurationWidget() override
+-	{
+-		return nullptr;
+-	}
++	QWidget* configurationWidget() override;
+ 
+ 	void prepareServer() override;
+ 
+@@ -137,6 +135,8 @@ private Q_SLOTS:
+ 	static void onKbdAddEvent(rfbBool down, rfbKeySym keySym, rfbClientRec* cl);
+ 	static void onPtrAddEvent(int buttonMask, int x, int y, rfbClientRec* cl);
+ 
++	PipeWireVncConfiguration m_configuration;
++
+ 	PortalSession*       m_portalSession{nullptr};
+ 	PipeWireFramebuffer* m_framebuffer{nullptr};
+ 	rfbScreenInfoPtr     m_rfbScreen{nullptr};
+diff --git a/plugins/vncserver/pipewire/PortalSession.cpp b/plugins/vncserver/pipewire/PortalSession.cpp
+index 889fbe0a1..cd86dd51f 100644
+--- a/plugins/vncserver/pipewire/PortalSession.cpp
++++ b/plugins/vncserver/pipewire/PortalSession.cpp
+@@ -30,9 +30,15 @@
+ #include <QDBusPendingCallWatcher>
+ #include <QDBusPendingReply>
+ #include <QDBusUnixFileDescriptor>
++#include <QDir>
++#include <QFile>
++#include <QFileInfo>
+ #include <QGuiApplication>
+ #include <QProcess>
+ #include <QRandomGenerator>
++#include <QSaveFile>
++#include <QStandardPaths>
++#include <QUuid>
+ 
+ #include "PortalSession.h"
+ #include "VeyonCore.h"
+@@ -40,9 +46,10 @@
+ // XDG Desktop Portal service and interface names
+ static const auto PortalService = QStringLiteral("org.freedesktop.portal.Desktop");
+ static const auto PortalObjectPath = QStringLiteral("/org/freedesktop/portal/desktop");
+-PortalSession::PortalSession(QObject* parent)
++PortalSession::PortalSession(bool persistRestoreToken, QObject* parent)
+ 	: QObject(parent)
+ 	, m_sessionBus(QDBusConnection::sessionBus())
++	, m_persistRestoreToken(persistRestoreToken)
+ {
+ 	const auto appId = QGuiApplication::desktopFileName();
+ 
+@@ -73,6 +80,17 @@ PortalSession::PortalSession(QObject* parent)
+ 
+ 	m_remoteDesktop = new OrgFreedesktopPortalRemoteDesktopInterface(PortalService, PortalObjectPath, m_sessionBus, this);
+ 	m_screenCast = new OrgFreedesktopPortalScreenCastInterface(PortalService, PortalObjectPath, m_sessionBus, this);
++
++	// persist_mode 2 only pays off across server runs if the token outlives this process; a
++	// token left from when persistence was enabled is removed so it no longer grants anything
++	if (m_persistRestoreToken)
++	{
++		loadRestoreToken();
++	}
++	else
++	{
++		QFile::remove(restoreTokenFilePath());
++	}
+ }
+ 
+ 
+@@ -317,7 +335,11 @@ void PortalSession::onPortalResponse(uint response, const QVariantMap& results)
+ 	if (results.contains(QStringLiteral("restore_token")))
+ 	{
+ 		m_restoreToken = results.value(QStringLiteral("restore_token")).toString();
+-		vDebug() << "Got portal restore_token:" << m_restoreToken;
++		vDebug() << "Got portal restore_token";
++		if (m_persistRestoreToken)
++		{
++			storeRestoreToken();
++		}
+ 	}
+ 
+ 	switch (m_state)
+@@ -378,6 +400,49 @@ void PortalSession::onPortalResponse(uint response, const QVariantMap& results)
+ 	}
+ }
+ 
++// ---------------------------------------------------------------------------
++// Restore token persistence
++// ---------------------------------------------------------------------------
++
++QString PortalSession::restoreTokenFilePath()
++{
++	return QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation) +
++		   QStringLiteral("/veyon/portal-restore-token");
++}
++
++
++
++void PortalSession::loadRestoreToken()
++{
++	QFile file(restoreTokenFilePath());
++	if (file.open(QFile::ReadOnly))
++	{
++		const auto token = QString::fromUtf8(file.read(64)).trimmed();
++		// the portal fails the whole SelectDevices call for anything but a bare
++		// UUID, and QUuid would also accept one in braces
++		if (token.size() == 36 && QUuid::fromString(token).isNull() == false)
++		{
++			m_restoreToken = token;
++		}
++	}
++}
++
++
++
++void PortalSession::storeRestoreToken() const
++{
++	const auto path = restoreTokenFilePath();
++	QSaveFile file(path);
++	if (QDir().mkpath(QFileInfo(path).path()) == false ||
++		file.open(QFile::WriteOnly) == false ||
++		file.setPermissions(QFile::ReadOwner | QFile::WriteOwner) == false ||
++		file.write(m_restoreToken.toUtf8()) < 0 ||
++		file.commit() == false)
++	{
++		vWarning() << "could not store portal restore token";
++	}
++}
++
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+diff --git a/plugins/vncserver/pipewire/PortalSession.h b/plugins/vncserver/pipewire/PortalSession.h
+index 2579c39af..871157b6d 100644
+--- a/plugins/vncserver/pipewire/PortalSession.h
++++ b/plugins/vncserver/pipewire/PortalSession.h
+@@ -65,7 +65,11 @@ class PortalSession : public QObject
+ 	};
+ 	Q_ENUM(State)
+ 
+-	explicit PortalSession(QObject* parent = nullptr);
++	/**
++	 * @param persistRestoreToken keep the portal's restore token in the user's state directory,
++	 * so the screen sharing approval outlives this process (see PipeWireVncConfiguration)
++	 */
++	explicit PortalSession(bool persistRestoreToken, QObject* parent = nullptr);
+ 	~PortalSession() override;
+ 
+ 	/**
+@@ -130,6 +134,10 @@ private Q_SLOTS:
+ 	void connectResponseSignal(const QString& requestPath);
+ 	void disconnectResponseSignal();
+ 
++	void loadRestoreToken();
++	void storeRestoreToken() const;
++	static QString restoreTokenFilePath();
++
+ 	void setState(State s);
+ 
+ 	QString makeRequestToken() const;
+@@ -143,6 +151,7 @@ private Q_SLOTS:
+ 
+ 	QString m_sessionHandle;
+ 	QString m_restoreToken;
++	const bool m_persistRestoreToken;
+ 	State m_state{State::Idle};
+ 	int m_pipewireFd{-1};
+ 	quint32 m_pipeWireNodeId{0};

@@ -1,12 +1,11 @@
 # Veyon classroom management: service, keys and base configuration.
 #
 # Veyon 4.11 provides a native PipeWire/XDG portal backend for Wayland.
-# GNOME still requires interactive screen-sharing consent, which prevents
-# fully unattended use. Hosts not explicitly selected for the native pilot
-# therefore delegate capture to gnome-remote-desktop on port 5900.
+# GNOME requires initial interactive screen-sharing consent; native hosts keep
+# the granted authorization outside reset homes. Other hosts delegate capture
+# to gnome-remote-desktop on port 5900.
 #
-# gnome-remote-desktop is patched in our overlay to allow multiple
-# concurrent VNC connections (upstream limits it to one).
+# The fallback overlay allows a new connection to replace a stale VNC session.
 #
 # - Public key deployed to all PCs for key-file authentication
 # - Private key must be placed manually where needed (not managed by Nix)
@@ -25,6 +24,10 @@ let
   veyonPublicKeyFile = labSettings.veyonPublicKeyFile;
   hasVeyonPublicKey = veyonPublicKeyFile != null && builtins.pathExists veyonPublicKeyFile;
   useNativeWayland = builtins.elem hostName labSettings.veyonNativeHosts;
+  nativeEnabled = laboratoryEnabled && useNativeWayland;
+  nativeUsers = lib.unique [ "admin" labSettings.teacherUser labSettings.studentUser ];
+  # Separate per-user state, never part of student templates or snapshots.
+  nativeStateRoot = "/var/lib/nixorium/veyon-session";
   vncServerPluginUid =
     if useNativeWayland then
       "{3b8e5c1a-9f72-4d3e-b6a0-2c7f1e8d4b95}"
@@ -110,6 +113,11 @@ let
     [VncServer]
     Plugin=${vncServerPluginUid}
 
+    ${lib.optionalString useNativeWayland ''
+      [PipeWireVnc]
+      PersistRestoreToken=true
+    ''}
+
     ${lib.optionalString (!useNativeWayland) ''
       [ExternalVncServer]
       ServerPort=5900
@@ -138,8 +146,11 @@ in
   systemd.user.services.veyon-server = lib.mkIf laboratoryEnabled {
     description = "Veyon Service";
     wantedBy = [ "graphical-session.target" ];
+    partOf = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ]
-      ++ lib.optional (!useNativeWayland) "gnome-remote-desktop.service";
+      ++ lib.optional (!useNativeWayland) "gnome-remote-desktop.service"
+      ++ lib.optional nativeEnabled "xdg-permission-store.service";
+    requires = lib.optional nativeEnabled "xdg-permission-store.service";
     environment.PATH = lib.mkForce "/run/wrappers/bin:${lib.makeBinPath [
       pkgs.veyon
       pkgs.coreutils
@@ -148,12 +159,51 @@ in
       pkgs.gnused
       pkgs.systemd
     ]}";
+    # veyon-service reconstructs the child's environment from the login
+    # session, so a service-only XDG_STATE_HOME would not reach veyon-server.
+    # Link only Veyon's state directory as the unprivileged desktop user.
+    preStart = lib.optionalString nativeEnabled ''
+      STATE_HOME="''${XDG_STATE_HOME:-$HOME/.local/state}"
+      TARGET="${nativeStateRoot}/$(${pkgs.coreutils}/bin/id -un)/state/veyon"
+      mkdir -p "$STATE_HOME"
+      if [ -L "$STATE_HOME/veyon" ]; then
+        test "$(readlink "$STATE_HOME/veyon")" = "$TARGET"
+      else
+        if [ -d "$STATE_HOME/veyon" ]; then
+          # Never discard or overwrite a previously granted authorization.
+          rmdir "$STATE_HOME/veyon"
+        fi
+        ln -sT "$TARGET" "$STATE_HOME/veyon"
+      fi
+    '';
     serviceConfig = {
       ExecStart = "${pkgs.veyon}/bin/veyon-service";
       Restart = "on-failure";
       RestartSec = 5;
+      UMask = "0077";
     };
   };
+
+  # The portal holds the other half of the restore token in PermissionStore.
+  # Redirect only that service, not applications' XDG_DATA_HOME. Its portal
+  # grants persist together across home reset; initial approval stays explicit.
+  systemd.user.services.xdg-permission-store = lib.mkIf nativeEnabled {
+    overrideStrategy = "asDropin";
+    serviceConfig = {
+      Environment = [ "XDG_DATA_HOME=${nativeStateRoot}/%u/data" ];
+      UMask = "0077";
+    };
+  };
+
+  systemd.tmpfiles.rules = lib.optionals nativeEnabled (
+    [ "d ${nativeStateRoot} 0711 root root - -" ]
+    ++ lib.concatMap (user: [
+      "d ${nativeStateRoot}/${user} 0700 ${user} users - -"
+      "d ${nativeStateRoot}/${user}/state 0700 ${user} users - -"
+      "d ${nativeStateRoot}/${user}/state/veyon 0700 ${user} users - -"
+      "d ${nativeStateRoot}/${user}/data 0700 ${user} users - -"
+    ]) nativeUsers
+  );
 
   # Fallback VNC configuration for hosts outside the native Wayland pilot.
   services.desktopManager.gnome.extraGSettingsOverrides = lib.mkIf (laboratoryEnabled && !useNativeWayland) ''
@@ -177,7 +227,10 @@ in
   # gnome-remote-desktop user service: set the VNC password via environment
   # variable (GNOME Keyring is disabled in desktop.nix), and ensure it's enabled
   # at session start.
-  systemd.user.services.gnome-remote-desktop = lib.mkIf (laboratoryEnabled && !useNativeWayland) {
+  systemd.user.services.gnome-remote-desktop = if nativeEnabled then {
+    # Also stop an already running bridge during a switch to native capture.
+    enable = false;
+  } else lib.mkIf laboratoryEnabled {
     wantedBy = [ "gnome-session.target" ];
     serviceConfig.Environment = [
       "GNOME_REMOTE_DESKTOP_TEST_VNC_PASSWORD=${vncPassword}"

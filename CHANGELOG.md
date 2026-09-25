@@ -61,6 +61,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Native Wayland pilot hosts use Veyon 4.11.3 plus upstream's opt-in portal
+  restore-token persistence fix. Per-user tokens and portal permission stores
+  survive student-home resets outside the template and snapshots; GNOME still
+  requires initial approval. Other hosts retain the existing VNC fallback.
+  The sanitized server PATH now uses trusted NixOS paths for authentication
+  and input helpers; release metadata correctly identifies the 4.11.3 tag.
+
 - Guided USB/SSH installation now asks the operator to type only the live IPv4
   address and temporary password. The controller observes the Ed25519 host key
   without credentials, displays its fingerprint for comparison with the

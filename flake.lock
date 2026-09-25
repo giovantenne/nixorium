@@ -84,17 +84,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1783693648,
-        "narHash": "sha256-IwZoJsCLsyV4Rs2WhKJ5RTcygygfg0ywtvptr0dbHQc=",
-        "ref": "refs/tags/v4.11.0",
-        "rev": "ace22c54bef8373f4cbe84d1624c32604b6e3022",
-        "revCount": 6750,
+        "lastModified": 1789470936,
+        "narHash": "sha256-k2/QOehw1wvt5auoyDV5TsiXaMZDOcCB7oDUrBUNM6M=",
+        "ref": "refs/tags/v4.11.3",
+        "rev": "0c629d9931810a5974038fc1a207d52fbd0e65f6",
+        "revCount": 6877,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/veyon/veyon.git"
       },
       "original": {
-        "ref": "refs/tags/v4.11.0",
+        "ref": "refs/tags/v4.11.3",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/veyon/veyon.git"

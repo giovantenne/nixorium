@@ -178,6 +178,7 @@ let
   controllerTCP = controllerFirewall.interfaces.enp0s3.allowedTCPPorts;
   controllerUDP = controllerFirewall.interfaces.enp0s3.allowedUDPPorts;
   clientTCP = clientFirewall.interfaces.enp0s3.allowedTCPPorts;
+  nativeClient = nativeVeyonLab.nixosConfigurations.pc01.config;
   nativeClientTCP = nativeVeyonLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
   clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
   clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
@@ -362,6 +363,16 @@ assert clientFirewall.interfaces.enp0s3.allowedUDPPorts == [ 5353 ];
 assert builtins.all (port: builtins.elem port nativeClientTCP) [ 22 11100 ];
 assert !(builtins.elem 5900 nativeClientTCP);
 assert builtins.length nativeClientTCP == 2;
+assert nativeVeyonLab.nixosConfigurations.pc01.pkgs.veyon.version == "4.11.3";
+assert nativeClient.systemd.user.services.xdg-permission-store.overrideStrategy == "asDropin";
+assert nativeClient.systemd.user.services.xdg-permission-store.serviceConfig.Environment == [
+  "XDG_DATA_HOME=/var/lib/nixorium/veyon-session/%u/data"
+];
+assert nativeClient.systemd.user.services.veyon-server.partOf == [ "graphical-session.target" ];
+assert nativeClient.systemd.user.services.veyon-server.preStart != "";
+assert builtins.elem "d /var/lib/nixorium/veyon-session/${labConfig.studentUser}/state/veyon 0700 ${labConfig.studentUser} users - -" nativeClient.systemd.tmpfiles.rules;
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? xdg-permission-store);
+assert !nativeClient.systemd.user.services.gnome-remote-desktop.enable;
 assert builtins.any (package: (package.pname or "") == "vlc")
   softwareLab.nixosConfigurations.pc01.config.environment.systemPackages;
 assert !(builtins.any (package: (package.pname or "") == "vlc")

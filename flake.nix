@@ -8,7 +8,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     veyon = {
-      url = "git+https://github.com/veyon/veyon.git?ref=refs/tags/v4.11.0&submodules=1";
+      url = "git+https://github.com/veyon/veyon.git?ref=refs/tags/v4.11.3&submodules=1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

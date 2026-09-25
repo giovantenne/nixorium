@@ -114,9 +114,21 @@ let
   clientIps = map mkHostIp clientNumbers;
 
   veyonWaylandOverlay = final: prev: {
-    veyon = prev.veyon.overrideAttrs (oldAttrs: {
+    # The v4.11.3 tag still has VERSION_PATCH 2 in CMake's fallback; pass the
+    # release explicitly so the official flake also sets both CI tag variables.
+    veyon = (prev.makeVeyon { version = "4.11.3"; }).overrideAttrs (oldAttrs: {
       buildInputs = (oldAttrs.buildInputs or []) ++ [ final.pipewire ];
+      # Upstream 22218d7 (2026-09-25), pending the next Veyon release.
+      patches = (oldAttrs.patches or []) ++ [
+        ../pkgs/patches/veyon-persist-restore-token.patch
+      ];
       postPatch = (oldAttrs.postPatch or "") + ''
+        # Veyon 4.11.1 sanitizes child PATH to FHS locations. Keep its fixed,
+        # trusted-path policy while resolving NixOS setuid helpers and tools.
+        substituteInPlace plugins/platform/linux/LinuxServiceCore.cpp \
+          --replace-fail \
+            'QStringLiteral("/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")' \
+            "QStringLiteral(\"/run/wrappers/bin:$out/bin:/run/current-system/sw/bin\")"
         substituteInPlace plugins/platform/linux/input-helper/CMakeLists.txt \
           --replace-fail 'OWNER_READ OWNER_WRITE OWNER_EXECUTE SETUID' \
                          'OWNER_READ OWNER_WRITE OWNER_EXECUTE'
