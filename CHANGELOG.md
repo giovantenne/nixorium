@@ -106,6 +106,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   intent, discards only local operation credentials, and reports remote key
   revocation as unconfirmed. It never releases an uncertain/dispatched install
   through this path or reuses its disk review.
+- USB/SSH CLI and TUI now require explicit bootstrap success before transferring
+  the installer. A failed connection with prepared artifacts no longer advances
+  into an unverified session. The TUI retains the original connection error
+  across status refreshes and allows reconnecting the prepared operation with
+  fresh physical host-key confirmation and password entry.
 - USB/SSH live-host revalidation now compares the canonical Ed25519 key
   material rather than the non-cryptographic comment in the public-key file,
   and a confirmed remote failure before disk mutation now revokes its live key

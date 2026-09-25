@@ -141,6 +141,17 @@ LAN as a troubleshooting shortcut.
 
 ## USB installation refuses the disk or cache
 
+If a connection attempt returns to `artifacts-ready`, only the controller-side
+build is ready; the live SSH session has not been verified. The TUI keeps the
+connection error visible during the current TUI session, even after refreshing
+status, and returns to physical host-key verification before another password
+attempt. When reattaching an artifacts-only operation, use **Connect live
+client** to continue with the same prepared artifacts, or **Cancel safely** to
+release them. Do not interpret `artifacts-ready` as installation progress or
+disable strict SSH checks. Older versions could hide the initial connection
+error behind `worker does not own the verified live session`; inspect the live
+ISO's `sshd` journal and use an updated CLI/TUI to capture the original error.
+
 The hardware probe excludes the live ISO's boot medium, read-only/removable
 media, mounted/active disks, and unsuitable devices. Compare the reviewed
 canonical path, model, serial, size, and boot-medium evidence with `lsblk` on

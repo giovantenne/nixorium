@@ -228,19 +228,20 @@ const (
 )
 
 type remoteInstallationModel struct {
-	stage        remoteInstallationStage
-	hostCursor   int
-	host         string
-	operationID  string
-	address      string
-	fingerprint  string
-	password     string
-	formField    int
-	diskCursor   int
-	confirmation string
-	recovery     bool
-	response     domain.RemoteInstallResponse
-	plan         domain.RemoteInstallPlanReport
+	stage          remoteInstallationStage
+	hostCursor     int
+	host           string
+	operationID    string
+	address        string
+	fingerprint    string
+	password       string
+	formField      int
+	diskCursor     int
+	confirmation   string
+	recovery       bool
+	bootstrapError string
+	response       domain.RemoteInstallResponse
+	plan           domain.RemoteInstallPlanReport
 }
 
 // computersModel owns inventory, filtering, detail and restore navigation.

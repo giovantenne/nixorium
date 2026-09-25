@@ -206,6 +206,7 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "Choose PXE for many computers or USB over SSH for one physically identified client.", "An existing USB operation can be reattached without repeating apply.")
 	case dashboardUSBInstall:
 		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.", "Use r for status, n for reconciliation, b for reviewed reboot, c to close without reboot, and v for post-boot verification when visible.")
+		lines = append(lines, "Artifacts-ready means the live session is not verified. Use a to connect with fresh physical key confirmation, or x to cancel safely, when visible.", "A failed connection's original error remains visible across status refreshes in this TUI session.")
 	case dashboardRestore:
 		lines = append(lines, "Choose reapply to keep the disk, or reinstall with PXE or USB over SSH.", "Each method keeps its own explicit identity and disk-erasure confirmation boundary.")
 	case dashboardAdministration:
