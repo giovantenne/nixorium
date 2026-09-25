@@ -281,6 +281,12 @@ review. Consumed apply tokens, any remote receipt, uncertain dispatch, and
 reboot evidence prohibit this path. Never remove coordination files manually.
 
 Post-boot verification must succeed before the shared reservation is released.
+Controller rebuild is the sole exception to that reservation: after a strict
+check of the persisted disk-completion receipt, its service pauses the worker,
+acquires and rechecks under the shared lock, and resumes the worker on every
+exit. The client may remain offline/unverified; no pending record is discarded.
+Active, failed, or unknown disk work still blocks controller activation, and
+all other operations continue to respect the reservation.
 If an older worker cannot publish known hosts or logs in its sandbox, preserve
 the reservation and operation credentials while applying the corrected worker
 and service configuration together, then repeat verification. Host trust lives

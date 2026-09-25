@@ -33,6 +33,12 @@ func main() {
 }
 
 func run() error {
+	if len(os.Args) == 2 && os.Args[1] == "--controller-rebuild-check" {
+		return adapters.CheckControllerUSBReservation()
+	}
+	if len(os.Args) != 1 {
+		return errors.New("usage: nixorium-remote-worker [--controller-rebuild-check]")
+	}
 	repository, err := readFixedDeploymentPath(workerDeploymentPathFile)
 	if err != nil {
 		return err
@@ -616,7 +622,7 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 			message = "confirmed pre-mutation failure was already made safe; controller reservation released"
 		}
 	}
-	if worker.operationID == request.OperationID && worker.liveSession != nil && session.Preparation != nil &&
+	if worker.operationID == request.OperationID && worker.liveSession != nil && session.Preparation != nil && !domain.RemoteInstallDiskCompleted(session) &&
 		(session.TokenConsumed || session.DispatchUncertain || session.Receipt != nil) {
 		connection, connectionErr := worker.newStatusConnection(*worker.liveSession)
 		if connectionErr != nil {

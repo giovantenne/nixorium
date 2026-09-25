@@ -267,6 +267,33 @@ type RemoteInstallBootstrapRecord struct {
 	Facts             RemoteMachineFacts `json:"facts"`
 }
 
+// RemoteInstallDiskCompleted distinguishes durable completion of disk work
+// from a still-pending reboot or post-boot identity check. It never means that
+// the installed host has passed that final identity check.
+func RemoteInstallDiskCompleted(session RemoteInstallSession) bool {
+	if !session.TokenConsumed || session.Preparation == nil || session.Receipt == nil ||
+		session.OperationID != session.Plan.OperationID || session.OperationID != session.Preparation.OperationID ||
+		session.OperationID != session.Receipt.OperationID || ValidateRemoteInstallPlan(session.Plan) != nil ||
+		ValidateRemoteInstallPreparation(*session.Preparation) != nil {
+		return false
+	}
+	p, plan, receipt := session.Preparation, session.Plan, session.Receipt
+	if p.SystemPath != plan.SystemPath || p.DeploymentRevision != plan.DeploymentRevision ||
+		p.Host.Name != plan.Host.Name || p.Host.StaticIP != plan.Host.StaticIP ||
+		p.HostKeyPublic != plan.HostKeyPublic || p.Facts.BootID != plan.BootID ||
+		receipt.SchemaVersion != RemoteInstallSchemaVersion || !receipt.Installed ||
+		!receipt.MutationStarted || !receipt.DiskMayBeModified {
+		return false
+	}
+	switch session.State {
+	case "ready-to-reboot", "reboot-dispatching", "reboot-requested", "reconciliation-required", "verified":
+	default:
+		return false
+	}
+	return (receipt.State == "ready-to-reboot" && receipt.Phase == RemoteInstallPhaseReadyToReboot) ||
+		(receipt.State == "reboot-requested" && receipt.Phase == RemoteInstallPhaseReboot && session.RebootRequested)
+}
+
 var (
 	remoteOperationIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	remoteBootIDPattern      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)

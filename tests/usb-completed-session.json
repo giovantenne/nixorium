@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "operationId": "aabbccddeeff00112233445566778899",
+  "state": "reconciliation-required",
+  "plan": {
+    "schemaVersion": 1,
+    "operationId": "aabbccddeeff00112233445566778899",
+    "bootId": "01234567-89ab-cdef-0123-456789abcdef",
+    "deploymentRevision": "0123456789abcdef0123456789abcdef01234567",
+    "systemPath": "/nix/store/00000000000000000000000000000000-nixos-system-pc01-test",
+    "host": {
+      "name": "pc01",
+      "interface": "enp0s2",
+      "liveIp": "192.0.2.20",
+      "staticIp": "10.0.0.1"
+    },
+    "cache": {
+      "url": "http://192.0.2.10:5000",
+      "publicKey": "cache.example:YWJjZA=="
+    },
+    "disk": {
+      "path": "/dev/sda",
+      "kname": "sda",
+      "majorMinor": "8:0",
+      "sizeBytes": 17179869184,
+      "serial": "fixture",
+      "model": "fixture",
+      "transport": "sata",
+      "diskSeq": "1"
+    },
+    "adminPublicKey": "ssh-ed25519 YWJjZA== admin@test",
+    "hostKeyPublic": "ssh-ed25519 YWJjZA== root@test",
+    "hostKeyRotation": false
+  },
+  "preparation": {
+    "operationId": "aabbccddeeff00112233445566778899",
+    "deploymentRevision": "0123456789abcdef0123456789abcdef01234567",
+    "systemPath": "/nix/store/00000000000000000000000000000000-nixos-system-pc01-test",
+    "host": {
+      "name": "pc01",
+      "interface": "enp0s2",
+      "liveIp": "192.0.2.20",
+      "staticIp": "10.0.0.1"
+    },
+    "cache": {
+      "url": "http://192.0.2.10:5000",
+      "publicKey": "cache.example:YWJjZA=="
+    },
+    "adminPublicKey": "ssh-ed25519 YWJjZA== admin@test",
+    "hostKeyPublic": "ssh-ed25519 YWJjZA== root@test",
+    "repository": "/deployment",
+    "bundlePath": "/nix/store/11111111111111111111111111111111-remote-installer",
+    "bundleClosureBytes": 1024,
+    "systemClosureBytes": 2048,
+    "hostFingerprint": "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "preparedAt": "2026-01-01T00:00:00Z",
+    "issues": [],
+    "facts": {
+      "schemaVersion": 1,
+      "variantId": "installer",
+      "versionId": "26.05",
+      "architecture": "x86_64",
+      "uefi": true,
+      "sudoReady": true,
+      "bootId": "01234567-89ab-cdef-0123-456789abcdef",
+      "interfaces": [],
+      "disks": []
+    }
+  },
+  "tokenConsumed": true,
+  "dispatchUncertain": true,
+  "rebootRequested": true,
+  "bootVerified": false,
+  "events": [],
+  "receipt": {
+    "schemaVersion": 1,
+    "operationId": "aabbccddeeff00112233445566778899",
+    "state": "ready-to-reboot",
+    "phase": "ready-to-reboot",
+    "sequence": 4,
+    "mutationStarted": true,
+    "diskMayBeModified": true,
+    "installed": true,
+    "message": "installation completed"
+  }
+}
