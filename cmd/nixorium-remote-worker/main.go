@@ -78,15 +78,39 @@ type remotePreparer interface {
 	Discard(string) error
 }
 
+type remoteStatusConnection interface {
+	Status(context.Context, string, string) (domain.RemoteInstallReceipt, error)
+	OperationLog(context.Context, string, string) ([]byte, error)
+}
+
+type remoteStatusConnectionFactory func(adapters.VerifiedLiveSession) (remoteStatusConnection, error)
+type remoteOperationLogPublisher func(string, []byte, string) (string, error)
+
 type remoteWorker struct {
-	mutex        sync.Mutex
-	state        remoteState
-	bootstrap    liveBootstrapper
-	preparer     remotePreparer
-	reservations remoteReservationSource
-	operationID  string
-	liveSession  *adapters.VerifiedLiveSession
-	reservation  domain.RemoteInstallReservation
+	mutex            sync.Mutex
+	state            remoteState
+	bootstrap        liveBootstrapper
+	preparer         remotePreparer
+	reservations     remoteReservationSource
+	statusConnection remoteStatusConnectionFactory
+	publishRemoteLog remoteOperationLogPublisher
+	operationID      string
+	liveSession      *adapters.VerifiedLiveSession
+	reservation      domain.RemoteInstallReservation
+}
+
+func (worker *remoteWorker) newStatusConnection(session adapters.VerifiedLiveSession) (remoteStatusConnection, error) {
+	if worker.statusConnection != nil {
+		return worker.statusConnection(session)
+	}
+	return adapters.NewStrictLiveSSH(session)
+}
+
+func (worker *remoteWorker) publishOperationLog(operationID string, content []byte, result string) (string, error) {
+	if worker.publishRemoteLog != nil {
+		return worker.publishRemoteLog(operationID, content, result)
+	}
+	return adapters.PublishRemoteOperationLog(operationID, content, result)
 }
 
 func (worker *remoteWorker) recover() error {
@@ -103,6 +127,12 @@ func (worker *remoteWorker) recover() error {
 	}
 	worker.operationID = operationID
 	worker.reservation = reservation
+	if session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
+		if err := worker.releaseResolvedFailureLocked(&session); err != nil {
+			return fmt.Errorf("finish resolved USB failure cleanup: %w", err)
+		}
+		return nil
+	}
 
 	changed := false
 	if session.State == "dispatching" || session.State == "reboot-dispatching" {
@@ -509,12 +539,24 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 	}
 	worker.mutex.Lock()
 	defer worker.mutex.Unlock()
+	message := "remote installation state loaded"
+	if worker.operationID == request.OperationID && session.State == "failed-resolved" && remoteSessionConfirmedNoMutationFailure(session) {
+		if cleanupErr := worker.releaseResolvedFailureLocked(&session); cleanupErr != nil {
+			message = "confirmed pre-mutation failure cleanup remains incomplete: " + cleanupErr.Error()
+		} else {
+			message = "confirmed pre-mutation failure was already made safe; controller reservation released"
+		}
+	}
 	if worker.operationID == request.OperationID && worker.liveSession != nil && session.Preparation != nil &&
 		(session.TokenConsumed || session.DispatchUncertain || session.Receipt != nil) {
-		connection, connectionErr := adapters.NewStrictLiveSSH(*worker.liveSession)
-		if connectionErr == nil {
+		connection, connectionErr := worker.newStatusConnection(*worker.liveSession)
+		if connectionErr != nil {
+			message = "remote installation state loaded; verified live connection is unavailable: " + connectionErr.Error()
+		} else {
 			receipt, statusErr := connection.Status(ctx, session.Preparation.BundlePath, request.OperationID)
-			if statusErr == nil {
+			if statusErr != nil {
+				message = "remote installation state loaded; remote status refresh failed: " + statusErr.Error()
+			} else {
 				session.Receipt = &receipt
 				session.DispatchUncertain = receipt.State == "unknown"
 				if receipt.State == "unknown" {
@@ -522,6 +564,7 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 				} else {
 					session.State = receipt.State
 				}
+				logMessage := ""
 				if receipt.State == "failed" || receipt.State == "ready-to-reboot" || receipt.State == "reboot-requested" {
 					if remoteLog, logErr := connection.OperationLog(ctx, session.Preparation.BundlePath, request.OperationID); logErr == nil {
 						result := "completed"
@@ -531,18 +574,34 @@ func (worker *remoteWorker) handleStatus(ctx context.Context, request domain.Rem
 								result = "partial"
 							}
 						}
-						if logID, publishErr := adapters.PublishRemoteOperationLog(request.OperationID, remoteLog, result); publishErr == nil {
+						if logID, publishErr := worker.publishOperationLog(request.OperationID, remoteLog, result); publishErr == nil {
 							session.LogID = logID
+						} else {
+							logMessage = "controller could not publish the remote operation log: " + publishErr.Error()
 						}
+					} else {
+						logMessage = "controller could not retrieve the remote operation log: " + logErr.Error()
 					}
 				}
-				_ = worker.state.Save(session)
+				saveErr := worker.state.Save(session)
+				if saveErr != nil {
+					message = "remote status was observed but could not be persisted: " + saveErr.Error()
+				} else if remoteSessionSafelyCancellable(session) {
+					if cleanupErr := worker.resolveConfirmedFailureLocked(ctx, &session); cleanupErr != nil {
+						message = "remote failure occurred before disk mutation, but automatic cleanup is incomplete: " + cleanupErr.Error()
+					} else {
+						message = "remote failure occurred before disk mutation; live credentials were revoked and the controller reservation was released automatically"
+					}
+				}
+				if logMessage != "" {
+					message += "; " + logMessage
+				}
 			}
 		}
 	}
 	response.State = session.State
 	response.Session = &session
-	response.Message = "remote installation state loaded"
+	response.Message = message
 	return response
 }
 
@@ -999,9 +1058,65 @@ func remoteSessionSafelyCancellable(session domain.RemoteInstallSession) bool {
 			return true
 		}
 	}
+	return session.State == "failed" && remoteSessionConfirmedNoMutationFailure(session)
+}
+
+func remoteSessionConfirmedNoMutationFailure(session domain.RemoteInstallSession) bool {
 	receipt := session.Receipt
-	return session.State == "failed" && receipt != nil && receipt.OperationID == session.OperationID && receipt.State == "failed" &&
-		!receipt.MutationStarted && !receipt.DiskMayBeModified && !receipt.Installed
+	return receipt != nil && receipt.OperationID == session.OperationID && receipt.State == "failed" &&
+		!receipt.MutationStarted && !receipt.DiskMayBeModified && !receipt.Installed && !session.DispatchUncertain
+}
+
+func (worker *remoteWorker) resolveConfirmedFailureLocked(ctx context.Context, session *domain.RemoteInstallSession) error {
+	if !remoteSessionSafelyCancellable(*session) || worker.liveSession == nil || worker.reservation == nil {
+		return errors.New("confirmed failure does not have a complete verified live session")
+	}
+	if err := worker.bootstrap.CloseSession(ctx, *worker.liveSession); err != nil {
+		return fmt.Errorf("live key cleanup was not confirmed; reservation retained: %w", err)
+	}
+	worker.liveSession = nil
+	session.State = "failed-resolved"
+	session.Events = append(session.Events, domain.RemoteInstallProgress{
+		Phase:  session.Receipt.Phase,
+		Detail: "confirmed remote failure before disk mutation; ephemeral live key revoked",
+	})
+	if err := worker.state.Save(*session); err != nil {
+		stateErr := fmt.Errorf("persist resolved failure state: %w", err)
+		if releaseErr := worker.releaseResolvedFailureLocked(session); releaseErr != nil {
+			return fmt.Errorf("%v; %w", stateErr, releaseErr)
+		}
+		return stateErr
+	}
+	return worker.releaseResolvedFailureLocked(session)
+}
+
+func (worker *remoteWorker) releaseResolvedFailureLocked(session *domain.RemoteInstallSession) error {
+	if session.State != "failed-resolved" || !remoteSessionConfirmedNoMutationFailure(*session) || worker.reservation == nil {
+		return errors.New("resolved failure state is incomplete")
+	}
+	var cleanupErr error
+	if worker.preparer == nil {
+		cleanupErr = errors.New("preparation cleanup is unavailable")
+	} else if err := worker.preparer.Discard(session.OperationID); err != nil {
+		cleanupErr = fmt.Errorf("discard preparation roots: %w", err)
+	}
+	if err := worker.reservation.ReleaseResolved(); err != nil {
+		if cleanupErr != nil {
+			return fmt.Errorf("%v; release controller reservation: %w", cleanupErr, err)
+		}
+		return fmt.Errorf("release controller reservation: %w", err)
+	}
+	worker.operationID = ""
+	worker.liveSession = nil
+	worker.reservation = nil
+	if cleanupErr != nil {
+		session.Events = append(session.Events, domain.RemoteInstallProgress{
+			Phase:  session.Receipt.Phase,
+			Detail: "controller reservation released after confirmed pre-mutation failure; preparation-root cleanup needs maintenance",
+		})
+		_ = worker.state.Save(*session)
+	}
+	return nil
 }
 
 func readFixedDeploymentPath(path string) (string, error) {

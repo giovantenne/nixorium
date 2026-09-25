@@ -695,10 +695,12 @@ nixorium install usb close --id 0123456789abcdef0123456789abcdef
 do not accept `--json`; there is no `--yes` path. `prepare` is optional and
 safe to run early. `cancel` is available before dispatch and after a confirmed
 remote failure that reports no disk mutation; the TUI exposes it as **Cancel
-safely** only in those states. After any uncertain or disk-mutating dispatch,
-use `status` and `reconcile`: the controller never repeats Disko or an
-uncertain reboot automatically. If the worker or controller restarted, invoke
-`start` again for the same host and physically re-enter the same address,
+safely** only when automatic cleanup could not be confirmed. Ordinarily,
+status observation revokes the live key and releases the reservation
+automatically for a definitive pre-mutation failure. After any uncertain or
+disk-mutating dispatch, use `status` and `reconcile`: the controller never
+repeats Disko or an uncertain reboot automatically. If the worker or controller
+restarted, invoke `start` again for the same host and physically re-enter the same address,
 fingerprint, and password. A matching live boot can be reattached for status
 reconciliation only; a different boot is blocked and the old key is revoked.
 

@@ -189,7 +189,7 @@ nixorium_run_disko() {
 }
 
 nixorium_require_clean_install_mount() {
-  if findmnt -rn --target /mnt >/dev/null 2>&1; then
+  if findmnt -rn --mountpoint /mnt >/dev/null 2>&1; then
     echo "/mnt is already occupied" >&2
     return 1
   fi

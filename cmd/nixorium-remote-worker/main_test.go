@@ -34,9 +34,11 @@ func (state *fakeWorkerState) Save(session domain.RemoteInstallSession) error {
 }
 
 type fakeWorkerBootstrap struct {
-	session adapters.VerifiedLiveSession
-	err     error
-	closed  bool
+	session  adapters.VerifiedLiveSession
+	err      error
+	closeErr error
+	closed   bool
+	trace    *[]string
 }
 
 func (bootstrap *fakeWorkerBootstrap) Establish(_ context.Context, operationID, address, fingerprint string, secret *adapters.LivePassword) (adapters.VerifiedLiveSession, error) {
@@ -61,7 +63,10 @@ func (bootstrap *fakeWorkerBootstrap) RecoverSession(operationID string, record 
 
 func (bootstrap *fakeWorkerBootstrap) CloseSession(context.Context, adapters.VerifiedLiveSession) error {
 	bootstrap.closed = true
-	return nil
+	if bootstrap.trace != nil {
+		*bootstrap.trace = append(*bootstrap.trace, "close")
+	}
+	return bootstrap.closeErr
 }
 
 func (bootstrap *fakeWorkerBootstrap) DiscardLocalSession(adapters.VerifiedLiveSession) error {
@@ -69,10 +74,16 @@ func (bootstrap *fakeWorkerBootstrap) DiscardLocalSession(adapters.VerifiedLiveS
 	return nil
 }
 
-type fakeWorkerReservation struct{ released bool }
+type fakeWorkerReservation struct {
+	released bool
+	trace    *[]string
+}
 
 func (reservation *fakeWorkerReservation) ReleaseResolved() error {
 	reservation.released = true
+	if reservation.trace != nil {
+		*reservation.trace = append(*reservation.trace, "release")
+	}
 	return nil
 }
 
@@ -86,7 +97,9 @@ type fakeWorkerPreparer struct {
 	preparation domain.RemoteInstallPreparation
 	artifacts   domain.RemoteInstallArtifacts
 	err         error
+	discardErr  error
 	discarded   bool
+	trace       *[]string
 }
 
 func (preparer *fakeWorkerPreparer) PrepareArtifacts(_ context.Context, operationID, host string) (domain.RemoteInstallArtifacts, error) {
@@ -104,7 +117,32 @@ func (preparer *fakeWorkerPreparer) Finalize(_ context.Context, artifacts domain
 
 func (preparer *fakeWorkerPreparer) Discard(string) error {
 	preparer.discarded = true
-	return nil
+	if preparer.trace != nil {
+		*preparer.trace = append(*preparer.trace, "discard")
+	}
+	return preparer.discardErr
+}
+
+type fakeWorkerStatusConnection struct {
+	receipt   domain.RemoteInstallReceipt
+	statusErr error
+	log       []byte
+	logErr    error
+	trace     *[]string
+}
+
+func (connection *fakeWorkerStatusConnection) Status(context.Context, string, string) (domain.RemoteInstallReceipt, error) {
+	if connection.trace != nil {
+		*connection.trace = append(*connection.trace, "status")
+	}
+	return connection.receipt, connection.statusErr
+}
+
+func (connection *fakeWorkerStatusConnection) OperationLog(context.Context, string, string) ([]byte, error) {
+	if connection.trace != nil {
+		*connection.trace = append(*connection.trace, "log")
+	}
+	return connection.log, connection.logErr
 }
 
 func (source *fakeWorkerReservations) ReserveRemoteSession(string) (domain.RemoteInstallReservation, error) {
@@ -247,6 +285,160 @@ func TestRemoteWorkerConfirmedFailureBeforeMutationCanBeCancelled(t *testing.T) 
 	}
 	if remoteSessionSafelyCancellable(unsafe) {
 		t.Fatal("a failure after disk mutation was marked safely cancellable")
+	}
+}
+
+func TestRemoteWorkerAutomaticallyResolvesConfirmedFailureBeforeMutation(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	live := validWorkerLiveSession()
+	receipt := domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePreflight,
+	}
+	session := domain.RemoteInstallSession{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", TokenConsumed: true, Receipt: &receipt, Events: []domain.RemoteInstallProgress{},
+	}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{operationID: session}}
+	bootstrap := &fakeWorkerBootstrap{session: live}
+	preparer := &fakeWorkerPreparer{}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{
+		state: state, bootstrap: bootstrap, preparer: preparer,
+		operationID: operationID, liveSession: &live, reservation: reservation,
+	}
+	if err := worker.resolveConfirmedFailureLocked(context.Background(), &session); err != nil {
+		t.Fatal(err)
+	}
+	stored := state.sessions[operationID]
+	if stored.State != "failed-resolved" || !bootstrap.closed || !preparer.discarded || !reservation.released ||
+		worker.operationID != "" || worker.liveSession != nil || worker.reservation != nil {
+		t.Fatalf("resolved=%+v worker=%+v", stored, worker)
+	}
+}
+
+func TestRemoteWorkerStatusPublishesFailureLogBeforeAutomaticCleanup(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	live := validWorkerLiveSession()
+	receipt := domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePreflight,
+	}
+	session := domain.RemoteInstallSession{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		LogID: "usb-install-" + operationID + ".log", State: "accepted", TokenConsumed: true,
+		Preparation: &domain.RemoteInstallPreparation{BundlePath: "/nix/store/11111111111111111111111111111111-remote-installer"},
+		Events:      []domain.RemoteInstallProgress{},
+	}
+	trace := []string{}
+	connection := &fakeWorkerStatusConnection{receipt: receipt, log: []byte("/mnt is already occupied\n"), trace: &trace}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{operationID: session}}
+	bootstrap := &fakeWorkerBootstrap{session: live, trace: &trace}
+	preparer := &fakeWorkerPreparer{trace: &trace}
+	reservation := &fakeWorkerReservation{trace: &trace}
+	published := []byte(nil)
+	worker := &remoteWorker{
+		state: state, bootstrap: bootstrap, preparer: preparer,
+		statusConnection: func(adapters.VerifiedLiveSession) (remoteStatusConnection, error) { return connection, nil },
+		publishRemoteLog: func(id string, content []byte, result string) (string, error) {
+			trace = append(trace, "publish")
+			if id != operationID || result != "failed" {
+				t.Fatalf("publish id=%q result=%q", id, result)
+			}
+			published = append([]byte(nil), content...)
+			return "usb-install-" + id + ".log", nil
+		},
+		operationID: operationID, liveSession: &live, reservation: reservation,
+	}
+	response := worker.handleStatus(context.Background(), domain.RemoteInstallRequest{OperationID: operationID})
+	if response.State != "failed-resolved" || response.Session == nil || response.Session.State != "failed-resolved" ||
+		!strings.Contains(response.Message, "controller reservation was released automatically") {
+		t.Fatalf("response=%+v", response)
+	}
+	if string(published) != "/mnt is already occupied\n" || !bootstrap.closed || !preparer.discarded || !reservation.released {
+		t.Fatalf("published=%q bootstrap=%+v preparer=%+v reservation=%+v", published, bootstrap, preparer, reservation)
+	}
+	expectedTrace := []string{"status", "log", "publish", "close", "discard", "release"}
+	if strings.Join(trace, ",") != strings.Join(expectedTrace, ",") {
+		t.Fatalf("trace=%v want=%v", trace, expectedTrace)
+	}
+}
+
+func TestRemoteWorkerRecoveryFinishesResolvedFailureRelease(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	receipt := domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePreflight,
+	}
+	session := domain.RemoteInstallSession{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed-resolved", TokenConsumed: true, Receipt: &receipt, Events: []domain.RemoteInstallProgress{},
+	}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{operationID: session}}
+	preparer := &fakeWorkerPreparer{}
+	reservations := &fakeWorkerReservations{recoverID: operationID}
+	worker := &remoteWorker{
+		state: state, bootstrap: &fakeWorkerBootstrap{}, preparer: preparer, reservations: reservations,
+	}
+	if err := worker.recover(); err != nil {
+		t.Fatal(err)
+	}
+	if !preparer.discarded || reservations.reservation == nil || !reservations.reservation.released ||
+		worker.operationID != "" || worker.reservation != nil {
+		t.Fatalf("preparer=%+v reservations=%+v worker=%+v", preparer, reservations, worker)
+	}
+}
+
+func TestRemoteWorkerResolvedFailureDoesNotLetRootCleanupHoldControllerReservation(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	receipt := domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePreflight,
+	}
+	session := domain.RemoteInstallSession{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed-resolved", Receipt: &receipt, Events: []domain.RemoteInstallProgress{},
+	}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{operationID: session}}
+	preparer := &fakeWorkerPreparer{discardErr: errors.New("fixture root cleanup failed")}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{
+		state: state, preparer: preparer, operationID: operationID, reservation: reservation,
+	}
+	if err := worker.releaseResolvedFailureLocked(&session); err != nil {
+		t.Fatal(err)
+	}
+	stored := state.sessions[operationID]
+	if !reservation.released || worker.operationID != "" || worker.reservation != nil || len(stored.Events) != 1 ||
+		!strings.Contains(stored.Events[0].Detail, "preparation-root cleanup needs maintenance") {
+		t.Fatalf("stored=%+v worker=%+v reservation=%+v", stored, worker, reservation)
+	}
+}
+
+func TestRemoteWorkerRetainsReservationWhenLiveKeyRevocationFails(t *testing.T) {
+	operationID := "0123456789abcdef0123456789abcdef"
+	live := validWorkerLiveSession()
+	receipt := domain.RemoteInstallReceipt{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", Phase: domain.RemoteInstallPhasePreflight,
+	}
+	session := domain.RemoteInstallSession{
+		SchemaVersion: domain.RemoteInstallSchemaVersion, OperationID: operationID,
+		State: "failed", TokenConsumed: true, Receipt: &receipt, Events: []domain.RemoteInstallProgress{},
+	}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{operationID: session}}
+	bootstrap := &fakeWorkerBootstrap{session: live, closeErr: errors.New("fixture revoke failed")}
+	reservation := &fakeWorkerReservation{}
+	worker := &remoteWorker{
+		state: state, bootstrap: bootstrap, preparer: &fakeWorkerPreparer{},
+		operationID: operationID, liveSession: &live, reservation: reservation,
+	}
+	if err := worker.resolveConfirmedFailureLocked(context.Background(), &session); err == nil {
+		t.Fatal("expected live key revocation failure")
+	}
+	if reservation.released || worker.operationID != operationID || worker.liveSession == nil || worker.reservation == nil ||
+		state.sessions[operationID].State != "failed" {
+		t.Fatalf("state=%+v worker=%+v reservation=%+v", state.sessions[operationID], worker, reservation)
 	}
 }
 

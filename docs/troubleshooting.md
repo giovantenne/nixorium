@@ -155,6 +155,12 @@ repair the cache through its managed workflow, then make a fresh plan. Never
 add a public substituter or set signature checking/fallback to false on the
 client.
 
+If the private operation log says `/mnt is already occupied`, first run
+`findmnt -rn --mountpoint /mnt` on the live ISO. A result means an exact mount
+must be investigated; no result means `/mnt` is free. Current Nixorium releases
+use this exact-mount test. Do not unmount anything merely because the older,
+broader target lookup reported the live ISO root filesystem.
+
 ## A USB installation was interrupted
 
 First inspect the exact operation without starting another install:
@@ -174,9 +180,10 @@ reattaches only when the fingerprint and live boot ID also match, then performs
 status reconciliation only. A different boot remains blocked and the recovered
 operation key is revoked.
 
-Use `cancel` before apply, or after a failed remote receipt explicitly reports
-that disk mutation did not start; the TUI offers **Cancel safely** only for
-those states. Do not cancel an uncertain or post-mutation failure. Use `reboot`
+When a failed remote receipt proves that disk mutation did not start, status
+revokes the live key and releases the controller reservation automatically.
+Use **Cancel safely** if that cleanup remains pending; never move coordination
+files by hand. Do not cancel an uncertain or post-mutation failure. Use `reboot`
 only after status reports the installation ready, remove the USB first, and
 verify the installed revision after disk boot. `close` releases a completed or
 deliberately abandoned record; it does not make an uncertain disk safe. If the

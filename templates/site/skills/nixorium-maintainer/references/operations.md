@@ -266,7 +266,9 @@ can reattach only to the same live boot and then observes status without
 replaying Disko. A new boot or changed identity remains blocked. Remove the USB
 only when ready, then use separately confirmed `reboot` and `verify` actions.
 `cancel` is valid before dispatch and after a confirmed remote failure whose
-receipt says disk mutation did not start. It remains forbidden for uncertain or
+receipt says disk mutation did not start. Status normally revokes the live key
+and releases that reservation automatically; use **Cancel safely** only when
+cleanup remains pending. Cancellation remains forbidden for uncertain or
 post-mutation failures; `close` does not prove an uncertain disk safe. Approve
 a reinstall's `ROTATE HOST KEY` only after the physical host and disk are
 independently established; the entry changes after verification.

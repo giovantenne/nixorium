@@ -798,10 +798,12 @@ The controller state machine separates artifact preparation, live-boot
 verification, hardware probe, content-bound plan, apply dispatch, receipt
 observation, reboot dispatch, post-boot verification, and close. Cancellation
 is allowed before dispatch and after a definitive failed receipt proves that
-disk mutation did not start. Once Disko may have started, or a response is
-absent, the state is `reconciliation-required`, not permission to retry or
-cancel. Worker or controller
-restart recovers the durable marker and state; credentials may be physically
+disk mutation did not start. Status automatically revokes the live key and
+releases the reservation for that definitive case, while retaining explicit
+safe cancellation as a cleanup retry. Once Disko may have started, or a
+response is absent, the state is `reconciliation-required`, not permission to
+retry or cancel. Worker or controller restart recovers the durable marker and
+state; credentials may be physically
 re-pinned only after the controller re-observes and the operator reconfirms the
 same address, fingerprint, host and live boot ID. Recovery
 then observes status only. A different live boot revokes the recovered key and

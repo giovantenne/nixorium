@@ -70,6 +70,22 @@ have materially higher fixed cost. The remote VM simulates the supported live
 ISO contract; it does not certify the official ISO, VirtualBox networking, or
 physical firmware and storage.
 
+USB/SSH coverage is deliberately layered. Shell tests own exact live-installer
+preflight predicates, Go adapter tests own the pinned SSH command contract, and
+worker tests own the ordered receipt, log-publication, credential-revocation,
+and reservation-release transition. The management VM owns durable recovery
+and the controller systemd sandbox; the remote-client VM owns the signed cache,
+independent job, Disko receipt, installation, and booted target. A runtime USB
+regression must add a deterministic test at the lowest responsible layer and,
+when the failure depended on filesystem, systemd, or network reality, a fixture
+in the closest VM. Passing either VM alone does not prove the whole workflow.
+
+There is currently no automated test that drives the public TUI from a
+controller VM into an official NixOS Minimal ISO VM. The documented official
+ISO acceptance run therefore remains a required separate checkpoint for that
+cross-machine user journey; it must not be represented as covered by the
+simulated remote-client VM.
+
 ## Selecting the smallest sound gate
 
 - Go domain, application, adapter, or presentation logic: default gate; add

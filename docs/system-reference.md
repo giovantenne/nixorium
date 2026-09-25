@@ -157,11 +157,12 @@ under `/run`.
 An interrupted post-dispatch operation is never replayed. Reconciliation
 observes the exact operation receipt and reports whether disk mutation may have
 started. A definitive failed receipt with no mutation remains safely
-cancellable; uncertain or post-mutation failures do not. A controller restart
-may reattach only after the controller re-observes
-the key and the operator physically reconfirms the same live boot; reboot and known-host rotation remain separately
-confirmed. Ordinary changes to an installed client use `deploy`, not this
-destructive installation API.
+cancellable and normally triggers automatic live-key, preparation-root, and
+reservation cleanup; uncertain or post-mutation failures do not. A controller
+restart may reattach only after the controller re-observes the key and the
+operator physically reconfirms the same live boot; reboot and known-host
+rotation remain separately confirmed. Ordinary changes to an installed client
+use `deploy`, not this destructive installation API.
 
 ## Student home reset
 
