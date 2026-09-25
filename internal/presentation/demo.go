@@ -409,10 +409,17 @@ func renderUSBInstallationDemo(revision string, width, height int) DemoScenario 
 	r.model.busy = ""
 	r.model.installation.remote.stage = remoteInstallConsole
 	r.model.installation.remote.address = "192.168.1.141"
+	r.capture("Enter the live IPv4 address", 2200)
+	r.model.installation.remote.stage = remoteInstallFingerprint
 	r.model.installation.remote.fingerprint = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	r.capture("Compare the automatically observed fingerprint", 2800)
+	r.model.installation.remote.confirmation = "MATCH"
+	r.capture("Confirm the physical fingerprint match", 1800)
+	r.model.installation.remote.confirmation = ""
+	r.model.installation.remote.stage = remoteInstallPassword
 	r.model.installation.remote.password = strings.Repeat("x", 12)
 	r.model.installation.remote.formField = 2
-	r.capture("Enter console-observed identity and masked password", 2600)
+	r.capture("Enter only the temporary password", 2200)
 
 	preparation := domain.RemoteInstallPreparation{
 		OperationID: "0123456789abcdef0123456789abcdef", DeploymentRevision: revision,
@@ -430,7 +437,7 @@ func renderUSBInstallationDemo(revision string, width, height int) DemoScenario 
 	r.model.installation.remote.operationID = preparation.OperationID
 	r.model.installation.remote.stage = remoteInstallBootstrap
 	r.model.busy = "Verifying signed cache access, importing the installer bundle and probing disks"
-	r.capture("Verify the ISO fingerprint and signed cache", 2400)
+	r.capture("Verify the pinned ISO identity and signed cache", 2400)
 	r.model.busy = ""
 	r.model.installation.remote.stage = remoteInstallSelectDisk
 	r.model.installation.remote.diskCursor = 1
@@ -473,7 +480,7 @@ func renderUSBInstallationDemo(revision string, width, height int) DemoScenario 
 	r.capture("Verify the installed identity after reboot", 3400)
 	return DemoScenario{
 		ID: "installation-usb", Title: "Install one computer from the official USB ISO",
-		Description: "Pin the fingerprint observed on the physical console, select one Nixorium identity and disk, install from the signed controller cache, then authorize reboot and verify the exact system.",
+		Description: "Observe the Ed25519 key automatically, confirm its physical-console fingerprint, select one Nixorium identity and disk, install from the signed controller cache, then authorize reboot and verify the exact system.",
 		Frames:      r.frames,
 	}
 }
@@ -651,6 +658,10 @@ func demoActions() DashboardActions {
 		PrepareRemoteInstall: func(string) (domain.RemoteInstallResponse, error) {
 			fail("PrepareRemoteInstall")
 			return domain.RemoteInstallResponse{}, nil
+		},
+		ObserveRemoteInstall: func(string) (string, error) {
+			fail("ObserveRemoteInstall")
+			return "", nil
 		},
 		BootstrapRemoteInstall: func(string, string, string, []byte) (domain.RemoteInstallResponse, error) {
 			fail("BootstrapRemoteInstall")

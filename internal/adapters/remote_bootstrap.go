@@ -156,6 +156,42 @@ func NewLiveBootstrap() LiveBootstrap {
 	return LiveBootstrap{runtimeRoot: "/run/nixorium/remote-install", port: 22, timeout: remoteBootstrapTimeout}
 }
 
+// ObserveHostFingerprint completes the SSH host-key exchange without sending
+// authentication material. The caller must compare the returned fingerprint
+// with the key shown on the physical live-ISO console before it is trusted by
+// Establish.
+func (bootstrap LiveBootstrap) ObserveHostFingerprint(ctx context.Context, address string) (string, error) {
+	if err := validateLiveInstallerAddress(address); err != nil {
+		return "", err
+	}
+	observed := ""
+	client, err := bootstrap.dial(ctx, address, &ssh.ClientConfig{
+		User: "nixos",
+		Auth: []ssh.AuthMethod{ssh.PasswordCallback(func() (string, error) {
+			return "", errors.New("host-key observation completed before authentication")
+		})},
+		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			if key.Type() != ssh.KeyAlgoED25519 {
+				return fmt.Errorf("live installer offered unsupported host key algorithm %q", key.Type())
+			}
+			observed = ssh.FingerprintSHA256(key)
+			return nil
+		},
+		HostKeyAlgorithms: []string{ssh.KeyAlgoED25519},
+		Timeout:           bootstrap.timeout,
+	})
+	if client != nil {
+		_ = client.Close()
+	}
+	if observed == "" {
+		if err == nil {
+			err = errors.New("SSH handshake returned no Ed25519 host key")
+		}
+		return "", fmt.Errorf("observe live installer host key: %w", err)
+	}
+	return observed, nil
+}
+
 // RecoverSession reconstructs only the non-secret in-memory handle for a
 // previously verified live session. The private key and known-hosts file must
 // still be the exact private runtime artifacts bound by the persistent record;
@@ -241,10 +277,9 @@ func (bootstrap LiveBootstrap) Establish(ctx context.Context, operationID, addre
 		password.Destroy()
 		return result, errors.New("remote installation operation ID is invalid")
 	}
-	parsedAddress := net.ParseIP(address)
-	if parsedAddress == nil || parsedAddress.To4() == nil || parsedAddress.String() != address || parsedAddress.IsLinkLocalUnicast() || parsedAddress.IsUnspecified() || parsedAddress.IsMulticast() {
+	if err := validateLiveInstallerAddress(address); err != nil {
 		password.Destroy()
-		return result, errors.New("live installer address is not a canonical usable IPv4 address")
+		return result, err
 	}
 	if !validSSHFingerprint(expectedFingerprint) {
 		password.Destroy()
@@ -384,6 +419,14 @@ func (bootstrap LiveBootstrap) Establish(ctx context.Context, operationID, addre
 		KnownHostsPath: knownHostsPath, PublicKeyLine: restrictedLine, Facts: facts,
 	}
 	return result, nil
+}
+
+func validateLiveInstallerAddress(address string) error {
+	parsedAddress := net.ParseIP(address)
+	if parsedAddress == nil || parsedAddress.To4() == nil || parsedAddress.String() != address || parsedAddress.IsLinkLocalUnicast() || parsedAddress.IsUnspecified() || parsedAddress.IsMulticast() {
+		return errors.New("live installer address is not a canonical usable IPv4 address")
+	}
+	return nil
 }
 
 func (bootstrap LiveBootstrap) dial(ctx context.Context, address string, configuration *ssh.ClientConfig) (*ssh.Client, error) {

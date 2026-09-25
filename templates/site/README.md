@@ -661,13 +661,15 @@ ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
 Keep that console visible. From **Installation → Install computers**, choose
-**USB over SSH**, select one configured identity, and enter the live IPv4
-address, the exact displayed Ed25519 `SHA256:` fingerprint, and the temporary
-password. Nixorium verifies the fingerprint before attempting password
-authentication, installs an operation-specific ephemeral key, probes hardware,
-and shows only eligible non-boot disks. Enter the exact disk path and the
-content-bound confirmation shown by the review. Do not remove the USB, reboot,
-or reuse the address while the install is running.
+**USB over SSH**, select one configured identity, and enter only the live IPv4
+address. Nixorium reads the Ed25519 host key without sending credentials and
+shows its `SHA256:` fingerprint. Compare the complete value with the physical
+console and type `MATCH`; only then enter the temporary password. Nixorium pins
+that key before attempting password authentication, installs an
+operation-specific ephemeral key, probes hardware, and shows only eligible
+non-boot disks. Enter the exact disk path and the content-bound confirmation
+shown by the review. Do not remove the USB, reboot, or reuse the address while
+the install is running.
 
 The controller prepares only target-independent installer content before it
 contacts the live ISO; the target closure is then built and served by the

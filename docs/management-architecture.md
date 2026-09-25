@@ -762,10 +762,13 @@ secret in the public netboot closure.
 The USB path is a controller-orchestrated installation for one configured host,
 not a second deployment transport. The client boots the official NixOS 26.05
 Minimal ISO for `x86_64-linux` in UEFI mode on wired Ethernet. The operator
-reads its canonical IPv4 address and Ed25519 fingerprint from the physical
-console, sets a temporary live password, and enters all three through an
-interactive controller session. The fingerprint is pinned before the password
-is attempted. A short-lived operation key replaces password authentication as
+reads its canonical IPv4 address from the physical console and sets a temporary
+live password. The controller performs a credential-free SSH host-key exchange,
+shows the observed Ed25519 fingerprint, and requires the operator to compare it
+with the value on the still-visible physical console. Only after the explicit
+`MATCH` confirmation does it request the temporary password. The fingerprint
+is therefore pinned before the password is attempted. A short-lived operation
+key replaces password authentication as
 soon as the live boot is verified; neither secret is stored in Git, a Nix
 derivation, process arguments, durable session JSON, or the operation log.
 
@@ -794,7 +797,8 @@ observation, reboot dispatch, post-boot verification, and close. Cancellation
 is allowed only before apply. Once Disko may have started, an absent response is
 `reconciliation-required`, not permission to retry. Worker or controller
 restart recovers the durable marker and state; credentials may be physically
-re-pinned only to the same address, fingerprint, host and live boot ID. Recovery
+re-pinned only after the controller re-observes and the operator reconfirms the
+same address, fingerprint, host and live boot ID. Recovery
 then observes status only. A different live boot revokes the recovered key and
 remains blocked. Reboot and host-key rotation are separate reviewed actions;
 the configured static-address key changes only after installed-host verification.

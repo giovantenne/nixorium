@@ -61,6 +61,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Guided USB/SSH installation now asks the operator to type only the live IPv4
+  address and temporary password. The controller observes the Ed25519 host key
+  without credentials, displays its fingerprint for comparison with the
+  physical console, and requires `MATCH` before any password authentication.
 - New private deployments now install and enable Desktop Icons NG and Dash to
   Dock as baseline workstation policy, independently of the application
   profile. Files created in the Desktop directory are visible on the desktop,

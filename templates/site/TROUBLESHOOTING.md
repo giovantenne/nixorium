@@ -120,13 +120,15 @@ ip -4 -br address
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
-Enter the canonical address and the complete Ed25519 `SHA256:` fingerprint
-shown there. Do not copy a fingerprint from DNS, an earlier boot, or
-`known_hosts`. A mismatch is rejected before password authentication and no
-operation key is installed. A correct fingerprint with a wrong temporary
-password also leaves no operation key. Correct the console value and start a
-fresh reviewed attempt; do not disable host-key checking or enable persistent
-root password access.
+Enter the canonical address in the TUI. Nixorium reads the current Ed25519 host
+key without sending the password and shows its complete `SHA256:` fingerprint.
+Compare it with the value on the physical console and type `MATCH` only when
+they are identical. Do not approve a fingerprint using DNS, an earlier boot,
+or `known_hosts`. A changed key is rejected before password authentication and
+no operation key is installed. A confirmed fingerprint with a wrong temporary
+password also leaves no operation key. Correct the address or restart the live
+environment and make a fresh reviewed attempt; do not disable host-key checking
+or enable persistent root password access.
 
 If the address cannot be reached, confirm the live ISO and controller are on
 the same routed wired segment and that the address is not the controller or a
@@ -164,9 +166,11 @@ If apply may have been dispatched, assume the selected disk may be partially
 partitioned. Reconciliation reads the remote receipt and service state; it does
 not rerun Disko. After a worker/controller restart, run `install usb start` for
 the same host and physically re-enter the same live address, fingerprint, and
-password. Nixorium reattaches only when the live boot ID also matches, then
-performs status reconciliation only. A different boot remains blocked and the
-recovered operation key is revoked.
+password. In the guided TUI, Nixorium instead re-observes the key for physical
+comparison and asks the operator to re-enter only the address and password. It
+reattaches only when the fingerprint and live boot ID also match, then performs
+status reconciliation only. A different boot remains blocked and the recovered
+operation key is revoked.
 
 Use `cancel` only before apply. Use `reboot` only after status reports the
 installation ready, remove the USB first, and verify the installed revision

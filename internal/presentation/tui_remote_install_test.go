@@ -101,7 +101,7 @@ func TestUSBInstallPasswordIsMaskedAndClearedBeforeCallbackResult(t *testing.T) 
 	model := dashboardModel{
 		screen: dashboardUSBInstall,
 		installation: installationModel{method: domain.RemoteInstallUSBSSH, remote: remoteInstallationModel{
-			stage: remoteInstallConsole, host: "pc01", operationID: remoteTUITestOperationID,
+			stage: remoteInstallPassword, host: "pc01", operationID: remoteTUITestOperationID,
 			address: "192.0.2.20", fingerprint: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", password: "temporary-secret", formField: 2,
 		}},
 		actions: DashboardActions{BootstrapRemoteInstall: func(_, _, _ string, password []byte) (domain.RemoteInstallResponse, error) {
@@ -123,6 +123,55 @@ func TestUSBInstallPasswordIsMaskedAndClearedBeforeCallbackResult(t *testing.T) 
 	model = updated.(dashboardModel)
 	if received != "temporary-secret" || model.installation.remote.password != "" {
 		t.Fatalf("bootstrap secret transfer=%q model password=%q", received, model.installation.remote.password)
+	}
+}
+
+func TestUSBInstallObservesFingerprintBeforePasswordEntry(t *testing.T) {
+	observedAddress := ""
+	bootstrapCalls := 0
+	model := dashboardModel{
+		screen: dashboardUSBInstall,
+		installation: installationModel{method: domain.RemoteInstallUSBSSH, remote: remoteInstallationModel{
+			stage: remoteInstallConsole, host: "pc01", operationID: remoteTUITestOperationID, address: "192.0.2.20",
+		}},
+		actions: DashboardActions{
+			ObserveRemoteInstall: func(address string) (string, error) {
+				observedAddress = address
+				return "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", nil
+			},
+			BootstrapRemoteInstall: func(_, _, _ string, _ []byte) (domain.RemoteInstallResponse, error) {
+				bootstrapCalls++
+				return remoteTUITestPreparedResponse("bootstrapped-artifacts"), nil
+			},
+		},
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command == nil || model.installation.remote.stage != remoteInstallFingerprint || model.installation.remote.password != "" {
+		t.Fatal("address submission did not start credential-free host-key observation")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if observedAddress != "192.0.2.20" || model.installation.remote.fingerprint == "" || !strings.Contains(model.View().Content, "Type MATCH") || bootstrapCalls != 0 {
+		t.Fatalf("observed=%q fingerprint=%q bootstrap=%d", observedAddress, model.installation.remote.fingerprint, bootstrapCalls)
+	}
+	for _, character := range "WRONG" {
+		updated, _ = model.Update(tea.KeyPressMsg{Text: string(character)})
+		model = updated.(dashboardModel)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || model.installation.remote.stage != remoteInstallFingerprint || bootstrapCalls != 0 {
+		t.Fatal("wrong physical-match confirmation reached password entry or bootstrap")
+	}
+	for _, character := range "MATCH" {
+		updated, _ = model.Update(tea.KeyPressMsg{Text: string(character)})
+		model = updated.(dashboardModel)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || model.installation.remote.stage != remoteInstallPassword || bootstrapCalls != 0 {
+		t.Fatal("fingerprint confirmation did not open password entry cleanly")
 	}
 }
 

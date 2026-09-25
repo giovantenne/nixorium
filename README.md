@@ -163,12 +163,14 @@ ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
 Keep the console visible. On the controller choose **USB over SSH**, select the
-configured computer, and enter the live IPv4 address, the exact displayed
-`SHA256:` Ed25519 fingerprint, and the temporary live-ISO password. Review the
-reported hardware and eligible disks, type the exact confirmation shown, and
-wait for the independent operation to finish. Remove the USB only when the
-result says the install is ready, request the separately confirmed reboot, and
-verify the installed revision after the client starts from disk.
+configured computer, and enter only the live IPv4 address. Nixorium reads the
+Ed25519 host key without sending credentials and shows its `SHA256:`
+fingerprint; compare the complete value with the physical console and type
+`MATCH`. Only then enter the temporary live-ISO password. Review the reported
+hardware and eligible disks, type the exact confirmation shown, and wait for
+the independent operation to finish. Remove the USB only when the result says
+the install is ready, request the separately confirmed reboot, and verify the
+installed revision after the client starts from disk.
 
 The password is read only from the controlling terminal and is never a root
 password for the installed system. A fingerprint mismatch is rejected before

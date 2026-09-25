@@ -141,7 +141,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 			t.Fatalf("USB installation demo omits %q", expected)
 		}
 	}
-	if strings.Contains(usbText, strings.Repeat("x", 12)) || !demoFramesContain(usb.Frames, "Authorize reboot separately") || !demoFramesContain(usb.Frames, "Verify the installed identity after reboot") {
+	if strings.Contains(usbText, strings.Repeat("x", 12)) || !demoFramesContain(usb.Frames, "Compare the automatically observed fingerprint") || !demoFramesContain(usb.Frames, "Confirm the physical fingerprint match") || !demoFramesContain(usb.Frames, "Enter only the temporary password") || !demoFramesContain(usb.Frames, "Authorize reboot separately") || !demoFramesContain(usb.Frames, "Verify the installed identity after reboot") {
 		t.Fatal("USB installation demo exposes a secret or omits the separate reboot/verification boundary")
 	}
 }

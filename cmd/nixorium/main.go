@@ -398,6 +398,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 				Operation: domain.RemoteInstallPrepareOperation, Host: host,
 			}, nil)
 		},
+		ObserveRemoteInstall: func(address string) (string, error) {
+			return adapters.NewLiveBootstrap().ObserveHostFingerprint(ctx, address)
+		},
 		BootstrapRemoteInstall: func(host, address, fingerprint string, password []byte) (domain.RemoteInstallResponse, error) {
 			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{
 				Operation: domain.RemoteInstallBootstrapOperation, Host: host, Address: address, Fingerprint: fingerprint,
