@@ -42,8 +42,9 @@ describes the site; the controller supplies the systems over the local network.
 
 - Centralized configuration and deployment to one, selected, or all clients
   from pinned Nix inputs.
-- Guided PXE installation and reinstallation, with computer identity, disk
-  selection, and destructive confirmation performed locally on each client.
+- Guided installation and reinstallation through PXE or an official NixOS
+  Minimal ISO over reviewed USB/SSH. Both paths bind a configured computer to
+  an eligible disk and require an explicit destructive confirmation.
 - Controller-prepared installation artifacts and a signed local binary cache,
   so clients can install and receive system updates without Internet access.
 - ProxyDHCP network boot alongside an existing DHCP server, which remains
@@ -67,18 +68,19 @@ describes the site; the controller supplies the systems over the local network.
 ## Before you try it
 
 - **Hardware:** the supported target is `x86_64-linux`. Controller and clients
-  require UEFI; clients need working UEFI network boot. Start with a disposable
-  controller and one client, using VMs or dedicated test hardware.
+  require UEFI. PXE needs working UEFI network boot; USB/SSH needs USB boot and
+  wired Ethernet. Start with a disposable controller and one client, using VMs
+  or dedicated test hardware.
 - **Controller:** bootstrap from the official [NixOS Minimal
   ISO](https://nixos.org/download/#nixos-iso) in UEFI mode with Internet access.
   It provides the predictable Linux text console required while choosing the
   keyboard and entering passwords. Allow storage for the deployment, build
   outputs, and prepared client systems; requirements depend on the software
   selected.
-- **Network:** use a lab LAN with an existing DHCP server and permission to run
-  PXE services. For an initial test, keep the controller and client on the same
-  isolated segment with DHCP available. Choose a static lab address range that
-  does not conflict with the existing network.
+- **Network:** keep the controller and client on the same wired lab segment.
+  PXE additionally needs an existing DHCP server and permission to run
+  ProxyDHCP services. Choose a static lab address range that does not conflict
+  with the existing network.
 - **Internet:** the controller fetches inputs and packages during preparation
   and updates. Prepared client installations and system deployments use the
   LAN only; applications and user sessions may have their own Internet needs.
@@ -143,14 +145,46 @@ settings**. The flow validates and saves the settings, generates missing keys,
 activates the controller configuration, and prepares all configured clients.
 It retains the controller's time zone and keyboard settings.
 
-Review the network transition when prompted, then confirm starting PXE.
-Existing DHCP continues assigning leases. Keep the generated deployment
-repository private.
+### 3. Choose how to install the first client
 
-### 3. Install and check one client
+For PXE, continue in the guided flow, review the temporary controller network
+change, boot the client with UEFI network boot, and run `/installer/setup.sh`.
+The client console owns identity, disk selection, `ERASE` confirmation, and the
+separate reboot confirmation.
 
-Boot the test client over the network. In the downloaded installer environment,
-run:
+For USB/SSH, boot that client from the official **NixOS 26.05 Minimal ISO** in
+UEFI mode with wired Ethernet. At its local console run:
+
+```sh
+passwd
+systemctl is-active sshd
+ip -4 -br address
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+Keep the console visible. On the controller choose **USB over SSH**, select the
+configured computer, and enter the live IPv4 address, the exact displayed
+`SHA256:` Ed25519 fingerprint, and the temporary live-ISO password. Review the
+reported hardware and eligible disks, type the exact confirmation shown, and
+wait for the independent operation to finish. Remove the USB only when the
+result says the install is ready, request the separately confirmed reboot, and
+verify the installed revision after the client starts from disk.
+
+The password is read only from the controlling terminal and is never a root
+password for the installed system. A fingerprint mismatch is rejected before
+password authentication. Wi-Fi, legacy BIOS boot, graphical ISOs, arbitrary
+live environments, and unattended USB installation are outside this supported
+path. Installation creates or replaces a machine; later configuration changes
+use the separate reviewed deployment workflow.
+
+On the PXE path, review the network transition when prompted and confirm start;
+existing DHCP continues assigning leases. On either path, keep the generated
+deployment repository private.
+
+### 4. Check the installed client
+
+For PXE, boot the test client over the network and run this in the downloaded
+installer environment:
 
 ```sh
 /installer/setup.sh
@@ -158,12 +192,13 @@ run:
 
 Select that computer's configured identity and target disk. The installer
 console uses the controller's configured keyboard layout and requires explicit
-destructive confirmation before proceeding. After installation, boot the
-client from its local disk.
+destructive confirmation before proceeding. For USB/SSH, follow the reviewed
+operation to its verified result. After either installation, boot the client
+from its local disk.
 
-Stop PXE from **Installation → PXE mode and network recovery** to restore the
-controller's normal static address. Check login, desktop behavior, home reset,
-and a client deployment before adding more computers.
+If used, stop PXE from **Installation → PXE mode and network recovery** to
+restore the controller's normal static address. Check login, desktop behavior,
+home reset, and a client deployment before adding more computers.
 
 Continue with the [administrator guide](templates/site/README.md) for normal
 operation and customization. The [hardware validation plan](docs/hardware-validation.md)
@@ -191,7 +226,7 @@ normal lab operation; PXE services run on demand.
 Privileged operations use fixed systemd units and constrained polkit rules,
 not arbitrary root commands from the interface. Firewall openings are scoped
 to the configured lab interface and machine role. Client installation requires
-local confirmation; unattended installation is disabled.
+an exact reviewed confirmation; unattended installation is disabled.
 
 > [!NOTE]
 > TCP port 5900 is open on the lab interface only for hosts using Nixorium's

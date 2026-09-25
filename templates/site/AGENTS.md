@@ -46,9 +46,13 @@ configuration, software, home customization, diagnostics, and operations.
   or `veyon-private-key.pem`, or expose them to the Nix store or chat.
 - Create/verify keys with `nixorium setup keys`; never overwrite mismatched
   pairs. Install verified secrets only through `nixorium setup install-secrets`.
-- Use managed controller, deployment, and PXE operations. Do not work around
-  a refusal with raw root commands, a second cache, or altered network state.
-  Inspect `nixorium doctor` and the reported operation journal instead.
+- Use managed controller, deployment, PXE, and USB/SSH installation operations.
+  For USB, physically compare the live ISO address/fingerprint, select only an
+  eligible non-boot disk, and reconcile an existing operation ID after
+  interruption; never rerun an uncertain install or reboot. Do not work around
+  a refusal with raw root commands, relaxed host-key checks, a second cache, or
+  altered network state. Inspect `nixorium doctor`, operation status, and the
+  reported journal instead.
 - The student intentionally cannot administer NetworkManager. Do not add that
   account to the `networkmanager` group or override its polkit denial without
   an explicit, reviewed change to the lab's security policy.

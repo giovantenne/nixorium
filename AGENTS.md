@@ -41,10 +41,12 @@ lib/
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
   mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
+scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
 pkgs/
   gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
   nixorium.nix             # Go management command package
 cmd/nixorium/              # Management CLI entrypoint
+cmd/nixorium-remote-worker/ # Controller-owned USB/SSH operation worker
 cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
 internal/                  # Domain, application, adapter, and presentation layers
 modules/
@@ -197,6 +199,13 @@ Release from the matching changelog section.
   host numbers are validated offsets. Each PC gets DHCP plus its static address
   on its resolved interface.
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
+- USB/SSH installation supports only the official NixOS 26.05 Minimal ISO on
+  `x86_64-linux`, UEFI, and wired Ethernet. Preserve physical-console
+  fingerprint pinning before password use, terminal-only secret input,
+  operation-specific keys, signed-cache-only transfer, boot-medium exclusion,
+  exact disk/revision revalidation, and separate reboot/verification. Never
+  replay apply or reboot after uncertain dispatch. Recovery may reattach only
+  to the exact host, address, fingerprint, and live boot ID.
 - Custom settings flow from `lib/mk-lab.nix` via `specialArgs` (`labSettings`, `labAssets`, `hostName`, `hostIp`) to modules that need them.
 - `labSettings` is a plain attribute set containing all configurable values: user names (`teacherUser`, `studentUser`), passwords, SSH key, network settings, locale/timezone, homepage URL, git identity, and more.
 - Structured settings changes use `config plan` followed by `config apply --expect <fingerprint>`; the plan must pass the deployment's `nixoriumValidateCandidate` hook and must never expose password hashes in its diff.
@@ -429,6 +438,12 @@ set -euo pipefail
 - public PXE lifecycle control must retain the exact verb/unit allowlist,
   require readiness before confirmed start, deny direct network-unit start,
   and synchronously stop listener/network units after a failed start
+- `nixorium-remote-install.service` is the only USB/SSH controller worker. Keep
+  its fixed deployment path, administrator ownership, mode-0600 private socket,
+  `/run`-only credentials, strict durable records, and content-bound IPC. Its
+  persistent reservation and the fleet lock must remain atomic with PXE and
+  deployment; malformed/orphan state fails closed and post-dispatch recovery
+  observes receipts without issuing a second mutation.
 - keep product firewall openings interface- and role-scoped; do not restore
   global `allowed*Ports` or module `openFirewall` shortcuts
 - Keep the student outside the `networkmanager` group and preserve the explicit

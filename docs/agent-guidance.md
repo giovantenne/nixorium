@@ -16,7 +16,7 @@ an explicit product decision.
 | Controller-only readiness, inventory, interfaces | `lib/mk-lab.nix`, domain/app readiness tests | Deployment AGENTS; maintainer context/validation |
 | Home reset, extensions, npm, desktop defaults | `modules/home-reset.nix`, home scripts, template modules/assets | Maintainer student-home guide; system reference |
 | Account roles and NetworkManager authorization | `modules/users.nix`, mkLab tests | Both AGENTS files; maintainer configuration guidance; deployment README; system/architecture docs; changelog |
-| Privilege, keys, PXE/recovery | Management/PXE modules, adapters, integration tests | Core invariants; maintainer configuration/operations; troubleshooting |
+| Privilege, keys, PXE or USB/SSH recovery | Management/PXE modules, remote worker/helper, adapters, integration tests | Core invariants; maintainer configuration/operations; troubleshooting |
 | Input ownership and updates | Update adapters/tests, Flake/template contract | Maintainer software/framework-update guidance; deployment AGENTS |
 | Bootstrap prompts, sequencing, and netboot keyboard | `install.sh`, bootstrap CLI, `lib/mk-lab.nix`, controller-bootstrap and mkLab tests | Root README; deployment README; system reference; controller-first ADR; changelog |
 | Validation or skill distribution | `scripts/validate.sh`, `tests/source-checks.nix`, package source fileset | Both AGENTS files; developer validation reference |
@@ -77,6 +77,8 @@ disposable fixture or read-only review, never an actual unapproved deployment:
 - Add Python editor extensions to the reset student home.
 - Rebuild a controller-only deployment with zero clients.
 - Diagnose a failed PXE transition without changing network state.
+- Diagnose an interrupted USB/SSH install by operation ID without replaying
+  disk mutation or accepting a new physical identity.
 
 Check chosen files/scopes, questions, validation cost, authorization boundaries,
 and whether the result honestly separates saved from applied state.

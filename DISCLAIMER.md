@@ -15,7 +15,8 @@ same result on different hardware, firmware, networks, or institutional policy.
 The operator is responsible for:
 
 - verifying every target, scope, disk, network interface, and destructive
-  confirmation before proceeding;
+  confirmation before proceeding, including physically comparing a live USB
+  client's address and SSH fingerprint and excluding its boot medium;
 - maintaining tested backups for data that must survive reset, reinstall, disk
   failure, or operator error;
 - testing changes on a representative non-critical system before wider
@@ -34,6 +35,12 @@ reinstallation or failed disk can remove both current data and snapshots.
 Nixorium does not provide centralized identity management, durable student-file
 storage, regulatory compliance, or unattended authorization for destructive
 installation.
+
+USB/SSH installation does not make an interrupted disk mutation reversible.
+The operator must keep local console access, remove the installation medium at
+the documented point, and treat an uncertain post-dispatch result as possible
+partial disk erasure until the same operation is reconciled or the dedicated
+target is deliberately reinitialized.
 
 Documentation, demonstrations, sample configuration, and observations from the
 original classroom describe specific tested or historical conditions. They are

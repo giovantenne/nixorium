@@ -2,22 +2,22 @@
 
 Use one disposable controller and one client to follow the official installer,
 boot the client from its own disk, and deploy one software change. This recipe
-sets up the virtual environment; the [official quick start at the selected
-tag](https://github.com/giovantenne/nixorium/blob/v2.0.0-beta.4/README.md#quick-start)
-and [administrator guide](https://github.com/giovantenne/nixorium/blob/v2.0.0-beta.4/templates/site/README.md)
-remain the installation and operating references.
+sets up the virtual environment; the [quick start](../README.md#quick-start)
+and [administrator guide](../templates/site/README.md) in the exact checkout
+under test remain the installation and operating references.
 
 ## Scope and verification status
 
-Recipe target: Nixorium **v2.0.0-beta.4**, commit
-`50051393c9c1a7a9efdb8a9733931808eed7effa`, on Linux x86_64 with VirtualBox
-7.2.16. The published tag and current source were checked on 2026-09-20.
-This is an evaluation of the beta workflow, not the earlier stable line.
+Recipe target: the exact clean Nixorium checkout being evaluated, on Linux
+`x86_64` with VirtualBox 7.2.16. Record `VERSION` and the full Git commit before
+starting; the USB/SSH scenario requires a revision that exposes
+`nixorium install usb`. This is an evaluation of the beta workflow, not the
+earlier stable line or an unrecorded moving branch.
 
 **Not tested end to end.** The virtual DHCP configuration commands were
 executed in a temporary VirtualBox configuration and inspected with VirtualBox
 7.2.16. Installation instructions and network settings were checked against the
-tagged source. No controller/client VM was booted, installed, or deployed:
+source. No controller/client VM was booted, installed, or deployed:
 the authoring environment did not expose `/dev/vboxdrv`.
 DHCP lease delivery, UEFI/ProxyDHCP interoperability, disk installation, software
 deployment, and guest shutdown still need a recorded run. Expected results
@@ -148,8 +148,11 @@ Expected: UEFI confirmation, both adapters visible, working controller
 Internet, and exactly one 96 GiB installable disk (normally `/dev/sda`), plus the
 ISO. Stop if the disk list includes anything you did not create for this trial.
 
-Now follow the linked **official quick start**, selecting **v2.0.0-beta.4** in
-the bootstrap's version menu. Retain every account/password, keyboard, and disk
+Now follow the linked **official quick start**, selecting the exact published
+tag under evaluation in the bootstrap menu. An unreleased local checkout
+cannot be installed through that public menu; build a controlled local test
+artifact or defer the VM run until its release rather than silently testing an
+older remote revision. Retain every account/password, keyboard, and disk
 confirmation. The selected 96 GiB virtual disk will be erased. Record the
 resolved commit printed by bootstrap; it must match the recipe target above.
 
@@ -228,6 +231,53 @@ ip -4 route
 Expected: `pc01`, local Btrfs root, `10.77.0.1/24` on adapter 1, and no default
 route. The desktop should open; application Internet access is intentionally
 absent in this fixture.
+
+## 5B. Alternate USB/SSH installation scenario
+
+Run this as a separate destructive scenario from a fresh blank client disk.
+Either create `nixorium-eval-usb-client` with the same client settings, or
+restore a snapshot taken before step 5 and verify the 40 GiB disk is blank.
+Never attach the already installed disk merely to compare methods. Attach the
+same verified official NixOS 26.05 Minimal ISO to the optical drive, keep EFI
+enabled, and boot it. PXE must be stopped; adapter 1 remains the wired Internal
+Network and the client still has no Internet route.
+
+At the live client's local console run:
+
+```sh
+passwd
+systemctl is-active sshd
+ip -4 -br address
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+lsblk -o NAME,PATH,SIZE,TYPE,RM,RO,MOUNTPOINTS,MODEL,SERIAL
+```
+
+Record the live IPv4 address, full Ed25519 fingerprint, ISO device, and blank
+target disk. On the controller choose **Installation → Install computers → USB
+over SSH**, select `pc01`, and transcribe the address, fingerprint, and temporary
+password while the client console remains visible. The client VM should not
+have the controller's NAT adapter or any Internet route. Expected: fingerprint
+verification precedes password use, the optical boot medium is excluded, only
+the 40 GiB disk is eligible, the target closure arrives from the controller's
+signed cache, and the review names `pc01`, the exact disk, revision, and risk.
+
+Enter one wrong confirmation first and prove no transient install unit or disk
+mutation starts. Then enter the exact displayed confirmation. Record the
+operation ID and observe it independently:
+
+```sh
+nixorium install usb status --id 0123456789abcdef0123456789abcdef --json
+nixorium install usb reconcile --id 0123456789abcdef0123456789abcdef
+```
+
+When status reports the install ready, detach the ISO before using the
+separately confirmed reboot action. After disk boot, run `verify` and the same
+hostname, mount, address, route, and active-system checks from step 5. Pass only
+when the installed revision matches, PXE stayed stopped, the controller static
+address never changed, the operation key was removed, and the client still had
+no Internet route. Exercise a worker restart before apply in one disposable run
+and a controller restart after dispatch in another; recovery must bind the same
+live boot and reconcile status without running Disko twice.
 
 ## 6. Make and verify one software change
 

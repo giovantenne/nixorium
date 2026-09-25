@@ -125,6 +125,41 @@ override, role override, then fallback. `labMeta.network.ifaceName` remains the
 effective controller interface for older management consumers; controller and
 client records also expose their effective interface explicitly.
 
+## USB/SSH client installation boundary
+
+The supported remote-install environment is the official NixOS 26.05 Minimal
+ISO for `x86_64-linux`, booted with UEFI and wired Ethernet. The controller
+must be a configured laboratory controller with a healthy signed Harmonia
+cache; controller-only deployments and arbitrary rescue environments are not
+accepted. This workflow does not depend on PXE services or alter the
+controller's static address.
+
+`packages.x86_64-linux.remoteInstallerBundle` contains the target-independent
+remote helper, metadata, and Disko programs. It deliberately excludes a client
+system closure and can be prepared before the live address is known. After a
+physical-console fingerprint has been pinned, the controller builds the exact
+selected client's closure and the live helper copies only signed paths from
+Harmonia with substituter fallback disabled. The helper excludes the ISO boot
+medium and validates the chosen disk, NIC, cache public key, deployment
+revision, and closure immediately before mutation.
+
+The public CLI surface is `install usb prepare/start/status/reconcile/reboot/
+verify/cancel/close`. `prepare` and `start` take `--host`; later actions take
+the returned `--id`. `start`, `reboot`, and `close` require `/dev/tty`, have no
+JSON or unattended form, and collect secrets only through the terminal.
+`status`, `reconcile`, `verify`, and `cancel` support `--json`. The installed
+controller owns `nixorium-remote-install.service`; its private socket is
+`/run/nixorium/remote-install/control.sock`, durable state is under
+`/var/lib/nixorium/remote-install`, and volatile keys/password material remains
+under `/run`.
+
+An interrupted post-dispatch operation is never replayed. Reconciliation
+observes the exact operation receipt and reports whether disk mutation may have
+started. A controller restart may reattach only after the operator physically
+re-pins the same live boot; reboot and known-host rotation remain separately
+confirmed. Ordinary changes to an installed client use `deploy`, not this
+destructive installation API.
+
 ## Student home reset
 
 At boot, the previous student home becomes one of five rotating snapshots and
@@ -312,7 +347,8 @@ consume `lib.mkLab`. Important generated outputs include:
 - `nixoriumSoftwarePresets` for the normalized optional profile catalog, or `null` when a deployment does not provide one;
 - `nixoriumUpdateTargets` and `nixoriumOfflineCheck` for base-update validation;
 - `nixorium` and supporting Flake applications;
-- `pxeFirmware` and `installerBundle`;
+- `pxeFirmware`, `installerBundle`, and the target-independent
+  `remoteInstallerBundle` for USB/SSH live-ISO installation;
 - schema, compatibility, package, and VM checks.
 
 For an unchanged lock and site configuration, a client evaluated through the

@@ -147,8 +147,10 @@ Mutating workflows terminate in compact typed result states. Presentation maps
 each result only to existing typed navigation callbacks—for example Git review,
 bounded logs, retry/review, further editing, or dashboard. The computer
 installation flow is the explicit orchestration exception: presentation chains
-only the typed settings, key, controller, artifact and PXE-plan callbacks, and
-stops before the network mutation for exact confirmation.
+only typed settings, key, controller, method-selection and installation
+callbacks. PXE stops before its network mutation; USB/SSH stops before its
+content-bound disk mutation. Both require the exact confirmation owned by their
+typed plan.
 All non-terminal dashboard wait states reuse one background-aware official
 Bubbles spinner. It provides liveness only: the accompanying authored activity
 label describes the work, while spinner state is never treated as operational
@@ -475,10 +477,10 @@ inspect environment
   -> validate and save managed configuration
   -> create, verify and install missing key material
   -> apply controller configuration
-  -> prepare installation artifacts
-  -> verify PXE readiness
-  -> confirm the network transition
-  -> start PXE
+  -> choose PXE or USB over SSH
+  -> prepare the selected installation boundary
+  -> review its network/session and destructive effects
+  -> start the selected installation
 ```
 
 The private deployment records only non-secret intent and completed review
@@ -507,20 +509,22 @@ uses the same candidate-plan/apply backend as automation. The dashboard's
 **Installation → Install computers** action validates and saves the complete
 form without a second review, while omitting time zone and keyboard because the
 installed controller values are retained. It creates missing keys, activates
-the controller, and prepares every configured client. Existing valid keys are
-reused; importing an existing private key is available only under Maintenance
-settings. The flow
-shows each phase and stops only at the exact PXE-start confirmation, immediately
-before the controller's static address is removed. Reopening it skips
+the controller, and then asks which installation method to use. Existing valid
+keys are reused; importing an existing private key is available only under
+Maintenance settings. PXE prepares every configured client and stops at its
+exact start confirmation immediately before the controller's static address is
+removed. USB/SSH prepares one selected target without the fleet PXE build and
+stops at its exact host/disk review. Reopening either path reconciles only
 prerequisites already observed as current.
 Status derives stage state from the managed settings,
 required commands, password-hash readiness, verified key correspondence and
 private modes, clean Git review state, Nix evaluation, controller activation,
 and prepared artifacts; it never advances a stage by writing a global
 completion flag. Setup ends when the controller and installation artifacts are
-ready. Client identity and destructive disk confirmation remain local to the
-downloaded installer; the controller stores no per-installation target or
-verification evidence.
+ready for the selected method. PXE client identity and destructive disk
+confirmation remain local to the downloaded installer. USB/SSH instead stores
+one strict controller operation record and obtains its destructive confirmation
+on the controller after physically binding the live session.
 
 Key creation uses create-new semantics. Existing keys are verified and reused;
 they are never overwritten. Regeneration is a separately named recovery action
@@ -753,6 +757,48 @@ prevention requires an authenticated enrollment protocol and is deferred until
 authenticated client identity can be established without embedding a reusable
 secret in the public netboot closure.
 
+## Reviewed USB/SSH installation
+
+The USB path is a controller-orchestrated installation for one configured host,
+not a second deployment transport. The client boots the official NixOS 26.05
+Minimal ISO for `x86_64-linux` in UEFI mode on wired Ethernet. The operator
+reads its canonical IPv4 address and Ed25519 fingerprint from the physical
+console, sets a temporary live password, and enters all three through an
+interactive controller session. The fingerprint is pinned before the password
+is attempted. A short-lived operation key replaces password authentication as
+soon as the live boot is verified; neither secret is stored in Git, a Nix
+derivation, process arguments, durable session JSON, or the operation log.
+
+`packages.x86_64-linux.remoteInstallerBundle` is target-independent. It
+contains the fixed remote helper, strict metadata, and precompiled Disko
+scripts but no selected client's system closure. Preparation builds and roots
+that bundle, the exact deployment source, and the selected client closure,
+then requires the live host to fetch only signed paths from the controller's
+Harmonia cache with fallback disabled. The helper rechecks the boot-medium
+exclusion, selected NIC, exact disk, cache key, closure and deployment revision
+before it dispatches a transient `nixorium-remote-install-<id>.service`.
+
+The administrator-owned `nixorium-remote-install.service` is the sole
+controller worker. It exposes a mode-0600 Unix socket at
+`/run/nixorium/remote-install/control.sock`, keeps credentials only under
+`/run/nixorium/remote-install`, and records strict mode-0600 operation state
+under `/var/lib/nixorium/remote-install`. Its root-owned coordination marker at
+`/var/lib/nixorium/coordination/usb-reservation.json` is bound to the exact
+operation and held with the same non-blocking fleet lock used by PXE and
+deployment. PXE rechecks this marker after acquiring its own lock, so the two
+installation methods cannot cross at startup.
+
+The controller state machine separates artifact preparation, live-boot
+verification, hardware probe, content-bound plan, apply dispatch, receipt
+observation, reboot dispatch, post-boot verification, and close. Cancellation
+is allowed only before apply. Once Disko may have started, an absent response is
+`reconciliation-required`, not permission to retry. Worker or controller
+restart recovers the durable marker and state; credentials may be physically
+re-pinned only to the same address, fingerprint, host and live boot ID. Recovery
+then observes status only. A different live boot revokes the recovered key and
+remains blocked. Reboot and host-key rotation are separate reviewed actions;
+the configured static-address key changes only after installed-host verification.
+
 ## Client enrollment
 
 The client-side application reads the configured host list from the versioned
@@ -926,9 +972,15 @@ Testing is layered:
 - Nix evaluation tests cover package/module exports, strict configuration,
   public metadata schemas, template generation, and unchanged legacy inputs;
 - NixOS VM tests cover first-run discovery, systemd ordering, Harmonia health,
-  PXE start/stop/recovery, permission boundaries, CLI status, fake-Colmena
-  success/failure/retry, a forced-command SSH shutdown boundary, and real PTY
-  traversals of the TUI's reviewed PXE, deployment, and shutdown flows;
+  PXE start/stop/recovery, the remote worker's unit/socket/ownership and orphan
+  recovery boundaries, mutual PXE/USB exclusion, permission boundaries, CLI
+  status, fake-Colmena success/failure/retry, a forced-command SSH shutdown
+  boundary, and real PTY traversals of reviewed installation, deployment, and
+  shutdown flows;
+- the remote-client VM test uses a real signed Harmonia closure and exercises
+  wrong signatures, unreachable cache, boot-media/disk/NIC/key refusals,
+  post-Disko interruption, exact-operation resume without a second Disko run,
+  completion, explicit reboot, and installed-revision verification;
 - offline equivalence continues comparing the direct and bundled client
   derivations;
 - a QEMU PXE scenario is added when deterministic ProxyDHCP behavior can be
@@ -961,9 +1013,10 @@ Evaluation alone is not evidence that affected packages or host roles build.
 - Hardware diversity may invalidate assumptions about interface ownership,
   UEFI PXE, disk naming, and `snponly.efi`; physical validation remains distinct
   from VM validation.
-- Reliable duplicate enrollment is unresolved without a controller protocol.
-  The local installer must describe the actual guarantee rather than simulate
-  controller-side coordination.
+- PXE still cannot provide authenticated duplicate enrollment without a
+  controller protocol. USB/SSH reserves one configured identity through its
+  controller worker, but that guarantee does not retroactively apply to the
+  standalone PXE installer.
 
 The following decisions are recorded separately:
 

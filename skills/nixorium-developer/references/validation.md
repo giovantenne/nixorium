@@ -41,6 +41,7 @@ Add the one affected integration test when changing its behavior:
 ```sh
 ./scripts/validate.sh --management-vm
 ./scripts/validate.sh --client-installer-vm
+./scripts/validate.sh --remote-client-installer-vm
 ```
 
 The management VM is required for changes to management operations that cross
@@ -48,7 +49,10 @@ process, filesystem, network, privilege, systemd, or end-to-end terminal
 boundaries. Presentation-only refactors with focused state-transition unit
 tests do not require it. The client-installer VM is required for changes to
 enrollment, Disko installation, or installer runtime behavior. Each targeted
-mode includes the quick checks.
+mode includes the quick checks. The remote-client installer VM is required for
+USB/SSH live-session identity, signed-cache transfer, remote Disko receipts,
+resume, reboot, or post-boot verification. It simulates the live contract and
+does not replace a run with the official ISO or physical hardware.
 
 Run the complete local matrix with:
 
@@ -58,8 +62,9 @@ Run the complete local matrix with:
 
 It additionally builds every declared `checks` derivation, a representative
 client, the controller, netboot ramdisk, Disko package, PXE firmware, command
-package, and installer bundle, generates a fresh site deployment, and verifies
-offline derivation equivalence. It does not ask `nix flake check` to enumerate
+package, PXE installer bundle, and target-independent remote installer bundle,
+generates a fresh site deployment, and verifies offline derivation equivalence.
+It does not ask `nix flake check` to enumerate
 all generated clients: address/hostname generation is covered by `mk-lab`, and
 one client exercises their shared module graph. Run it after public API,
 template, built-in module, installer bundle, asset-plumbing, input, Disko, or

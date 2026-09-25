@@ -1,9 +1,10 @@
 # Security policy
 
 Nixorium manages privileged installation and maintenance operations for NixOS
-workstations. Reports involving privilege boundaries, SSH, PXE, cache signing,
-credential handling, destructive confirmation, or generated deployment
-configuration are especially important.
+workstations. Reports involving privilege boundaries, SSH/PXE or USB live
+installation, physical fingerprint binding, ephemeral credentials, cache
+signing, destructive confirmation, disk exclusion, restart reconciliation, or
+generated deployment configuration are especially important.
 
 ## Supported versions
 
