@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -148,6 +149,27 @@ func TestRemoteWorkerVerifiesAfterLosingLiveCredentials(t *testing.T) {
 				t.Fatal("verification ran without matching persisted authorization")
 			}
 		})
+	}
+}
+
+func TestCompletedDiskReceiptSurvivesOfflineStatusRefresh(t *testing.T) {
+	data, err := os.ReadFile("../../tests/usb-completed-session.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := domain.DecodeRemoteInstallSession(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := &fakeWorkerState{sessions: map[string]domain.RemoteInstallSession{session.OperationID: session}}
+	worker := &remoteWorker{state: state, operationID: session.OperationID, liveSession: &adapters.VerifiedLiveSession{}}
+	worker.statusConnection = func(adapters.VerifiedLiveSession) (remoteStatusConnection, error) {
+		t.Fatal("completed disk evidence must not be overwritten by an unavailable old ISO")
+		return nil, errors.New("offline")
+	}
+	response := worker.handleStatus(context.Background(), domain.RemoteInstallRequest{OperationID: session.OperationID})
+	if response.Session == nil || !domain.RemoteInstallDiskCompleted(*response.Session) || response.Session.BootVerified {
+		t.Fatalf("completion evidence changed: %+v", response)
 	}
 }
 

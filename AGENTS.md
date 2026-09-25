@@ -277,6 +277,13 @@ Release from the matching changelog section.
   links the standard `known_hosts` path to that directory. Never replace
   conflicting migration/backup evidence or remove a reservation to bypass
   failed post-boot verification. Already-private log ancestors need no chmod.
+- A completed USB disk installation may await reboot/verification while the
+  controller rebuilds. Only the controller apply job may cross that reservation:
+  check its strictly decoded, identity-bound completion receipt, pause the
+  worker, acquire the shared lock, and recheck before continuing. Resume the
+  worker on every exit and retain its private runtime directory across stops.
+  Never infer completion from a state label alone, clear the pending record,
+  or apply this exception to active/failed/unknown disk work or client operations.
 - Git review is read-only and typed: preserve the staged/unstaged/untracked
   distinction, managed-versus-unexpected classification, bounded patch output,
   password-hash redaction, no automatic untracked-file reads, and refusal before

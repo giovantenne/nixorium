@@ -80,6 +80,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Controller rebuilds no longer wait for an already-installed USB client to
+  come online for its first-boot check. A strict, read-only guard confirms the
+  persisted completion receipt before pausing the worker, acquiring the normal
+  controller lock, and resuming the worker after success or failure. The client
+  remains unverified, its reservation and runtime credentials are retained,
+  and active, failed, or uncertain disk installations still block activation.
+  Refreshing a completed operation no longer replaces durable disk-completion
+  evidence with the status of an old ISO that has already disappeared.
 - USB/SSH post-boot verification can now publish host trust atomically inside
   the worker sandbox and release the installation reservation that blocks
   controller rebuilds. Controller activation preserves existing known hosts

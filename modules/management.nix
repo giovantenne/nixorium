@@ -7,7 +7,7 @@ let
     runtimeInputs = [ pkgs.coreutils pkgs.diffutils pkgs.util-linux ];
     text = builtins.readFile ../scripts/migrate-known-hosts.sh;
   };
-  operationGate = ''
+  operationGate = allowCompletedUSB: ''
     COORDINATION_DIRECTORY=/var/lib/nixorium/coordination
     COORDINATION_LOCK="$COORDINATION_DIRECTORY/operation.lock"
     USB_RESERVATION="$COORDINATION_DIRECTORY/usb-reservation.json"
@@ -17,13 +17,30 @@ let
     [[ -f "$COORDINATION_LOCK" && ! -L "$COORDINATION_LOCK" \
         && "$(stat -c '%U:%G:%a' "$COORDINATION_LOCK")" == root:nixorium-operations:660 ]] \
       || fail "managed operation lock is unsafe"
-    [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
-      || fail "a USB installation remains reserved; reconcile it before starting another operation"
+    check_usb_reservation() {
+      if [[ -e "$USB_RESERVATION" || -L "$USB_RESERVATION" ]]; then
+        ${if allowCompletedUSB then ''
+          runuser -u admin -- ${nixoriumPackage}/bin/nixorium-remote-worker --controller-rebuild-check \
+            || fail "USB disk installation has not been confirmed complete; controller apply cannot interrupt it"
+        '' else ''
+          fail "a USB installation remains reserved; reconcile it before starting another operation"
+        ''}
+      fi
+    }
+    check_usb_reservation
+    ${lib.optionalString allowCompletedUSB ''
+      if [[ -e "$USB_RESERVATION" || -L "$USB_RESERVATION" ]]; then
+        # A completed client no longer depends on the controller cache/worker.
+        # Keep its durable reservation and resume verification after this job.
+        USB_WORKER_PAUSED=true
+        systemctl stop nixorium-remote-install.service \
+          || fail "could not pause the completed USB installation worker"
+      fi
+    ''}
     exec 9<>"$COORDINATION_LOCK"
     flock -n 9 \
       || fail "another Nixorium controller or client operation is already running"
-    [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
-      || fail "a USB installation became reserved while acquiring the operation lock"
+    check_usb_reservation
     LEGACY_LOCK=/home/admin/.local/state/nixorium/operations/deploy.lock
     if [[ -e "$LEGACY_LOCK" || -L "$LEGACY_LOCK" ]]; then
       [[ -f "$LEGACY_LOCK" && ! -L "$LEGACY_LOCK" \
@@ -45,7 +62,7 @@ let
         exit 1
       }
 
-      ${operationGate}
+      ${operationGate false}
 
       [[ -d "$REPOSITORY" && ! -L "$REPOSITORY" ]] \
         || fail "configured deployment path is not a real directory"
@@ -97,6 +114,7 @@ let
       pkgs.iproute2
       pkgs.jq
       pkgs.nix
+      pkgs.systemd
       pkgs.util-linux
       nixoriumPackage
     ];
@@ -119,6 +137,7 @@ let
       PROGRESS_RECENT='[]'
       TEMPORARY_RECORD=""
       keep_temporary=false
+      USB_WORKER_PAUSED=false
 
       publish_progress() {
         local state="$1"
@@ -161,6 +180,12 @@ let
           publish_progress failed "$PROGRESS_PHASE" \
             "Controller apply stopped unexpectedly" "$PROGRESS_CURRENT" || true
         fi
+        if [[ "$USB_WORKER_PAUSED" == true ]]; then
+          # Release both locks before restarting the owner of the retained USB
+          # reservation, including when validation/build/activation failed.
+          exec 8>&- 9>&-
+          systemctl start --no-block nixorium-remote-install.service || true
+        fi
       }
       trap cleanup_controller EXIT
 
@@ -174,7 +199,7 @@ let
         exit 1
       }
 
-      ${operationGate}
+      ${operationGate true}
 
       publish_progress running starting "Starting controller apply" 0
       publish_progress running validate "Validating the reviewed controller configuration" 0
@@ -331,7 +356,6 @@ let
       keep_temporary=false
       sync "$STATE_DIRECTORY"
       publish_progress completed complete "Controller revision activated and verified" 4
-      trap - EXIT
     '';
   };
   preparePxe = pkgs.writeShellApplication {
@@ -425,7 +449,7 @@ let
         exit 1
       }
 
-      ${operationGate}
+      ${operationGate false}
 
       publish_progress running starting "Starting PXE preparation" 0 0
       publish_progress running validate "Validating the reviewed deployment" 0 0
@@ -622,7 +646,7 @@ let
         exit 1
       }
 
-      ${operationGate}
+      ${operationGate false}
       systemctl restart harmonia.service
     '';
   };
@@ -842,6 +866,9 @@ in
         UMask = "0077";
         RuntimeDirectory = "nixorium/remote-install";
         RuntimeDirectoryMode = "0700";
+        # Controller repair may pause a completed installation worker. Its
+        # operation credentials still expire at reboot or explicit cleanup.
+        RuntimeDirectoryPreserve = "yes";
         StateDirectory = "nixorium/remote-install";
         StateDirectoryMode = "0700";
         CacheDirectory = "nixorium/admin";

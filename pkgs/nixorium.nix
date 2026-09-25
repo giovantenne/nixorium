@@ -18,6 +18,7 @@ buildGoModule {
       ../templates/site/lab-settings.json
       ../tests/lab-settings-validation-cases.json
       ../tests/software-preset-validation-cases.json
+      ../tests/usb-completed-session.json
     ];
   };
 

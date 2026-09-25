@@ -376,6 +376,7 @@
       }
     '';
     environment.etc."nixorium-test/lab-settings.json".source = ../templates/site/lab-settings.json;
+    environment.etc."nixorium-test/usb-completed-session.json".source = ./usb-completed-session.json;
     environment.etc."nixorium-test/lab-software.json".text = builtins.toJSON {
       schemaVersion = 1;
       packages = [];
@@ -778,5 +779,28 @@
       controller.succeed("token=$(jq -r .reviewToken /tmp/shared-plan.json); su - admin -c \"nixorium software apply --repo ~/nixorium-deployment --package hello --scope shared --expect $token --yes --json\" | jq -e '.state == \"applied\" and .affectedController == \"pc99\"'; jq -e 'any(.packages[]; .package == \"hello\" and .scope.kind == \"shared\")' /home/admin/nixorium-deployment/lab-software.json")
       controller.succeed("su - admin -c 'nixorium software plan --repo ~/nixorium-deployment --package hello --scope shared --remove --json' > /tmp/shared-remove.json; jq -e '.state == \"ready\" and .affectedController == \"pc99\" and .candidate.packages == []' /tmp/shared-remove.json")
       controller.succeed("token=$(jq -r .reviewToken /tmp/shared-remove.json); su - admin -c \"nixorium software apply --repo ~/nixorium-deployment --package hello --scope shared --remove --expect $token --yes --json\" | jq -e '.state == \"applied\"'; jq -e '.packages == []' /home/admin/nixorium-deployment/lab-software.json")
+    with subtest("completed USB installation does not block controller repair"):
+      controller.succeed("su - admin -c 'cd ~/nixorium-deployment; git add lab-software.json; git diff --cached --quiet || git -c user.name=Test -c user.email=test@example.invalid commit -qm software-fixture'")
+      controller.succeed("install -m 0600 -o admin -g users /tmp/controller-only-secrets/installed-ssh /home/admin/.ssh/id_ed25519")
+      completed = json.loads(controller.succeed("cat /etc/nixorium-test/usb-completed-session.json"))
+      completed_id = completed["operationId"]
+      completed_path = f"/var/lib/nixorium/remote-install/{completed_id}.json"
+      completed_marker = {"schemaVersion": 1, "operationId": completed_id, "statePath": completed_path, "tokenDigest": ""}
+      controller.succeed("systemctl stop nixorium-remote-install.service")
+      controller.succeed("printf %s " + shlex.quote(json.dumps(completed_marker)) + " > /var/lib/nixorium/coordination/usb-reservation.json; chown admin:users /var/lib/nixorium/coordination/usb-reservation.json; chmod 0600 /var/lib/nixorium/coordination/usb-reservation.json")
+      active = json.loads(json.dumps(completed))
+      active["state"] = "running"
+      active["receipt"].update(state="running", phase="install", installed=False)
+      controller.succeed("printf %s " + shlex.quote(json.dumps(active)) + f" > {completed_path}; chown admin:users {completed_path}; chmod 0600 {completed_path}; systemctl start nixorium-remote-install.service")
+      worker_pid = controller.succeed("systemctl show nixorium-remote-install.service -p MainPID --value").strip()
+      controller.fail("systemctl start nixorium-apply-controller.service")
+      assert controller.succeed("systemctl show nixorium-remote-install.service -p MainPID --value").strip() == worker_pid
+      controller.succeed(f"install -m 0600 -o admin -g users /etc/nixorium-test/usb-completed-session.json {completed_path}; su - admin -c 'touch /run/nixorium/remote-install/preserved-during-controller-rebuild'")
+      # Failure must also resume the worker and retain all pending evidence.
+      controller.succeed("touch /run/nixorium-test-activation-fail; ! systemctl start nixorium-apply-controller.service; rm /run/nixorium-test-activation-fail; systemctl reset-failed nixorium-apply-controller.service")
+      controller.wait_until_succeeds("systemctl is-active --quiet nixorium-remote-install.service; test -S /run/nixorium/remote-install/control.sock")
+      controller.succeed("su - admin -c 'revision=$(git -C ~/nixorium-deployment rev-parse HEAD); nixorium controller apply --repo ~/nixorium-deployment --expect \"$revision\" --yes --json' | jq -e '.state == \"completed\" and .verified'")
+      controller.wait_until_succeeds("systemctl is-active --quiet nixorium-remote-install.service; test -S /run/nixorium/remote-install/control.sock")
+      controller.succeed(f"cmp /etc/nixorium-test/usb-completed-session.json {completed_path}; test -f /var/lib/nixorium/coordination/usb-reservation.json; test -f /run/nixorium/remote-install/preserved-during-controller-rebuild")
   '';
 }

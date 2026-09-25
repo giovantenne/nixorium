@@ -202,14 +202,21 @@ only after proving the old machine is the selected physical client. Approve
 the newly installed host passes verification. Never delete the entire
 `known_hosts` file or accept a changed key merely because the address matches.
 
-If the client has booted successfully but controller rebuild reports that a USB
-installation remains reserved, complete `install usb verify --id OPERATION_ID`.
-Verification checks the preserved host key, hostname, exact system closure,
-and reviewed revision before releasing the reservation. A `read-only file
-system` error while publishing known hosts or the operation log indicates an
-older controller worker sandbox; retrying the rebuild cannot repair that
-worker. Apply the corrected worker and its filesystem configuration together,
-preserving operation state and runtime credentials, then repeat verification.
+Controller rebuild may proceed while a completed USB installation still awaits
+reboot or verification, even if the client is offline. The controller validates
+the persisted disk-completion receipt, pauses the worker without deleting its
+state or credentials, holds the normal operation lock, and resumes the worker
+on success or failure. Active, failed, or unknown disk work remains protected;
+other client operations still respect the reservation. Older controller apply
+services that block every reserved installation need the corrected apply
+service as well as the worker; never remove their coordination files manually.
+
+Complete `install usb verify --id OPERATION_ID` when the installed client is
+available. Verification checks the preserved host key, hostname, exact system
+closure, and reviewed revision before releasing the reservation. A `read-only
+file system` error while publishing known hosts or logs indicates an older
+worker sandbox. Apply the corrected worker and filesystem configuration
+together, preserving operation state and credentials, then repeat verification.
 After an authorized client reboot, verification can also resume if a controller
 reboot cleared the ISO credentials: it authenticates the installed host with
 the administrator key and the original persisted host pin and revision.
