@@ -94,7 +94,8 @@ case the laboratory interface transition interrupts SSH.
 For each VirtualBox and physical family, repeat installation from the official
 NixOS 26.05 Minimal ISO for `x86_64-linux`, in UEFI mode over wired Ethernet.
 Keep the physical/local console visible so the address and Ed25519 fingerprint
-are independent evidence. Attach exactly one disposable SATA/SCSI or NVMe
+are independent evidence for the controller's automatic host-key observation.
+Attach exactly one disposable SATA/SCSI or NVMe
 target plus the boot medium; include a multi-disk case to prove that the review
 does not infer a target. Clients must reach the controller's SSH and signed
 Harmonia endpoints but need no Internet route. PXE must remain stopped during
@@ -180,10 +181,12 @@ reinitialize only the dedicated test disk before repeating.
 Boot the supported Minimal ISO, set its temporary password, and record the live
 IPv4 address, Ed25519 fingerprint, boot ID, NIC, boot medium, and all disks from
 the local console. From the controller start USB/SSH installation for one
-configured unused identity. Exercise each refusal in a fresh disposable run:
+configured unused identity, enter only the address, and compare the
+automatically observed fingerprint before entering the password. Exercise each
+refusal in a fresh disposable run:
 
-- alter one fingerprint character and prove password authentication and key
-  installation do not occur;
+- present a different SSH host key after the physical comparison and prove
+  password authentication and key installation do not occur;
 - use a wrong password after the correct fingerprint and prove no operation key
   remains;
 - make Harmonia unreachable or present a wrong cache key and prove Disko does

@@ -254,8 +254,10 @@ lsblk -o NAME,PATH,SIZE,TYPE,RM,RO,MOUNTPOINTS,MODEL,SERIAL
 
 Record the live IPv4 address, full Ed25519 fingerprint, ISO device, and blank
 target disk. On the controller choose **Installation → Install computers → USB
-over SSH**, select `pc01`, and transcribe the address, fingerprint, and temporary
-password while the client console remains visible. The client VM should not
+over SSH**, select `pc01`, and enter the address while the client console remains
+visible. Confirm that no password attempt occurs while Nixorium observes the
+host key, compare the displayed fingerprint with the console, type `MATCH`, and
+then enter the temporary password. The client VM should not
 have the controller's NAT adapter or any Internet route. Expected: fingerprint
 verification precedes password use, the optical boot medium is excluded, only
 the 40 GiB disk is eligible, the target closure arrives from the controller's

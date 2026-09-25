@@ -12,6 +12,8 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case dashboardRemoteFingerprintMsg:
+		return model.handleRemoteFingerprintMessage(message)
 	case dashboardRemoteInstallMsg:
 		return model.handleRemoteInstallMessage(message)
 	case dashboardInitialMsg:

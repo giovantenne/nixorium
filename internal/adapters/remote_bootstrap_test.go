@@ -224,6 +224,21 @@ func TestLiveBootstrapPinsHostTransitionsCredentialAndKeepsOnlyRuntimeKey(t *tes
 	}
 }
 
+func TestLiveBootstrapObservesHostFingerprintWithoutSendingPassword(t *testing.T) {
+	server := newBootstrapSSHServer(t)
+	bootstrap := NewLiveBootstrap()
+	bootstrap.port = server.port()
+	fingerprint, err := bootstrap.ObserveHostFingerprint(context.Background(), "127.0.0.1")
+	if err != nil || fingerprint != server.fingerprint() {
+		t.Fatalf("fingerprint=%q error=%v", fingerprint, err)
+	}
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	if server.passwordAttempts != 0 || server.locked || len(server.authorized) != 0 {
+		t.Fatal("host-key observation sent credentials or changed live authorization")
+	}
+}
+
 func TestLiveBootstrapRecoversOnlyExactlyBoundRuntimeCredentials(t *testing.T) {
 	operationID := "0123456789abcdef0123456789abcdef"
 	runtimeRoot := filepath.Join(t.TempDir(), "runtime")

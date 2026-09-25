@@ -96,11 +96,11 @@ func (model dashboardModel) remoteInstallView() string {
 		}
 		actions = []tuiAction{{key: "↑/↓", label: "Select identity"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Method"}, {key: "F1", label: "Help"}}
 	case remoteInstallConsole:
-		consoleTitle := "Verify the fingerprint on the local console"
-		consoleDetail := "The password is used once in memory, then replaced by an ephemeral key and cleared."
+		consoleTitle := "Keep the physical console visible"
+		consoleDetail := "The controller reads the Ed25519 host key without sending a password. You will compare its fingerprint on the next screen."
 		if remote.recovery {
 			consoleTitle = "Restore access only to reconcile the reserved operation"
-			consoleDetail = "Re-enter the original live address and fingerprint. This cannot create or replay an apply."
+			consoleDetail = "Re-enter the original live address. The controller will compare its observed key with the reserved identity before any password is sent."
 		}
 		lines = append(lines,
 			"On the physical client, boot the official NixOS Minimal 26.05 ISO in UEFI mode and use:",
@@ -110,12 +110,34 @@ func (model dashboardModel) remoteInstallView() string {
 			"  ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
 			"",
 			fmt.Sprintf("Identity:           %s", remote.host),
-			remoteInstallField("Live IPv4", remote.address, remote.formField == 0, false),
-			remoteInstallField("Ed25519 fingerprint", remote.fingerprint, remote.formField == 1, false),
-			remoteInstallField("Temporary password", remote.password, remote.formField == 2, true),
+			remoteInstallField("Live IPv4", remote.address, true, false),
 		)
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: consoleTitle, detail: consoleDetail})
-		actions = []tuiAction{{key: "Tab/↑/↓", label: "Field"}, {key: "Enter", label: "Connect"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+		actions = []tuiAction{{key: "Enter", label: "Read host key"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+	case remoteInstallFingerprint:
+		lines = append(lines,
+			"Compare the complete fingerprint below with the output still visible on the physical client console.",
+			"",
+			fmt.Sprintf("Identity:             %s", remote.host),
+			fmt.Sprintf("Live IPv4:            %s", remote.address),
+			fmt.Sprintf("Observed fingerprint: %s", remote.fingerprint),
+		)
+		if remote.recovery && remote.response.Session != nil && remote.response.Session.Bootstrap != nil {
+			lines = append(lines, fmt.Sprintf("Reserved fingerprint: %s", remote.response.Session.Bootstrap.HostFingerprint))
+		}
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Confirm the physical host identity", detail: "Type MATCH only when the entire SHA256 fingerprint is identical. The temporary password has not been sent."})
+		actions = []tuiAction{{key: "Enter", label: "Confirm match"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+	case remoteInstallPassword:
+		lines = append(lines,
+			"The physical fingerprint was confirmed. Enter the temporary password created on the live ISO.",
+			"",
+			fmt.Sprintf("Identity:             %s", remote.host),
+			fmt.Sprintf("Live IPv4:            %s", remote.address),
+			fmt.Sprintf("Pinned fingerprint:   %s", remote.fingerprint),
+			remoteInstallField("Temporary password", remote.password, true, true),
+		)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "One-time credential transition", detail: "The password is used once in memory, replaced by an operation key, and then cleared."})
+		actions = []tuiAction{{key: "Enter", label: "Connect"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallSelectDisk:
 		lines = append(lines,
 			fmt.Sprintf("Verified live client: %s at %s", remote.host, remote.address),
@@ -178,9 +200,11 @@ func (model dashboardModel) remoteInstallView() string {
 		actions = model.remoteInstallResultActions()
 	}
 
-	if remote.stage == remoteInstallRotateHostKey || remote.stage == remoteInstallReview || remote.stage == remoteInstallConfirmReboot || remote.stage == remoteInstallConfirmClose {
+	if remote.stage == remoteInstallFingerprint || remote.stage == remoteInstallRotateHostKey || remote.stage == remoteInstallReview || remote.stage == remoteInstallConfirmReboot || remote.stage == remoteInstallConfirmClose {
 		expected := ""
 		switch remote.stage {
+		case remoteInstallFingerprint:
+			expected = "MATCH"
 		case remoteInstallRotateHostKey:
 			expected = "ROTATE HOST KEY"
 		case remoteInstallReview:
@@ -223,7 +247,7 @@ func (model dashboardModel) remoteInstallProgressLines() []string {
 	for _, item := range []struct {
 		stage remoteInstallationStage
 		label string
-	}{{remoteInstallPreparing, "Build pinned artifacts"}, {remoteInstallBootstrap, "Verify live ISO and replace password"}, {remoteInstallSelectDisk, "Transfer signed bundle and probe disks"}, {remoteInstallApplying, "Dispatch independent installer job"}} {
+	}{{remoteInstallPreparing, "Build pinned artifacts"}, {remoteInstallFingerprint, "Read live Ed25519 host key"}, {remoteInstallBootstrap, "Verify live ISO and replace password"}, {remoteInstallSelectDisk, "Transfer signed bundle and probe disks"}, {remoteInstallApplying, "Dispatch independent installer job"}} {
 		kind := tuiStatusAttention
 		if remote.stage > item.stage {
 			kind = tuiStatusSuccess
@@ -347,25 +371,63 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 				return model, nil
 			}
 			return model.cancelRemoteInstall()
-		case "tab", "down":
-			remote.formField = min(2, remote.formField+1)
-		case "shift+tab", "up":
-			remote.formField = max(0, remote.formField-1)
 		case "backspace":
 			model.remoteInstallRemoveInputRune()
 		case "enter":
-			if remote.formField < 2 {
-				remote.formField++
+			if remote.address == "" || model.actions.ObserveRemoteInstall == nil {
+				model.message = "The live IPv4 address is required before reading the host key."
 				return model, nil
 			}
-			if remote.address == "" || remote.fingerprint == "" || remote.password == "" || model.actions.BootstrapRemoteInstall == nil {
-				model.message = "IPv4 address, console fingerprint and temporary password are required."
+			remote.fingerprint = ""
+			remote.confirmation = ""
+			remote.stage = remoteInstallFingerprint
+			model.busy = "Reading the live Ed25519 host key without sending a password"
+			address := remote.address
+			return model, func() tea.Msg {
+				fingerprint, err := model.actions.ObserveRemoteInstall(address)
+				return dashboardRemoteFingerprintMsg{fingerprint: fingerprint, err: err}
+			}
+		default:
+			model.remoteInstallAppendInput(key.Text)
+		}
+	case remoteInstallFingerprint:
+		if key.String() == "esc" && remote.recovery {
+			remote.recovery = false
+			remote.confirmation = ""
+			remote.stage = remoteInstallResult
+			return model, nil
+		}
+		return model.updateRemoteInstallConfirmation(key, "MATCH", func(model dashboardModel) (tea.Model, tea.Cmd) {
+			remote := &model.installation.remote
+			if remote.recovery && remote.response.Session != nil && remote.response.Session.Bootstrap != nil && remote.fingerprint != remote.response.Session.Bootstrap.HostFingerprint {
+				model.message = "The observed fingerprint differs from the reserved physical session; recovery remains blocked."
+				return model, nil
+			}
+			remote.stage = remoteInstallPassword
+			remote.formField = 2
+			return model, nil
+		})
+	case remoteInstallPassword:
+		switch key.String() {
+		case "esc":
+			remote.password = ""
+			if remote.recovery {
+				remote.recovery = false
+				remote.stage = remoteInstallResult
+				return model, nil
+			}
+			return model.cancelRemoteInstall()
+		case "backspace":
+			model.remoteInstallRemoveInputRune()
+		case "enter":
+			if remote.password == "" || remote.fingerprint == "" || model.actions.BootstrapRemoteInstall == nil {
+				model.message = "The confirmed fingerprint and temporary password are required."
 				return model, nil
 			}
 			secret := []byte(remote.password)
 			remote.password = ""
 			remote.stage = remoteInstallBootstrap
-			model.busy = "Verifying the physical console fingerprint and supported live ISO"
+			model.busy = "Verifying the pinned host identity and supported live ISO"
 			host, address, fingerprint := remote.host, remote.address, remote.fingerprint
 			return model, func() tea.Msg {
 				response, err := model.actions.BootstrapRemoteInstall(host, address, fingerprint, secret)
@@ -449,7 +511,7 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 				remote.formField = 0
 				remote.recovery = true
 				remote.stage = remoteInstallConsole
-				model.message = "Read the original address and Ed25519 fingerprint again from the live console."
+				model.message = "Read the original address again; the controller will observe the Ed25519 key for physical comparison."
 			}
 		case "b":
 			if remote.response.State == "ready-to-reboot" {
@@ -567,6 +629,28 @@ func (model dashboardModel) remoteInstallCommand(action string, request domain.R
 		response, err := model.actions.RemoteInstallRequest(request)
 		return dashboardRemoteInstallMsg{action: action, response: response, err: err}
 	}
+}
+
+func (model dashboardModel) handleRemoteFingerprintMessage(message dashboardRemoteFingerprintMsg) (tea.Model, tea.Cmd) {
+	model.busy = ""
+	remote := &model.installation.remote
+	if message.err != nil {
+		remote.stage = remoteInstallConsole
+		remote.fingerprint = ""
+		model.message = "The live Ed25519 host key could not be read: " + sanitizeRemoteInstallText(message.err.Error())
+		return model, nil
+	}
+	if !domain.ValidRemoteFingerprint(message.fingerprint) {
+		remote.stage = remoteInstallConsole
+		remote.fingerprint = ""
+		model.message = "The live client returned an invalid Ed25519 fingerprint."
+		return model, nil
+	}
+	remote.fingerprint = message.fingerprint
+	remote.confirmation = ""
+	remote.stage = remoteInstallFingerprint
+	model.message = ""
+	return model, nil
 }
 
 func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteInstallMsg) (tea.Model, tea.Cmd) {

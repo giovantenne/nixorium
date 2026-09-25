@@ -231,8 +231,10 @@ of one configured client and the pinned deployment exposes `install usb`. The
 supported live environment is the official NixOS 26.05 Minimal ISO for
 `x86_64-linux`, UEFI, and wired Ethernet. Ask the operator to keep its physical
 console visible, set a temporary password, and read the canonical IPv4 address
-and Ed25519 `SHA256:` fingerprint there. Never infer or retrieve the fingerprint
-from DNS, a previous boot, or `known_hosts`.
+and Ed25519 `SHA256:` fingerprint there. In the guided TUI, enter only the
+address: Nixorium observes the live key without credentials, displays its
+fingerprint, and asks for `MATCH` after a complete physical-console comparison.
+Never approve the fingerprint using DNS, a previous boot, or `known_hosts`.
 
 The ordinary guided TUI owns host selection, secret input, hardware review,
 disk selection, and confirmation. For CLI operation, `start` must be run by the
@@ -245,8 +247,10 @@ nixorium install usb status --id 0123456789abcdef0123456789abcdef --json
 nixorium install usb reconcile --id 0123456789abcdef0123456789abcdef
 ```
 
-Preparation is non-destructive and target-independent. Start pins the physical
-fingerprint before password use, replaces the password with an operation key,
+Preparation is non-destructive and target-independent. The guided TUI observes
+the host key before password entry and pins it only after the operator confirms
+the physical-console match. Start preserves the manual equivalent for CLI use,
+then replaces the password with an operation key,
 requires a signed-cache closure, excludes the boot medium, and presents the
 exact configured host/disk/revision review. Do not automate `/dev/tty`, expose
 the password in arguments/chat/logs, disable signature or host-key checks, or
@@ -255,7 +259,9 @@ approve the destructive phrase for the operator.
 After apply dispatch, status is independent of the initiating terminal. Use
 reconcile after loss or restart; never issue a second apply or assume a silent
 client is safe. Controller recovery may require the operator to run `start`
-again and physically re-enter the same address, fingerprint, and password; it
+again and physically re-enter the same address, fingerprint, and password. The
+guided TUI instead re-observes the fingerprint for comparison and asks the
+operator to re-enter only the address and password; it
 can reattach only to the same live boot and then observes status without
 replaying Disko. A new boot or changed identity remains blocked. Remove the USB
 only when ready, then use separately confirmed `reboot` and `verify` actions.

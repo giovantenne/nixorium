@@ -89,9 +89,11 @@ active still requires stopping it or explicitly confirming that it should stay
 active.
 
 Choosing **USB over SSH** instead keeps PXE stopped and selects one configured
-identity on the controller. The form asks for the address and Ed25519
-fingerprint read from the physical Minimal-ISO console, then reads the temporary
-password without echo. Hardware inspection leads to a content-bound review:
+identity on the controller. The form asks only for the live address, reads the
+Ed25519 host key without credentials, and shows its fingerprint for comparison
+with the physical Minimal-ISO console. After the operator types `MATCH`, it
+reads the temporary password without echo. Hardware inspection leads to a
+content-bound review:
 
 ```text
 Nixorium  /  Installation  /  USB over SSH

@@ -28,10 +28,14 @@ check, content-bound review, separate reboot, or conservative reconciliation.
 
 Add `usb-ssh` as a second reviewed transport. The operator boots the official
 NixOS Minimal ISO in UEFI mode, reads its IPv4 address and Ed25519 fingerprint
-from the local console, and enters those values plus a temporary password in
-Nixorium. The initial Go SSH client verifies the fingerprint before sending the
-password. It checks the supported installer facts, installs and verifies one
-ephemeral root key, and then locks the live user's password.
+from the local console, and sets a temporary password. In the guided TUI the
+operator enters only the address; the initial Go SSH client performs the host-key
+exchange without credentials and shows the observed fingerprint. The operator
+compares the complete value with the physical console and types `MATCH` before
+the TUI accepts the password. The client then verifies the pinned fingerprint,
+checks the supported installer facts, installs and verifies one ephemeral root
+key, and locks the live user's password. The CLI retains explicit fingerprint
+entry as an advanced manual equivalent.
 
 All later connections use a private, operation-scoped key and known-hosts file
 with strict Ed25519 pinning. The password is an in-memory bootstrap value, not
@@ -102,8 +106,8 @@ schemas are versioned, bounded, strict, and reject unknown or duplicate fields.
 
 ## Consequences
 
-USB installation requires local presence for boot, address/fingerprint
-observation, and media removal. Wired networking, x86_64, UEFI, the qualified
+USB installation requires local presence for boot, address observation,
+fingerprint comparison, and media removal. Wired networking, x86_64, UEFI, the qualified
 NixOS Minimal ISO, SATA/NVMe targets, and one operation at a time are the v1
 support boundary. Wi-Fi, arbitrary installers, Secure Boot certification,
 parallel installation, and unattended discovery remain out of scope.

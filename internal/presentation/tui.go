@@ -63,6 +63,7 @@ type DashboardActions struct {
 	StopPXE                func() domain.PXELifecycleReport
 	RecoverPXE             func() domain.PXELifecycleReport
 	PrepareRemoteInstall   func(string) (domain.RemoteInstallResponse, error)
+	ObserveRemoteInstall   func(string) (string, error)
 	BootstrapRemoteInstall func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
 	RemoteInstallRequest   func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
 	LoadRemoteInstall      func() (domain.RemoteInstallResponse, error)
@@ -214,6 +215,8 @@ const (
 	remoteInstallSelectHost remoteInstallationStage = iota
 	remoteInstallPreparing
 	remoteInstallConsole
+	remoteInstallFingerprint
+	remoteInstallPassword
 	remoteInstallBootstrap
 	remoteInstallSelectDisk
 	remoteInstallRotateHostKey
@@ -383,6 +386,11 @@ type dashboardRemoteInstallMsg struct {
 	action   string
 	response domain.RemoteInstallResponse
 	err      error
+}
+
+type dashboardRemoteFingerprintMsg struct {
+	fingerprint string
+	err         error
 }
 
 type dashboardHostsMsg struct {

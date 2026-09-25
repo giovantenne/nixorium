@@ -137,7 +137,8 @@ controller's static address.
 `packages.x86_64-linux.remoteInstallerBundle` contains the target-independent
 remote helper, metadata, and Disko programs. It deliberately excludes a client
 system closure and can be prepared before the live address is known. After a
-physical-console fingerprint has been pinned, the controller builds the exact
+credential-free SSH host-key observation has been compared with the
+physical-console fingerprint and explicitly confirmed, the controller builds the exact
 selected client's closure and the live helper copies only signed paths from
 Harmonia with substituter fallback disabled. The helper excludes the ISO boot
 medium and validates the chosen disk, NIC, cache public key, deployment
@@ -155,8 +156,8 @@ under `/run`.
 
 An interrupted post-dispatch operation is never replayed. Reconciliation
 observes the exact operation receipt and reports whether disk mutation may have
-started. A controller restart may reattach only after the operator physically
-re-pins the same live boot; reboot and known-host rotation remain separately
+started. A controller restart may reattach only after the controller re-observes
+the key and the operator physically reconfirms the same live boot; reboot and known-host rotation remain separately
 confirmed. Ordinary changes to an installed client use `deploy`, not this
 destructive installation API.
 

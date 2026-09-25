@@ -201,7 +201,8 @@ Release from the matching changelog section.
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
 - USB/SSH installation supports only the official NixOS 26.05 Minimal ISO on
   `x86_64-linux`, UEFI, and wired Ethernet. Preserve physical-console
-  fingerprint pinning before password use, terminal-only secret input,
+  credential-free host-key observation, physical-console fingerprint
+  confirmation and pinning before password use, terminal-only secret input,
   operation-specific keys, signed-cache-only transfer, boot-medium exclusion,
   exact disk/revision revalidation, and separate reboot/verification. Never
   replay apply or reboot after uncertain dispatch. Recovery may reattach only
