@@ -120,6 +120,33 @@ func TestStrictLiveSSHDispatchesPlanOnStdinAndDecodesAcknowledgement(t *testing.
 	}
 }
 
+func TestStrictLiveSSHFetchesTheBoundedOperationLog(t *testing.T) {
+	connection := strictLiveSSHFixture(t)
+	directory := t.TempDir()
+	argumentsPath := filepath.Join(directory, "arguments")
+	executable := filepath.Join(directory, "ssh")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" >\"$NIXORIUM_TEST_ARGUMENTS\"\nprintf '/mnt is already occupied\\n'\n"
+	if err := os.WriteFile(executable, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	connection.sshExecutable = executable
+	t.Setenv("NIXORIUM_TEST_ARGUMENTS", argumentsPath)
+	operationID := "0123456789abcdef0123456789abcdef"
+	bundle := "/nix/store/11111111111111111111111111111111-remote-installer"
+	content, err := connection.OperationLog(context.Background(), bundle, operationID)
+	if err != nil || string(content) != "/mnt is already occupied\n" {
+		t.Fatalf("content=%q error=%v", content, err)
+	}
+	arguments, err := os.ReadFile(argumentsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := bundle + "/bin/nixorium-remote-client-installer log " + operationID
+	if !strings.Contains(string(arguments), command) {
+		t.Fatalf("operation log command missing from SSH arguments: %s", arguments)
+	}
+}
+
 func strictLiveSSHFixture(t *testing.T) *StrictLiveSSH {
 	t.Helper()
 	directory := t.TempDir()

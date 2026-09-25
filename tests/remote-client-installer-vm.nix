@@ -136,6 +136,7 @@ in
     wrong_cache_key["cache"]["publicKey"] = "wrong-cache:YWJjZA=="
     rejected_plan(wrong_cache_key, "wrong-cache-key-plan", "preflight")
 
+    installer.succeed("mkdir -p /mnt; ! findmnt -rn --mountpoint /mnt")
     unreachable_cache = json.loads(json.dumps(plan))
     unreachable_cache["operationId"] = "4" * 32
     unreachable_cache["cache"]["url"] = f"http://{cache_ip}:5999"

@@ -82,8 +82,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 - USB/SSH live-host revalidation now compares the canonical Ed25519 key
   material rather than the non-cryptographic comment in the public-key file,
-  and a confirmed remote failure before disk mutation can be cancelled safely
-  instead of stranding the controller reservation.
+  and a confirmed remote failure before disk mutation now revokes its live key
+  and releases the controller reservation automatically instead of blocking
+  controller maintenance. Safe cancellation remains available when automatic
+  cleanup needs operator retry.
+- USB/SSH preflight now tests whether `/mnt` itself is mounted instead of
+  mistaking the live ISO root filesystem for an occupied installation target.
+  Status also reports remote-log retrieval or publication failures instead of
+  silently advertising a log file that was never collected.
 - USB/SSH temporary-password entry now treats printable `q` and `?`
   characters as masked secret input instead of global quit/help shortcuts.
 - The USB/SSH worker sandbox now permits read-only netlink route queries, so

@@ -79,10 +79,28 @@ test_ed25519_key_identity_ignores_only_the_comment() {
   ! nixorium_canonical_ed25519_public_key $'ssh-ed25519 YWJjZA== root@nixos\nssh-ed25519 YWJjZA==' >/dev/null
 }
 
+test_install_mount_check_requires_an_exact_mountpoint() (
+  findmnt() {
+    test "$*" = "-rn --mountpoint /mnt"
+    return 1
+  }
+  nixorium_require_clean_install_mount
+)
+
+test_install_mount_check_rejects_an_occupied_mountpoint() (
+  findmnt() {
+    test "$*" = "-rn --mountpoint /mnt"
+    printf '%s\n' "/dev/sdz2 /mnt ext4 rw"
+  }
+  ! nixorium_require_clean_install_mount >/dev/null 2>&1
+)
+
 test_identity_is_content_bound
 test_exclusions_are_additive
 test_safe_disk_has_no_exclusion
 test_exact_profile_and_parent_are_required
 test_ed25519_key_identity_ignores_only_the_comment
+test_install_mount_check_requires_an_exact_mountpoint
+test_install_mount_check_rejects_an_occupied_mountpoint
 
 echo "Client installer library tests passed."

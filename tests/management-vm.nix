@@ -434,6 +434,45 @@
     controller.fail("systemctl start nixorium-pxe-network.service")
     controller.succeed("journalctl -u nixorium-pxe-network.service --no-pager | grep -F 'USB installation remains reserved'; systemctl reset-failed nixorium-pxe-network.service; systemctl stop nixorium-remote-install.service; rm /var/lib/nixorium/coordination/usb-reservation.json /var/lib/nixorium/remote-install/" + orphan_id + ".json; systemctl start nixorium-remote-install.service")
     controller.wait_for_unit("nixorium-remote-install.service")
+    resolved_id = "1234567890abcdef1234567890abcdef"
+    resolved_session = {
+      "schemaVersion": 1,
+      "operationId": resolved_id,
+      "logId": f"usb-install-{resolved_id}.log",
+      "state": "failed-resolved",
+      "plan": {},
+      "tokenConsumed": True,
+      "dispatchUncertain": False,
+      "rebootRequested": False,
+      "bootVerified": False,
+      "receipt": {
+        "schemaVersion": 1,
+        "operationId": resolved_id,
+        "state": "failed",
+        "phase": "preflight",
+        "mutationStarted": False,
+        "diskMayBeModified": False,
+        "installed": False,
+        "message": "fixture failure before disk mutation",
+      },
+      "events": [],
+    }
+    resolved_marker = {
+      "schemaVersion": 1,
+      "operationId": resolved_id,
+      "statePath": f"/var/lib/nixorium/remote-install/{resolved_id}.json",
+      "tokenDigest": "",
+    }
+    write_resolved = (
+      "import json,pathlib; "
+      f"pathlib.Path('/var/lib/nixorium/remote-install/{resolved_id}.json').write_text({json.dumps(json.dumps(resolved_session) + chr(10))}); "
+      f"pathlib.Path('/var/lib/nixorium/coordination/usb-reservation.json').write_text({json.dumps(json.dumps(resolved_marker) + chr(10))})"
+    )
+    controller.succeed("systemctl stop nixorium-remote-install.service; su - admin -c " + shlex.quote("python3 -c " + shlex.quote(write_resolved)))
+    controller.succeed(f"chmod 0600 /var/lib/nixorium/remote-install/{resolved_id}.json /var/lib/nixorium/coordination/usb-reservation.json; systemctl start nixorium-remote-install.service")
+    controller.wait_for_unit("nixorium-remote-install.service")
+    controller.succeed(f"test ! -e /var/lib/nixorium/coordination/usb-reservation.json; test -f /var/lib/nixorium/remote-install/{resolved_id}.json")
+    controller.succeed("su - admin -c " + shlex.quote("python3 -c " + shlex.quote(ipc_probe)))
     controller.succeed("systemd-run --quiet --unit=nixorium-test-operation-holder --uid=admin /run/current-system/sw/bin/flock /var/lib/nixorium/coordination/operation.lock /run/current-system/sw/bin/sleep infinity; systemctl is-active --quiet nixorium-test-operation-holder.service")
     controller.wait_until_succeeds("! flock -n /var/lib/nixorium/coordination/operation.lock true")
     controller.succeed("test ! -e /var/lib/nixorium/pxe/session.json; systemctl start nixorium-pxe-recover.service")
