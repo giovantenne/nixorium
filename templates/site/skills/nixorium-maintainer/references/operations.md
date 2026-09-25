@@ -71,6 +71,10 @@ CLI apply requires the exact confirmation returned by the plan and starts only a
 revision-bound systemd instance. It builds the pinned Git source as the
 deployment owner, refuses repository drift before activation, and verifies the
 active system plus its revision-bound durable success receipt afterward. The
+reviewed generation is registered in the persistent NixOS system profile before
+activation, keeping boot configuration, rollback history, and GC retention in
+sync with the running system. Failed activation still requires inspection;
+profile registration alone is not evidence of success. The
 TUI's **Rebuild controller** task uses the same
 typed operation with an Enter confirmation after review; the systemd job and
 journal survive closing the dashboard. Keep `setup apply` for first-run

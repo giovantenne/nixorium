@@ -80,6 +80,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Controller rebuilds register the reviewed system in the persistent NixOS
+  system profile before activation and verify it afterward. The activated
+  generation now participates in boot configuration, rollback history, and
+  garbage-collection retention instead of only changing the running system.
 - Controller rebuilds no longer wait for an already-installed USB client to
   come online for its first-boot check. A strict, read-only guard confirms the
   persisted completion receipt before pausing the worker, acquiring the normal
