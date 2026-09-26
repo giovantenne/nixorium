@@ -340,6 +340,15 @@ Release from the matching changelog section.
   a guard before connection tracking preventing IPv6/old-connection bypass.
   Controller services stay interface-scoped; only it opens Harmonia/PXE.
   Preserve independently owned runtime tables on firewall reload.
+- Temporary Internet control uses typed `internet plan`/`apply` callbacks,
+  client-only evaluated identities, an expiring review and the shared fleet
+  lock. Recheck authenticated boot ID and state before every fixed helper
+  request; verify afterward and report partial/unconfirmed outcomes honestly.
+  Never queue offline targets or reuse authorization across reboot. The
+  root-only helper controls only `nixorium-internet-block.service` and its
+  owned nftables table. Preserve lab IPv4, DHCP, IPv6 neighbor discovery,
+  ordinary firewall reloads and reboot-to-enabled semantics. No gateway,
+  persistent enablement, arbitrary remote commands or student privileges.
 - Native Veyon hosts persist per-user tokens and portal grants under
   `/var/lib/nixorium/veyon-session`; never copy these into templates, snapshots,
   Git, or other machines. GNOME initial consent stays explicit. The user-only

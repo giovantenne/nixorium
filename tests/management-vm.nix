@@ -1,9 +1,43 @@
-{ nixoriumPackage }:
+{ nixoriumPackage, useKVM ? true, internetOnly ? false }:
+let
+  internetTestScript = ''
+    controller.succeed("loginctl enable-linger root")
+    controller.wait_for_unit("user@0.service")
+    controller.wait_until_succeeds("ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@127.0.0.1 nixorium-internet status | jq -e '.state == \"enabled\"'")
+    with subtest("temporary Internet control through authenticated SSH and systemd"):
+      controller.fail("su - student -c 'nixorium-internet status'")
+      controller.succeed("nixorium-internet status | jq -e '.state == \"enabled\"'")
+      controller.succeed("nixorium internet plan --repo /tmp/deployment --on pc01 --action block --json | tee /tmp/internet-plan.json; token=$(jq -r .reviewToken /tmp/internet-plan.json); nixorium internet apply --repo /tmp/deployment --on pc01 --action block --expect \"$token\" --yes --json | tee /tmp/internet-result.json | jq -e '.state == \"completed\" and .targets[0].state == \"verified\"'")
+      controller.succeed("systemctl reload nftables.service; nixorium-internet status | jq -e '.state == \"blocked\"'")
+      controller.fail("su - student -c 'systemctl --no-ask-password stop nixorium-internet-block.service'")
+      controller.succeed("nixorium internet plan --repo /tmp/deployment --on pc01 --action unblock --json | tee /tmp/internet-unblock.json; token=$(jq -r .reviewToken /tmp/internet-unblock.json); nixorium internet apply --repo /tmp/deployment --on pc01 --action unblock --expect \"$token\" --yes --json | tee /tmp/internet-result.json | jq -e '.state == \"completed\"'")
+      controller.succeed("nixorium-internet status | jq -e '.state == \"enabled\"'; cat /proc/sys/kernel/random/boot_id > /root/internet-old-boot; nixorium-internet block $(cat /root/internet-old-boot) | jq -e '.state == \"blocked\"'")
+      controller.shutdown()
+      controller.start()
+      controller.wait_for_unit("sshd.service")
+      controller.wait_for_unit("nixorium-test-network.service")
+      controller.succeed("nixorium-internet status | jq -e '.state == \"enabled\"'")
+      controller.fail("nixorium-internet block $(cat /root/internet-old-boot)")
+      controller.succeed("nixorium-internet status | jq -e '.state == \"enabled\"'")
+  '';
+in
 {
   name = "nixorium-management";
+  requiredFeatures.kvm = useKVM;
 
   nodes.controller = { config, lib, pkgs, ... }:
   let
+    internetModule = import ../modules/client-internet.nix {
+      inherit pkgs lib;
+      hostName = "pc01";
+      labSettings = {
+        masterHostName = "pc99";
+        ifaceName = "lab0";
+        networkBase = "10.0.0.0";
+        networkPrefixLength = 8;
+      };
+    };
+    internetHelper = builtins.head internetModule.environment.systemPackages;
     sandboxCheck = nixoriumPackage.overrideAttrs {
       pname = "nixorium-worker-sandbox-check";
       doCheck = false;
@@ -34,6 +68,7 @@
         fakeColmena
         fakeHostState
         nixoriumPackage
+        internetHelper
       ];
     };
     fakeControllerSystem = pkgs.runCommand "nixorium-test-controller-system" { } ''
@@ -87,6 +122,10 @@
       set -eu
       printf '%s\n' "''${SSH_ORIGINAL_COMMAND:-}" >> /tmp/nixorium-test-shutdown-ssh.log
       case "''${SSH_ORIGINAL_COMMAND:-}" in
+        nixorium-internet*)
+          read -r -a ARGS <<< "$SSH_ORIGINAL_COMMAND"
+          exec ${internetHelper}/bin/nixorium-internet "''${ARGS[@]:1}"
+          ;;
         nixorium-session-state)
           if [[ -e /tmp/nixorium-test-session-state ]]; then
             cat /tmp/nixorium-test-session-state
@@ -177,6 +216,7 @@
   in
   {
     imports = [
+      internetModule
       ../modules/cache.nix
       ../modules/firewall.nix
       ../modules/management.nix
@@ -209,7 +249,8 @@
     networking.hostName = "pc99";
     # This test applies systems after power-loss recovery. Keep fetched Flake
     # sources across reboot rather than losing the writable store's tmpfs.
-    virtualisation.writableStoreUseTmpfs = false;
+    virtualisation.writableStoreUseTmpfs = internetOnly;
+    virtualisation.memorySize = if internetOnly then 2048 else 1024;
     environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit ];
     users.groups.veyon-master = {};
     system.activationScripts.createHomeTemplates = "";
@@ -385,7 +426,23 @@
     environment.etc."nixorium-test/.gitignore".source = ../templates/site/.gitignore;
   };
 
-  testScript = ''
+  testScript = if internetOnly then ''
+    start_all()
+    controller.wait_for_unit("sshd.service")
+    controller.wait_for_unit("nixorium-test-network.service")
+    controller.succeed("mkdir -p /tmp/deployment")
+    controller.succeed("cp /etc/nixorium-test/flake.nix /tmp/deployment/flake.nix")
+    controller.succeed("cp /etc/nixorium-test/lab-settings.json /tmp/deployment/lab-settings.json")
+    controller.succeed("cp /etc/nixorium-test/lab-software.json /tmp/deployment/lab-software.json")
+    controller.succeed("cp /etc/nixorium-test/.gitignore /tmp/deployment/.gitignore")
+    controller.succeed("jq --arg password '$6$vm$not-the-public-default' '.lab.masterDhcpIp = \"192.0.2.10\" | .lab.ifaceName = \"lab0\" | .lab.teacherPassword = $password | .lab.studentPassword = $password | .lab.adminPassword = $password' /tmp/deployment/lab-settings.json > /tmp/lab-settings.json && mv /tmp/lab-settings.json /tmp/deployment/lab-settings.json")
+    controller.succeed("git -C /tmp/deployment init -q")
+    controller.succeed("git -C /tmp/deployment config user.name Test; git -C /tmp/deployment config user.email test@example.invalid")
+    controller.succeed("git -C /tmp/deployment add flake.nix lab-settings.json lab-software.json .gitignore")
+    controller.succeed("git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm initial")
+    controller.succeed("install -d -m 0700 /root/.ssh; ssh-keygen -q -t ed25519 -N \"\" -f /root/.ssh/id_ed25519; printf 'restrict,command=\"/run/current-system/sw/bin/nixorium-test-shutdown-remote\" %s\n' \"$(cat /root/.ssh/id_ed25519.pub)\" > /root/.ssh/authorized_keys; chmod 0600 /root/.ssh/authorized_keys; systemctl reload sshd.service")
+    ${internetTestScript}
+  '' else ''
     import json
     import shlex
 
@@ -402,7 +459,7 @@
     controller.succeed("systemctl show nixorium-remote-install.service -p Environment --value | grep -F 'XDG_STATE_HOME=/home/admin/.local/state'; systemctl show nixorium-remote-install.service -p ReadWritePaths --value | grep -F '/home/admin/.ssh/nixorium-known-hosts'; systemctl cat nixorium-remote-install.service | grep -F -- '-/home/admin/.local/state/nixorium/operations'")
     controller.succeed("su - admin -c 'systemctl start nixorium-remote-install.service'")
     controller.wait_for_unit("nixorium-remote-install.service")
-    controller.succeed("test \"$(stat -c '%U:%G:%a' /run/nixorium/remote-install/control.sock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/remote-install)\" = admin:users:700")
+    controller.wait_until_succeeds("test \"$(stat -c '%U:%G:%a' /run/nixorium/remote-install/control.sock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/remote-install)\" = admin:users:700")
     ipc_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium/remote-install/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"worker-probe"}\\n\'); value=json.loads(s.makefile().readline()); assert value["requestId"] == "0123456789abcdef0123456789abcdef" and value["state"] == "ready"'
     controller.succeed("su - admin -c " + shlex.quote("python3 -c " + shlex.quote(ipc_probe)))
     orphan_id = "abcdefabcdefabcdefabcdefabcdefab"
@@ -544,6 +601,7 @@
     controller.succeed("token=$(jq -r .reviewToken /tmp/shutdown-plan.json); nixorium shutdown apply --repo /tmp/deployment --on @lab --expect \"$token\" </dev/null >/tmp/shutdown-noninteractive.out 2>/tmp/shutdown-noninteractive.err || test $? = 2; grep -F 'requires an interactive terminal or explicit --yes' /tmp/shutdown-noninteractive.err; test ! -e /tmp/nixorium-test-shutdown-dispatch.log")
     controller.succeed("nixorium shutdown apply --repo /tmp/deployment --on @lab --expect sha256:stale --yes --json > /tmp/shutdown-stale.json || test $? = 1; jq -e '.operation == \"shutdown-apply\" and .state == \"blocked\" and .retrySafe and any(.issues[]; .field == \"review\")' /tmp/shutdown-stale.json; test ! -e /tmp/nixorium-test-shutdown-dispatch.log")
     controller.succeed("nixorium shutdown plan --repo /tmp/deployment --on @lab --json > /tmp/shutdown-fresh-plan.json; token=$(jq -r .reviewToken /tmp/shutdown-fresh-plan.json); nixorium shutdown apply --repo /tmp/deployment --on @lab --expect \"$token\" --yes --json > /tmp/shutdown-apply.json; jq -e '.operation == \"shutdown-apply\" and .state == \"completed\" and .accepted == 1 and .notSent == 0 and .unconfirmed == 0 and (.retrySafe | not) and .targets[0].name == \"pc01\" and .targets[0].state == \"accepted\"' /tmp/shutdown-apply.json; test \"$(wc -l < /tmp/nixorium-test-shutdown-dispatch.log)\" = 1; grep -Fx 'nixorium-session-state' /tmp/nixorium-test-shutdown-ssh.log; grep -Fx 'systemctl poweroff --no-block' /tmp/nixorium-test-shutdown-ssh.log")
+    ${internetTestScript}
     controller.succeed("cp /tmp/deployment/lab-settings.json /tmp/candidate.json")
     controller.succeed("nixorium config plan --repo /tmp/deployment --file /tmp/candidate.json --json | jq -e '.operation == \"config-plan\" and .state == \"unchanged\" and (.changes | length) == 0'")
     controller.succeed("nixorium setup keys --repo /tmp/deployment --json | jq -e '.operation == \"setup-keys\" and .state == \"ready\" and all(.keys[]; .verified and .matches and .privateMode == 384)'")
@@ -559,7 +617,7 @@
     controller.succeed("grep -aF 'Add a software profile' /tmp/nixorium-software-profile-tui.log; grep -aF 'Essential packages' /tmp/nixorium-software-profile-tui.log; grep -aF 'Validated together against the pinned package set' /tmp/nixorium-software-profile-tui.log; grep -aF 'Essential saved' /tmp/nixorium-software-profile-tui.log; grep -aF 'Distribute affected computers' /tmp/nixorium-software-profile-tui.log; ! grep -aF 'Caught panic' /tmp/nixorium-software-profile-tui.log")
     controller.succeed("nixorium software preset plan --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --json > /tmp/software-preset-plan.json; jq -e '.operation == \"software-preset-plan\" and .state == \"ready\" and .request.exclude == [\"vlc\"] and (.selectedPackages | map(.id)) == [\"gimp\"] and (.additions | length) == 1 and .affectedClients == [\"pc01\"] and .confirmation == \"ADD PROFILE\" and (.reviewToken | startswith(\"sha256:\"))' /tmp/software-preset-plan.json")
     controller.succeed("before=$(sha256sum /tmp/preset-deployment/lab-software.json); nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect sha256:stale --yes --json > /tmp/software-preset-stale.json || test $? = 1; after=$(sha256sum /tmp/preset-deployment/lab-software.json); test \"$before\" = \"$after\"; jq -e '.operation == \"software-preset-apply\" and .state == \"conflict\" and any(.issues[]; .field == \"reviewToken\")' /tmp/software-preset-stale.json")
-    controller.succeed("token=$(jq -r .reviewToken /tmp/software-preset-plan.json); nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect \"$token\" --yes --json > /tmp/software-preset-apply.json; jq -e '.operation == \"software-preset-apply\" and .state == \"applied\" and (.additions | length) == 1 and .affectedClients == [\"pc01\"]' /tmp/software-preset-apply.json; jq -e '.packages == [{\"package\":\"gimp\",\"scope\":{\"kind\":\"all-clients\"}}]' /tmp/preset-deployment/lab-software.json; nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect \"$token\" --yes --json | jq -e '.state == \"unchanged\"'")
+    controller.succeed("token=$(jq -r .reviewToken /tmp/software-preset-plan.json); nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect \"$token\" --yes --json > /tmp/software-preset-apply.json; jq -e '.operation == \"software-preset-apply\" and .state == \"applied\" and (.additions | length) == 1 and .affectedClients == [\"pc01\"]' /tmp/software-preset-apply.json; jq -e '.packages == [{\"package\":\"gimp\",\"scope\":{\"kind\":\"all-clients\"}}]' /tmp/preset-deployment/lab-software.json; nixorium software preset apply --repo /tmp/preset-deployment --preset essential --scope all-clients --exclude vlc --expect \"$token\" --yes --json | tee /tmp/internet-result.json | jq -e '.state == \"unchanged\"'")
     controller.succeed("nixorium software search --repo /tmp/deployment --query hell --json > /tmp/software-search.json; jq -e '.operation == \"software-search\" and .state == \"ready\" and .query == \"hell\" and .results == [{\"id\":\"hello\",\"label\":\"hello\",\"summary\":\"A friendly greeting program\",\"version\":\"2.12\",\"availability\":\"available\"}]' /tmp/software-search.json")
     controller.succeed("nixorium software plan --repo /tmp/deployment --package vlc --scope group:graphics --json > /tmp/software-plan.json; jq -e '.operation == \"software-change-plan\" and .state == \"ready\" and .request.package == \"vlc\" and .request.scope.group == \"graphics\" and .affectedClients == [\"pc01\"] and (.reviewToken | startswith(\"sha256:\")) and .confirmation == \"SAVE\"' /tmp/software-plan.json")
     controller.succeed("before=$(sha256sum /tmp/deployment/lab-software.json); token=$(jq -r .reviewToken /tmp/software-plan.json); nixorium software apply --repo /tmp/deployment --package vlc --scope group:graphics --expect \"$token\" </dev/null >/tmp/software-noninteractive.out 2>/tmp/software-noninteractive.err || test $? = 2; after=$(sha256sum /tmp/deployment/lab-software.json); test \"$before\" = \"$after\"; grep -F 'requires an interactive terminal or explicit --yes' /tmp/software-noninteractive.err")

@@ -171,3 +171,13 @@ It refuses the host namespaces, creates only temporary virtual links, and checks
 master access, peer denial, IPv6, loopback, external VNC and established peer
 connections. No live firewall, gateway or client is changed. Run the mkLab
 contract evaluation and affected system builds as well.
+
+The same namespace test covers temporary Internet blocking, existing external
+connections, IPv6, management reachability, firewall reload and unblock. The
+management VM additionally exercises authenticated CLI dispatch, real systemd,
+student denial and reboot restoration. On development hosts without KVM, run
+the Internet scenario in the same management VM, using software emulation:
+
+```sh
+nix build --file tests/source-checks.nix internet-management-vm-tcg --no-link
+```

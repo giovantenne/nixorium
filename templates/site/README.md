@@ -120,6 +120,15 @@ only SSH (22) and Veyon (11100) to the controller's static IPv4 address on the
 lab interface; IPv6 cannot bypass this restriction. Old `veyonNativeHosts`
 settings are accepted for compatibility but no longer select a backend.
 
+## Temporary Internet access
+
+To restrict browsing during a lesson, open **Computers → Internet access**,
+select clients, choose **block** or **unblock** with Tab, and review before
+applying. Internet returns after each client reboots. The lab's IPv4 subnet,
+SSH and Veyon remain available; other IPv4/IPv6 destinations are blocked.
+Offline or outdated clients are reported and receive no queued command.
+Update the controller and clients before first use.
+
 ## Local customization
 
 - `modules/shared.nix`: every machine

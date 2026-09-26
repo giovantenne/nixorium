@@ -8,6 +8,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Administrators can block or restore client Internet access from Computers →
+  Internet access, or reviewed `internet plan` / `internet apply` commands.
+  The temporary IPv4/IPv6 firewall preserves laboratory access and DHCP,
+  blocks existing external connections, and resets on reboot. Authenticated
+  observations, boot-bound requests and per-client verification prevent stale
+  reviews or offline computers from receiving a delayed block.
+
 - Added a reviewed USB/SSH client-installation path for systems without usable
   UEFI network boot. It pins the official Minimal ISO's physical-console host
   fingerprint before password use, installs an ephemeral operation key, builds

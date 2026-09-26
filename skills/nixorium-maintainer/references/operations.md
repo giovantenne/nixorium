@@ -33,6 +33,29 @@ Do not add this boundary check to a settings-only or controller-only task.
 Report evaluations and builds separately. Building may fetch sources and use
 substantial storage/time; it does not activate a system or authorize deployment.
 
+## Temporary Internet access
+
+Use **Computers → Internet access** to select clients, choose block/unblock,
+review authenticated state and apply. The controller and clients must first
+run a version supporting the client helper. Internet returns on client reboot;
+offline clients are never queued. The configured laboratory IPv4 subnet stays
+reachable, including SSH and Veyon. Other destinations and established Internet
+connections are blocked without changing the gateway.
+
+```sh
+nixorium internet plan --on @lab --action block
+nixorium internet apply --on @lab --action block --expect TOKEN_FROM_PLAN
+nixorium internet plan --on pc01 --action unblock
+nixorium internet apply --on pc01 --action unblock --expect TOKEN_FROM_PLAN
+```
+
+Use the current plan's exact token. Reboot, changed observations, expiry or an
+inventory change require a fresh review. Report unavailable, not-sent and
+unconfirmed targets individually; never infer success from an SSH dispatch.
+An explicit unblock can recover an inconsistent owned table/service state.
+Do not edit routes, enable the unit at boot, flush the ruleset or grant student
+network privileges. Allowed lab services, including a lab proxy, remain reachable.
+
 ## Installation and deployment
 
 Disk installation is destructive. Resolve the exact host and disk first and

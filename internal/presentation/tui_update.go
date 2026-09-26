@@ -752,6 +752,19 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.software = software
 		model.message = result.message
 		return model, nil
+	case internetPlanMsg:
+		model.busy = ""
+		model.internet.plan = message.plan
+		model.internet.stage = 1
+		model.message = ""
+		return model, nil
+	case internetApplyMsg:
+		model.busy = ""
+		model.internet.applying = false
+		model.internet.result = message.report
+		model.internet.stage = 2
+		model.message = ""
+		return model, nil
 	case dashboardShutdownPlanMsg:
 		model.busy = ""
 		model.shutdown.plan = message.report
@@ -906,7 +919,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.software.mutating() || model.shutdown.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}

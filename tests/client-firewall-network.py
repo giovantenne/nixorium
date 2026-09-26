@@ -9,7 +9,8 @@ import subprocess
 import sys
 import time
 
-rules, nft, python = sys.argv[1:]
+rules, nft, python = sys.argv[1:4]
+internet_rules = sys.argv[4] if len(sys.argv) == 5 else None
 if str(pathlib.Path('/proc/self/ns/net').readlink()) == os.environ['NIXORIUM_TEST_PARENT_NETNS']:
     raise SystemExit('Refusing to test in the host network namespace')
 if str(pathlib.Path('/proc/self/ns/user').readlink()) == os.environ['NIXORIUM_TEST_PARENT_USERNS']:
@@ -117,6 +118,46 @@ assert data!=b'test', 'pre-existing peer connection bypassed the source guard'
     connect(peer, '10.77.0.1', 5900, False)
     connect(client, '127.0.0.1', 5900, True)
     print('PASS: master IPv4 allowed; peer IPv4 and all remote IPv6 denied; old peer connection revoked; loopback retained; external VNC denied')
+    if internet_rules:
+        # Public-address endpoints live only in this isolated test namespace.
+        run('ip', 'addr', 'add', '203.0.113.99/32', 'dev', 'br-test')
+        run('ip', '-6', 'addr', 'add', '2001:db8::99/128', 'dev', 'br-test', 'nodad')
+        run(*ns(client, 'ip', 'route', 'add', 'default', 'via', '10.77.0.99'))
+        run(*ns(client, 'ip', '-6', 'route', 'add', 'default', 'via', 'fd77::99'))
+        spawn(python, '-c', server.replace('(22,11100,5900)', '(443,)'))
+        time.sleep(.3)
+        for address in ('203.0.113.99', '2001:db8::99'):
+            connect(client, address, 443, True)
+        existing = spawn(*ns(client, python, '-u', '-c', '''import socket,sys
+s=socket.create_connection(('203.0.113.99',443),1)
+s.sendall(b'ping');assert s.recv(4)==b'ping'
+print('connected',flush=True);sys.stdin.readline();s.settimeout(.8)
+try:
+ s.sendall(b'test');data=s.recv(4)
+except OSError: data=b''
+assert data!=b'test', 'existing Internet connection bypassed the block'
+'''), stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        assert existing.stdout.readline().strip() == 'connected'
+        run(*ns(client, nft, '-c', '-f', internet_rules))
+        run(*ns(client, nft, '-f', internet_rules))
+        existing.stdin.write('check\n');existing.stdin.flush()
+        assert existing.wait(timeout=3) == 0
+        for address in ('203.0.113.99', '2001:db8::99'):
+            connect(client, address, 443, False)
+        connect(client, '10.77.0.99', 443, True)
+        for port in (22, 11100):
+            connect(os.getpid(), '10.77.0.1', port, True)
+        # A normal firewall reload must retain the independently owned block.
+        reload_rules = ('delete table inet base_firewall\n'
+                        'delete table inet nixorium_client_access\n' + pathlib.Path(rules).read_text())
+        run(*ns(client, nft, '-f', '-'), input=reload_rules)
+        connect(client, '203.0.113.99', 443, False)
+        connect(os.getpid(), '10.77.0.1', 11100, True)
+        run(*ns(client, nft, 'delete', 'table', 'inet', 'nixorium_internet'))
+        for address in ('203.0.113.99', '2001:db8::99'):
+            connect(client, address, 443, True)
+        connect(peer, '10.77.0.1', 11100, False)
+        print('PASS: Internet IPv4/IPv6 and established traffic blocked; LAN/SSH/Veyon retained; firewall reload retains block; unblock restores Internet only')
 finally:
     for p in reversed(children):
         if p.poll() is None:
