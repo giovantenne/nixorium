@@ -68,6 +68,23 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Installation now opens PXE and USB/SSH directly. PXE has one state-aware
+  entry for guided preparation, reviewed start, finish and network recovery;
+  a failed state refresh cannot expose actions against previously ready data.
+- The site desktop uses MoreWaita icons, a compact bottom dock, native Adwaita
+  decoration, blue accents and a static vector wallpaper. Tiling Assistant adds
+  snap assist with small gaps. A targeted one-time migration updates existing
+  accounts while preserving later staff customization and unrelated settings.
+
+- Task menus now show direct shortcuts, use consistent compact rows and return
+  to their parent area. Removed the duplicate Restore route: reapply lives in
+  Computers and reinstall in Installation. Settings and installation methods
+  expose direct shortcuts; software tabs use F2/F3/F4. Help, focus markers and
+  action-bar wrapping share one visual vocabulary across terminal sizes.
+- Dashboard startup defers key, controller-closure and PXE-artifact checks to
+  their operations while retaining local first-run validation and current PXE
+  service state. Deferred checks are never reported as verified readiness.
+
 - All laboratory hosts now use native PipeWire/Wayland Veyon capture. Removed
   the patched GNOME Remote Desktop bridge, embedded shared VNC credential and
   pilot selector from settings screens. Legacy selector data remains readable

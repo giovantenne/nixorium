@@ -15,16 +15,14 @@ Nixorium  /  Overview
 Laboratory overview
 Choose an area. Observed state is loaded only when the selected task needs it.
 
-› Computers
-    Inventory, distribute, restore or shut down client computers
-  Installation
-    Configure the lab and install computers by PXE or the official USB ISO over SSH
-  Software
-    Review configured choices or search this lab's pinned packages
-  Maintenance
-    Settings, controller updates, services, revisions, logs and diagnostics
+› [c] Computers
+  [n] Installation
+  [w] Software
+  [a] Maintenance
 
-↑/↓ Select  ·  Enter Open  ·  ? Help  ·  q Quit
+Inventory, system deployment, Internet access and shutdown
+
+↑/↓ Select  ·  Enter Open  ·  F1 Help  ·  q Quit
 ```
 
 ## Pinned package search
@@ -34,7 +32,7 @@ Nixorium  /  Software
 
 Software
 
-Selected   [Search packages]   Suggestions
+[F2] Selected   [F3] Search packages   [F4] Suggestions
 Choose desired software here. Running clients change only when you deploy them.
 
 Search packages
@@ -97,7 +95,7 @@ NOTICE
 ○ Opened from a saved software change. Review deploys the complete current configuration.
 ! Software selection saved locally.
 
-Space Select  ·  a All  ·  Enter Review  ·  Esc Computers  ·  ? Help
+Space Select  ·  a All  ·  Enter Review  ·  Esc Computers  ·  F1 Help
 ```
 
 ## Client deployment review
@@ -137,7 +135,7 @@ Detailed log: /demo/state/deploy-lab.log
 NOTICE
 ○ All five clients report the reviewed revision.
 
-r New review  ·  l Logs  ·  Enter Computers  ·  ? Help
+r New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ```
 
 ## PXE network-impact review

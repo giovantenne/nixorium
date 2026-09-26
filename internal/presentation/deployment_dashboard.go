@@ -25,7 +25,7 @@ type deploymentIntent struct {
 	message     string
 }
 
-func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg, hosts []domain.HostMeta, restoreMode bool) (deploymentModel, deploymentIntent) {
+func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg, hosts []domain.HostMeta) (deploymentModel, deploymentIntent) {
 	if screen == dashboardDeploy && model.result.Operation != "" {
 		switch key.String() {
 		case "enter", "esc", "left":
@@ -46,9 +46,7 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 		switch key.String() {
 		case "esc", "left":
 			destination := dashboardHome
-			if restoreMode {
-				destination = dashboardRestore
-			} else if model.context != "" {
+			if model.context != "" {
 				destination = dashboardSoftware
 				model.context = ""
 			}
@@ -113,7 +111,7 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 	if model.deployment.usbRecovery != nil {
 		return model.updateDeploymentUSBRecovery(key)
 	}
-	deployment, intent := model.deployment.update(model.screen, key, model.report.Meta.Clients.Hosts, model.computers.restoreMode)
+	deployment, intent := model.deployment.update(model.screen, key, model.report.Meta.Clients.Hosts)
 	model.deployment = deployment
 	if intent.message != "" {
 		model.message = intent.message
@@ -123,9 +121,6 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		model.screen = intent.destination
 		if intent.message == "" {
 			model.message = ""
-		}
-		if intent.destination == dashboardRestore {
-			model.computers.restoreMode = false
 		}
 	case deploymentPlanIntent:
 		if model.actions.LoadRemoteInstall != nil {

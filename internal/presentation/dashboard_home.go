@@ -16,12 +16,12 @@ type dashboardTask struct {
 	description string
 }
 
-func (task dashboardTask) Title() string       { return task.title + "  [" + task.shortcut + "]" }
+func (task dashboardTask) Title() string       { return menuTitle(task.shortcut, task.title) }
 func (task dashboardTask) Description() string { return task.description }
 func (task dashboardTask) FilterValue() string { return task.title + " " + task.description }
 
 var dashboardTasks = []dashboardTask{
-	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, distribute, restore or shut down client computers"},
+	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, system deployment, Internet access and shutdown"},
 	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab and install computers by PXE or the official USB ISO over SSH"},
 	{id: "software", shortcut: "w", title: "Software", description: "Review configured choices or search this lab's pinned packages"},
 	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
@@ -30,20 +30,19 @@ var dashboardTasks = []dashboardTask{
 var computersAreaTasks = []dashboardTask{
 	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Check reachability and compare observed systems with the intended revision"},
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
-	{id: "restore", shortcut: "r", title: "Restore computers", description: "Reapply the intended system or reinstall from scratch"},
 	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
 	{id: "internet", shortcut: "i", title: "Internet access", description: "Temporarily block or restore Internet on selected clients"},
 }
 
 var installationAreaTasks = []dashboardTask{
-	{id: "install", shortcut: "n", title: "Install computers", description: "Validate shared prerequisites, then choose PXE or USB over SSH"},
-	{id: "pxe", shortcut: "p", title: "PXE mode and network recovery", description: "Advanced controls for network boot and interrupted controller networking"},
+	{id: "pxe", shortcut: "p", title: "Network boot (PXE)", description: "Prepare, start or finish network installation; recover interrupted networking here"},
+	{id: "usb", shortcut: "u", title: "USB over SSH", description: "Install one physically identified computer using the official Minimal ISO"},
 }
 
 var administrationTasks = []dashboardTask{
 	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
 	{id: "package-base", shortcut: "b", title: "Update system and packages", description: "Refresh the NixOS base or review a channel migration"},
-	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git, and Veyon"},
+	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git and controller keys"},
 	{id: "controller", shortcut: "c", title: "Rebuild controller", description: "Review and activate the committed controller revision"},
 	{id: "services", shortcut: "s", title: "Controller services", description: "Check software delivery services or restart the signed cache when troubleshooting"},
 	{id: "git", shortcut: "g", title: "Review Git changes", description: "Inspect and commit selected safe deployment files"},
@@ -155,7 +154,7 @@ func (model dashboardModel) homeView() string {
 			detail: "Open Installation to continue or restore normal controller networking.",
 		})
 	}
-	if model.setup.State != "ready" {
+	if model.setup.State != "ready" && model.setup.State != "unchecked" {
 		notices = append(notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Computer installation is not configured yet",
@@ -165,9 +164,7 @@ func (model dashboardModel) homeView() string {
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
 	}
-	for index, item := range dashboardTasks {
-		lines = append(lines, tuiSelection(item.title, index == menu.list.Index(), model.isDark), tuiMuted("    "+item.description, model.isDark))
-	}
+	lines = append(lines, model.taskMenu(dashboardTasks, menu.list.Index()))
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
@@ -175,15 +172,13 @@ func (model dashboardModel) homeView() string {
 		path:    []string{"Overview"},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
-		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "?", label: "Help"}, {key: "q", label: "Quit"}},
+		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}},
 	})
 }
 
 func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
 	lines := []string{tuiTitle(title, model.isDark), tuiMuted(description, model.isDark), ""}
-	for index, task := range tasks {
-		lines = append(lines, tuiSelection(task.title, index == cursor, model.isDark), tuiMuted("    "+task.description, model.isDark))
-	}
+	lines = append(lines, model.taskMenu(tasks, cursor))
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
@@ -192,7 +187,7 @@ func (model dashboardModel) areaView(path, title, description string, tasks []da
 		path:    []string{path},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
-		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "?", label: "Help"}},
+		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}},
 	})
 }
 
@@ -203,15 +198,5 @@ func (model dashboardModel) computersAreaView() string {
 		"Observed state is loaded only by Computer inventory or an operation that needs it.",
 		computersAreaTasks,
 		model.computers.areaCursor,
-	)
-}
-
-func (model dashboardModel) installationAreaView() string {
-	return model.areaView(
-		"Installation",
-		"Install client computers",
-		"Choose PXE for many computers or USB over SSH for one physically identified client.",
-		installationAreaTasks,
-		model.installationAreaCursor,
 	)
 }

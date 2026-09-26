@@ -36,6 +36,18 @@ module wiring, or software scopes change:
 This mode includes the quick checks and evaluates the complete `mkLab` test
 graph without booting a VM.
 
+For GNOME workstation changes, also run the focused schema/extension check:
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' build \
+  --file tests/source-checks.nix desktop-profile --no-link
+```
+
+It compiles the actual GSettings overrides, checks extension metadata against
+GNOME's pinned major version, and validates the login script. Keep it separate
+from the quick Go gate: a cold store may need GNOME dependencies. It does not
+replace login/hardware verification or an affected-system build.
+
 Add the one affected integration test when changing its behavior:
 
 ```sh

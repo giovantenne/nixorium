@@ -9,10 +9,6 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func (model dashboardModel) openComputerInstallation() (tea.Model, tea.Cmd) {
-	return model.startComputerInstallation()
-}
-
 func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
 	model.screen = dashboardController
 	model.busy = "Reviewing controller revision and active system"
@@ -24,10 +20,6 @@ func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
 
 func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd) {
 	switch action {
-	case "r":
-		model.screen = dashboardRestore
-		model.computers.restoreCursor = 0
-		model.message = ""
 	case "i":
 		model.screen = dashboardInternet
 		model.internet = internetModel{chosen: map[string]bool{}, action: domain.InternetBlock}
@@ -115,6 +107,30 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 }
 
 func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.screen == dashboardSettings && model.settings.result.Operation == "" {
+		if model.settings.menu.filtering() {
+			var command tea.Cmd
+			model.settings.menu, command = model.settings.menu.update(key)
+			return model, command
+		}
+		for index, group := range routineSettingsGroups {
+			if key.String() == group.shortcut {
+				model.settings.menu.list.ResetFilter()
+				model.settings.menu.list.Select(index)
+				key = tea.KeyPressMsg{Code: tea.KeyEnter}
+				break
+			}
+		}
+	}
+	if model.screen == dashboardSettingsPasswords && model.settings.returnScreen != dashboardSetup && !model.installation.flow && model.settings.passwordMenu.initialized {
+		for index, choice := range routinePasswordChoices {
+			if key.String() == choice.id[:1] {
+				model.settings.passwordMenu.list.Select(index)
+				key = tea.KeyPressMsg{Code: tea.KeyEnter}
+				break
+			}
+		}
+	}
 	switch model.screen {
 	case dashboardHome:
 		if model.initialError {
@@ -131,9 +147,6 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			return model, nil
 		}
-		// Restoration context never leaks into a later intervention after a
-		// completed result or a detour through logs.
-		model.computers.restoreMode = false
 		model.ensureHomeMenu()
 		action := key.String()
 		if action == "enter" {
@@ -161,8 +174,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			return model, func() tea.Msg { return dashboardSoftwareCatalogMsg{report: model.actions.LoadSoftware()} }
 		case "n":
-			model.screen = dashboardInstallationArea
-			model.message = ""
+			return model.startComputerInstallation()
 		default:
 			var command tea.Cmd
 			model.homeMenu, command = model.homeMenu.update(key)
@@ -181,7 +193,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.computers.areaCursor = max(0, model.computers.areaCursor-1)
 		case "down", "j":
 			model.computers.areaCursor = min(len(computersAreaTasks)-1, model.computers.areaCursor+1)
-		case "h", "d", "r", "x", "i":
+		case "h", "d", "x", "i":
 			model.areaReturn = dashboardComputersArea
 			return model.openComputerTask(action)
 		}
@@ -191,36 +203,17 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			action = installationAreaTasks[model.installationAreaCursor].shortcut
 		}
 		switch action {
+		case "p":
+			return model.openNetworkInstallation()
+		case "u":
+			return model.openUSBInstallation()
 		case "esc", "left":
+			model.installation.flow = false
 			model.screen = dashboardHome
-			model.message = ""
 		case "up", "k":
 			model.installationAreaCursor = max(0, model.installationAreaCursor-1)
 		case "down", "j":
 			model.installationAreaCursor = min(len(installationAreaTasks)-1, model.installationAreaCursor+1)
-		case "n":
-			return model.openComputerInstallation()
-		case "p":
-			model.areaReturn = dashboardInstallationArea
-			model.screen = dashboardPXE
-			model.message = ""
-		}
-	case dashboardInstallMethod:
-		switch key.String() {
-		case "esc", "left":
-			model.installation.flow = false
-			if model.computers.restoreMode {
-				model.screen = dashboardRestore
-			} else {
-				model.screen = dashboardInstallationArea
-			}
-		case "up", "k":
-			model.installation.methodCursor = max(0, model.installation.methodCursor-1)
-		case "down", "j":
-			model.installation.methodCursor = min(len(installMethods)-1, model.installation.methodCursor+1)
-		case "enter":
-			method := installMethods[model.installation.methodCursor].method
-			return model.beginComputerInstallation(method)
 		case "r":
 			if model.installation.remote.operationID != "" {
 				model.screen = dashboardUSBInstall
@@ -231,29 +224,6 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		}
 	case dashboardUSBInstall:
 		return model.updateRemoteInstallKey(key)
-	case dashboardRestore:
-		switch key.String() {
-		case "esc", "left":
-			model.screen = dashboardHome
-			model.message = ""
-		case "up", "k":
-			model.computers.restoreCursor = max(0, model.computers.restoreCursor-1)
-		case "down", "j":
-			model.computers.restoreCursor = min(1, model.computers.restoreCursor+1)
-		case "enter":
-			model.message = ""
-			if model.computers.restoreCursor == 0 {
-				model.computers.restoreMode = true
-				model.screen = dashboardDeploy
-				model.deployment.result = domain.DeploymentExecutionReport{}
-				model.deployment.context = ""
-				model.deployment.chosen = map[string]bool{}
-				model.deployment.cursor = 0
-			} else {
-				model.computers.restoreMode = true
-				return model.startComputerInstallation()
-			}
-		}
 	case dashboardSetup:
 		if key.String() == "t" {
 			model.setupDetails = !model.setupDetails
@@ -456,7 +426,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
 			model.message = ""
 			model.screen = dashboardSettingsPasswords
-		case "k":
+		case "y":
 			if model.actions.LoadSetupKeys == nil {
 				model.message = "Controller key management is not available in this session."
 				return model, nil
@@ -1142,7 +1112,14 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
 	case dashboardPXE:
-		switch key.String() {
+		action := key.String()
+		if action == "enter" {
+			action = model.pxePrimaryAction().key
+		}
+		if model.installation.stateError && action != "f" && action != "esc" && action != "left" {
+			return model, nil
+		}
+		switch action {
 		case "esc", "left":
 			if model.installation.flow && model.installation.failed {
 				model.installation.flow = false
@@ -1151,10 +1128,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 				model.message = ""
 				return model, nil
 			}
-			if model.computers.restoreMode {
-				model.screen = dashboardRestore
-				model.computers.restoreMode = false
-			} else if model.setupMode {
+			if model.setupMode {
 				model.screen = dashboardSetup
 			} else {
 				model.screen = dashboardHome
@@ -1164,25 +1138,26 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 				model.busy = "Refreshing first-run progress"
 				return model, model.loadSetup()
 			}
+		case "f":
+			return model.openNetworkInstallation()
 		case "p":
-			model.busy = "Preparing netboot artifacts and client closures"
-			model.installation.pxePreparing = true
-			model.installation.pxeProgress = domain.OperationProgress{}
-			model.installation.pxeStarted = time.Now().UTC()
-			model.installation.pxeProgressID++
-			model.message = ""
-			operation := model.runAction(func() string {
-				report := model.actions.PreparePXE()
-				return report.Message
-			}, dashboardPXE)
-			return model, tea.Batch(operation, schedulePXEProgressTick(model.installation.pxeProgressID))
+			if model.report.PXE.Mode == "active" || model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required" {
+				return model, nil
+			}
+			return model.beginComputerInstallation("pxe")
 		case "s":
+			if !model.report.PXEPreparation.Ready || model.report.PXE.Mode == "active" || model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required" || model.actions.PlanPXEStart == nil {
+				return model, nil
+			}
 			model.busy = "Checking PXE readiness"
 			model.message = ""
 			return model, func() tea.Msg {
 				return dashboardPlanMsg{report: model.actions.PlanPXEStart()}
 			}
 		case "x":
+			if model.actions.StopPXE == nil || model.actions.Refresh == nil || (model.report.PXE.Mode != "active" && model.report.PXE.Mode != "degraded" && model.report.PXE.Mode != "recovery-required") {
+				return model, nil
+			}
 			model.busy = "Stopping installation mode and restoring networking"
 			model.message = ""
 			return model, model.runAction(func() string {

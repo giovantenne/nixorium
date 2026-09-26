@@ -68,24 +68,21 @@ cd ~/nixorium-deployment
 nixorium
 ```
 
-The controller is already usable. Choose **Installation → Install computers**
-when the lab network is ready. Complete the single **Laboratory settings** form;
-`Esc` returns directly to the overview without changing the file. On completion
-Nixorium validates and saves the managed settings without a separate save
-review, creates missing controller keys automatically, activates the saved
-controller configuration, and prepares the netboot artifacts plus every
-configured client closure. The existing controller time zone and keyboard are
-reused rather than requested again. Importing an existing key is an advanced
-action under **Maintenance → Change settings → Advanced keys**.
+The controller is already usable. Open **Installation** and choose
+**Network boot (PXE)** or **USB over SSH**. PXE has one screen for preparation,
+starting, finishing and network recovery. Opening it only checks current state;
+Enter offers the appropriate next step. If files are missing or stale, the
+guided preparation reviews lab settings, saves them, creates missing keys,
+activates the controller and prepares client systems. Esc returns to Installation.
+A ready system goes straight to the reviewed PXE start; an active or interrupted
+session offers finish/recovery without repeating setup.
 
-The same screen shows progress through configuration and controller activation,
-then offers PXE or USB over SSH. PXE prepares every configured client and asks
-for confirmation immediately before temporarily changing the controller's
-network. The downloaded installer asks for identity and confirms the disk on
-the client console. USB/SSH instead selects one configured identity on the
-controller, verifies a live Minimal ISO and its physical-console fingerprint,
-and requires a content-bound disk review before dispatching an independent
-systemd-owned install.
+The existing controller time zone and keyboard are reused. Importing existing
+keys is available under **Maintenance → Change settings → Controller keys**.
+PXE asks for confirmation before temporarily changing the controller network;
+the client installer confirms identity and disk erasure locally. USB/SSH selects
+one configured identity, verifies the live Minimal ISO's physical fingerprint,
+and requires its own content-bound disk review before dispatch.
 
 You can press `q` at any safe point. While PXE is active, leaving it active is a
 separate exact-confirmation choice; stopping PXE restores normal controller
@@ -235,12 +232,20 @@ spinner and the current plain-language action.
 
 | Area | Purpose |
 |---|---|
-| **Computers** | Inspect, distribute, restore/reinstall, or shut down selected clients |
+| **Computers** | Inspect, distribute, control Internet access, or shut down selected clients |
 | **Installation** | Configure the lab, install through PXE or USB/SSH, and recover interrupted installation state |
 | **Software** | Review configured packages, search the pin, choose scope, and save/apply changes |
 | **Maintenance** | Change settings, update/rebuild the controller, inspect services, Git, logs, and diagnostics |
 
-The initial dashboard and `status` are local and do not probe clients. Add
+Every task menu shows its direct shortcut beside the title. `Esc` returns to
+the parent area; `F1` opens contextual help even while typing. Software tabs
+are directly accessible with `F2`, `F3`, and `F4`. Reapplying a system belongs
+to Computers → Distribute; reinstalling belongs to Installation.
+
+The initial dashboard reads local settings, evaluated inventory and current
+services, without checking system closures, keys or PXE artifacts. These checks
+run when the relevant operation is opened; startup never implies installation
+readiness. Both the dashboard and `status` avoid client probes. Add
 `--json` to supported CLI commands for structured output. Use `doctor` for
 actionable diagnostics and `doctor --full` only when a real controller build is
 needed.
@@ -251,7 +256,7 @@ For symptom-first recovery, safe retry rules, and backup boundaries, see
 ### Change settings
 
 Open **Change settings** for routine Network, Computers, Accounts, Regional,
-Browser, Git, or Veyon changes. Regional fields reuse the offline searchable
+Browser, or Git changes. Regional fields reuse the offline searchable
 selectors from first-run setup. Git author names and email addresses live here
 instead of extending the initial setup path.
 
@@ -308,10 +313,19 @@ only and does not migrate existing deployments.
 Every profile includes Git, the Ghostty/TTE lab screensaver, Node.js (and npm),
 Pi and OpenCode. Git is available to every user and is also a runtime
 dependency of the controller management workflows. The screensaver therefore
-remains active in Essential as well as the larger profiles. Desktop Icons NG
-and Dash to Dock are installed separately as workstation basics for every
-profile. Files saved in the Desktop directory appear on the desktop, and the
-dock remains visible outside the GNOME overview.
+remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and
+Tiling Assistant are installed as workstation basics in every profile. The
+compact bottom dock stays visible, Desktop files appear on the desktop, and
+dragging a window to an edge offers an adjacent window with small 8 px gaps.
+MoreWaita icons complement native Adwaita decorations; blue accents and a static
+vector wallpaper keep the desktop coherent without blur effects or background
+polling services. Super+arrow window shortcuts remain available.
+
+The login helper enables the three required extensions without replacing other
+enabled extensions. A one-time migration applies only the managed appearance
+keys to existing accounts; staff may then customize them. Student accounts
+receive the defaults again after their ordinary home reset. All assets and
+extensions come from the locked Nix packages and work without login downloads.
 
 Pi and OpenCode have a reproducible system version available to every user. npm
 global installs use `~/.local/npm` and take precedence in the user's shell, so
@@ -571,10 +585,10 @@ the complete candidate, shows a redacted review, writes atomically after
 acceptance, and reconciles all three key pairs. It never overwrites existing
 key material. Bare `setup` and `setup status` report the first incomplete stage
 without trusting a hidden completion flag; run `nixorium` and choose
-**Installation → Install computers** for the continuous interactive flow. The
+**Installation → Network boot (PXE)** for the continuous interactive flow. The
 ordinary TUI flow creates missing keys
 automatically; import of existing private keys is available only from
-**Maintenance → Change settings → Advanced keys**.
+**Maintenance → Change settings → Controller keys**.
 
 `lab.ifaceName` remains the backward-compatible fallback. Optional
 `controllerIfaceName` and `clientIfaceName` select role defaults, while
@@ -679,7 +693,7 @@ ip -4 -br address
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
-Keep that console visible. From **Installation → Install computers**, choose
+Keep that console visible. From **Installation**, choose
 **USB over SSH**, select one configured identity, and enter only the live IPv4
 address. Nixorium reads the Ed25519 host key without sending credentials and
 shows its `SHA256:` fingerprint. Compare the complete value with the physical

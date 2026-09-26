@@ -110,7 +110,7 @@ func (model dashboardModel) computersView() string {
 	var actions []tuiAction
 	if model.computers.hostDetail && len(hosts) > 0 {
 		lines = append(lines, model.computerDetail(hosts[min(model.computers.hostCursor, len(hosts)-1)]))
-		actions = []tuiAction{{key: "d", label: "Deploy"}, {key: "t", label: "Technical"}, {key: "i", label: "Diagnostics"}, {key: "Esc", label: "Back"}, {key: "?", label: "Help"}}
+		actions = []tuiAction{{key: "d", label: "Deploy"}, {key: "t", label: "Technical"}, {key: "i", label: "Diagnostics"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	} else {
 		available, total := hostAvailability(model.computers.hosts.Hosts)
 		lines = append(lines, fmt.Sprintf("%d / %d reachable · %d up to date · %d update ready", available, total, model.computers.hosts.Deployment.Current, model.computers.hosts.Deployment.Outdated))
@@ -147,7 +147,7 @@ func (model dashboardModel) computersView() string {
 			body = lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", right)
 		}
 		lines = append(lines, body, "", tuiMuted(fmt.Sprintf("%d–%d of %d computers", displayedLineStart(start, len(hosts)), end, len(hosts)), model.isDark))
-		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Details"}, {key: "/", label: "Search"}, {key: "r", label: "Refresh"}, {key: "Esc", label: back}, {key: "?", label: "Help"}}
+		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Details"}, {key: "/", label: "Search"}, {key: "r", label: "Refresh"}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
 	}
 	notices := []tuiNotice{}
 	if configurationView && model.computers.configurationState.HasErrors() {
@@ -176,11 +176,7 @@ func (model dashboardModel) administrationView() string {
 		tuiMuted("Configuration, controller operations and technical evidence", model.isDark),
 		"",
 	}
-	start, end := listWindow(len(administrationTasks), model.adminCursor, max(3, (model.height-15)/2))
-	for i := start; i < end; i++ {
-		task := administrationTasks[i]
-		lines = append(lines, tuiSelection(task.title+"  ["+task.shortcut+"]", i == model.adminCursor, model.isDark), tuiMuted("    "+task.description, model.isDark))
-	}
+	lines = append(lines, model.taskMenu(administrationTasks, model.adminCursor))
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
@@ -189,7 +185,7 @@ func (model dashboardModel) administrationView() string {
 		path:    []string{"Maintenance"},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
-		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "?", label: "Help"}},
+		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}},
 	})
 }
 
@@ -197,20 +193,17 @@ func (model dashboardModel) helpView() string {
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
 	case dashboardHome:
-		lines = append(lines, "Choose Computers, Installation, Software or Maintenance.", "Use the visible list with arrows and Enter; direct routes are not required.")
+		lines = append(lines, taskHelp(dashboardTasks)...)
 	case dashboardComputersArea:
-		lines = append(lines, "Choose inventory, distribute, restore or shut down.", "Observed state is loaded only by the task that needs it.")
+		lines = append(lines, taskHelp(computersAreaTasks)...)
 	case dashboardInstallationArea:
-		lines = append(lines, "Install computers validates shared laboratory prerequisites, then offers PXE or USB over SSH.", "PXE mode and network recovery is the advanced controller-side view.")
-	case dashboardInstallMethod:
-		lines = append(lines, "Choose PXE for many computers or USB over SSH for one physically identified client.", "An existing USB operation can be reattached without repeating apply.")
+		lines = append(lines, taskHelp(installationAreaTasks)...)
+		lines = append(lines, "r  Reattach the recorded USB operation when available")
 	case dashboardUSBInstall:
 		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.", "Use r for status, n for reconciliation, b for reviewed reboot, c to close without reboot, and v for post-boot verification when visible.")
 		lines = append(lines, "Artifacts-ready means the live session is not verified. Use a to connect with fresh physical key confirmation, or x to cancel safely, when visible.", "A failed connection's original error remains visible across status refreshes in this TUI session.")
-	case dashboardRestore:
-		lines = append(lines, "Choose reapply to keep the disk, or reinstall with PXE or USB over SSH.", "Each method keeps its own explicit identity and disk-erasure confirmation boundary.")
 	case dashboardAdministration:
-		lines = append(lines, "u update Nixorium   e settings   c controller", "s controller services   g changes   l history   i diagnostics")
+		lines = append(lines, taskHelp(administrationTasks)...)
 	case dashboardHosts:
 		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail   i diagnostics", "d review a deployment for the focused computer", "Search owns all text keys until Enter or Esc.")
 	case dashboardDeploy:
@@ -221,15 +214,22 @@ func (model dashboardModel) helpView() string {
 				"Esc keeps your selection. Successful recovery creates a fresh review requiring DEPLOY again.")
 			break
 		}
-		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l progress details; q cannot interrupt", "After result: l logs   r new review   Enter overview")
+		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l progress details; q cannot interrupt", "After result: l logs   r new review   Enter Computers")
 	case dashboardInternet:
 		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		lines = append(lines, "Space select   a select/deselect all   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state.")
 	case dashboardSetup:
 		lines = append(lines, "Enter continue the observed stage   t full checklist")
+	case dashboardSettings:
+		for _, group := range routineSettingsGroups {
+			lines = append(lines, group.shortcut+"  "+group.label)
+		}
+		lines = append(lines, "p  Account passwords", "y  Controller keys", "/  Search categories; Esc clears the search before leaving")
+	case dashboardSettingsPasswords:
+		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
 	case dashboardPXE:
-		lines = append(lines, "p prepare   s review start   x stop   r recover", "l progress details while preparing; q closes only the view")
+		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   r recover   f refresh", "l progress details while preparing; q closes only the view")
 	case dashboardController:
 		lines = append(lines, "r new review   d result details   l logs / progress detail", "q closes the view; systemd-owned work continues")
 	case dashboardServices:
@@ -247,7 +247,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardDiagnostics:
 		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")
 	case dashboardSoftware:
-		lines = append(lines, "p add a deployment-owned profile   Tab change package view   / search", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
+		lines = append(lines, "F2 selected   F3 package search   F4 suggestions   Tab next view", "p add a deployment-owned profile   / search", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
 	default:
 		lines = append(lines, "Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help.")
 	}
@@ -293,30 +293,6 @@ func (model dashboardModel) diagnosticsView() string {
 	}
 	actions = append(actions, tuiAction{key: "r", label: "Check again"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
-}
-
-func (model dashboardModel) restoreView() string {
-	options := []struct {
-		title       string
-		description string
-	}{
-		{"Reapply the intended system", "Keeps the disk and deploys the declared configuration again."},
-		{"Reinstall from scratch", "Choose PXE or USB over SSH; disk erasure always requires an explicit reviewed confirmation."},
-	}
-	lines := []string{tuiTitle("Restore computers", model.isDark), tuiMuted("Choose whether to keep or replace the installed system.", model.isDark), ""}
-	for index, option := range options {
-		lines = append(lines, tuiSelection(option.title, index == model.computers.restoreCursor, model.isDark), tuiMuted("    "+option.description, model.isDark), "")
-	}
-	return model.renderShell(tuiShell{
-		path: []string{"Computers", "Restore"},
-		body: strings.Join(lines, "\n"),
-		notices: []tuiNotice{{
-			kind:   tuiStatusNeutral,
-			title:  "Disk erasure is always confirmed locally",
-			detail: "Choosing a method does not erase a disk. PXE confirms locally; USB over SSH binds the physical fingerprint, identity and disk in the controller review.",
-		}},
-		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}},
-	})
 }
 
 // frame bounds plain content such as contextual help. Routine screens use
@@ -408,6 +384,8 @@ func (model dashboardModel) textEntry() bool {
 		return true
 	}
 	switch model.screen {
+	case dashboardSettings:
+		return model.settings.menu.filtering()
 	case dashboardDeployReview, dashboardControllerReview, dashboardServicesRestartReview,
 		dashboardGitCommitReview, dashboardUpdateReview, dashboardShutdownReview,
 		dashboardSettingsEdit, dashboardPXEStartReview, dashboardPXELeaveReview:

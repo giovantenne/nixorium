@@ -104,10 +104,12 @@ required by the screensaver.
 Removing a declaration therefore does not leave an upstream launcher or service
 behind.
 
-Desktop Icons NG and Dash to Dock are baseline workstation components rather
-than application-profile choices. The template installs and enables both for
-every role, keeps the dock visible outside the GNOME overview, and reapplies the
-required extension state at login without disabling unrelated user extensions.
+Desktop Icons NG, Dash to Dock and Tiling Assistant are baseline workstation
+components rather than application-profile choices. The template enables all
+three for every role, keeps a compact bottom dock visible outside the GNOME
+overview, and preserves unrelated enabled extensions. MoreWaita icons complement
+native Adwaita decorations and a static blue vector wallpaper. A one-time
+appearance migration lets persistent staff preferences survive later logins.
 This keeps files under the XDG Desktop directory visible for reset student
 homes and persistent staff homes alike.
 

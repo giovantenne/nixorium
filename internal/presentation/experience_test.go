@@ -83,7 +83,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 					}(),
 					screen: dashboardPXE,
 				},
-				expected: []string{"Network installation", "Prepare", "Start PXE", "Esc", "Help"},
+				expected: []string{"Network installation", "Configure / prepare", "Start PXE", "Esc", "Help"},
 			},
 			{
 				name:     "setup installation",
@@ -481,10 +481,10 @@ func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
 func TestInterventionEntryDoesNotScanTheFleet(t *testing.T) {
 	m := experienceFixture(2)
 	m = press(m, "c")
-	updated, command := m.Update(tea.KeyPressMsg{Text: "r"})
+	updated, command := m.Update(tea.KeyPressMsg{Text: "d"})
 	next := updated.(dashboardModel)
-	if command != nil || next.screen != dashboardRestore {
-		t.Fatal("restore entry started an implicit scan")
+	if command != nil || next.screen != dashboardDeploy {
+		t.Fatal("deployment entry started an implicit scan")
 	}
 	if strings.Contains(m.View().Content, "reachable") || strings.Contains(m.View().Content, "Everything looks good") {
 		t.Fatal("intervention entry still presents fleet health")
@@ -520,7 +520,7 @@ func TestHelpAndScrollingCannotConfirmMutation(t *testing.T) {
 
 func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
-		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardRestore, dashboardSoftware, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardSetupKeys, dashboardUpdate, dashboardAdministration} {
+		for _, screen := range []dashboardScreen{dashboardHome, dashboardComputersArea, dashboardInstallationArea, dashboardSoftware, dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult, dashboardHosts, dashboardDeploy, dashboardDeployReview, dashboardServicesRestartReview, dashboardControllerReview, dashboardPXEStartReview, dashboardPXELeaveReview, dashboardSetup, dashboardSetupKeys, dashboardUpdate, dashboardAdministration} {
 			m := experienceFixture(200)
 			m.width = size[0]
 			m.height = size[1]
@@ -614,22 +614,6 @@ func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 	}
 }
 
-func TestRestoreSelectionUsesSharedNavigationAccent(t *testing.T) {
-	model := dashboardModel{screen: dashboardRestore, isDark: true, width: 100, height: 30}
-	view := model.View().Content
-	if !strings.Contains(view, tuiSelection("Reapply the intended system", true, true)) ||
-		strings.Contains(view, tuiSelection("Reinstall from scratch", true, true)) {
-		t.Fatalf("restore did not accent only the focused choice:\n%s", view)
-	}
-
-	model.computers.restoreCursor = 1
-	view = model.View().Content
-	if !strings.Contains(view, tuiSelection("Reinstall from scratch", true, true)) ||
-		strings.Contains(view, tuiSelection("Reapply the intended system", true, true)) {
-		t.Fatalf("restore accent did not follow navigation:\n%s", view)
-	}
-}
-
 func TestUpdateProgressExplainsSystemChecksInOperatorLanguage(t *testing.T) {
 	tests := []struct {
 		detail string
@@ -715,12 +699,12 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 		t.Fatalf("installation area did not open: screen=%d", m.screen)
 	}
 	m = press(m, "enter")
-	if m.screen != dashboardInstallMethod || !m.installation.flow {
+	if m.screen != dashboardPXE {
 		t.Fatalf("installation task did not open method selection: screen=%d", m.screen)
 	}
-	updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, command := m.Update(tea.KeyPressMsg{Text: "p"})
 	m = updated.(dashboardModel)
-	if command == nil || m.screen != dashboardSettings || m.areaReturn != dashboardHome {
+	if command == nil || m.screen != dashboardSettings || m.areaReturn != dashboardInstallationArea {
 		t.Fatalf("PXE method did not start the common settings flow: screen=%d return=%d", m.screen, m.areaReturn)
 	}
 	updated, command = m.Update(dashboardSettingsMsg{settings: wizardSettings()})
@@ -729,7 +713,7 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 		t.Fatalf("installation settings did not open: screen=%d", m.screen)
 	}
 	m = press(m, "esc")
-	if m.screen != dashboardHome || m.installation.flow {
+	if m.screen != dashboardInstallationArea || m.installation.flow {
 		t.Fatalf("cancelled installation returned to %d", m.screen)
 	}
 }
@@ -826,13 +810,13 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 func TestExperienceRenderGallery(t *testing.T) {
 	m := experienceFixture(24)
 	m.computers.hosts.GeneratedAt = time.Now().Truncate(time.Minute)
-	for _, name := range []string{"interventions", "setup", "restore", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "shutdown", "shutdown-confirmation", "shutdown-result", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
+	for _, name := range []string{"interventions", "setup", "installation", "software", "software-scope", "software-confirmation", "software-result", "software-partial", "shutdown", "shutdown-confirmation", "shutdown-result", "computers", "deploy", "update", "confirmation", "progress", "recovery"} {
 		m.screen = dashboardHome
 		m.busy = ""
 		m.deployment.applying = false
 		switch name {
-		case "restore":
-			m.screen = dashboardRestore
+		case "installation":
+			m.screen = dashboardInstallationArea
 		case "computers":
 			m.screen = dashboardHosts
 			m.computers.hostCursor = 6

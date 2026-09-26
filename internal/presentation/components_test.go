@@ -42,13 +42,13 @@ func TestTUIHelpRespectsTerminalWidth(t *testing.T) {
 	}
 }
 
-func TestTUIActionBarUsesDedicatedControlColor(t *testing.T) {
+func TestTUIActionBarUsesSharedNavigationAccent(t *testing.T) {
 	theme := newTUITheme(true)
 	bar := tuiActionBar(80, true, tuiAction{key: "Enter", label: "Open"}, tuiAction{key: "Esc", label: "Back"})
 	controlLabel := lipgloss.NewStyle().Foreground(theme.controls).Render("Open")
 	accentLabel := lipgloss.NewStyle().Foreground(theme.accent).Render("Open")
-	if !strings.Contains(bar, controlLabel) || controlLabel == accentLabel {
-		t.Fatalf("action bar does not use its dedicated control color: %q", bar)
+	if !strings.Contains(bar, controlLabel) || controlLabel != accentLabel {
+		t.Fatalf("action bar does not share the navigation accent: %q", bar)
 	}
 }
 

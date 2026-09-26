@@ -36,6 +36,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.message = ""
 		return model, nil
+	case dashboardPXEOverviewMsg:
+		model.busy = ""
+		model.installation.stateError = message.err != nil
+		if message.err != nil {
+			model.message = "Network installation state could not be checked: " + message.err.Error()
+		} else {
+			model.report = message.report
+			model.message = ""
+		}
+		return model, nil
 	case dashboardStatusMsg:
 		if message.err == nil {
 			model.report = message.report
@@ -210,7 +220,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.installation.flow = false
 			model.installation.failed = false
 			model.setupMode = false
-			model.areaReturn = dashboardHome
+			model.areaReturn = dashboardInstallationArea
 		}
 		if preparationFinished && model.actions.LoadPXEProgress != nil {
 			return model, model.loadPXEProgress(model.installation.pxeProgressID)

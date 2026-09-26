@@ -25,7 +25,7 @@ type tuiTheme struct {
 func newTUITheme(dark bool) tuiTheme {
 	return tuiTheme{
 		accent:    lipgloss.LightDark(dark)(lipgloss.Color("#1D4ED8"), lipgloss.Color("#7AA2F7")),
-		controls:  lipgloss.LightDark(dark)(lipgloss.Color("#6D28D9"), lipgloss.Color("#C4B5FD")),
+		controls:  lipgloss.LightDark(dark)(lipgloss.Color("#1D4ED8"), lipgloss.Color("#7AA2F7")),
 		text:      lipgloss.LightDark(dark)(lipgloss.Color("#292524"), lipgloss.Color("#E7E5E4")),
 		muted:     lipgloss.LightDark(dark)(lipgloss.Color("#6B7280"), lipgloss.Color("#A8A29E")),
 		success:   lipgloss.LightDark(dark)(lipgloss.Color("#047857"), lipgloss.Color("#86EFAC")),
@@ -46,7 +46,8 @@ func tuiListDelegate(dark bool) list.DefaultDelegate {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles = list.NewDefaultItemStyles(dark)
 	delegate.SetSpacing(0)
-	delegate.Styles.SelectedTitle = lipgloss.NewStyle().Bold(true).Foreground(tuiAccent(dark)).PaddingLeft(2)
+	delegate.Styles.SelectedTitle = lipgloss.NewStyle().Bold(true).Foreground(tuiAccent(dark)).
+		BorderStyle(lipgloss.Border{Left: "›"}).BorderLeft(true).BorderForeground(tuiAccent(dark)).PaddingLeft(1)
 	delegate.Styles.SelectedDesc = lipgloss.NewStyle().PaddingLeft(2)
 	return delegate
 }
@@ -189,11 +190,26 @@ func tuiActionBar(width int, darkBackground bool, actions ...tuiAction) string {
 		items = append(items, keyStyle.Render(action.key)+" "+labelStyle.Render(action.label))
 	}
 	separator := tuiMuted("  ·  ", darkBackground)
-	bar := strings.Join(items, separator)
-	if width > 0 {
-		return lipgloss.NewStyle().Width(max(20, width-6)).Render(bar)
+	if width <= 0 {
+		return strings.Join(items, separator)
 	}
-	return bar
+	limit := max(20, min(116, width-6))
+	lines := []string{}
+	line := ""
+	for _, item := range items {
+		if line != "" && lipgloss.Width(line)+lipgloss.Width(separator)+lipgloss.Width(item) > limit {
+			lines = append(lines, line)
+			line = ""
+		}
+		if line != "" {
+			line += separator
+		}
+		line += item
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func tuiResult(value string, success, darkBackground bool) string {

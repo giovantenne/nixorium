@@ -214,12 +214,12 @@ func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
 	if command != nil || model.screen != dashboardInstallationArea {
 		t.Fatalf("installation area did not open: screen=%d", model.screen)
 	}
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
-	if command != nil || setupLoads != 0 || model.screen != dashboardInstallMethod || !model.installation.flow {
+	if command != nil || setupLoads != 0 || model.screen != dashboardPXE {
 		t.Fatalf("install did not open method selection: setupLoads=%d screen=%d", setupLoads, model.screen)
 	}
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	if command == nil || model.screen != dashboardSettings {
 		t.Fatalf("PXE selection did not open common settings: screen=%d", model.screen)
@@ -249,12 +249,12 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	if command != nil || model.screen != dashboardInstallationArea {
 		t.Fatalf("installation area did not open: screen=%d", model.screen)
 	}
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
-	if command != nil || model.screen != dashboardInstallMethod {
-		t.Fatal("computer installation method selection did not start")
+	if command != nil || model.screen != dashboardPXE {
+		t.Fatal("network installation status did not open")
 	}
-	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	if command == nil || !model.installation.startingLabSetup {
 		t.Fatal("computer installation settings did not start")
@@ -596,7 +596,7 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 		}}
 	}
 
-	updated, command := model.Update(tea.KeyPressMsg{Text: "k"})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "y"})
 	model = updated.(dashboardModel)
 	if command == nil || model.setupKeysReturn != dashboardSettings {
 		t.Fatalf("advanced key settings did not open: return=%d", model.setupKeysReturn)

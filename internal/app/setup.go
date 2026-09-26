@@ -102,6 +102,16 @@ func (m SetupManager) keyReport(ctx context.Context, repository, operation strin
 }
 
 func (m SetupManager) Status(ctx context.Context, repository string) domain.SetupReport {
+	return m.status(ctx, repository, false)
+}
+
+// InitialStatus checks only the saved first-run fields. Installation readiness
+// is deliberately unknown until the operator opens an installation task.
+func (m SetupManager) InitialStatus(ctx context.Context, repository string) domain.SetupReport {
+	return m.status(ctx, repository, true)
+}
+
+func (m SetupManager) status(ctx context.Context, repository string, initial bool) domain.SetupReport {
 	facts := domain.SetupFacts{}
 	if gitState, err := m.source.GitState(ctx, repository); err != nil {
 		facts.Review.Detail = fmt.Sprintf("local configuration history is unavailable: %v", err)
@@ -169,6 +179,15 @@ func (m SetupManager) Status(ctx context.Context, repository string) domain.Setu
 	}
 
 	settingsReady := facts.Network.Complete && facts.Identity.Complete && facts.Credentials.Complete
+	if initial {
+		report := domain.ReconcileSetup(repository, facts)
+		if facts.Environment.Complete && settingsReady {
+			report.State = "unchecked"
+			report.CurrentStage = ""
+			report.Stages = nil
+		}
+		return report
+	}
 	if settingsReady {
 		keyStates := m.source.KeyMaterial(ctx, repository)
 		keyProblems := []string{}

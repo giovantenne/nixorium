@@ -49,6 +49,8 @@ Review both light and dark backgrounds and ASCII, ANSI, and ANSI-256 output.
 
 Prefer a small shared vocabulary:
 
+- every task-menu entry shows a unique direct shortcut; reserve `j`/`k` for
+  list movement and keep data collections searchable or selectable with arrows;
 - arrows or `j`/`k` move through a list;
 - `Enter` opens or invokes the visible primary action;
 - `Esc` returns or cancels without mutation;
@@ -81,6 +83,13 @@ of the same concept.
 Presentation receives typed callbacks from the command composition root. It
 must not execute shell commands, choose privileged units, reproduce domain
 validation, or infer success from visual progress.
+
+Keep startup observational and small: check saved first-run fields, evaluated
+inventory and current service state. Load key reconciliation, controller
+closures and PXE artifact readiness only when opening the relevant task. Never
+turn deferred checks into a claim of readiness; operation planning retains its
+full validation. Keep each operation in one canonical area, with contextual
+follow-ups returning to their parent.
 
 ## Validate behavior and rendering
 

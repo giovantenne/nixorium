@@ -79,7 +79,6 @@ const (
 	dashboardInstallationArea
 	dashboardSetup
 	dashboardSetupKeys
-	dashboardRestore
 	dashboardHosts
 	dashboardDeploy
 	dashboardDeployReview
@@ -101,7 +100,6 @@ const (
 	dashboardPXE
 	dashboardPXEStartReview
 	dashboardPXELeaveReview
-	dashboardInstallMethod
 	dashboardUSBInstall
 	dashboardAdministration
 	dashboardDiagnostics
@@ -210,7 +208,7 @@ type installationModel struct {
 	pxeStarted       time.Time
 	pxeProgressID    uint64
 	method           domain.RemoteInstallMethod
-	methodCursor     int
+	stateError       bool
 	remote           remoteInstallationModel
 }
 
@@ -254,8 +252,6 @@ type remoteInstallationModel struct {
 // Deployment and shutdown remain separate because they have independent jobs.
 type computersModel struct {
 	areaCursor         int
-	restoreMode        bool
-	restoreCursor      int
 	hostCursor         int
 	hostQuery          string
 	hostSearching      bool
@@ -624,16 +620,22 @@ func (model dashboardModel) openSetupSettings() (tea.Model, tea.Cmd) {
 func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
 	remote := model.installation.remote
 	model.installation = installationModel{flow: true, remote: remote}
-	model.screen = dashboardInstallMethod
+	model.screen = dashboardInstallationArea
 	model.message = ""
 	model.busy = ""
+	return model, nil
+}
+
+func (model dashboardModel) openUSBInstallation() (tea.Model, tea.Cmd) {
 	if model.actions.LoadRemoteInstall == nil {
-		return model, nil
+		return model.beginComputerInstallation(domain.RemoteInstallUSBSSH)
 	}
+	model.areaReturn = dashboardInstallationArea
 	model.busy = "Checking for an existing USB installation operation"
+	model.message = ""
 	return model, func() tea.Msg {
 		response, err := model.actions.LoadRemoteInstall()
-		return dashboardRemoteInstallMsg{action: "probe", response: response, err: err}
+		return dashboardRemoteInstallMsg{action: "open-usb", response: response, err: err}
 	}
 }
 
@@ -656,7 +658,7 @@ func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstal
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	model.installation.pxeProgress = domain.OperationProgress{}
-	model.areaReturn = dashboardHome
+	model.areaReturn = dashboardInstallationArea
 	model.screen = dashboardSettings
 	model.busy = "Loading laboratory settings"
 	model.message = ""
@@ -923,8 +925,6 @@ func (model dashboardModel) View() tea.View {
 		content = model.setupView()
 	case dashboardSetupKeys:
 		content = model.setupKeysView()
-	case dashboardRestore:
-		content = model.restoreView()
 	case dashboardHosts:
 		content = model.computersView()
 	case dashboardAdministration:
@@ -955,8 +955,6 @@ func (model dashboardModel) View() tea.View {
 		content = model.settingsView()
 	case dashboardPXE, dashboardPXEStartReview, dashboardPXELeaveReview:
 		content = model.pxeView()
-	case dashboardInstallMethod:
-		content = model.installMethodView()
 	case dashboardUSBInstall:
 		content = model.remoteInstallView()
 	default:
@@ -1898,7 +1896,7 @@ func (model dashboardModel) servicesView() string {
 		}
 		lines = append(lines, tuiMuted("  "+service.Detail, model.isDark))
 		if service.ID == "pxe" {
-			lines = append(lines, "  Start, stop or recover it from Installation → PXE mode and network recovery.")
+			lines = append(lines, "  Start, stop or recover it from Installation → Network boot (PXE).")
 		}
 		lines = append(lines, "")
 	}
@@ -2062,9 +2060,6 @@ func gitReviewStatusKind(report domain.GitReviewReport) tuiStatusKind {
 
 func (model dashboardModel) deployView() string {
 	path := []string{"Computers", "Distribute"}
-	if model.computers.restoreMode {
-		path = []string{"Computers", "Restore", "Reapply"}
-	}
 	shell := tuiShell{path: path}
 	if model.deployment.usbRecovery != nil {
 		return model.deploymentUSBRecoveryView(shell)
@@ -2141,7 +2136,7 @@ func (model dashboardModel) deployView() string {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 		}
 		shell.body = strings.Join(lines, "\n")
-		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "?", label: "Help"}}
+		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
 
@@ -2177,7 +2172,7 @@ func (model dashboardModel) deployView() string {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
 	shell.body = strings.Join(lines, "\n")
-	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}}
+	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	return model.renderShell(shell)
 }
 
@@ -2251,7 +2246,7 @@ func (model dashboardModel) pxeView() string {
 	if model.report.PXEPreparation.Ready {
 		preparation = "ready"
 	}
-	path := []string{"Installation", "Network installation"}
+	path := []string{"Installation", "Network boot (PXE)"}
 	title := "Network installation"
 	if model.installation.flow {
 		path = []string{"Installation", "Install computers"}
@@ -2259,9 +2254,9 @@ func (model dashboardModel) pxeView() string {
 	} else if model.setupMode {
 		path = []string{"Installation", "Install computers"}
 		title = "Install computers"
-	} else if model.computers.restoreMode {
-		path = []string{"Computers", "Restore", "Reinstall"}
-		title = "Reinstall computers"
+	}
+	if model.installation.stateError {
+		return model.renderShell(tuiShell{path: path, body: tuiTitle(title, model.isDark), notices: []tuiNotice{{kind: tuiStatusFailure, title: model.message}}, actions: model.pxeActions()})
 	}
 	lines := []string{
 		tuiTitle(title, model.isDark),
@@ -2433,10 +2428,14 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	if model.installation.flow && model.installation.failed {
 		return []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 	}
-	actions := []tuiAction{}
+	primary := model.pxePrimaryAction()
+	actions := []tuiAction{{key: "Enter", label: primary.label}}
+	if model.installation.stateError {
+		return append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Installation"}, tuiAction{key: "F1", label: "Help"})
+	}
 	recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
 	if model.report.PXE.Mode != "active" && !recovery {
-		actions = append(actions, tuiAction{key: "p", label: "Prepare"})
+		actions = append(actions, tuiAction{key: "p", label: "Configure / prepare"})
 		if model.report.PXEPreparation.Ready {
 			actions = append(actions, tuiAction{key: "s", label: "Start PXE"})
 		}
@@ -2445,13 +2444,11 @@ func (model dashboardModel) pxeActions() []tuiAction {
 		actions = append(actions, tuiAction{key: "x", label: "Stop PXE"})
 	}
 	backLabel := "Installation"
-	if model.computers.restoreMode {
-		backLabel = "Computers"
-	}
 	if recovery {
 		actions = append(actions, tuiAction{key: "r", label: "Recover network"})
 	}
 	return append(actions,
+		tuiAction{key: "f", label: "Refresh"},
 		tuiAction{key: "Esc", label: backLabel},
 		tuiAction{key: "q", label: "Quit"},
 		tuiAction{key: "F1", label: "Help"},
@@ -2462,19 +2459,12 @@ func (model dashboardModel) pxeNextStepView() []string {
 	switch model.report.PXE.Mode {
 	case "active":
 		title := "Next: install computers"
-		if model.computers.restoreMode {
-			title = "Next: reinstall computers"
-		}
 		lines := []string{
 			tuiResult(title, true, model.isDark),
 			"  1. Boot one configured computer using UEFI network boot.",
 			"  2. In the downloaded installer, run /installer/setup.sh.",
 		}
-		if model.computers.restoreMode {
-			lines = append(lines, "  3. Choose its configured identity and confirm the target disk locally.")
-		} else {
-			lines = append(lines, "  3. Choose its configured identity and inspect the target disk.")
-		}
+		lines = append(lines, "  3. Choose its configured identity and inspect the target disk.")
 		return append(lines,
 			"  4. When installations are finished, press x here to stop PXE.",
 			tuiStatus("Only the disk confirmed locally in the installer is erased.", tuiStatusAttention, model.isDark),
@@ -2489,7 +2479,7 @@ func (model dashboardModel) pxeNextStepView() []string {
 	if !model.report.PXEPreparation.Ready {
 		return []string{
 			tuiResult("Next: prepare installation files", false, model.isDark),
-			"  Press p to build netboot artifacts and every configured client system.",
+			"  Press Enter to review lab settings, prepare the controller and build installation files.",
 		}
 	}
 	return []string{

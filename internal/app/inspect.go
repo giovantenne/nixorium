@@ -53,6 +53,16 @@ func NewInspector(source Source) *Inspector {
 }
 
 func (i *Inspector) Status(ctx context.Context, repository string) (domain.StatusReport, error) {
+	return i.status(ctx, repository, true)
+}
+
+// Overview loads evaluated identities and current PXE unit state, without
+// evaluating system closures, installation artifacts or client reachability.
+func (i *Inspector) Overview(ctx context.Context, repository string) (domain.StatusReport, error) {
+	return i.status(ctx, repository, false)
+}
+
+func (i *Inspector) status(ctx context.Context, repository string, full bool) (domain.StatusReport, error) {
 	root, err := filepath.Abs(repository)
 	if err != nil {
 		return domain.StatusReport{}, fmt.Errorf("resolve repository path: %w", err)
@@ -71,15 +81,19 @@ func (i *Inspector) Status(ctx context.Context, repository string) (domain.Statu
 		return domain.StatusReport{}, fmt.Errorf("inspect Git worktree: %w", err)
 	}
 
-	preparation := i.source.PXEPreparation(ctx, root, meta)
-	artifacts := []domain.ArtifactState{
-		i.source.ArtifactState(root, "kernel", "result-kernel/bzImage"),
-		i.source.ArtifactState(root, "initrd", "result-initrd/initrd"),
-		i.source.ArtifactState(root, "iPXE script", "result-ipxe/netboot.ipxe"),
-		i.source.ArtifactState(root, "iPXE firmware", "assets/ipxe/snponly.efi"),
-	}
-	if preparation.Ready {
-		artifacts = preparation.Artifacts
+	preparation := domain.PXEPreparationState{}
+	var artifacts []domain.ArtifactState
+	if full {
+		preparation = i.source.PXEPreparation(ctx, root, meta)
+		artifacts = []domain.ArtifactState{
+			i.source.ArtifactState(root, "kernel", "result-kernel/bzImage"),
+			i.source.ArtifactState(root, "initrd", "result-initrd/initrd"),
+			i.source.ArtifactState(root, "iPXE script", "result-ipxe/netboot.ipxe"),
+			i.source.ArtifactState(root, "iPXE firmware", "assets/ipxe/snponly.efi"),
+		}
+		if preparation.Ready {
+			artifacts = preparation.Artifacts
+		}
 	}
 	listener := i.source.ServiceState(ctx, PXEListenerUnit)
 	network := i.source.ServiceState(ctx, PXENetworkUnit)

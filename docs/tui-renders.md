@@ -13,31 +13,33 @@ Nixorium  /  Overview
 Laboratory overview
 Choose an area. Observed state is loaded only when the selected task needs it.
 
-› Computers
-    Inventory, distribute, restore or shut down client computers
+› [c] Computers
+  [n] Installation
+  [w] Software
+  [a] Maintenance
 
-  Installation
-    Configure the lab, prepare netboot and guide computer installation
-
-  Software
-    Review configured choices or search this lab's pinned packages
-
-  Maintenance
-    Settings, controller updates, services, revisions, logs and diagnostics
+Inventory, system deployment, Internet access and shutdown
 
 ↑/↓ Select  ·  Enter Open  ·  q Quit  ·  F1 Help
 ```
 
-No client count or reachability state is loaded at startup. If an already
-observed PXE recovery condition exists, it appears above the question.
+Startup reads saved settings, evaluated inventory and current service state.
+It does not probe clients, reconcile keys or evaluate system/PXE closures.
+Current PXE activity or recovery remains visible; deferring the full checks
+never implies that an installation is ready.
 
 ## Install computers
 
-Selecting **Installation → Install computers** opens the complete Laboratory
-settings form directly, reusing the controller's existing time zone and
-keyboard rather than asking for them again. `Esc` returns to the overview.
-Completing the form validates and saves it without a second review screen, then
-shows the common prerequisite progress before method selection:
+**Installation** directly offers `[p] Network boot (PXE)` and `[u] USB over SSH`.
+PXE opens its current state without changing settings or networking. Enter
+configures/prepares when needed, reviews the start when ready, finishes an
+active session, or recovers an interrupted one. There is no separate advanced
+PXE entry. Refresh failures keep operational actions unavailable until status
+can be checked again.
+
+The guided preparation reuses the current time zone and keyboard; Esc returns
+to Installation. It validates and saves the lab form, then prepares the shared
+prerequisites:
 
 ```text
 Nixorium  /  Installation  /  Install computers
@@ -57,10 +59,8 @@ l progress details  •  F1 help
 
 Missing controller keys are generated, verified, saved, and installed
 automatically. Importing an existing key is deliberately outside this ordinary
-flow under **Maintenance → Change settings → Advanced keys**. The next screen
-offers **Network boot (PXE)** for one or many clients and **USB over SSH** for
-one physically identified client. Choosing USB does not prepare every PXE
-closure or change controller networking.
+flow under **Maintenance → Change settings → Controller keys**. The chosen method remains visible throughout the workflow. Choosing USB does
+not prepare every PXE closure or change controller networking.
 
 On the PXE branch, after every configured client closure and the immutable
 netboot artifacts are prepared, the flow stops at its network confirmation:
@@ -120,47 +120,20 @@ reboot, installed-system verification, or close. An interrupted dispatch is
 shown as requiring reconciliation and is never offered as an automatic retry.
 The generated gallery includes the full disk-review and verified-result frames.
 
-## Restore choice
+## One route for each operation
 
-```text
-Nixorium  /  Restore computers
+Use **Computers → Distribute the prepared system** to reapply the declared
+configuration while keeping the disk. Use **Installation → Network boot (PXE) / USB over SSH**
+to reinstall through PXE or USB over SSH, with the method-specific disk review.
+There is no separate Restore submenu duplicating these choices. A failed
+deployment never becomes a reinstall automatically.
 
-What kind of restoration is needed?
-
-› Reapply the intended system
-  Keeps the disk and deploys the declared configuration again.
-
-  Reinstall from scratch
-  Opens network installation; the disk confirmed on the computer is erased.
-
-A failed reapply never becomes a reinstall automatically.
-
-↑/↓ move   enter continue   esc interventions   ? help
-```
-
-Choosing reinstall opens the same generic PXE control used by ordinary
-installation:
-
-```text
-Nixorium  /  Computers  /  Restore  /  Reinstall
-
-Reinstall computers
-
-Installation mode:  ✓ ready
-Prepared artifacts: ready
-Interface:          enp1s0
-Service address:    192.0.2.10
-
-Next: start network installation
-  Press s to review the temporary address change and start PXE.
-
-p Prepare  •  s Start PXE  •  Esc Computers  •  q Quit  •  F1 Help
-```
-
-There is no controller-side target selection or verification session. Each
-computer chooses its configured identity and confirms its disk in the local
-installer. Reapply continues to use the separate reviewed deployment flow and
-never escalates into reinstall.
+Task menus show one action per row with its shortcut in a fixed column and
+the focused action's description below. `Esc` returns to the parent area.
+Settings categories and account-password choices also display direct shortcuts;
+`k` always moves up, while `y` opens controller keys from Settings. `F1` opens
+contextual help even in text fields. Data collections retain arrows, search
+where available, and `Space` for multiple selection.
 
 ## Add or change software
 
@@ -171,7 +144,7 @@ contacted and no input is updated:
 ```text
 Nixorium  /  Software
 
-Selected   [Search packages]   Suggestions
+[F2] Selected   [F3] Search packages   [F4] Suggestions
 Choose desired software here. Running clients change only when you deploy them.
 
 Search packages
@@ -212,7 +185,7 @@ Choose where this declaration applies. This is not the set of computers deployed
 Powered-on clients required: none
 Managed file: lab-software.json
 
-↑/↓ move   space select computer   enter review   esc catalog   ? help
+↑/↓ move   space select computer   enter review   esc catalog   F1 help
 ```
 
 The review keeps only the information needed for the decision:
@@ -245,7 +218,7 @@ as one user-facing operation:
 
 You can apply this configuration to selected computers now or later.
 
-enter interventions   ? help
+enter interventions   F1 help
 ```
 
 ## Shut down computers
@@ -318,7 +291,7 @@ Requests accepted for 1 computer; 1 not sent and 1 unconfirmed. Do not retry bli
 
 Network loss alone is not evidence of physical power state.
 
-r new review   l operation history   t technical details   enter interventions   ? help
+r new review   l operation history   t technical details   enter interventions   F1 help
 ```
 
 ## Computers
@@ -342,10 +315,10 @@ Observation: 17:56:00 · r refresh
 
 1–10 of 24 computers
 
-↑/↓ move   enter details   / search   esc back   ? help
+↑/↓ move   enter details   / search   esc back   F1 help
 ```
 
-This screen is reached explicitly through Advanced tools or from a focused
+This screen is reached through Computers → Computer inventory or from a focused
 operation. “Could not be reached” does not claim that the computer is broken.
 
 ## Distribute the prepared system
