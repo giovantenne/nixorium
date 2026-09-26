@@ -36,8 +36,9 @@ cancellation path remain visible.
 ## Keep visual semantics restrained
 
 Define theme tokens centrally and use them by meaning rather than per screen.
-Use blue for focus and a subtle selected-row background, violet for shortcut
-keys, and neutral text levels for headings, breadcrumbs and footer descriptions.
+Use restrained violet page headings, a petrol selected-row background with
+light text, and teal focus markers and progress. Shortcut keys are neutral and
+bold; section labels, breadcrumbs and footer descriptions use neutral text levels.
 Keep the current breadcrumb stronger than its ancestors. Reserve green for
 verified success, amber for attention, and red for failure or danger. A selected row must remain obvious without relying on color alone.
 Status must retain a symbol and textual label for monochrome or limited-color

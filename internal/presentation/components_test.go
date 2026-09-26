@@ -52,8 +52,8 @@ func TestTUIChromeSeparatesFocusShortcutsAndText(t *testing.T) {
 		if !strings.Contains(bar, tuiShortcut("Enter", dark)) || !strings.Contains(bar, tuiMuted("Open", dark)) {
 			t.Fatalf("action bar does not distinguish keys from descriptions: %q", bar)
 		}
-		if tuiTitle("Heading", dark) != tuiSection("Heading", dark) {
-			t.Fatal("headings must use neutral hierarchy, not the focus accent")
+		if theme.heading == theme.accent || tuiTitle("Heading", dark) == tuiSection("Heading", dark) {
+			t.Fatal("page headings must stand apart from focus and neutral section labels")
 		}
 	}
 }

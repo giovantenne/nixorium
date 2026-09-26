@@ -315,7 +315,8 @@ Pi and OpenCode. Git is available to every user and is also a runtime
 dependency of the controller management workflows. The screensaver therefore
 remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and
 Tiling Assistant are installed as workstation basics in every profile. The
-compact bottom dock stays visible, Desktop files appear on the desktop, and
+compact bottom dock hides when a window overlaps it and reappears at the bottom
+edge. It stays visible on a clear desktop. Desktop files appear on the desktop, and
 dragging a window to an edge offers an adjacent window with small 8 px gaps.
 MoreWaita icons complement native Adwaita decorations; blue accents and a static
 vector wallpaper keep the desktop coherent without blur effects or background
@@ -323,7 +324,8 @@ polling services. Super+arrow window shortcuts remain available.
 
 The login helper enables the three required extensions without replacing other
 enabled extensions. A one-time migration applies only the managed appearance
-keys to existing accounts; staff may then customize them. Student accounts
+keys to existing accounts; staff may then customize them. The separate
+`desktop-dock-v1` migration updates only dock visibility for existing accounts. Student accounts
 receive the defaults again after their ordinary home reset. All assets and
 extensions come from the locked Nix packages and work without login downloads.
 

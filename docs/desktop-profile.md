@@ -5,8 +5,9 @@ The deployment-owned workstation module supplies a restrained GNOME 50 profile:
 - Native dark Adwaita decorations with blue accents, plus MoreWaita application
   and MIME icons. GTK 4 applications retain their supported native styling.
 - A static vector background without animation or blur.
-- A compact, visible bottom Dash to Dock with 40 px icons, no full-width panel,
-  and no duplicate trash or removable-drive entries.
+- A compact bottom Dash to Dock with 40 px icons, no full-width panel,
+  and no duplicate trash or removable-drive entries. It hides when any window
+  overlaps its area and reappears at the bottom edge; a clear desktop keeps it visible.
 - Desktop Icons NG for files saved to the Desktop directory.
 - Tiling Assistant for snap assist and 8 px window gaps, with its panel indicator
   disabled. Existing Super+arrow window controls remain available.
@@ -40,7 +41,10 @@ versions; they do not prove all blur setups behave poorly.
 The login helper enables only the three required UUIDs, preserving other enabled
 extensions. It migrates the specific appearance keys once and records
 `~/.config/nixorium/desktop-style-v1`; later staff preferences survive. There
-are no new dconf locks or complete-database resets. Student defaults return
+are no new dconf locks or complete-database resets. A separate
+`~/.config/nixorium/desktop-dock-v1` migration changes only the four dock visibility
+keys, including for accounts that already completed the appearance migration.
+Later dock preferences remain editable. Student defaults return
 with the ordinary home reset, rather than modifying a live student's files.
 
 Run the optional `desktop-profile` check from `tests/source-checks.nix` for

@@ -24,10 +24,17 @@ func (model dashboardModel) taskMenu(tasks []dashboardTask, cursor int) string {
 	}
 	start, end := listWindow(len(tasks), cursor, rows)
 	lines := []string{}
+	rowWidth := 0
+	for _, task := range tasks {
+		rowWidth = max(rowWidth, lipgloss.Width(menuTitle(task.shortcut, task.title)))
+	}
+	if model.width > 0 {
+		rowWidth = min(rowWidth, max(1, model.width-10))
+	}
 	for index := start; index < end; index++ {
 		task := tasks[index]
 		if index == cursor {
-			lines = append(lines, tuiSelection(menuTitle(task.shortcut, task.title), true, model.isDark))
+			lines = append(lines, tuiSelection(lipgloss.NewStyle().Width(rowWidth).Render(menuTitle(task.shortcut, task.title)), true, model.isDark))
 		} else {
 			lines = append(lines, "  "+tuiShortcut("["+task.shortcut+"]", model.isDark)+" "+task.title)
 		}

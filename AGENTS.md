@@ -362,7 +362,7 @@ Release from the matching changelog section.
 - Site desktop favorites and shortcuts live in `templates/site/modules/workstation.nix`;
   student template content lives in `templates/site/modules/home-profile.nix`.
   Keep application entries conditional on effective software scope, not in core
-  desktop policy. The site template's Desktop Icons NG, the compact visible Dash
+  desktop policy. The site template's Desktop Icons NG, the compact intelligently hiding Dash
   to Dock and Tiling Assistant are baseline workstation behavior, independent
   of the selected profile. Keep MoreWaita/Adwaita appearance deployment-owned,
   validate extension metadata and GSettings, and preserve the targeted one-time
