@@ -26,7 +26,11 @@ func (model dashboardModel) taskMenu(tasks []dashboardTask, cursor int) string {
 	lines := []string{}
 	for index := start; index < end; index++ {
 		task := tasks[index]
-		lines = append(lines, tuiSelection(menuTitle(task.shortcut, task.title), index == cursor, model.isDark))
+		if index == cursor {
+			lines = append(lines, tuiSelection(menuTitle(task.shortcut, task.title), true, model.isDark))
+		} else {
+			lines = append(lines, "  "+tuiShortcut("["+task.shortcut+"]", model.isDark)+" "+task.title)
+		}
 	}
 	if start > 0 || end < len(tasks) {
 		lines = append(lines, tuiMuted(fmt.Sprintf("  %d–%d of %d", start+1, end, len(tasks)), model.isDark))
