@@ -256,6 +256,22 @@ reboot/home reset. The controller also needs approval for screen broadcasts.
 Veyon still uses RFB internally; removing the bridge does not remove that
 protocol or its local native implementation.
 
+## Temporary client Internet access
+
+The administrator's Computers → Internet access action uses authenticated SSH
+and the root-only `nixorium-internet` helper. Requests bind to the observed
+client boot ID; an old request cannot reapply a block after reboot. The
+`nixorium-internet-block.service` unit is never enabled for boot. It owns only
+the `inet nixorium_internet` table, which is retained across ordinary firewall
+reloads and removed on unblock. The controller itself is never a target.
+
+Output and forwarded traffic outside the configured lab IPv4 subnet is
+blocked, including established connections and IPv6 Internet traffic.
+Loopback, IPv4 DHCP, IPv6 DHCP and neighbor discovery remain available.
+This is destination-based network control: allowed laboratory services remain
+reachable, including any proxy deliberately hosted there. No gateway or
+NetworkManager connection is rewritten. Reboot restores normal connectivity.
+
 ## Private deployment customization
 
 Do not fork or edit upstream modules for site policy. New installations create

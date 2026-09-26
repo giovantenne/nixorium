@@ -91,6 +91,11 @@ in
   network-shell = pkgs.mkShell {
     packages = [ pkgs.nftables pkgs.iproute2 pkgs.util-linux pkgs.python3 pkgs.nix ];
   };
+  internet-management-vm-tcg = pkgs.testers.runNixOSTest (import ./management-vm.nix {
+    inherit nixoriumPackage;
+    useKVM = false;
+    internetOnly = true;
+  });
   go-shell = pkgs.mkShell {
     packages = [ pkgs.go ];
   };

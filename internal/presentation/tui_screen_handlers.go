@@ -28,6 +28,10 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.screen = dashboardRestore
 		model.computers.restoreCursor = 0
 		model.message = ""
+	case "i":
+		model.screen = dashboardInternet
+		model.internet = internetModel{chosen: map[string]bool{}, action: domain.InternetBlock}
+		model.message = ""
 	case "x":
 		model.screen = dashboardShutdown
 		model.shutdown = newShutdownModel()
@@ -177,7 +181,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.computers.areaCursor = max(0, model.computers.areaCursor-1)
 		case "down", "j":
 			model.computers.areaCursor = min(len(computersAreaTasks)-1, model.computers.areaCursor+1)
-		case "h", "d", "r", "x":
+		case "h", "d", "r", "x", "i":
 			model.areaReturn = dashboardComputersArea
 			return model.openComputerTask(action)
 		}
@@ -632,6 +636,8 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 
 func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch model.screen {
+	case dashboardInternet:
+		return model.updateInternet(key)
 	case dashboardSoftware:
 		return model.updateSoftware(key)
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:

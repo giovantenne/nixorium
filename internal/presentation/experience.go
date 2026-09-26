@@ -222,6 +222,8 @@ func (model dashboardModel) helpView() string {
 			break
 		}
 		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l progress details; q cannot interrupt", "After result: l logs   r new review   Enter overview")
+	case dashboardInternet:
+		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		lines = append(lines, "Space select   a select/deselect all   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state.")
 	case dashboardSetup:

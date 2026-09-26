@@ -238,6 +238,10 @@ an exact reviewed confirmation; unattended installation is disabled.
 > GNOME requires initial local approval of sharing, including on the
 > controller when broadcasting its screen.
 
+**Computers → Internet access** lets administrators temporarily block or restore
+Internet on selected clients. Laboratory access stays available, and reboot
+restores Internet. Offline computers receive no delayed command.
+
 Site settings, password hashes, public keys, and policy belong in the private
 deployment repository. Private SSH, cache-signing, and Veyon keys must stay out
 of Git and the Nix store. Public keys may be committed to the deployment.

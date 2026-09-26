@@ -32,6 +32,7 @@ var computersAreaTasks = []dashboardTask{
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
 	{id: "restore", shortcut: "r", title: "Restore computers", description: "Reapply the intended system or reinstall from scratch"},
 	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
+	{id: "internet", shortcut: "i", title: "Internet access", description: "Temporarily block or restore Internet on selected clients"},
 }
 
 var installationAreaTasks = []dashboardTask{

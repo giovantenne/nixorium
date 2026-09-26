@@ -12,6 +12,8 @@ import (
 )
 
 type DashboardActions struct {
+	PlanInternet           func(string, domain.InternetAction) domain.InternetPlan
+	ApplyInternet          func(domain.InternetPlan) domain.InternetReport
 	RunningVersion         string
 	LoadInitial            func() (domain.StatusReport, domain.SetupReport, error)
 	LoadDoctor             func() (domain.DoctorReport, error)
@@ -104,6 +106,7 @@ const (
 	dashboardAdministration
 	dashboardDiagnostics
 	dashboardSoftware
+	dashboardInternet
 	dashboardShutdown
 	dashboardShutdownReview
 	dashboardShutdownResult
@@ -298,6 +301,7 @@ type dashboardModel struct {
 	updates                updateModel
 	settings               settingsModel
 	software               softwareModel
+	internet               internetModel
 	shutdown               shutdownModel
 	width                  int
 	height                 int
@@ -929,6 +933,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.diagnosticsView()
 	case dashboardSoftware:
 		content = model.softwareView()
+	case dashboardInternet:
+		content = model.internetView()
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		content = model.shutdownView()
 	case dashboardDeploy, dashboardDeployReview:
