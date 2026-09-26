@@ -60,7 +60,9 @@ func acquireManagedOperationGate() (*operationGate, error) {
 }
 
 func acquireLegacyDeploymentLock() (*os.File, error) {
-	descriptor, err := syscall.Open(legacyDeploymentLockPath, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	// Linux flock remains exclusive on a read-only descriptor, including when
+	// service sandboxing makes the legacy home read-only.
+	descriptor, err := syscall.Open(legacyDeploymentLockPath, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
 	if errors.Is(err, syscall.ENOENT) {
 		return nil, nil
 	}

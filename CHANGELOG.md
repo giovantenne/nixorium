@@ -120,6 +120,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- PXE preparation and operation guards can lock an existing legacy deployment
+  lock through a read-only home sandbox. Active legacy operations still block
+  new work; no home write access or lock deletion is required.
+
 - Veyon remote control normalizes unused RFB pixel bytes before rendering,
   preventing transparent blocks and visual corruption on Wayland while
   retaining lossless image quality.

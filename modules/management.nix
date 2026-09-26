@@ -46,7 +46,9 @@ let
       [[ -f "$LEGACY_LOCK" && ! -L "$LEGACY_LOCK" \
           && "$(stat -c '%U:%G:%a' "$LEGACY_LOCK")" == admin:users:600 ]] \
         || fail "legacy deployment lock is unsafe; close old Nixorium processes before migration"
-      exec 8<>"$LEGACY_LOCK"
+      # Linux flock remains exclusive on a read-only descriptor.
+      # Keep compatibility with services that protect the home as read-only.
+      exec 8<"$LEGACY_LOCK"
       flock -n 8 \
         || fail "a legacy Nixorium deployment is still running"
     fi
