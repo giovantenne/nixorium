@@ -604,7 +604,7 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if loads != 1 || model.screen != dashboardSetupKeys || !strings.Contains(view, "Maintenance  /  Settings  /  Advanced  /  Controller keys") || !strings.Contains(view, "Import") {
+	if loads != 1 || model.screen != dashboardSetupKeys || !strings.Contains(demoANSI.ReplaceAllString(view, ""), "Maintenance  /  Settings  /  Advanced  /  Controller keys") || !strings.Contains(view, "Import") {
 		t.Fatalf("existing-key import is not in advanced settings: loads=%d screen=%d\n%s", loads, model.screen, view)
 	}
 	model.setupKeyCursor = 1

@@ -33,7 +33,7 @@ func TestEveryTaskHasVisibleUniqueShortcutAndMatchingEnterRoute(t *testing.T) {
 					m.installationAreaCursor = index
 					m.adminCursor = index
 					view := m.View().Content
-					if !strings.Contains(view, menuTitle(task.shortcut, task.title)) || !strings.Contains(view, "F1") || lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+					if !strings.Contains(demoANSI.ReplaceAllString(view, ""), menuTitle(task.shortcut, task.title)) || !strings.Contains(view, "F1") || lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 						t.Fatalf("menu %v choice %s %v overflow or hidden action:\n%s", menu.screen, task.id, size, view)
 					}
 					shortcut, sc := m.Update(tea.KeyPressMsg{Text: task.shortcut})

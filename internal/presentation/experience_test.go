@@ -38,7 +38,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 		m.height = size[1]
 		view := m.View().Content
 		for _, expected := range []string{"Nixorium", "Overview", "Laboratory overview", "Enter", "Open", "Help"} {
-			if !strings.Contains(view, expected) {
+			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("overview %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
 		}
@@ -49,7 +49,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 		m.screen = dashboardAdministration
 		view = m.View().Content
 		for _, expected := range []string{"Nixorium", "Maintenance", "Enter", "Open", "Esc", "Overview"} {
-			if !strings.Contains(view, expected) {
+			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("maintenance %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
 		}
@@ -116,7 +116,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 			state.model.height = size[1]
 			view := state.model.View().Content
 			for _, expected := range state.expected {
-				if !strings.Contains(view, expected) {
+				if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
 				}
 			}
@@ -202,7 +202,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 			state.model.height = size[1]
 			view := state.model.View().Content
 			for _, expected := range state.expected {
-				if !strings.Contains(view, expected) {
+				if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
 				}
 			}
@@ -316,7 +316,7 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 			state.model.height = size[1]
 			view := state.model.View().Content
 			for _, expected := range state.expected {
-				if !strings.Contains(view, expected) {
+				if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
 				}
 			}
@@ -366,7 +366,7 @@ func TestEvidenceScreensKeepNavigationVisible(t *testing.T) {
 			state.model.height = size[1]
 			view := state.model.View().Content
 			for _, expected := range state.expected {
-				if !strings.Contains(view, expected) {
+				if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 					t.Fatalf("%s %dx%d lacks %q:\n%s", state.name, size[0], size[1], expected, view)
 				}
 			}
@@ -468,7 +468,7 @@ func TestComputerInventoryShellKeepsActionsVisible(t *testing.T) {
 		m.screen = dashboardHosts
 		view := m.View().Content
 		for _, expected := range []string{"Computers", "Inventory", "pc01", "Refresh", "Esc", "Help"} {
-			if !strings.Contains(view, expected) {
+			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("inventory %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
 		}
@@ -599,7 +599,7 @@ func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 		model.updates.planProgress = domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5}
 		view := model.View().Content
 		for _, expected := range []string{"Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "elapsed", "current deployment remains unchanged", "Help"} {
-			if !strings.Contains(view, expected) {
+			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("update progress %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
 		}
@@ -726,7 +726,7 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 		m.screen = dashboardSetup
 		view := m.View().Content
 		for _, expected := range []string{"Installation", "Setup", "Continue", "Technical steps", "Esc", "Help"} {
-			if !strings.Contains(view, expected) {
+			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("setup %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
 		}
@@ -735,7 +735,7 @@ func TestSetupShellKeepsPrimaryActionsVisible(t *testing.T) {
 		m.setupKeys = domain.KeyReconcileReport{State: "action-required"}
 		view = m.View().Content
 		for _, expected := range []string{"Controller keys", "Create missing", "Esc", "Help"} {
-			if !strings.Contains(view, expected) {
+			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("setup keys %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
 		}

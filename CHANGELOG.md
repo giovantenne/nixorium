@@ -68,6 +68,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- TUI headings and footer descriptions use neutral text, shortcut keys use
+  violet, and blue focus has a subtle background. Current breadcrumbs are
+  emphasized; status colors retain their success, attention and failure roles.
+
 - Installation now opens PXE and USB/SSH directly. PXE has one state-aware
   entry for guided preparation, reviewed start, finish and network recovery;
   a failed state refresh cannot expose actions against previously ready data.

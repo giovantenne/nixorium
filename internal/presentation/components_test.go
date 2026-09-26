@@ -42,13 +42,19 @@ func TestTUIHelpRespectsTerminalWidth(t *testing.T) {
 	}
 }
 
-func TestTUIActionBarUsesSharedNavigationAccent(t *testing.T) {
-	theme := newTUITheme(true)
-	bar := tuiActionBar(80, true, tuiAction{key: "Enter", label: "Open"}, tuiAction{key: "Esc", label: "Back"})
-	controlLabel := lipgloss.NewStyle().Foreground(theme.controls).Render("Open")
-	accentLabel := lipgloss.NewStyle().Foreground(theme.accent).Render("Open")
-	if !strings.Contains(bar, controlLabel) || controlLabel != accentLabel {
-		t.Fatalf("action bar does not share the navigation accent: %q", bar)
+func TestTUIChromeSeparatesFocusShortcutsAndText(t *testing.T) {
+	for _, dark := range []bool{false, true} {
+		theme := newTUITheme(dark)
+		if theme.controls == theme.accent || theme.text == theme.accent || theme.controls == theme.muted {
+			t.Fatal("focus, shortcuts and neutral text must have distinct roles")
+		}
+		bar := tuiActionBar(80, dark, tuiAction{key: "Enter", label: "Open"})
+		if !strings.Contains(bar, tuiShortcut("Enter", dark)) || !strings.Contains(bar, tuiMuted("Open", dark)) {
+			t.Fatalf("action bar does not distinguish keys from descriptions: %q", bar)
+		}
+		if tuiTitle("Heading", dark) != tuiSection("Heading", dark) {
+			t.Fatal("headings must use neutral hierarchy, not the focus accent")
+		}
 	}
 }
 

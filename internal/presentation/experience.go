@@ -129,7 +129,7 @@ func (model dashboardModel) computersView() string {
 			marker := tuiSelectionMarker(index == model.computers.hostCursor, model.isDark)
 			name := fmt.Sprintf("%-10s", h.Name)
 			if index == model.computers.hostCursor {
-				name = lipgloss.NewStyle().Bold(true).Foreground(tuiAccent(model.isDark)).Render(name)
+				name = tuiFocusStyle(model.isDark).Render(name)
 			}
 			rows = append(rows, marker+name+" "+tuiStatus(label, statusLevel(level), model.isDark))
 		}
