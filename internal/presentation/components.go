@@ -14,6 +14,8 @@ import (
 
 type tuiTheme struct {
 	accent              color.Color
+	heading             color.Color
+	selectionText       color.Color
 	selectionBackground color.Color
 	controls            color.Color
 	text                color.Color
@@ -25,11 +27,13 @@ type tuiTheme struct {
 
 func newTUITheme(dark bool) tuiTheme {
 	return tuiTheme{
-		accent:              lipgloss.LightDark(dark)(lipgloss.Color("#1D4ED8"), lipgloss.Color("#7AA2F7")),
-		controls:            lipgloss.LightDark(dark)(lipgloss.Color("#6D28D9"), lipgloss.Color("#C4B5FD")),
-		selectionBackground: lipgloss.LightDark(dark)(lipgloss.Color("#E8EFFC"), lipgloss.Color("#25304A")),
+		accent:              lipgloss.LightDark(dark)(lipgloss.Color("#155E75"), lipgloss.Color("#7CC8D4")),
+		heading:             lipgloss.LightDark(dark)(lipgloss.Color("#6B3FA0"), lipgloss.Color("#C4B5E8")),
+		selectionText:       lipgloss.Color("#F8FAFC"),
+		controls:            lipgloss.LightDark(dark)(lipgloss.Color("#374151"), lipgloss.Color("#CBD5E1")),
+		selectionBackground: lipgloss.LightDark(dark)(lipgloss.Color("#245566"), lipgloss.Color("#285665")),
 		text:                lipgloss.LightDark(dark)(lipgloss.Color("#292524"), lipgloss.Color("#E7E5E4")),
-		muted:               lipgloss.LightDark(dark)(lipgloss.Color("#6B7280"), lipgloss.Color("#A8A29E")),
+		muted:               lipgloss.LightDark(dark)(lipgloss.Color("#596273"), lipgloss.Color("#A3ADBA")),
 		success:             lipgloss.LightDark(dark)(lipgloss.Color("#047857"), lipgloss.Color("#86EFAC")),
 		attention:           lipgloss.LightDark(dark)(lipgloss.Color("#B45309"), lipgloss.Color("#FBBF24")),
 		failure:             lipgloss.LightDark(dark)(lipgloss.Color("#B91C1C"), lipgloss.Color("#FDA4AF")),
@@ -48,6 +52,8 @@ func tuiListDelegate(dark bool) list.DefaultDelegate {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles = list.NewDefaultItemStyles(dark)
 	delegate.SetSpacing(0)
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Foreground(newTUITheme(dark).text)
+	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Foreground(newTUITheme(dark).muted)
 	delegate.Styles.SelectedTitle = tuiFocusStyle(dark).
 		BorderStyle(lipgloss.Border{Left: "›"}).BorderLeft(true).BorderForeground(tuiAccent(dark)).PaddingLeft(1)
 	delegate.Styles.SelectedDesc = lipgloss.NewStyle().Foreground(newTUITheme(dark).muted).PaddingLeft(2)
@@ -64,7 +70,7 @@ const (
 )
 
 func tuiTitle(value string, darkBackground bool) string {
-	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).text).Render(value)
+	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(darkBackground).heading).Render(value)
 }
 
 func tuiError(value string, darkBackground bool) string {
@@ -96,7 +102,7 @@ func tuiSelection(value string, selected bool, darkBackground bool) string {
 
 func tuiFocusStyle(darkBackground bool) lipgloss.Style {
 	theme := newTUITheme(darkBackground)
-	return lipgloss.NewStyle().Bold(true).Foreground(theme.accent).Background(theme.selectionBackground)
+	return lipgloss.NewStyle().Bold(true).Foreground(theme.selectionText).Background(theme.selectionBackground)
 }
 
 func tuiShortcut(value string, darkBackground bool) string {

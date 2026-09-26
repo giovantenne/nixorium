@@ -106,8 +106,8 @@ behind.
 
 Desktop Icons NG, Dash to Dock and Tiling Assistant are baseline workstation
 components rather than application-profile choices. The template enables all
-three for every role, keeps a compact bottom dock visible outside the GNOME
-overview, and preserves unrelated enabled extensions. MoreWaita icons complement
+three for every role, keeps a compact bottom dock visible when its area is clear,
+hides it behind overlapping windows, and preserves unrelated enabled extensions. MoreWaita icons complement
 native Adwaita decorations and a static blue vector wallpaper. A one-time
 appearance migration lets persistent staff preferences survive later logins.
 This keeps files under the XDG Desktop directory visible for reset student

@@ -31,6 +31,12 @@ let
   '';
   # One source for fresh-account defaults and the targeted, one-time migration.
   # No dconf locks: staff can adjust these choices after the first login.
+  dockVisibilitySettings = {
+    autohide = "true";
+    dock-fixed = "false";
+    intellihide = "true";
+    intellihide-mode = "'ALL_WINDOWS'";
+  };
   appearanceSettings = {
     "org.gnome.desktop.interface" = {
       color-scheme = "'prefer-dark'";
@@ -49,10 +55,7 @@ let
       picture-uri-dark = "'file://${desktopBackground}'";
       picture-options = "'zoom'";
     };
-    "org.gnome.shell.extensions.dash-to-dock" = {
-      autohide = "false";
-      dock-fixed = "true";
-      intellihide = "false";
+    "org.gnome.shell.extensions.dash-to-dock" = dockVisibilitySettings // {
       dock-position = "'BOTTOM'";
       extend-height = "false";
       dash-max-icon-size = "40";
@@ -69,11 +72,15 @@ let
       show-layout-panel-indicator = "false";
     };
   };
-  applyAppearance = lib.concatStringsSep "\n" (lib.mapAttrsToList (schema: values:
+  applySettings = settings: lib.concatStringsSep "\n" (lib.mapAttrsToList (schema: values:
     lib.concatStringsSep "\n" (lib.mapAttrsToList (key: value:
       "gsettings set ${lib.escapeShellArg schema} ${lib.escapeShellArg key} ${lib.escapeShellArg value}"
     ) values)
-  ) appearanceSettings);
+  ) settings);
+  applyAppearance = applySettings appearanceSettings;
+  applyDockVisibility = applySettings {
+    "org.gnome.shell.extensions.dash-to-dock" = dockVisibilitySettings;
+  };
   gvariantList = values: "['${builtins.concatStringsSep "', '" values}']";
   studentFavorites = lib.optionals hasGhostty [ "com.mitchellh.ghostty.desktop" ]
     ++ lib.optionals hasChromium [ "chromium-browser.desktop" ]
@@ -224,6 +231,12 @@ in
         ${applyAppearance}
         mkdir -p "$(dirname "$STYLE_STATE")"
         touch "$STYLE_STATE"
+      fi
+      DOCK_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-dock-v1"
+      if [ ! -e "$DOCK_STATE" ]; then
+        ${applyDockVisibility}
+        mkdir -p "$(dirname "$DOCK_STATE")"
+        touch "$DOCK_STATE"
       fi
       gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
     '';

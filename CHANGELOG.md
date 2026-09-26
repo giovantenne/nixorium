@@ -68,9 +68,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- TUI headings and footer descriptions use neutral text, shortcut keys use
-  violet, and blue focus has a subtle background. Current breadcrumbs are
-  emphasized; status colors retain their success, attention and failure roles.
+- TUI page headings use restrained violet; selected rows have a petrol background
+  and high-contrast light text. Neutral bold shortcut keys and aligned menu
+  highlights separate navigation from green/amber/red operation states.
+- The desktop template uses intelligent dock hiding for overlapping windows,
+  with bottom-edge reveal. A separate one-time migration updates only dock
+  visibility for existing accounts, preserving other appearance preferences.
 
 - Installation now opens PXE and USB/SSH directly. PXE has one state-aware
   entry for guided preparation, reviewed start, finish and network recovery;

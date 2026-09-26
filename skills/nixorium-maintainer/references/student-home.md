@@ -59,14 +59,17 @@ dconf database or overwriting unrelated desktop settings.
 
 The supplied workstation module installs Desktop Icons NG, Dash to Dock and
 Tiling Assistant independently of the application profile. Keep their enablement
-additive so unrelated extensions survive. The compact visible bottom dock,
+additive so unrelated extensions survive. The compact bottom dock with intelligent hiding,
 MoreWaita icons, native Adwaita decoration, blue accent and static vector
 background are deployment-owned defaults. Tiling Assistant provides snap assist
 with small window gaps; no blur or animated wallpaper is required.
 
 Existing accounts receive a targeted, one-time migration marked by
 `~/.config/nixorium/desktop-style-v1`; later staff choices remain editable.
-Do not reset entire dconf databases. Students receive the defaults after their
+A separate `desktop-dock-v1` migration updates only the four dock visibility
+keys for existing accounts: hide on overlap with any window, reveal at the
+bottom edge, and remain visible on a clear desktop. Later staff dock choices
+survive. Do not reset entire dconf databases. Students receive the defaults after their
 normal home reset. Validate extension metadata against the locked GNOME major
 and compile GSettings schemas strictly before applying. Favorites still depend
 on effective package scope.

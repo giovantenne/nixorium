@@ -23,7 +23,10 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   export GSETTINGS_SCHEMA_DIR=${schemas}/share/gsettings-schemas/nixos-gsettings-overrides/glib-2.0/schemas
   test "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'MoreWaita'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'BOTTOM'"
-  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-fixed)" = true
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-fixed)" = false
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = true
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock intellihide)" = true
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock intellihide-mode)" = "'ALL_WINDOWS'"
   test "$(gsettings get org.gnome.shell.extensions.tiling-assistant window-gap)" = 8
   ${pkgs.lib.concatMapStringsSep "\n" (extension: ''
     jq -e --arg version '${pkgs.lib.versions.major pkgs.gnome-shell.version}' \
