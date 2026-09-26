@@ -56,6 +56,12 @@ Add the one affected integration test when changing its behavior:
 ./scripts/validate.sh --remote-client-installer-vm
 ```
 
+For the legacy PXE operation lock, `nix build --file tests/source-checks.nix
+pxe-legacy-lock-vm-tcg --no-link` runs a focused regression with the real
+preparation unit and its read-only home sandbox, without requiring KVM. It
+checks idle/held locks, unchanged contents, unsafe modes, and symlinks. It
+stops at the missing-deployment check, before any client or netboot build.
+
 The management VM is required for changes to management operations that cross
 process, filesystem, network, privilege, systemd, or end-to-end terminal
 boundaries. Presentation-only refactors with focused state-transition unit

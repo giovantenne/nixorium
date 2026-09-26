@@ -92,6 +92,10 @@ in
   network-shell = pkgs.mkShell {
     packages = [ pkgs.nftables pkgs.iproute2 pkgs.util-linux pkgs.python3 pkgs.nix ];
   };
+  pxe-legacy-lock-vm-tcg = pkgs.testers.runNixOSTest (import ./pxe-legacy-lock-vm.nix {
+    inherit nixoriumPackage;
+    useKVM = false;
+  });
   internet-management-vm-tcg = pkgs.testers.runNixOSTest (import ./management-vm.nix {
     inherit nixoriumPackage;
     useKVM = false;

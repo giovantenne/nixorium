@@ -479,6 +479,9 @@ set -euo pipefail
 - `nixorium setup apply` requires a clean reviewed Git deployment and may start
   only `nixorium-apply-controller.service`; never add arbitrary target/path
   parameters or evaluate ignored private files through a `path:` Flake URL
+- Legacy deployment locks are opened read-only and locked exclusively so
+  service home sandboxes remain read-only. Preserve ownership/symlink checks
+  and reject active legacy operations; never delete a lock to unblock work.
 - `nixorium pxe prepare` may start only the fixed administrator-owned
   `nixorium-prepare-pxe.service`; keep its clean-Git, live-DHCP, healthy-cache,
   canonical-store-path, and managed-GC-root checks intact
