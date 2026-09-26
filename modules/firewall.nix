@@ -1,35 +1,37 @@
 { hostName, labSettings, lib, ... }:
 let
   isController = hostName == labSettings.masterHostName;
-  useNativeVeyon = builtins.elem hostName labSettings.veyonNativeHosts;
-  interfaceRules = {
-    allowedTCPPorts = [
-      22
-      11100
-    ]
-    ++ lib.optional (!useNativeVeyon) 5900
-    ++ lib.optionals isController [
-      labSettings.cachePort
-      labSettings.pxeHttpPort
-    ];
-    allowedUDPPorts = [ 5353 ] ++ lib.optionals isController [
-      67
-      69
-      4011
-    ];
+  laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
+  isClient = laboratoryEnabled && !isController;
+  clientRules = import ../lib/client-firewall-rules.nix {
+    interface = labSettings.ifaceName;
+    masterIp = labSettings.masterIp;
   };
 in
 {
+  networking.nftables.enable = true;
+  # Reload only owned tables, preserving independently managed runtime rules.
+  networking.nftables.flushRuleset = false;
   networking.firewall = {
     enable = true;
-    interfaces = lib.mkIf ((labSettings.deploymentMode or "laboratory") == "laboratory") {
-      ${labSettings.ifaceName} = interfaceRules;
+    interfaces = lib.mkIf laboratoryEnabled {
+      ${labSettings.ifaceName} = {
+        allowedTCPPorts = lib.optionals isController [
+          22 11100 labSettings.cachePort labSettings.pxeHttpPort
+        ];
+        allowedUDPPorts = lib.optionals isController [ 5353 67 69 4011 ];
+      };
     };
+    extraInputRules = lib.optionalString isClient clientRules.allow;
   };
 
-  # Avoid the OpenSSH module adding port 22 on every controller interface.
-  services.openssh.openFirewall = false;
+  # Enforce the master source even for existing connections or additional
+  # site openings. No IPv6 management address is configured.
+  networking.nftables.tables.nixorium-client-access = lib.mkIf isClient {
+    family = "inet";
+    content = clientRules.guard;
+  };
 
-  # Preserve desktop mDNS discovery without opening it on other interfaces.
+  services.openssh.openFirewall = false;
   services.avahi.openFirewall = false;
 }

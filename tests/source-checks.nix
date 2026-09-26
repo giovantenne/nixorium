@@ -88,6 +88,9 @@ in
     '';
     postFixup = "";
   };
+  network-shell = pkgs.mkShell {
+    packages = [ pkgs.nftables pkgs.iproute2 pkgs.util-linux pkgs.python3 pkgs.nix ];
+  };
   go-shell = pkgs.mkShell {
     packages = [ pkgs.go ];
   };

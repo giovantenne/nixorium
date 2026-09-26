@@ -226,11 +226,12 @@ configured clients under the `Lab` location.
 - Clients receive only the Veyon public key.
 - The controller receives the private key outside Git and the Nix store.
 - The `veyon-master` group grants key access to `admin` and the teacher.
-- Veyon's service listens on port 11100 on the configured lab interface.
-- The default backend uses the unattended GNOME Remote Desktop VNC bridge on
-  port 5900.
-- Hosts selected by `veyonNativeHosts` use the native PipeWire/portal backend
-  and do not open port 5900.
+- Every lab host uses native PipeWire/portal capture; no external VNC server,
+  shared password or port 5900 is enabled.
+- Client TCP ports 22 and 11100 accept only the controller's static IPv4
+  address on the configured lab interface. IPv6 and other sources are denied.
+  Veyon's internal capture and feature ports remain on loopback.
+- Controller SSH, Veyon, discovery, cache and PXE remain interface-scoped.
 
 Native hosts include upstream commit `22218d772dba639819938911b47ab80924c6c87f`
 and enable `PipeWireVnc/PersistRestoreToken`. GNOME still requires initial
@@ -247,12 +248,13 @@ on native hosts, outside home templates and snapshots. Initial rollout uses a
 fresh permission store and can require reapproval of existing portal grants.
 Never clone this state between users or machines or place tokens in Git.
 
-Enable a canary with `veyonNativeHosts = [ "pc01" ];`, deploy it, approve the
-initial GNOME dialog locally, then test monitoring, input, lock/unlock, demo,
-service restart, logout/login and reboot/home reset. Remove the fallback only
-after this evidence, including the controller when its screen is broadcast.
-Changing the declaration back disables native capture; persistent grants are
-retained so rollback does not silently erase authorization state.
+The old `veyonNativeHosts` field is accepted only for configuration
+compatibility and no longer selects a backend. It is absent from new templates
+and settings screens. After deployment, approve GNOME sharing locally, then
+test monitoring, input, lock/unlock, demo, service restart, logout/login and
+reboot/home reset. The controller also needs approval for screen broadcasts.
+Veyon still uses RFB internally; removing the bridge does not remove that
+protocol or its local native implementation.
 
 ## Private deployment customization
 

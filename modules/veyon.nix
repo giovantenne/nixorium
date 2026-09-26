@@ -1,16 +1,13 @@
 # Veyon classroom management: service, keys and base configuration.
 #
 # Veyon 4.11 provides a native PipeWire/XDG portal backend for Wayland.
-# GNOME requires initial interactive screen-sharing consent; native hosts keep
-# the granted authorization outside reset homes. Other hosts delegate capture
-# to gnome-remote-desktop on port 5900.
-#
-# The fallback overlay allows a new connection to replace a stale VNC session.
+# GNOME requires initial interactive screen-sharing consent. Every lab host
+# uses native capture and keeps its authorization outside reset homes.
 #
 # - Public key deployed to all PCs for key-file authentication
 # - Private key must be placed manually where needed (not managed by Nix)
 # - Classroom/PC layout is configured via Veyon Configurator or veyon-cli
-{ pkgs, lib, hostName, labSettings, ... }:
+{ pkgs, lib, labSettings, ... }:
 
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
@@ -23,30 +20,10 @@ let
   privateKeyBaseDir = "/etc/veyon/keys/private";
   veyonPublicKeyFile = labSettings.veyonPublicKeyFile;
   hasVeyonPublicKey = veyonPublicKeyFile != null && builtins.pathExists veyonPublicKeyFile;
-  useNativeWayland = builtins.elem hostName labSettings.veyonNativeHosts;
-  nativeEnabled = laboratoryEnabled && useNativeWayland;
   nativeUsers = lib.unique [ "admin" labSettings.teacherUser labSettings.studentUser ];
   # Separate per-user state, never part of student templates or snapshots.
   nativeStateRoot = "/var/lib/nixorium/veyon-session";
-  vncServerPluginUid =
-    if useNativeWayland then
-      "{3b8e5c1a-9f72-4d3e-b6a0-2c7f1e8d4b95}"
-    else
-      "{67dfc1c1-8f37-4539-a298-16e74e34fd8b}";
-
-  # VNC password used between veyon-service and gnome-remote-desktop.
-  # Both sides must agree on this value.  Since this is LAN-only
-  # and already protected by Veyon's RSA key authentication, a simple
-  # password is sufficient.
-  vncPassword = "veyon";
-
-  # The password encrypted with Veyon's hardcoded RSA-OAEP key.
-  # Generated with:
-  #   echo -n "veyon" | openssl pkeyutl -encrypt -pubin \
-  #     -inkey <(openssl rsa -in /tmp/veyon-hardcoded-key.pem -pubout) \
-  #     -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha1 | xxd -p | tr -d '\n'
-  # The hardcoded key is embedded in libveyon-core.so.
-  vncPasswordEncrypted = "1e44d88e4161df4d14706c39da3b14b1dba0df9ca8a6a6463663e5902bfa40a4fadd19072e5c5efd48c860e0acccffff05a684fee37aee1cedf07d90fd865cbc5ead5d44daba27260e91571e5306c2afcaab4741a781a5a030966bdb05afa1e2c1643e3b55c3b7c9024ee8ef945010879a05b252fba12100e1bb6c045e2336b6fbd9dd74cbc786a735b82eeff0b890302ed1e7117521061816b62f716de2d854c112dde6b09aa419a6c975d722c65ce6a1c988f52a7ba56c720c55fa1a6aa727bdca29dacf5196cbc7b9b3aae54cd6be0fbedb31261e44887f0cdcb22aac78c8b5c3a5e6735a3a083a535e15b12f4133131caec58ad068531f765bd01a131fe2f77c136e39d1348e551e273f85c9a04d795ce309de36b081b6b7999319360dc54e24ad48672527660d32de06ec46b2d3bb86654ea48845688b60da54644eb246b6730e75f9d6fe22f936bed036fedede388619cce640c37c15099c1330f112114cc2f21c7abb5db1e4b2229053706420ccdab2112e53f8c5056ee3d8e398c04df369429b9f1abad23c993b35f33e7894822dfc88a0ca531336fc47d4f4d48fc2c063a0e65afa97825f13485027cfa02c66e47daa2c407de5f1c1bc531b45705d17fb8d849cd47e9a24aa87938ac1fcf4e9bb20b351ae7df2440920c6a6f2fe8104759c706cd8ad19456610c515ac80dfb85cfe0517fbaf8ce1fbf300f96a7569";
+  vncServerPluginUid = "{3b8e5c1a-9f72-4d3e-b6a0-2c7f1e8d4b95}";
 
   padNumber = n: if n < 10 then "0${toString n}" else toString n;
 
@@ -113,16 +90,8 @@ let
     [VncServer]
     Plugin=${vncServerPluginUid}
 
-    ${lib.optionalString useNativeWayland ''
-      [PipeWireVnc]
-      PersistRestoreToken=true
-    ''}
-
-    ${lib.optionalString (!useNativeWayland) ''
-      [ExternalVncServer]
-      ServerPort=5900
-      Password=${vncPasswordEncrypted}
-    ''}
+    [PipeWireVnc]
+    PersistRestoreToken=true
     EOF
   '';
 in
@@ -147,10 +116,8 @@ in
     description = "Veyon Service";
     wantedBy = [ "graphical-session.target" ];
     partOf = [ "graphical-session.target" ];
-    after = [ "graphical-session.target" ]
-      ++ lib.optional (!useNativeWayland) "gnome-remote-desktop.service"
-      ++ lib.optional nativeEnabled "xdg-permission-store.service";
-    requires = lib.optional nativeEnabled "xdg-permission-store.service";
+    after = [ "graphical-session.target" "xdg-permission-store.service" ];
+    requires = [ "xdg-permission-store.service" ];
     environment.PATH = lib.mkForce "/run/wrappers/bin:${lib.makeBinPath [
       pkgs.veyon
       pkgs.coreutils
@@ -162,7 +129,7 @@ in
     # veyon-service reconstructs the child's environment from the login
     # session, so a service-only XDG_STATE_HOME would not reach veyon-server.
     # Link only Veyon's state directory as the unprivileged desktop user.
-    preStart = lib.optionalString nativeEnabled ''
+    preStart = lib.optionalString laboratoryEnabled ''
       STATE_HOME="''${XDG_STATE_HOME:-$HOME/.local/state}"
       TARGET="${nativeStateRoot}/$(${pkgs.coreutils}/bin/id -un)/state/veyon"
       mkdir -p "$STATE_HOME"
@@ -187,7 +154,7 @@ in
   # The portal holds the other half of the restore token in PermissionStore.
   # Redirect only that service, not applications' XDG_DATA_HOME. Its portal
   # grants persist together across home reset; initial approval stays explicit.
-  systemd.user.services.xdg-permission-store = lib.mkIf nativeEnabled {
+  systemd.user.services.xdg-permission-store = lib.mkIf laboratoryEnabled {
     overrideStrategy = "asDropin";
     serviceConfig = {
       Environment = [ "XDG_DATA_HOME=${nativeStateRoot}/%u/data" ];
@@ -195,7 +162,7 @@ in
     };
   };
 
-  systemd.tmpfiles.rules = lib.optionals nativeEnabled (
+  systemd.tmpfiles.rules = lib.optionals laboratoryEnabled (
     [ "d ${nativeStateRoot} 0711 root root - -" ]
     ++ lib.concatMap (user: [
       "d ${nativeStateRoot}/${user} 0700 ${user} users - -"
@@ -205,37 +172,8 @@ in
     ]) nativeUsers
   );
 
-  # Fallback VNC configuration for hosts outside the native Wayland pilot.
-  services.desktopManager.gnome.extraGSettingsOverrides = lib.mkIf (laboratoryEnabled && !useNativeWayland) ''
-    [org.gnome.desktop.remote-desktop.vnc]
-    enable=true
-    view-only=true
-    auth-method='password'
-    screen-share-mode='mirror-primary'
-
-    [org.gnome.desktop.remote-desktop.rdp]
-    enable=false
-
-    [org.gnome.desktop.remote-desktop.rdp.headless]
-    enable=false
-  '';
-
-  # Ensure the remote-desktop schemas are visible to gsettings.
-  services.desktopManager.gnome.extraGSettingsOverridePackages =
-    lib.optionals (laboratoryEnabled && !useNativeWayland) [ pkgs.gnome-remote-desktop ];
-
-  # gnome-remote-desktop user service: set the VNC password via environment
-  # variable (GNOME Keyring is disabled in desktop.nix), and ensure it's enabled
-  # at session start.
-  systemd.user.services.gnome-remote-desktop = if nativeEnabled then {
-    # Also stop an already running bridge during a switch to native capture.
-    enable = false;
-  } else lib.mkIf laboratoryEnabled {
-    wantedBy = [ "gnome-session.target" ];
-    serviceConfig.Environment = [
-      "GNOME_REMOTE_DESKTOP_TEST_VNC_PASSWORD=${vncPassword}"
-    ];
-  };
+  # Stop and mask the obsolete bridge on upgraded installations too.
+  systemd.user.services.gnome-remote-desktop.enable = lib.mkIf laboratoryEnabled false;
 
   # Group for Veyon Master access (private key ownership)
   users.groups.veyon-master = {};

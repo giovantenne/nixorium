@@ -1,5 +1,6 @@
 { mkLab, deploymentSelf, labConfig }:
 let
+  lib = subnetLab.nixosConfigurations.pc01.pkgs.lib;
   baseArgs = {
     inherit deploymentSelf;
     inherit labConfig;
@@ -189,7 +190,7 @@ in
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
 assert controllerOnlyLab.nixoriumUpdateTargets == [ "pc99" ];
 assert subnetLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];
-assert builtins.elem "pc02" nativeVeyonLab.nixoriumUpdateTargets;
+assert nativeVeyonLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];
 assert builtins.elem "pc02" softwareLab.nixoriumUpdateTargets;
 assert (mkLab (baseArgs // { updateValidationHosts = [ "pc03" ]; })).nixoriumUpdateTargets == [ "pc99" "pc01" "pc03" ];
 assert controllerOnlyLab.nixoriumOfflineCheck.drvPath != "";
@@ -262,7 +263,7 @@ assert subnetLab.colmena.pc01.deployment.targetHost == "10.23.4.129";
 # Colmena starts from the unmodified package set. Each host's module graph
 # applies the laboratory overlay exactly once while evaluating that node.
 assert !(builtins.elem "-Dvnc=true" (colmenaBaseGnomeRemoteDesktop.mesonFlags or [ ]));
-assert builtins.elem "-Dvnc=true" (clientGnomeRemoteDesktop.mesonFlags or [ ]);
+assert colmenaBaseGnomeRemoteDesktop.drvPath == clientGnomeRemoteDesktop.drvPath;
 assert subnetLab.apps.x86_64-linux.nixorium.type == "app";
 assert subnetLab.packages.x86_64-linux.nixorium.pname == "nixorium";
 assert subnetLab.packages.x86_64-linux.pxeFirmware.name == "nixorium-ipxe-firmware";
@@ -345,8 +346,8 @@ assert subnetLab.nixosConfigurations.pc99.config.users.users.nixorium-pxe-dnsmas
 assert controllerFirewall.enable;
 assert controllerFirewall.allowedTCPPorts == [];
 assert controllerFirewall.allowedUDPPorts == [];
-assert builtins.all (port: builtins.elem port controllerTCP) [ 22 11100 5900 5000 8080 ];
-assert builtins.length controllerTCP == 5;
+assert builtins.all (port: builtins.elem port controllerTCP) [ 22 11100 5000 8080 ];
+assert builtins.length controllerTCP == 4;
 assert builtins.all (port: builtins.elem port controllerUDP) [ 67 69 4011 5353 ];
 assert builtins.length controllerUDP == 4;
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
@@ -357,12 +358,15 @@ assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-
 assert clientFirewall.enable;
 assert clientFirewall.allowedTCPPorts == [];
 assert clientFirewall.allowedUDPPorts == [];
-assert builtins.all (port: builtins.elem port clientTCP) [ 22 11100 5900 ];
-assert builtins.length clientTCP == 3;
-assert clientFirewall.interfaces.enp0s3.allowedUDPPorts == [ 5353 ];
-assert builtins.all (port: builtins.elem port nativeClientTCP) [ 22 11100 ];
-assert !(builtins.elem 5900 nativeClientTCP);
-assert builtins.length nativeClientTCP == 2;
+assert clientTCP == [];
+assert clientFirewall.interfaces.enp0s3.allowedUDPPorts == [];
+assert nativeClientTCP == [];
+assert subnetLab.nixosConfigurations.pc01.config.networking.nftables.enable;
+assert !subnetLab.nixosConfigurations.pc01.config.networking.nftables.flushRuleset;
+assert lib.hasInfix "10.23.4.227" clientFirewall.extraInputRules;
+assert lib.hasInfix "22, 11100" clientFirewall.extraInputRules;
+assert lib.hasInfix "priority -10" subnetLab.nixosConfigurations.pc01.config.networking.nftables.tables.nixorium-client-access.content;
+assert !(subnetLab.nixosConfigurations.pc99.config.networking.nftables.tables ? nixorium-client-access);
 assert nativeVeyonLab.nixosConfigurations.pc01.pkgs.veyon.version == "4.11.3";
 assert nativeClient.systemd.user.services.xdg-permission-store.overrideStrategy == "asDropin";
 assert nativeClient.systemd.user.services.xdg-permission-store.serviceConfig.Environment == [
@@ -371,7 +375,9 @@ assert nativeClient.systemd.user.services.xdg-permission-store.serviceConfig.Env
 assert nativeClient.systemd.user.services.veyon-server.partOf == [ "graphical-session.target" ];
 assert nativeClient.systemd.user.services.veyon-server.preStart != "";
 assert builtins.elem "d /var/lib/nixorium/veyon-session/${labConfig.studentUser}/state/veyon 0700 ${labConfig.studentUser} users - -" nativeClient.systemd.tmpfiles.rules;
-assert !(subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? xdg-permission-store);
+assert subnetLab.nixosConfigurations.pc01.config.systemd.user.services.xdg-permission-store.overrideStrategy == "asDropin";
+assert !subnetLab.nixosConfigurations.pc99.config.systemd.user.services.gnome-remote-desktop.enable;
+assert nativeVeyonLab.nixosConfigurations.pc02.config.systemd.user.services.veyon-server.preStart != "";
 assert !nativeClient.systemd.user.services.gnome-remote-desktop.enable;
 assert builtins.any (package: (package.pname or "") == "vlc")
   softwareLab.nixosConfigurations.pc01.config.environment.systemPackages;

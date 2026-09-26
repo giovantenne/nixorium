@@ -110,6 +110,16 @@ compatibility, not a new Nixorium release. Actual evaluation/build failures
 still block. See [UPDATES.md](UPDATES.md) for the complete TUI/CLI journey,
 one-time adoption for older deployments, independent packages and recovery.
 
+## Native classroom control
+
+Veyon uses PipeWire/Wayland directly on every laboratory computer. Approve the
+initial GNOME sharing dialog locally; the grant survives student-home resets.
+The controller also needs its own approval when broadcasting the teacher screen.
+The external VNC bridge and shared password have been removed. Clients expose
+only SSH (22) and Veyon (11100) to the controller's static IPv4 address on the
+lab interface; IPv6 cannot bypass this restriction. Old `veyonNativeHosts`
+settings are accepted for compatibility but no longer select a backend.
+
 ## Local customization
 
 - `modules/shared.nix`: every machine

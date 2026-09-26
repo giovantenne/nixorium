@@ -55,7 +55,7 @@ type LabSettings struct {
 	ExtraLocale             string            `json:"extraLocale"`
 	KeyboardLayout          string            `json:"keyboardLayout"`
 	ConsoleKeyMap           string            `json:"consoleKeyMap"`
-	VeyonNativeHosts        []string          `json:"veyonNativeHosts"`
+	VeyonNativeHosts        []string          `json:"veyonNativeHosts,omitempty"`
 }
 
 func (l LabSettings) ControllerInterface() string {

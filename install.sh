@@ -317,7 +317,11 @@ configure_bootstrap_settings() {
       '    "defaultLocale": '*) printf '    "defaultLocale": "en_US.UTF-8",\n' >> "$OUTPUT_FILE" ;;
       '    "extraLocale": '*) printf '    "extraLocale": "en_US.UTF-8",\n' >> "$OUTPUT_FILE" ;;
       '    "keyboardLayout": '*) printf '    "keyboardLayout": "%s",\n' "$BOOTSTRAP_KEYBOARD" >> "$OUTPUT_FILE" ;;
-      '    "consoleKeyMap": '*) printf '    "consoleKeyMap": "%s",\n' "$BOOTSTRAP_CONSOLE_KEYMAP" >> "$OUTPUT_FILE" ;;
+      '    "consoleKeyMap": '*)
+        printf '    "consoleKeyMap": "%s"' "$BOOTSTRAP_CONSOLE_KEYMAP" >> "$OUTPUT_FILE"
+        if [[ "$LINE" == *, ]]; then printf ',' >> "$OUTPUT_FILE"; fi
+        printf '\n' >> "$OUTPUT_FILE"
+        ;;
       *) printf '%s\n' "$LINE" >> "$OUTPUT_FILE" ;;
     esac
   done < "$SETTINGS_FILE"

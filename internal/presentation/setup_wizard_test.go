@@ -72,7 +72,7 @@ func TestFirstRunOmitsGitIdentityAndGroupsEssentialFields(t *testing.T) {
 			t.Fatalf("first-run still asks for Git identity: %+v", field)
 		}
 	}
-	for _, expected := range []string{"Network", "Laboratory", "Accounts", "Regional settings", "Preferences", "Classroom"} {
+	for _, expected := range []string{"Network", "Laboratory", "Accounts", "Regional settings", "Preferences"} {
 		if !groups[expected] {
 			t.Fatalf("first-run group %q is missing: %v", expected, groups)
 		}
