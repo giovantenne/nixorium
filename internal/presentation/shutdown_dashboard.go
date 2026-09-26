@@ -229,10 +229,10 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 		if shutdownHasTechnicalDetail(model.result) {
 			shell.actions = append(shell.actions, tuiAction{key: "t", label: "Technical"})
 		}
-		shell.actions = append(shell.actions, tuiAction{key: "Enter", label: "Computers"}, tuiAction{key: "?", label: "Help"})
+		shell.actions = append(shell.actions, tuiAction{key: "Enter", label: "Computers"}, tuiAction{key: "F1", label: "Help"})
 	default:
 		shell.body = strings.Join(model.selectionView(hosts, context), "\n")
-		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Check"}, {key: "Esc", label: "Computers"}, {key: "?", label: "Help"}}
+		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Check"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	}
 	if context.message != "" && context.message != model.plan.Message {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: context.message})

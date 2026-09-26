@@ -310,6 +310,11 @@ func demoDeploymentTargets() []domain.DeploymentTarget {
 func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	actions.LoadSettings = func() (domain.LabSettingsFile, error) { return demoSettings(), nil }
+	actions.Refresh = func() (domain.StatusReport, error) {
+		report := demoStatus("stopped", revision)
+		report.PXEPreparation.Ready = false
+		return report, nil
+	}
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1100)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move the cursor to Installation", 700)
@@ -395,8 +400,9 @@ func renderInstallationDemo(revision string, width, height int) DemoScenario {
 func renderUSBInstallationDemo(revision string, width, height int) DemoScenario {
 	r := newDemoRecorder(demoActions(), revision, width, height)
 	r.capture("Overview", 900)
-	r.model.screen = dashboardInstallMethod
-	r.model.installation = installationModel{flow: true, methodCursor: 1}
+	r.model.screen = dashboardInstallationArea
+	r.model.installation = installationModel{flow: true}
+	r.model.installationAreaCursor = 1
 	r.capture("Choose USB over SSH", 1800)
 	r.model.screen = dashboardUSBInstall
 	r.model.installation.method = domain.RemoteInstallUSBSSH
@@ -511,7 +517,6 @@ func renderShutdownDemo(revision string, width, height int) DemoScenario {
 	r.key(demoText("c"))
 	r.capture("Open Computers", 1300)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move to client distribution", 450)
-	r.pressAndCapture(demoCode(tea.KeyDown), "Move to computer restore", 450)
 	r.pressAndCapture(demoCode(tea.KeyDown), "Move to Shut down computers", 700)
 	r.key(demoCode(tea.KeyEnter))
 	r.capture("Choose client computers", 1800)

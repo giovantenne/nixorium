@@ -17,6 +17,7 @@ type SettingsPasswordAction func(string, domain.LabSettingsFile, *os.File, io.Wr
 
 type routineSettingsGroup struct {
 	id          string
+	shortcut    string
 	label       string
 	description string
 	fields      []settingsField
@@ -27,7 +28,9 @@ type routineSettingsGroupItem struct {
 	group routineSettingsGroup
 }
 
-func (item routineSettingsGroupItem) Title() string       { return item.group.label }
+func (item routineSettingsGroupItem) Title() string {
+	return menuTitle(item.group.shortcut, item.group.label)
+}
 func (item routineSettingsGroupItem) Description() string { return item.group.description }
 func (item routineSettingsGroupItem) FilterValue() string {
 	return item.group.label + " " + item.group.description
@@ -36,6 +39,7 @@ func (item routineSettingsGroupItem) FilterValue() string {
 var routineSettingsGroups = []routineSettingsGroup{
 	{
 		id:          "network",
+		shortcut:    "n",
 		label:       "Network",
 		description: "Controller/client interfaces, address, and laboratory subnet",
 		fields: []settingsField{
@@ -49,6 +53,7 @@ var routineSettingsGroups = []routineSettingsGroup{
 	},
 	{
 		id:          "computers",
+		shortcut:    "c",
 		label:       "Computers",
 		description: "Client count and controller host number",
 		fields: []settingsField{
@@ -58,6 +63,7 @@ var routineSettingsGroups = []routineSettingsGroup{
 	},
 	{
 		id:          "accounts",
+		shortcut:    "a",
 		label:       "Accounts",
 		description: "Teacher and student account names",
 		fields: []settingsField{
@@ -67,6 +73,7 @@ var routineSettingsGroups = []routineSettingsGroup{
 	},
 	{
 		id:          "regional",
+		shortcut:    "r",
 		label:       "Regional",
 		description: "Time zone and keyboard layout",
 		fields: []settingsField{
@@ -76,6 +83,7 @@ var routineSettingsGroups = []routineSettingsGroup{
 	},
 	{
 		id:          "browser",
+		shortcut:    "b",
 		label:       "Browser",
 		description: "Default classroom homepage",
 		fields: []settingsField{
@@ -84,6 +92,7 @@ var routineSettingsGroups = []routineSettingsGroup{
 	},
 	{
 		id:          "git",
+		shortcut:    "g",
 		label:       "Git",
 		description: "Student and administrator commit identity",
 		fields: []settingsField{
@@ -99,13 +108,15 @@ type routineSettingsMenu struct {
 	list list.Model
 }
 
+func (menu routineSettingsMenu) filtering() bool { return menu.list.FilterState() == list.Filtering }
+
 type routinePasswordChoice struct {
 	id          string
 	label       string
 	description string
 }
 
-func (item routinePasswordChoice) Title() string       { return item.label }
+func (item routinePasswordChoice) Title() string       { return menuTitle(item.id[:1], item.label) }
 func (item routinePasswordChoice) Description() string { return item.description }
 func (item routinePasswordChoice) FilterValue() string { return item.label }
 
@@ -310,7 +321,7 @@ func (model dashboardModel) settingsView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "k", label: "Advanced keys"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}})
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "y", label: "Controller keys"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) settingsPasswordsView() string {

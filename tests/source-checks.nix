@@ -45,6 +45,7 @@ in
   software-preset-schema = assert softwarePresetSchemaTest; pkgs.runCommand "nixorium-software-preset-schema-test" {} ''
     touch "$out"
   '';
+  desktop-profile = import ./desktop-profile.nix { inherit pkgs; };
   nixorium = nixoriumPackage;
   nixorium-runtime = pkgs.runCommand "nixorium-runtime-test" {} ''
     mkdir -p repository "$TMPDIR/home"

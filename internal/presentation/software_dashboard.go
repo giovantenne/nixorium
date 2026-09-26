@@ -247,6 +247,9 @@ func (model softwareModel) updateSearchInput(key tea.KeyPressMsg, search func(co
 	}
 	changed := false
 	switch key.String() {
+	case "f2", "f3", "f4":
+		target := int(key.String()[1] - '2')
+		return model.changeMode(target - int(model.mode)), softwareSearchInput{handled: true, clearMessage: true}
 	case "tab":
 		return model.changeMode(1), softwareSearchInput{handled: true, clearMessage: true}
 	case "shift+tab":
@@ -281,6 +284,9 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 	case softwareCatalog:
 		items := model.items()
 		switch key.String() {
+		case "f2", "f3", "f4":
+			target := int(key.String()[1] - '2')
+			return model.changeMode(target - int(model.mode)), softwareIntent{setMessage: true}
 		case "esc", "left":
 			model.searchID++
 			if model.searchCancel != nil {
@@ -987,8 +993,9 @@ func softwareModeTabs(mode softwareListMode, dark bool) string {
 	labels := []string{"Selected", "Search packages", "Suggestions"}
 	parts := make([]string, len(labels))
 	for index, label := range labels {
+		label = menuTitle(fmt.Sprintf("F%d", index+2), label)
 		if index == int(mode) {
-			parts[index] = tuiTitle("["+label+"]", dark)
+			parts[index] = tuiTitle(label, dark)
 		} else {
 			parts[index] = tuiMuted(label, dark)
 		}

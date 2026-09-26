@@ -62,7 +62,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 		t.Fatal("main demo pauses on the intermediate declaration result")
 	}
 	search := demoFrameWithLabel(main.Frames, "Open Software directly in Search")
-	if !strings.Contains(search.Text, "[Search packages]") || !strings.Contains(search.Text, "Package name  _") || strings.Contains(search.Text, "VLC") || strings.Contains(search.Text, "[Selected]") {
+	if !strings.Contains(search.Text, "[F3] Search packages") || !strings.Contains(search.Text, "Package name  _") || strings.Contains(search.Text, "VLC") || strings.Contains(search.Text, "[Selected]") {
 		t.Fatalf("main demo does not open directly in package search:\n%s", search.Text)
 	}
 	result := demoFrameWithLabel(main.Frames, "Find Inkscape in the pinned package set")

@@ -191,7 +191,7 @@ func TestUSBInstallUsesCommonReadinessWithoutPreparingPXE(t *testing.T) {
 	}
 }
 
-func TestInstallMethodDetectsAndReattachesKnownUSBOperation(t *testing.T) {
+func TestUSBChoiceDetectsAndReattachesKnownOperation(t *testing.T) {
 	prepared := remoteTUITestPreparedResponse("prepared")
 	statusRequests := 0
 	model := dashboardModel{actions: DashboardActions{
@@ -205,13 +205,17 @@ func TestInstallMethodDetectsAndReattachesKnownUSBOperation(t *testing.T) {
 	}}
 	updated, command := model.startComputerInstallation()
 	model = updated.(dashboardModel)
-	if command == nil || model.screen != dashboardInstallMethod {
-		t.Fatal("installation method did not probe the worker")
+	if command != nil || model.screen != dashboardInstallationArea {
+		t.Fatal("opening Installation must not probe USB")
 	}
-	updated, _ = model.Update(command())
+	updated, command = model.Update(tea.KeyPressMsg{Text: "u"})
+	if command == nil {
+		t.Fatal("USB selection must inspect the existing operation")
+	}
+	updated, _ = updated.Update(command())
 	model = updated.(dashboardModel)
-	if model.installation.remote.operationID != remoteTUITestOperationID || !strings.Contains(model.View().Content, "Reattach USB operation") {
-		t.Fatal("known USB operation was not offered for reattachment")
+	if model.installation.remote.operationID != remoteTUITestOperationID || model.screen != dashboardUSBInstall {
+		t.Fatal("known USB operation did not open")
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)

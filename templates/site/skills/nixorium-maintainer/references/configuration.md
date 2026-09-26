@@ -35,9 +35,11 @@ application. Validate it through both schema layers after any edit:
 nix run .#nixorium -- config validate
 ```
 
-For an administrator using the current TUI, prefer its installation flow:
-laboratory settings are followed by validation/save, keys, controller activation,
-client preparation, and a reviewed PXE start. This is not a save-only editor.
+For an administrator using the current TUI, open Installation and choose PXE
+or USB over SSH. PXE observes current state first; preparation guides settings,
+validation/save, keys, controller activation and client preparation, then stops
+at reviewed start. Active sessions offer finish or recovery in that same view.
+The preparation form is not a save-only editor.
 For the first-run CLI settings/key workflow:
 
 ```sh

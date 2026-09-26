@@ -10,35 +10,24 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-var installMethods = []struct {
-	method      domain.RemoteInstallMethod
-	title       string
-	description string
-}{
-	{"pxe", "Network boot (PXE)", "Recommended for many computers; temporarily enables the managed network installer."},
-	{domain.RemoteInstallUSBSSH, "USB over SSH", "Use the official NixOS Minimal ISO and install one physically identified computer."},
-}
-
-func (model dashboardModel) installMethodView() string {
+func (model dashboardModel) installationAreaView() string {
 	lines := []string{
-		tuiTitle("Choose an installation method", model.isDark),
+		tuiTitle("Install client computers", model.isDark),
 		"Both methods install the same reviewed NixOS closure and shared Disko layout.",
 		"",
 	}
-	for index, method := range installMethods {
-		lines = append(lines, tuiSelection(method.title, index == model.installation.methodCursor, model.isDark), tuiMuted("    "+method.description, model.isDark))
-	}
+	lines = append(lines, model.taskMenu(installationAreaTasks, model.installationAreaCursor))
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
 	}
 	notices := []tuiNotice{}
-	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
+	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 	if model.installation.remote.operationID != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "A USB installation operation is still known", detail: "Operation " + model.installation.remote.operationID + " can be refreshed without repeating apply."})
 		actions = append([]tuiAction{{key: "r", label: "Reattach USB operation"}}, actions...)
 	}
 	return model.renderShell(tuiShell{
-		path: []string{"Installation", "Install computers", "Method"}, body: strings.Join(lines, "\n"),
+		path: []string{"Installation"}, body: strings.Join(lines, "\n"),
 		notices: notices, actions: actions,
 	})
 }
@@ -94,7 +83,7 @@ func (model dashboardModel) remoteInstallView() string {
 				lines = append(lines, tuiSelection(host.Name, index == remote.hostCursor, model.isDark), tuiMuted("    "+detail, model.isDark))
 			}
 		}
-		actions = []tuiAction{{key: "↑/↓", label: "Select identity"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Method"}, {key: "F1", label: "Help"}}
+		actions = []tuiAction{{key: "↑/↓", label: "Select identity"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
 	case remoteInstallConsole:
 		consoleTitle := "Keep the physical console visible"
 		consoleDetail := "The controller reads the Ed25519 host key without sending a password. You will compare its fingerprint on the next screen."
@@ -374,7 +363,7 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 		hosts := model.remoteInstallHosts()
 		switch key.String() {
 		case "esc", "left":
-			model.screen = dashboardInstallMethod
+			model.screen = dashboardInstallationArea
 		case "up", "k":
 			remote.hostCursor = max(0, remote.hostCursor-1)
 		case "down", "j":
@@ -660,7 +649,7 @@ func (model dashboardModel) planRemoteInstall(disk string, rotation bool) (tea.M
 func (model dashboardModel) cancelRemoteInstall() (tea.Model, tea.Cmd) {
 	model.installation.remote.password = ""
 	if model.installation.remote.operationID == "" || model.actions.RemoteInstallRequest == nil {
-		model.screen = dashboardInstallMethod
+		model.screen = dashboardInstallationArea
 		return model, nil
 	}
 	model.busy = "Confirming safe cancellation, credential cleanup, and GC-root cleanup"
@@ -705,7 +694,7 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 	model.busy = ""
 	remote := &model.installation.remote
 	remote.password = ""
-	if message.action == "probe" {
+	if message.action == "open-usb" {
 		if message.err != nil {
 			model.message = "Existing USB installation state could not be checked: " + sanitizeRemoteInstallText(message.err.Error())
 			return model, nil
@@ -720,7 +709,13 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		} else {
 			*remote = remoteInstallationModel{}
 		}
-		return model, nil
+		if remote.operationID != "" {
+			model.screen = dashboardUSBInstall
+			model.installation.method = domain.RemoteInstallUSBSSH
+			model.installation.flow = false
+			return model, nil
+		}
+		return model.beginComputerInstallation(domain.RemoteInstallUSBSSH)
 	}
 	if message.err != nil {
 		if message.action == "bootstrap" {

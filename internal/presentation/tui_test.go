@@ -901,51 +901,8 @@ func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	}
 }
 
-func TestRestoreKeepsReapplyAndReinstallDistinct(t *testing.T) {
-	model := newDashboardModel(testDashboardReport("ready"), testSetupReport(true, true, true, true), DashboardActions{}, false)
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "c"})
-	model = updated.(dashboardModel)
-	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
-	model = updated.(dashboardModel)
-	view := model.View().Content
-	if command != nil || model.screen != dashboardRestore || !strings.Contains(view, "Keeps the disk") || !strings.Contains(view, "PXE or USB over SSH") || !strings.Contains(view, "does not erase a disk") {
-		t.Fatalf("restore choice is ambiguous:\n%s", view)
-	}
-
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	if model.screen != dashboardDeploy || !model.computers.restoreMode {
-		t.Fatalf("reapply did not route to reviewed deployment: %+v", model)
-	}
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
-	model = updated.(dashboardModel)
-	if model.screen != dashboardRestore || model.computers.restoreMode {
-		t.Fatal("deployment did not return to the restoration choice")
-	}
-
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(dashboardModel)
-	view = model.View().Content
-	if model.screen != dashboardInstallMethod || !model.computers.restoreMode || !strings.Contains(view, "Network boot (PXE)") || !strings.Contains(view, "USB over SSH") {
-		t.Fatalf("reinstall did not offer both installation methods: %s", view)
-	}
-}
-
-func TestCompletedRestoreContextDoesNotLeakIntoLaterInstallation(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("ready"), computers: computersModel{restoreMode: true}, screen: dashboardHome}
-	updated, _ := model.Update(tea.KeyPressMsg{Text: "n"})
-	model = updated.(dashboardModel)
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
-	model = updated.(dashboardModel)
-	if model.computers.restoreMode || model.screen != dashboardPXE || strings.Contains(model.View().Content, "Reinstall computers") {
-		t.Fatalf("stale restore context changed a later installation:\n%s", model.View().Content)
-	}
-}
-
 func TestReinstallReviewsConsequencesBeforeLeavingPXEActive(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("active"), computers: computersModel{restoreMode: true}, screen: dashboardPXE}
+	model := dashboardModel{report: testDashboardReport("active"), screen: dashboardPXE}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
 	if command != nil || model.screen != dashboardPXELeaveReview || !strings.Contains(model.View().Content, "Type LEAVE to continue") {
@@ -1694,7 +1651,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "healthy") || !strings.Contains(model.View().Content, "Installation → PXE mode and network recovery") {
+	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "healthy") || !strings.Contains(model.View().Content, "Installation → Network boot (PXE)") {
 		t.Fatalf("services screen missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "r"})
@@ -2034,11 +1991,8 @@ func TestDashboardPXEConfirmationRejectsLegacyMultiwordInput(t *testing.T) {
 func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 	called := ""
 	actions := DashboardActions{
-		Refresh: func() (domain.StatusReport, error) { return testDashboardReport("ready"), nil },
-		PreparePXE: func() domain.ActionReport {
-			called = "prepare"
-			return domain.ActionReport{Message: "prepared"}
-		},
+		Refresh:      func() (domain.StatusReport, error) { return testDashboardReport("ready"), nil },
+		LoadSettings: func() (domain.LabSettingsFile, error) { called = "configure"; return wizardSettings(), nil },
 		StopPXE: func() domain.PXELifecycleReport {
 			called = "stop"
 			return domain.PXELifecycleReport{Message: "stopped"}
@@ -2048,9 +2002,12 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 			return domain.PXELifecycleReport{Message: "recovered"}
 		},
 	}
-	for key, expected := range map[string]string{"p": "prepare", "x": "stop", "r": "recover"} {
+	for key, expected := range map[string]string{"p": "configure", "x": "stop", "r": "recover"} {
 		called = ""
 		mode := "active"
+		if key == "p" {
+			mode = "stopped"
+		}
 		if key == "r" {
 			mode = "recovery-required"
 		}
@@ -2060,17 +2017,7 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 		if command == nil {
 			t.Fatalf("%s did not schedule an operation", key)
 		}
-		if key == "p" && !strings.Contains(model.View().Content, "Waiting for managed progress") {
-			t.Fatalf("PXE preparation omits managed progress feedback:\n%s", model.View().Content)
-		}
 		message := command()
-		if key == "p" {
-			batch, ok := message.(tea.BatchMsg)
-			if !ok || len(batch) != 2 {
-				t.Fatalf("PXE preparation command = %#v, want action and progress poll", message)
-			}
-			message = batch[0]()
-		}
 		_, _ = model.Update(message)
 		if called != expected {
 			t.Errorf("%s called %q, want %q", key, called, expected)

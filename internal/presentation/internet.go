@@ -131,7 +131,7 @@ func (model dashboardModel) internetView() string {
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
-	lines := []string{"Internet returns after reboot. Lab access remains available.", ""}
+	lines := []string{tuiTitle("Internet access", model.isDark), tuiMuted("Internet returns after reboot. Lab access remains available.", model.isDark), ""}
 	switch m.stage {
 	case 1:
 		lines = append(lines, "Review: "+string(m.action)+" Internet", m.plan.Message, "")
@@ -155,20 +155,15 @@ func (model dashboardModel) internetView() string {
 	default:
 		lines = append(lines, "Action: "+string(m.action)+" Internet", "")
 		hosts := model.report.Meta.Clients.Hosts
-		count := max(1, model.height-16)
-		start := max(0, m.cursor-count+1)
-		end := min(len(hosts), start+count)
+		count := max(1, model.height-17)
+		start, end := listWindow(len(hosts), m.cursor, count)
 		for i := start; i < end; i++ {
 			h := hosts[i]
 			mark := "[ ]"
 			if m.chosen[h.Name] {
 				mark = "[x]"
 			}
-			focus := " "
-			if i == m.cursor {
-				focus = ">"
-			}
-			lines = append(lines, fmt.Sprintf("%s %s %s  %s", focus, mark, h.Name, h.IP))
+			lines = append(lines, tuiSelection(fmt.Sprintf("%s %-10s %s", mark, h.Name, h.IP), i == m.cursor, model.isDark))
 		}
 		if len(hosts) == 0 {
 			lines = append(lines, "No client computers configured.")
@@ -176,7 +171,7 @@ func (model dashboardModel) internetView() string {
 		if start > 0 || end < len(hosts) {
 			lines = append(lines, fmt.Sprintf("Showing %d–%d of %d", start+1, end, len(hosts)))
 		}
-		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Tab", label: "Block / unblock"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "↑/↓", label: "Move"}, {key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Tab", label: "Block / unblock"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	}
 	shell.body = strings.Join(lines, "\n")
 	if model.message != "" {

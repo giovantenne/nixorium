@@ -214,11 +214,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return report
 		},
 		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
-			setup := setupManager.Status(ctx, repository)
-			if setupMode || setupStartsBeforeDashboardInspection(setup) {
+			if setupMode {
+				return domain.StatusReport{}, setupManager.Status(ctx, repository), nil
+			}
+			setup := setupManager.InitialStatus(ctx, repository)
+			if setupStartsBeforeDashboardInspection(setup) {
 				return domain.StatusReport{}, setup, nil
 			}
-			report, err := inspector.Status(ctx, repository)
+			report, err := inspector.Overview(ctx, repository)
 			if err != nil {
 				return domain.StatusReport{}, domain.SetupReport{}, err
 			}

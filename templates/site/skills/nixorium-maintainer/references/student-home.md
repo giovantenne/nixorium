@@ -57,12 +57,19 @@ policy affects student only or staff too, and whether it supplies initial
 defaults or reapplies settings at login. Avoid blindly copying an entire
 dconf database or overwriting unrelated desktop settings.
 
-The supplied workstation module always installs and enables Desktop Icons NG
-and Dash to Dock, with a fixed visible dock, independently of the application
-profile. Keep these baseline extensions system-managed and preserve the login
-repair that enables each required UUID without replacing unrelated enabled
-extensions. Application favorites remain conditional on effective package
-scope.
+The supplied workstation module installs Desktop Icons NG, Dash to Dock and
+Tiling Assistant independently of the application profile. Keep their enablement
+additive so unrelated extensions survive. The compact visible bottom dock,
+MoreWaita icons, native Adwaita decoration, blue accent and static vector
+background are deployment-owned defaults. Tiling Assistant provides snap assist
+with small window gaps; no blur or animated wallpaper is required.
+
+Existing accounts receive a targeted, one-time migration marked by
+`~/.config/nixorium/desktop-style-v1`; later staff choices remain editable.
+Do not reset entire dconf databases. Students receive the defaults after their
+normal home reset. Validate extension metadata against the locked GNOME major
+and compile GSettings schemas strictly before applying. Favorites still depend
+on effective package scope.
 
 Every supplied software profile includes Ghostty and
 `python3Packages.terminaltexteffects`, so the site screensaver is present even

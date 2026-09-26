@@ -14,7 +14,7 @@ func TestGalleryRenderingIsDeterministicAndSemantic(t *testing.T) {
 		t.Fatal("identical documentation fixtures produced different bytes")
 	}
 	for _, expected := range []string{
-		"[Search packages]",
+		"[F3] Search packages",
 		"Profile review",
 		"5 add · 0 keep scope · 1 excluded",
 		"Opened from a saved software change",
