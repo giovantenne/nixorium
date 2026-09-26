@@ -231,13 +231,12 @@ to the configured lab interface and machine role. Client installation requires
 an exact reviewed confirmation; unattended installation is disabled.
 
 > [!NOTE]
-> TCP port 5900 is open on the lab interface only for hosts using Nixorium's
-> temporary Veyon Wayland fallback. Veyon's native PipeWire backend is still
-> experimental and GNOME requires interactive screen-sharing consent, so the
-> fallback uses view-only GNOME Remote Desktop with a shared VNC password for
-> unattended monitoring. This workaround will be retired as native Wayland
-> support and managed GNOME authorization mature; hosts using the native Veyon
-> backend do not open port 5900.
+> Veyon uses native PipeWire/Wayland capture on every laboratory host.
+> The external VNC bridge, shared password and port 5900 have been removed.
+> Clients admit SSH (22) and Veyon (11100) only from the controller's static
+> IPv4 address on the laboratory interface; IPv6 cannot bypass this policy.
+> GNOME requires initial local approval of sharing, including on the
+> controller when broadcasting its screen.
 
 Site settings, password hashes, public keys, and policy belong in the private
 deployment repository. Private SSH, cache-signing, and Veyon keys must stay out

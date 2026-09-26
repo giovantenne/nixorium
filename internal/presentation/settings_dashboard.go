@@ -93,14 +93,6 @@ var routineSettingsGroups = []routineSettingsGroup{
 			{id: "lab.adminGitEmail", group: "Git", label: "Administrator Git author email"},
 		},
 	},
-	{
-		id:          "veyon",
-		label:       "Veyon",
-		description: "Native classroom-control hosts",
-		fields: []settingsField{
-			{id: "lab.veyonNativeHosts", group: "Veyon", label: "Veyon native hosts (comma-separated, optional)"},
-		},
-	},
 }
 
 type routineSettingsMenu struct {

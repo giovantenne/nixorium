@@ -61,6 +61,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- All laboratory hosts now use native PipeWire/Wayland Veyon capture. Removed
+  the patched GNOME Remote Desktop bridge, embedded shared VNC credential and
+  pilot selector from settings screens. Legacy selector data remains readable
+  but cannot enable the removed backend; each user must approve initial GNOME
+  sharing, including the controller for screen broadcasts.
+- Client SSH/Veyon ports now accept only the controller's static IPv4 address
+  on the laboratory interface. Nftables blocks other sources, IPv6 management,
+  old unauthorized connections and external VNC while preserving loopback.
+
 - Native Wayland pilot hosts use Veyon 4.11.3 plus upstream's opt-in portal
   restore-token persistence fix. Per-user tokens and portal permission stores
   survive student-home resets outside the template and snapshots; GNOME still

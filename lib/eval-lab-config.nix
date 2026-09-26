@@ -142,7 +142,7 @@ let
           veyonNativeHosts = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [];
-            description = "Hosts using Veyon's native PipeWire backend";
+            description = "Deprecated compatibility field; all laboratory hosts now use native PipeWire capture";
           };
         };
       }

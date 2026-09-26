@@ -32,3 +32,18 @@ policy upstream. A configured interface that carries both laboratory and other
 traffic still exposes the documented product services to that link, so physical
 deployment review remains necessary. Role-specific evaluation assertions and
 the management VM protect the intended port matrix.
+
+## Revision: native Veyon and controller-only client management
+
+The native migration removes the external VNC bridge and shared credential.
+Nftables now admits client SSH/Veyon only from the evaluated controller static
+IPv4 address on the lab interface. A separate input hook before connection
+tracking rejects other sources, IPv6 management and port 5900, including
+previously established unauthorized sessions. Loopback remains available for
+Veyon's internal services. Client mDNS has no public opening. Controller
+service openings remain interface-scoped because its DHCP/PXE peers are not a
+stable source range. Reload only owned tables, never the entire ruleset.
+
+The isolated network test exercises the production rule generator with a
+master, client and peer, proving IPv4 permissions, IPv6 denial, loopback,
+legacy VNC denial and rejection of an already established peer connection.

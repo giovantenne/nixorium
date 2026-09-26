@@ -70,7 +70,6 @@ var settingsFields = []settingsField{
 	{id: "lab.timeZone", group: "Regional settings", label: "Time zone", choices: timeZoneChoices},
 	{id: "lab.keyboardLayout", group: "Regional settings", label: "Keyboard layout", choices: keyboardChoices},
 	{id: "lab.homepageUrl", group: "Preferences", label: "Browser homepage"},
-	{id: "lab.veyonNativeHosts", group: "Classroom", label: "Veyon native hosts (comma-separated, optional)"},
 }
 
 var installationSettingsFields = func() []settingsField {

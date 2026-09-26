@@ -147,9 +147,6 @@ let
   labOverlay = lib.composeManyExtensions [
     veyon.overlays.default
     veyonWaylandOverlay
-    (final: prev: {
-      gnome-remote-desktop = import (upstreamRoot + "/pkgs/gnome-remote-desktop.nix") { inherit prev; };
-    })
   ];
 
   labSettings = {
@@ -321,7 +318,6 @@ let
   updateClientVariants = lib.groupBy (name: builtins.toJSON {
     packages = lib.sort builtins.lessThan (lib.unique (map (entry: entry.package)
       (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages)));
-    nativeVeyon = builtins.elem name veyonNativeHosts;
     interface = ifaceForHost name;
   }) validClientNames;
   unknownVeyonNativeHosts = builtins.filter (name: !builtins.elem name validHostNames) veyonNativeHosts;

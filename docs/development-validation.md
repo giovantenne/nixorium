@@ -157,3 +157,17 @@ Do not move a test upward merely because a higher level can exercise it. When a
 new integration scenario requires fixed sleeps or a full desktop closure,
 also add a lower-level deterministic test for its state machine or validation
 logic whenever possible.
+
+## Isolated client firewall test
+
+After changing client ingress rules, run:
+
+```sh
+nix develop --file tests/source-checks.nix network-shell --command scripts/check-client-firewall.sh
+```
+
+This uses the production rule generator in unprivileged user/network namespaces.
+It refuses the host namespaces, creates only temporary virtual links, and checks
+master access, peer denial, IPv6, loopback, external VNC and established peer
+connections. No live firewall, gateway or client is changed. Run the mkLab
+contract evaluation and affected system builds as well.

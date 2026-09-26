@@ -43,7 +43,6 @@ lib/
 setup.sh                   # Installer script for PXE-booted client PCs
 scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
 pkgs/
-  gnome-remote-desktop.nix # gnome-remote-desktop overlay (VNC + multi-session)
   nixorium.nix             # Go management command package
 cmd/nixorium/              # Management CLI entrypoint
 cmd/nixorium-remote-worker/ # Controller-owned USB/SSH operation worker
@@ -331,13 +330,16 @@ Release from the matching changelog section.
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
 - Netboot uses the systemd-owned `nixorium-pxe.service` with `dnsmasq` in ProxyDHCP mode so institutional DHCP remains authoritative for leases. `scripts/run-pxe-proxy.sh` remains an advanced foreground compatibility helper. `mkLab` builds a standalone installer source containing the effective downstream configuration and only local Flake inputs for offline evaluation.
-- `labOverlay` composes Veyon's official overlay with local PipeWire packaging fixes and the GNOME Remote Desktop fallback patch. It is applied in each host's module list and in `colmena.meta.nixpkgs`.
+- `labOverlay` composes Veyon's official overlay with local PipeWire and RGB32 rendering fixes. It is applied in each host's module list and in `colmena.meta.nixpkgs`.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
-- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. `labSettings.veyonNativeHosts` selects the Veyon 4.11 native PipeWire backend per host; other hosts use the GNOME Remote Desktop fallback on port 5900. The private key is not managed by Nix (see Security).
+- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. Every lab host uses native PipeWire capture. The legacy `veyonNativeHosts` field is compatibility-only; never reintroduce the external bridge or shared VNC password. The private key is not managed by Nix (see Security).
 - `modules/firewall.nix` enables the firewall everywhere, disables implicit
-  all-interface SSH/Avahi openings, scopes SSH/mDNS/Veyon/optional VNC to the
-  configured interface, and adds Harmonia/PXE ports only on the controller.
+  all-interface SSH/Avahi openings, and uses nftables. Client TCP 22/11100
+  admits only the static controller IPv4 address on the lab interface, with
+  a guard before connection tracking preventing IPv6/old-connection bypass.
+  Controller services stay interface-scoped; only it opens Harmonia/PXE.
+  Preserve independently owned runtime tables on firewall reload.
 - Native Veyon hosts persist per-user tokens and portal grants under
   `/var/lib/nixorium/veyon-session`; never copy these into templates, snapshots,
   Git, or other machines. GNOME initial consent stays explicit. The user-only
