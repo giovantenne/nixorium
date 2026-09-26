@@ -87,6 +87,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Veyon remote control normalizes unused RFB pixel bytes before rendering,
+  preventing transparent blocks and visual corruption on Wayland while
+  retaining lossless image quality.
+
 - Client deployment now checks for unfinished USB installations before review.
   An installed computer awaiting its final check offers verification and a
   return to a fresh deployment review, preserving the selected computers.
