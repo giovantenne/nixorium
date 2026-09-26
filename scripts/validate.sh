@@ -243,7 +243,14 @@ profile_state() {
       desktopExtensionDefaults =
         pkgs.lib.hasInfix "ding@rastersoft.com" config.services.desktopManager.gnome.extraGSettingsOverrides
         && pkgs.lib.hasInfix "dash-to-dock@micxgx.gmail.com" config.services.desktopManager.gnome.extraGSettingsOverrides
-        && pkgs.lib.hasInfix "dock-fixed=true" config.services.desktopManager.gnome.extraGSettingsOverrides;
+        && pkgs.lib.all (setting:
+          pkgs.lib.hasInfix setting config.services.desktopManager.gnome.extraGSettingsOverrides
+        ) [
+          "dock-fixed=false"
+          "autohide=true"
+          "intellihide=true"
+          "intellihide-mode='"'"'ALL_WINDOWS'"'"'"
+        ];
       desktopExtensionRepair =
         pkgs.lib.hasInfix "gnome-extensions enable \"ding@rastersoft.com\""
           config.environment.etc."lab/gnome-user-setup.sh".text
