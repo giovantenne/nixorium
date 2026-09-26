@@ -1,0 +1,47 @@
+Subject: [PATCH] VncConnection: keep RGB32 framebuffer pixels opaque
+
+RFB padding bytes are unspecified, whereas Qt RGB32 requires 0xff in the
+high byte. ZRLE updates can leave arbitrary padding behind, producing
+transparent blocks when the remote access widget is painted on Wayland.
+Initialize opaque black and normalize each updated rectangle before Qt
+receives its update notification. RGB channels and encoding stay unchanged.
+
+--- a/core/src/VncConnection.cpp
++++ b/core/src/VncConnection.cpp
+@@ -27,6 +27,7 @@
+ 
+ #include <rfb/rfbclient.h>
+ 
++#include <algorithm>
+ #include <cstdio>
+ 
+ #include <QBitmap>
+@@ -62,6 +63,19 @@
+ 	auto connection = static_cast<VncConnection *>( clientData( client, VncConnectionTag ) );
+ 	if( connection )
+ 	{
++		// RFB's fourth byte is padding, not alpha. Decoders such as ZRLE
++		// leave it unspecified, but QImage::Format_RGB32 requires 0xff.
++		// Normalize before notifying the painter, otherwise Wayland can
++		// composite arbitrary transparency into the remote desktop.
++		const auto rect = QRect(x, y, w, h).intersected(QRect(0, 0, client->width, client->height));
++		for (int row = rect.top(); row <= rect.bottom(); ++row)
++		{
++			auto* pixels = reinterpret_cast<QRgb*>(client->frameBuffer) + row * client->width + rect.left();
++			for (int column = 0; column < rect.width(); ++column)
++			{
++				pixels[column] |= 0xff000000U;
++			}
++		}
+ 		Q_EMIT connection->imageUpdated( x, y, w, h );
+ 	}
+ }
+@@ -742,7 +756,7 @@
+ 
+ 	m_client->frameBuffer = reinterpret_cast<uint8_t *>(new RfbPixel[pixelCount]);
+ 
+-	memset(m_client->frameBuffer, '\0', pixelCount*RfbBytesPerPixel);
++	std::fill_n(reinterpret_cast<QRgb*>(m_client->frameBuffer), pixelCount, qRgb(0, 0, 0));
+ 
+ 	// initialize framebuffer image which just wraps the allocated memory and ensures cleanup after last
+ 	// image copy using the framebuffer gets destroyed

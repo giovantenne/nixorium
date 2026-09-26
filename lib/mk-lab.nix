@@ -118,9 +118,11 @@ let
     # release explicitly so the official flake also sets both CI tag variables.
     veyon = (prev.makeVeyon { version = "4.11.3"; }).overrideAttrs (oldAttrs: {
       buildInputs = (oldAttrs.buildInputs or []) ++ [ final.pipewire ];
-      # Upstream 22218d7 (2026-09-25), pending the next Veyon release.
       patches = (oldAttrs.patches or []) ++ [
+        # Upstream 22218d7 (2026-09-25), pending the next Veyon release.
         ../pkgs/patches/veyon-persist-restore-token.patch
+        # Local fix for RGB32 padding exposed by Qt Wayland rendering.
+        ../pkgs/patches/veyon-opaque-framebuffer.patch
       ];
       postPatch = (oldAttrs.postPatch or "") + ''
         # Veyon 4.11.1 sanitizes child PATH to FHS locations. Keep its fixed,
