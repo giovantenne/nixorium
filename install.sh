@@ -22,7 +22,23 @@ BOOTSTRAP_ADMIN_HASH=""
 BOOTSTRAP_TEACHER_HASH=""
 BOOTSTRAP_STUDENT_HASH=""
 BOOTSTRAP_INPUT_FD=""
-UI_RULE="----------------------------------------------------------------------"
+UI_RULE="--------------------------------------------------------"
+UI_RESET=""
+UI_BOLD=""
+UI_TITLE=""
+UI_FOCUS=""
+UI_SUCCESS=""
+UI_WARNING=""
+
+# Keep redirected output and limited terminals readable without ANSI escapes.
+if [[ -t 1 && "${TERM:-dumb}" != "dumb" && -z "${NO_COLOR:-}" ]]; then
+  UI_RESET=$'\033[0m'
+  UI_BOLD=$'\033[1m'
+  UI_TITLE=$'\033[1;35m'
+  UI_FOCUS=$'\033[36m'
+  UI_SUCCESS=$'\033[32m'
+  UI_WARNING=$'\033[33m'
+fi
 
 # Keep bootstrap downloads independent from any cache configured in the live environment.
 export NIX_CONFIG=$'experimental-features = nix-command flakes\nsubstituters = https://cache.nixos.org/\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
@@ -33,29 +49,31 @@ usage() {
 }
 
 ui_banner() {
+  printf '\n%s' "$UI_TITLE"
   cat <<'EOF'
-
- _   _ _                 _
-| \ | (_)_  _____  _ __(_)_   _ _ __ ___
-|  \| | \ \/ / _ \| '__| | | | | '_ ` _ \
-| |\  | |>  < (_) | |  | | |_| | | | | | |
-|_| \_|_/_/\_\___/|_|  |_|\__,_|_| |_| |_|
-
-             NixOS lab controller bootstrap
+   _   _ _                 _
+  | \ | (_)_  _____  _ __(_)_   _ _ __ ___
+  |  \| | \ \/ / _ \| '__| | | | | '_ ` _ \
+  | |\  | |>  < (_) | |  | | |_| | | | | | |
+  |_| \_|_/_/\_\___/|_|  |_|\__,_|_| |_| |_|
 EOF
+  printf '%s\n' "$UI_RESET"
+  ui_note "NixOS lab controller bootstrap"
+  printf '\n'
+  ui_note "Welcome. Let's set up your controller."
 }
 
 ui_section() {
   local TITLE="$1"
-  printf '\n%s\n  %s\n%s\n\n' "$UI_RULE" "$TITLE" "$UI_RULE"
+  printf '\n  %s%s%s\n  %s\n\n' "$UI_TITLE" "$TITLE" "$UI_RESET" "$UI_RULE"
 }
 
 ui_log() {
-  printf '  [....] %s\n' "$1"
+  printf '  %s[....]%s %s\n' "$UI_FOCUS" "$UI_RESET" "$1"
 }
 
 ui_success() {
-  printf '  [ OK ] %s\n' "$1"
+  printf '  %s[ OK ]%s %s\n' "$UI_SUCCESS" "$UI_RESET" "$1"
 }
 
 ui_note() {
@@ -63,7 +81,23 @@ ui_note() {
 }
 
 ui_feedback() {
-  printf '  ! %s\n' "$1"
+  printf '  %s!%s %s\n' "$UI_WARNING" "$UI_RESET" "$1"
+}
+
+ui_detail() {
+  local LABEL="$1"
+  local VALUE="$2"
+  printf '    %-14s %s%s%s\n' "${LABEL}:" "$UI_BOLD" "$VALUE" "$UI_RESET"
+}
+
+ui_prompt() {
+  local LABEL="$1"
+  local DEFAULT_VALUE="${2:-}"
+  printf '  %s>%s %s%s%s' "$UI_FOCUS" "$UI_RESET" "$UI_BOLD" "$LABEL" "$UI_RESET"
+  if [[ -n "$DEFAULT_VALUE" ]]; then
+    printf ' [%s]' "$DEFAULT_VALUE"
+  fi
+  printf ': '
 }
 
 prompt_bootstrap_value() {
@@ -72,7 +106,7 @@ prompt_bootstrap_value() {
   local TARGET_VAR="$3"
   local READ_VALUE
 
-  printf '  > %s [%s]: ' "$LABEL" "$DEFAULT_VALUE"
+  ui_prompt "$LABEL" "$DEFAULT_VALUE"
   if ! IFS= read -r -u "$BOOTSTRAP_INPUT_FD" READ_VALUE; then
     echo >&2
     echo "Error: controller setup input ended before configuration was complete." >&2
@@ -135,7 +169,7 @@ prompt_bootstrap_password() {
   local LC_ALL=C
 
   while true; do
-    printf '  > %s: ' "$LABEL"
+    ui_prompt "$LABEL"
     if ! IFS= read -r -s -u "$BOOTSTRAP_INPUT_FD" PASSWORD; then
       echo >&2
       echo "Error: controller setup input ended before configuration was complete." >&2
@@ -151,7 +185,7 @@ prompt_bootstrap_password() {
       ui_feedback "Password must contain at least 8 bytes."
       continue
     fi
-    printf '  > Confirm %s: ' "${LABEL,,}"
+    ui_prompt "Confirm ${LABEL,,}"
     if ! IFS= read -r -s -u "$BOOTSTRAP_INPUT_FD" CONFIRMATION; then
       echo >&2
       echo "Error: controller setup input ended before configuration was complete." >&2
@@ -203,14 +237,16 @@ collect_bootstrap_configuration() {
   fi
   exec {BOOTSTRAP_INPUT_FD}< "$BOOTSTRAP_TTY"
 
-  ui_section "CONTROLLER SETUP"
+  ui_section "Controller setup"
   ui_note "Recommended environment: official NixOS Minimal ISO in UEFI mode."
-  ui_note "Configure regional settings first, then accounts and passwords."
-  ui_note "The administrator account name is fixed as 'admin'."
+  ui_note "First, your keyboard and time zone. Then, accounts and passwords."
+  echo
+  ui_note "Enter keeps the value in brackets. Ctrl+C stops setup."
 
-  ui_section "1 / 4  REGIONAL SETTINGS"
+  ui_section "1 / 4  Regional settings"
+  ui_note "Keyboard choices: us, it, gb, fr, de, es"
+  echo
   while true; do
-    ui_note "Keyboard choices: us, it, gb, fr, de, es"
     if ! prompt_bootstrap_value "Keyboard layout" "$BOOTSTRAP_KEYBOARD" BOOTSTRAP_KEYBOARD; then
       return 1
     fi
@@ -239,30 +275,35 @@ collect_bootstrap_configuration() {
     ui_feedback "Choose an installed IANA time zone such as America/New_York or Europe/Rome."
   done
 
-  ui_section "2 / 4  ACCOUNTS"
+  ui_section "2 / 4  Accounts"
+  ui_note "The administrator account name is fixed as 'admin'."
+  echo
   prompt_bootstrap_user "Teacher username" "$BOOTSTRAP_TEACHER_USER" "" BOOTSTRAP_TEACHER_USER
   echo
   prompt_bootstrap_user "Student username" "$BOOTSTRAP_STUDENT_USER" "$BOOTSTRAP_TEACHER_USER" BOOTSTRAP_STUDENT_USER
 
-  ui_section "3 / 4  PASSWORDS"
+  ui_section "3 / 4  Passwords"
   ui_note "Each password must contain at least 8 bytes. Input remains hidden."
+  echo
   prompt_bootstrap_password "Administrator password" BOOTSTRAP_ADMIN_HASH
   echo
   prompt_bootstrap_password "Teacher password" BOOTSTRAP_TEACHER_HASH
   echo
   prompt_bootstrap_password "Student password" BOOTSTRAP_STUDENT_HASH
 
-  ui_section "4 / 4  REVIEW"
-  echo "  Administrator: admin"
-  echo "  Teacher:       $BOOTSTRAP_TEACHER_USER"
-  echo "  Student:       $BOOTSTRAP_STUDENT_USER"
-  echo "  Time zone:     $BOOTSTRAP_TIME_ZONE"
-  echo "  Keyboard:      $BOOTSTRAP_KEYBOARD"
-  echo "  Passwords:     set locally and hidden"
-  echo "  Client setup:  available later from Nixorium"
+  ui_section "4 / 4  Review"
+  ui_detail "Administrator" "admin"
+  ui_detail "Teacher" "$BOOTSTRAP_TEACHER_USER"
+  ui_detail "Student" "$BOOTSTRAP_STUDENT_USER"
+  echo
+  ui_detail "Time zone" "$BOOTSTRAP_TIME_ZONE"
+  ui_detail "Keyboard" "$BOOTSTRAP_KEYBOARD"
+  echo
+  ui_note "Passwords are set locally and hidden."
+  ui_note "Client setup is available later from Nixorium."
   echo
   while true; do
-    printf '  > Continue with these settings? [Y/n]: '
+    ui_prompt "Continue with these settings?" "Y/n"
     if ! IFS= read -r -u "$BOOTSTRAP_INPUT_FD" CONFIRMATION; then
       echo >&2
       echo "Error: controller setup input ended before configuration was complete." >&2
@@ -342,8 +383,8 @@ choose_release() {
   local -a AVAILABLE_RELEASES=("master")
   local -a STABLE_RELEASES=()
 
-  printf '\n%s\n  VERSION\n%s\n\n' "$UI_RULE" "$UI_RULE" >&3
-  printf '  [....] Fetching published Nixorium releases...\n' >&3
+  ui_section "Version" >&3
+  ui_log "Fetching published Nixorium releases..." >&3
   if API_RESPONSE="$(curl -fsSL "$RELEASES_API_URL")"; then
     API_SUCCEEDED=true
     while IFS= read -r TAG; do
@@ -363,7 +404,7 @@ choose_release() {
         sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\(v[^"]*\)",*$/\1/p'
     )
   else
-    echo "Warning: could not retrieve the GitHub release list." >&3
+    ui_feedback "Could not retrieve the GitHub release list." >&3
   fi
 
   if [[ -n "$LATEST_PRERELEASE" ]]; then
@@ -396,7 +437,8 @@ choose_release() {
   fi
 
   echo >&3
-  echo "  Select a Nixorium version:" >&3
+  ui_note "Select a Nixorium version:" >&3
+  echo >&3
   for INDEX in "${!AVAILABLE_RELEASES[@]}"; do
     TAG="${AVAILABLE_RELEASES[$INDEX]}"
     if [[ "$TAG" == "master" ]]; then
@@ -409,11 +451,14 @@ choose_release() {
     if [[ "$TAG" == "$MENU_DEFAULT" ]]; then
       LABEL="${LABEL}, default"
     fi
-    printf '  %d) %s (%s)\n' "$((INDEX + 1))" "$TAG" "$LABEL" >&3
+    printf '  %s%2d)%s %-22s %s\n' "$UI_FOCUS" "$((INDEX + 1))" "$UI_RESET" "$TAG" "$LABEL" >&3
   done
 
+  echo >&3
+  ui_note "Type a number, or press Enter to keep ${MENU_DEFAULT}." >&3
+  echo >&3
   while true; do
-    printf '  > Version [%s]: ' "$MENU_DEFAULT" >&3
+    ui_prompt "Version" "$MENU_DEFAULT" >&3
     IFS= read -r CHOICE <&3
 
     if [[ -z "$CHOICE" ]]; then
@@ -428,10 +473,10 @@ choose_release() {
       fi
     fi
 
-    echo "  ! Invalid selection. Enter a number from 1 to ${#AVAILABLE_RELEASES[@]}, or press Enter for ${MENU_DEFAULT}." >&3
+    ui_feedback "Enter a number from 1 to ${#AVAILABLE_RELEASES[@]}, or press Enter for ${MENU_DEFAULT}." >&3
   done
 
-  echo "  [ OK ] Selected ${RELEASE}." >&3
+  ui_success "Selected ${RELEASE}." >&3
   echo >&3
 }
 
@@ -501,7 +546,7 @@ if [[ "$TARGET_ROOT" != /* || "$TARGET_ROOT" == "/" ]]; then
 fi
 
 COMMIT_API_URL="https://api.github.com/repos/${REPOSITORY}/commits/${RELEASE}"
-ui_section "BOOTSTRAP LOG"
+ui_section "Getting started"
 ui_log "Resolving ${RELEASE} to one immutable revision..."
 if ! COMMIT_RESPONSE="$(curl -fsSL "$COMMIT_API_URL")"; then
   echo "Error: could not resolve ${RELEASE} to an immutable GitHub revision." >&2
@@ -571,7 +616,7 @@ else
   )
 fi
 
-ui_section "PREPARATION LOG"
+ui_section "Preparing your controller"
 ui_success "Configuration collected."
 ui_log "Downloading the pinned installer and deployment sources..."
 ui_log "Preparing Nixorium ${RELEASE} at ${UPSTREAM_REV}..."
@@ -600,7 +645,7 @@ curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
     fi
     # shellcheck source=/dev/null
     source "$PROFILE_HELPER"
-    ui_section "SOFTWARE PROFILE"
+    ui_section "Software profile"
     configure_site_software_profile software-presets.json lab-software.json "$BOOTSTRAP_INPUT_FD"
   fi
   "${GIT_COMMAND[@]}" init -b master
@@ -629,7 +674,7 @@ if [[ -n "$INSTALL_DISK" ]]; then
   INSTALLER_ARGS+=("$INSTALL_DISK")
 fi
 
-ui_section "INSTALLATION LOG"
+ui_section "Installing your controller"
 ui_log "Installing the controller from the generated private deployment..."
 ui_note "Wait for the final bootstrap completion message before rebooting."
 FLAKE_REF="path:${TEMP_DEPLOYMENT}" \
@@ -670,8 +715,12 @@ sudo install -d -m 0700 "$DEPLOYMENT_TARGET"
 sudo cp -a "${TEMP_DEPLOYMENT}/." "${DEPLOYMENT_TARGET}/"
 sudo chown -R "$ADMIN_OWNER" "$DEPLOYMENT_TARGET"
 
-ui_section "COMPLETE"
+ui_section "All done"
 ui_success "Installation complete."
+echo
 ui_note "After reboot, the deployment repository will be available at:"
-ui_note "~/${DEPLOYMENT_NAME}"
+ui_note "  ~/${DEPLOYMENT_NAME}"
+echo
 ui_note "Reboot with: reboot"
+ui_note "Then sign in as admin and open Nixorium with: nixorium"
+echo

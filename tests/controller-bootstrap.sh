@@ -148,7 +148,7 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
 fi
 grep -F "cannot be verified safely from a graphical terminal" \
   "${TEST_ROOT}/graphical.out" >/dev/null
-if grep -F "3 / 4  PASSWORDS" "${TEST_ROOT}/graphical.out" >/dev/null; then
+if grep -F "3 / 4  Passwords" "${TEST_ROOT}/graphical.out" >/dev/null; then
   echo "bootstrap requested passwords in an unverified graphical layout" >&2
   exit 1
 fi
@@ -178,7 +178,7 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
 fi
 grep -F "could not activate console keymap 'it2'" \
   "${TEST_ROOT}/keymap-failure.out" >/dev/null
-if grep -F "3 / 4  PASSWORDS" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
+if grep -F "3 / 4  Passwords" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
   grep -F "mkpasswd" "$CALL_LOG" >/dev/null; then
   echo "bootstrap requested or hashed a password before keyboard activation" >&2
   exit 1
@@ -242,14 +242,14 @@ grep -F "Recommended environment: official NixOS Minimal ISO in UEFI mode." \
   "${TEST_ROOT}/install.out" >/dev/null
 for UI_TEXT in \
   "NixOS lab controller bootstrap" \
-  "CONTROLLER SETUP" \
-  "1 / 4  REGIONAL SETTINGS" \
-  "2 / 4  ACCOUNTS" \
-  "3 / 4  PASSWORDS" \
-  "4 / 4  REVIEW" \
-  "PREPARATION LOG" \
-  "INSTALLATION LOG" \
-  "COMPLETE"; do
+  "Controller setup" \
+  "1 / 4  Regional settings" \
+  "2 / 4  Accounts" \
+  "3 / 4  Passwords" \
+  "4 / 4  Review" \
+  "Preparing your controller" \
+  "Installing your controller" \
+  "All done"; do
   grep -F "$UI_TEXT" "${TEST_ROOT}/install.out" >/dev/null
 done
 grep -F "> Keyboard layout" "${TEST_ROOT}/install.out" >/dev/null
