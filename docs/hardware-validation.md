@@ -14,6 +14,12 @@ a disk containing data that must be retained.
 
 ## Reported deployments and compatibility evidence
 
+The maintainer confirms that Nixorium has been successfully deployed in a
+laboratory with **30 clients and one controller** (31 machines). The release,
+hardware inventory, and per-scenario evidence for this deployment have not been
+recorded here; the confirmation does not mark the individual validation
+scenarios below as passed.
+
 | Deployment | Evidence | What it establishes |
 |---|---|---|
 | Original Italian school lab: 30 student workstations + 1 controller (31 machines) | Maintainer's public post and [adapted account](https://nixorium.org/case-study/original-classroom/) | The author's original operating experience; not independent validation or a current-release test |
@@ -67,6 +73,12 @@ Use one controller and at least two disposable client VMs.
   at least 20 GiB. Vary the emulated NIC or storage controller where practical.
 - Take hypervisor snapshots only as test-fixture recovery. Product pass/fail
   must be determined from Nixorium and guest state, not snapshot rollback.
+
+**Reported limitation:** PXE boot problems have been observed in VirtualBox
+when the host is connected to the network over Wi-Fi instead of wired
+Ethernet. Use a wired Ethernet connection when bridging VMs to the physical
+laboratory network. This observation does not establish a failure of the
+isolated Internal Network recipe.
 
 Record the VirtualBox version and exact adapter/network modes. If the built-in
 PXE firmware cannot interoperate with ProxyDHCP, record that limitation and use
