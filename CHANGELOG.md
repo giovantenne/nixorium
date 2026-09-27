@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-27
+
 ### Added
 
 - Administrators can block or restore client Internet access from Computers →
@@ -890,7 +892,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.5...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.5...v2.0.0
 [2.0.0-beta.5]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.4...v2.0.0-beta.5
 [2.0.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.3...v2.0.0-beta.4
 [2.0.0-beta.3]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.2...v2.0.0-beta.3
