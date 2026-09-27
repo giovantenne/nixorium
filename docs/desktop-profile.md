@@ -4,7 +4,9 @@ The deployment-owned workstation module supplies a restrained GNOME 50 profile:
 
 - Native dark Adwaita decorations with blue accents, plus MoreWaita application
   and MIME icons. GTK 4 applications retain their supported native styling.
-- A static vector background without animation or blur.
+- A static blue vector background for administrator and teacher accounts;
+  reset student homes select one deployment-owned background at random on each
+  boot, without animation or blur.
 - A compact bottom Dash to Dock with 40 px icons, no full-width panel,
   and no duplicate trash or removable-drive entries. It hides when any window
   overlaps its area and reappears at the bottom edge; a clear desktop keeps it visible.
@@ -44,8 +46,10 @@ extensions. It migrates the specific appearance keys once and records
 are no new dconf locks or complete-database resets. A separate
 `~/.config/nixorium/desktop-dock-v1` migration changes only the four dock visibility
 keys, including for accounts that already completed the appearance migration.
-Later dock preferences remain editable. Student defaults return
-with the ordinary home reset, rather than modifying a live student's files.
+Later dock preferences remain editable. Student defaults return with the
+ordinary home reset, including a fresh random choice from the deployment's
+backgrounds. The login migration preserves that choice rather than replacing
+it with the staff wallpaper or modifying a live student's files.
 
 Run the optional `desktop-profile` check from `tests/source-checks.nix` for
 strict GSettings compilation, extension compatibility and login-script syntax.

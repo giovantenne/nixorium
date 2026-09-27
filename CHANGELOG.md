@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The student login setup now preserves the random deployment-owned wallpaper
+  selected during the boot-time home reset. The static blue wallpaper remains
+  the default for the persistent administrator and teacher accounts.
+
 ## [2.0.0] - 2026-09-27
 
 ### Added

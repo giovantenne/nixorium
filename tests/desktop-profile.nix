@@ -19,7 +19,9 @@ in
 pkgs.runCommand "nixorium-desktop-profile-check" {
   nativeBuildInputs = [ pkgs.glib pkgs.jq pkgs.bash ];
 } ''
-  export GSETTINGS_BACKEND=memory
+  export GSETTINGS_BACKEND=keyfile
+  export XDG_CONFIG_HOME="$TMPDIR/config"
+  mkdir -p "$XDG_CONFIG_HOME"
   export GSETTINGS_SCHEMA_DIR=${schemas}/share/gsettings-schemas/nixos-gsettings-overrides/glib-2.0/schemas
   test "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'MoreWaita'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'BOTTOM'"
@@ -28,6 +30,16 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock intellihide)" = true
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock intellihide-mode)" = "'ALL_WINDOWS'"
   test "$(gsettings get org.gnome.shell.extensions.tiling-assistant window-gap)" = 8
+  source ${loginScript}
+  RANDOM_BACKGROUND="file:///etc/lab/backgrounds/random.jpg"
+  gsettings set org.gnome.desktop.background picture-uri "'$RANDOM_BACKGROUND'"
+  gsettings set org.gnome.desktop.background picture-uri-dark "'$RANDOM_BACKGROUND'"
+  apply_student_appearance
+  test "$(gsettings get org.gnome.desktop.background picture-uri)" = "'$RANDOM_BACKGROUND'"
+  test "$(gsettings get org.gnome.desktop.background picture-uri-dark)" = "'$RANDOM_BACKGROUND'"
+  apply_staff_appearance
+  test "$(gsettings get org.gnome.desktop.background picture-uri)" != "'$RANDOM_BACKGROUND'"
+  test "$(gsettings get org.gnome.desktop.background picture-uri-dark)" != "'$RANDOM_BACKGROUND'"
   ${pkgs.lib.concatMapStringsSep "\n" (extension: ''
     jq -e --arg version '${pkgs.lib.versions.major pkgs.gnome-shell.version}' \
       '."shell-version" | index($version) != null' \

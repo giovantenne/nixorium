@@ -318,15 +318,17 @@ Tiling Assistant are installed as workstation basics in every profile. The
 compact bottom dock hides when a window overlaps it and reappears at the bottom
 edge. It stays visible on a clear desktop. Desktop files appear on the desktop, and
 dragging a window to an edge offers an adjacent window with small 8 px gaps.
-MoreWaita icons complement native Adwaita decorations; blue accents and a static
-vector wallpaper keep the desktop coherent without blur effects or background
-polling services. Super+arrow window shortcuts remain available.
+MoreWaita icons complement native Adwaita decorations. Administrator and
+teacher accounts start with blue accents and a static vector wallpaper; every
+student home reset chooses one of `assets.backgrounds` at random. No blur or
+background polling service is used. Super+arrow window shortcuts remain available.
 
 The login helper enables the three required extensions without replacing other
 enabled extensions. A one-time migration applies only the managed appearance
 keys to existing accounts; staff may then customize them. The separate
 `desktop-dock-v1` migration updates only dock visibility for existing accounts. Student accounts
-receive the defaults again after their ordinary home reset. All assets and
+receive the defaults and a fresh random wallpaper after their ordinary home
+reset; the login helper preserves that wallpaper. All assets and
 extensions come from the locked Nix packages and work without login downloads.
 
 Pi and OpenCode have a reproducible system version available to every user. npm

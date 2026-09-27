@@ -72,12 +72,16 @@ let
       show-layout-panel-indicator = "false";
     };
   };
+  studentAppearanceSettings = builtins.removeAttrs appearanceSettings [
+    "org.gnome.desktop.background"
+  ];
   applySettings = settings: lib.concatStringsSep "\n" (lib.mapAttrsToList (schema: values:
     lib.concatStringsSep "\n" (lib.mapAttrsToList (key: value:
       "gsettings set ${lib.escapeShellArg schema} ${lib.escapeShellArg key} ${lib.escapeShellArg value}"
     ) values)
   ) settings);
-  applyAppearance = applySettings appearanceSettings;
+  applyStudentAppearance = applySettings studentAppearanceSettings;
+  applyStaffAppearance = applySettings appearanceSettings;
   applyDockVisibility = applySettings {
     "org.gnome.shell.extensions.dash-to-dock" = dockVisibilitySettings;
   };
@@ -215,30 +219,57 @@ in
       #!/usr/bin/env bash
       set -euo pipefail
 
-      case "''${USER:-}" in
-        ${labSettings.studentUser}) favorites=${lib.escapeShellArg (gvariantList studentFavorites)} ;;
-        admin|${labSettings.teacherUser}) favorites=${lib.escapeShellArg (gvariantList staffFavorites)} ;;
-        *) exit 0 ;;
-      esac
+      apply_student_appearance() {
+        ${applyStudentAppearance}
+      }
 
-      sleep 2
-      gsettings set org.gnome.shell favorite-apps "$favorites"
-      ${pkgs.gnome-shell}/bin/gnome-extensions enable "ding@rastersoft.com"
-      ${pkgs.gnome-shell}/bin/gnome-extensions enable "dash-to-dock@micxgx.gmail.com"
-      ${pkgs.gnome-shell}/bin/gnome-extensions enable "tiling-assistant@leleat-on-github"
-      STYLE_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-style-v1"
-      if [ ! -e "$STYLE_STATE" ]; then
-        ${applyAppearance}
-        mkdir -p "$(dirname "$STYLE_STATE")"
-        touch "$STYLE_STATE"
+      apply_staff_appearance() {
+        ${applyStaffAppearance}
+      }
+
+      main() {
+        local APPEARANCE_ROLE
+        local FAVORITES
+
+        case "''${USER:-}" in
+          ${labSettings.studentUser})
+            APPEARANCE_ROLE=student
+            FAVORITES=${lib.escapeShellArg (gvariantList studentFavorites)}
+            ;;
+          admin|${labSettings.teacherUser})
+            APPEARANCE_ROLE=staff
+            FAVORITES=${lib.escapeShellArg (gvariantList staffFavorites)}
+            ;;
+          *) exit 0 ;;
+        esac
+
+        sleep 2
+        gsettings set org.gnome.shell favorite-apps "$FAVORITES"
+        ${pkgs.gnome-shell}/bin/gnome-extensions enable "ding@rastersoft.com"
+        ${pkgs.gnome-shell}/bin/gnome-extensions enable "dash-to-dock@micxgx.gmail.com"
+        ${pkgs.gnome-shell}/bin/gnome-extensions enable "tiling-assistant@leleat-on-github"
+        STYLE_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-style-v1"
+        if [ ! -e "$STYLE_STATE" ]; then
+          if [[ "$APPEARANCE_ROLE" == student ]]; then
+            apply_student_appearance
+          else
+            apply_staff_appearance
+          fi
+          mkdir -p "$(dirname "$STYLE_STATE")"
+          touch "$STYLE_STATE"
+        fi
+        DOCK_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-dock-v1"
+        if [ ! -e "$DOCK_STATE" ]; then
+          ${applyDockVisibility}
+          mkdir -p "$(dirname "$DOCK_STATE")"
+          touch "$DOCK_STATE"
+        fi
+        gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
+      }
+
+      if [[ "''${BASH_SOURCE[0]}" == "$0" ]]; then
+        main "$@"
       fi
-      DOCK_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-dock-v1"
-      if [ ! -e "$DOCK_STATE" ]; then
-        ${applyDockVisibility}
-        mkdir -p "$(dirname "$DOCK_STATE")"
-        touch "$DOCK_STATE"
-      fi
-      gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
     '';
     mode = "0755";
   };
