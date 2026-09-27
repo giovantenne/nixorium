@@ -13,11 +13,10 @@ Internet access for installation or system deployment.
 [Sponsor](https://github.com/sponsors/giovantenne) ·
 [Releases](https://github.com/giovantenne/nixorium/releases)
 
-> **Status: beta.** The current development line is intended for evaluation and
-> hardware testing. [VERSION](VERSION) identifies this checkout;
-> [Releases](https://github.com/giovantenne/nixorium/releases) distinguishes
-> prereleases from the previous stable line. `master` may contain unreleased
-> changes: consult documentation at your selected release tag.
+> [VERSION](VERSION) identifies this checkout. Published versions and their
+> release status are listed on [Releases](https://github.com/giovantenne/nixorium/releases).
+> `master` may contain unreleased changes: consult documentation at your
+> selected release tag.
 
 Learn what Nixorium is designed for and how it is used in a lab:
 [nixorium.org](https://nixorium.org/).
@@ -116,8 +115,8 @@ curl -fsSL https://nixorium.org/install.sh | bash
 ```
 
 The command downloads and executes the public [bootstrap script](install.sh);
-inspect it first if required by your local policy. Select a published beta to
-evaluate the current workflow, rather than the moving `master` branch. Follow
+inspect it first if required by your local policy. Select a published release
+rather than the moving `master` branch. Follow
 the prompts for regional settings, accounts, passwords, the initial software
 profile, and the controller disk. The software choice is reviewed after the
 account settings and before any disk change. Bootstrap installs the complete
