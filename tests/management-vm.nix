@@ -57,6 +57,7 @@ in
         pkgs.bash
         pkgs.colmena
         pkgs.coreutils
+        pkgs.diffutils
         pkgs.git
         pkgs.gnugrep
         pkgs.iproute2
@@ -609,7 +610,7 @@ in
     controller.succeed("before=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh /tmp/deployment/veyon-private-key.pem); nixorium setup keys --repo /tmp/deployment --json >/dev/null; after=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh /tmp/deployment/veyon-private-key.pem); test \"$before\" = \"$after\"")
     controller.succeed("git -C /tmp/deployment add keys && git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm keys")
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
-    controller.succeed("cp /tmp/deployment/admin-ssh /tmp/existing-admin-key; chmod 0600 /tmp/existing-admin-key; sha256sum /tmp/existing-admin-key > /tmp/existing-admin-key.sha256; rm /tmp/deployment/admin-ssh /tmp/deployment/keys/admin-ssh.pub; ((sleep 8; printf a; sleep 1; printf e; sleep 4; printf k; sleep 4; printf j; printf i; sleep 1; printf '/tmp/existing-admin-key\\r'; sleep 6; printf '\\r'; sleep 6) | TERM=xterm timeout 35s script -qefc 'stty rows 40 cols 120; nixorium --repo /tmp/deployment' /tmp/nixorium-key-import-tui.log) || test $? = 124")
+    controller.succeed("cp /tmp/deployment/admin-ssh /tmp/existing-admin-key; chmod 0600 /tmp/existing-admin-key; sha256sum /tmp/existing-admin-key > /tmp/existing-admin-key.sha256; rm /tmp/deployment/admin-ssh /tmp/deployment/keys/admin-ssh.pub; ((sleep 8; printf a; sleep 1; printf e; sleep 4; printf y; sleep 4; printf j; printf i; sleep 1; printf '/tmp/existing-admin-key\\r'; sleep 6; printf '\\r'; sleep 6) | TERM=xterm timeout 35s script -qefc 'stty rows 40 cols 120; nixorium --repo /tmp/deployment' /tmp/nixorium-key-import-tui.log) || test $? = 124")
     controller.succeed("sha256sum -c /tmp/existing-admin-key.sha256; cmp /tmp/existing-admin-key /tmp/deployment/admin-ssh; test \"$(stat -c '%a' /tmp/deployment/admin-ssh)\" = 600; nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'; ! git -C /tmp/deployment status --porcelain=v1 | grep -F 'keys/admin-ssh.pub'")
     controller.succeed("nixorium software catalog --repo /tmp/deployment --json > /tmp/software-catalog.json; jq -e '.operation == \"software-catalog\" and .state == \"ready\" and .managedFile == \"lab-software.json\" and (.catalog | length) == 2 and (.packages | length) == 0 and .groups.graphics == [\"pc01\"]' /tmp/software-catalog.json")
     controller.succeed("cp -a /tmp/deployment /tmp/preset-deployment; nixorium software presets --repo /tmp/preset-deployment --json > /tmp/software-presets.json; jq -e '.operation == \"software-presets\" and .state == \"ready\" and .catalog.defaultPreset == \"essential\" and .catalog.presets[0].packages == [\"gimp\",\"vlc\"] and (.fingerprint | startswith(\"sha256:\"))' /tmp/software-presets.json")
