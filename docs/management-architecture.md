@@ -489,6 +489,17 @@ No legacy migration workflow is in product scope because managed deployments
 are new; setup optimizes for `lab-settings.json` while preserving upstream
 standalone compatibility.
 
+The internal workspace application boundary adds a separate, declaration-only
+plan/save contract for `workspace-profile.json`; CLI/TUI wiring is not yet
+available. Review binds the normalized candidate and full resolved preparation
+metadata to the repository, Git revision/source, lock and original file identity.
+Absence of the file remains legacy mode, not an empty managed profile. Apply
+regenerates the review before checking its token, including unchanged proposals,
+and requires a locked snapshot recheck from its writer. Only the profile may be
+replaced. A successful result says `saved`, never active; an unconfirmed durable
+write is a recovery-required partial result. No commit, runtime opt-in, build,
+deployment or reset is implicit.
+
 ## Computer-installation state machine
 
 Installation is a resumable reconciliation, not a single `configured` flag.

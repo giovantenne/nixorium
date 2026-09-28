@@ -377,6 +377,14 @@ failure or timeout must block publication.
   JSON without writing it. Review consumers must also compose the deployment's
   `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base
   identity; resolved metadata by itself is not save authorization.
+- `internal/app/workspace.go` owns the declaration-only workspace review/save
+  contract. Bind review to the normalized candidate, complete resolved metadata,
+  base-file presence/content/mode, Git source, revision and pin. Always regenerate
+  review before saving, including unchanged proposals; stale tokens must not
+  become successful no-ops. The adapter must recheck the snapshot under the
+  deployment-root lock and replace only `workspace-profile.json`. Report saved,
+  conflict and unconfirmed durability distinctly, never inferred activation.
+  CLI/TUI wiring is separate; do not imply a command exists from this contract.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing
