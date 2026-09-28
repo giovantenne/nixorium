@@ -5,7 +5,11 @@ json:
 let
   fail = message: throw "workspace profile: ${message}";
   checkedJSON = if builtins.isString json && builtins.stringLength json <= 65536
-    then json else fail "expected JSON text of at most 65536 bytes";
+    then
+      # fromJSON accepts an initial BOM, but the Go JSON decoder does not.
+      if lib.hasPrefix (builtins.fromJSON ''"\uFEFF"'') json then fail "UTF-8 BOM is not supported"
+      else json
+    else fail "expected JSON text of at most 65536 bytes";
   raw = builtins.fromJSON checkedJSON;
   # Every colon outside a JSON string introduces one member. Comparing that
   # count with the parsed tree detects duplicate keys, including escaped names,

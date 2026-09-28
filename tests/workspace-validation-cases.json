@@ -9,6 +9,7 @@
     { "name": "escaped field", "json": "{\"schemaVersion\":1,\"desktop\":{\"color\\u0053cheme\":\"dark\",\"dock\":{\"position\":\"right\"}}}", "normalized": { "schemaVersion": 1, "desktop": { "colorScheme": "dark", "dock": { "position": "right" } } } }
   ],
   "invalid": [
+    { "name": "UTF-8 BOM", "json": "\ufeff{\"schemaVersion\":1}" },
     { "name": "missing version", "json": "{}" },
     { "name": "future version", "json": "{\"schemaVersion\":2}" },
     { "name": "string version", "json": "{\"schemaVersion\":\"1\"}" },
