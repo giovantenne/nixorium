@@ -131,6 +131,7 @@ run_full_checks() {
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-seed" \
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-seed-pinned" \
     "path:${REPO_ROOT}#checks.x86_64-linux.home-reset-filesystem-vm" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-reset-service-vm" \
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-offline" \
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-systems" \
     "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \

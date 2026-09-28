@@ -45,6 +45,41 @@ type resetAccount struct {
 // an administrator must inspect incomplete work before any subsequent attempt.
 func Reset(config Config) error { return runReset(config, copyTree) }
 
+// ResetConfigured is the fixed systemd entry point. The configuration must
+// resolve to an immutable store file below the root-controlled /etc tree.
+func ResetConfigured() error {
+	if os.Geteuid() != 0 {
+		return errors.New("reset requires root")
+	}
+	if err := trustedDirectory("/etc"); err != nil {
+		return err
+	}
+	const configPath = "/etc/nixorium-workspace-reset.json"
+	info, err := os.Lstat(configPath)
+	if err != nil {
+		return err
+	}
+	if info.Sys().(*syscall.Stat_t).Uid != 0 {
+		return errors.New("reset configuration is not root-owned")
+	}
+	resolved, err := filepath.EvalSymlinks(configPath)
+	if err != nil {
+		return err
+	}
+	if err := immutableStoreFile(resolved); err != nil {
+		return err
+	}
+	data, err := readBounded(resolved, 128*1024)
+	if err != nil {
+		return err
+	}
+	var config Config
+	if err := decodeStrict(data, &config); err != nil {
+		return err
+	}
+	return Reset(config)
+}
+
 func runReset(config Config, restore func(string, string, int, int) error) error {
 	account, err := preflight(config)
 	if err != nil {
@@ -286,6 +321,9 @@ func privateDirectory(name string, mode os.FileMode, gid int) error {
 		if err := os.Chown(name, 0, gid); err != nil {
 			return err
 		}
+		if err := os.Chmod(name, mode); err != nil {
+			return err
+		}
 	} else if !errors.Is(err, os.ErrExist) {
 		return err
 	}
@@ -340,7 +378,7 @@ func loginBarrier(config Config, uid int) error {
 		return errors.New("untrusted login barrier")
 	}
 	for _, unit := range []string{"systemd-user-sessions.service", "display-manager.service"} {
-		output, err := exec.Command(config.Systemctl, "show", "--property=ActiveState", "--value", unit).Output()
+		output, err := commandOutput(config.Systemctl, "show", "--property=ActiveState", "--value", unit)
 		if err != nil {
 			return errors.New("cannot establish login service state")
 		}
@@ -439,7 +477,7 @@ func inspectSnapshots(config Config) error {
 		}); err != nil {
 			return err
 		}
-		output, err := exec.Command(config.Btrfs, "property", "get", "-ts", name, "ro").Output()
+		output, err := commandOutput(config.Btrfs, "property", "get", "-ts", name, "ro")
 		if err != nil || strings.TrimSpace(string(output)) != "ro=true" {
 			return errors.New("managed snapshot is not read-only")
 		}
@@ -550,11 +588,15 @@ func syncFilesystem(name string) error {
 }
 
 func command(binary string, args ...string) error {
-	cmd := exec.Command(binary, args...)
-	cmd.Env = []string{"LANG=C", "LC_ALL=C"}
-	output, err := cmd.CombinedOutput()
+	output, err := commandOutput(binary, args...)
 	if err != nil {
 		return fmt.Errorf("%s failed: %w: %s", filepath.Base(binary), err, strings.TrimSpace(string(output)))
 	}
 	return nil
+}
+
+func commandOutput(binary string, args ...string) ([]byte, error) {
+	cmd := exec.Command(binary, args...)
+	cmd.Env = []string{"LANG=C", "LC_ALL=C"}
+	return cmd.CombinedOutput()
 }

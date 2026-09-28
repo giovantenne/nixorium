@@ -250,6 +250,16 @@ These are internal engine tests, not proof of systemd ordering, deployment
 activation, or legacy-path safety. Mount/lifecycle tests are explicitly disabled
 outside that fixture. The VM belongs to the full checkpoint, not the quick loop.
 
+The separate `workspace-reset-service-vm` check imports the internal service
+module in two minimal systems. It verifies successful boot ordering and the
+packaged helper's fixed root-only entry point, then performs real NixOS
+configuration switches while a student-owned process runs. Both a seed update
+and a transition from an active legacy reset preserve the process and session
+files. Retained failure evidence blocks the display-manager fixture and normal
+user sessions on reboot. This check uses a small login consumer, not GNOME;
+it does not establish complete `mkLab` or deployment-template integration.
+Run it through `tests/source-checks.nix`; it is also in the full checkpoint.
+
 After the automated milestone, follow the documented VirtualBox recipe with
 the official Minimal ISO. Keep that result separate from physical-hardware
 evidence; neither is replaced by a simulated NixOS VM pass.

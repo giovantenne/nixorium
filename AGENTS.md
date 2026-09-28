@@ -381,9 +381,14 @@ failure or timeout must block publication.
   publication; five read-only managed snapshots live separately from legacy
   snapshots. Durable pending evidence must block retries after failure and
   reboot. Never delete it automatically or treat a previous success receipt as
-  completion of a pending attempt. The engine is not a public command and the
-  legacy reset service does not use it. Systemd integration must prove the
-  login barrier and no-reset-on-rebuild behavior separately before activation.
+  completion of a pending attempt. The fixed root-only `nixorium-home-reset`
+  helper accepts no target arguments and reads only its store-backed system
+  configuration. The isolated `modules/workspace-reset.nix` service retains
+  the `home-reset` unit name, never restarts on switch, and gates both the
+  display manager and normal user sessions. Preserve manual-start refusal,
+  no automatic retry, and `X-OnlyManualStart` so first-time installation during
+  a rebuild also waits for boot. The module is not yet selected by `mkLab`;
+  preparation-only deployments and the legacy script remain unchanged.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
