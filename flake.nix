@@ -135,6 +135,7 @@
         softwareSchemaVersion = 1;
         softwarePresetSchemaVersion = 1;
         workspaceProfileSchemaVersion = 1;
+        workspaceCandidateVersion = 1;
         workspaceRuntimeVersion = 1;
         packageBase = {
           schemaVersion = 2;

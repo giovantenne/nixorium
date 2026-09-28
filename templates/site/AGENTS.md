@@ -44,6 +44,9 @@ configuration, software, home customization, diagnostics, and operations.
   `workspace-profile.example.json` is an inactive Essential starting proposal,
   not a migration result. Review unsupported legacy settings and private module
   conflicts explicitly; the supplied catalog does not install applications.
+  On supporting pins, `nixoriumResolveWorkspaceCandidate` can preview effective
+  values and destinations without writing a profile. Keep any local validation
+  hook in the review path; preview success is not permission to save or deploy.
 - Keep the direct `nixpkgs` input and
   `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together when present.
   Updating Nixorium must preserve that package-base lock node. Do not change

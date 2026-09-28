@@ -858,11 +858,16 @@ rec {
     managedFile = "workspace-profile.json";
     inherit studentUser;
   };
-  nixoriumValidateWorkspaceCandidate = rawJSON:
+  # Return the exact resolved proposal without replacing deployment files.
+  # Consumers must also invoke the public validation hook: a deployment may
+  # wrap that hook with additional local policy.
+  nixoriumResolveWorkspaceCandidate = rawJSON:
     assert builtins.isString rawJSON || throw "workspace candidate must be JSON text";
     let candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko veyon; }
       (args // { workspaceProfileJSON = rawJSON; });
-    in builtins.deepSeq candidate.nixoriumWorkspace true;
+    in builtins.deepSeq candidate.nixoriumWorkspace candidate.nixoriumWorkspace;
+  nixoriumValidateWorkspaceCandidate = rawJSON:
+    builtins.deepSeq (nixoriumResolveWorkspaceCandidate rawJSON) true;
 
   nixoriumSearchSoftwarePackages = softwarePackageTools.search;
   nixoriumResolveSoftwarePackage = softwarePackageTools.describe;

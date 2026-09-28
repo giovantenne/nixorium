@@ -327,6 +327,8 @@ boot on the controller and clients. Preparation alone preserves legacy homes;
 there is no workspace TUI command yet. The template includes an inactive
 Essential example and a [migration review](skills/nixorium-maintainer/references/student-home.md#review-a-migration);
 neither changes existing homes or selects VS Code implicitly.
+The candidate-resolution hook can preview effective settings and destinations
+without saving a profile; it does not build or activate them.
 
 From a checkout with Nix available, run the normal fast validation gate:
 

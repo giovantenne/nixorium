@@ -373,6 +373,10 @@ failure or timeout must block publication.
   Its deployment-owned catalog can prepare the first candidate on supporting
   pins; `workspace-profile.example.json` is inactive and must never become an
   implicit fallback. Keep that example compatible with Essential without VS Code.
+  `nixoriumResolveWorkspaceCandidate` returns the same metadata for raw candidate
+  JSON without writing it. Review consumers must also compose the deployment's
+  `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base
+  identity; resolved metadata by itself is not save authorization.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing

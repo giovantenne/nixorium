@@ -8,6 +8,10 @@ let
   };
   rejected = extra: !(builtins.tryEval (builtins.deepSeq (mkWorkspaceLab extra).nixoriumWorkspace true)).success;
   candidate = workspaceLab.nixoriumValidateWorkspaceCandidate;
+  resolveCandidate = workspaceLab.nixoriumResolveWorkspaceCandidate;
+  cleared = resolveCandidate ''{"schemaVersion":1,"desktop":{"favorites":[]}}'';
+  managedCandidate = workspaceRuntimeLab.nixoriumResolveWorkspaceCandidate
+    ''{"schemaVersion":1,"vscode":{"settings":{"editor.fontSize":19}}}'';
   scope = kind: {
     schemaVersion = 1;
     packages = [
@@ -46,6 +50,9 @@ assert legacyTemplate.legacyCompatible;
 assert templateLab.nixoriumWorkspace == null;
 assert templateLab.nixoriumValidateWorkspaceCandidate templateProfile;
 assert templateController.nixoriumValidateWorkspaceCandidate templateProfile;
+assert (templateLab.nixoriumResolveWorkspaceCandidate templateProfile).declared
+  == builtins.fromJSON templateProfile;
+assert !(templateLab.nixoriumResolveWorkspaceCandidate templateProfile).runtimeEnabled;
 assert templateManagedLab.nixoriumWorkspace.runtimeEnabled;
 assert !(templateManagedLab.nixoriumWorkspace.effective ? vscode);
 assert builtins.all (name:
@@ -86,6 +93,23 @@ assert builtins.all (name:
   == workspaceLab.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
 ) [ "pc99" "pc01" ];
 assert candidate ''{"schemaVersion":1,"desktop":{"favorites":[]}}'';
+assert cleared.declared.desktop.favorites == [];
+assert cleared.effective.desktop.favorites == [];
+assert cleared.effective.desktop.enableAnimations == false;
+assert cleared.targets == workspaceLab.nixoriumWorkspace.targets;
+assert cleared.catalog == workspaceLab.nixoriumWorkspace.catalog;
+assert cleared.studentUser == labConfig.studentUser;
+assert cleared.state == "prepared" && !cleared.runtimeEnabled && cleared.seed == null;
+assert cleared.extensions == [] && !(builtins.elem "vscode" cleared.requiredPackages);
+assert workspaceLab.nixoriumWorkspace.effective.desktop.favorites == [ "org.gnome.TextEditor.desktop" "code.desktop" ];
+assert managedCandidate.state == "prepared" && managedCandidate.runtimeEnabled;
+assert managedCandidate.effective.vscode.settings."editor.fontSize" == 19;
+assert managedCandidate.seed != workspaceRuntimeLab.nixoriumWorkspace.seed;
+assert builtins.all (raw: !(builtins.tryEval (resolveCandidate raw)).success) [
+  null ''{"schemaVersion":1,"schemaVersion":1}''
+  ''{"schemaVersion":1,"vscode":{"extensions":["missing.extension"]}}''
+];
+assert !(builtins.tryEval (absent.nixoriumResolveWorkspaceCandidate ''{"schemaVersion":1}'')).success;
 assert !(builtins.tryEval (candidate ''{"schemaVersion":1,"vscode":{"extensions":["missing.extension"]}}'')).success;
 assert !(builtins.tryEval (candidate ''{"schemaVersion":1,"schemaVersion":1}'')).success;
 assert !(builtins.tryEval (candidate null)).success;

@@ -462,6 +462,15 @@ or unresolved required packages fail preparation. No live hosts are contacted.
 `nixoriumValidateWorkspaceCandidate` accepts raw candidate JSON text and checks
 the same schema, catalog and all-host prerequisites without saving or deploying.
 The candidate hook does not qualify extension loading or mutate sessions.
+Pins exposing `lib.workspaceCandidateVersion` also provide
+`nixoriumResolveWorkspaceCandidate`, with the same raw JSON argument and core
+validation. It returns the candidate's complete preparation metadata, including
+declared/effective preferences, catalog, resolved versions, targets and runtime
+choice, without saving the candidate or changing current metadata. Consumers
+must still invoke `nixoriumValidateWorkspaceCandidate` to preserve any additional
+validation supplied by the deployment. Resolved metadata alone is not a review
+token or proof that the deployment stayed unchanged while evaluating; a save
+workflow must bind and recheck its source, pin, base file and exact candidate.
 Both profile text and catalog data travel through the offline installer. The
 template passes its catalog to supporting pins even before the first profile,
 so that hook can validate a candidate without creating an active file. It reads

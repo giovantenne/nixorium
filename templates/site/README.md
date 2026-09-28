@@ -237,6 +237,9 @@ Have an administrator inspect the journal and recovery data first. Snapshots
 are not backups. A `nixoriumWorkspace.state` of `prepared`, even with
 `runtimeEnabled = true`, is not evidence of deployment or a successful reset.
 There is no workspace CLI/TUI workflow yet.
+Supporting pins expose `nixoriumResolveWorkspaceCandidate` to preview a raw JSON
+proposal's effective values, versions and destinations without saving it. This
+complements, rather than replaces, the deployment's validation hook.
 Follow the [migration review](skills/nixorium-maintainer/references/student-home.md#review-a-migration)
 to identify supported settings, retained system policy and legacy behavior that
 the new seed cannot represent. Do not enable runtime while essential differences

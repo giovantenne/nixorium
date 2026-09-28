@@ -23,6 +23,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Added an inactive Essential workspace example, a deployment-owned starter
   catalog and an explicit migration review. New templates can validate a first
   candidate without activating it; older pins and existing homes stay unchanged.
+- Added a read-only workspace candidate-resolution hook for exact preference,
+  version and destination previews without temporarily saving a profile.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes

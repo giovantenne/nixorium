@@ -29,6 +29,10 @@ Some upstream pins expose `nixoriumWorkspace` and
 catalog/baseline preferences and prerequisites across the controller and all
 clients. Their `prepared` state is not an active-home receipt and there are no
 workspace CLI commands. Preparation-only pins do not seed homes.
+Where available, `nixoriumResolveWorkspaceCandidate` previews a raw candidate's
+effective settings, versions and destinations without writing it. Still run the
+deployment's validation hook, which may include additional local policy; a
+preview is neither a save token nor evidence that the source remained unchanged.
 Do not migrate a working deployment merely because these outputs exist. Check
 the actual pinned capabilities and keep configuration, preparation and live
 activation distinct. Workspace data and catalog contents can enter the public
