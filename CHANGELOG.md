@@ -61,6 +61,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Full and evaluation-only validation now use bounded groups of related checks,
+  with exact coverage validation and separate base/workspace API evaluators,
+  to avoid retaining every NixOS test graph in one memory-heavy process.
 - Home-reset services no longer restart automatically during system rebuilds,
   including managed/legacy transitions. Returning to legacy cannot bypass an
   incomplete managed reset. Staff preferences and controller login selection

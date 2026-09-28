@@ -81,6 +81,7 @@ bash scripts/sync-canonical-copies.sh --check
 test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md
 test -e .pi/skills/nixorium-developer/SKILL.md
+nix eval --file tests/validation-groups-test.nix --json | jq -e '. == true' >/dev/null
 
 run_quick_checks() {
   nix build \
@@ -100,16 +101,17 @@ run_quick_checks() {
 }
 
 run_mk_lab_check() {
-  nix build \
-    "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
-    --no-write-lock-file \
-    --no-link
+  local CHECK
+  for CHECK in mk-lab workspace-template workspace-preparation workspace-runtime workspace-candidate workspace-rejection; do
+    nix build "path:${REPO_ROOT}#checks.x86_64-linux.${CHECK}" \
+      --no-write-lock-file --no-link
+  done
 }
 
 eval_ci_group() {
   local SOURCE="$1"
   local GROUP="$2"
-  echo "Evaluating CI ${GROUP} outputs..."
+  echo "Evaluating ${GROUP} outputs..." >&2
   NIXORIUM_CI_SOURCE="$SOURCE" NIXORIUM_CI_GROUP="$GROUP" \
     NIXORIUM_CI_EVALUATOR="${REPO_ROOT}/tests/ci-eval.nix" \
     nix eval --impure --json --no-write-lock-file --expr '
@@ -117,33 +119,21 @@ eval_ci_group() {
         flake = builtins.getFlake ("path:" + builtins.getEnv "NIXORIUM_CI_SOURCE");
         groups = import (builtins.toPath (builtins.getEnv "NIXORIUM_CI_EVALUATOR")) { inherit flake; };
       in groups.${builtins.getEnv "NIXORIUM_CI_GROUP"}
-    ' >/dev/null
+    '
 }
 
 run_full_checks() {
-  nix build \
-    "path:${REPO_ROOT}#checks.x86_64-linux.config-schema" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.software-schema" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.software-preset-schema" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.desktop-profile" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-schema" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-resolution" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-seed" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-seed-pinned" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.home-reset-filesystem-vm" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-reset-service-vm" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-editor-vm" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-offline" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-systems" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.client-installer" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.remote-client-installer-vm" \
-    "path:${REPO_ROOT}#checks.x86_64-linux.management-vm" \
-    "path:${REPO_ROOT}#nixoriumOfflineCheck" \
-    --no-write-lock-file \
-    --no-link
+  local GROUP CHECK
+  local -a CHECKS OUTPUTS
+  while IFS= read -r GROUP; do
+    mapfile -t CHECKS < <(jq -r --arg group "$GROUP" '.[$group][]' <<<"$VALIDATION_GROUPS")
+    OUTPUTS=()
+    for CHECK in "${CHECKS[@]}"; do
+      OUTPUTS+=("path:${REPO_ROOT}#checks.x86_64-linux.${CHECK}")
+    done
+    echo "Building full ${GROUP} outputs..."
+    nix build "${OUTPUTS[@]}" --no-write-lock-file --no-link
+  done < <(jq -r 'keys[]' <<<"$VALIDATION_GROUPS")
 }
 
 case "$MODE" in
@@ -184,8 +174,11 @@ case "$MODE" in
     ;;
 esac
 
+VALIDATION_GROUPS=$(eval_ci_group "$REPO_ROOT" checkGroups)
 if [[ "${MODE}" == "--ci" ]]; then
-  eval_ci_group "$REPO_ROOT" checks
+  while IFS= read -r GROUP; do
+    eval_ci_group "$REPO_ROOT" "$GROUP" >/dev/null
+  done < <(jq -r 'keys[]' <<<"$VALIDATION_GROUPS")
 else
   bash scripts/check-agent-guidance.sh
   nix build --file "${REPO_ROOT}/tests/source-checks.nix" documentation-check --no-write-lock-file --no-link
@@ -193,7 +186,7 @@ else
 fi
 
 if [[ "${MODE}" == "--ci" ]]; then
-  eval_ci_group "$REPO_ROOT" systems
+  eval_ci_group "$REPO_ROOT" systems >/dev/null
 else
   LAB_META=$(nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file)
   CONTROLLER_NAME=$(jq -r .controller.name <<<"$LAB_META")
@@ -206,6 +199,7 @@ else
     "path:${REPO_ROOT}#remoteInstallerBundle" \
     "path:${REPO_ROOT}#pxeFirmware" \
     "path:${REPO_ROOT}#nixorium" \
+    "path:${REPO_ROOT}#nixoriumOfflineCheck" \
     --no-write-lock-file \
     --no-link
 fi
@@ -310,7 +304,7 @@ jq -e '
 cp "$TEMP_DIR/lab-software-profile.json" "$SITE_DIR/lab-software.json"
 
 if [[ "${MODE}" == "--ci" ]]; then
-  eval_ci_group "$SITE_DIR" template
+  eval_ci_group "$SITE_DIR" template >/dev/null
   echo "CI evaluation completed successfully."
   exit 0
 fi

@@ -71,7 +71,7 @@
         labConfig = (import ./lab-config.nix) // { deploymentMode = "controller"; pcCount = 0; };
         publicKeys = { cache = null; ssh = null; veyon = null; };
       };
-      workspaceIntegrationTest = import ./tests/workspace-mk-lab.nix {
+      workspaceIntegrationTests = import ./tests/workspace-mk-lab.nix {
         inherit mkWorkspaceLab workspaceLab;
         inherit workspaceRuntimeLab workspaceRuntimeControllerLab;
         labConfig = import ./lab-config.nix;
@@ -176,7 +176,22 @@
         workspace-resolution = assert workspaceResolutionTest; pkgs.runCommand "nixorium-workspace-resolution-test" {} ''
           touch "$out"
         '';
-        mk-lab = assert mkLabTest && workspaceIntegrationTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
+        mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
+          touch "$out"
+        '';
+        workspace-template = assert workspaceIntegrationTests.template; pkgs.runCommand "nixorium-workspace-template-test" {} ''
+          touch "$out"
+        '';
+        workspace-preparation = assert workspaceIntegrationTests.preparation; pkgs.runCommand "nixorium-workspace-preparation-test" {} ''
+          touch "$out"
+        '';
+        workspace-runtime = assert workspaceIntegrationTests.runtime; pkgs.runCommand "nixorium-workspace-runtime-test" {} ''
+          touch "$out"
+        '';
+        workspace-candidate = assert workspaceIntegrationTests.candidate; pkgs.runCommand "nixorium-workspace-candidate-test" {} ''
+          touch "$out"
+        '';
+        workspace-rejection = assert workspaceIntegrationTests.rejection; pkgs.runCommand "nixorium-workspace-rejection-test" {} ''
           touch "$out"
         '';
         workspace-offline = pkgs.runCommand "nixorium-workspace-offline-test" {} ''

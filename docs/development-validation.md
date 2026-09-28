@@ -67,8 +67,10 @@ through code scanning. These tools complement review of NixOS, shell,
 privilege, network, and credential boundaries; they do not prove that a
 deployment is secure.
 
-`--eval` adds the complete `checks.x86_64-linux.mk-lab` assertion graph. It is
-the normal escalation for Nix behavior that does not require booting a machine.
+`--eval` adds `checks.x86_64-linux.mk-lab` and the complete workspace API
+assertions (`workspace-template`, `workspace-preparation`, `workspace-runtime`,
+`workspace-candidate`, `workspace-rejection`) in separate evaluators. It is the
+normal escalation for Nix behavior that does not require booting a machine.
 Presentation-only Go refactors do not require a VM when focused unit tests cover
 the changed state transitions. Use the management VM when behavior crosses the
 terminal, process, filesystem, network, privilege, or systemd boundary.
@@ -154,13 +156,20 @@ The documentation generator is a separate code-only command; its check reads
 `docs/tui-gallery.md` in a small derivation. Editing narrative or generated
 prose does not invalidate the packaged management application.
 
-The complete gate submits related upstream outputs to one `nix build`
-invocation, allowing one Flake evaluation and normal Nix parallel scheduling.
+The complete gate submits related outputs in bounded `nix build` groups.
+`tests/validation-groups.nix` is shared by full validation and evaluation CI;
+its membership must cover every declared Flake check exactly once. Missing,
+unexpected or duplicated checks fail before any group can be skipped. Each
+group shares its Flake/module evaluation and normal Nix build scheduling, then
+releases that evaluator's memory before unrelated graphs are evaluated.
+The base and workspace API scenarios are separate checks so each releases
+unrelated scenario graphs. Limiting build jobs alone does not bound evaluator
+memory; a single invocation for every check can otherwise cause heavy swapping.
 For the generated site it builds the management executable once and reuses the
 result for all CLI checks instead of evaluating `nix run` for every command.
 
-CI groups checks, upstream systems and template outputs through
-`tests/ci-eval.nix`, replacing repeated evaluations of individual attributes.
+CI evaluates those check groups, upstream systems and template outputs through
+`tests/ci-eval.nix`, avoiding repeated evaluation within related groups.
 Each group shares its NixOS module graphs within one evaluator; separate groups
 bound memory use. All declared checks are included, and import-from-derivation
 remains disabled. Profile variants are still evaluated independently because
@@ -221,7 +230,7 @@ cover failure modes; a separate assertion resolves an extension from the locked
 package set. No manifest is read from a derivation during evaluation. Passing
 this check proves neither live installed state nor extension loading.
 
-The `mk-lab` graph also checks workspace preparation against generated system
+The workspace API checks cover preparation against generated system
 packages, controller-only mode, downstream removals, unchanged representative
 system derivations and template compatibility without workspace input.
 `workspace-offline` compares system derivations and workspace metadata with
@@ -263,7 +272,7 @@ and transitions to/from an active legacy reset preserve the process and session
 files. The legacy pre-start guard also refuses managed pending evidence.
 Retained failure evidence blocks the display-manager fixture and normal
 user sessions on reboot. This check uses a small login consumer, not GNOME;
-`mk-lab`, `workspace-systems`, `workspace-offline` and `desktop-profile` own
+the workspace API checks, `workspace-systems`, `workspace-offline` and `desktop-profile` own
 the separate generated-system, offline and template-preference contracts.
 Run it through `tests/source-checks.nix`; it is also in the full checkpoint.
 
