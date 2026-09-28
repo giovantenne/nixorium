@@ -42,6 +42,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   dependencies and preferences across the current and proposed pins, with the
   comparison bound to the review token. Changed reset opt-in or destinations
   require separate migration; builds do not certify actual plugin loading.
+- Added a release-checkpoint VM test for the pinned VS Code/Live Server pair:
+  real extension activation and local HTTP serving with external traffic
+  blocked, editable student preferences, and boot-only profile updates and
+  extension removal. The focused check is separate from the fast edit loop.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes

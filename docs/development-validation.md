@@ -267,6 +267,26 @@ user sessions on reboot. This check uses a small login consumer, not GNOME;
 the separate generated-system, offline and template-preference contracts.
 Run it through `tests/source-checks.nix`; it is also in the full checkpoint.
 
+`workspace-editor-vm` reuses that reset fixture with the locked VS Code and
+Live Server packages. It runs a real Extension Host as the student under Xvfb,
+reads the default home paths, checks the loaded package identity/version and
+editable preferences, activates Live Server and requests a page over loopback.
+The VM blocks all non-loopback output, checks both extension-update settings
+and editor updates are disabled, switches generations without changing the
+active student's files, and boots the new preferences. A further generation
+removes the extension; the next boot must remove it from editor discovery too.
+This qualifies the pinned pair in a disposable system, not arbitrary plugins,
+a full GNOME login, newer vendor releases, or a physical lab deployment.
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' \
+  build --file tests/source-checks.nix workspace-editor-vm --no-link
+```
+
+The check also belongs to `--full`; ordinary `--quick` and `--eval` do not run
+the editor or the VM. Existing lower-level seed/resolution tests retain fast
+failure coverage without launching the graphical application.
+
 After the automated milestone, follow the documented VirtualBox recipe with
 the official Minimal ISO. Keep that result separate from physical-hardware
 evidence; neither is replaced by a simulated NixOS VM pass.

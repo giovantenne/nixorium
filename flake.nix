@@ -157,6 +157,7 @@
         workspace-seed-pinned = import ./tests/workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };
         home-reset-filesystem-vm = import ./tests/home-reset-filesystem-vm.nix { inherit pkgs; };
         workspace-reset-service-vm = import ./tests/workspace-reset-service-vm.nix { inherit pkgs; };
+        workspace-editor-vm = import ./tests/workspace-reset-service-vm.nix { inherit pkgs; editorQualification = true; };
         config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
           touch "$out"
         '';

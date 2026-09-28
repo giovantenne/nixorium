@@ -57,6 +57,7 @@ in
   workspace-seed-pinned = import ./workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };
   home-reset-filesystem-vm = import ./home-reset-filesystem-vm.nix { inherit pkgs; };
   workspace-reset-service-vm = import ./workspace-reset-service-vm.nix { inherit pkgs; };
+  workspace-editor-vm = import ./workspace-reset-service-vm.nix { inherit pkgs; editorQualification = true; };
   workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
     touch "$out"
   '';

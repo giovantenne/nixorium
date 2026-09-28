@@ -1,14 +1,22 @@
-{ pkgs }:
+{ pkgs, editorQualification ? false }:
 let
-  makeSeed = size: import ../lib/build-workspace-home.nix { inherit (pkgs) lib; inherit pkgs; } {
+  editorPkgs = import pkgs.path { inherit (pkgs.stdenv.hostPlatform) system; config.allowUnfree = true; };
+  seedPkgs = if editorQualification then editorPkgs else pkgs;
+  extension = editorPkgs.vscode-extensions.ritwickdey.liveserver;
+  makeSeed = size: withExtension: import ../lib/build-workspace-home.nix { inherit (pkgs) lib; pkgs = seedPkgs; } {
     resolution = {
-      effective = { schemaVersion = 1; vscode = { extensions = []; settings."editor.fontSize" = size; }; };
-      extensions = [];
+      effective = { schemaVersion = 1; vscode = { extensions = pkgs.lib.optional withExtension "ritwickdey.liveserver"; settings."editor.fontSize" = size; }; };
+      extensions = pkgs.lib.optional withExtension {
+        id = "ritwickdey.liveserver";
+        package = "vscode-extensions.ritwickdey.liveserver";
+        inherit (extension) version;
+      };
     };
     labSettings = { studentGitName = "Student"; studentGitEmail = "student@example.invalid"; };
   };
-  seed = makeSeed 15;
-  nextSeed = makeSeed 19;
+  seed = makeSeed 15 editorQualification;
+  nextSeed = makeSeed 19 editorQualification;
+  editorCheck = import ./workspace-editor-fixture.nix { inherit pkgs; editor = editorPkgs.vscode; inherit extension; };
   resetModule = ../modules/workspace-reset.nix;
   legacyService = (import ../modules/home-reset.nix {
     inherit pkgs;
@@ -25,7 +33,7 @@ let
   }).systemd.services.home-reset.content;
   nixoriumPackage = pkgs.callPackage ../pkgs/nixorium.nix {};
   makeNode = managed: { lib, ... }: {
-    imports = lib.optionals managed [ resetModule ];
+    imports = lib.optionals managed [ resetModule ] ++ lib.optional (editorQualification && managed) editorCheck.module;
     _module.args = {
       labSettings.studentUser = "student";
       homeResetEphemeralPaths = [ ".local/npm" ];
@@ -33,7 +41,7 @@ let
       workspaceWallpapers = [];
       inherit nixoriumPackage;
     };
-    virtualisation = { memorySize = 768; emptyDiskImages = [ 512 ]; };
+    virtualisation = { memorySize = if editorQualification then 2048 else 768; emptyDiskImages = [ 512 ]; };
     users.users.student = { isNormalUser = true; uid = 2000; group = "users"; };
     users.groups.veyon-master = {};
     environment.systemPackages = [ pkgs.btrfs-progs ];
@@ -93,15 +101,16 @@ let
       };
     } // lib.optionalAttrs managed {
       legacy.configuration.systemd.services.home-reset = lib.mkForce legacyService;
+    } // lib.optionalAttrs (managed && editorQualification) {
+      without-extension.configuration._module.args.workspaceSeed = lib.mkForce (makeSeed 19 false);
     };
     system.stateVersion = "26.05";
   };
 in
 pkgs.testers.runNixOSTest {
-  name = "nixorium-workspace-reset-service";
-  nodes.managed = makeNode true;
-  nodes.legacy = makeNode false;
-  testScript = ''
+  name = if editorQualification then "nixorium-workspace-editor" else "nixorium-workspace-reset-service";
+  nodes = { managed = makeNode true; } // pkgs.lib.optionalAttrs (!editorQualification) { legacy = makeNode false; };
+  testScript = if editorQualification then editorCheck.testScript else ''
     managed.start(allow_reboot=True)
     legacy.start()
     for machine in (managed, legacy):
