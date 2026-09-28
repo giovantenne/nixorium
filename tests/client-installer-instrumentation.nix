@@ -6,6 +6,11 @@ in
 {
   imports = [ (modulesPath + "/testing/test-instrumentation.nix") ];
 
+  # These installed targets boot in QEMU, where dev-vboxguest.device never
+  # appears. Keep its dependency timeout out of installer tests without
+  # changing VirtualBox support in production configurations.
+  virtualisation.virtualbox.guest.enable = lib.mkForce false;
+
   boot.initrd.availableKernelModules = [
     "virtio_blk"
     "virtio_pci"

@@ -188,6 +188,9 @@ let
   clientGnomeRemoteDesktop = subnetLab.nixosConfigurations.pc01.pkgs.gnome-remote-desktop;
 in
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
+assert controllerOnly.virtualisation.virtualbox.guest.enable;
+assert subnetLab.nixosConfigurations.pc99.config.virtualisation.virtualbox.guest.enable;
+assert subnetLab.nixosConfigurations.pc01.config.virtualisation.virtualbox.guest.enable;
 assert controllerOnlyLab.nixoriumUpdateTargets == [ "pc99" ];
 assert subnetLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];
 assert nativeVeyonLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];

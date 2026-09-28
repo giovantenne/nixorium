@@ -177,6 +177,7 @@ in
     os.environ["NIX_EFI_VARS"] = str(installer.state_dir / "installer-efi-vars.fd")
     target.start()
     target.wait_for_unit("multi-user.target")
+    target.succeed("test \"$(systemctl show virtualbox.service --property=LoadState --value)\" = not-found")
     target.succeed("test \"$(hostname)\" = pc01")
     target.succeed("test \"$(readlink -f /run/current-system)\" = ${clientSystem}")
     target.succeed("test \"$(nixos-version --configuration-revision)\" = ${deploymentRevision}")

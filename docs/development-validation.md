@@ -81,6 +81,13 @@ have materially higher fixed cost. The remote VM simulates the supported live
 ISO contract; it does not certify the official ISO, VirtualBox networking, or
 physical firmware and storage.
 
+The installed targets in both installer VMs disable VirtualBox guest additions
+through their shared QEMU-only instrumentation module. Otherwise systemd waits
+for the absent `dev-vboxguest.device` before reaching `multi-user.target`, even
+though the guest service has a virtualization condition. The tests assert that
+the service is absent; production configurations retain their VirtualBox
+default. This fixture optimization does not qualify VirtualBox support.
+
 USB/SSH coverage is deliberately layered. Shell tests own exact live-installer
 preflight predicates, Go adapter tests own the pinned SSH command contract, and
 worker tests own the ordered receipt, log-publication, credential-revocation,
