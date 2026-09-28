@@ -374,12 +374,16 @@ failure or timeout must block publication.
   preferences. Check built extension manifests against resolved identities and
   versions. A built seed is not home activation or proof of plugin loading;
   this helper is not connected to the legacy reset path.
-- `internal/homereset` currently provides only a confined ephemeral-path removal
-  primitive. Keep full-list/tree preflight, descriptor-relative no-follow
-  traversal, and mount/subvolume identity checks. It does not authorize a reset
-  or establish account ownership, inactive sessions, snapshots, or recovery.
-  Never connect it to a live reset without those separate boundaries and VM
-  coverage; the legacy reset service does not use it yet.
+- `internal/homereset` contains a confined removal primitive and an internal
+  boot-reset engine. Preserve complete preflight, no-follow traversal,
+  mount/subvolume checks, immutable seed validation, account/process checks,
+  and a held login barrier. The private recovery snapshot is sanitized before
+  publication; five read-only managed snapshots live separately from legacy
+  snapshots. Durable pending evidence must block retries after failure and
+  reboot. Never delete it automatically or treat a previous success receipt as
+  completion of a pending attempt. The engine is not a public command and the
+  legacy reset service does not use it. Systemd integration must prove the
+  login barrier and no-reset-on-rebuild behavior separately before activation.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.

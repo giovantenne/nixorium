@@ -234,15 +234,21 @@ payload. Run both, plus `desktop-profile`, through `tests/source-checks.nix`.
 They are full-checkpoint checks, not part of the fast edit loop. They do not
 activate homes, exercise the reset service, or prove VS Code loads an extension.
 
-The internal cleanup primitive has ordinary Go filesystem tests under
+The internal home-reset engine has ordinary Go filesystem tests under
 `internal/homereset`. Run them with
 `./scripts/test-go.sh ./internal/homereset -race`. The dedicated
 `nix build --file tests/source-checks.nix home-reset-filesystem-vm --no-link`
 check adds real same-filesystem file/directory bind mounts and nested Btrfs
-subvolumes on a disposable VM disk. It proves rejected inputs leave sentinels
-intact, not that a complete reset service is ready. Mount tests are explicitly
-disabled outside that fixture. The VM belongs to the full checkpoint and is
-not part of the quick loop.
+subvolumes on a disposable VM disk. It also exercises immutable-seed validation,
+account ownership, a held login barrier, active student-process rejection,
+whole-home preflight, private snapshot sanitization, five-snapshot rotation,
+restore ownership, editable preferences and dconf/wallpaper composition.
+Injected failures before deletion and during restoration retain durable
+evidence, prevent blind retries and preserve recovery data across a VM reboot.
+Negative lifecycle cases assert the rejection reason, not just any error.
+These are internal engine tests, not proof of systemd ordering, deployment
+activation, or legacy-path safety. Mount/lifecycle tests are explicitly disabled
+outside that fixture. The VM belongs to the full checkpoint, not the quick loop.
 
 After the automated milestone, follow the documented VirtualBox recipe with
 the official Minimal ISO. Keep that result separate from physical-hardware

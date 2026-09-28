@@ -1,6 +1,6 @@
-// Package homereset contains internal filesystem primitives, not a public reset
-// command. Callers must separately establish the managed account, trusted mount,
-// inactive sessions, snapshot policy, and recovery behavior before using them.
+// Package homereset contains an internal boot reset engine and confined
+// filesystem primitives. Runtime callers must hold the login barrier for the
+// complete operation; these functions are not interactive maintenance commands.
 package homereset
 
 import (
@@ -28,9 +28,87 @@ const childResolution = unix.RESOLVE_BENEATH | unix.RESOLVE_NO_SYMLINKS | unix.R
 // during removal can leave a partial result, which must not be retried blindly.
 // Unsupported kernel confinement primitives fail closed, without a fallback.
 func RemoveEphemeral(directory string, paths []string) error {
+	return cleanSelected(directory, paths, true)
+}
+
+func cleanSelected(directory string, paths []string, remove bool) error {
 	if err := validatePaths(paths); err != nil {
 		return err
 	}
+	return withDirectory(directory, func(fd int, root unix.Statx_t) error {
+		for _, deleting := range []bool{false, remove} {
+			for _, relative := range paths {
+				parent, err := unix.Openat2(fd, path.Dir(relative), &unix.OpenHow{
+					Flags:   unix.O_RDONLY | unix.O_DIRECTORY | unix.O_CLOEXEC | unix.O_NOFOLLOW,
+					Resolve: childResolution,
+				})
+				if errors.Is(err, unix.ENOENT) {
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("inspect cleanup parent %q: %w", relative, err)
+				}
+				parentInfo, parentErr := statEntry(parent, "", unix.AT_EMPTY_PATH)
+				if parentErr == nil {
+					parentErr = sameBoundary(root, parentInfo)
+				}
+				if parentErr == nil {
+					parentErr = visit(parent, path.Base(relative), root, 0, deleting)
+				}
+				unix.Close(parent)
+				if parentErr != nil {
+					return fmt.Errorf("clean ephemeral path %q: %w", relative, parentErr)
+				}
+			}
+			if !remove {
+				break
+			}
+		}
+		return nil
+	})
+}
+
+// cleanHome keeps the mounted root itself. Every tree is inspected before the
+// removal pass, not just the paths excluded from snapshots.
+func cleanHome(directory string, remove bool) error {
+	return withDirectory(directory, func(fd int, root unix.Statx_t) error {
+		for _, deleting := range []bool{false, remove} {
+			duplicate, err := unix.Openat(fd, ".", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+			if err != nil {
+				return err
+			}
+			dir := os.NewFile(uintptr(duplicate), directory)
+			err = walkEntries(dir, func(name string) error { return visit(fd, name, root, 0, deleting) })
+			dir.Close()
+			if err != nil {
+				return err
+			}
+			if !remove {
+				break
+			}
+		}
+		return nil
+	})
+}
+
+func walkEntries(dir *os.File, action func(string) error) error {
+	for {
+		entries, err := dir.ReadDir(128)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		for _, entry := range entries {
+			if err := action(entry.Name()); err != nil {
+				return err
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+	}
+}
+
+func withDirectory(directory string, action func(int, unix.Statx_t) error) error {
 	if !filepath.IsAbs(directory) || filepath.Clean(directory) != directory || directory == "/" || directory == "/home" {
 		return errors.New("home cleanup requires an explicit canonical directory")
 	}
@@ -53,34 +131,7 @@ func RemoveEphemeral(directory string, paths []string) error {
 	if filesystem.Type == unix.BTRFS_SUPER_MAGIC && root.Mask&unix.STATX_SUBVOL == 0 {
 		return errors.New("kernel did not provide the required Btrfs subvolume identity")
 	}
-	// The first pass is read-only, including checks for mounts hidden deeper in
-	// an earlier selection. A later invalid selection must not delete anything.
-	for _, remove := range []bool{false, true} {
-		for _, relative := range paths {
-			parent, err := unix.Openat2(fd, path.Dir(relative), &unix.OpenHow{
-				Flags:   unix.O_RDONLY | unix.O_DIRECTORY | unix.O_CLOEXEC | unix.O_NOFOLLOW,
-				Resolve: childResolution,
-			})
-			if errors.Is(err, unix.ENOENT) {
-				continue
-			}
-			if err != nil {
-				return fmt.Errorf("inspect cleanup parent %q: %w", relative, err)
-			}
-			parentInfo, parentErr := statEntry(parent, "", unix.AT_EMPTY_PATH)
-			if parentErr == nil {
-				parentErr = sameBoundary(root, parentInfo)
-			}
-			if parentErr == nil {
-				parentErr = visit(parent, path.Base(relative), root, 0, remove)
-			}
-			unix.Close(parent)
-			if parentErr != nil {
-				return fmt.Errorf("clean ephemeral path %q: %w", relative, parentErr)
-			}
-		}
-	}
-	return nil
+	return action(fd, root)
 }
 
 func validatePaths(paths []string) error {
@@ -107,7 +158,7 @@ func validatePaths(paths []string) error {
 
 func statEntry(fd int, name string, flags int) (unix.Statx_t, error) {
 	var stat unix.Statx_t
-	const required = unix.STATX_TYPE | unix.STATX_MNT_ID
+	const required = unix.STATX_BASIC_STATS | unix.STATX_MNT_ID
 	err := unix.Statx(fd, name, flags|unix.AT_SYMLINK_NOFOLLOW|unix.AT_NO_AUTOMOUNT, required|unix.STATX_SUBVOL, &stat)
 	if err != nil {
 		return stat, err
