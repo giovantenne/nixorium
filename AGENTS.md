@@ -370,6 +370,9 @@ failure or timeout must block publication.
   profile; serialize it offline and expose the seed path without claiming it
   is built, deployed, or active. Absent input preserves legacy home content.
   The template must still work with older pins when no workspace file exists.
+  Its deployment-owned catalog can prepare the first candidate on supporting
+  pins; `workspace-profile.example.json` is inactive and must never become an
+  implicit fallback. Keep that example compatible with Essential without VS Code.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing

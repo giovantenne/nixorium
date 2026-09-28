@@ -113,6 +113,7 @@ let
     hostPackages.pc99 = [ "vscode" "jdk" ];
   };
 in
+assert import ./workspace-template.nix { inherit lib; pkgs = realPkgs; };
 assert builtins.all (value: value) tests;
 assert result.effective.desktop.favorites == [ "org.gnome.Nautilus.desktop" ];
 assert result.effective.desktop.colorScheme == "dark";

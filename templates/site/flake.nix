@@ -25,12 +25,15 @@
       # Preparation and runtime activation are separate choices. Keep false
       # until the local home/profile modules have been reviewed for migration.
       workspaceRuntimeEnabled = false;
-      # Optional metadata; absence preserves legacy homes.
-      # Older pinned upstream versions receive no new mkLab arguments.
+      # The catalog prepares the candidate hook even before the first profile
+      # exists. The example is never read as the active declaration.
+      # Older pins receive no new mkLab arguments; absent JSON keeps legacy homes.
       workspaceArguments =
         if !(builtins.pathExists ./workspace-profile.json) then
           assert !workspaceRuntimeEnabled || throw "Workspace runtime requires workspace-profile.json";
-          {}
+          if nixorium.lib ? workspaceProfileSchemaVersion then {
+            workspaceCatalog = import ./workspace-catalog.nix;
+          } else {}
         else if !(nixorium.lib ? workspaceProfileSchemaVersion) then
           throw "The pinned Nixorium version does not support workspace profile preparation"
         else if workspaceRuntimeEnabled && !(nixorium.lib ? workspaceRuntimeVersion) then

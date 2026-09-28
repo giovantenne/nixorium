@@ -56,6 +56,14 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = false
   test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-style-v1"
   test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-dock-v1"
+  # The same opt-in script must retain the ordinary staff migration.
+  apply_session_defaults staff "['org.gnome.TextEditor.desktop']"
+  test "$(gsettings get org.gnome.shell favorite-apps)" = "['org.gnome.TextEditor.desktop']"
+  test "$(gsettings get org.gnome.desktop.interface color-scheme)" = "'prefer-dark'"
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'BOTTOM'"
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = true
+  test -e "$XDG_CONFIG_HOME/nixorium/desktop-style-v1"
+  test -e "$XDG_CONFIG_HOME/nixorium/desktop-dock-v1"
   ${pkgs.lib.concatMapStringsSep "\n" (extension: ''
     jq -e --arg version '${pkgs.lib.versions.major pkgs.gnome-shell.version}' \
       '."shell-version" | index($version) != null' \

@@ -208,9 +208,11 @@ checkout is needed while installing clients without internet access.
 
 ## Occasional interventions
 
-The template recognizes optional `workspace-profile.json` and
-`workspace-catalog.nix` only when the pinned upstream supports workspace
-preparation. They are not created by default. This interface validates
+The template supplies `workspace-catalog.nix` and an inactive
+`workspace-profile.example.json` matching Essential without requiring VS Code.
+It never reads the example as an active profile. With a supporting pin, the
+catalog can validate a first candidate before `workspace-profile.json` exists;
+older pins receive no new arguments. This interface validates
 preferences and prerequisites for the configured student on the controller
 and every client, and carries them into offline evaluation. Preparation alone
 does **not** apply preferences to homes. The separate `workspaceRuntimeEnabled`
@@ -235,6 +237,10 @@ Have an administrator inspect the journal and recovery data first. Snapshots
 are not backups. A `nixoriumWorkspace.state` of `prepared`, even with
 `runtimeEnabled = true`, is not evidence of deployment or a successful reset.
 There is no workspace CLI/TUI workflow yet.
+Follow the [migration review](skills/nixorium-maintainer/references/student-home.md#review-a-migration)
+to identify supported settings, retained system policy and legacy behavior that
+the new seed cannot represent. Do not enable runtime while essential differences
+or conflicting private student-home writers remain unresolved.
 
 Run the task-oriented dashboard from the repository root:
 

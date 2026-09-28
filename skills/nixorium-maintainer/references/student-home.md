@@ -64,6 +64,65 @@ failure and request a separately authorized recovery based on the actual
 snapshot/home state. Managed snapshots are read-only, sanitized copies under
 `/var/lib/home-snapshots/workspace`; they remain distinct from external backups.
 
+## Review a migration
+
+New templates include a deployment-owned `workspace-catalog.nix` and an inactive
+`workspace-profile.example.json`. Neither enables managed homes. The example
+matches the Essential software selection: Ghostty, Chromium, Files, Text Editor,
+dark appearance and a compact bottom dock. It does not select VS Code. Treat it
+as a starting proposal, not an import of the laboratory's current preferences.
+The catalog baseline is empty; its application and extension entries are choices,
+not additional software declarations. Live Server is an initial pinned extension
+choice, not a certificate of loading on every editor version.
+
+For an authorized migration, present an explicit comparison of existing policy
+and the proposed profile before changing the runtime switch:
+
+| Existing source or behavior | Managed student outcome |
+|---|---|
+| Favorites and the supported appearance/dock fields in `modules/workstation.nix` | Declare desired values in the profile; the managed student login no longer overwrites them |
+| GTK/icon themes, fonts, shortcuts, GNOME extensions and Chromium homepage policy | Remain deployment/system policy, outside the JSON schema; review their existing scope separately |
+| `assets/mimeapps.list` | The profile can select the HTTP/HTTPS/HTML browser; other MIME associations are not imported |
+| `assets/vscode-settings.json` | Only the seven supported editor settings can be declared; themes, terminal profiles, telemetry, chat and extension-specific preferences are not imported |
+| Legacy editor/extension auto-update preferences | Managed VS Code settings disable editor and extension update checks; this does not transfer the rest of the legacy asset |
+| Java extension pack, other extensions and locally edited extension manifests | No automatic transfer; resolve each desired component, dependencies and pin, and test loading before use |
+| `.vscode/argv.json`, including the legacy password-store option | Not part of the managed seed; review the behavioral difference instead of silently copying it |
+| Student shell/Git/XDG scaffold | Recreated from declared identity and neutral defaults; standard folders have stable English names |
+| Student files, browser sessions, credentials, caches and personal application state | Never imported into the seed; pending work and external backups need separate handling |
+| Teacher/admin home setup | Preserved by the supplied modules; older private copies require a local comparison |
+
+Use the actual files and settings in that deployment for the comparison. Do not
+claim automatic parity, execute arbitrary legacy policy to infer a profile, or
+capture a live home. If an unsupported setting is essential, keep legacy mode
+until its handling is explicitly resolved. Do not silently drop it.
+
+Keep preparation and runtime adoption as separate reviewed changes:
+
+1. Confirm the pin supports the workspace schema. Keep
+   `workspaceRuntimeEnabled = false`. Adapt the inactive example to the actual
+   software on every destination, including the controller; validate the raw
+   candidate through `nixoriumValidateWorkspaceCandidate` before saving the
+   optional `workspace-profile.json`. Keep catalog additions explicit and
+   preserve an existing profile rather than overwriting it with the example.
+2. Inspect `nixoriumWorkspace`: check the declared/effective values, targets,
+   prerequisites and versions. Preparation does not modify homes, and copying
+   the example alone is not migration or authorization to deploy.
+3. Before enabling runtime, separately review the pin's runtime capability,
+   private module changes and unresolved differences. The supplied modules
+   guard student writes with `workspaceRuntimeEnabled`; old local copies do not
+   gain these guards from an upstream update. Remove conflicting student
+   template writes, login overrides and ownership repairs without broad changes
+   to staff policy. If custom writers cannot be excluded, keep runtime disabled.
+4. Build and test the reviewed seed/system in an authorized disposable target,
+   including actual extension loading when selected. Deployment, next normal
+   boot/reset and live verification each remain separately authorized steps.
+
+There is no automated migration or workspace save command yet. Returning to
+legacy is also a reviewed system change, not recovery of erased files. Preserve
+managed snapshots and pending evidence; do not remove them to make a downgrade
+proceed. Nix generations, profile declarations and student-data backups serve
+different purposes.
+
 ## VS Code extensions and settings
 
 For “prepare VS Code for Python”, inspect whether VS Code is selected for the

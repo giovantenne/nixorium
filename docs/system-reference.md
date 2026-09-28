@@ -409,8 +409,9 @@ distribution action when no client is affected.
 
 ### Workspace preparation
 
-Preparation and runtime activation are separate. No workspace file ships in
-the template. With no `workspaceProfileJSON`, `nixoriumWorkspace`
+Preparation and runtime activation are separate. The template ships a catalog
+and an inactive Essential example, never an active `workspace-profile.json`.
+With no `workspaceProfileJSON`, `nixoriumWorkspace`
 is `null` and existing home/template/login behavior remains unchanged. With a
 profile, the output reports `state = "prepared"`, the configured `studentUser`,
 all target hosts, declared/effective preferences, normalized catalog and pinned
@@ -462,9 +463,15 @@ or unresolved required packages fail preparation. No live hosts are contacted.
 the same schema, catalog and all-host prerequisites without saving or deploying.
 The candidate hook does not qualify extension loading or mutate sessions.
 Both profile text and catalog data travel through the offline installer. The
-template reads optional workspace files only when present, and gives a clear
-error if the pinned upstream lacks this capability. Do not remove operational
-home modules on the assumption that preparation replaces them.
+template passes its catalog to supporting pins even before the first profile,
+so that hook can validate a candidate without creating an active file. It reads
+only `workspace-profile.json`, never `workspace-profile.example.json`, as the
+declaration, and rejects a profile if the pin lacks this capability. Older pins
+without a profile receive no new arguments. Do not remove operational home
+modules on the assumption that preparation replaces them. The
+[migration review](../skills/nixorium-maintainer/references/student-home.md#review-a-migration)
+distinguishes representable preferences from retained policy and unsupported
+legacy content.
 
 #### Explicit managed-home runtime
 

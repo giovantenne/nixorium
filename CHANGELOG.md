@@ -20,6 +20,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   evidence block unsafe retries and login after an incomplete reset. Existing
   template content is not imported automatically; workspace CLI/TUI editing
   is not included.
+- Added an inactive Essential workspace example, a deployment-owned starter
+  catalog and an explicit migration review. New templates can validate a first
+  candidate without activating it; older pins and existing homes stay unchanged.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes

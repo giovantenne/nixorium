@@ -26,8 +26,33 @@ let
         { legacyCompatible = true; };
     };
   };
+  templateArgs = {
+    workspaceProfileJSON = null;
+    workspaceCatalog = import ../templates/site/workspace-catalog.nix;
+    labSoftware = builtins.fromJSON (builtins.readFile ../templates/site/lab-software.json);
+    sharedModules = [ ../templates/site/modules/shared.nix ];
+  };
+  templateLab = mkWorkspaceLab templateArgs;
+  templateProfile = builtins.readFile ../templates/site/workspace-profile.example.json;
+  templateManagedLab = mkWorkspaceLab (templateArgs // {
+    workspaceProfileJSON = templateProfile;
+    workspaceRuntimeEnabled = true;
+  });
+  templateController = mkWorkspaceLab (templateArgs // {
+    labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
+  });
 in
 assert legacyTemplate.legacyCompatible;
+assert templateLab.nixoriumWorkspace == null;
+assert templateLab.nixoriumValidateWorkspaceCandidate templateProfile;
+assert templateController.nixoriumValidateWorkspaceCandidate templateProfile;
+assert templateManagedLab.nixoriumWorkspace.runtimeEnabled;
+assert !(templateManagedLab.nixoriumWorkspace.effective ? vscode);
+assert builtins.all (name:
+  let cfg = templateManagedLab.nixosConfigurations.${name}.config;
+  in !(lib.hasInfix "/var/lib/home-template/${labConfig.studentUser}" cfg.system.activationScripts.siteHomeProfile.text)
+    && lib.hasInfix "APPEARANCE_ROLE=managed-student" cfg.environment.etc."lab/gnome-user-setup.sh".text
+) [ "pc99" "pc01" ];
 assert absent.nixoriumWorkspace == null;
 assert workspaceLab.nixoriumWorkspace.state == "prepared";
 assert workspaceLab.nixoriumWorkspace.runtimeEnabled == false;

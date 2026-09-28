@@ -324,7 +324,9 @@ The optional [workspace preparation API](docs/system-reference.md#workspace-prep
 validates initial student preferences and pinned prerequisites. A separate,
 default-off runtime switch enables the managed student home at the next normal
 boot on the controller and clients. Preparation alone preserves legacy homes;
-there is no workspace TUI command yet.
+there is no workspace TUI command yet. The template includes an inactive
+Essential example and a [migration review](skills/nixorium-maintainer/references/student-home.md#review-a-migration);
+neither changes existing homes or selects VS Code implicitly.
 
 From a checkout with Nix available, run the normal fast validation gate:
 
