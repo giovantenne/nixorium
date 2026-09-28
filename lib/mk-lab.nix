@@ -13,6 +13,8 @@ args@{
   labSoftware ? { schemaVersion = 1; packages = []; },
   softwareCatalog ? [],
   softwarePresets ? null,
+  workspaceProfileJSON ? null,
+  workspaceCatalog ? null,
   clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
@@ -296,6 +298,9 @@ let
   labSoftwareJson = builtins.toFile "lab-software.json" (builtins.toJSON labSoftwareConfig);
   softwareCatalogJson = builtins.toFile "software-catalog.json" (builtins.toJSON softwareCatalog);
   softwarePresetsJson = builtins.toFile "software-presets.json" (builtins.toJSON softwarePresetsConfig);
+  workspaceProfileFile = builtins.toFile "workspace-profile.json"
+    (if workspaceProfileJSON == null then "null" else workspaceProfileJSON);
+  workspaceCatalogFile = builtins.toFile "workspace-catalog.json" (builtins.toJSON workspaceCatalog);
   homeResetEphemeralPathsJson = builtins.toFile "home-reset-ephemeral-paths.json"
     (builtins.toJSON homeResetEphemeralPaths);
   clientGroupsJson = builtins.toFile "client-groups.json" (builtins.toJSON clientGroups);
@@ -415,6 +420,32 @@ let
         else throw "lab-software.json: package ${entry.package} is unavailable in the pinned package set")
       (builtins.filter (entry: softwareAppliesTo hostName entry.scope) labSoftwareConfig.packages);
   };
+  # Resolve against actual declarative system packages, including GNOME core
+  # packages and downstream modules, not just managed software declarations.
+  # No live machine is inspected and no application is installed by this path.
+  workspacePackagePaths = lib.unique (
+    [ "vscode" "gnome-shell" "gnomeExtensions.dash-to-dock" ]
+    ++ map (entry: entry.package) workspaceCatalog.applications
+    ++ lib.concatMap (entry: entry.requiredPackages or []) workspaceCatalog.extensions
+  );
+  workspaceHostPackages = name:
+    let installed = map toString hostConfigurations.${name}.config.environment.systemPackages; in
+    builtins.filter (path:
+      let
+        info = softwarePackageTools.describe path;
+        package = if info != null && info.availability == "available" then
+          builtins.tryEval (toString (softwarePackageTools.resolve path))
+        else { success = false; };
+      in package.success && builtins.elem package.value installed
+    ) workspacePackagePaths;
+  workspaceResolution = if workspaceProfileJSON == null then null else
+    import ./resolve-workspace-profile.nix { inherit lib; pkgs = softwarePkgs; } {
+      profileJSON = workspaceProfileJSON;
+      catalog = workspaceCatalog;
+      controllerName = masterHostName;
+      clientNames = validClientNames;
+      hostPackages = lib.genAttrs validHostNames workspaceHostPackages;
+    };
   installerDiskoRuntimePackages = disko.lib.packages {
     disko.devices = import (upstreamRoot + "/lib/disko-layout.nix") {
       device = "/dev/nixorium-install-target";
@@ -551,6 +582,10 @@ let
           labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
           softwareCatalog = builtins.fromJSON (builtins.readFile ./software-catalog.json);
           softwarePresets = builtins.fromJSON (builtins.readFile ./software-presets.json);
+          ${lib.optionalString (workspaceProfileJSON != null) ''
+            workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
+            workspaceCatalog = builtins.fromJSON (builtins.readFile ./workspace-catalog.json);
+          ''}
           homeResetEphemeralPaths = builtins.fromJSON (builtins.readFile ./home-reset-ephemeral-paths.json);
           clientGroups = builtins.fromJSON (builtins.readFile ./client-groups.json);
           publicKeys = {
@@ -588,6 +623,10 @@ let
     install -m 0644 ${labMetaJson} "$out/lab-meta.json"
     install -m 0644 ${softwareCatalogJson} "$out/software-catalog.json"
     install -m 0644 ${softwarePresetsJson} "$out/software-presets.json"
+    ${lib.optionalString (workspaceProfileJSON != null) ''
+      install -m 0644 ${workspaceProfileFile} "$out/workspace-profile.json"
+      install -m 0644 ${workspaceCatalogFile} "$out/workspace-catalog.json"
+    ''}
     install -m 0644 ${homeResetEphemeralPathsJson} "$out/home-reset-ephemeral-paths.json"
     install -m 0644 ${clientGroupsJson} "$out/client-groups.json"
     install -m 0755 ${upstreamRoot}/setup.sh "$out/setup.sh"
@@ -615,6 +654,14 @@ let
         modules = modulesForHost name false;
       };
     };
+
+  hostConfigurations = builtins.listToAttrs (map mkHost pcNumbers) // {
+    ${masterHostName} = nixpkgs.lib.nixosSystem {
+      inherit system;
+      specialArgs = specialArgsForHost masterHostName masterIp;
+      modules = modulesForHost masterHostName true;
+    };
+  };
 
   mkColmenaHost = n:
     let
@@ -678,13 +725,11 @@ assert unknownHostModuleNames == []
   || throw "hostModules contains unknown hosts: ${builtins.concatStringsSep ", " unknownHostModuleNames}";
 assert unknownVeyonNativeHosts == []
   || throw "veyonNativeHosts contains unknown hosts: ${builtins.concatStringsSep ", " unknownVeyonNativeHosts}";
+assert workspaceProfileJSON == null || workspaceCatalog != null
+  || throw "workspaceProfileJSON requires a deployment-owned workspaceCatalog";
+assert builtins.deepSeq workspaceResolution true;
 rec {
-  nixosConfigurations = builtins.listToAttrs (map mkHost pcNumbers) // {
-    ${masterHostName} = nixpkgs.lib.nixosSystem {
-      inherit system;
-      specialArgs = specialArgsForHost masterHostName masterIp;
-      modules = modulesForHost masterHostName true;
-    };
+  nixosConfigurations = hostConfigurations // {
     netboot = nixpkgs.lib.nixosSystem {
       inherit system;
       specialArgs = {
@@ -736,21 +781,28 @@ rec {
   # selected role with the self-contained installer, using its exact sources.
   nixoriumOfflineCheck = bootstrapPkgs.runCommand "nixorium-offline-equivalence" {
     nativeBuildInputs = [ bootstrapPkgs.nix ];
-    expected = builtins.toJSON (builtins.listToAttrs (map (name: {
-      inherit name;
-      # These are comparison strings, not build inputs. Keeping .drv context
-      # would pull the entire build-time source closure into this check.
-      value = builtins.unsafeDiscardStringContext nixosConfigurations.${name}.config.system.build.toplevel.drvPath;
-    }) nixoriumUpdateTargets));
+    expected = builtins.toJSON {
+      systems = builtins.listToAttrs (map (name: {
+        inherit name;
+        # These are comparison strings, not build inputs. Keeping .drv context
+        # would pull the entire build-time source closure into this check.
+        value = builtins.unsafeDiscardStringContext nixosConfigurations.${name}.config.system.build.toplevel.drvPath;
+      }) nixoriumUpdateTargets);
+      # Preparation does not alter a system yet: drvPath equality alone cannot
+      # detect workspace inputs accidentally omitted from the installer.
+      workspace = nixoriumWorkspace;
+    };
     passAsFile = [ "expected" ];
   } ''
     export XDG_CACHE_HOME="$TMPDIR/cache"
     mkdir -p "$XDG_CACHE_HOME"
     export NIX_CONFIG="experimental-features = nix-command flakes"
     nix eval --offline --store "$TMPDIR/nix" --no-write-lock-file --impure --json \
-      --expr 'let f = builtins.getFlake "path:${installerBundle}"; in
-        builtins.mapAttrs (name: _: f.nixosConfigurations.''${name}.config.system.build.toplevel.drvPath)
-          (builtins.fromJSON (builtins.readFile ${builtins.toJSON (bootstrapPkgs.writeText "update-targets.json" (builtins.toJSON (builtins.listToAttrs (map (name: { inherit name; value = true; }) nixoriumUpdateTargets))))}))' > actual.json
+      --expr 'let f = builtins.getFlake "path:${installerBundle}"; in {
+        systems = builtins.mapAttrs (name: _: f.nixosConfigurations.''${name}.config.system.build.toplevel.drvPath)
+          (builtins.fromJSON (builtins.readFile ${builtins.toJSON (bootstrapPkgs.writeText "update-targets.json" (builtins.toJSON (builtins.listToAttrs (map (name: { inherit name; value = true; }) nixoriumUpdateTargets))))}));
+        workspace = f.nixoriumWorkspace;
+      }' > actual.json
     ${bootstrapPkgs.jq}/bin/jq -S . "$expectedPath" > expected.json
     ${bootstrapPkgs.jq}/bin/jq -S . actual.json > actual-sorted.json
     diff -u expected.json actual-sorted.json
@@ -768,6 +820,19 @@ rec {
   };
 
   nixoriumSoftwarePresets = softwarePresetsConfig;
+
+  # Preparation metadata is deliberately not an active-home receipt. Runtime
+  # seeding and management workflows are not enabled by these arguments alone.
+  nixoriumWorkspace = if workspaceResolution == null then null else workspaceResolution // {
+    state = "prepared";
+    managedFile = "workspace-profile.json";
+    inherit studentUser;
+  };
+  nixoriumValidateWorkspaceCandidate = rawJSON:
+    assert builtins.isString rawJSON || throw "workspace candidate must be JSON text";
+    let candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko veyon; }
+      (args // { workspaceProfileJSON = rawJSON; });
+    in builtins.deepSeq candidate.nixoriumWorkspace true;
 
   nixoriumSearchSoftwarePackages = softwarePackageTools.search;
   nixoriumResolveSoftwarePackage = softwarePackageTools.describe;

@@ -59,6 +59,16 @@
         deploymentSelf = self;
         labConfig = import ./lab-config.nix;
       };
+      mkWorkspaceLab = import ./tests/workspace-lab.nix {
+        inherit mkLab;
+        deploymentSelf = self;
+        labConfig = import ./lab-config.nix;
+      };
+      workspaceLab = mkWorkspaceLab {};
+      workspaceIntegrationTest = import ./tests/workspace-mk-lab.nix {
+        inherit mkWorkspaceLab workspaceLab;
+        labConfig = import ./lab-config.nix;
+      };
       managementVmTest = pkgs.testers.runNixOSTest (import ./tests/management-vm.nix {
         nixoriumPackage = defaultLab.packages.${system}.nixorium;
       });
@@ -117,6 +127,7 @@
         settingsSchemaVersion = 1;
         softwareSchemaVersion = 1;
         softwarePresetSchemaVersion = 1;
+        workspaceProfileSchemaVersion = 1;
         packageBase = {
           schemaVersion = 2;
           source = "github:NixOS/nixpkgs";
@@ -150,7 +161,13 @@
         workspace-resolution = assert workspaceResolutionTest; pkgs.runCommand "nixorium-workspace-resolution-test" {} ''
           touch "$out"
         '';
-        mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
+        mk-lab = assert mkLabTest && workspaceIntegrationTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
+          touch "$out"
+        '';
+        workspace-offline = workspaceLab.nixoriumOfflineCheck;
+        workspace-systems = pkgs.runCommand "nixorium-workspace-systems-test" {} ''
+          test -e ${workspaceLab.nixosConfigurations.pc99.config.system.build.toplevel}/init
+          test -e ${workspaceLab.nixosConfigurations.pc01.config.system.build.toplevel}/init
           touch "$out"
         '';
         client-installer = pkgs.runCommand "nixorium-client-installer-test" {

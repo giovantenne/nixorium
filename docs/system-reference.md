@@ -366,6 +366,8 @@ installer so client installation needs no second checkout.
 | `labSoftware` | Strict versioned supported client-package declarations, normally decoded from `lab-software.json` |
 | `softwareCatalog` | Deployment-owned suggested packages shown before free search; each entry has `id`, `label`, and `summary` |
 | `softwarePresets` | Optional versioned deployment-owned software-profile catalog; each profile has an ID, label, description, and package IDs |
+| `workspaceProfileJSON` | Optional raw JSON text for preparation of student preferences; `null` preserves legacy behavior |
+| `workspaceCatalog` | Deployment-owned baseline/application/extension catalog required with workspace JSON; no implicit package installation |
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
@@ -404,6 +406,63 @@ client-deployment review. Missing metadata leaves individual software
 management available, and controller-only results never offer a client
 distribution action when no client is affected.
 
+### Workspace preparation
+
+This is a preparation interface, not a home-activation mechanism. No workspace
+file ships in the template. With no `workspaceProfileJSON`, `nixoriumWorkspace`
+is `null` and existing home/template/login behavior remains unchanged. With a
+profile, the output reports `state = "prepared"`, the configured `studentUser`,
+all target hosts, declared/effective preferences, normalized catalog and pinned
+package/extension versions. It does not report live installed or active state.
+
+`workspaceProfileJSON` must be raw JSON text, limited to 64 KiB, with integer
+`schemaVersion: 1`. Unknown fields, duplicate keys (including escaped aliases),
+nulls and wrong types are rejected. Optional sections are:
+
+- `desktop`: ordered unique `favorites` (at most 32 desktop IDs), `colorScheme`
+  (`light`/`dark`), boolean `enableAnimations`, and `dock`. Dock supports
+  `position` (`top`/`bottom`/`left`/`right`), integer `iconSize` (16–128) and
+  booleans `autoHide`, `extendHeight`, `showTrash`, `showMounts`.
+- `vscode`: unique `extensions` (at most 64 lowercase `publisher.extension`
+  IDs, normalized in sorted order) and allowlisted `settings`: `editor.fontSize`
+  (8–40), `editor.tabSize` (1–8), booleans `editor.insertSpaces`,
+  `editor.formatOnSave`, `editor.minimap.enabled`, `editor.wordWrap`
+  (`off`/`on`/`wordWrapColumn`/`bounded`), and `files.autoSave`
+  (`off`/`onFocusChange`/`onWindowChange`).
+- `browser`: `defaultApplication`, a desktop ID catalogued as a browser.
+
+Identifiers have a 128-byte ASCII limit. Desktop IDs end in `.desktop` and
+cannot contain paths, whitespace or control characters. There are no arbitrary
+files, commands, account selectors, download URLs, or whole-home imports.
+
+The catalog is a Nix attribute set containing `schemaVersion = 1`, `baseline`
+(a profile attribute set using the same schema), `applications` and `extensions`.
+Both lists are limited to 128 unique entries. Applications contain `id`
+(desktop ID), `package` (pinned package attribute) and optional boolean `browser`.
+Extensions contain `id`, matching `package = "vscode-extensions.<id>"`, and
+optional `requiredPackages` and `requiredExtensions` lists. Dependencies must
+be present explicitly; they are never installed or selected automatically.
+Fields omitted from the profile inherit the baseline; explicit lists replace
+baseline lists, including `[]` to clear them. An empty section does not erase
+baseline fields. Catalog declarations do not prove plugin compatibility or
+complete manifest dependencies.
+
+Every selected application/runtime must be in each generated host's declarative
+`environment.systemPackages`, including the controller in controller-only mode.
+Selected package identities must match the shared pin; different downstream
+package overrides are not silently treated as equivalent. VS Code preferences
+require `vscode`, desktop preferences require `gnome-shell`, and dock preferences
+require `gnomeExtensions.dash-to-dock`. Broken, insecure, unsupported-platform
+or unresolved required packages fail preparation. No live hosts are contacted.
+
+`nixoriumValidateWorkspaceCandidate` accepts raw candidate JSON text and checks
+the same schema, catalog and all-host prerequisites without saving or deploying.
+The candidate hook does not qualify extension loading or mutate sessions.
+Both profile text and catalog data travel through the offline installer. The
+template reads optional workspace files only when present, and gives a clear
+error if the pinned upstream lacks this capability. Do not remove operational
+home modules on the assumption that preparation replaces them.
+
 ## Public Flake outputs
 
 The upstream keeps its standalone example evaluable while private deployments
@@ -415,6 +474,7 @@ consume `lib.mkLab`. Important generated outputs include:
 - `deploymentStatus` for readiness blockers;
 - `nixoriumSoftware` for the supported pinned catalog, evaluated scopes, and managed declarations;
 - `nixoriumSoftwarePresets` for the normalized optional profile catalog, or `null` when a deployment does not provide one;
+- `nixoriumWorkspace` and `nixoriumValidateWorkspaceCandidate` for optional preparation metadata and prerequisite validation, not activation;
 - `nixoriumUpdateTargets` and `nixoriumOfflineCheck` for base-update validation;
 - `nixorium` and supporting Flake applications;
 - `pxeFirmware`, `installerBundle`, and the target-independent

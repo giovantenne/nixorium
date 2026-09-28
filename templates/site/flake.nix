@@ -22,8 +22,18 @@
       clientGroups = {
         # graphics = [ "pc01" "pc02" ];
       };
+      # Optional preparation metadata only; absence preserves legacy homes.
+      # Older pinned upstream versions receive no new mkLab arguments.
+      workspaceArguments =
+        if !(builtins.pathExists ./workspace-profile.json) then {}
+        else if !(nixorium.lib ? workspaceProfileSchemaVersion) then
+          throw "The pinned Nixorium version does not support workspace profile preparation"
+        else {
+          workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
+          workspaceCatalog = import ./workspace-catalog.nix;
+        };
       mkDeployment = candidateLabConfig: candidateLabSoftware:
-        nixorium.lib.mkLab {
+        nixorium.lib.mkLab ({
           deploymentSelf = self;
           labConfig = candidateLabConfig;
           labSoftware = candidateLabSoftware;
@@ -65,7 +75,7 @@
           hostModules = {
             # pc05 = [ ./modules/pc05.nix ];
           };
-        };
+        } // workspaceArguments);
       deployment = mkDeployment labConfig labSoftware;
       validateCandidate = rawSettings:
         let

@@ -208,6 +208,15 @@ checkout is needed while installing clients without internet access.
 
 ## Occasional interventions
 
+The template recognizes optional `workspace-profile.json` and
+`workspace-catalog.nix` only when the pinned upstream supports workspace
+preparation. They are not created by default. This interface validates
+preferences and prerequisites for the configured student on the controller
+and every client, and carries them into offline evaluation; it does **not**
+apply those preferences to homes. Continue using the existing local modules
+for operational home customization. A `nixoriumWorkspace.state` of `prepared`
+is not evidence of activation, and there is no workspace CLI/TUI workflow.
+
 Run the task-oriented dashboard from the repository root:
 
 ```sh

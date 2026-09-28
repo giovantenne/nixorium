@@ -354,6 +354,13 @@ failure or timeout must block publication.
   evidence. Preserve explicit dependencies, pinned identity/version checks and
   list-replacement semantics when composing the deployment baseline. It does
   not install software or qualify plugin loading.
+- Optional `mkLab.workspaceProfileJSON` (raw JSON text) and `workspaceCatalog`
+  expose preparation-only `nixoriumWorkspace` metadata and a candidate hook.
+  `mkLab` checks prerequisites against each generated host's actual declarative
+  system packages, including downstream overrides. Serialize both inputs into
+  the offline installer. `state = "prepared"` is not activation; absent input
+  must preserve legacy homes. The template must still work with older pins
+  when no workspace file exists.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.

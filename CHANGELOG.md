@@ -8,6 +8,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added an opt-in workspace preparation API with strict preference validation,
+  deployment-owned catalog/baseline resolution, pinned extension metadata and
+  prerequisite checks on the controller and every client. Preparation metadata
+  is preserved in the offline installer; it does not activate student-home
+  preferences or change legacy deployment behavior.
+
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes
   only authenticated computer inventory, temporary Internet control, and

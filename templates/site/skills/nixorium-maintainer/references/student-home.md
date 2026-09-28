@@ -22,6 +22,18 @@ There is no supported “capture this student's home” command in this contract
 If asked for snapshots as a new template feature, distinguish that upstream
 design request from the currently available declarative customization.
 
+## Optional workspace preparation metadata
+
+Some upstream pins expose `nixoriumWorkspace` and
+`nixoriumValidateWorkspaceCandidate`. They validate optional workspace JSON,
+catalog/baseline preferences and prerequisites across the controller and all
+clients. Their `prepared` state is not an active-home receipt: this interface
+does not seed homes, replace local modules, or provide workspace CLI commands.
+Do not migrate a working deployment merely because these outputs exist. Check
+the actual pinned capabilities and keep configuration, preparation and live
+activation distinct. Workspace data and catalog contents can enter the public
+Nix store; never include credentials or personal session data.
+
 ## VS Code extensions and settings
 
 For “prepare VS Code for Python”, inspect whether VS Code is selected for the

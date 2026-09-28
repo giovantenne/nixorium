@@ -211,6 +211,13 @@ cover failure modes; a separate assertion resolves an extension from the locked
 package set. No manifest is read from a derivation during evaluation. Passing
 this check proves neither live installed state nor extension loading.
 
+The `mk-lab` graph also checks workspace preparation against generated system
+packages, controller-only mode, downstream removals, unchanged representative
+system derivations and template compatibility without workspace input.
+`workspace-offline` compares system derivations and workspace metadata with
+the serialized installer, and `workspace-systems` builds its controller and representative
+client. Both build checks belong to the full checkpoint, not the quick loop.
+
 After the automated milestone, follow the documented VirtualBox recipe with
 the official Minimal ISO. Keep that result separate from physical-hardware
 evidence; neither is replaced by a simulated NixOS VM pass.

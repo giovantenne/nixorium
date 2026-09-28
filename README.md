@@ -320,6 +320,10 @@ deployment. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then read
 [`nixorium-developer` skill](skills/nixorium-developer/SKILL.md) before changing
 the API, modules, installers, or template.
 
+The optional [workspace preparation API](docs/system-reference.md#workspace-preparation)
+validates initial student preferences and pinned prerequisites. It is not a
+home-activation feature or a new TUI command; existing home behavior is unchanged.
+
 From a checkout with Nix available, run the normal fast validation gate:
 
 ```sh
