@@ -56,6 +56,11 @@ configuration, software, home customization, diagnostics, and operations.
 - The student intentionally cannot administer NetworkManager. Do not add that
   account to the `networkmanager` group or override its polkit denial without
   an explicit, reviewed change to the lab's security policy.
+- The teacher's controller TUI is intentionally restricted to computer
+  inventory, temporary Internet access, and reviewed client shutdown/restart
+  through the local classroom worker. Do not grant the teacher read access to
+  the administrator deployment, add the student to `nixorium-classroom`, or
+  bypass this boundary with sudo or copied private keys.
 
 ## Validation and reporting
 

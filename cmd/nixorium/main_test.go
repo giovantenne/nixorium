@@ -585,6 +585,10 @@ func TestParseShutdownCommandsAndSessionAcknowledgement(t *testing.T) {
 	if err != nil || apply.subcommand != "apply" || apply.on != "@lab" || apply.expect != "sha256:review" || !apply.yes {
 		t.Fatalf("shutdown apply = %+v, error = %v", apply, err)
 	}
+	restart, err := parseArguments([]string{"restart", "plan", "--on", "pc01", "--acknowledge-unknown-sessions"})
+	if err != nil || restart.command != "restart" || restart.subcommand != "plan" || restart.on != "pc01" || !restart.acknowledgeUnknown {
+		t.Fatalf("restart plan = %+v, error = %v", restart, err)
+	}
 	for _, arguments := range [][]string{
 		{"shutdown", "plan"},
 		{"shutdown", "apply", "--on", "pc01"},

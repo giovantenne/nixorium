@@ -21,6 +21,7 @@ func TestGalleryRenderingIsDeterministicAndSemantic(t *testing.T) {
 		"Deployment completed and verified",
 		"Type START to continue",
 		"Active user sessions will be shut down",
+		"Restricted teacher dashboard",
 	} {
 		if !strings.Contains(first, expected) {
 			t.Fatalf("generated gallery omits %q", expected)

@@ -24,6 +24,7 @@ type fakeShutdownSource struct {
 	acquireErr    error
 	observations  map[string]domain.ShutdownObservation
 	dispatch      map[string]domain.ShutdownDispatchResult
+	action        domain.ClientPowerAction
 	dispatchHosts []domain.HostMeta
 }
 
@@ -49,7 +50,8 @@ func (f *fakeShutdownSource) ShutdownObservations(_ context.Context, hosts []dom
 	}
 	return result
 }
-func (f *fakeShutdownSource) DispatchShutdowns(_ context.Context, hosts []domain.HostMeta, _ time.Duration) map[string]domain.ShutdownDispatchResult {
+func (f *fakeShutdownSource) DispatchPowerRequests(_ context.Context, hosts []domain.HostMeta, action domain.ClientPowerAction, _ time.Duration) map[string]domain.ShutdownDispatchResult {
+	f.action = action
 	f.dispatchHosts = append([]domain.HostMeta(nil), hosts...)
 	return f.dispatch
 }
@@ -171,5 +173,17 @@ func TestShutdownApplyDoesNotRetryBlindlyAfterUnconfirmedDispatch(t *testing.T) 
 	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
 	if report.State != "partial" || report.Unconfirmed != 1 || report.RetrySafe || !strings.Contains(report.Message, "Do not retry blindly") || !strings.Contains(report.Targets[0].TechnicalDetail, "connection closed") || strings.Contains(report.Targets[0].Detail, "SSH") {
 		t.Fatalf("unconfirmed result = %+v", report)
+	}
+}
+
+func TestRestartUsesDistinctReviewAndDispatchAction(t *testing.T) {
+	source, manager := shutdownFixture()
+	plan := manager.PlanAction(context.Background(), "/deployment", "pc01", domain.ShutdownProtectUnknown, domain.ClientRestart)
+	if plan.HasErrors() || plan.Action != domain.ClientRestart || plan.Confirmation != "RESTART" || plan.Operation != "restart-plan" {
+		t.Fatalf("restart plan = %+v", plan)
+	}
+	report := manager.ApplyPlan(context.Background(), plan, plan.ReviewToken)
+	if report.HasErrors() || report.Operation != "restart-apply" || report.Action != domain.ClientRestart || source.action != domain.ClientRestart {
+		t.Fatalf("restart report = %+v, dispatched action = %q", report, source.action)
 	}
 }

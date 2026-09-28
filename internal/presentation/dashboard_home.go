@@ -30,8 +30,21 @@ var dashboardTasks = []dashboardTask{
 var computersAreaTasks = []dashboardTask{
 	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Check reachability and compare observed systems with the intended revision"},
 	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
-	{id: "shutdown", shortcut: "x", title: "Shut down computers", description: "Send reviewed power-off requests to selected clients only"},
+	{id: "shutdown", shortcut: "x", title: "Power controls", description: "Shut down or restart selected client computers after review"},
 	{id: "internet", shortcut: "i", title: "Internet access", description: "Temporarily block or restore Internet on selected clients"},
+}
+
+var classroomComputerTasks = []dashboardTask{
+	computersAreaTasks[0],
+	computersAreaTasks[2],
+	computersAreaTasks[3],
+}
+
+func (model dashboardModel) availableComputerTasks() []dashboardTask {
+	if model.actions.ClassroomMode {
+		return classroomComputerTasks
+	}
+	return computersAreaTasks
 }
 
 var installationAreaTasks = []dashboardTask{
@@ -183,20 +196,30 @@ func (model dashboardModel) areaView(path, title, description string, tasks []da
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
+	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+	if model.actions.ClassroomMode && path == "Computers" {
+		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}}
+	}
 	return model.renderShell(tuiShell{
 		path:    []string{path},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
-		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}},
+		actions: actions,
 	})
 }
 
 func (model dashboardModel) computersAreaView() string {
+	title := "Manage client computers"
+	description := "Observed state is loaded only by Computer inventory or an operation that needs it."
+	if model.actions.ClassroomMode {
+		title = "Classroom controls"
+		description = "Check computers, control temporary Internet access, or review a shutdown or restart. Administrative configuration is not available here."
+	}
 	return model.areaView(
 		"Computers",
-		"Manage client computers",
-		"Observed state is loaded only by Computer inventory or an operation that needs it.",
-		computersAreaTasks,
+		title,
+		description,
+		model.availableComputerTasks(),
 		model.computers.areaCursor,
 	)
 }

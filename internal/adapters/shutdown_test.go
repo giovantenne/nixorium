@@ -77,8 +77,24 @@ func TestDispatchShutdownTreatsConnectionLossAsUnconfirmed(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	result := dispatchShutdown(context.Background(), domain.HostMeta{IP: "192.0.2.1"}, time.Second)
+	result := dispatchPowerRequest(context.Background(), domain.HostMeta{IP: "192.0.2.1"}, domain.ClientPowerOff, time.Second)
 	if result.Accepted || !strings.Contains(result.Detail, "connection closed") {
 		t.Fatalf("dispatch=%+v", result)
+	}
+}
+
+func TestDispatchPowerRequestUsesOnlyFixedSystemctlVerbs(t *testing.T) {
+	for _, test := range []struct {
+		action domain.ClientPowerAction
+		verb   string
+	}{
+		{domain.ClientPowerOff, "poweroff"},
+		{domain.ClientRestart, "reboot"},
+	} {
+		arguments := shutdownSSHArguments(domain.HostMeta{Name: "pc01", IP: "192.0.2.1"}, time.Second, "systemctl", test.verb, "--no-block")
+		joined := strings.Join(arguments, " ")
+		if !strings.Contains(joined, "systemctl "+test.verb+" --no-block") {
+			t.Fatalf("%s action is not fixed: %s", test.action, joined)
+		}
 	}
 }

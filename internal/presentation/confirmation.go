@@ -161,13 +161,17 @@ func ConfirmSoftwarePreset(input io.Reader, output io.Writer, report domain.Soft
 }
 
 func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPlanReport) (bool, error) {
-	fmt.Fprintln(output, "Client shutdown review")
+	label := "shutdown"
+	if report.Action == domain.ClientRestart {
+		label = "restart"
+	}
+	fmt.Fprintf(output, "Client %s review\n", label)
 	fmt.Fprintf(output, "Targets: %d eligible of %d selected computer(s)\n", report.Eligible, len(report.Targets))
 	fmt.Fprintln(output, "Controller: always excluded")
 	fmt.Fprintf(output, "Session safety: %s\n", shutdownPolicyLabel(report.Policy))
 	fmt.Fprintln(output, "Impact: unsaved user work may be lost; checks run again before dispatch")
 	if active := shutdownActiveCount(report); active > 0 {
-		fmt.Fprintf(output, "Explicit confirmation: %s authorizes shutdown of %d computer(s) with an active user session\n", report.Confirmation, active)
+		fmt.Fprintf(output, "Explicit confirmation: %s authorizes %s of %d computer(s) with an active user session\n", report.Confirmation, label, active)
 	}
 	fmt.Fprintln(output, "Outcome: acceptance confirms only that the operating system received the request, not physical power state")
 	fmt.Fprintln(output, "Retry: do not retry an unconfirmed request blindly")

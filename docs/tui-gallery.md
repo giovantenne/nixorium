@@ -210,7 +210,7 @@ r Refresh status  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
 ## Shutdown with active sessions
 
 ```text
-Nixorium  /  Computers  /  Shut down
+Nixorium  /  Computers  /  Power controls
 
 Shut down 2 eligible client(s)?
 
@@ -228,6 +228,48 @@ Access and session state are checked again immediately before requests are sent.
 An accepted request does not prove that a computer is physically off.
 
 Type SHUTDOWN to confirm shutdown of active sessions:
+> _
+
+Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+```
+
+## Restricted teacher dashboard
+
+```text
+Nixorium  /  Computers
+
+Classroom controls
+Check computers, control temporary Internet access, or review a shutdown or restart. Administrative configuration
+is not available here.
+
+› [h] Computer inventory
+  [x] Power controls
+  [i] Internet access
+
+Check reachability and compare observed systems with the intended revision
+
+↑/↓ Select  ·  Enter Open  ·  F1 Help  ·  q Quit
+```
+
+## Teacher restart review
+
+```text
+Nixorium  /  Computers  /  Power controls
+
+Restart 1 eligible client(s)?
+
+Selected  1
+Eligible  1
+Controller  excluded
+Session safety  unknown states protected
+
+✓ pc01 · Ready
+
+! Selected computers will be restarted; unsaved user work may be lost.
+Access and session state are checked again immediately before requests are sent.
+An accepted request does not prove that the computer completed its restart.
+
+Type RESTART to continue:
 > _
 
 Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help

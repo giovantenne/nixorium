@@ -237,9 +237,15 @@ an exact reviewed confirmation; unattended installation is disabled.
 > GNOME requires initial local approval of sharing, including on the
 > controller when broadcasting its screen.
 
-**Computers → Internet access** lets administrators temporarily block or restore
+**Computers → Internet access** lets administrators and the teacher temporarily block or restore
 Internet on selected clients. Laboratory access stays available, and reboot
 restores Internet. Offline computers receive no delayed command.
+
+On the controller, running `nixorium` as the configured teacher opens a
+restricted classroom dashboard with computer inventory, temporary Internet
+control, and reviewed shutdown/restart actions. It cannot open the private
+deployment, change configuration, deploy systems, install clients, or maintain
+the controller. Student accounts cannot access this worker or dashboard.
 
 Site settings, password hashes, public keys, and policy belong in the private
 deployment repository. Private SSH, cache-signing, and Veyon keys must stay out

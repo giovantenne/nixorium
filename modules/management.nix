@@ -676,7 +676,9 @@ in
       '';
     };
     users.groups.nixorium-operations = { };
-    users.users.admin.extraGroups = [ "nixorium-operations" ];
+    users.groups.nixorium-classroom = { };
+    users.users.admin.extraGroups = [ "nixorium-operations" "nixorium-classroom" ];
+    users.users.${labSettings.teacherUser}.extraGroups = [ "nixorium-classroom" ];
 
     environment.etc."nixorium/deployment-path" = {
       text = "${cfg.deploymentPath}\n";
@@ -896,6 +898,45 @@ in
           "/var/lib/nixorium/remote-install"
           "/var/lib/nixorium/coordination"
           # Only host trust data needs atomic replacement, never SSH keys/config.
+          "/home/admin/.ssh/nixorium-known-hosts"
+          "-/home/admin/.local/state/nixorium/operations"
+          "-/var/cache/nixorium/admin"
+        ];
+        NoNewPrivileges = true;
+        CapabilityBoundingSet = "";
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
+        LimitCORE = 0;
+        Restart = "on-failure";
+        RestartSec = "2s";
+      };
+    };
+
+    systemd.services.nixorium-classroom = {
+      description = "Restricted Nixorium classroom operations worker";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      path = [ pkgs.git pkgs.iputils pkgs.nix pkgs.openssh pkgs.systemd pkgs.util-linux ];
+      serviceConfig = {
+        Type = "simple";
+        ExecStart = "${nixoriumPackage}/bin/nixorium-classroom-worker";
+        User = "admin";
+        Group = "nixorium-classroom";
+        SupplementaryGroups = [ "nixorium-operations" ];
+        UMask = "0007";
+        RuntimeDirectory = "nixorium-classroom";
+        RuntimeDirectoryMode = "0770";
+        Environment = [
+          "XDG_CACHE_HOME=/var/cache/nixorium/admin"
+          "XDG_STATE_HOME=/home/admin/.local/state"
+        ];
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ProtectHome = "read-only";
+        ReadOnlyPaths = [ cfg.deploymentPath "/etc/nixorium/deployment-path" "/home/admin/.ssh/id_ed25519" "/home/admin/.ssh/id_ed25519.pub" ];
+        ReadWritePaths = [
+          "/run/nixorium-classroom"
+          "/var/lib/nixorium/coordination"
           "/home/admin/.ssh/nixorium-known-hosts"
           "-/home/admin/.local/state/nixorium/operations"
           "-/var/cache/nixorium/admin"

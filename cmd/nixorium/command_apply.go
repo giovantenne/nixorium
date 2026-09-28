@@ -14,8 +14,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
 
-func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, repository string, stdout, stderr io.Writer, requested string, policy domain.ShutdownSessionPolicy, expectedToken string, assumeYes, jsonOutput bool) int {
-	plan := manager.Plan(ctx, repository, requested, policy)
+func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, repository string, stdout, stderr io.Writer, requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction, expectedToken string, assumeYes, jsonOutput bool) int {
+	plan := manager.PlanAction(ctx, repository, requested, policy, action)
 	if plan.HasErrors() {
 		if jsonOutput {
 			_ = presentation.JSON(stdout, plan)
@@ -26,7 +26,7 @@ func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, reposit
 	}
 	if !assumeYes {
 		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Error: shutdown apply requires an interactive terminal or explicit --yes")
+			fmt.Fprintf(stderr, "Error: %s apply requires an interactive terminal or explicit --yes\n", optionsPowerCommand(action))
 			return 2
 		}
 		confirmationOutput := stdout
@@ -39,7 +39,7 @@ func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, reposit
 			return 1
 		}
 		if !approved {
-			fmt.Fprintln(confirmationOutput, "Shutdown cancelled; no request was sent.")
+			fmt.Fprintln(confirmationOutput, "Power action cancelled; no request was sent.")
 			return 0
 		}
 	}
@@ -57,6 +57,13 @@ func runShutdownApply(ctx context.Context, manager *app.ShutdownManager, reposit
 		return 1
 	}
 	return 0
+}
+
+func optionsPowerCommand(action domain.ClientPowerAction) string {
+	if action == domain.ClientRestart {
+		return "restart"
+	}
+	return "shutdown"
 }
 
 func parseSoftwareScope(value string) (domain.SoftwareScope, error) {

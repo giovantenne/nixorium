@@ -110,7 +110,10 @@ func (model dashboardModel) computersView() string {
 	var actions []tuiAction
 	if model.computers.hostDetail && len(hosts) > 0 {
 		lines = append(lines, model.computerDetail(hosts[min(model.computers.hostCursor, len(hosts)-1)]))
-		actions = []tuiAction{{key: "d", label: "Deploy"}, {key: "t", label: "Technical"}, {key: "i", label: "Diagnostics"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		actions = []tuiAction{{key: "t", label: "Technical"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		if !model.actions.ClassroomMode {
+			actions = append([]tuiAction{{key: "d", label: "Deploy"}, {key: "i", label: "Diagnostics"}}, actions...)
+		}
 	} else {
 		available, total := hostAvailability(model.computers.hosts.Hosts)
 		lines = append(lines, fmt.Sprintf("%d / %d reachable · %d up to date · %d update ready", available, total, model.computers.hosts.Deployment.Current, model.computers.hosts.Deployment.Outdated))
@@ -195,7 +198,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardHome:
 		lines = append(lines, taskHelp(dashboardTasks)...)
 	case dashboardComputersArea:
-		lines = append(lines, taskHelp(computersAreaTasks)...)
+		lines = append(lines, taskHelp(model.availableComputerTasks())...)
 	case dashboardInstallationArea:
 		lines = append(lines, taskHelp(installationAreaTasks)...)
 		lines = append(lines, "r  Reattach the recorded USB operation when available")
@@ -205,7 +208,10 @@ func (model dashboardModel) helpView() string {
 	case dashboardAdministration:
 		lines = append(lines, taskHelp(administrationTasks)...)
 	case dashboardHosts:
-		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail   i diagnostics", "d review a deployment for the focused computer", "Search owns all text keys until Enter or Esc.")
+		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail", "Search owns all text keys until Enter or Esc.")
+		if !model.actions.ClassroomMode {
+			lines = append(lines, "d review a deployment for the focused computer")
+		}
 	case dashboardDeploy:
 		if model.deployment.usbRecovery != nil {
 			lines = append(lines, "Enter runs the visible recovery action; it never starts deployment.",
@@ -218,7 +224,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardInternet:
 		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
-		lines = append(lines, "Space select   a select/deselect all   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state.")
+		lines = append(lines, "Space select   a select/deselect all   Tab shutdown/restart   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state or a completed restart.")
 	case dashboardSetup:
 		lines = append(lines, "Enter continue the observed stage   t full checklist")
 	case dashboardSettings:

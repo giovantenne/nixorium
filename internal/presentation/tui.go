@@ -12,6 +12,7 @@ import (
 )
 
 type DashboardActions struct {
+	ClassroomMode          bool
 	PlanInternet           func(string, domain.InternetAction) domain.InternetPlan
 	ApplyInternet          func(domain.InternetPlan) domain.InternetReport
 	RunningVersion         string
@@ -34,6 +35,7 @@ type DashboardActions struct {
 	PlanSoftwarePreset     func(domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport
 	SaveSoftwarePreset     func(domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport
 	PlanShutdown           func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
+	PlanPower              func(string, domain.ShutdownSessionPolicy, domain.ClientPowerAction) domain.ShutdownPlanReport
 	ApplyShutdown          func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
 	PlanDeployment         func(string) domain.DeploymentPlanReport
 	ApplyDeployment        func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport

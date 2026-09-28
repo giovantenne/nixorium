@@ -20,7 +20,7 @@ type ShutdownSource interface {
 	ClientOperationActive() (bool, error)
 	AcquireClientOperation() (io.Closer, error)
 	ShutdownObservations(context.Context, []domain.HostMeta, time.Duration) map[string]domain.ShutdownObservation
-	DispatchShutdowns(context.Context, []domain.HostMeta, time.Duration) map[string]domain.ShutdownDispatchResult
+	DispatchPowerRequests(context.Context, []domain.HostMeta, domain.ClientPowerAction, time.Duration) map[string]domain.ShutdownDispatchResult
 }
 
 type ShutdownManager struct {
@@ -33,14 +33,25 @@ func NewShutdownManager(source ShutdownSource) *ShutdownManager {
 }
 
 func (m *ShutdownManager) Plan(ctx context.Context, repository, requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+	return m.PlanAction(ctx, repository, requested, policy, domain.ClientPowerOff)
+}
+
+func (m *ShutdownManager) PlanAction(ctx context.Context, repository, requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
 	report := domain.ShutdownPlanReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "shutdown-plan",
 		State:         "blocked",
 		Requested:     requested,
+		Action:        action,
 		Policy:        policy,
 		Targets:       []domain.ShutdownTargetPlan{},
 		Issues:        []domain.ValidationIssue{},
+	}
+	if !action.Valid() {
+		return shutdownPlanIssue(report, "action", "power action must be poweroff or restart")
+	}
+	if action == domain.ClientRestart {
+		report.Operation = "restart-plan"
 	}
 	root, err := filepath.Abs(repository)
 	if err != nil {
@@ -75,19 +86,24 @@ func (m *ShutdownManager) Plan(ctx context.Context, repository, requested string
 	hosts := shutdownHostMeta(selected)
 	report.Targets, report.Eligible = shutdownTargetsFromObservations(hosts, m.source.ShutdownObservations(ctx, hosts, shutdownObservationTimeout), policy)
 	if report.Eligible == 0 {
-		report.Message = "No selected computer is currently eligible for shutdown. Nothing will be queued for later."
+		report.Message = "No selected computer is currently eligible for this power action. Nothing will be queued for later."
 		return shutdownPlanIssue(report, "targets", "power on a selected computer, restore management access, or review unknown-session risk")
 	}
 	report.State = "ready"
 	report.ExpiresAt = m.now().UTC().Truncate(shutdownReviewWindow).Add(shutdownReviewWindow)
 	report.ReviewToken = domain.ShutdownReviewToken(report)
-	report.Confirmation = "SHUTDOWN"
+	report.Confirmation = action.Confirmation()
 	report.Message = fmt.Sprintf("%d of %d selected computer(s) are eligible; checks will run again before requests are sent.", report.Eligible, len(report.Targets))
 	return report
 }
 
 func (m *ShutdownManager) ApplyPlan(ctx context.Context, plan domain.ShutdownPlanReport, expectedToken string) domain.ShutdownApplyReport {
 	report := shutdownApplyFromPlan(plan)
+	if !plan.Action.Valid() {
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "action", Message: "power action must be poweroff or restart"})
+		report.Message = "The power request was not started because its action is invalid."
+		return report
+	}
 	if plan.HasErrors() || plan.State != "ready" || plan.ReviewToken == "" {
 		report.Message = "Shutdown was not started because the reviewed plan is not ready."
 		return report
@@ -144,11 +160,15 @@ func (m *ShutdownManager) ApplyPlan(ctx context.Context, plan domain.ShutdownPla
 		eligible = append(eligible, domain.HostMeta{Name: target.Name, IP: target.IP})
 	}
 
-	dispatched := m.source.DispatchShutdowns(ctx, eligible, shutdownDispatchTimeout)
+	dispatched := m.source.DispatchPowerRequests(ctx, eligible, plan.Action, shutdownDispatchTimeout)
 	for _, host := range eligible {
 		result, found := dispatched[host.Name]
 		if found && result.Accepted {
-			outcomes[host.Name] = domain.ShutdownTargetOutcome{Name: host.Name, State: "accepted", Detail: "the operating system accepted the power-off request"}
+			detail := "the operating system accepted the power-off request"
+			if plan.Action == domain.ClientRestart {
+				detail = "the operating system accepted the restart request"
+			}
+			outcomes[host.Name] = domain.ShutdownTargetOutcome{Name: host.Name, State: "accepted", Detail: detail}
 			report.Accepted++
 		} else {
 			technicalDetail := "no dispatch result was returned"
@@ -177,7 +197,11 @@ func (m *ShutdownManager) ApplyPlan(ctx context.Context, plan domain.ShutdownPla
 		report.Message = fmt.Sprintf("Requests accepted for %d computer(s); %d not sent and %d unconfirmed. Do not retry blindly.", report.Accepted, report.NotSent, report.Unconfirmed)
 	default:
 		report.State = "completed"
-		report.Message = fmt.Sprintf("Power-off requests were accepted for all %d reviewed computer(s). Physical power state is not inferred from network loss.", report.Accepted)
+		if plan.Action == domain.ClientRestart {
+			report.Message = fmt.Sprintf("Restart requests were accepted for all %d reviewed computer(s). A completed reboot is not inferred from temporary network loss.", report.Accepted)
+		} else {
+			report.Message = fmt.Sprintf("Power-off requests were accepted for all %d reviewed computer(s). Physical power state is not inferred from network loss.", report.Accepted)
+		}
 	}
 	return report
 }
@@ -278,15 +302,20 @@ func shutdownPlanIssue(report domain.ShutdownPlanReport, field, message string) 
 }
 
 func shutdownApplyFromPlan(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
-	return domain.ShutdownApplyReport{
+	report := domain.ShutdownApplyReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "shutdown-apply",
 		State:         "blocked",
 		Repository:    plan.Repository,
 		Requested:     plan.Requested,
+		Action:        plan.Action,
 		Policy:        plan.Policy,
 		Targets:       []domain.ShutdownTargetOutcome{},
 		RetrySafe:     true,
 		Issues:        []domain.ValidationIssue{},
 	}
+	if plan.Action == domain.ClientRestart {
+		report.Operation = "restart-apply"
+	}
+	return report
 }

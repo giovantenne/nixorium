@@ -14,6 +14,7 @@ type shutdownModel struct {
 	cursor       int
 	chosen       map[string]bool
 	policy       domain.ShutdownSessionPolicy
+	action       domain.ClientPowerAction
 	plan         domain.ShutdownPlanReport
 	result       domain.ShutdownApplyReport
 	applying     bool
@@ -25,6 +26,7 @@ func newShutdownModel() shutdownModel {
 	return shutdownModel{
 		chosen: map[string]bool{},
 		policy: domain.ShutdownProtectUnknown,
+		action: domain.ClientPowerOff,
 	}
 }
 
@@ -71,6 +73,12 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 			for _, host := range hosts {
 				model.chosen[host.Name] = selectAll
 			}
+		case "tab":
+			if model.action == domain.ClientPowerOff {
+				model.action = domain.ClientRestart
+			} else {
+				model.action = domain.ClientPowerOff
+			}
 		case "enter":
 			requested := model.requested(hosts)
 			if requested == "" {
@@ -82,7 +90,7 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 		switch key.String() {
 		case "esc":
 			model.confirmation = ""
-			return model, shutdownIntent{kind: shutdownSelectionIntent, message: "Shutdown cancelled; no request was sent."}
+			return model, shutdownIntent{kind: shutdownSelectionIntent, message: "Power action cancelled; no request was sent."}
 		case "u":
 			if !shutdownHasUnknown(model.plan) {
 				return model, shutdownIntent{message: "No selected computer has an unknown session state."}
@@ -103,11 +111,11 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 			model.confirmation += " "
 		case "enter":
 			if model.plan.HasErrors() || model.plan.State != "ready" {
-				return model, shutdownIntent{message: "No eligible shutdown request can be sent from this plan."}
+				return model, shutdownIntent{message: "No eligible power request can be sent from this plan."}
 			}
 			if model.confirmation != model.plan.Confirmation {
 				model.confirmation = ""
-				return model, shutdownIntent{message: "Confirmation did not match; no shutdown request was sent."}
+				return model, shutdownIntent{message: "Confirmation did not match; no power request was sent."}
 			}
 			model.applying = true
 			model.confirmation = ""
@@ -146,7 +154,11 @@ func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.
 	}
 	switch intent.kind {
 	case shutdownCloseIntent:
-		model.screen = dashboardHome
+		if model.actions.ClassroomMode {
+			model.screen = dashboardComputersArea
+		} else {
+			model.screen = dashboardHome
+		}
 		model.message = ""
 	case shutdownSelectionIntent:
 		model.screen = dashboardShutdown
@@ -158,7 +170,7 @@ func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.
 			model.message = "Shutdown is not available in this deployment."
 			return model, nil
 		}
-		model.busy = "Rechecking access and sending reviewed power-off requests"
+		model.busy = "Rechecking access and sending the reviewed power requests"
 		plan := model.shutdown.plan
 		return model, func() tea.Msg { return dashboardShutdownApplyMsg{report: model.actions.ApplyShutdown(plan)} }
 	case shutdownHistoryIntent:
@@ -174,41 +186,49 @@ func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.
 }
 
 func (model dashboardModel) startShutdownPlan(requested string) (tea.Model, tea.Cmd) {
-	if model.actions.PlanShutdown == nil {
-		model.message = "Shutdown planning is not available in this deployment."
+	if model.actions.PlanPower == nil && (model.actions.PlanShutdown == nil || model.shutdown.action != domain.ClientPowerOff) {
+		model.message = "This power action is not available in this deployment."
 		return model, nil
 	}
 	model.busy = "Checking selected computers, user sessions and conflicting operations"
 	model.message = ""
 	policy := model.shutdown.policy
-	return model, func() tea.Msg { return dashboardShutdownPlanMsg{report: model.actions.PlanShutdown(requested, policy)} }
+	action := model.shutdown.action
+	return model, func() tea.Msg {
+		if model.actions.PlanPower != nil {
+			return dashboardShutdownPlanMsg{report: model.actions.PlanPower(requested, policy, action)}
+		}
+		return dashboardShutdownPlanMsg{report: model.actions.PlanShutdown(requested, policy)}
+	}
 }
 
 func (model dashboardModel) shutdownView() string {
 	context := shutdownViewContext{
-		height:   model.height,
-		dark:     model.isDark,
-		message:  model.message,
-		busy:     model.busy,
-		busyView: model.busyView(),
+		height:           model.height,
+		dark:             model.isDark,
+		message:          model.message,
+		busy:             model.busy,
+		busyView:         model.busyView(),
+		historyAvailable: model.actions.LoadLogs != nil,
 	}
 	return model.renderShell(model.shutdown.view(model.screen, model.report.Meta.Clients.Hosts, context))
 }
 
 type shutdownViewContext struct {
-	height   int
-	dark     bool
-	message  string
-	busy     string
-	busyView string
+	height           int
+	dark             bool
+	message          string
+	busy             string
+	busyView         string
+	historyAvailable bool
 }
 
 func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta, context shutdownViewContext) tuiShell {
-	shell := tuiShell{path: []string{"Computers", "Shut down"}}
+	shell := tuiShell{path: []string{"Computers", "Power controls"}}
 	if context.busy != "" {
 		shell.body = context.busyView
 		if model.applying {
-			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Power-off requests are being dispatched", detail: "Closing is disabled until the reviewed operation returns."}}
+			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Power requests are being dispatched", detail: "Closing is disabled until the reviewed operation returns."}}
 		}
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return shell
@@ -225,14 +245,17 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 		}
 	case dashboardShutdownResult:
 		shell.body = strings.Join(model.resultView(context), "\n")
-		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "History"}}
+		shell.actions = []tuiAction{{key: "r", label: "New review"}}
+		if context.historyAvailable {
+			shell.actions = append(shell.actions, tuiAction{key: "l", label: "History"})
+		}
 		if shutdownHasTechnicalDetail(model.result) {
 			shell.actions = append(shell.actions, tuiAction{key: "t", label: "Technical"})
 		}
 		shell.actions = append(shell.actions, tuiAction{key: "Enter", label: "Computers"}, tuiAction{key: "F1", label: "Help"})
 	default:
 		shell.body = strings.Join(model.selectionView(hosts, context), "\n")
-		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Check"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Tab", label: "Shut down / restart"}, {key: "Enter", label: "Check"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	}
 	if context.message != "" && context.message != model.plan.Message {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: context.message})
@@ -247,7 +270,11 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 			selected++
 		}
 	}
-	lines := []string{tuiSection("Which client computers should receive the request?", context.dark), tuiMuted("Computers are checked only after you continue. The controller is never included.", context.dark), "", fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
+	actionLabel := "Shut down"
+	if model.action == domain.ClientRestart {
+		actionLabel = "Restart"
+	}
+	lines := []string{tuiSection("Which client computers should receive the request?", context.dark), tuiMuted("Computers are checked only after you continue. The controller is never included.", context.dark), "", "Action  " + actionLabel, fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
 	start, end := listWindow(len(hosts), model.cursor, max(3, context.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
@@ -269,7 +296,13 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 
 func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []string) {
 	plan := model.plan
-	lines := []string{tuiSection(fmt.Sprintf("Shut down %d eligible client(s)?", plan.Eligible), context.dark), "", fmt.Sprintf("Selected  %d", len(plan.Targets)), fmt.Sprintf("Eligible  %d", plan.Eligible), "Controller  excluded", "Session safety  " + shutdownPolicyLabel(plan.Policy), ""}
+	verb := "Shut down"
+	pastVerb := "shut down"
+	if plan.Action == domain.ClientRestart {
+		verb = "Restart"
+		pastVerb = "restarted"
+	}
+	lines := []string{tuiSection(fmt.Sprintf("%s %d eligible client(s)?", verb, plan.Eligible), context.dark), "", fmt.Sprintf("Selected  %d", len(plan.Targets)), fmt.Sprintf("Eligible  %d", plan.Eligible), "Controller  excluded", "Session safety  " + shutdownPolicyLabel(plan.Policy), ""}
 	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-20))
 	for _, target := range plan.Targets[start:end] {
 		lines = append(lines, shutdownTargetStatus(target, context.dark))
@@ -277,11 +310,18 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 	if end < len(plan.Targets) {
 		lines = append(lines, tuiMuted(fmt.Sprintf("Showing %d of %d reviewed targets", end, len(plan.Targets)), context.dark))
 	}
-	warning := "Selected computers will be shut down; unsaved user work may be lost."
+	warning := "Selected computers will be " + pastVerb + "; unsaved user work may be lost."
 	if shutdownHasActive(plan) {
 		warning = "Active user sessions will be shut down; unsaved work may be lost."
+		if plan.Action == domain.ClientRestart {
+			warning = "Active user sessions will be interrupted by the restart; unsaved work may be lost."
+		}
 	}
-	lines = append(lines, "", tuiStatus(warning, tuiStatusAttention, context.dark), "Access and session state are checked again immediately before requests are sent.", "An accepted request does not prove that a computer is physically off.")
+	finalEvidence := "An accepted request does not prove that a computer is physically off."
+	if plan.Action == domain.ClientRestart {
+		finalEvidence = "An accepted request does not prove that the computer completed its restart."
+	}
+	lines = append(lines, "", tuiStatus(warning, tuiStatusAttention, context.dark), "Access and session state are checked again immediately before requests are sent.", finalEvidence)
 	if shutdownHasUnknown(plan) {
 		if plan.Policy == domain.ShutdownAcknowledgeUnknown {
 			lines = append(lines, "", tuiStatus("Unknown session risk acknowledged", tuiStatusAttention, context.dark), "Press u to protect unknown session states again.")
@@ -293,6 +333,9 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		confirmationPrompt := "Type " + plan.Confirmation + " to continue:"
 		if shutdownActiveCount(plan) > 0 {
 			confirmationPrompt = "Type " + plan.Confirmation + " to confirm shutdown of active sessions:"
+			if plan.Action == domain.ClientRestart {
+				confirmationPrompt = "Type " + plan.Confirmation + " to confirm restart of active sessions:"
+			}
 		}
 		return lines, []string{tuiSection(confirmationPrompt, context.dark), "> " + model.confirmation + "_"}
 	} else {
@@ -304,11 +347,15 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 func (model shutdownModel) resultView(context shutdownViewContext) []string {
 	report := model.result
 	success := report.State == "completed"
-	title := "Shutdown requests need attention"
+	actionLabel := "Shutdown"
+	if report.Action == domain.ClientRestart {
+		actionLabel = "Restart"
+	}
+	title := actionLabel + " requests need attention"
 	if success {
-		title = "Shutdown requests accepted"
+		title = actionLabel + " requests accepted"
 	} else if report.State == "blocked" {
-		title = "No shutdown request was sent"
+		title = "No " + strings.ToLower(actionLabel) + " request was sent"
 	}
 	lines := []string{tuiResult(title, success, context.dark), "", fmt.Sprintf("Accepted  %d    Not sent  %d    Unconfirmed  %d", report.Accepted, report.NotSent, report.Unconfirmed), ""}
 	for _, target := range report.Targets {
@@ -323,7 +370,11 @@ func (model shutdownModel) resultView(context shutdownViewContext) []string {
 			lines = append(lines, tuiMuted("  Technical: "+target.TechnicalDetail, context.dark))
 		}
 	}
-	lines = append(lines, "", report.Message, "", "Network loss alone is not evidence of physical power state.")
+	evidence := "Network loss alone is not evidence of physical power state."
+	if report.Action == domain.ClientRestart {
+		evidence = "Temporary network loss alone is not evidence of a completed restart."
+	}
+	lines = append(lines, "", report.Message, "", evidence)
 	return lines
 }
 

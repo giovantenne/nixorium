@@ -137,6 +137,9 @@ in
         "systemctl poweroff --no-block")
           printf 'accepted\n' >> /tmp/nixorium-test-shutdown-dispatch.log
           ;;
+        "systemctl reboot --no-block")
+          printf 'accepted\n' >> /tmp/nixorium-test-restart-dispatch.log
+          ;;
         *)
           exit 64
           ;;
@@ -454,7 +457,10 @@ in
     controller.succeed("nft list ruleset | grep -F lab0 | grep -F 5000 | grep -F 8080; nft list ruleset | grep -F lab0 | grep -F 67")
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
-    controller.succeed("id -nG admin | tr ' ' '\n' | grep -Fx nixorium-operations; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination)\" = root:nixorium-operations:770; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/operation.lock)\" = root:nixorium-operations:660")
+    controller.succeed("id -nG admin | tr ' ' '\n' | grep -Fx nixorium-operations; id -nG admin | tr ' ' '\n' | grep -Fx nixorium-classroom; id -nG teacher | tr ' ' '\n' | grep -Fx nixorium-classroom; ! id -nG student | tr ' ' '\n' | grep -Fx nixorium-classroom; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination)\" = root:nixorium-operations:770; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/operation.lock)\" = root:nixorium-operations:660")
+    controller.wait_for_unit("nixorium-classroom.service")
+    controller.wait_until_succeeds("test \"$(stat -c '%U:%G:%a' /run/nixorium-classroom/control.sock)\" = admin:nixorium-classroom:660")
+    controller.fail("su - student -c 'python3 -c \"import socket; s=socket.socket(socket.AF_UNIX); s.connect(\\\"/run/nixorium-classroom/control.sock\\\")\"'")
     controller.succeed("test \"$(cat /etc/nixorium/deployment-path)\" = /home/admin/nixorium-deployment; test \"$(stat -c '%U:%G:%a' /etc/nixorium/deployment-path)\" = root:root:444; systemctl cat nixorium-remote-install.service | grep -F '/etc/nixorium/deployment-path'; systemctl show nixorium-remote-install.service -p LimitCORE --value | grep -Fx 0; systemctl show nixorium-remote-install.service -p RestrictAddressFamilies --value | grep -Fw AF_NETLINK")
     controller.succeed("test -L /home/admin/.ssh/known_hosts; test \"$(stat -Lc '%U:%G:%a' /home/admin/.ssh/known_hosts)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /home/admin/.ssh/nixorium-known-hosts/.nixorium-known-hosts.lock)\" = admin:users:600; test \"$(stat -c '%U:%G:%a' /home/admin/.local/state/nixorium/operations)\" = admin:users:700")
     controller.succeed("systemctl show nixorium-remote-install.service -p Environment --value | grep -F 'XDG_STATE_HOME=/home/admin/.local/state'; systemctl show nixorium-remote-install.service -p ReadWritePaths --value | grep -F '/home/admin/.ssh/nixorium-known-hosts'; systemctl cat nixorium-remote-install.service | grep -F -- '-/home/admin/.local/state/nixorium/operations'")
@@ -685,7 +691,10 @@ in
     controller.succeed("git -C /tmp/deployment rm --cached -q secret-key")
     controller.succeed("mkdir -p /home/admin/nixorium-deployment")
     controller.succeed("cp -a /tmp/deployment/. /home/admin/nixorium-deployment/")
-    controller.succeed("chown -R admin:users /home/admin/nixorium-deployment")
+    controller.succeed("chown -R admin:users /home/admin/nixorium-deployment; chmod 0700 /home/admin/nixorium-deployment")
+    classroom_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium-classroom/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"overview"}\\n\'); value=json.loads(s.makefile().readline()); assert value["requestId"] == "0123456789abcdef0123456789abcdef" and value["state"] == "completed" and value["status"]["lab"]["controller"]["name"] == "pc99"'
+    controller.succeed("su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_probe)))
+    controller.fail("su - teacher -c 'test -r /home/admin/nixorium-deployment/flake.nix'")
     controller.succeed("su - admin -c 'cd /home/admin/nixorium-deployment && nixorium install usb status --id 0123456789abcdef0123456789abcdef --json' >/tmp/usb-status.json || test $? = 1; jq -e '.operationId == \"0123456789abcdef0123456789abcdef\" and .state == \"unavailable\"' /tmp/usb-status.json")
     controller.fail("cd /home/admin/nixorium-deployment && nixorium install usb status --id 0123456789abcdef0123456789abcdef --json")
     controller.succeed("ip -4 -o addr show dev lab0 scope global | grep -F '192.0.2.10/24'; ip -4 -o addr show dev lab0 scope global | grep -F '10.0.0.99/8'")
@@ -709,6 +718,21 @@ in
     controller.succeed("cmp /home/admin/nixorium-deployment/veyon-private-key.pem /etc/veyon/keys/private/teacher/key")
     controller.succeed("cmp /home/admin/nixorium-deployment/secret-key /var/lib/nixorium/keys/harmonia-secret-key")
     controller.succeed("test $(stat -c '%a' /home/admin/.ssh/id_ed25519 /var/lib/nixorium/keys/harmonia-secret-key | sort -u) = 600")
+    controller.succeed("printf 'restrict,command=\"/run/current-system/sw/bin/nixorium-test-shutdown-remote\" %s\n' \"$(cat /home/admin/nixorium-deployment/keys/admin-ssh.pub)\" > /root/.ssh/authorized_keys; chmod 0600 /root/.ssh/authorized_keys; systemctl reload sshd.service")
+    classroom_restart = "\n".join([
+        "import json, socket",
+        "path = '/run/nixorium-classroom/control.sock'",
+        "def call(request):",
+        "    connection = socket.socket(socket.AF_UNIX)",
+        "    connection.connect(path)",
+        "    connection.sendall((json.dumps(request) + '\\n').encode())",
+        "    return json.loads(connection.makefile().readline())",
+        "plan = call({'schemaVersion': 1, 'requestId': '11111111111111111111111111111111', 'operation': 'power-plan', 'requested': 'pc01', 'powerAction': 'restart', 'sessionPolicy': 'acknowledge-unknown'})",
+        "assert plan['powerPlan']['state'] == 'ready' and plan['powerPlan']['policy'] == 'acknowledge-unknown' and plan['powerPlan']['confirmation'] == 'RESTART', plan",
+        "result = call({'schemaVersion': 1, 'requestId': '22222222222222222222222222222222', 'operation': 'power-apply', 'powerPlan': plan['powerPlan']})",
+        "assert result['powerReport']['state'] == 'completed' and result['powerReport']['action'] == 'restart', result",
+    ])
+    controller.succeed("rm -f /tmp/nixorium-test-restart-dispatch.log; su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_restart)) + "; grep -Fx 'systemctl reboot --no-block' /tmp/nixorium-test-shutdown-ssh.log; test \"$(wc -l < /tmp/nixorium-test-restart-dispatch.log)\" = 1")
     controller.succeed("systemctl start nixorium-worker-sandbox-check.service")
     controller.succeed("journalctl -u nixorium-worker-sandbox-check.service --no-pager | grep -F -- '--- PASS: TestRemoteWorkerFilesystemSandbox'")
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")

@@ -277,6 +277,13 @@ Release from the matching changelog section.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. After every apply attempt it authenticates selected host state and records only revision-matching systems in a separate administrator-owned mode-0600 history; live host state remains authoritative.
 - Client shutdown expands only evaluated client identities and never the controller. Active sessions remain eligible after an explicit data-loss warning; when any are present, the review must state that the one-word `SHUTDOWN` confirmation authorizes their interruption. Preserve explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the same non-blocking lock used by deployment. Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.
+- Client restart shares the shutdown review and safety boundary but binds the
+  distinct action and `RESTART` confirmation; its adapter may additionally
+  issue only `systemctl reboot --no-block`. Never infer completion from network
+  loss. The teacher dashboard reaches inventory, Internet and client power only
+  through the group-private classroom worker running as `admin`; keep the
+  deployment mode 0700, exclude the student, reject repository/address/command
+  selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
 - The USB worker may write only the dedicated `.ssh/nixorium-known-hosts`
   directory for atomic host-trust updates; the enclosing `.ssh`, keys, and

@@ -126,7 +126,11 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 		record.Operation = report.Operation
 		record.State = report.State
 		record.Subject = fmt.Sprintf("%d selected client(s)", len(report.Targets))
-		record.Summary = fmt.Sprintf("shutdown requests: accepted=%d; not-sent=%d; unconfirmed=%d", report.Accepted, report.NotSent, report.Unconfirmed)
+		action := "shutdown"
+		if report.Action == domain.ClientRestart {
+			action = "restart"
+		}
+		record.Summary = fmt.Sprintf("%s requests: accepted=%d; not-sent=%d; unconfirmed=%d", action, report.Accepted, report.NotSent, report.Unconfirmed)
 	case domain.InternetReport:
 		record.Operation = report.Operation
 		record.State = report.State

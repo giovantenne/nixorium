@@ -26,7 +26,7 @@ func TestDemoRendererFitsSupportedLayouts(t *testing.T) {
 
 func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-09-19")
-	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 5 {
+	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 6 {
 		t.Fatalf("unexpected bundle metadata: %+v", bundle)
 	}
 	for _, scenario := range bundle.Scenarios {
@@ -143,6 +143,21 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	}
 	if strings.Contains(usbText, strings.Repeat("x", 12)) || !demoFramesContain(usb.Frames, "Compare the automatically observed fingerprint") || !demoFramesContain(usb.Frames, "Confirm the physical fingerprint match") || !demoFramesContain(usb.Frames, "Enter only the temporary password") || !demoFramesContain(usb.Frames, "Authorize reboot separately") || !demoFramesContain(usb.Frames, "Verify the installed identity after reboot") {
 		t.Fatal("USB installation demo exposes a secret or omits the separate reboot/verification boundary")
+	}
+	classroom := bundle.Scenarios[5]
+	classroomText := ""
+	for _, frame := range classroom.Frames {
+		classroomText += frame.Text
+	}
+	for _, expected := range []string{"Classroom controls", "Computer inventory", "Power controls", "Internet access", "Action  Restart", "Type RESTART", "Restart requests accepted"} {
+		if !strings.Contains(classroomText, expected) {
+			t.Fatalf("classroom demo omits %q", expected)
+		}
+	}
+	for _, forbidden := range []string{"Distribute the prepared system", "Installation", "Maintenance"} {
+		if strings.Contains(classroomText, forbidden) {
+			t.Fatalf("classroom demo exposes %q", forbidden)
+		}
 	}
 }
 

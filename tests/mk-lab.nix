@@ -333,6 +333,11 @@ assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe-
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe-recover";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe-recover".unitConfig.ConditionPathExists == "/var/lib/nixorium/pxe/session.json";
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-pxe";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-classroom";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services.nixorium-classroom.serviceConfig.User == "admin";
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services.nixorium-classroom.serviceConfig.Group == "nixorium-classroom";
+assert builtins.elem "nixorium-classroom" subnetLab.nixosConfigurations.pc99.config.users.users.${labConfig.teacherUser}.extraGroups;
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-classroom");
 assert subnetLab.nixosConfigurations.pc99.config.systemd.services."nixorium-pxe".serviceConfig.CapabilityBoundingSet == [
   "CAP_KILL"
   "CAP_NET_ADMIN"

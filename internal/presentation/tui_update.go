@@ -31,6 +31,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.setup = message.setup
 		if model.setupMode || setupNeedsImmediateAttention(message.setup) {
 			return model.beginComputerInstallation("")
+		} else if model.actions.ClassroomMode {
+			model.screen = dashboardComputersArea
 		} else {
 			model.screen = dashboardHome
 		}
@@ -988,7 +990,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		}
 		return model.openMaintenanceTask(key.String())
 	}
-	if key.String() == "i" && model.screen == dashboardHosts {
+	if key.String() == "i" && model.screen == dashboardHosts && !model.actions.ClassroomMode {
 		model.diagnosticReturn = model.screen
 		model.screen = dashboardDiagnostics
 		command := model.startDiagnostics()

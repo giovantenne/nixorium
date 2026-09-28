@@ -6,6 +6,20 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The configured teacher can now open a restricted classroom TUI on the
+  controller without access to the administrator-owned deployment. It exposes
+  only authenticated computer inventory, temporary Internet control, and
+  reviewed client shutdown or restart. A group-private local worker performs
+  those operations as the deployment owner while student accounts remain
+  excluded; configuration, deployment, installation and controller maintenance
+  are not delegated.
+- Added reviewed client restart to **Computers → Power controls** and the
+  `restart plan` / `restart apply` CLI. It reuses inventory/session rechecks,
+  expiring review tokens, the fleet operation lock and fixed SSH dispatch, and
+  never treats temporary network loss as proof of a completed reboot.
+
 ### Fixed
 
 - The student login setup now preserves the random deployment-owned wallpaper

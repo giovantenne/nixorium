@@ -191,14 +191,18 @@ func runUpdateCommand(ctx context.Context, repository string, options options, s
 
 func runShutdownCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
 	manager := app.NewShutdownManager(adapters.Local{})
+	action := domain.ClientPowerOff
+	if options.command == "restart" {
+		action = domain.ClientRestart
+	}
 	policy := domain.ShutdownProtectUnknown
 	if options.acknowledgeUnknown {
 		policy = domain.ShutdownAcknowledgeUnknown
 	}
 	if options.subcommand != "plan" {
-		return runShutdownApply(ctx, manager, repository, stdout, stderr, options.on, policy, options.expect, options.yes, options.json)
+		return runShutdownApply(ctx, manager, repository, stdout, stderr, options.on, policy, action, options.expect, options.yes, options.json)
 	}
-	report := manager.Plan(ctx, repository, options.on, policy)
+	report := manager.PlanAction(ctx, repository, options.on, policy, action)
 	var err error
 	if options.json {
 		err = presentation.JSON(stdout, report)

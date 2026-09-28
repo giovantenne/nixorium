@@ -72,9 +72,16 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	resolvedRepository, resolveErr := resolveRepository(options.repository)
 	if resolveErr == nil {
 		repository = resolvedRepository
-	} else if commandRequiresRepository(options) {
-		fmt.Fprintln(stderr, "Error:", resolveErr)
-		return 1
+	} else {
+		if options.command == "" && options.repository == "" {
+			if handled, code := tryRunClassroomDashboard(ctx, stderr); handled {
+				return code
+			}
+		}
+		if commandRequiresRepository(options) {
+			fmt.Fprintln(stderr, "Error:", resolveErr)
+			return 1
+		}
 	}
 
 	local := adapters.Local{}
@@ -134,7 +141,7 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		return runSoftwareCommand(ctx, repository, options, stdout, stderr)
 	case "internet":
 		return runInternetCommand(ctx, repository, options, stdout, stderr)
-	case "shutdown":
+	case "shutdown", "restart":
 		return runShutdownCommand(ctx, repository, options, stdout, stderr)
 	case "install":
 		return runInstallCommand(ctx, repository, options, stdout, stderr)
@@ -293,6 +300,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		PlanShutdown: func(requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 			return shutdownManager.Plan(ctx, repository, requested, policy)
+		},
+		PlanPower: func(requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
+			return shutdownManager.PlanAction(ctx, repository, requested, policy, action)
 		},
 		ApplyShutdown: func(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
 			report := shutdownManager.ApplyPlan(ctx, plan, plan.ReviewToken)
@@ -654,8 +664,8 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "preset-plan"
 				continue
 			}
-			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "shutdown" && result.command != "internet") || result.subcommand != "" {
-				return options{}, errors.New("plan must follow config, deploy, controller, update, software, shutdown, or git commit")
+			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "shutdown" && result.command != "restart" && result.command != "internet") || result.subcommand != "" {
+				return options{}, errors.New("plan must follow config, deploy, controller, update, software, shutdown, restart, Internet, or git commit")
 			}
 			result.subcommand = "plan"
 		case "keys":
@@ -682,15 +692,19 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "preset-apply"
 				continue
 			}
-			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown" || result.command == "internet") && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown" || result.command == "restart" || result.command == "internet") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
 			if result.command != "setup" || result.subcommand != "" {
-				return options{}, errors.New("apply must follow config, deploy, controller, update, software, shutdown, or setup")
+				return options{}, errors.New("apply must follow config, deploy, controller, update, software, shutdown, restart, Internet, or setup")
 			}
 			result.subcommand = "apply"
 		case "restart":
+			if result.command == "" {
+				result.command = "restart"
+				continue
+			}
 			if result.command != "services" || result.subcommand != "" {
 				return options{}, errors.New("restart must follow services")
 			}
@@ -757,8 +771,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown" || result.command == "internet") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, shutdown apply, services restart, or git commit apply")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown" || result.command == "restart" || result.command == "internet") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, shutdown/restart apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -772,11 +786,11 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown" || result.command == "internet") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, shutdown apply, or git commit apply")
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "shutdown" || result.command == "restart" || result.command == "internet") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, shutdown/restart apply, or git commit apply")
 	}
-	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "internet") || (result.subcommand != "plan" && result.subcommand != "apply")) {
-		return options{}, errors.New("--on is only valid with deploy or shutdown plan/apply")
+	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet") || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, or Internet plan/apply")
 	}
 	if result.command == "deploy" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("deploy requires the plan or apply subcommand")
@@ -845,14 +859,14 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "software" && result.subcommand == "preset-apply" && result.expect == "" {
 		return options{}, errors.New("software preset apply requires --expect from software preset plan")
 	}
-	if result.command == "shutdown" && result.subcommand != "plan" && result.subcommand != "apply" {
-		return options{}, errors.New("shutdown requires the plan or apply subcommand")
+	if (result.command == "shutdown" || result.command == "restart") && result.subcommand != "plan" && result.subcommand != "apply" {
+		return options{}, fmt.Errorf("%s requires the plan or apply subcommand", result.command)
 	}
-	if result.command == "shutdown" && result.on == "" {
-		return options{}, fmt.Errorf("shutdown %s requires --on", result.subcommand)
+	if (result.command == "shutdown" || result.command == "restart") && result.on == "" {
+		return options{}, fmt.Errorf("%s %s requires --on", result.command, result.subcommand)
 	}
-	if result.command == "shutdown" && result.subcommand == "apply" && result.expect == "" {
-		return options{}, errors.New("shutdown apply requires --expect from shutdown plan")
+	if (result.command == "shutdown" || result.command == "restart") && result.subcommand == "apply" && result.expect == "" {
+		return options{}, fmt.Errorf("%s apply requires --expect from %s plan", result.command, result.command)
 	}
 	if result.internetAction != "" && result.command != "internet" {
 		return options{}, errors.New("--action is only valid with internet")
@@ -865,8 +879,8 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("internet apply requires --expect from internet plan")
 		}
 	}
-	if result.acknowledgeUnknown && result.command != "shutdown" {
-		return options{}, errors.New("--acknowledge-unknown-sessions is only valid with shutdown")
+	if result.acknowledgeUnknown && result.command != "shutdown" && result.command != "restart" {
+		return options{}, errors.New("--acknowledge-unknown-sessions is only valid with shutdown or restart")
 	}
 	if result.command == "services" && result.subcommand != "" && result.subcommand != "restart" {
 		return options{}, errors.New("services accepts only the restart subcommand")
@@ -1015,7 +1029,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|internet plan|internet apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       install usb prepare --host <pcNN> builds only pinned target-independent artifacts")
 	fmt.Fprintln(writer, "       install usb start --host <pcNN> interactively verifies the live ISO, disk, and destructive review")
 	fmt.Fprintln(writer, "       install usb {status|reconcile|reboot|verify|cancel|close} --id <operation-id>")
@@ -1030,6 +1044,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       internet apply --on <clients|@lab> --action <block|unblock> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")
 	fmt.Fprintln(writer, "       shutdown apply --on <targets> [--acknowledge-unknown-sessions] --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       restart plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")
+	fmt.Fprintln(writer, "       restart apply --on <targets> [--acknowledge-unknown-sessions] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       deploy plan --on <pcNN[,pcNN...]|@lab>")
 	fmt.Fprintln(writer, "       deploy apply --on <targets> --expect <git-revision> [--yes]")
 	fmt.Fprintln(writer, "       controller plan")

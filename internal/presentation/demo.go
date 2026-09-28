@@ -62,7 +62,48 @@ func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) 
 			renderShutdownDemo(sourceCommit, width, height),
 			renderSoftwareProfileDemo(sourceCommit, width, height),
 			renderUSBInstallationDemo(sourceCommit, width, height),
+			renderClassroomDemo(sourceCommit, width, height),
 		},
+	}
+}
+
+func renderClassroomDemo(revision string, width, height int) DemoScenario {
+	actions := demoActions()
+	actions.ClassroomMode = true
+	actions.PlanPower = func(requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
+		return domain.ShutdownPlanReport{
+			SchemaVersion: domain.SchemaVersion, Operation: "restart-plan", State: "ready", Repository: "/demo/lab", Requested: requested,
+			Action: action, Policy: policy, Targets: []domain.ShutdownTargetPlan{{Name: "pc01", IP: "10.42.0.11", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}},
+			Eligible: 1, ReviewToken: "sha256:classroom-demo", Confirmation: "RESTART", Message: "The selected client is ready for restart.", Issues: []domain.ValidationIssue{},
+		}
+	}
+	actions.ApplyShutdown = func(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
+		return domain.ShutdownApplyReport{
+			SchemaVersion: domain.SchemaVersion, Operation: "restart-apply", State: "completed", Repository: plan.Repository, Requested: plan.Requested,
+			Action: plan.Action, Policy: plan.Policy, Targets: []domain.ShutdownTargetOutcome{{Name: "pc01", State: "accepted", Detail: "The operating system accepted the restart request"}},
+			Accepted: 1, Message: "Restart request accepted; completion is not inferred from temporary network loss.", Issues: []domain.ValidationIssue{},
+		}
+	}
+	r := newDemoRecorder(actions, revision, width, height)
+	r.model.screen = dashboardComputersArea
+	r.capture("Overview", 1600)
+	r.pressAndCapture(demoCode(tea.KeyDown), "Choose Power controls", 700)
+	r.key(demoCode(tea.KeyEnter))
+	r.capture("Select clients for a classroom power action", 1800)
+	r.pressAndCapture(tea.KeyPressMsg{Code: tea.KeyTab}, "Choose restart instead of shutdown", 900)
+	r.pressAndCapture(demoCode(tea.KeySpace), "Select pc01", 700)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Review the client restart", 2500)
+	r.typeAndCapture("RESTART", "Type the restart confirmation")
+	apply := r.key(demoCode(tea.KeyEnter))
+	r.capture("Send the reviewed restart request", 650)
+	r.command(apply)
+	r.capture("Report the accepted restart request", 3200)
+	return DemoScenario{
+		ID:          "classroom",
+		Title:       "Use the restricted teacher dashboard",
+		Description: "The teacher sees only inventory, Internet and reviewed power controls. This example restarts one client without exposing deployment or controller administration.",
+		Frames:      r.frames,
 	}
 }
 

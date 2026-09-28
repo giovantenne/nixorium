@@ -181,19 +181,28 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			return model, command
 		}
 	case dashboardComputersArea:
+		tasks := model.availableComputerTasks()
 		action := key.String()
 		if action == "enter" {
-			action = computersAreaTasks[model.computers.areaCursor].shortcut
+			action = tasks[model.computers.areaCursor].shortcut
 		}
 		switch action {
 		case "esc", "left":
-			model.screen = dashboardHome
-			model.message = ""
+			if !model.actions.ClassroomMode {
+				model.screen = dashboardHome
+				model.message = ""
+			}
 		case "up", "k":
 			model.computers.areaCursor = max(0, model.computers.areaCursor-1)
 		case "down", "j":
-			model.computers.areaCursor = min(len(computersAreaTasks)-1, model.computers.areaCursor+1)
-		case "h", "d", "x", "i":
+			model.computers.areaCursor = min(len(tasks)-1, model.computers.areaCursor+1)
+		case "d":
+			if model.actions.ClassroomMode {
+				return model, nil
+			}
+			model.areaReturn = dashboardComputersArea
+			return model.openComputerTask(action)
+		case "h", "x", "i":
 			model.areaReturn = dashboardComputersArea
 			return model.openComputerTask(action)
 		}
@@ -564,6 +573,8 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			if model.computers.configurationState.Operation != "" {
 				model.screen = dashboardSoftware
+			} else if model.actions.ClassroomMode {
+				model.screen = dashboardComputersArea
 			} else {
 				model.screen = dashboardHome
 			}
@@ -581,6 +592,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.computers.hostTechnical = !model.computers.hostTechnical
 			model.computers.hostDetail = true
 		case "d":
+			if model.actions.ClassroomMode {
+				return model, nil
+			}
 			hosts := model.filteredHosts()
 			if len(hosts) > 0 {
 				model.screen = dashboardDeploy

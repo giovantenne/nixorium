@@ -59,9 +59,13 @@ state snapshot: controller evidence comes from the matching durable activation
 record and active closure, while client currency comes from authenticated live
 observations. Historical deployment records are never promoted to current
 state. Git recording and client deployment remain separate operations.
-Reviewed client shutdown now uses the same CLI/TUI application service,
+Reviewed client shutdown and restart now use the same CLI/TUI application service,
 evaluated identities, session observations, expiring review, shared client
-operation lock, and fixed SSH request without claiming physical power state.
+operation lock, and fixed SSH requests without claiming physical power state or
+a completed reboot. The teacher-facing dashboard reaches only inventory,
+Internet and these power operations through a group-private local worker. The
+worker retains the fixed administrator-owned deployment and SSH identity;
+neither the repository nor general management callbacks are delegated.
 End-to-end documentation and physical validation remain tracked externally.
 
 Important constraints in the current implementation are:
@@ -89,6 +93,11 @@ Important constraints in the current implementation are:
 - the student identity is excluded from the `networkmanager` group and denied
   all NetworkManager polkit actions, while teacher and admin retain management
   access and NetworkManager continues providing system connectivity;
+- the `nixorium-classroom` group can connect only to the controller's local
+  classroom worker. The teacher is a member, the student is not, and the
+  mode-0700 deployment remains owned by `admin`. The worker exposes a closed
+  typed protocol for inventory, Internet and client power actions rather than
+  a shell, repository path override, arbitrary address or systemd unit;
 
 ## Architectural goals and invariants
 
@@ -218,6 +227,7 @@ nixorium config             review or change managed settings
 nixorium hosts              inspect configured machines
 nixorium deploy             build and deploy selected machines
 nixorium shutdown           review and request power-off for selected clients
+nixorium restart            review and request restart for selected clients
 nixorium controller         review, rebuild, activate, and verify the controller
 nixorium pxe                prepare, start, inspect, stop, or recover PXE mode
 nixorium services           inspect services; restart only the signed cache
@@ -276,7 +286,7 @@ hosts. Retrying is convergent: it requires a fresh valid review and rebuilds
 before applying again. Direct Colmena remains an advanced compatibility
 surface.
 
-`shutdown plan --on` accepts the same explicit client selector grammar as
+`shutdown plan --on` and `restart plan --on` accept the same explicit client selector grammar as
 deployment but never permits the controller. It observes TCP reachability,
 authenticated SSH access, and the exact `active`/`idle` output of the fixed
 `nixorium-session-state` helper installed in every managed host generation.
@@ -286,23 +296,37 @@ sessions remain eligible after an explicit data-loss warning; unknown session
 state requires the distinct `acknowledge-unknown` policy and a new reviewed
 plan.
 
-The ready plan binds repository, normalized targets, evaluated addresses,
-observations, policy, and an expiry window to a review token and the one-word
-`SHUTDOWN` confirmation. If active sessions are present, the review states
+The ready plan binds action, repository, normalized targets, evaluated addresses,
+observations, policy, and an expiry window to a review token and the matching
+one-word `SHUTDOWN` or `RESTART` confirmation. If active sessions are present, the review states
 explicitly that this word authorizes their interruption. `shutdown apply`
-validates that reviewed plan, takes the
+or `restart apply` validates that reviewed plan, takes the
 same non-blocking client-operation lock used by deployment, rejects active or
 degraded PXE networking, reevaluates inventory, and repeats session checks
 immediately before dispatch. The adapter receives only evaluated host metadata
 and constructs fixed non-interactive SSH argument arrays for
-`nixorium-session-state` and `systemctl poweroff --no-block`; presentation
+`nixorium-session-state`, `systemctl poweroff --no-block`, or
+`systemctl reboot --no-block`; presentation
 cannot provide a command, address, or shell fragment.
 
 Per-target outcomes are limited to `accepted`, `not-sent`, and `unconfirmed`.
 Accepted means only that the operating system accepted the request. A lost SSH
 connection or subsequent network absence never proves physical power state,
-and an unconfirmed dispatch is explicitly not safe for blind retry. Operation
+or that a restart completed, and an unconfirmed dispatch is explicitly not safe for blind retry. Operation
 history stores the bounded typed outcome rather than remote command output.
+
+When the configured teacher starts `nixorium` on the controller, ordinary
+repository discovery fails because `/home/admin/nixorium-deployment` remains
+mode 0700. The frontend then connects to `/run/nixorium-classroom/control.sock`,
+whose parent and socket are group-private to `nixorium-classroom`. The worker
+runs as `admin`, reads only the declaratively fixed deployment, and composes the
+same inspector, Internet and power application managers used by the full
+dashboard. Its response supplies only the typed status/plan/result needed by a
+restricted Computers area; presentation hides and ignores deployment and every
+maintenance shortcut. Filesystem permissions deny the student before protocol
+handling. Request content never selects a repository, SSH command, address or
+privileged unit, and apply rechecks all client identities against the fixed
+deployment.
 
 `logs` lists at most the newest 50 recognized deployment logs in the current
 administrator's XDG state; it does not require a deployment checkout. It also
@@ -357,9 +381,9 @@ Failures state what failed, what was left intact, whether retry is safe, and
 the next action. ASCII text conveys critical state; color and Unicode are
 enhancements only. The layout targets ordinary 80-column terminals and SSH.
 
-The implemented installation-mode, computer-inventory, deployment, shutdown, and update
+The implemented installation-mode, computer-inventory, deployment, power, Internet, and update
 screens follow this structure. Presentation callbacks invoke typed PXE
-lifecycle, host-inspection, deployment, shutdown, and upstream-update services; the TUI
+lifecycle, host-inspection, deployment, power, Internet, and upstream-update services; the TUI
 itself contains no command execution, log creation, locking, systemd policy,
 network/filesystem mutation, or CLI-output parsing. It renders reconciled state,
 runs host probes only when the inventory is opened/refreshed, and shows exact
@@ -986,8 +1010,8 @@ Testing is layered:
   PXE start/stop/recovery, the remote worker's unit/socket/ownership and orphan
   recovery boundaries, mutual PXE/USB exclusion, permission boundaries, CLI
   status, fake-Colmena success/failure/retry, a forced-command SSH shutdown
-  boundary, and real PTY traversals of reviewed installation, deployment, and
-  shutdown flows;
+  boundary, the group-private classroom worker with student exclusion, and real
+  PTY traversals of reviewed installation, deployment, and power flows;
 - the remote-client VM test uses a real signed Harmonia closure and exercises
   wrong signatures, unreachable cache, boot-media/disk/NIC/key refusals,
   post-Disko interruption, exact-operation resume without a second Disko run,

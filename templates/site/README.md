@@ -58,8 +58,14 @@ rename later.
 The student session uses the network configured by the system but cannot change
 NetworkManager connections, radios, DNS, or other host network state through
 GNOME, `nmcli`, or `nmtui`. Teacher and administrator accounts retain network
-management access. Keep this role boundary unless the deployment has an
-explicitly reviewed reason to relax it.
+management access. On the controller, the teacher can also run `nixorium` from
+their own home to open a restricted classroom dashboard: computer inventory,
+temporary Internet control, and reviewed shutdown/restart actions only. The
+teacher never receives read access to the administrator's private deployment;
+configuration, software, Git, installation, deployment, updates, logs and
+controller maintenance remain unavailable. Student accounts cannot access the
+classroom worker. Keep these role boundaries unless the deployment has an
+explicitly reviewed reason to relax them.
 
 After the controller's first reboot, sign in as `admin` and run:
 
@@ -119,7 +125,8 @@ settings are accepted for compatibility but no longer select a backend.
 
 ## Temporary Internet access
 
-To restrict browsing during a lesson, open **Computers → Internet access**,
+As `admin` or the configured teacher, open **Computers → Internet access**
+to restrict browsing during a lesson,
 select clients, choose **block** or **unblock** with Tab, and review before
 applying. Internet returns after each client reboots. The lab's IPv4 subnet,
 SSH and Veyon remain available; other IPv4/IPv6 destinations are blocked.
@@ -232,7 +239,7 @@ spinner and the current plain-language action.
 
 | Area | Purpose |
 |---|---|
-| **Computers** | Inspect, distribute, control Internet access, or shut down selected clients |
+| **Computers** | Inspect, distribute, control Internet access, or shut down/restart selected clients |
 | **Installation** | Configure the lab, install through PXE or USB/SSH, and recover interrupted installation state |
 | **Software** | Review configured packages, search the pin, choose scope, and save/apply changes |
 | **Maintenance** | Change settings, update/rebuild the controller, inspect services, Git, logs, and diagnostics |
@@ -457,10 +464,10 @@ state. Inspect the log and fresh **Computer inventory** results, make a new plan
 and retry; never infer rollback or completion from a lost terminal. `--yes` is
 for deliberate automation and never removes the revision check.
 
-### Shut down computers
+### Power controls
 
-Open **Shut down computers**, select the intended clients, and continue to run
-the preflight. The controller is never selectable. Computers that are off,
+Open **Power controls**, choose shutdown or restart with Tab, select the
+intended clients, and continue to run the preflight. The controller is never selectable. Computers that are off,
 unreachable, or lack authenticated management access remain visible as not
 sent; Nixorium does not queue a request for later.
 
@@ -475,11 +482,14 @@ nix run .#nixorium -- shutdown plan --on pc01,pc02
 nix run .#nixorium -- shutdown plan --on @lab
 nix run .#nixorium -- shutdown apply --on @lab \
   --expect REVIEW_TOKEN
+nix run .#nixorium -- restart plan --on @lab
+nix run .#nixorium -- restart apply --on @lab \
+  --expect REVIEW_TOKEN
 ```
 
 Planning checks installation/network recovery and concurrent client work as
 well as access and sessions. When an active session is present, the review says
-explicitly that `SHUTDOWN` authorizes interrupting it. Apply requires that single word (or explicit
+explicitly that `SHUTDOWN` or `RESTART` authorizes interrupting it. Apply requires the matching single word (or explicit
 automation-only `--yes`), takes the same client-operation lock as deployment,
 and repeats inventory, conflict, and session checks immediately before sending
 the fixed operating-system request. Use
@@ -488,7 +498,7 @@ that risk.
 
 Results are `accepted`, `not-sent`, or `unconfirmed`. Accepted means the remote
 operating system accepted the request; loss of network contact does not prove
-physical power state. An unconfirmed result may have taken effect, so inspect
+physical power state or a completed reboot. An unconfirmed result may have taken effect, so inspect
 the target instead of retrying blindly.
 
 ### Operation logs
@@ -761,6 +771,8 @@ nix run .#nixorium -- deploy plan --on @lab
 nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 nix run .#nixorium -- shutdown plan --on @lab
 nix run .#nixorium -- shutdown apply --on @lab --expect REVIEW_TOKEN
+nix run .#nixorium -- restart plan --on @lab
+nix run .#nixorium -- restart apply --on @lab --expect REVIEW_TOKEN
 nix run .#nixorium -- controller plan
 nix run .#nixorium -- controller apply --expect REVISION_FROM_PLAN
 nix run .#nixorium -- services

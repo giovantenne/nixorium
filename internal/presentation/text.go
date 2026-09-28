@@ -670,7 +670,11 @@ func SoftwareChangeApplyText(writer io.Writer, report domain.SoftwareChangeApply
 }
 
 func ShutdownPlanText(writer io.Writer, report domain.ShutdownPlanReport) {
-	fmt.Fprintf(writer, "Shutdown plan: %s\n", strings.ToUpper(report.State))
+	label := "Shutdown"
+	if report.Action == domain.ClientRestart {
+		label = "Restart"
+	}
+	fmt.Fprintf(writer, "%s plan: %s\n", label, strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Targets:       %s\n", report.Requested)
 	fmt.Fprintf(writer, "Eligible:      %d/%d\n", report.Eligible, len(report.Targets))
 	fmt.Fprintf(writer, "Session safety: %s\n", shutdownPolicyLabel(report.Policy))
@@ -695,7 +699,11 @@ func ShutdownPlanText(writer io.Writer, report domain.ShutdownPlanReport) {
 }
 
 func ShutdownApplyText(writer io.Writer, report domain.ShutdownApplyReport) {
-	fmt.Fprintf(writer, "Shutdown requests: %s\n", strings.ToUpper(report.State))
+	label := "Shutdown"
+	if report.Action == domain.ClientRestart {
+		label = "Restart"
+	}
+	fmt.Fprintf(writer, "%s requests: %s\n", label, strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Accepted: %d  Not sent: %d  Unconfirmed: %d\n", report.Accepted, report.NotSent, report.Unconfirmed)
 	for _, target := range report.Targets {
 		fmt.Fprintf(writer, "  %-10s %-11s %s\n", target.Name, target.State, target.Detail)

@@ -140,7 +140,15 @@ current Git revision. Its timestamp identifies one refreshable snapshot; if
 the repository revision changes while the snapshot is collected, the view is
 partial and must not be treated as verified.
 
-## Client shutdown
+## Classroom controls and client power
+
+On the controller, the configured teacher can run `nixorium` from their normal
+home. The restricted dashboard exposes only authenticated computer inventory,
+temporary Internet access, and reviewed client shutdown/restart. It deliberately
+does not expose or make readable the administrator deployment, settings,
+software, Git, PXE/USB installation, deployment, updates, logs, services, or
+controller activation. Do not add the teacher to `wheel`, share the deployment
+or SSH key, or add students to `nixorium-classroom` to expand this boundary.
 
 Use the reviewed client-only workflow:
 
@@ -148,6 +156,8 @@ Use the reviewed client-only workflow:
 nixorium shutdown plan --on pc05
 nixorium shutdown plan --on @lab
 nixorium shutdown apply --on @lab --expect REVIEW_TOKEN
+nixorium restart plan --on pc05
+nixorium restart apply --on pc05 --expect REVIEW_TOKEN
 ```
 
 The controller is never a valid target. Planning checks evaluated client
@@ -159,11 +169,11 @@ session state remains blocked unless both plan and apply use
 shown as not sent and are never queued for later.
 
 When the plan includes an active session, the review states explicitly that
-`SHUTDOWN` authorizes interrupting it. Apply requires that single word, takes the same lock as
+`SHUTDOWN` or `RESTART` authorizes interrupting it. Apply requires the matching single word, takes the same lock as
 deployment, and repeats inventory, conflict, and session checks immediately
 before issuing the fixed operating-system request. Results describe only
 `accepted`, `not-sent`, or `unconfirmed`. A successful request is not proof of
-physical power state; a lost connection may mean the request took effect, so
+physical power state or completed restart; a lost connection may mean the request took effect, so
 do not retry an unconfirmed target blindly. `--yes` is only for deliberate
 automation with the exact fresh review token.
 

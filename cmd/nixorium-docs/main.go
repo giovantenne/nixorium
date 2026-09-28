@@ -121,6 +121,8 @@ func renderGallery() string {
 		{title: "USB SSH disk review", scenarioID: "installation-usb", label: "Review physical identity, logical identity and disk"},
 		{title: "USB SSH verified result", scenarioID: "installation-usb", label: "Verify the installed identity after reboot"},
 		{title: "Shutdown with active sessions", scenarioID: "shutdown", label: "Active sessions will shut down; unreachable clients are not sent"},
+		{title: "Restricted teacher dashboard", scenarioID: "classroom", label: "Overview"},
+		{title: "Teacher restart review", scenarioID: "classroom", label: "Review the client restart"},
 	}
 	var output strings.Builder
 	for index, selection := range frames {

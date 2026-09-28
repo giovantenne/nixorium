@@ -12,7 +12,7 @@ and privilege boundaries belong in the
 | Account | Default role |
 |---|---|
 | `admin` | System administrator, SSH access, sudo, and Veyon Master access |
-| Teacher account | Persistent instructor workspace and Veyon Master access |
+| Teacher account | Persistent instructor workspace, Veyon Master, and restricted classroom controls |
 | Student account | Client autologin, reset home, and read-only host networking |
 | `root` | Disabled password and key-only SSH access |
 
@@ -26,6 +26,17 @@ action for that identity. The session can use the system-managed connection and
 inspect ordinary network status, but cannot change connections, radios, DNS, or
 other NetworkManager state through GNOME, `nmcli`, `nmtui`, or direct D-Bus
 requests.
+
+On the controller, `admin` owns the mode-0700 private deployment and the SSH
+identity used to manage clients. The teacher instead belongs to the
+`nixorium-classroom` group. Running `nixorium` without a readable deployment
+connects to a group-private local worker and opens only inventory, temporary
+Internet control, and reviewed client shutdown/restart. The worker runs as
+`admin`, validates every target against the fixed deployment, uses only fixed
+SSH helper/systemd commands, and shares the normal client-operation lock.
+Student accounts cannot traverse the runtime directory or connect to its
+socket. The worker does not expose settings, software, Git, installation,
+deployment, update, log, or controller-maintenance operations.
 
 ## Storage and boot
 
@@ -262,7 +273,7 @@ protocol or its local native implementation.
 
 ## Temporary client Internet access
 
-The administrator's Computers → Internet access action uses authenticated SSH
+The administrator and teacher Computers → Internet access action uses authenticated SSH
 and the root-only `nixorium-internet` helper. Requests bind to the observed
 client boot ID; an old request cannot reapply a block after reboot. The
 `nixorium-internet-block.service` unit is never enabled for boot. It owns only

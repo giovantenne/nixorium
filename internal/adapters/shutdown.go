@@ -96,7 +96,7 @@ func observeShutdownSession(ctx context.Context, host domain.HostMeta, timeout t
 	}
 }
 
-func (Local) DispatchShutdowns(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.ShutdownDispatchResult {
+func (Local) DispatchPowerRequests(ctx context.Context, hosts []domain.HostMeta, action domain.ClientPowerAction, timeout time.Duration) map[string]domain.ShutdownDispatchResult {
 	type result struct {
 		name     string
 		dispatch domain.ShutdownDispatchResult
@@ -110,7 +110,7 @@ func (Local) DispatchShutdowns(ctx context.Context, hosts []domain.HostMeta, tim
 		go func() {
 			defer group.Done()
 			for host := range jobs {
-				results <- result{name: host.Name, dispatch: dispatchShutdown(ctx, host, timeout)}
+				results <- result{name: host.Name, dispatch: dispatchPowerRequest(ctx, host, action, timeout)}
 			}
 		}()
 	}
@@ -130,10 +130,16 @@ func (Local) DispatchShutdowns(ctx context.Context, hosts []domain.HostMeta, tim
 	return dispatched
 }
 
-func dispatchShutdown(ctx context.Context, host domain.HostMeta, timeout time.Duration) domain.ShutdownDispatchResult {
+func dispatchPowerRequest(ctx context.Context, host domain.HostMeta, action domain.ClientPowerAction, timeout time.Duration) domain.ShutdownDispatchResult {
+	verb := "poweroff"
+	if action == domain.ClientRestart {
+		verb = "reboot"
+	} else if action != domain.ClientPowerOff {
+		return domain.ShutdownDispatchResult{Detail: "invalid power action"}
+	}
 	commandContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	command := exec.CommandContext(commandContext, "ssh", shutdownSSHArguments(host, timeout, "systemctl", "poweroff", "--no-block")...)
+	command := exec.CommandContext(commandContext, "ssh", shutdownSSHArguments(host, timeout, "systemctl", verb, "--no-block")...)
 	output := &boundedCommandBuffer{limit: 8 * 1024}
 	command.Stdout = output
 	command.Stderr = output

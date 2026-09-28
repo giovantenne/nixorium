@@ -620,6 +620,25 @@ func TestDashboardShutdownIncludesActiveSessionAndAcknowledgesUnknownSession(t *
 	}
 }
 
+func TestClassroomModeExposesOnlyInventoryInternetAndPower(t *testing.T) {
+	actions := DashboardActions{ClassroomMode: true}
+	model := newDashboardModel(testDashboardReport("ready"), domain.SetupReport{}, actions, false)
+	model.screen = dashboardComputersArea
+	view := model.computersAreaView()
+	for _, expected := range []string{"Computer inventory", "Power controls", "Internet access"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("classroom view omits %q:\n%s", expected, view)
+		}
+	}
+	if strings.Contains(view, "Distribute the prepared system") || strings.Contains(view, "Maintenance") {
+		t.Fatalf("classroom view exposes administrative actions:\n%s", view)
+	}
+	updated, _ := model.updateKeyState(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	if updated.(dashboardModel).screen != dashboardComputersArea {
+		t.Fatal("hidden deployment shortcut opened from classroom mode")
+	}
+}
+
 func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *testing.T) {
 	catalog := testSoftwareCatalogReport()
 	for index := 4; index <= 40; index++ {

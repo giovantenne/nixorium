@@ -9,6 +9,24 @@ import (
 
 type ShutdownSessionPolicy string
 
+type ClientPowerAction string
+
+const (
+	ClientPowerOff ClientPowerAction = "poweroff"
+	ClientRestart  ClientPowerAction = "restart"
+)
+
+func (a ClientPowerAction) Valid() bool {
+	return a == ClientPowerOff || a == ClientRestart
+}
+
+func (a ClientPowerAction) Confirmation() string {
+	if a == ClientRestart {
+		return "RESTART"
+	}
+	return "SHUTDOWN"
+}
+
 const (
 	ShutdownProtectUnknown     ShutdownSessionPolicy = "protect-unknown"
 	ShutdownAcknowledgeUnknown ShutdownSessionPolicy = "acknowledge-unknown"
@@ -48,6 +66,7 @@ type ShutdownPlanReport struct {
 	State         string                `json:"state"`
 	Repository    string                `json:"repository"`
 	Requested     string                `json:"requested"`
+	Action        ClientPowerAction     `json:"action"`
 	Policy        ShutdownSessionPolicy `json:"policy"`
 	Targets       []ShutdownTargetPlan  `json:"targets"`
 	Eligible      int                   `json:"eligible"`
@@ -80,6 +99,7 @@ type ShutdownApplyReport struct {
 	State         string                  `json:"state"`
 	Repository    string                  `json:"repository"`
 	Requested     string                  `json:"requested"`
+	Action        ClientPowerAction       `json:"action"`
 	Policy        ShutdownSessionPolicy   `json:"policy"`
 	Targets       []ShutdownTargetOutcome `json:"targets"`
 	Accepted      int                     `json:"accepted"`
@@ -110,10 +130,11 @@ func ShutdownReviewToken(report ShutdownPlanReport) string {
 	bound := struct {
 		Repository string
 		Requested  string
+		Action     ClientPowerAction
 		Policy     ShutdownSessionPolicy
 		Targets    []boundTarget
 		ExpiresAt  time.Time
-	}{report.Repository, report.Requested, report.Policy, targets, report.ExpiresAt.UTC()}
+	}{report.Repository, report.Requested, report.Action, report.Policy, targets, report.ExpiresAt.UTC()}
 	content, _ := json.Marshal(bound)
 	digest := sha256.Sum256(content)
 	return "sha256:" + hex.EncodeToString(digest[:])
