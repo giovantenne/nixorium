@@ -113,7 +113,7 @@ type WorkspaceApplyReport struct {
 }
 
 func (r WorkspaceApplyReport) HasErrors() bool {
-	return len(r.Issues) != 0 || (r.State != "saved" && r.State != "unchanged")
+	return len(r.Issues) != 0 || (r.State != "saved" && r.State != "unchanged" && r.State != "cancelled")
 }
 
 var workspaceFingerprintPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)

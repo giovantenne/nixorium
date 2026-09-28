@@ -384,7 +384,9 @@ failure or timeout must block publication.
   become successful no-ops. The adapter must recheck the snapshot under the
   deployment-root lock and replace only `workspace-profile.json`. Report saved,
   conflict and unconfirmed durability distinctly, never inferred activation.
-  CLI/TUI wiring is separate; do not imply a command exists from this contract.
+  `workspace plan`/`apply` use this boundary; interactive confirmation or explicit
+  `--yes` authorizes only the JSON save. Keep candidate reads bounded and
+  non-blocking for special files. TUI editing remains a separate integration.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing

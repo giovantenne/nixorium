@@ -29,7 +29,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   proposal binding, fresh validation and distinct conflict/durability outcomes.
   Its adapter preserves Git-filtered source identity, composes both deployment
   hooks and saves only the JSON through a locked no-follow atomic replacement.
-  This foundation does not yet expose a CLI/TUI save operation.
+  `workspace plan`/`apply` expose JSON/text review and confirmed declaration-only
+  saving without implicit commit, activation, deployment or reset. The TUI editor
+  is not included yet.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes

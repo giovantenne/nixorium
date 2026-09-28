@@ -38,8 +38,10 @@ configuration, software, home customization, diagnostics, and operations.
   "prepared"` is never evidence of deployment or reset. Managed preferences
   apply to the student on the controller and clients at normal boot, remain
   editable in session, and must not be reapplied at login. Keep staff behavior
-  unchanged. Do not infer migration permission or invent workspace CLI commands;
-  use the student-home reference. Never discard pending reset evidence or
+  unchanged. On supporting pins, use `workspace plan`/`apply` for a separately
+  prepared candidate and source-bound JSON save; this does not authorize
+  migration or deployment. Check the actual CLI/hook capabilities and use the
+  student-home reference. Never discard pending reset evidence or
   disable the profile to bypass failed-reset recovery.
   `workspace-profile.example.json` is an inactive Essential starting proposal,
   not a migration result. Review unsupported legacy settings and private module

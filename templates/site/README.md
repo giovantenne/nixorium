@@ -236,7 +236,16 @@ do not delete evidence, restart the helper, or disable the profile as a retry.
 Have an administrator inspect the journal and recovery data first. Snapshots
 are not backups. A `nixoriumWorkspace.state` of `prepared`, even with
 `runtimeEnabled = true`, is not evidence of deployment or a successful reset.
-There is no workspace CLI/TUI workflow yet.
+On supporting pins, `workspace plan --file <candidate.json>` reviews a separate
+proposal and `workspace apply --file <candidate.json> --expect <review-token>`
+saves only `workspace-profile.json` after confirmation (or explicit `--yes`).
+Both support `--json`. Review includes the current/effective preferences, student
+account, controller/client destinations and pinned dependencies. Changed source,
+catalog, pin or profile requires a new review. Saving does not stage, commit,
+enable runtime, build, deploy or reset. See the
+[save procedure](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
+for requirements and conflict/durability handling. The TUI editor is not yet
+available; older pins/commands may not provide this workflow.
 Supporting pins expose `nixoriumResolveWorkspaceCandidate` to preview a raw JSON
 proposal's effective values, versions and destinations without saving it. This
 complements, rather than replaces, the deployment's validation hook.

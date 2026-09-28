@@ -329,6 +329,9 @@ Essential example and a [migration review](skills/nixorium-maintainer/references
 neither changes existing homes or selects VS Code implicitly.
 The candidate-resolution hook can preview effective settings and destinations
 without saving a profile; it does not build or activate them.
+On supporting pins, [`workspace plan` and `workspace apply`](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
+review and save a candidate JSON with source/pin conflict checks. Saving changes
+only the declaration, not the runtime switch or any current home.
 
 From a checkout with Nix available, run the normal fast validation gate:
 

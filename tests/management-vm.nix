@@ -291,8 +291,9 @@ in
     };
     services.openssh.enable = true;
     systemd.services.nixorium-workspace-save-check = {
-      path = [ pkgs.git pkgs.nix pkgs.coreutils ];
+      path = [ pkgs.git pkgs.nix pkgs.coreutils nixoriumPackage ];
       environment.NIXORIUM_TEST_WORKSPACE_NIX = "1";
+      environment.NIXORIUM_TEST_WORKSPACE_CLI = "1";
       serviceConfig = {
         Type = "oneshot";
         User = "admin";
@@ -746,6 +747,7 @@ in
     controller.succeed("journalctl -u nixorium-worker-sandbox-check.service --no-pager | grep -F -- '--- PASS: TestRemoteWorkerFilesystemSandbox'")
     controller.succeed("systemctl start nixorium-workspace-save-check.service")
     controller.succeed("journalctl -u nixorium-workspace-save-check.service --no-pager | grep -F -- '--- PASS: TestWorkspaceRealNixSave'")
+    controller.succeed("journalctl -u nixorium-workspace-save-check.service --no-pager | grep -F -- '--- PASS: TestWorkspaceRealCLI'")
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")
     controller.succeed("systemctl reset-failed harmonia.service harmonia.socket; systemctl restart harmonia.socket nixorium-harmonia.service")
     controller.wait_for_unit("nixorium-harmonia.service")

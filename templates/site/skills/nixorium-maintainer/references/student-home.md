@@ -27,8 +27,10 @@ design request from the currently available declarative customization.
 Some upstream pins expose `nixoriumWorkspace` and
 `nixoriumValidateWorkspaceCandidate`. They validate optional workspace JSON,
 catalog/baseline preferences and prerequisites across the controller and all
-clients. Their `prepared` state is not an active-home receipt and there are no
-workspace CLI commands. Preparation-only pins do not seed homes.
+clients. Their `prepared` state is not an active-home receipt.
+Preparation-only pins do not seed homes. Recent management commands expose
+`workspace plan`/`apply`; check CLI help and the deployment's candidate hooks
+before using them. The TUI editor is not available yet.
 Where available, `nixoriumResolveWorkspaceCandidate` previews a raw candidate's
 effective settings, versions and destinations without writing it. Still run the
 deployment's validation hook, which may include additional local policy; a
@@ -121,11 +123,50 @@ Keep preparation and runtime adoption as separate reviewed changes:
    including actual extension loading when selected. Deployment, next normal
    boot/reset and live verification each remain separately authorized steps.
 
-There is no automated migration or workspace save command yet. Returning to
+There is no automated migration command. Returning to
 legacy is also a reviewed system change, not recovery of erased files. Preserve
 managed snapshots and pending evidence; do not remove them to make a downgrade
 proceed. Nix generations, profile declarations and student-data backups serve
 different purposes.
+
+## Review and save a profile
+
+Where supported, prepare the candidate in a separate regular JSON file rather
+than overwriting `workspace-profile.json` before review. Preserve existing
+preferences; the inactive example is only a starting point for a first profile.
+The candidate supports the strict workspace schema, not arbitrary home files,
+program settings or secrets. Use the deployment catalog and prerequisites on
+every destination, including the controller student.
+
+```sh
+nixorium workspace plan --repo . --file /tmp/student-profile.json --json
+nixorium workspace apply --repo . --file /tmp/student-profile.json --expect <review-token> --yes --json
+```
+
+Review the current/proposed declarations, effective baseline, student account,
+destinations, resolved package/extension versions and dependencies. Use the exact
+`reviewToken` from that plan only after authorization to save. Without `--yes`,
+apply requires an interactive terminal and confirmation for a changed profile.
+It re-evaluates the candidate and rejects stale source, pin, catalog or file
+identity; do not automatically renew a failed token and retry the write.
+
+This operation writes only `workspace-profile.json`, mode `0600`. It does not
+stage or commit it, edit the catalog/lock/modules, enable runtime, build systems,
+deploy or reset any home. `saved` and `unchanged` are declaration states, not
+evidence of live preferences. Review/commit and activation/distribution remain
+separate authorized workflows; do not assume this save token authorizes them.
+A first save leaves the profile untracked, so Nix cannot consume it until it is
+explicitly tracked. If authorized, use the existing exact-path Git review/commit
+workflow, selecting only the intended files and its separate commit token. A
+workspace save token is not a Git commit token.
+
+The deployment must have a committed revision and tracked `flake.nix` and
+`flake.lock`. Existing unrelated staged/unstaged edits are preserved and included
+in the source review. Untracked files are not Nix inputs; explicitly review any
+needed catalog/module additions before tracking them. Symlinked deployment paths,
+non-regular profile files, unresolved Git entries and submodules are refused.
+A `partial` durability result means the JSON was replaced but durable storage
+could not be confirmed: inspect the profile and Git state before another plan.
 
 ## VS Code extensions and settings
 

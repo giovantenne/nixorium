@@ -490,8 +490,9 @@ are new; setup optimizes for `lab-settings.json` while preserving upstream
 standalone compatibility.
 
 The internal workspace application boundary adds a separate, declaration-only
-plan/save contract for `workspace-profile.json`; CLI/TUI wiring is not yet
-available. Review binds the normalized candidate and full resolved preparation
+plan/save contract for `workspace-profile.json`, exposed through `workspace
+plan`/`apply`; the TUI editor is not yet available. Review binds the normalized
+candidate and full resolved preparation
 metadata to the repository, Git revision/source, lock and original file identity.
 Absence of the file remains legacy mode, not an empty managed profile. Apply
 regenerates the review before checking its token, including unchanged proposals,
@@ -511,8 +512,9 @@ they must be reviewed again if they change. The deployment must have a committed
 revision and tracked `flake.nix`/`flake.lock`, with no submodules or unresolved
 index entries. Symlinked deployment paths and non-regular managed files are
 refused. These are cooperative edit checks, not a sandbox against the deployment
-owner rewriting arbitrary files during an operation. CLI/TUI integration remains
-separate.
+owner rewriting arbitrary files during an operation. CLI confirmation (or
+explicit `--yes`) authorizes only the profile save; JSON output remains separate
+from interactive prompts. TUI integration remains separate.
 
 ## Computer-installation state machine
 
