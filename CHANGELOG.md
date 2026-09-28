@@ -27,6 +27,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   version and destination previews without temporarily saving a profile.
 - Added the internal workspace review/save application contract with complete
   proposal binding, fresh validation and distinct conflict/durability outcomes.
+  Its adapter preserves Git-filtered source identity, composes both deployment
+  hooks and saves only the JSON through a locked no-follow atomic replacement.
   This foundation does not yet expose a CLI/TUI save operation.
 
 - The configured teacher can now open a restricted classroom TUI on the

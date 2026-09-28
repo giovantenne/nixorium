@@ -290,6 +290,15 @@ in
       '';
     };
     services.openssh.enable = true;
+    systemd.services.nixorium-workspace-save-check = {
+      path = [ pkgs.git pkgs.nix pkgs.coreutils ];
+      environment.NIXORIUM_TEST_WORKSPACE_NIX = "1";
+      serviceConfig = {
+        Type = "oneshot";
+        User = "admin";
+        ExecStart = "${sandboxCheck}/bin/sandbox-check -test.run ^TestWorkspace -test.v";
+      };
+    };
     systemd.services.nixorium-worker-sandbox-check.serviceConfig =
       config.systemd.services.nixorium-remote-install.serviceConfig // {
         Type = "oneshot";
@@ -704,7 +713,7 @@ in
       controller.succeed("systemd-run --unit=nixorium-test-legacy-lock --property=User=admin sh -ec 'exec 8<>/home/admin/.local/state/nixorium/operations/deploy.lock; /run/current-system/sw/bin/flock -n 8; : > /tmp/nixorium-legacy-lock-held; exec /run/current-system/sw/bin/sleep infinity'")
       controller.wait_until_succeeds("test -f /tmp/nixorium-legacy-lock-held", timeout=30)
       controller.fail("systemctl start nixorium-prepare-pxe.service")
-      controller.succeed("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'a legacy Nixorium deployment is still running'")
+      controller.wait_until_succeeds("journalctl -u nixorium-prepare-pxe.service --no-pager | grep -F 'a legacy Nixorium deployment is still running'")
       controller.succeed("systemctl stop nixorium-test-legacy-lock.service")
     # Leave the legacy file in place for preparation, key installation and PXE.
     controller.succeed("su - admin -c 'nixorium pxe prepare --repo ~/nixorium-deployment --json > /tmp/pxe-prepare-failed.json' || test $? = 1")
@@ -735,6 +744,8 @@ in
     controller.succeed("rm -f /tmp/nixorium-test-restart-dispatch.log; su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_restart)) + "; grep -Fx 'systemctl reboot --no-block' /tmp/nixorium-test-shutdown-ssh.log; test \"$(wc -l < /tmp/nixorium-test-restart-dispatch.log)\" = 1")
     controller.succeed("systemctl start nixorium-worker-sandbox-check.service")
     controller.succeed("journalctl -u nixorium-worker-sandbox-check.service --no-pager | grep -F -- '--- PASS: TestRemoteWorkerFilesystemSandbox'")
+    controller.succeed("systemctl start nixorium-workspace-save-check.service")
+    controller.succeed("journalctl -u nixorium-workspace-save-check.service --no-pager | grep -F -- '--- PASS: TestWorkspaceRealNixSave'")
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")
     controller.succeed("systemctl reset-failed harmonia.service harmonia.socket; systemctl restart harmonia.socket nixorium-harmonia.service")
     controller.wait_for_unit("nixorium-harmonia.service")

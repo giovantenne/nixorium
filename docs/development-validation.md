@@ -108,6 +108,9 @@ simulated remote-client VM.
 
 - Go domain, application, adapter, or presentation logic: default gate; add
   `--management-vm` only for an affected integration boundary.
+  The management VM also exercises workspace review/save with real Git/Nix as
+  the unprivileged administrator, including private deployment validators,
+  tracked-source drift, first creation and atomic profile replacement.
 - JSON/Nix settings validation: default gate plus `--eval`.
 - `lib.mkLab`, built-in module composition, or software scope semantics:
   `--eval`, followed by the affected real host build before completion.

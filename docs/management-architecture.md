@@ -500,6 +500,20 @@ replaced. A successful result says `saved`, never active; an unconfirmed durable
 write is a recovery-required partial result. No commit, runtime opt-in, build,
 deployment or reset is implicit.
 
+The workspace adapter now implements that boundary using the deployment-root
+advisory lock and descriptor-relative, no-follow filesystem operations. The
+review source is Git-filtered and content-bound; ignored credentials are not
+exported. Both candidate hooks run without updating the lock or enabling
+import-from-derivation. The source is checked again after evaluation and under
+the writer lock, while first creation uses no-replace semantics. Tracked module
+edits and unrelated staged changes are permitted, preserved and bound to review;
+they must be reviewed again if they change. The deployment must have a committed
+revision and tracked `flake.nix`/`flake.lock`, with no submodules or unresolved
+index entries. Symlinked deployment paths and non-regular managed files are
+refused. These are cooperative edit checks, not a sandbox against the deployment
+owner rewriting arbitrary files during an operation. CLI/TUI integration remains
+separate.
+
 ## Computer-installation state machine
 
 Installation is a resumable reconciliation, not a single `configured` flag.
