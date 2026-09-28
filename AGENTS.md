@@ -368,6 +368,12 @@ failure or timeout must block publication.
   the offline installer. `state = "prepared"` is not activation; absent input
   must preserve legacy homes. The template must still work with older pins
   when no workspace file exists.
+- `lib/build-workspace-seed.nix` builds the internal preference payload from a
+  resolved workspace. Keep its dconf source separate from the compiled user
+  database so reset-time wallpaper selection can be composed without losing
+  preferences. Check built extension manifests against resolved identities and
+  versions. A built seed is not home activation or proof of plugin loading;
+  this helper is not connected to the legacy reset path.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.

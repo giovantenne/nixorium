@@ -225,6 +225,15 @@ system derivations and template compatibility without workspace input.
 the serialized installer, and `workspace-systems` builds its controller and representative
 client. Both build checks belong to the full checkpoint, not the quick loop.
 
+The focused `workspace-seed` and `workspace-seed-pinned` checks build the
+internal preference payload. They read compiled dconf values using the pinned
+GNOME schemas, verify copied preferences remain editable, check browser/editor
+files and extension links, and reject inconsistent extension manifests. The
+first uses a synthetic extension; the second checks a real pinned extension
+payload. Run both, plus `desktop-profile`, through `tests/source-checks.nix`.
+They are full-checkpoint checks, not part of the fast edit loop. They do not
+activate homes, exercise the reset service, or prove VS Code loads an extension.
+
 After the automated milestone, follow the documented VirtualBox recipe with
 the official Minimal ISO. Keep that result separate from physical-hardware
 evidence; neither is replaced by a simulated NixOS VM pass.

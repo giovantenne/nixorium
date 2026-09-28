@@ -143,6 +143,8 @@
         };
       };
       checks.${system} = {
+        workspace-seed = import ./tests/workspace-seed.nix { inherit pkgs; };
+        workspace-seed-pinned = import ./tests/workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };
         config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
           touch "$out"
         '';
