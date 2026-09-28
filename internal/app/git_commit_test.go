@@ -9,12 +9,13 @@ import (
 )
 
 type fakeGitCommitSource struct {
-	revision string
-	review   domain.GitReviewSnapshot
-	proposal domain.GitCommitProposal
-	settings []byte
-	software []byte
-	commits  int
+	revision  string
+	review    domain.GitReviewSnapshot
+	proposal  domain.GitCommitProposal
+	settings  []byte
+	software  []byte
+	workspace []byte
+	commits   int
 }
 
 func (source *fakeGitCommitSource) GitRevision(context.Context, string) (string, error) {
@@ -33,6 +34,37 @@ func (source *fakeGitCommitSource) CommitGitPaths(context.Context, string, []str
 }
 func (source *fakeGitCommitSource) ReadSettings(string) ([]byte, error) { return source.settings, nil }
 func (source *fakeGitCommitSource) ReadSoftware(string) ([]byte, error) { return source.software, nil }
+func (source *fakeGitCommitSource) ReadWorkspace(string) ([]byte, error) {
+	return source.workspace, nil
+}
+
+func TestGitCommitValidatesWorkspaceAndRechecksBeforeCommit(t *testing.T) {
+	source := &fakeGitCommitSource{
+		revision:  strings.Repeat("a", 40),
+		review:    domain.GitReviewSnapshot{Changes: []domain.GitChange{{Path: domain.WorkspaceFileName, Untracked: true, Managed: true}}},
+		proposal:  domain.GitCommitProposal{TreeID: strings.Repeat("c", 40)},
+		workspace: []byte(`{"schemaVersion":1}`),
+	}
+	manager := NewGitCommitManager(source)
+	plan := manager.Plan(t.Context(), "/deployment", domain.WorkspaceFileName)
+	if plan.HasErrors() || plan.CommitMessage != "chore: update student workspace" {
+		t.Fatalf("workspace commit plan: %+v", plan)
+	}
+	source.workspace = []byte(`{"schemaVersion":1,"apiKey":"must-not-leak"}`)
+	result := manager.Apply(t.Context(), "/deployment", domain.WorkspaceFileName, plan.ReviewToken)
+	if !result.HasErrors() || source.commits != 0 {
+		t.Fatalf("invalid profile committed: %+v", result)
+	}
+	for _, issue := range result.Issues {
+		if strings.Contains(issue.Message, "must-not-leak") {
+			t.Fatal("invalid workspace value leaked")
+		}
+	}
+	source.workspace = nil
+	if missing := manager.Plan(t.Context(), "/deployment", domain.WorkspaceFileName); !missing.HasErrors() {
+		t.Fatal("missing profile committed")
+	}
+}
 
 func TestGitCommitPlanAcceptsValidatedManagedSoftware(t *testing.T) {
 	software, err := domain.MarshalLabSoftware(domain.LabSoftwareFile{SchemaVersion: domain.SoftwareSchemaVersion, Packages: []domain.SoftwareDeclaration{{Package: "vlc", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}}})

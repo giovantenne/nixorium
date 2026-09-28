@@ -83,8 +83,9 @@ func (source *fakeUpdateSource) CommitGitPaths(context.Context, string, []string
 	return source.revision, nil
 }
 
-func (source *fakeUpdateSource) ReadSettings(string) ([]byte, error) { return nil, nil }
-func (source *fakeUpdateSource) ReadSoftware(string) ([]byte, error) { return nil, nil }
+func (source *fakeUpdateSource) ReadSettings(string) ([]byte, error)  { return nil, nil }
+func (source *fakeUpdateSource) ReadSoftware(string) ([]byte, error)  { return nil, nil }
+func (source *fakeUpdateSource) ReadWorkspace(string) ([]byte, error) { return nil, nil }
 
 func TestParseUpdateReleaseClassifiesAndComparesTargets(t *testing.T) {
 	stable, err := parseUpdateRelease("v2.1.0")

@@ -20,6 +20,7 @@ const (
 )
 
 var managedDeploymentPaths = map[string]bool{
+	domain.WorkspaceFileName:    true,
 	"lab-settings.json":         true,
 	"lab-software.json":         true,
 	"keys/cache-public-key":     true,

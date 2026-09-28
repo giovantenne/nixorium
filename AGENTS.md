@@ -387,6 +387,10 @@ failure or timeout must block publication.
   `workspace plan`/`apply` use this boundary; interactive confirmation or explicit
   `--yes` authorizes only the JSON save. Keep candidate reads bounded and
   non-blocking for special files. TUI editing remains a separate integration.
+  The initial editor load reads the current declaration (absence stays legacy),
+  resolves it, and rejects concurrent changes. Never load the example implicitly.
+  Git review classifies the profile as managed; a separately authorized exact-path
+  commit validates its schema without implying Nix validation or activation.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing

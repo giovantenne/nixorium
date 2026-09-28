@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"reflect"
 	"strings"
 	"testing"
@@ -20,6 +21,56 @@ type fakeWorkspaceSource struct {
 	written    domain.WorkspaceProfile
 	expected   domain.WorkspaceSnapshot
 	afterRead  func()
+	afterLoad  func()
+}
+
+func (f *fakeWorkspaceSource) ReadWorkspace(string) ([]byte, error) {
+	if f.afterLoad != nil {
+		defer f.afterLoad()
+	}
+	if f.inspection.Base == nil {
+		return nil, fs.ErrNotExist
+	}
+	return domain.MarshalWorkspaceProfile(*f.inspection.Base)
+}
+
+func TestWorkspaceLoadKeepsLegacyDistinctAndDoesNotWrite(t *testing.T) {
+	source, manager := workspaceManagerFixture()
+	legacy := manager.Load(t.Context(), "/deployment")
+	if legacy.HasErrors() || legacy.Inspection.Base != nil || source.writes != 0 {
+		t.Fatalf("legacy load: %+v", legacy)
+	}
+	source.inspection.Base = &domain.WorkspaceProfile{SchemaVersion: 1, Desktop: &domain.WorkspaceDesktop{}}
+	source.inspection.Snapshot.BaseExists = true
+	current := manager.Load(t.Context(), "/deployment")
+	if current.HasErrors() || current.State != "unchanged" || current.Candidate.Desktop == nil || source.writes != 0 {
+		t.Fatalf("current load: %+v", current)
+	}
+}
+
+func TestWorkspaceLoadRejectsConcurrentFileChanges(t *testing.T) {
+	for _, kind := range []string{"created", "removed", "modified"} {
+		t.Run(kind, func(t *testing.T) {
+			source, manager := workspaceManagerFixture()
+			if kind != "created" {
+				source.inspection.Base = &domain.WorkspaceProfile{SchemaVersion: 1}
+				source.inspection.Snapshot.BaseExists = true
+			}
+			source.afterLoad = func() {
+				if kind == "removed" {
+					source.inspection.Base = nil
+					source.inspection.Snapshot.BaseExists = false
+				} else {
+					source.inspection.Base = &domain.WorkspaceProfile{SchemaVersion: 1, Desktop: &domain.WorkspaceDesktop{}}
+					source.inspection.Snapshot.BaseExists = true
+				}
+			}
+			report := manager.Load(t.Context(), "/deployment")
+			if !report.HasErrors() || report.State != "conflict" || report.ReviewToken != "" || source.writes != 0 {
+				t.Fatalf("concurrent load: %+v", report)
+			}
+		})
+	}
 }
 
 func (f *fakeWorkspaceSource) InspectWorkspace(_ context.Context, _ string, candidate domain.WorkspaceProfile) (domain.WorkspaceInspection, error) {

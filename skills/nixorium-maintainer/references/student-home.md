@@ -159,6 +159,15 @@ A first save leaves the profile untracked, so Nix cannot consume it until it is
 explicitly tracked. If authorized, use the existing exact-path Git review/commit
 workflow, selecting only the intended files and its separate commit token. A
 workspace save token is not a Git commit token.
+The profile is classified as managed and its schema is checked before a managed
+commit. This check is not a substitute for the source-bound workspace review,
+system validation or deployment. Missing/invalid profiles block this commit
+path; opting out of managed homes is a separately reviewed migration.
+
+```sh
+nixorium git commit plan --repo . --paths workspace-profile.json --json
+nixorium git commit apply --repo . --paths workspace-profile.json --expect <commit-review-token> --yes --json
+```
 
 The deployment must have a committed revision and tracked `flake.nix` and
 `flake.lock`. Existing unrelated staged/unstaged edits are preserved and included

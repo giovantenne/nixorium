@@ -8,6 +8,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func (Local) ReadWorkspace(repository string) ([]byte, error) {
+	return ReadWorkspaceCandidate(filepath.Join(repository, domain.WorkspaceFileName))
+}
+
 // ReadWorkspaceCandidate reads only a bounded regular file. In particular, a
 // named pipe must not block the management command before schema validation.
 func ReadWorkspaceCandidate(path string) ([]byte, error) {

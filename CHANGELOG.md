@@ -32,6 +32,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   `workspace plan`/`apply` expose JSON/text review and confirmed declaration-only
   saving without implicit commit, activation, deployment or reset. The TUI editor
   is not included yet.
+- Recognize workspace profiles in Git review and validate their schema in the
+  existing separately reviewed, exact-path commit workflow. Unrelated staged
+  content remains untouched; committing does not deploy the profile.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes

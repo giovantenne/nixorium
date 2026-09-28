@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"path/filepath"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -14,6 +15,7 @@ import (
 // The writer locks the deployment root and rechecks the entire snapshot before
 // replacing only WorkspaceFileName, with no-follow, atomic, durable semantics.
 type WorkspaceSource interface {
+	ReadWorkspace(string) ([]byte, error)
 	InspectWorkspace(context.Context, string, domain.WorkspaceProfile) (domain.WorkspaceInspection, error)
 	WriteWorkspaceIfUnchanged(context.Context, string, domain.WorkspaceSnapshot, domain.WorkspaceProfile) error
 }
@@ -22,6 +24,37 @@ type WorkspaceManager struct{ source WorkspaceSource }
 
 func NewWorkspaceManager(source WorkspaceSource) WorkspaceManager {
 	return WorkspaceManager{source: source}
+}
+
+// Load reviews the actual current profile, or an explicit empty proposal for
+// legacy mode. It never imports the example or enables managed runtime.
+func (m WorkspaceManager) Load(ctx context.Context, repository string) domain.WorkspacePlanReport {
+	data, err := m.source.ReadWorkspace(repository)
+	exists := !errors.Is(err, fs.ErrNotExist)
+	if err != nil && exists {
+		return workspacePlanIssue(domain.WorkspacePlanReport{
+			SchemaVersion: domain.WorkspaceSchemaVersion, Operation: "workspace-plan", State: "invalid",
+			Repository: repository, ManagedFile: domain.WorkspaceFileName, Issues: []domain.ValidationIssue{},
+		}, "file", err)
+	}
+	if !exists {
+		data = []byte(`{"schemaVersion":1}`)
+	}
+	plan := m.Plan(ctx, repository, data)
+	if plan.HasErrors() {
+		return plan
+	}
+	if plan.Inspection.Snapshot.BaseExists != exists {
+		return workspacePlanIssue(plan, "source", domain.ErrWorkspaceConflict)
+	}
+	if exists {
+		current, _ := domain.MarshalWorkspaceProfile(*plan.Inspection.Base)
+		requested, _ := domain.MarshalWorkspaceProfile(*plan.Candidate)
+		if !bytes.Equal(current, requested) {
+			return workspacePlanIssue(plan, "source", domain.ErrWorkspaceConflict)
+		}
+	}
+	return plan
 }
 
 func (m WorkspaceManager) Plan(ctx context.Context, repository string, data []byte) domain.WorkspacePlanReport {
@@ -110,6 +143,8 @@ func (m WorkspaceManager) Apply(ctx context.Context, repository string, data []b
 }
 
 func workspacePlanIssue(report domain.WorkspacePlanReport, field string, err error) domain.WorkspacePlanReport {
+	report.ReviewToken, report.Confirmation = "", ""
+	report.State = "invalid"
 	if errors.Is(err, domain.ErrWorkspaceConflict) {
 		report.State = "conflict"
 	}
