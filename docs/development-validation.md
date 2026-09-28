@@ -194,6 +194,16 @@ New regression tests belong at the lowest level that proves the invariant:
 4. one targeted VM or real closure build;
 5. full release checkpoint.
 
+The internal workspace schema has a shared raw-JSON corpus in
+`tests/workspace-validation-cases.json`. Both Go and Nix check rejection and
+normalization, including duplicate object keys, exact field names, nulls,
+ordered favorites and sorted extension sets. Run the focused checks with
+`./scripts/test-go.sh ./internal/domain -run Workspace` and
+`nix build --file tests/source-checks.nix workspace-schema --no-link`.
+The evaluator takes JSON text, not an attrset: decoding it first would erase
+duplicate keys. These tests validate data only, not installed applications,
+extension loading, student-home changes, or a public management workflow.
+
 After the automated milestone, follow the documented VirtualBox recipe with
 the official Minimal ISO. Keep that result separate from physical-hardware
 evidence; neither is replaced by a simulated NixOS VM pass.

@@ -47,6 +47,9 @@
       softwarePresetSchemaTest = import ./tests/eval-software-presets.nix {
         inherit (nixpkgs) lib;
       };
+      workspaceSchemaTest = import ./tests/eval-workspace-profile.nix {
+        inherit (nixpkgs) lib;
+      };
       mkLabTest = import ./tests/mk-lab.nix {
         inherit mkLab;
         deploymentSelf = self;
@@ -135,6 +138,9 @@
           touch "$out"
         '';
         software-preset-schema = assert softwarePresetSchemaTest; pkgs.runCommand "nixorium-software-preset-schema-test" {} ''
+          touch "$out"
+        '';
+        workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
           touch "$out"
         '';
         mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''

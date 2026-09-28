@@ -39,6 +39,7 @@ lib/
   eval-lab-config.nix      # Typed schema and validation for lab-config.nix
   eval-lab-settings.nix    # Strict versioned lab-settings.json envelope
   eval-lab-software.nix    # Strict allowlisted lab-software.json evaluator
+  eval-workspace-profile.nix # Internal student preference JSON validator
   mk-lab.nix               # Host, netboot, Colmena, app, and installer output constructor
 setup.sh                   # Installer script for PXE-booted client PCs
 scripts/remote-client-installer.sh # Fixed live-ISO USB/SSH installation helper
@@ -342,6 +343,11 @@ failure or timeout must block publication.
   through active-system verification and receipt creation.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. `nixoriumSoftware` is the typed non-secret catalog/scope/declaration contract; optional `nixoriumSoftwarePresets` is the versioned deployment-owned profile catalog. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. Keep its semantic checks aligned with `internal/domain/settings.go` through `tests/lab-settings-validation-cases.json`. No custom NixOS options are added to host configurations.
+- `lib/eval-workspace-profile.nix` accepts raw JSON text so duplicate keys are
+  rejected before they can disappear in `builtins.fromJSON`. Keep it aligned
+  with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.
+  This internal schema alone does not enable a profile, resolve software or
+  change a home; do not describe schema validation as deployment validation.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.

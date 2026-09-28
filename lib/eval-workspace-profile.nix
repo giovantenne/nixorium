@@ -1,0 +1,76 @@
+{ lib }:
+# Accept JSON text, not an already-decoded attrset: fromJSON alone silently
+# discards duplicate object keys. Keep the textual boundary for all callers.
+json:
+let
+  fail = message: throw "workspace profile: ${message}";
+  checkedJSON = if builtins.isString json && builtins.stringLength json <= 65536
+    then json else fail "expected JSON text of at most 65536 bytes";
+  raw = builtins.fromJSON checkedJSON;
+  # Every colon outside a JSON string introduces one member. Comparing that
+  # count with the parsed tree detects duplicate keys, including escaped names,
+  # without implementing a second JSON parser. fromJSON owns syntax checking.
+  gaps = builtins.filter builtins.isString (builtins.split ''"([^"\\]|\\.)*"'' checkedJSON);
+  memberCount = lib.foldl' (count: gap: count + builtins.length (lib.splitString ":" gap) - 1) 0 gaps;
+  countMembers = depth: value:
+    if depth > 8 then fail "nesting limit exceeded"
+    else if builtins.isAttrs value then
+      builtins.length (builtins.attrNames value)
+      + lib.foldl' (count: child: count + countMembers (depth + 1) child) 0 (builtins.attrValues value)
+    else if builtins.isList value then
+      lib.foldl' (count: child: count + countMembers (depth + 1) child) 0 value
+    else 0;
+  object = fields: value:
+    if !builtins.isAttrs value then fail "expected an object"
+    else if builtins.any (key: !(builtins.hasAttr key fields)) (builtins.attrNames value)
+    then fail "unsupported field"
+    else builtins.mapAttrs (key: item: fields.${key} item) value;
+  boolean = value: if builtins.isBool value then value else fail "expected a boolean";
+  integer = min: max: value:
+    if builtins.isInt value && value >= min && value <= max then value
+    else fail "integer outside supported range";
+  enum = values: value:
+    if builtins.isString value && builtins.elem value values then value else fail "unsupported enum value";
+  identifier = pattern: value:
+    if builtins.isString value && builtins.stringLength value <= 128 && builtins.match pattern value != null
+    then value else fail "invalid identifier";
+  desktopID = identifier "[A-Za-z0-9][A-Za-z0-9_.-]*\\.desktop";
+  extensionID = identifier "[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*";
+  list = max: check: value:
+    if !builtins.isList value || builtins.length value > max then fail "invalid list length"
+    else let checked = map check value; in
+      if builtins.length (lib.unique checked) != builtins.length checked then fail "duplicate list entry"
+      else checked;
+  profile = object {
+    schemaVersion = integer 1 1;
+    desktop = object {
+      favorites = list 32 desktopID;
+      colorScheme = enum [ "light" "dark" ];
+      enableAnimations = boolean;
+      dock = object {
+        position = enum [ "top" "bottom" "left" "right" ];
+        iconSize = integer 16 128;
+        autoHide = boolean;
+        extendHeight = boolean;
+        showTrash = boolean;
+        showMounts = boolean;
+      };
+    };
+    vscode = object {
+      extensions = value: lib.sort builtins.lessThan (list 64 extensionID value);
+      settings = object {
+        "editor.fontSize" = integer 8 40;
+        "editor.tabSize" = integer 1 8;
+        "editor.insertSpaces" = boolean;
+        "editor.wordWrap" = enum [ "off" "on" "wordWrapColumn" "bounded" ];
+        "editor.formatOnSave" = boolean;
+        "editor.minimap.enabled" = boolean;
+        "files.autoSave" = enum [ "off" "onFocusChange" "onWindowChange" ];
+      };
+    };
+    browser = object { defaultApplication = desktopID; };
+  } raw;
+in
+if memberCount != countMembers 0 raw then fail "duplicate field"
+else if !(profile ? schemaVersion) then fail "missing schemaVersion"
+else builtins.deepSeq profile profile

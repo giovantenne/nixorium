@@ -19,6 +19,9 @@ let
   softwarePresetSchemaTest = import ./eval-software-presets.nix {
     inherit (pkgs) lib;
   };
+  workspaceSchemaTest = import ./eval-workspace-profile.nix {
+    inherit (pkgs) lib;
+  };
   nixoriumPackage = pkgs.callPackage ../pkgs/nixorium.nix {};
   documentationGenerator = nixoriumPackage.overrideAttrs (_: {
     pname = "nixorium-docs";
@@ -46,6 +49,9 @@ in
     touch "$out"
   '';
   desktop-profile = import ./desktop-profile.nix { inherit pkgs; };
+  workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
+    touch "$out"
+  '';
   nixorium = nixoriumPackage;
   nixorium-runtime = pkgs.runCommand "nixorium-runtime-test" {} ''
     mkdir -p repository "$TMPDIR/home"
