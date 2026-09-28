@@ -23,7 +23,7 @@ from `templates/site`.
 ```
 .github/workflows/validate.yml # Go build/tests plus evaluation-only source/template CI
 .github/workflows/security.yml # CodeQL plus pinned Go vulnerability/static analysis
-.github/workflows/release.yml # Revalidates release metadata and publishes GitHub Releases
+.github/workflows/release.yml # Full tag validation gates GitHub Release publication
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
 flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
@@ -100,7 +100,10 @@ Generated locally during setup and committed in the private deployment repo:
 Use the smallest gate appropriate to the change:
 
 ```sh
-# Default: syntax, shell regressions, agent guidance, schemas, Go build/tests
+# Edit-test loop: cached Go tests; accepts package paths and go test flags
+./scripts/test-go.sh
+
+# Reproducible gate: syntax, shell regressions, guidance, schemas, Go package
 ./scripts/validate.sh --quick
 
 # Add full mkLab evaluation for Nix API or host-composition changes
@@ -122,6 +125,9 @@ and milestone/release completion, not the edit-test loop. Build one
 representative client and the controller when needed; add another client only
 for materially different host-specific modules. See
 [development validation](docs/development-validation.md) for the complete policy.
+
+The packaged Go check must run `go test ./...`; `subPackages` selects installed
+commands and must not restrict tests to `cmd/`.
 
 Validation reuses a persistent evaluation cache, creates no persistent result
 roots, and must never garbage-collect the shared Nix store automatically.
@@ -151,8 +157,11 @@ review CLI versus TUI behavior and existing workflow tests explicitly.
 Releases follow Semantic Versioning. `VERSION`, the release tag (`v<version>`),
 and the dated `CHANGELOG.md` section must agree. After the release commit has
 been pushed to `master`, run `./scripts/release.sh <version>` to create and push
-the annotated tag. The GitHub Actions release workflow publishes the GitHub
-Release from the matching changelog section.
+the annotated tag. The GitHub Actions release workflow validates metadata and
+runs `--full` on that exact commit before a dependent job publishes the GitHub
+Release from the matching changelog section. Full CI is release-tag-only, not
+part of pushes to `master`. Hosted validation has GitHub's six-hour job limit;
+failure or timeout must block publication.
 
 ## Architecture Notes
 

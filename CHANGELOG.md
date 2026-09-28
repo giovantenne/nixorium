@@ -22,6 +22,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- GitHub Release publication now requires successful full validation of the
+  tagged commit, including VM tests, representative system builds and offline
+  equivalence. Release jobs enable KVM and use the maximum hosted duration;
+  pull-request and `master` checks remain lightweight.
 - The student login setup now preserves the random deployment-owned wallpaper
   selected during the boot-time home reset. The static blue wallpaper remains
   the default for the persistent administrator and teacher accounts.

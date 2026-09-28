@@ -1,11 +1,9 @@
 # Nixorium management architecture
 
-Status: accepted design for incremental implementation
-
-This document defines the target management architecture and the boundaries
-that implementation must preserve. It describes the intended end state; items
-not yet implemented are tracked in the external project status rather than
-being implied complete here.
+This document describes the management architecture and the boundaries that
+implementation must preserve. Code and tests define current behavior; the
+[hardware validation plan](hardware-validation.md) tracks the separate manual
+qualification requirements. Historical execution plans are not specifications.
 
 ## Baseline and implementation state
 
@@ -66,7 +64,8 @@ a completed reboot. The teacher-facing dashboard reaches only inventory,
 Internet and these power operations through a group-private local worker. The
 worker retains the fixed administrator-owned deployment and SSH identity;
 neither the repository nor general management callbacks are delegated.
-End-to-end documentation and physical validation remain tracked externally.
+See the [administrator guide](../templates/site/README.md) for operator
+procedures and [hardware validation](hardware-validation.md) for manual evidence.
 
 Important constraints in the current implementation are:
 

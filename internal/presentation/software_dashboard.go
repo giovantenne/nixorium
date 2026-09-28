@@ -348,45 +348,18 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 			return model, softwareIntent{kind: softwareProfilesIntent}
 		}
 	case softwareScope:
-		options := model.scopeOptions()
-		clientOption := len(options) - 1
 		switch key.String() {
 		case "esc", "left":
 			model.stage = softwareCatalog
 			return model, softwareIntent{setMessage: true}
-		case "up", "k":
-			if model.scopeCursor == clientOption && len(model.catalog.Clients) > 0 && model.clientCursor > 0 {
-				model.clientCursor--
-			} else {
-				model.scopeCursor = max(0, model.scopeCursor-1)
-			}
-		case "down", "j":
-			if model.scopeCursor == clientOption && model.clientCursor < len(model.catalog.Clients)-1 {
-				model.clientCursor++
-			} else {
-				model.scopeCursor = min(clientOption, model.scopeCursor+1)
-			}
-		case "space":
-			if model.scopeCursor == clientOption && len(model.catalog.Clients) > 0 {
-				name := model.catalog.Clients[model.clientCursor]
-				model.clients[name] = !model.clients[name]
-			}
 		case "enter":
-			if len(options) == 0 {
-				return model, softwareIntent{}
-			}
-			scope := options[model.scopeCursor].scope
-			if scope.Kind == domain.SoftwareScopeClients {
-				for _, name := range model.catalog.Clients {
-					if model.clients[name] {
-						scope.Clients = append(scope.Clients, name)
-					}
-				}
-				if len(scope.Clients) == 0 {
-					return model, softwareIntent{message: "Select at least one configured computer with Space.", setMessage: true}
-				}
+			scope, notice := model.selectedScope()
+			if notice != "" {
+				return model, softwareIntent{message: notice, setMessage: true}
 			}
 			return model, softwareIntent{kind: softwarePlanIntent, request: domain.SoftwareChangeRequest{Package: model.selected, Present: true, Scope: scope}}
+		default:
+			model = model.updateScopeSelection(key)
 		}
 	case softwareReview:
 		switch key.String() {
@@ -1023,6 +996,45 @@ func (model softwareModel) declaration(id string) (domain.SoftwareDeclaration, b
 		}
 	}
 	return domain.SoftwareDeclaration{}, false
+}
+
+func (model softwareModel) updateScopeSelection(key tea.KeyPressMsg) softwareModel {
+	clientOption := len(model.scopeOptions()) - 1
+	switch key.String() {
+	case "up", "k":
+		if model.scopeCursor == clientOption && len(model.catalog.Clients) > 0 && model.clientCursor > 0 {
+			model.clientCursor--
+		} else {
+			model.scopeCursor = max(0, model.scopeCursor-1)
+		}
+	case "down", "j":
+		if model.scopeCursor == clientOption && model.clientCursor < len(model.catalog.Clients)-1 {
+			model.clientCursor++
+		} else {
+			model.scopeCursor = min(clientOption, model.scopeCursor+1)
+		}
+	case "space":
+		if model.scopeCursor == clientOption && len(model.catalog.Clients) > 0 {
+			name := model.catalog.Clients[model.clientCursor]
+			model.clients[name] = !model.clients[name]
+		}
+	}
+	return model
+}
+
+func (model softwareModel) selectedScope() (domain.SoftwareScope, string) {
+	scope := model.scopeOptions()[model.scopeCursor].scope
+	if scope.Kind == domain.SoftwareScopeClients {
+		for _, name := range model.catalog.Clients {
+			if model.clients[name] {
+				scope.Clients = append(scope.Clients, name)
+			}
+		}
+		if len(scope.Clients) == 0 {
+			return scope, "Select at least one configured computer with Space."
+		}
+	}
+	return scope, ""
 }
 
 func (model softwareModel) scopeOptions() []softwareScopeOption {

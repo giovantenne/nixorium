@@ -15,15 +15,24 @@ Before release:
 3. Update `VERSION`, `DEFAULT_RELEASE` in `install.sh`, and the released tag in
    `templates/site/flake.nix`.
 4. Move Unreleased notes into a dated changelog section and update links.
-5. Run `./scripts/validate.sh --full`.
+5. Run the focused local checks; use `./scripts/validate.sh --full` locally
+   when full preflight is practical. GitHub repeats the complete gate regardless.
 6. Commit the metadata as `chore: prepare v<version>` and push it to `master`.
 7. Run `./scripts/release.sh <version>` only with explicit authorization.
 8. Verify the GitHub workflow and published release.
 
-The release workflow repeats evaluation-only checks and rejects a tag when
-`VERSION`, `DEFAULT_RELEASE`, or the changelog section does not match. It does
-not repeat system builds: the full local validation in step 5 is the release
-build gate.
+The release workflow first checks metadata, then runs
+`./scripts/validate.sh --full` on the exact tagged commit, including VM tests,
+representative system builds and offline equivalence. A separate publication
+job depends on successful full validation and consumes its validated release
+notes. Failure, cancellation or timeout must never publish a GitHub Release.
+The tag already exists while validation runs; it is not proof of qualification.
+
+Full CI runs only for release tags, including prereleases, never on ordinary
+pushes to `master`. The hosted runner enables KVM, runs one Nix build at a time,
+and retains the validation log as an artifact. Its 360-minute job limit is
+GitHub's maximum, not an unlimited execution guarantee. Nix has no additional
+build/silence timeout; individual test deadlines remain intact.
 Use only the annotated tag created by `scripts/release.sh`; never create, move,
 replace, or push tags as an implicit part of implementation work. If publishing
 fails after the tag is pushed, inspect the tag and workflow before retrying.

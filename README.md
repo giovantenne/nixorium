@@ -265,16 +265,15 @@ the versioned operational and contributor references.
 | Understand the product and lab use cases | [Website](https://nixorium.org/) |
 | Evaluate one controller, one client, and one change | [Isolated VM recipe](docs/evaluation-environment.md), then [quick start](#quick-start) |
 | Set up and manage a lab | [Administrator guide](templates/site/README.md) |
-| Understand the management interface | [TUI tour](docs/tui-renders.md), [generated renderer gallery](docs/tui-gallery.md) |
+| Understand the management interface | [TUI guide and generated renderer gallery](docs/tui-gallery.md) |
 | Diagnose a failure or restore a backup | [Troubleshooting](docs/troubleshooting.md) |
 | Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
-| Compare reference software-profile closure sizes | [Profile closure measurements](docs/profile-closure-measurements.md) |
+| Measure software-profile closure sizes | [Profile measurement](docs/system-reference.md#measuring-profile-size) |
 | Update the core, NixOS or packages; adopt older deployments | [Update and recovery guide](docs/updates.md) |
 | Understand architecture and security | [Management architecture](docs/management-architecture.md), [ADRs](docs/adr/) |
 | Report a suspected vulnerability | [Security policy](SECURITY.md) |
 | Review operator responsibilities and limitations | [Operational disclaimer](DISCLAIMER.md) |
 | Evaluate firmware and physical hardware | [Hardware validation plan](docs/hardware-validation.md) |
-| Evaluate with disposable virtual machines | [Evaluation environment](docs/evaluation-environment.md) |
 | Develop and validate changes | [Contributor guide](CONTRIBUTING.md), [agent instructions](AGENTS.md), [development validation](docs/development-validation.md) |
 | Work with a coding agent | [Agent skills](#agent-skills) |
 | Review release changes | [Changelog](CHANGELOG.md), [Releases](https://github.com/giovantenne/nixorium/releases) |

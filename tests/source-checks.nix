@@ -102,7 +102,7 @@ in
     internetOnly = true;
   });
   go-shell = pkgs.mkShell {
-    packages = [ pkgs.go ];
+    packages = [ pkgs.go pkgs.git ];
   };
   security-shell = pkgs.mkShell {
     packages = [ pkgs.go pkgs.go-tools pkgs.govulncheck pkgs.actionlint ];

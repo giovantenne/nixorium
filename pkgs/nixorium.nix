@@ -26,6 +26,15 @@ buildGoModule {
   subPackages = [ "cmd/nixorium" "cmd/nixorium-classroom-worker" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
 
   nativeBuildInputs = [ makeWrapper ];
+  nativeCheckInputs = [ git ];
+
+  # subPackages limits installed commands, not the unit-test coverage.
+  checkPhase = ''
+    runHook preCheck
+    export GOFLAGS=''${GOFLAGS//-trimpath/}
+    go test ./...
+    runHook postCheck
+  '';
 
   postFixup = ''
     wrapProgram "$out/bin/nixorium" \

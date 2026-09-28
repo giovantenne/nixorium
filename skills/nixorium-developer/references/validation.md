@@ -1,146 +1,67 @@
 # Upstream validation
 
-Never update `flake.lock` unless input updates are part of the task. The
-validation script uses a persistent evaluation cache under
-`${XDG_CACHE_HOME:-$HOME/.cache}/nixorium-validation`; override it with
-`NIXORIUM_VALIDATION_CACHE_HOME` only when isolation is required.
+The contributor-facing [validation guide](../../../docs/development-validation.md)
+owns the gate table, coverage, performance model and focused commands. Keep
+this reference focused on the rules for choosing and reporting validation.
 
-Use the quick validation during the normal edit-test cycle:
+## Normal development
 
-```sh
-./scripts/validate.sh
-```
+Never update `flake.lock` unless input updates are part of the task.
 
-This is equivalent to `--quick`. It checks shell syntax, Git whitespace,
-client-installer shell tests, skill distribution and discovery, configuration
-and settings schemas, and the packaged Go command with its unit tests. An
-isolated runtime check also exercises a real Git-backed command with an
-otherwise empty `PATH`, proving the installed wrapper supplies its external
-dependency fallback. The schema and Go derivations use
-`tests/source-checks.nix`, which imports the exact locked `nixpkgs` directly and
-avoids constructing the full laboratory graph. It does not evaluate `mkLab`,
-build NixOS systems, or run VM tests.
-
-For repeated Go edits, enter the lightweight locked toolchain once with
-`nix --extra-experimental-features 'nix-command flakes' develop --file tests/source-checks.nix go-shell`
-and run `go test ./...` inside it. Go's incremental cache makes this the tight
-loop; finish with the default gate for the reproducible package test.
-
-Add the full `mkLab` contract when Nix schemas, the Flake API, host composition,
-module wiring, or software scopes change:
+For repeated Go edits, use `./scripts/test-go.sh` (all packages), or pass an
+affected package and ordinary `go test` flags. The runner uses the locked
+compiler and persistent Go cache. A persistent shell is also available:
 
 ```sh
-./scripts/validate.sh --eval
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix go-shell
+go test ./...
 ```
 
-This mode includes the quick checks and evaluates the complete `mkLab` test
-graph without booting a VM.
+Finish a coherent change with `./scripts/validate.sh --quick`. It checks shell
+regressions, schemas, generated docs, canonical copies, agent guidance, the
+packaged Go application and its isolated runtime wrapper. Package tests must
+cover `./...`, not just the installed command list.
 
-For GNOME workstation changes, also run the focused schema/extension check:
+Add `--eval` for schemas, the public Nix API, host composition or software
+scopes. Use only the affected VM when behavior crosses process, filesystem,
+network, privilege, systemd or terminal boundaries. Presentation-only cleanup
+with state-transition coverage does not require a VM. GNOME changes also need
+the focused `desktop-profile` check. Security changes need the locked static
+analysis/security tools documented in the validation guide.
 
-```sh
-nix --extra-experimental-features 'nix-command flakes' build \
-  --file tests/source-checks.nix desktop-profile --no-link
-```
+## Complete qualification
 
-It compiles the actual GSettings overrides, checks extension metadata against
-GNOME's pinned major version, and validates the login script. Keep it separate
-from the quick Go gate: a cold store may need GNOME dependencies. It does not
-replace login/hardware verification or an affected-system build.
+Reserve `./scripts/validate.sh --full` for cross-cutting build changes and
+milestone/release checkpoints. It builds every declared check, representative
+systems, netboot/installer artifacts, and a fresh deployment, then verifies
+offline derivation equivalence. Related outputs must stay batched, and the
+generated deployment's command is built once and reused.
 
-Add the one affected integration test when changing its behavior:
+Build the controller and one representative client, not all generated clients
+with the same module graph. Add another client only for materially different
+host-specific modules. A successful evaluation does not prove that packages
+or affected system roles build. Simulated VM tests do not replace official-ISO
+or physical-hardware evidence.
 
-```sh
-./scripts/validate.sh --management-vm
-./scripts/validate.sh --client-installer-vm
-./scripts/validate.sh --remote-client-installer-vm
-```
+Pull-request and `master` CI run Go packaging/tests plus `./scripts/validate.sh --ci`.
+The latter evaluates all checks and grouped representative source/template
+outputs with import-from-derivation disabled. The separate release-tag workflow
+runs `--full` with KVM before publication, with a 360-minute hosted-job limit.
+Full local preflight is optional for releases; successful full CI on the tagged
+commit is mandatory. Report local and remote evidence separately.
 
-For the legacy PXE operation lock, `nix build --file tests/source-checks.nix
-pxe-legacy-lock-vm-tcg --no-link` runs a focused regression with the real
-preparation unit and its read-only home sandbox, without requiring KVM. It
-checks idle/held locks, unchanged contents, unsafe modes, and symlinks. It
-stops at the missing-deployment check, before any client or netboot build.
+## Cache and guidance
 
-The management VM is required for changes to management operations that cross
-process, filesystem, network, privilege, systemd, or end-to-end terminal
-boundaries. Presentation-only refactors with focused state-transition unit
-tests do not require it. The client-installer VM is required for changes to
-enrollment, Disko installation, or installer runtime behavior. Each targeted
-mode includes the quick checks. The remote-client installer VM is required for
-USB/SSH live-session identity, signed-cache transfer, remote Disko receipts,
-resume, reboot, or post-boot verification. It simulates the live contract and
-does not replace a run with the official ISO or physical hardware.
+Validation reuses `${XDG_CACHE_HOME:-$HOME/.cache}/nixorium-validation`; override
+`NIXORIUM_VALIDATION_CACHE_HOME` only when isolation is required. Build modes
+use `--no-link`; the full gate's temporary installer link is cleaned up.
+Never garbage-collect the shared Nix store automatically.
 
-Run the complete local matrix with:
-
-```sh
-./scripts/validate.sh --full
-```
-
-It additionally builds every declared `checks` derivation, a representative
-client, the controller, netboot ramdisk, Disko package, PXE firmware, command
-package, PXE installer bundle, and target-independent remote installer bundle,
-generates a fresh site deployment, and verifies offline derivation equivalence.
-It does not ask `nix flake check` to enumerate
-all generated clients: address/hostname generation is covered by `mk-lab`, and
-one client exercises their shared module graph. Run it after public API,
-template, built-in module, installer bundle, asset-plumbing, input, Disko, or
-netboot changes only when the change crosses several built roles or affects
-offline equivalence. Always run it before a milestone or release is declared
-complete. During development, prefer `--eval`, one targeted VM, and affected
-real closure builds. A successful evaluation does not prove that source
-patches compile, so affected host roles require real builds.
-
-Never build all generated clients merely to repeat their shared module graph.
-Build one representative client plus the controller; schema and `mkLab` tests
-cover the complete generated hostname/address inventory. Add another client
-build only when a changed host-specific module or role override makes that host
-materially different.
-
-The complete mode groups related upstream outputs into one `nix build`
-invocation. The generated deployment's management executable is built once and
-reused for its CLI scenarios. Keep this batching intact: repeated Flake
-evaluation is a material part of the uncached runtime.
-
-The GitHub source/template job must use the evaluation-only mode:
-
-```sh
-./scripts/validate.sh --ci
-```
-
-This mode checks syntax and skill distribution, evaluates the schema tests and
-one representative client plus the controller, netboot, apps, packages,
-Colmena metadata, and deployment status. It also generates and evaluates a
-fresh deployment and its installer bundle without building system closures.
-It intentionally skips the other generated clients because they share the
-same module graph and their address generation is covered by `mk-lab` tests.
-The CI mode disables import-from-derivation so evaluation cannot trigger hidden
-builds. A separate CI job builds the same direct-source `nixorium` and isolated
-runtime checks used by the fast gate, including the Go unit tests, without
-constructing the laboratory graph or building NixOS system closures. Keep the
-full matrix off GitHub-hosted runners; it is a local prerequisite for changes
-that affect builds and for release preparation.
-
-Build modes use `--no-link`; the full mode's one installer result link exists
-only inside its automatically removed temporary directory. Validation therefore
-leaves no persistent result roots. Unrooted results can still remain as reusable
-Nix store cache until the system garbage collector removes them. Inspect that
-state with `nix-store --gc --print-dead`; never run garbage collection
-automatically or assume that validation work authorizes deleting shared store
-cache.
-
-For skill changes, validate both skill directories with the skill validator.
-The upstream and template copies of `nixorium-maintainer` must be identical,
-and template discovery links must resolve to that copy.
-
-`bash scripts/check-agent-guidance.sh` checks the actual instruction examples
-against the CLI parser without executing operations, checks relative links,
-and validates skill copies/discovery. The quick gate and management-command CI
-run it automatically. Its compiled checker reads prose at runtime to preserve
-the code build cache. Review behavioral claims using
-[the guidance maintenance map](../../../docs/agent-guidance.md); these checks
-cannot prove prose semantics or replace workflow tests.
-
-The contributor-facing decision table and guidance for placing new tests are
-maintained in `docs/development-validation.md`.
+For guidance changes, run `bash scripts/check-agent-guidance.sh` (also part of
+the quick gate). It checks real-parser CLI examples, relative links, discovery
+and canonical maintainer copies. The compiled checker reads prose at runtime,
+so documentation edits do not rebuild the management package. Review behavior
+against the [guidance map](../../../docs/agent-guidance.md): automated checks
+cannot prove prose semantics. Validate both skill directories when changing
+skills; keep upstream and template maintainer copies identical.

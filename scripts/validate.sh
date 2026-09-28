@@ -104,6 +104,20 @@ run_mk_lab_check() {
     --no-link
 }
 
+eval_ci_group() {
+  local SOURCE="$1"
+  local GROUP="$2"
+  echo "Evaluating CI ${GROUP} outputs..."
+  NIXORIUM_CI_SOURCE="$SOURCE" NIXORIUM_CI_GROUP="$GROUP" \
+    NIXORIUM_CI_EVALUATOR="${REPO_ROOT}/tests/ci-eval.nix" \
+    nix eval --impure --json --no-write-lock-file --expr '
+      let
+        flake = builtins.getFlake ("path:" + builtins.getEnv "NIXORIUM_CI_SOURCE");
+        groups = import (builtins.toPath (builtins.getEnv "NIXORIUM_CI_EVALUATOR")) { inherit flake; };
+      in groups.${builtins.getEnv "NIXORIUM_CI_GROUP"}
+    ' >/dev/null
+}
+
 run_full_checks() {
   nix build \
     "path:${REPO_ROOT}#checks.x86_64-linux.config-schema" \
@@ -159,41 +173,18 @@ case "$MODE" in
 esac
 
 if [[ "${MODE}" == "--ci" ]]; then
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.config-schema.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.software-schema.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.software-preset-schema.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.remote-client-installer-vm.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#checks.x86_64-linux.management-vm.drvPath" --raw --no-write-lock-file >/dev/null
+  eval_ci_group "$REPO_ROOT" checks
 else
   bash scripts/check-agent-guidance.sh
   nix build --file "${REPO_ROOT}/tests/source-checks.nix" documentation-check --no-write-lock-file --no-link
   run_full_checks
 fi
 
-LAB_META=$(nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file)
-CONTROLLER_NAME=$(jq -r .controller.name <<<"$LAB_META")
-
 if [[ "${MODE}" == "--ci" ]]; then
-  nix eval "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#nixosConfigurations.netboot.config.system.build.netbootRamdisk.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.disko.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.installerBundle.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.remoteInstallerBundle.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.pxeFirmware.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-harmonia.program" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#apps.x86_64-linux.run-pxe-proxy.program" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#apps.x86_64-linux.nixorium.program" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#packages.x86_64-linux.nixorium.drvPath" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#colmena.pc01.deployment.targetHost" --raw --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#deploymentStatus" --json --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#nixoriumUpdateTargets" --json --no-write-lock-file >/dev/null
-  nix eval "path:${REPO_ROOT}#nixoriumOfflineCheck.drvPath" --raw --no-write-lock-file >/dev/null
+  eval_ci_group "$REPO_ROOT" systems
 else
+  LAB_META=$(nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file)
+  CONTROLLER_NAME=$(jq -r .controller.name <<<"$LAB_META")
   nix build \
     "path:${REPO_ROOT}#nixosConfigurations.pc01.config.system.build.toplevel" \
     "path:${REPO_ROOT}#nixosConfigurations.${CONTROLLER_NAME}.config.system.build.toplevel" \
@@ -307,18 +298,7 @@ jq -e '
 cp "$TEMP_DIR/lab-software-profile.json" "$SITE_DIR/lab-software.json"
 
 if [[ "${MODE}" == "--ci" ]]; then
-  nix eval "path:${SITE_DIR}#apps.x86_64-linux.nixorium.program" \
-    --raw \
-    --no-write-lock-file >/dev/null
-  nix eval "path:${SITE_DIR}#packages.x86_64-linux.pxeFirmware.drvPath" \
-    --raw \
-    --no-write-lock-file >/dev/null
-  nix eval "path:${SITE_DIR}#nixosConfigurations.pc01.config.system.build.toplevel.drvPath" \
-    --raw \
-    --no-write-lock-file >/dev/null
-  nix eval "path:${SITE_DIR}#installerBundle.drvPath" \
-    --raw \
-    --no-write-lock-file >/dev/null
+  eval_ci_group "$SITE_DIR" template
   echo "CI evaluation completed successfully."
   exit 0
 fi

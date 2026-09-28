@@ -1,10 +1,46 @@
-# Generated TUI gallery
+# TUI guide and generated gallery
 
 These plain-text screens come from the real Bubble Tea renderer at the 120×30
 reference size. Fixtures are synthetic and deterministic: generation does not
 inspect a laboratory, contact a computer, query a network, or execute an
 operation. Edit the surrounding explanation here; update the marked region
 with `scripts/generate-docs.sh --write`.
+
+## Workflow guide
+
+The overview opens Computers, Installation, Software and Maintenance. Startup
+reads configuration, inventory and service state; client probes and expensive
+readiness checks run when the selected task needs them. Deferred checks never
+imply that installation or deployment is ready.
+
+Installation offers network boot (PXE) and USB over SSH. PXE preparation builds
+the configured client artifacts before reviewing the temporary controller
+network change; client identity and disk erasure are confirmed on each client.
+USB selects one identity and verifies the live host fingerprint against its
+physical console before asking for a password. Its disk review, reboot and
+installed-system verification remain separate steps. Interrupted dispatches
+require reconciliation, never an automatic retry.
+
+Software changes desired configuration. Package search uses locked inputs;
+profiles add missing declarations and preserve existing scopes. After saving,
+controller-affecting changes use the controller activation workflow and
+client-affecting changes can open a fresh deployment review. Saving alone does
+not update running clients. Computers also offers ordinary system distribution
+without reinstalling disks, authenticated inventory, Internet access and power
+controls. The restricted teacher dashboard exposes only classroom controls.
+
+Maintenance contains settings, updates, history and recovery. Update validation
+may build candidate systems before presenting its review. The ordinary TUI
+then saves and activates the controller; client distribution remains separate.
+See the [update guide](updates.md) and [administrator guide](../templates/site/README.md)
+for complete procedures and the [architecture](management-architecture.md)
+for the operation boundaries.
+
+Arrows or `j`/`k` move, `Enter` invokes the visible action, `Esc` returns or
+cancels, `Space` toggles a selection and `F1` opens contextual help. Exact
+confirmation is retained for destructive operations. Progress reports phases,
+elapsed time and available logs without treating an accepted request as proof
+of completion. Renderer tests cover 80×24, 120×30 and 180×45 layouts.
 
 <!-- BEGIN GENERATED: tui-gallery -->
 ## Overview

@@ -126,10 +126,25 @@ appearance migration lets persistent staff preferences survive later logins.
 This keeps files under the XDG Desktop directory visible for reset student
 homes and persistent staff homes alike.
 
-The [reference profile measurement](profile-closure-measurements.md) compares
-complete Essential and Programming client closures under one documented lock.
-Closure size, transfer estimates and elapsed build time have different cache
-semantics and are reported separately.
+### Measuring profile size
+
+Measure the current template instead of using historical profile sizes. In a
+disposable deployment, keep the same lock, settings and target for each profile:
+
+```sh
+SYSTEM=$(nix build \
+  path:.#nixosConfigurations.pc01.config.system.build.toplevel \
+  --print-out-paths --no-write-lock-file --no-link)
+nix path-info --json-format 1 --json --closure-size "$SYSTEM"
+```
+
+Use `scripts/configure-software-profile.sh software-presets.json lab-software.json`
+in that disposable deployment to select another profile, then repeat. Record
+the upstream revision, lock and store/cache condition. Closure size includes
+the common NixOS/GNOME base; it is neither download size nor total disk usage.
+Time builds separately and measure network transfer independently. A warm
+build reuses existing store paths, so its duration is not an installation-time
+estimate.
 
 ## Network interfaces
 

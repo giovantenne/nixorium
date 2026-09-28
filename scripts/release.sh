@@ -69,4 +69,4 @@ fi
 git tag --annotate "${TAG}" --message "Nixorium ${TAG}"
 git push origin "${TAG}"
 
-echo "Published ${TAG}. GitHub Actions will create the GitHub Release."
+echo "Pushed ${TAG}. GitHub Actions will publish the release only after full validation succeeds."

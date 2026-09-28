@@ -12,9 +12,7 @@ the repository provides the pinned compiler and tools.
 ```sh
 git clone https://github.com/giovantenne/nixorium.git
 cd nixorium
-nix --extra-experimental-features 'nix-command flakes' \
-  develop --file tests/source-checks.nix go-shell
-go test ./...
+./scripts/test-go.sh
 ```
 
 Read [AGENTS.md](AGENTS.md) for repository invariants even when working
@@ -53,7 +51,13 @@ For example, when clarifying a TUI hint:
    go test ./internal/presentation/...
    ```
 
-4. Run the default gate from the repository root:
+4. During iteration, run just the affected package with the cached compiler:
+
+   ```sh
+   ./scripts/test-go.sh ./internal/presentation/...
+   ```
+
+5. Finish with the reproducible gate from the repository root:
 
    ```sh
    ./scripts/validate.sh --quick
@@ -87,7 +91,7 @@ Both write modes are explicit. CI and validation use only `--check`.
 | Schema, `lib.mkLab`, package scope or module composition | `./scripts/validate.sh --eval` |
 | Management adapter, privileged service or composed CLI/TUI operation | `./scripts/validate.sh --management-vm` |
 | Enrollment, Disko or client installer runtime | `./scripts/validate.sh --client-installer-vm` |
-| Cross-cutting milestone or release candidate | `./scripts/validate.sh --full` |
+| Cross-cutting change or milestone | `./scripts/validate.sh --full` |
 
 Use the smallest gate that proves the change while iterating. Run the complete
 checkpoint once when its wider coverage is warranted. The
@@ -109,5 +113,7 @@ Before opening a pull request:
 - avoid drive-by formatting or unrelated cleanup.
 
 Changes that affect releases also follow [the release process](scripts/release.sh)
-and are versioned only after review. Report suspected vulnerabilities through
+and are versioned only after review. The release-tag workflow requires `--full`
+on the tagged commit before publication; local full preflight is optional.
+Ordinary pushes to `master` do not trigger full CI. Report suspected vulnerabilities through
 [SECURITY.md](SECURITY.md), not a public issue.
