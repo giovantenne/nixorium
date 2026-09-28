@@ -76,6 +76,9 @@ func TestCanonicalDeploymentAndInstallationRoutes(t *testing.T) {
 
 func TestSettingsShortcutsDoNotStealNavigationOrSearch(t *testing.T) {
 	for index, group := range routineSettingsGroups {
+		if group.id == "workspace" {
+			continue // The workspace has a dedicated typed editor, tested separately.
+		}
 		m := experienceFixture(2)
 		m.screen = dashboardSettings
 		m.settings.current = wizardSettings()

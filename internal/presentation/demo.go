@@ -63,6 +63,7 @@ func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) 
 			renderSoftwareProfileDemo(sourceCommit, width, height),
 			renderUSBInstallationDemo(sourceCommit, width, height),
 			renderClassroomDemo(sourceCommit, width, height),
+			renderWorkspaceDemo(sourceCommit, width, height),
 		},
 	}
 }

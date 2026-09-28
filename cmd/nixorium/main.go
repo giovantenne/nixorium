@@ -206,12 +206,27 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	updateSaveManager := app.NewUpdateSaveManager(updateManager, local, gitReviewManager, configurationSaveManager)
 	baseSaveManager := app.NewUpdateSaveManager(baseManager, baseSource, gitReviewManager, configurationSaveManager)
 	softwareManager := app.NewSoftwareManager(local)
+	workspaceManager := app.NewWorkspaceManager(local)
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	softwarePresetSaveManager := app.NewSoftwarePresetSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
 	internetManager := app.NewInternetManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
+		LoadWorkspace: func(requestContext context.Context) domain.WorkspacePlanReport {
+			return workspaceManager.Load(requestContext, repository)
+		},
+		PlanWorkspace: func(requestContext context.Context, candidate domain.WorkspaceProfile) domain.WorkspacePlanReport {
+			data, _ := domain.MarshalWorkspaceProfile(candidate)
+			return workspaceManager.Plan(requestContext, repository, data)
+		},
+		SaveWorkspace: func(plan domain.WorkspacePlanReport) domain.WorkspaceApplyReport {
+			var data []byte
+			if plan.Candidate != nil {
+				data, _ = domain.MarshalWorkspaceProfile(*plan.Candidate)
+			}
+			return workspaceManager.Apply(ctx, repository, data, plan.ReviewToken)
+		},
 		RunningVersion:  nixoriumVersion,
 		LoadPackageBase: func() domain.PackageBaseStatus { return baseManager.PackageBaseStatus(repository) },
 		PlanPackageBase: func(target string, allowUnverified bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {

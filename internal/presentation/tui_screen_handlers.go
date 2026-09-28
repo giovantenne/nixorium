@@ -64,6 +64,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 			return dashboardLogsMsg{report: model.actions.LoadLogs()}
 		}
 	case "g":
+		model.maintenance.gitFromWorkspace = model.screen == dashboardWorkspace
+		model.maintenance.gitCommitResult = domain.GitCommitReport{}
 		model.screen = dashboardGitReview
 		model.busy = "Reviewing Git changes without modifying the worktree"
 		model.message = ""
@@ -423,6 +425,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			if !selected {
 				model.message = "Select a settings category."
 				return model, nil
+			}
+			if group.id == "workspace" {
+				return model.openWorkspace()
 			}
 			model.settings.editor = newSettingsEditorModel(model.settings.current, group.fields, "Nixorium — Edit "+group.label)
 			model.settings.editor.width = model.width
@@ -832,6 +837,11 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 		if model.maintenance.gitCommitResult.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
+				if model.maintenance.gitFromWorkspace {
+					model.screen = dashboardWorkspace
+					model.message = ""
+					return model, nil
+				}
 				if model.setupMode {
 					model.screen = dashboardSetup
 					model.message = ""
@@ -856,6 +866,11 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 		maximum := maximumGitReviewScroll(model.maintenance.gitReview, model.gitReviewHeight())
 		switch key.String() {
 		case "esc", "left":
+			if model.maintenance.gitFromWorkspace {
+				model.screen = dashboardWorkspace
+				model.message = ""
+				return model, nil
+			}
 			if model.setupMode {
 				model.screen = dashboardSetup
 			} else {

@@ -232,6 +232,15 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, group.shortcut+"  "+group.label)
 		}
 		lines = append(lines, "p  Account passwords", "y  Controller keys", "/  Search categories; Esc clears the search before leaving")
+	case dashboardWorkspace:
+		lines = append(lines,
+			"Choose Desktop, Dock, Editor or Browser, then a supported field.",
+			"Inherit keeps the deployment baseline; Clear means an explicit empty list.",
+			"In a list: Space toggles, i inherits, c clears; Shift arrows reorder favorites.",
+			"Enter keeps a field in the draft; Esc cancels that field edit.",
+			"v reviews the complete draft, dependencies and student destinations.",
+			"Type SAVE and Enter only after review. No commit, runtime opt-in, deploy or reset is included.",
+			"A saved profile can open the existing Git review; commit uses separate authorization.")
 	case dashboardSettingsPasswords:
 		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
 	case dashboardPXE:
@@ -400,6 +409,8 @@ func (model dashboardModel) textEntry() bool {
 		return model.computers.hostSearching
 	case dashboardSoftware:
 		return model.software.acceptsText()
+	case dashboardWorkspace:
+		return model.workspace.textEntry()
 	default:
 		return false
 	}

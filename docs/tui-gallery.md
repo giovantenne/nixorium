@@ -36,6 +36,12 @@ See the [update guide](updates.md) and [administrator guide](../templates/site/R
 for complete procedures and the [architecture](management-architecture.md)
 for the operation boundaries.
 
+Settings also offers **Student workspace** on supporting pins. Its desktop,
+dock, editor/extensions and browser fields are a draft until a complete review
+and explicit save. This workflow writes only the profile JSON; Git commit,
+runtime opt-in, system deployment and boot reset are separate. It is not a home
+capture tool and is unavailable in the restricted teacher dashboard.
+
 Arrows or `j`/`k` move, `Enter` invokes the visible action, `Esc` returns or
 cancels, `Space` toggles a selection and `F1` opens contextual help. Exact
 confirmation is retained for destructive operations. Progress reports phases,
@@ -309,5 +315,66 @@ Type RESTART to continue:
 > _
 
 Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
+```
+
+## Student workspace favorites
+
+```text
+Nixorium  /  Settings  /  Student workspace
+
+Student workspace
+Favorite applications (ordered)
+
+Explicit selection
+  [ ] firefox.desktop
+› [1] code.desktop
+  [ ] org.gnome.Nautilus.desktop
+
+Shift ↑/↓ changes the order of the selected favorite.
+
+Space Toggle  ·  i Inherit  ·  c Clear  ·  Enter Keep draft  ·  Esc Cancel field  ·  F1 Help
+```
+
+## Student workspace declaration review
+
+```text
+Nixorium  /  Settings  /  Student workspace
+
+Student workspace
+Student workspace review: READY
+Repository: /demo/lab
+File: workspace-profile.json
+Revision: 0123456789abcdef0123456789abcdef01234567
+Student: student
+Runtime opt-in: false (not changed by saving)
+Destinations:
+  controller (controller)
+  pc01 (client)
+  pc02 (client)
+Current declaration: absent (legacy mode)
+Proposed declaration:
+{
+Review lines 1–13 of 31
+
+Only the profile JSON is saved; no commit, deploy or reset.
+Type SAVE: _
+
+↑/↓ Scroll  ·  Enter Save JSON  ·  Esc Cancel  ·  F1 Help
+```
+
+## Student workspace saved, not deployed
+
+```text
+Nixorium  /  Settings  /  Student workspace
+
+Student workspace
+✓ SAVED
+
+Profile saved. No computer or student home changed.
+
+Next: separate Git review/commit, then reviewed system deployment.
+With runtime opt-in enabled, preferences apply at the next boot reset.
+
+g Git review  ·  Esc Settings  ·  F1 Help
 ```
 <!-- END GENERATED: tui-gallery -->

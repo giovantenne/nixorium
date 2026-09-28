@@ -18,8 +18,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   preference seed, composes wallpapers, validates pinned extension payloads,
   and restores only at normal boot. Guarded snapshots and durable failure
   evidence block unsafe retries and login after an incomplete reset. Existing
-  template content is not imported automatically; workspace CLI/TUI editing
-  is not included.
+  template content is not imported automatically.
 - Added an inactive Essential workspace example, a deployment-owned starter
   catalog and an explicit migration review. New templates can validate a first
   candidate without activating it; older pins and existing homes stay unchanged.
@@ -30,11 +29,15 @@ The project follows [Semantic Versioning](https://semver.org/).
   Its adapter preserves Git-filtered source identity, composes both deployment
   hooks and saves only the JSON through a locked no-follow atomic replacement.
   `workspace plan`/`apply` expose JSON/text review and confirmed declaration-only
-  saving without implicit commit, activation, deployment or reset. The TUI editor
-  is not included yet.
+  saving without implicit commit, activation, deployment or reset.
 - Recognize workspace profiles in Git review and validate their schema in the
   existing separately reviewed, exact-path commit workflow. Unrelated staged
   content remains untouched; committing does not deploy the profile.
+- Added a guided student workspace editor under Maintenance → Settings.
+  Desktop/dock, pinned editor extensions/settings and browser choices share the
+  CLI review/save boundary, preserve inheritance and ordered favorites, and
+  offer a separate Git review after saving. The editor never enables runtime,
+  deploys systems, captures a home or changes current student preferences.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes

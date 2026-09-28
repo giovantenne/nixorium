@@ -102,6 +102,10 @@ var routineSettingsGroups = []routineSettingsGroup{
 			{id: "lab.adminGitEmail", group: "Git", label: "Administrator Git author email"},
 		},
 	},
+	{
+		id: "workspace", shortcut: "w", label: "Student workspace",
+		description: "Desktop, dock, editor extensions and initial student preferences",
+	},
 }
 
 type routineSettingsMenu struct {

@@ -386,7 +386,11 @@ failure or timeout must block publication.
   conflict and unconfirmed durability distinctly, never inferred activation.
   `workspace plan`/`apply` use this boundary; interactive confirmation or explicit
   `--yes` authorizes only the JSON save. Keep candidate reads bounded and
-  non-blocking for special files. TUI editing remains a separate integration.
+  non-blocking for special files. The administrative TUI uses typed
+  load/plan/save callbacks for its draft editor, with a source-bound review and
+  explicit save confirmation. Preserve inherit versus empty values, ordered
+  favorites, cancellation and late-message checks. Do not activate, commit or
+  opt into runtime from the save callback; Git review is a separate follow-up.
   The initial editor load reads the current declaration (absence stays legacy),
   resolves it, and rejects concurrent changes. Never load the example implicitly.
   Git review classifies the profile as managed; a separately authorized exact-path

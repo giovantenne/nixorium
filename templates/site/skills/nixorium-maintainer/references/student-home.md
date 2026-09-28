@@ -30,7 +30,8 @@ catalog/baseline preferences and prerequisites across the controller and all
 clients. Their `prepared` state is not an active-home receipt.
 Preparation-only pins do not seed homes. Recent management commands expose
 `workspace plan`/`apply`; check CLI help and the deployment's candidate hooks
-before using them. The TUI editor is not available yet.
+before using them. Supporting commands also expose the administrative TUI editor
+under Maintenance → Settings → Student workspace.
 Where available, `nixoriumResolveWorkspaceCandidate` previews a raw candidate's
 effective settings, versions and destinations without writing it. Still run the
 deployment's validation hook, which may include additional local policy; a
@@ -130,6 +131,30 @@ proceed. Nix generations, profile declarations and student-data backups serve
 different purposes.
 
 ## Review and save a profile
+
+In the administrative TUI, open **Maintenance → Settings → Student workspace**.
+It loads the actual declaration, not the inactive example. With no saved file,
+it starts an explicitly labelled new draft and leaves legacy mode unchanged.
+Choose Desktop, Dock, Editor or Browser, then a supported field:
+
+- Use “Inherit” (or an empty numeric field) to omit an override. “Clear” on a
+  list means an explicit empty list, not inheritance.
+- Favorites and extensions come from the pinned deployment catalog. Space
+  toggles entries; Shift arrows reorder selected favorites. Adding catalog
+  entries or required software is a separate deployment change.
+- Enter keeps a field in the draft; Esc cancels that field. Leaving the editor
+  discards unsaved changes. Use the visible Review action (`v`) to evaluate the
+  complete candidate without writing it, then inspect the scrollable review.
+- Only confirmed `SAVE` writes the JSON. A saved result can open Git review,
+  where path selection and commit confirmation are separate. No callback
+  enables runtime, builds, deploys or resets a home.
+
+Review may be cancelled while metadata is loading; a save already in progress
+must finish before quitting. If the original profile changed during editing,
+leave and reload it before preparing another proposal. Do not automatically
+retry a stale review or an uncertain-durability result. The editor supports only
+the versioned fields: other application settings, whole-home imports and
+runtime migration remain outside it. The teacher dashboard has no editor.
 
 Where supported, prepare the candidate in a separate regular JSON file rather
 than overwriting `workspace-profile.json` before review. Preserve existing

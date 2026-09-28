@@ -40,7 +40,10 @@ configuration, software, home customization, diagnostics, and operations.
   editable in session, and must not be reapplied at login. Keep staff behavior
   unchanged. On supporting pins, use `workspace plan`/`apply` for a separately
   prepared candidate and source-bound JSON save; this does not authorize
-  migration or deployment. Check the actual CLI/hook capabilities and use the
+  migration or deployment. The administrative TUI can edit supported fields
+  under Maintenance → Settings → Student workspace using the same review/save
+  boundary. Catalog changes and migration remain explicit deployment edits.
+  Check the actual CLI/hook capabilities and use the
   student-home reference. Never discard pending reset evidence or
   disable the profile to bypass failed-reset recovery.
   `workspace-profile.example.json` is an inactive Essential starting proposal,

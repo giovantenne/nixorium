@@ -57,6 +57,9 @@ type DashboardActions struct {
 	PlanPackageBase        func(string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
 	SavePackageBase        func(domain.UpdatePlanReport) domain.UpdateApplyReport
 	LoadSettings           func() (domain.LabSettingsFile, error)
+	LoadWorkspace          func(context.Context) domain.WorkspacePlanReport
+	PlanWorkspace          func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
+	SaveWorkspace          func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
 	PlanSettings           func(domain.LabSettingsFile) domain.ConfigPlanReport
 	SaveSettings           func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
 	ChangePassword         SettingsPasswordAction
@@ -110,6 +113,7 @@ const (
 	dashboardShutdown
 	dashboardShutdownReview
 	dashboardShutdownResult
+	dashboardWorkspace
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -183,18 +187,19 @@ type updateModel struct {
 // maintenanceModel owns the read-only service/log/repository views and the
 // optional reviewed local commit state.
 type maintenanceModel struct {
-	services        domain.ServicesReport
-	serviceResult   domain.ServiceActionReport
-	logs            domain.OperationLogsReport
-	logDetail       domain.OperationLogReport
-	logCursor       int
-	logScroll       int
-	gitReview       domain.GitReviewReport
-	gitScroll       int
-	gitCommitCursor int
-	gitCommitChosen map[string]bool
-	gitCommitPlan   domain.GitCommitPlanReport
-	gitCommitResult domain.GitCommitReport
+	services         domain.ServicesReport
+	serviceResult    domain.ServiceActionReport
+	logs             domain.OperationLogsReport
+	logDetail        domain.OperationLogReport
+	logCursor        int
+	logScroll        int
+	gitReview        domain.GitReviewReport
+	gitScroll        int
+	gitCommitCursor  int
+	gitCommitChosen  map[string]bool
+	gitCommitPlan    domain.GitCommitPlanReport
+	gitCommitResult  domain.GitCommitReport
+	gitFromWorkspace bool
 }
 
 // installationModel owns guided installation and PXE lifecycle state,
@@ -298,6 +303,7 @@ type dashboardModel struct {
 	maintenance            maintenanceModel
 	updates                updateModel
 	settings               settingsModel
+	workspace              workspaceModel
 	software               softwareModel
 	internet               internetModel
 	shutdown               shutdownModel
@@ -935,6 +941,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.diagnosticsView()
 	case dashboardSoftware:
 		content = model.softwareView()
+	case dashboardWorkspace:
+		content = model.workspaceView()
 	case dashboardInternet:
 		content = model.internetView()
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
@@ -1244,6 +1252,11 @@ func (model dashboardModel) gitReviewView() string {
 		return model.gitCommitReviewView()
 	}
 	path := []string{"Maintenance", "Changes"}
+	backLabel := "Maintenance"
+	if model.maintenance.gitFromWorkspace {
+		path = []string{"Settings", "Student workspace", "Changes"}
+		backLabel = "Workspace"
+	}
 	lines := []string{tuiTitle("Repository changes", model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
@@ -1255,7 +1268,7 @@ func (model dashboardModel) gitReviewView() string {
 		if success {
 			title = "Git changes committed locally"
 		}
-		returnLabel := "Maintenance"
+		returnLabel := backLabel
 		if model.setupMode {
 			returnLabel = "Setup"
 		}
@@ -1296,7 +1309,7 @@ func (model dashboardModel) gitReviewView() string {
 	if len(model.maintenance.gitReview.Changes) > 0 && !model.maintenance.gitReview.HasErrors() {
 		actions = append(actions, tuiAction{key: "c", label: "Select commit paths"})
 	}
-	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: backLabel}, tuiAction{key: "F1", label: "Help"})
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 

@@ -244,8 +244,14 @@ account, controller/client destinations and pinned dependencies. Changed source,
 catalog, pin or profile requires a new review. Saving does not stage, commit,
 enable runtime, build, deploy or reset. See the
 [save procedure](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
-for requirements and conflict/durability handling. The TUI editor is not yet
-available; older pins/commands may not provide this workflow.
+for requirements and conflict/durability handling. The administrative TUI exposes
+the same save boundary at **Maintenance → Settings → Student workspace**.
+Choose desktop, dock, editor/extensions or browser, keep each change in the
+draft, then review the complete proposal and confirm the save. “Inherit” uses
+the deployment baseline; “Clear” is an explicit empty list. Saving offers a
+separate Git review, not automatic commit or deployment. Catalog additions and
+unsupported fields remain manual deployment edits. Older pins/commands may not
+provide this workflow; the inactive example is never loaded automatically.
 Supporting pins expose `nixoriumResolveWorkspaceCandidate` to preview a raw JSON
 proposal's effective values, versions and destinations without saving it. This
 complements, rather than replaces, the deployment's validation hook.

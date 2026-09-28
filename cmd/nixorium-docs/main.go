@@ -123,6 +123,9 @@ func renderGallery() string {
 		{title: "Shutdown with active sessions", scenarioID: "shutdown", label: "Active sessions will shut down; unreachable clients are not sent"},
 		{title: "Restricted teacher dashboard", scenarioID: "classroom", label: "Overview"},
 		{title: "Teacher restart review", scenarioID: "classroom", label: "Review the client restart"},
+		{title: "Student workspace favorites", scenarioID: "student-workspace", label: "Keep only the editor in the draft favorites"},
+		{title: "Student workspace declaration review", scenarioID: "student-workspace", label: "Review the declaration without activating a system"},
+		{title: "Student workspace saved, not deployed", scenarioID: "student-workspace", label: "Saved does not mean committed or deployed"},
 	}
 	var output strings.Builder
 	for index, selection := range frames {
