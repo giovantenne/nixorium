@@ -145,6 +145,7 @@
       checks.${system} = {
         workspace-seed = import ./tests/workspace-seed.nix { inherit pkgs; };
         workspace-seed-pinned = import ./tests/workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };
+        home-reset-filesystem-vm = import ./tests/home-reset-filesystem-vm.nix { inherit pkgs; };
         config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
           touch "$out"
         '';

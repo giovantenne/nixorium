@@ -55,6 +55,7 @@ in
   desktop-profile = import ./desktop-profile.nix { inherit pkgs; };
   workspace-seed = import ./workspace-seed.nix { inherit pkgs; };
   workspace-seed-pinned = import ./workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };
+  home-reset-filesystem-vm = import ./home-reset-filesystem-vm.nix { inherit pkgs; };
   workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
     touch "$out"
   '';
