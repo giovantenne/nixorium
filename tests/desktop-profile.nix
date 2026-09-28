@@ -1,6 +1,6 @@
 { pkgs }:
 let
-  profile = import ../templates/site/modules/workstation.nix {
+  profileArgs = {
     inherit pkgs;
     inherit (pkgs) lib;
     labSettings = {
@@ -10,12 +10,16 @@ let
     };
     hostSoftwarePackages = [];
   };
+  profile = import ../templates/site/modules/workstation.nix profileArgs;
+  managedProfile = import ../templates/site/modules/workstation.nix (profileArgs // { workspaceRuntimeEnabled = true; });
   cfg = profile.services.desktopManager.gnome;
   schemas = pkgs.gnome.nixos-gsettings-overrides.override {
     inherit (cfg) extraGSettingsOverrides extraGSettingsOverridePackages;
   };
   loginScript = pkgs.writeText "desktop-login.sh" profile.environment.etc."lab/gnome-user-setup.sh".text;
+  managedScript = pkgs.writeText "managed-desktop-login.sh" managedProfile.environment.etc."lab/gnome-user-setup.sh".text;
 in
+assert pkgs.lib.hasInfix "APPEARANCE_ROLE=managed-student" managedProfile.environment.etc."lab/gnome-user-setup.sh".text;
 pkgs.runCommand "nixorium-desktop-profile-check" {
   nativeBuildInputs = [ pkgs.glib pkgs.jq pkgs.bash ];
 } ''
@@ -40,11 +44,24 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   apply_staff_appearance
   test "$(gsettings get org.gnome.desktop.background picture-uri)" != "'$RANDOM_BACKGROUND'"
   test "$(gsettings get org.gnome.desktop.background picture-uri-dark)" != "'$RANDOM_BACKGROUND'"
+  source ${managedScript}
+  gsettings set org.gnome.shell favorite-apps "['code.desktop']"
+  gsettings set org.gnome.desktop.interface color-scheme "'prefer-light'"
+  gsettings set org.gnome.shell.extensions.dash-to-dock dock-position "'LEFT'"
+  gsettings set org.gnome.shell.extensions.dash-to-dock autohide false
+  apply_session_defaults managed-student "[]"
+  test "$(gsettings get org.gnome.shell favorite-apps)" = "['code.desktop']"
+  test "$(gsettings get org.gnome.desktop.interface color-scheme)" = "'prefer-light'"
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'LEFT'"
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = false
+  test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-style-v1"
+  test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-dock-v1"
   ${pkgs.lib.concatMapStringsSep "\n" (extension: ''
     jq -e --arg version '${pkgs.lib.versions.major pkgs.gnome-shell.version}' \
       '."shell-version" | index($version) != null' \
       ${extension}/share/gnome-shell/extensions/${extension.extensionUuid}/metadata.json > /dev/null
   '') [ pkgs.gnomeExtensions.dash-to-dock pkgs.gnomeExtensions.desktop-icons-ng-ding pkgs.gnomeExtensions.tiling-assistant ]}
   bash -n ${loginScript}
+  bash -n ${managedScript}
   touch "$out"
 ''

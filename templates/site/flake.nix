@@ -22,16 +22,23 @@
       clientGroups = {
         # graphics = [ "pc01" "pc02" ];
       };
-      # Optional preparation metadata only; absence preserves legacy homes.
+      # Preparation and runtime activation are separate choices. Keep false
+      # until the local home/profile modules have been reviewed for migration.
+      workspaceRuntimeEnabled = false;
+      # Optional metadata; absence preserves legacy homes.
       # Older pinned upstream versions receive no new mkLab arguments.
       workspaceArguments =
-        if !(builtins.pathExists ./workspace-profile.json) then {}
+        if !(builtins.pathExists ./workspace-profile.json) then
+          assert !workspaceRuntimeEnabled || throw "Workspace runtime requires workspace-profile.json";
+          {}
         else if !(nixorium.lib ? workspaceProfileSchemaVersion) then
           throw "The pinned Nixorium version does not support workspace profile preparation"
+        else if workspaceRuntimeEnabled && !(nixorium.lib ? workspaceRuntimeVersion) then
+          throw "The pinned Nixorium version does not support workspace runtime activation"
         else {
           workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
           workspaceCatalog = import ./workspace-catalog.nix;
-        };
+        } // (if nixorium.lib ? workspaceRuntimeVersion then { inherit workspaceRuntimeEnabled; } else {});
       mkDeployment = candidateLabConfig: candidateLabSoftware:
         nixorium.lib.mkLab ({
           deploymentSelf = self;

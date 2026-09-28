@@ -1,5 +1,6 @@
-{ mkWorkspaceLab, workspaceLab, labConfig }:
+{ mkWorkspaceLab, workspaceLab, workspaceRuntimeLab, workspaceRuntimeControllerLab, labConfig }:
 let
+  lib = workspaceLab.nixosConfigurations.pc99.pkgs.lib;
   absent = mkWorkspaceLab { workspaceProfileJSON = null; workspaceCatalog = null; };
   controller = mkWorkspaceLab {
     labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
@@ -21,7 +22,7 @@ let
       packageBase = {};
       evalLabSettings = settings: settings.lab;
       mkLab = args:
-        assert !(args ? workspaceProfileJSON) && !(args ? workspaceCatalog);
+        assert !(args ? workspaceProfileJSON) && !(args ? workspaceCatalog) && !(args ? workspaceRuntimeEnabled);
         { legacyCompatible = true; };
     };
   };
@@ -29,6 +30,25 @@ in
 assert legacyTemplate.legacyCompatible;
 assert absent.nixoriumWorkspace == null;
 assert workspaceLab.nixoriumWorkspace.state == "prepared";
+assert workspaceLab.nixoriumWorkspace.runtimeEnabled == false;
+assert workspaceLab.nixoriumWorkspace.seed == null;
+assert workspaceRuntimeLab.nixoriumWorkspace.state == "prepared";
+assert workspaceRuntimeLab.nixoriumWorkspace.runtimeEnabled;
+assert builtins.isString workspaceRuntimeLab.nixoriumWorkspace.seed;
+assert builtins.all (name:
+  let cfg = workspaceRuntimeLab.nixosConfigurations.${name}.config;
+  in !cfg.systemd.services.home-reset.restartIfChanged
+    && cfg.systemd.services.home-reset.unitConfig.RefuseManualStart
+    && builtins.elem "systemd-user-sessions.service" cfg.systemd.services.home-reset.requiredBy
+    && cfg.environment.etc ? "nixorium-workspace-reset.json"
+    && !(lib.hasInfix "/var/lib/home-template/${labConfig.studentUser}" cfg.system.activationScripts.createHomeTemplates.text)
+    && !(lib.hasInfix "/home/${labConfig.studentUser}" cfg.system.activationScripts.nixoriumUserHomeOwnership.text)
+) [ "pc99" "pc01" "pc02" ];
+assert !workspaceRuntimeLab.nixosConfigurations.pc99.config.services.displayManager.autoLogin.enable;
+assert workspaceRuntimeLab.nixosConfigurations.pc01.config.services.displayManager.autoLogin.enable;
+assert !workspaceRuntimeControllerLab.nixosConfigurations.pc99.config.services.displayManager.autoLogin.enable;
+assert workspaceRuntimeControllerLab.nixoriumWorkspace.runtimeEnabled;
+assert workspaceRuntimeControllerLab.nixoriumWorkspace.targets == [ { name = "pc99"; role = "controller"; } ];
 assert workspaceLab.nixoriumWorkspace.studentUser == labConfig.studentUser;
 assert map (target: target.name) workspaceLab.nixoriumWorkspace.targets == [ "pc99" "pc01" "pc02" ];
 assert workspaceLab.nixoriumWorkspace.effective.desktop.enableAnimations == false;
@@ -45,6 +65,12 @@ assert !(builtins.tryEval (candidate ''{"schemaVersion":1,"vscode":{"extensions"
 assert !(builtins.tryEval (candidate ''{"schemaVersion":1,"schemaVersion":1}'')).success;
 assert !(builtins.tryEval (candidate null)).success;
 assert rejected { workspaceCatalog = null; };
+assert rejected { workspaceRuntimeEnabled = "yes"; };
+assert rejected { workspaceRuntimeEnabled = true; workspaceProfileJSON = null; workspaceCatalog = null; };
+assert builtins.all (paths: rejected { workspaceRuntimeEnabled = true; homeResetEphemeralPaths = paths; }) [
+  [ "." ] [ "a//b" ] [ "a/./b" ] [ "a/" ] [ "a\\b" ] [ "a\nb" ]
+  [ ".cache" ".cache" ] [ ".cache" ".cache/tool" ] [ ".cache/tool" ".cache" ]
+];
 assert rejected { labSoftware = scope "all-clients"; };
 assert rejected { labSoftware = scope "controller"; };
 assert rejected { hostModules.pc02 = [ ./fixtures/workspace-remove-editor.nix ]; };

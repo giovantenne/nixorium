@@ -7,7 +7,7 @@ The current template uses `modules/home-profile.nix` for student template
 content, `modules/workstation.nix` for desktop/application policy, and assets
 for editor settings/backgrounds. Existing labs may have different local layouts.
 
-Upstream recreates the clean home template during activation; the local home
+In legacy mode upstream recreates the clean home template during activation; the local home
 profile runs afterward. Student home is reset from that template at boot.
 Changing a student's live home is not a persistent customization. Changing the
 template does not mean an already logged-in student's home changed immediately.
@@ -22,17 +22,47 @@ There is no supported “capture this student's home” command in this contract
 If asked for snapshots as a new template feature, distinguish that upstream
 design request from the currently available declarative customization.
 
-## Optional workspace preparation metadata
+## Optional workspace preparation and runtime
 
 Some upstream pins expose `nixoriumWorkspace` and
 `nixoriumValidateWorkspaceCandidate`. They validate optional workspace JSON,
 catalog/baseline preferences and prerequisites across the controller and all
-clients. Their `prepared` state is not an active-home receipt: this interface
-does not seed homes, replace local modules, or provide workspace CLI commands.
+clients. Their `prepared` state is not an active-home receipt and there are no
+workspace CLI commands. Preparation-only pins do not seed homes.
 Do not migrate a working deployment merely because these outputs exist. Check
 the actual pinned capabilities and keep configuration, preparation and live
 activation distinct. Workspace data and catalog contents can enter the public
 Nix store; never include credentials or personal session data.
+
+Pins exposing `lib.workspaceRuntimeVersion` additionally accept the separate
+default-off `workspaceRuntimeEnabled` switch. Check that value in the deployment
+and `nixoriumWorkspace.runtimeEnabled`; a prepared profile alone is not opt-in.
+When enabled, edit supported preferences/extensions in the workspace JSON and
+deployment catalog, not the ignored legacy template. Keep prerequisite software
+available on all targets, including a controller with zero clients.
+
+Before an explicitly requested migration, compare local home/desktop modules
+with the pinned capability: older private copies do not update automatically.
+Remove conflicting student writes only, preserving staff behavior. Retain the
+desired supported values in the catalog baseline/profile; omitted settings use
+system/application defaults, not an inferred copy of the old Nix policy.
+The managed seed includes neutral shell/Git defaults and standard XDG folders
+with stable English names. It does not import arbitrary legacy assets or settings.
+
+Configuration, system build/deploy and the next normal boot are separate steps.
+The managed reset serves the configured student on clients and controller,
+without changing controller autologin. Rebuilds do not reset the current home,
+and supported preferences are not reapplied at login. Students can edit them
+until the next boot reset. A seed path or reset receipt is not fleet-wide proof.
+
+If reset fails, inspect the `home-reset.service` journal read-only and preserve
+`/var/lib/home-snapshots/.workspace-reset` as private recovery evidence.
+`pending.json` blocks retries and normal login across reboot; a previous success
+receipt does not clear it, and switching to legacy is not a recovery method.
+Do not remove the marker or invoke the helper to try again. Escalate the exact
+failure and request a separately authorized recovery based on the actual
+snapshot/home state. Managed snapshots are read-only, sanitized copies under
+`/var/lib/home-snapshots/workspace`; they remain distinct from external backups.
 
 ## VS Code extensions and settings
 
@@ -44,13 +74,14 @@ inside each package rather than assuming Marketplace IDs are Nix attributes.
 Add only the agreed extensions to the local profile, preserving existing
 ones and any settings unrelated to Python. Inspect current activation ordering
 and ownership; keep the profile conditional on the effective VS Code package.
-Settings assets affect admin, teacher, and student in the supplied template:
+Legacy settings assets affect admin, teacher, and student in the supplied template:
 do not broaden a student-only request to staff without identifying that effect.
 
 Create staff application directories with their final owner instead of relying
 on `install -D -o` for intermediate directories. Core repairs the managed
 `.config/Code`, `.vscode/extensions`, and npm trees for admin, teacher, and
-student during activation; do not replace this with world-writable modes.
+legacy student during activation; managed student ownership is assigned at reset,
+not repaired during an active session. Do not use world-writable modes.
 `/run/user/<uid>` is created by logind, while activation only reconciles an
 already existing top-level directory whose ownership or mode is wrong.
 

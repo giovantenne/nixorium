@@ -13,6 +13,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   prerequisite checks on the controller and every client. Preparation metadata
   is preserved in the offline installer; it does not activate student-home
   preferences or change legacy deployment behavior.
+- Added a separate default-off managed-home runtime for the configured student
+  on the controller and clients. It builds an immutable shell/Git/XDG and
+  preference seed, composes wallpapers, validates pinned extension payloads,
+  and restores only at normal boot. Guarded snapshots and durable failure
+  evidence block unsafe retries and login after an incomplete reset. Existing
+  template content is not imported automatically; workspace CLI/TUI editing
+  is not included.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes
@@ -28,6 +35,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Home-reset services no longer restart automatically during system rebuilds,
+  including managed/legacy transitions. Returning to legacy cannot bypass an
+  incomplete managed reset. Staff preferences and controller login selection
+  are preserved.
 - GitHub Release publication now requires successful full validation of the
   tagged commit, including VM tests, representative system builds and offline
   equivalence. Release jobs enable KVM and use the maximum hosted duration;

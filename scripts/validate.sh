@@ -126,6 +126,7 @@ run_full_checks() {
     "path:${REPO_ROOT}#checks.x86_64-linux.settings-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.software-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.software-preset-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.desktop-profile" \
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-resolution" \
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-seed" \

@@ -321,8 +321,10 @@ deployment. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then read
 the API, modules, installers, or template.
 
 The optional [workspace preparation API](docs/system-reference.md#workspace-preparation)
-validates initial student preferences and pinned prerequisites. It is not a
-home-activation feature or a new TUI command; existing home behavior is unchanged.
+validates initial student preferences and pinned prerequisites. A separate,
+default-off runtime switch enables the managed student home at the next normal
+boot on the controller and clients. Preparation alone preserves legacy homes;
+there is no workspace TUI command yet.
 
 From a checkout with Nix available, run the normal fast validation gate:
 

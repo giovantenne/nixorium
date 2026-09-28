@@ -15,6 +15,7 @@ args@{
   softwarePresets ? null,
   workspaceProfileJSON ? null,
   workspaceCatalog ? null,
+  workspaceRuntimeEnabled ? false,
   clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
@@ -229,6 +230,9 @@ let
     labSettings = labSettings // { ifaceName = ifaceForHost name; };
     inherit labAssets;
     inherit homeResetEphemeralPaths;
+    inherit workspaceRuntimeEnabled;
+    inherit workspaceSeed;
+    workspaceWallpapers = map (background: "${background}") labAssets.backgrounds;
     hostSoftwarePackages = map (entry: entry.package)
       (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages);
     inherit nixoriumPackage;
@@ -317,6 +321,16 @@ let
     && path != ""
     && !(lib.hasPrefix "/" path)
     && !(builtins.elem ".." (lib.splitString "/" path));
+  validRuntimeEphemeralPaths =
+    builtins.length homeResetEphemeralPaths <= 128
+    && builtins.length (lib.unique homeResetEphemeralPaths) == builtins.length homeResetEphemeralPaths
+    && builtins.all (path:
+      builtins.stringLength path <= 4096
+      && builtins.match "[^[:cntrl:]]+" path != null
+      && !(lib.hasInfix "\\" path)
+      && builtins.all (part: part != "" && part != ".") (lib.splitString "/" path)
+      && !(builtins.any (parent: lib.hasPrefix "${parent}/" path) homeResetEphemeralPaths)
+    ) homeResetEphemeralPaths;
   validClientNames = map (n: "pc${padNumber n}") pcNumbers;
   validHostNames = validClientNames ++ [ masterHostName ];
   unknownHostModuleNames = builtins.attrNames (builtins.removeAttrs hostModules validHostNames);
@@ -445,6 +459,11 @@ let
       controllerName = masterHostName;
       clientNames = validClientNames;
       hostPackages = lib.genAttrs validHostNames workspaceHostPackages;
+    };
+  workspaceSeed = if !workspaceRuntimeEnabled then null else
+    import ./build-workspace-home.nix { inherit lib; pkgs = softwarePkgs; } {
+      resolution = workspaceResolution;
+      inherit labSettings;
     };
   installerDiskoRuntimePackages = disko.lib.packages {
     disko.devices = import (upstreamRoot + "/lib/disko-layout.nix") {
@@ -585,6 +604,7 @@ let
           ${lib.optionalString (workspaceProfileJSON != null) ''
             workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
             workspaceCatalog = builtins.fromJSON (builtins.readFile ./workspace-catalog.json);
+            workspaceRuntimeEnabled = ${lib.boolToString workspaceRuntimeEnabled};
           ''}
           homeResetEphemeralPaths = builtins.fromJSON (builtins.readFile ./home-reset-ephemeral-paths.json);
           clientGroups = builtins.fromJSON (builtins.readFile ./client-groups.json);
@@ -727,6 +747,14 @@ assert unknownVeyonNativeHosts == []
   || throw "veyonNativeHosts contains unknown hosts: ${builtins.concatStringsSep ", " unknownVeyonNativeHosts}";
 assert workspaceProfileJSON == null || workspaceCatalog != null
   || throw "workspaceProfileJSON requires a deployment-owned workspaceCatalog";
+assert builtins.isBool workspaceRuntimeEnabled
+  || throw "workspaceRuntimeEnabled must be a boolean";
+assert !workspaceRuntimeEnabled || workspaceProfileJSON != null
+  || throw "workspaceRuntimeEnabled requires an explicit workspace profile";
+assert !workspaceRuntimeEnabled || validRuntimeEphemeralPaths
+  || throw "workspace runtime requires bounded, canonical, non-overlapping ephemeral paths";
+assert !workspaceRuntimeEnabled || builtins.length labAssets.backgrounds <= 128
+  || throw "workspace runtime supports at most 128 wallpapers";
 assert builtins.deepSeq workspaceResolution true;
 rec {
   nixosConfigurations = hostConfigurations // {
@@ -825,6 +853,8 @@ rec {
   # seeding and management workflows are not enabled by these arguments alone.
   nixoriumWorkspace = if workspaceResolution == null then null else workspaceResolution // {
     state = "prepared";
+    runtimeEnabled = workspaceRuntimeEnabled;
+    seed = if workspaceRuntimeEnabled then toString workspaceSeed else null;
     managedFile = "workspace-profile.json";
     inherit studentUser;
   };

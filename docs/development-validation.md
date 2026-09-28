@@ -222,8 +222,10 @@ The `mk-lab` graph also checks workspace preparation against generated system
 packages, controller-only mode, downstream removals, unchanged representative
 system derivations and template compatibility without workspace input.
 `workspace-offline` compares system derivations and workspace metadata with
-the serialized installer, and `workspace-systems` builds its controller and representative
-client. Both build checks belong to the full checkpoint, not the quick loop.
+the serialized installer in preparation-only, runtime-enabled laboratory and
+runtime-enabled controller-only modes. `workspace-systems` builds a managed
+controller, representative client and controller-only system. Both build
+checks belong to the full checkpoint, not the quick loop.
 
 The focused `workspace-seed` and `workspace-seed-pinned` checks build the
 internal preference payload. They read compiled dconf values using the pinned
@@ -254,10 +256,12 @@ The separate `workspace-reset-service-vm` check imports the internal service
 module in two minimal systems. It verifies successful boot ordering and the
 packaged helper's fixed root-only entry point, then performs real NixOS
 configuration switches while a student-owned process runs. Both a seed update
-and a transition from an active legacy reset preserve the process and session
-files. Retained failure evidence blocks the display-manager fixture and normal
+and transitions to/from an active legacy reset preserve the process and session
+files. The legacy pre-start guard also refuses managed pending evidence.
+Retained failure evidence blocks the display-manager fixture and normal
 user sessions on reboot. This check uses a small login consumer, not GNOME;
-it does not establish complete `mkLab` or deployment-template integration.
+`mk-lab`, `workspace-systems`, `workspace-offline` and `desktop-profile` own
+the separate generated-system, offline and template-preference contracts.
 Run it through `tests/source-checks.nix`; it is also in the full checkpoint.
 
 After the automated milestone, follow the documented VirtualBox recipe with

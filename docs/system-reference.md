@@ -368,6 +368,7 @@ installer so client installation needs no second checkout.
 | `softwarePresets` | Optional versioned deployment-owned software-profile catalog; each profile has an ID, label, description, and package IDs |
 | `workspaceProfileJSON` | Optional raw JSON text for preparation of student preferences; `null` preserves legacy behavior |
 | `workspaceCatalog` | Deployment-owned baseline/application/extension catalog required with workspace JSON; no implicit package installation |
+| `workspaceRuntimeEnabled` | Explicit default-off switch for restoring a validated workspace at normal boot; requires workspace JSON |
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
@@ -408,12 +409,14 @@ distribution action when no client is affected.
 
 ### Workspace preparation
 
-This is a preparation interface, not a home-activation mechanism. No workspace
-file ships in the template. With no `workspaceProfileJSON`, `nixoriumWorkspace`
+Preparation and runtime activation are separate. No workspace file ships in
+the template. With no `workspaceProfileJSON`, `nixoriumWorkspace`
 is `null` and existing home/template/login behavior remains unchanged. With a
 profile, the output reports `state = "prepared"`, the configured `studentUser`,
 all target hosts, declared/effective preferences, normalized catalog and pinned
-package/extension versions. It does not report live installed or active state.
+package/extension versions. `runtimeEnabled` records the separate runtime
+choice; `seed` is the immutable build-output path when enabled, otherwise null.
+Neither field reports live installed or active state.
 
 `workspaceProfileJSON` must be raw JSON text, limited to 64 KiB, with integer
 `schemaVersion: 1`. Unknown fields, duplicate keys (including escaped aliases),
@@ -462,6 +465,59 @@ Both profile text and catalog data travel through the offline installer. The
 template reads optional workspace files only when present, and gives a clear
 error if the pinned upstream lacks this capability. Do not remove operational
 home modules on the assumption that preparation replaces them.
+
+#### Explicit managed-home runtime
+
+`workspaceRuntimeEnabled = true` requires a profile and a pin exposing
+`lib.workspaceRuntimeVersion`. It applies to the configured student on every
+client and the controller, including controller-only mode; it does not change
+controller autologin or staff preferences. Both the flag and seed metadata are
+preserved by offline reconstruction. Merely updating a preparation-only
+deployment never enables it.
+
+The immutable seed combines supported preferences with a neutral shell/Git/XDG
+scaffold. XDG folders use stable English names. It does not copy a live home,
+the writable legacy template, or arbitrary application assets. Extension links
+point to identity-checked pinned store payloads, and editor update checks start
+disabled as editable session defaults. This is not proof that every plugin
+loads correctly or works offline; qualify each supported plugin separately.
+Wallpapers are composed with the profile dconf source before restoration.
+
+Review existing local `home-profile.nix` and `workstation.nix` before opting in:
+older private copies do not update with the upstream pin. The current template
+skips student template writes, ownership repair, and supported login migrations
+in managed mode, while retaining staff behavior and desktop extension enablement.
+Keep desired preferences explicit in the profile/baseline. Missing settings use
+system/application defaults, not an inferred translation of old Nix modules.
+
+Build and deploy through the existing reviewed controller/client flows. The
+new home becomes available at the next normal boot, not on save or rebuild.
+Both reset implementations avoid automatic restart during a configuration
+switch, including transitions in either direction. Students may change their
+initial preferences during the session; the next reset restores the seed.
+
+The managed reset requires the declared Btrfs home/snapshot mounts, exact
+account ownership, a closed login barrier, no student processes or lingering,
+and a fully checked seed/home tree. Ephemeral paths must be canonical relative
+paths, non-overlapping and unique, at most 128 entries and 4096 bytes each.
+Nested mounts/subvolumes and intermediate symlinks fail closed. Unsupported
+kernel confinement APIs do not fall back to unsafe removal.
+
+Before changing the original home, it creates a private snapshot, removes the
+configured ephemeral data from that copy and makes it read-only. Five managed
+snapshots are published under `/var/lib/home-snapshots/workspace`, separate
+from legacy snapshots. Teacher access remains through `veyon-master`.
+Reset success records bind the seed, user and boot ID under the root-only
+`/var/lib/home-snapshots/.workspace-reset` directory. They are not fleet status
+and are not currently consumed by the TUI.
+
+An incomplete attempt leaves `pending.json` and recovery data, blocks normal
+login and refuses subsequent attempts, including after reboot or a switch
+back to the legacy path. The root-only helper is not an interactive reset or
+recovery command. Inspect the `home-reset.service` journal and preserve the
+private evidence before administrator-led recovery; never delete the marker
+or rerun the reset just to clear an error. Snapshot recovery, external backups
+and reverting the declared profile are distinct operations.
 
 ## Public Flake outputs
 

@@ -212,10 +212,29 @@ The template recognizes optional `workspace-profile.json` and
 `workspace-catalog.nix` only when the pinned upstream supports workspace
 preparation. They are not created by default. This interface validates
 preferences and prerequisites for the configured student on the controller
-and every client, and carries them into offline evaluation; it does **not**
-apply those preferences to homes. Continue using the existing local modules
-for operational home customization. A `nixoriumWorkspace.state` of `prepared`
-is not evidence of activation, and there is no workspace CLI/TUI workflow.
+and every client, and carries them into offline evaluation. Preparation alone
+does **not** apply preferences to homes. The separate `workspaceRuntimeEnabled`
+binding in `flake.nix` defaults to `false`; enable it only with a supporting pin
+and after reviewing local home/desktop modules for migration. The supplied
+modules then stop writing the legacy student template and stop reapplying
+managed student preferences at login. Staff behavior remains unchanged.
+
+With runtime enabled, a reviewed system deployment prepares an immutable seed;
+the next normal boot restores it for the student, including controller-only
+mode. Rebuilding does not reset an active session. Initial preferences remain
+editable until the next reset. The seed has shell/Git defaults, standard XDG
+folders with stable English names, and the supported profile settings; arbitrary
+legacy assets, editor settings and plugins are not imported automatically.
+Explicitly retain the desired supported values in the profile/catalog baseline;
+omitted values otherwise fall back to system/application defaults.
+
+Managed snapshots are separate under `/var/lib/home-snapshots/workspace`.
+An incomplete reset retains private recovery evidence and blocks normal login;
+do not delete evidence, restart the helper, or disable the profile as a retry.
+Have an administrator inspect the journal and recovery data first. Snapshots
+are not backups. A `nixoriumWorkspace.state` of `prepared`, even with
+`runtimeEnabled = true`, is not evidence of deployment or a successful reset.
+There is no workspace CLI/TUI workflow yet.
 
 Run the task-oriented dashboard from the repository root:
 

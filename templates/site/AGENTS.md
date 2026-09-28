@@ -32,10 +32,15 @@ configuration, software, home customization, diagnostics, and operations.
   Git, Node/npm, Pi and OpenCode are common to all supplied profiles. Per-user
   npm overrides persist for staff but are reset for students; keep student
   agent credentials and state out of both the template and rotating snapshots.
-- Optional workspace JSON/catalog files are a preparation-only interface when
-  supported by the pin. `nixoriumWorkspace.state = "prepared"` does not mean
-  homes are configured. Do not replace working home modules or invent workspace
-  CLI commands based on this metadata; use the student-home reference.
+- Optional workspace JSON/catalog files are preparation-only unless the
+  separately reviewed `workspaceRuntimeEnabled` switch is enabled with a
+  supporting pin and compatible local modules. `nixoriumWorkspace.state =
+  "prepared"` is never evidence of deployment or reset. Managed preferences
+  apply to the student on the controller and clients at normal boot, remain
+  editable in session, and must not be reapplied at login. Keep staff behavior
+  unchanged. Do not infer migration permission or invent workspace CLI commands;
+  use the student-home reference. Never discard pending reset evidence or
+  disable the profile to bypass failed-reset recovery.
 - Keep the direct `nixpkgs` input and
   `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together when present.
   Updating Nixorium must preserve that package-base lock node. Do not change

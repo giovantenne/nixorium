@@ -65,8 +65,15 @@
         labConfig = import ./lab-config.nix;
       };
       workspaceLab = mkWorkspaceLab {};
+      workspaceRuntimeLab = mkWorkspaceLab { workspaceRuntimeEnabled = true; };
+      workspaceRuntimeControllerLab = mkWorkspaceLab {
+        workspaceRuntimeEnabled = true;
+        labConfig = (import ./lab-config.nix) // { deploymentMode = "controller"; pcCount = 0; };
+        publicKeys = { cache = null; ssh = null; veyon = null; };
+      };
       workspaceIntegrationTest = import ./tests/workspace-mk-lab.nix {
         inherit mkWorkspaceLab workspaceLab;
+        inherit workspaceRuntimeLab workspaceRuntimeControllerLab;
         labConfig = import ./lab-config.nix;
       };
       managementVmTest = pkgs.testers.runNixOSTest (import ./tests/management-vm.nix {
@@ -128,6 +135,7 @@
         softwareSchemaVersion = 1;
         softwarePresetSchemaVersion = 1;
         workspaceProfileSchemaVersion = 1;
+        workspaceRuntimeVersion = 1;
         packageBase = {
           schemaVersion = 2;
           source = "github:NixOS/nixpkgs";
@@ -143,6 +151,7 @@
         };
       };
       checks.${system} = {
+        desktop-profile = import ./tests/desktop-profile.nix { inherit pkgs; };
         workspace-seed = import ./tests/workspace-seed.nix { inherit pkgs; };
         workspace-seed-pinned = import ./tests/workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };
         home-reset-filesystem-vm = import ./tests/home-reset-filesystem-vm.nix { inherit pkgs; };
@@ -168,10 +177,16 @@
         mk-lab = assert mkLabTest && workspaceIntegrationTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''
           touch "$out"
         '';
-        workspace-offline = workspaceLab.nixoriumOfflineCheck;
+        workspace-offline = pkgs.runCommand "nixorium-workspace-offline-test" {} ''
+          test -e ${workspaceLab.nixoriumOfflineCheck}
+          test -e ${workspaceRuntimeLab.nixoriumOfflineCheck}
+          test -e ${workspaceRuntimeControllerLab.nixoriumOfflineCheck}
+          touch "$out"
+        '';
         workspace-systems = pkgs.runCommand "nixorium-workspace-systems-test" {} ''
-          test -e ${workspaceLab.nixosConfigurations.pc99.config.system.build.toplevel}/init
-          test -e ${workspaceLab.nixosConfigurations.pc01.config.system.build.toplevel}/init
+          test -e ${workspaceRuntimeLab.nixosConfigurations.pc99.config.system.build.toplevel}/init
+          test -e ${workspaceRuntimeLab.nixosConfigurations.pc01.config.system.build.toplevel}/init
+          test -e ${workspaceRuntimeControllerLab.nixosConfigurations.pc99.config.system.build.toplevel}/init
           touch "$out"
         '';
         client-installer = pkgs.runCommand "nixorium-client-installer-test" {

@@ -1,6 +1,7 @@
-{ pkgs, labSettings, homeResetEphemeralPaths, ... }:
+args@{ pkgs, lib, labSettings, homeResetEphemeralPaths, ... }:
 
 let
+  workspaceRuntimeEnabled = args.workspaceRuntimeEnabled or false;
   # Git configuration
   gitConfigStudent = {
     name = labSettings.studentGitName;
@@ -24,12 +25,15 @@ let
   homeResetScript = ../scripts/home-reset.sh;
 in
 {
+  imports = lib.optional workspaceRuntimeEnabled ./workspace-reset.nix;
   # Create templates at system activation (rebuild time)
   system.activationScripts.createHomeTemplates = {
     text = ''
-      # Create student template
-      ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
-      chown -R ${labSettings.studentUser}:users "${templateDirStudent}"
+      ${lib.optionalString (!workspaceRuntimeEnabled) ''
+        # Create the legacy student template only when it owns the reset path.
+        ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
+        chown -R ${labSettings.studentUser}:users "${templateDirStudent}"
+      ''}
 
       # Create admin template
       ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
@@ -46,13 +50,18 @@ in
   };
 
   # Systemd service to reset student home at boot
-  systemd.services.home-reset = {
+  systemd.services.home-reset = lib.mkIf (!workspaceRuntimeEnabled) {
     description = "Reset ${labSettings.studentUser} home directory from template";
     wantedBy = [ "multi-user.target" ];
-    requiredBy = [ "display-manager.service" ];
-    before = [ "display-manager.service" ];
+    requiredBy = [ "systemd-user-sessions.service" "display-manager.service" ];
+    before = [ "systemd-user-sessions.service" "display-manager.service" ];
     after = [ "local-fs.target" ];
+    # Returning from the managed path must not reset a live session on switch.
+    restartIfChanged = false;
+    stopIfChanged = false;
     unitConfig = {
+      "X-OnlyManualStart" = true;
+      "X-StopOnRemoval" = false;
       RequiresMountsFor = [
         "/home/${labSettings.studentUser}"
         "/var/lib/home-template"
@@ -62,6 +71,8 @@ in
     path = [ pkgs.btrfs-progs pkgs.dconf pkgs.findutils pkgs.coreutils ];
     serviceConfig = {
       Type = "oneshot";
+      # Disabling the new profile is not recovery from an incomplete reset.
+      ExecStartPre = "${pkgs.coreutils}/bin/test ! -e /var/lib/home-snapshots/.workspace-reset/pending.json";
       ExecStart = "${pkgs.bash}/bin/bash ${homeResetScript} ${snapshotsDir} ${homeDirStudent} ${templateDirStudent} ${labSettings.studentUser}:users ${ephemeralPathsFile}";
       RemainAfterExit = true;
     };

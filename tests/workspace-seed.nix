@@ -66,6 +66,10 @@ let
     };
   };
   seed = build resolved;
+  home = import ../lib/build-workspace-home.nix { inherit lib; pkgs = seedPackages; } {
+    resolution = resolved;
+    labSettings = { studentGitName = "Student"; studentGitEmail = "student@example.invalid"; };
+  };
   lightSeed = build (prepare {
     desktop = { favorites = []; colorScheme = "light"; dock.autoHide = true; };
     vscode.extensions = [];
@@ -101,6 +105,18 @@ assert !mismatchedProfile.success;
 pkgs.runCommand "nixorium-workspace-seed${lib.optionalString usePinnedExtension "-pinned"}-check" {
   nativeBuildInputs = [ pkgs.glib pkgs.dconf pkgs.dbus pkgs.jq ];
 } ''
+  test -f ${home}/home/.bashrc
+  test -f ${home}/home/.profile
+  test -f ${home}/home/.gitconfig
+  test -f ${home}/home/.config/user-dirs.dirs
+  for DIRECTORY in Desktop Downloads Templates Public Documents Music Pictures Videos .local/share .local/npm; do
+    test -d "${home}/home/$DIRECTORY"
+  done
+  test ! -e ${home}/home/.ssh
+  test ! -e ${home}/home/.pi
+  cmp ${seed}/manifest.json ${home}/manifest.json
+  cmp ${seed}/home/.config/Code/User/settings.json ${home}/home/.config/Code/User/settings.json
+  test -L ${home}/home/.vscode/extensions/${extensionID}
   export XDG_CONFIG_HOME="$TMPDIR/student-config"
   export XDG_CACHE_HOME="$TMPDIR/student-cache"
   export GSETTINGS_BACKEND=dconf

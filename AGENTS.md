@@ -362,18 +362,21 @@ failure or timeout must block publication.
   list-replacement semantics when composing the deployment baseline. It does
   not install software or qualify plugin loading.
 - Optional `mkLab.workspaceProfileJSON` (raw JSON text) and `workspaceCatalog`
-  expose preparation-only `nixoriumWorkspace` metadata and a candidate hook.
+  expose `nixoriumWorkspace` preparation metadata and a candidate hook.
   `mkLab` checks prerequisites against each generated host's actual declarative
   system packages, including downstream overrides. Serialize both inputs into
-  the offline installer. `state = "prepared"` is not activation; absent input
-  must preserve legacy homes. The template must still work with older pins
-  when no workspace file exists.
+  the offline installer. `state = "prepared"` is not activation.
+  `workspaceRuntimeEnabled` is a separate default-off opt-in requiring the
+  profile; serialize it offline and expose the seed path without claiming it
+  is built, deployed, or active. Absent input preserves legacy home content.
+  The template must still work with older pins when no workspace file exists.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing
   preferences. Check built extension manifests against resolved identities and
-  versions. A built seed is not home activation or proof of plugin loading;
-  this helper is not connected to the legacy reset path.
+  versions. `build-workspace-home.nix` adds a neutral shell/Git/XDG scaffold,
+  never writable template content. A built seed is not home activation or
+  proof of plugin loading; neither builder changes the legacy payload.
 - `internal/homereset` contains a confined removal primitive and an internal
   boot-reset engine. Preserve complete preflight, no-follow traversal,
   mount/subvolume checks, immutable seed validation, account/process checks,
@@ -387,8 +390,11 @@ failure or timeout must block publication.
   the `home-reset` unit name, never restarts on switch, and gates both the
   display manager and normal user sessions. Preserve manual-start refusal,
   no automatic retry, and `X-OnlyManualStart` so first-time installation during
-  a rebuild also waits for boot. The module is not yet selected by `mkLab`;
-  preparation-only deployments and the legacy script remain unchanged.
+  a rebuild also waits for boot. Only the explicit runtime opt-in selects the
+  module. The legacy service also avoids rebuild-time restart and must refuse
+  managed pending evidence, so disabling the profile cannot bypass recovery.
+  Keep student ownership repair/template writes and login preference migration
+  out of the opted-in path, while retaining staff and legacy content behavior.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.

@@ -1,5 +1,6 @@
-{ pkgs, lib, labSettings, labAssets, hostSoftwarePackages, ... }:
+args@{ pkgs, lib, labSettings, labAssets, hostSoftwarePackages, ... }:
 let
+  legacyStudent = !(args.workspaceRuntimeEnabled or false);
   has = package: builtins.elem package hostSoftwarePackages;
   studentTemplate = "/var/lib/home-template/${labSettings.studentUser}";
   adminHome = "/home/admin";
@@ -38,7 +39,9 @@ in
     deps = [ "createHomeTemplates" ];
     text = ''
       ${lib.optionalString (has "chromium") ''
-        install -D -m 0644 ${labAssets.mimeApps} "${studentTemplate}/.config/mimeapps.list"
+        ${lib.optionalString legacyStudent ''
+          install -D -m 0644 ${labAssets.mimeApps} "${studentTemplate}/.config/mimeapps.list"
+        ''}
         install -D -o admin -g users -m 0644 ${labAssets.mimeApps} "${adminHome}/.config/mimeapps.list"
       ''}
       ${lib.optionalString (!has "chromium") ''
@@ -47,19 +50,21 @@ in
 
       ${lib.optionalString (has "vscode") ''
         ${prepareStaffDirectories}
-        install -D -m 0644 ${labAssets.vscodeSettings} "${studentTemplate}/.config/Code/User/settings.json"
         ${installForStaff ".config/Code/User/settings.json" labAssets.vscodeSettings}
-        install -d -m 0755 "${studentTemplate}/.vscode/extensions"
-        ${builtins.concatStringsSep "\n        " (map (extension:
-          ''cp -a "${extension.pkg}/share/vscode/extensions/${extension.dir}" "${studentTemplate}/.vscode/extensions/"''
-        ) vscodeExtensions)}
-        chmod -R u+w "${studentTemplate}/.vscode/extensions"
-        ${pkgs.jq}/bin/jq 'del(.announcement)' \
-          "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json" \
-          > "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp"
-        mv "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp" \
-          "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json"
-        install -D -m 0644 ${vscodeArgv} "${studentTemplate}/.vscode/argv.json"
+        ${lib.optionalString legacyStudent ''
+          install -D -m 0644 ${labAssets.vscodeSettings} "${studentTemplate}/.config/Code/User/settings.json"
+          install -d -m 0755 "${studentTemplate}/.vscode/extensions"
+          ${builtins.concatStringsSep "\n          " (map (extension:
+            ''cp -a "${extension.pkg}/share/vscode/extensions/${extension.dir}" "${studentTemplate}/.vscode/extensions/"''
+          ) vscodeExtensions)}
+          chmod -R u+w "${studentTemplate}/.vscode/extensions"
+          ${pkgs.jq}/bin/jq 'del(.announcement)' \
+            "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json" \
+            > "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp"
+          mv "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp" \
+            "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json"
+          install -D -m 0644 ${vscodeArgv} "${studentTemplate}/.vscode/argv.json"
+        ''}
         ${installForStaff ".vscode/argv.json" vscodeArgv}
       ''}
       ${lib.optionalString (!has "vscode") ''
@@ -67,13 +72,17 @@ in
         ${removeForStaff ".vscode/argv.json"}
       ''}
       ${lib.optionalString (has "nodejs") ''
-        install -d -m 0755 "${studentTemplate}/.local/npm"
+        ${lib.optionalString legacyStudent ''
+          install -d -m 0755 "${studentTemplate}/.local/npm"
+        ''}
         ${builtins.concatStringsSep "\n        " (map (profile:
           ''install -d -o ${profile.user} -g users -m 0755 "${profile.home}/.local/npm"''
         ) staffHomes)}
       ''}
 
-      chown -R ${labSettings.studentUser}:users "${studentTemplate}"
+      ${lib.optionalString legacyStudent ''
+        chown -R ${labSettings.studentUser}:users "${studentTemplate}"
+      ''}
     '';
   };
 

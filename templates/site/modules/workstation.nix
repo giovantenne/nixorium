@@ -1,5 +1,6 @@
-{ pkgs, lib, labSettings, hostSoftwarePackages, ... }:
+args@{ pkgs, lib, labSettings, hostSoftwarePackages, ... }:
 let
+  workspaceRuntimeEnabled = args.workspaceRuntimeEnabled or false;
   has = package: builtins.elem package hostSoftwarePackages;
   hasGhostty = has "ghostty";
   hasChromium = has "chromium";
@@ -233,7 +234,7 @@ in
 
         case "''${USER:-}" in
           ${labSettings.studentUser})
-            APPEARANCE_ROLE=student
+            APPEARANCE_ROLE=${if workspaceRuntimeEnabled then "managed-student" else "student"}
             FAVORITES=${lib.escapeShellArg (gvariantList studentFavorites)}
             ;;
           admin|${labSettings.teacherUser})
@@ -244,10 +245,22 @@ in
         esac
 
         sleep 2
-        gsettings set org.gnome.shell favorite-apps "$FAVORITES"
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "ding@rastersoft.com"
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "dash-to-dock@micxgx.gmail.com"
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "tiling-assistant@leleat-on-github"
+        # Managed student preferences are seeded only at the normal boot reset.
+        # Extension enablement and unrelated staff/legacy migrations remain.
+        apply_session_defaults "$APPEARANCE_ROLE" "$FAVORITES"
+        gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
+      }
+
+      apply_session_defaults() {
+        local APPEARANCE_ROLE="$1"
+        local FAVORITES="$2"
+        if [[ "$APPEARANCE_ROLE" == managed-student ]]; then
+          return 0
+        fi
+        gsettings set org.gnome.shell favorite-apps "$FAVORITES"
         STYLE_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-style-v1"
         if [ ! -e "$STYLE_STATE" ]; then
           if [[ "$APPEARANCE_ROLE" == student ]]; then
@@ -264,7 +277,6 @@ in
           mkdir -p "$(dirname "$DOCK_STATE")"
           touch "$DOCK_STATE"
         fi
-        gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
       }
 
       if [[ "''${BASH_SOURCE[0]}" == "$0" ]]; then
