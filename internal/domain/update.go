@@ -60,6 +60,14 @@ type UpdateProposal struct {
 	Diff         GitDiff
 	Checks       []UpdateCheck
 	PackageBase  *PackageBaseChange
+	Workspace    *WorkspaceUpdateImpact
+}
+
+// WorkspaceUpdateImpact compares pinned declarations, not live home state,
+// vendor-latest releases, or proof that an extension loads in the editor.
+type WorkspaceUpdateImpact struct {
+	Current  *WorkspaceResolution `json:"current"`
+	Proposed *WorkspaceResolution `json:"proposed"`
 }
 
 // PackageBaseChange reports observed pins, not a certification of runtime compatibility.
@@ -106,28 +114,29 @@ type UpdatePlanProgress struct {
 }
 
 type UpdatePlanReport struct {
-	Kind            string              `json:"kind,omitempty"`
-	AllowUnverified bool                `json:"allowUnverified,omitempty"`
-	PackageBase     *PackageBaseChange  `json:"packageBase,omitempty"`
-	SchemaVersion   int                 `json:"schemaVersion"`
-	Operation       string              `json:"operation"`
-	GeneratedAt     time.Time           `json:"generatedAt"`
-	State           string              `json:"state"`
-	Repository      string              `json:"repository"`
-	Revision        string              `json:"revision,omitempty"`
-	CurrentRef      string              `json:"currentRef,omitempty"`
-	CurrentRev      string              `json:"currentRevision,omitempty"`
-	CurrentChannel  UpdateChannel       `json:"currentChannel,omitempty"`
-	Target          string              `json:"target,omitempty"`
-	TargetChannel   UpdateChannel       `json:"targetChannel,omitempty"`
-	Downgrade       bool                `json:"downgrade"`
-	ReviewToken     string              `json:"reviewToken,omitempty"`
-	Confirmation    string              `json:"confirmation,omitempty"`
-	Diff            GitDiff             `json:"diff"`
-	Checks          []UpdateCheck       `json:"checks"`
-	Issues          []ValidationIssue   `json:"issues"`
-	Snapshot        UpdateInputSnapshot `json:"-"`
-	Proposal        UpdateProposal      `json:"-"`
+	Kind            string                 `json:"kind,omitempty"`
+	AllowUnverified bool                   `json:"allowUnverified,omitempty"`
+	PackageBase     *PackageBaseChange     `json:"packageBase,omitempty"`
+	Workspace       *WorkspaceUpdateImpact `json:"workspace,omitempty"`
+	SchemaVersion   int                    `json:"schemaVersion"`
+	Operation       string                 `json:"operation"`
+	GeneratedAt     time.Time              `json:"generatedAt"`
+	State           string                 `json:"state"`
+	Repository      string                 `json:"repository"`
+	Revision        string                 `json:"revision,omitempty"`
+	CurrentRef      string                 `json:"currentRef,omitempty"`
+	CurrentRev      string                 `json:"currentRevision,omitempty"`
+	CurrentChannel  UpdateChannel          `json:"currentChannel,omitempty"`
+	Target          string                 `json:"target,omitempty"`
+	TargetChannel   UpdateChannel          `json:"targetChannel,omitempty"`
+	Downgrade       bool                   `json:"downgrade"`
+	ReviewToken     string                 `json:"reviewToken,omitempty"`
+	Confirmation    string                 `json:"confirmation,omitempty"`
+	Diff            GitDiff                `json:"diff"`
+	Checks          []UpdateCheck          `json:"checks"`
+	Issues          []ValidationIssue      `json:"issues"`
+	Snapshot        UpdateInputSnapshot    `json:"-"`
+	Proposal        UpdateProposal         `json:"-"`
 }
 
 func (r UpdatePlanReport) HasErrors() bool {

@@ -808,8 +808,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		if model.screen == dashboardLogDetail && model.maintenance.logScroll > maximumLogScroll(model.maintenance.logDetail, model.logDetailHeight()) {
 			model.maintenance.logScroll = maximumLogScroll(model.maintenance.logDetail, model.logDetailHeight())
 		}
-		if model.screen == dashboardUpdateReview && model.updates.scroll > maximumUpdateScroll(model.updates.plan, model.updateReviewHeight()) {
-			model.updates.scroll = maximumUpdateScroll(model.updates.plan, model.updateReviewHeight())
+		if model.screen == dashboardUpdateReview && model.updates.scroll > model.maximumUpdateScroll() {
+			model.updates.scroll = model.maximumUpdateScroll()
 		}
 		if model.screen == dashboardSettings {
 			model.settings.menu.setSize(model.width, model.height)

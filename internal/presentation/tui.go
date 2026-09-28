@@ -1716,6 +1716,13 @@ func (model dashboardModel) updateReviewHeight() int {
 	if model.height <= 0 {
 		return 10
 	}
+	if model.updates.plan.Workspace != nil {
+		height := model.height - 16
+		if model.message != "" {
+			height -= 4
+		}
+		return max(1, height)
+	}
 	height := model.height - 21
 	if model.updates.packageBase {
 		height -= 4
@@ -1726,8 +1733,8 @@ func (model dashboardModel) updateReviewHeight() int {
 	return max(1, height)
 }
 
-func maximumUpdateScroll(report domain.UpdatePlanReport, height int) int {
-	maximum := len(strings.Split(strings.TrimSuffix(report.Diff.Content, "\n"), "\n")) - height
+func (model dashboardModel) maximumUpdateScroll() int {
+	maximum := len(model.updateReviewContent()) - model.updateReviewHeight()
 	if maximum < 0 {
 		return 0
 	}

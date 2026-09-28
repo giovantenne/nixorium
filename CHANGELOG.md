@@ -38,6 +38,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   CLI review/save boundary, preserve inheritance and ordered favorites, and
   offer a separate Git review after saving. The editor never enables runtime,
   deploys systems, captures a home or changes current student preferences.
+- Update reviews now compare existing workspace package/extension versions,
+  dependencies and preferences across the current and proposed pins, with the
+  comparison bound to the review token. Changed reset opt-in or destinations
+  require separate migration; builds do not certify actual plugin loading.
 
 - The configured teacher can now open a restricted classroom TUI on the
   controller without access to the administrator-owned deployment. It exposes

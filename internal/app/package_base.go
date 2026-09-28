@@ -87,6 +87,7 @@ func (m *UpdateManager) planPackageBase(ctx context.Context, repository, target 
 		return updatePlanIssue(r, "git", "worktree changed during validation")
 	}
 	r.Snapshot, r.Proposal, r.Diff, r.Checks, r.PackageBase = snapshot, proposal, proposal.Diff, proposal.Checks, proposal.PackageBase
+	r.Workspace = proposal.Workspace
 	r.TargetChannel, r.CurrentChannel = domain.UpdateChannel(target), domain.UpdateChannel(snapshot.CurrentRef)
 	r.Confirmation = "UPDATE"
 	if target != snapshot.CurrentRef {

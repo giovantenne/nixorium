@@ -113,6 +113,28 @@ over the deployment during planning.
 
 ## Validation and remaining gates
 
+For an existing prepared student workspace, both update planners compare its
+current and proposed pinned packages, extensions, dependencies and effective
+preferences. CLI JSON exposes these as `workspace.current` and
+`workspace.proposed`; text and TUI review show a scrollable comparison before
+the flake diff. This is not the currently running home state or a search for the
+vendor's latest release. Equal version strings can still hide rebuilt
+dependencies; review the pin diff too.
+
+The comparison and both validation hooks are bound to the update review. A
+candidate that removes existing workspace metadata, changes runtime opt-in,
+the student identity or destinations is blocked pending a separate migration.
+Legacy deployments with no prepared workspace retain their ordinary workflow;
+updating does not create a profile or migrate local home customizations.
+
+To update packaged VS Code extensions, use **Update system and packages** (or
+`package-base plan`/`apply`), not repeated profile saves or downloads in student
+homes. The package-base pin also controls the editor, desktop and operating
+system. After the reviewed update, qualify actual plugin loading on the
+controller and a selected client before wider distribution. Build success is
+not plugin-runtime certification; managed defaults disable editor/extension
+auto-update checks, and the next ordinary boot reset installs the new seed.
+
 System/package planning requires a direct stable
 `github:NixOS/nixpkgs/nixos-YY.05` or `nixos-YY.11` input and the explicit
 root follows relationship. Custom URLs, unstable channels, channel downgrades,

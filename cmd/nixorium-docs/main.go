@@ -126,6 +126,7 @@ func renderGallery() string {
 		{title: "Student workspace favorites", scenarioID: "student-workspace", label: "Keep only the editor in the draft favorites"},
 		{title: "Student workspace declaration review", scenarioID: "student-workspace", label: "Review the declaration without activating a system"},
 		{title: "Student workspace saved, not deployed", scenarioID: "student-workspace", label: "Saved does not mean committed or deployed"},
+		{title: "Workspace versions in system update review", scenarioID: "student-workspace", label: "Compare workspace versions during a system update"},
 	}
 	var output strings.Builder
 	for index, selection := range frames {

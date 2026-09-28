@@ -204,6 +204,22 @@ could not be confirmed: inspect the profile and Git state before another plan.
 
 ## VS Code extensions and settings
 
+For existing prepared profiles, framework and package-base update reviews show
+current/proposed pinned package and extension versions, prerequisites and
+effective preferences. Compare these before authorizing the input change;
+they do not describe live home state or the latest vendor release. The full
+comparison is token-bound; source changes still require a fresh review.
+Changed runtime opt-in, student identity or destinations require a separately
+reviewed migration. Deployments without a prepared profile keep their legacy
+update flow; there is no automatic profile import.
+
+Use Maintenance → Update system and packages (or `package-base plan`/`apply`)
+for packaged extensions. Explain that the same pin can change the editor,
+desktop, services and kernel; repeatedly saving a profile does not update an
+extension. Preserve disabled editor/extension auto-update checks in the managed
+seed. Build success is not plugin-loading evidence: test the reviewed candidate
+on one client before fleet distribution, without changing active homes at save.
+
 For “prepare VS Code for Python”, inspect whether VS Code is selected for the
 intended hosts. Resolve extensions from the deployment's pinned package set;
 verify attribute names, dependencies, and the installed extension directory

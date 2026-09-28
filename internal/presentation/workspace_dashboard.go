@@ -245,6 +245,7 @@ func (model dashboardModel) workspaceView() string {
 		resolved := w.loaded.Inspection.Resolution
 		switch w.stage {
 		case workspaceOverview:
+			fixed = "Pinned extensions update through Maintenance → Update system and packages."
 			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), fmt.Sprintf("Runtime opt-in: %t · Not changed here", resolved.RuntimeEnabled), "")
 			if w.loaded.Inspection.Base == nil {
 				lines = append(lines, "No saved profile (legacy mode); this is a new draft.")

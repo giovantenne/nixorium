@@ -1098,10 +1098,13 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 		}
 	case dashboardUpdateReview:
-		maximum := maximumUpdateScroll(model.updates.plan, model.updateReviewHeight())
+		maximum := model.maximumUpdateScroll()
 		switch key.String() {
 		case "f4":
 			model.updateDetails = !model.updateDetails
+			if model.updates.plan.Workspace != nil {
+				model.updates.scroll = 0
+			}
 		case "esc":
 			model.screen = dashboardUpdate
 			model.message = "Update cancelled; flake.nix and flake.lock were not changed."

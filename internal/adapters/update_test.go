@@ -220,6 +220,7 @@ case " $* " in
   *"#deploymentStatus "*)
     printf '%s\n' '{"ready":true,"issues":[]}'
     ;;
+  *"nixoriumWorkspace"*) printf 'null\n' ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -244,13 +245,13 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 8 || strings.Count(string(log), " build ") != 5 || strings.Count(string(log), "--no-link") != 5 || strings.Count(string(log), "--reference-lock-file") != 7 || strings.Count(string(log), "--no-write-lock-file") != 7 {
+	if len(lines) != 9 || strings.Count(string(log), " build ") != 5 || strings.Count(string(log), "--no-link") != 5 || strings.Count(string(log), "--reference-lock-file") != 7 || strings.Count(string(log), "--no-write-lock-file") != 8 {
 		t.Fatalf("unexpected Nix invocations (%d):\n%s", len(lines), log)
 	}
 	if strings.Contains(string(log), repository+"/secret-key") {
 		t.Fatalf("private path entered Nix arguments:\n%s", log)
 	}
-	if len(progress) != 9 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Phase != domain.UpdatePlanPhaseEvaluate || progress[2].Detail != "Evaluating candidate deployment readiness" || progress[3].Phase != domain.UpdatePlanPhaseBuild || progress[3].Current != 1 || progress[3].Total != 5 || progress[7].Current != 5 || progress[8].Phase != domain.UpdatePlanPhaseReview {
+	if len(progress) != 10 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Phase != domain.UpdatePlanPhaseEvaluate || progress[2].Detail != "Evaluating candidate deployment readiness" || progress[3].Detail != "Comparing pinned student workspace dependencies" || progress[4].Phase != domain.UpdatePlanPhaseBuild || progress[4].Current != 1 || progress[4].Total != 5 || progress[8].Current != 5 || progress[9].Phase != domain.UpdatePlanPhaseReview {
 		t.Fatalf("candidate progress = %+v", progress)
 	}
 }
@@ -287,6 +288,7 @@ case " $* " in
   *"#deploymentStatus "*)
     printf '%s\n' '{"ready":false,"issues":["Client installation is not configured"],"controller":{"ready":true,"issues":[],"requiresKeys":false}}'
     ;;
+  *"nixoriumWorkspace"*) printf 'null\n' ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -308,7 +310,7 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 4 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
+	if len(lines) != 5 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
 		t.Fatalf("unexpected controller-only Nix invocations (%d):\n%s", len(lines), log)
 	}
 	for _, excluded := range []string{"nixosConfigurations.pc01", "nixosConfigurations.netboot", "#pxeFirmware", "#installerBundle"} {

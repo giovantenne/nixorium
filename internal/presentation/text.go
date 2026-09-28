@@ -222,6 +222,7 @@ func UpdatePlanText(writer io.Writer, report domain.UpdatePlanReport) {
 		base := report.PackageBase
 		fmt.Fprintf(writer, "Package base: %s\n%s (%s) -> %s (%s)\n%s\n", base.Source, base.CurrentChannel, base.CurrentRevision, base.TargetChannel, base.TargetRevision, base.Validation)
 	}
+	workspaceUpdateText(writer, report.Workspace)
 	fmt.Fprintf(writer, "Repository:       %s\n", report.Repository)
 	if report.Revision != "" {
 		fmt.Fprintf(writer, "Deployment HEAD:  %s\n", report.Revision)

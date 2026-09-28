@@ -266,6 +266,11 @@ func validateUpdateCandidate(ctx context.Context, flake string, common []string,
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseEvaluate, "Comparing pinned student workspace dependencies", 0, 0)
+	workspace, err := inspectWorkspaceUpdate(ctx, flake, common)
+	if err != nil {
+		return domain.UpdateProposal{}, err
+	}
 	if packageBase {
 		output, err := runBoundedNix(ctx, 256*1024, append([]string{"eval", flake + "#nixoriumUpdateTargets", "--json"}, common...)...)
 		if err != nil {
@@ -312,6 +317,7 @@ func validateUpdateCandidate(ctx context.Context, flake string, common []string,
 		LockContent:  proposedLock,
 		Diff:         domain.GitDiff{Scope: "nixorium-update", Content: diff},
 		Checks:       checks,
+		Workspace:    workspace,
 	}, nil
 }
 

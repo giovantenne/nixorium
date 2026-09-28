@@ -131,6 +131,28 @@ func ValidateWorkspaceInspection(inspection WorkspaceInspection, candidate Works
 		snapshot.BaseExists != (inspection.Base != nil) {
 		return errors.New("incomplete workspace source identity")
 	}
+	if err := ValidateWorkspaceResolution(resolved); err != nil {
+		return err
+	}
+	if inspection.Base != nil {
+		if _, err := MarshalWorkspaceProfile(*inspection.Base); err != nil {
+			return errors.New("invalid base profile in workspace inspection")
+		}
+	}
+	want, err := MarshalWorkspaceProfile(candidate)
+	if err != nil {
+		return errors.New("invalid candidate in workspace inspection")
+	}
+	got, _ := MarshalWorkspaceProfile(resolved.Declared)
+	if !bytes.Equal(want, got) {
+		return errors.New("resolved workspace does not match the requested profile")
+	}
+	return nil
+}
+
+// ValidateWorkspaceResolution checks versioned metadata independently of the
+// save snapshot so update reviews can also compare current and candidate pins.
+func ValidateWorkspaceResolution(resolved WorkspaceResolution) error {
 	if resolved.SchemaVersion != WorkspaceSchemaVersion || resolved.State != "prepared" ||
 		resolved.ManagedFile != WorkspaceFileName || !userNamePattern.MatchString(resolved.StudentUser) ||
 		resolved.Catalog.SchemaVersion != WorkspaceSchemaVersion {
@@ -140,19 +162,11 @@ func ValidateWorkspaceInspection(inspection WorkspaceInspection, candidate Works
 		(resolved.Seed != nil && !ValidStorePath(*resolved.Seed)) {
 		return errors.New("inconsistent workspace runtime preparation metadata")
 	}
-	profiles := []WorkspaceProfile{candidate, resolved.Declared, resolved.Effective, resolved.Catalog.Baseline}
-	if inspection.Base != nil {
-		profiles = append(profiles, *inspection.Base)
-	}
+	profiles := []WorkspaceProfile{resolved.Declared, resolved.Effective, resolved.Catalog.Baseline}
 	for _, profile := range profiles {
 		if _, err := MarshalWorkspaceProfile(profile); err != nil {
 			return errors.New("invalid profile in workspace inspection")
 		}
-	}
-	want, _ := MarshalWorkspaceProfile(candidate)
-	got, _ := MarshalWorkspaceProfile(resolved.Declared)
-	if !bytes.Equal(want, got) {
-		return errors.New("resolved workspace does not match the requested profile")
 	}
 	if len(resolved.Targets) == 0 || resolved.Targets[0].Role != "controller" {
 		return errors.New("workspace destinations must include the controller student")

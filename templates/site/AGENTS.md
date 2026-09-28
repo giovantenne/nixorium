@@ -43,6 +43,9 @@ configuration, software, home customization, diagnostics, and operations.
   migration or deployment. The administrative TUI can edit supported fields
   under Maintenance → Settings → Student workspace using the same review/save
   boundary. Catalog changes and migration remain explicit deployment edits.
+  Existing profiles appear in input-update review with current/proposed pinned
+  versions and dependencies. Use package-base updates for packaged extensions;
+  qualify loading on a selected client before broader distribution.
   Check the actual CLI/hook capabilities and use the
   student-home reference. Never discard pending reset evidence or
   disable the profile to bypass failed-reset recovery.

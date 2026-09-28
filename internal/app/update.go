@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -223,6 +224,7 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 	report.Checks = append(report.Checks, proposal.Checks...)
 	report.Snapshot = snapshot
 	report.Proposal = proposal
+	report.Workspace = proposal.Workspace
 	report.ReviewToken = updateReviewToken(report, snapshot, proposal)
 	verb := "UPDATE"
 	if report.Downgrade {
@@ -303,6 +305,15 @@ func updateReviewToken(report domain.UpdatePlanReport, snapshot domain.UpdateInp
 	}
 	if report.Kind != "" {
 		fmt.Fprintf(digest, "%s\x00%t\x00%s\x00", report.Kind, report.AllowUnverified, report.Repository)
+	}
+	if proposal.Workspace != nil || report.Workspace != nil {
+		// Bind both the displayed report and the retained proposal. Neither may
+		// be replaced or omitted after the operator has reviewed versions.
+		data, _ := json.Marshal(struct {
+			Report   *domain.WorkspaceUpdateImpact
+			Proposal *domain.WorkspaceUpdateImpact
+		}{report.Workspace, proposal.Workspace})
+		_, _ = digest.Write(data)
 	}
 	return fmt.Sprintf("sha256:%x", digest.Sum(nil))
 }

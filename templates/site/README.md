@@ -252,6 +252,13 @@ the deployment baseline; “Clear” is an explicit empty list. Saving offers a
 separate Git review, not automatic commit or deployment. Catalog additions and
 unsupported fields remain manual deployment edits. Older pins/commands may not
 provide this workflow; the inactive example is never loaded automatically.
+Existing profiles are also compared during input-update review: current versus
+proposed package/extension versions, dependencies and effective preferences.
+Packaged extensions update through Maintenance → Update system and packages,
+which can also change the editor, desktop and operating system. Test plugin
+loading on a selected client before wider distribution; build success alone
+does not qualify it. Session auto-update checks remain disabled in managed
+defaults, and saving the same profile does not refresh its pinned extensions.
 Supporting pins expose `nixoriumResolveWorkspaceCandidate` to preview a raw JSON
 proposal's effective values, versions and destinations without saving it. This
 complements, rather than replaces, the deployment's validation hook.

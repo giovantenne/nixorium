@@ -377,4 +377,33 @@ With runtime opt-in enabled, preferences apply at the next boot reset.
 
 g Git review  ·  Esc Settings  ·  F1 Help
 ```
+
+## Workspace versions in system update review
+
+```text
+Nixorium  /  Maintenance  /  Update system and packages  /  Review
+
+Review update and student workspace
+Builds passed; runtime and plugin loading remain unverified.
+Workspace and diff lines 1-14 of 41
+Student workspace: current pin -> proposed pin (not live versions)
+This is a system/package update, not an isolated extension update.
+Builds do not certify plugin loading or the latest vendor release.
+Extension example.extension: 1.0 -> 2.0
+Package nodejs: not selected -> 24.0
+Package vscode: 1.0 -> 2.0
+Current pin: student student, runtime opt-in false
+  controller (controller)
+  pc01 (client)
+  pc02 (client)
+  example.extension requires packages [], extensions []
+Current pin effective preferences:
+{
+  "schemaVersion": 1,
+
+Enter saves/records the pin and activates this controller.
+No client deploy or home reset. Verify runtime on one client.
+
+↑/↓ Scroll  ·  F4 Details  ·  Enter Apply update  ·  Esc Cancel  ·  F1 Help
+```
 <!-- END GENERATED: tui-gallery -->

@@ -55,6 +55,7 @@ case " $* " in
   *"#labMeta "*) printf '%s\n' '{"schemaVersion":2,"controller":{"name":"pc99"},"clients":{"count":2,"hosts":[{"name":"pc01"},{"name":"pc02"}]}}' ;;
   *"#deploymentStatus "*) printf '%s\n' '{"ready":true,"issues":[]}' ;;
   *"#nixoriumUpdateTargets "*) printf '%s\n' '["pc99","pc01","pc02"]' ;;
+  *"nixoriumWorkspace"*) printf 'null\n' ;;
   *" build "*) test "$NIXORIUM_TEST_BASE_MODE" != build-failed ;;
   *) exit 3 ;;
 esac

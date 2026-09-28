@@ -395,6 +395,11 @@ failure or timeout must block publication.
   resolves it, and rejects concurrent changes. Never load the example implicitly.
   Git review classifies the profile as managed; a separately authorized exact-path
   commit validates its schema without implying Nix validation or activation.
+  Update planning compares existing workspace metadata on current/candidate
+  pins and preserves local validation hooks. Bind the complete comparison to
+  the update token; do not silently change reset opt-in, identity or targets.
+  Legacy absence stays outside this comparison. Extension versions come from
+  the package base, not independent home downloads or vendor-latest promises.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing

@@ -241,6 +241,7 @@ func (model dashboardModel) helpView() string {
 			"v reviews the complete draft, dependencies and student destinations.",
 			"Type SAVE and Enter only after review. No commit, runtime opt-in, deploy or reset is included.",
 			"A saved profile can open the existing Git review; commit uses separate authorization.")
+		lines = append(lines, "Extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
 	case dashboardSettingsPasswords:
 		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
 	case dashboardPXE:
@@ -442,6 +443,9 @@ func phaseSteps(labels []string, current int, complete bool, dark bool) []string
 }
 
 func (model dashboardModel) releaseReviewView() string {
+	if model.updates.plan.Workspace != nil {
+		return model.workspaceUpdateReviewView()
+	}
 	lines := []string{tuiTitle("Review Nixorium update", model.isDark), "", tuiSection("Validated release", model.isDark), fmt.Sprintf("%s → %s (%s)", model.updates.plan.CurrentRef, model.updates.plan.Target, model.updates.plan.TargetChannel), "Save flake.nix and flake.lock, then build and activate this controller", "No push, PXE action, or client deployment is included", fmt.Sprintf("Candidate checks: %d reviewed · F4 details", len(model.updates.plan.Checks))}
 	if model.updates.packageBase {
 		lines[0] = tuiTitle("Review system and package update", model.isDark)
@@ -456,7 +460,7 @@ func (model dashboardModel) releaseReviewView() string {
 			lines = append(lines, check.ID+" · "+check.State+" · "+check.Message)
 		}
 	}
-	patch := strings.Split(strings.TrimSuffix(model.updates.plan.Diff.Content, "\n"), "\n")
+	patch := updateReviewLines(model.updates.plan)
 	start := min(model.updates.scroll, max(0, len(patch)-model.updateReviewHeight()))
 	end := min(len(patch), start+model.updateReviewHeight())
 	lines = append(lines, "", fmt.Sprintf("Diff lines %d-%d of %d", start+1, end, len(patch)))

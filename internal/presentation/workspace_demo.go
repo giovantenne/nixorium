@@ -41,6 +41,15 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	actions.LoadGitReview = func() domain.GitReviewReport {
 		return domain.GitReviewReport{State: "changed"}
 	}
+	actions.LoadPackageBase = func() domain.PackageBaseStatus {
+		return domain.PackageBaseStatus{Channel: "nixos-26.05", Revision: revision}
+	}
+	actions.PlanPackageBase = func(string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+		return demoWorkspaceUpdatePlan()
+	}
+	actions.SavePackageBase = func(domain.UpdatePlanReport) domain.UpdateApplyReport {
+		panic("workspace demo must not apply a system update")
+	}
 	actions.LoadWorkspace = func(context.Context) domain.WorkspacePlanReport { return demoWorkspacePlan() }
 	actions.PlanWorkspace = func(_ context.Context, candidate domain.WorkspaceProfile) domain.WorkspacePlanReport {
 		plan := demoWorkspacePlan()
@@ -76,9 +85,26 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	r.capture("Recheck before the atomic save", 900)
 	r.command(save)
 	r.capture("Saved does not mean committed or deployed", 2500)
+	r.key(demoCode(tea.KeyEsc))
+	r.key(demoCode(tea.KeyEsc))
+	r.command(r.key(demoText("b")))
+	// Inject a synthetic validated report: demo generation never checks a
+	// channel, builds a system or claims these are current vendor versions.
+	r.message(dashboardUpdatePlanMsg{report: demoWorkspaceUpdatePlan()})
+	r.capture("Compare workspace versions during a system update", 2500)
 	return DemoScenario{
 		ID: "student-workspace", Title: "Customize the initial student workspace",
 		Description: "Edit ordered favorites, review one laboratory-wide profile, and save only the declaration. Runtime opt-in, Git commit, system deployment and boot reset remain separate.",
 		Frames:      r.frames,
 	}
+}
+
+func demoWorkspaceUpdatePlan() domain.UpdatePlanReport {
+	before := demoWorkspacePlan().Inspection.Resolution
+	after := demoWorkspacePlan().Inspection.Resolution
+	before.Packages = []domain.WorkspacePackage{{Package: "vscode", Version: "1.0"}}
+	after.Packages = []domain.WorkspacePackage{{Package: "vscode", Version: "2.0"}, {Package: "nodejs", Version: "24.0"}}
+	before.Extensions = []domain.WorkspaceExtension{{ID: "example.extension", Version: "1.0"}}
+	after.Extensions = []domain.WorkspaceExtension{{ID: "example.extension", Version: "2.0", RequiredPackages: []string{"nodejs"}}}
+	return domain.UpdatePlanReport{Kind: "package-base", State: "ready", CurrentRef: "nixos-26.05", Target: "nixos-26.05", Diff: domain.GitDiff{Content: "+ reviewed pin\n"}, Workspace: &domain.WorkspaceUpdateImpact{Current: &before, Proposed: &after}}
 }

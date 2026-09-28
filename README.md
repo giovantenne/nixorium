@@ -336,6 +336,9 @@ The administrative TUI offers the same reviewed save under **Maintenance →
 Settings → Student workspace**, with guided desktop, dock, editor/extension and
 browser fields. Catalog changes and unsupported application settings remain
 explicit deployment edits; no whole-home capture is performed.
+For an existing profile, system/package update reviews also compare pinned
+editor/extension versions and preferences. This does not certify plugin loading
+or mean that only extensions change; see the [update guide](docs/updates.md).
 
 From a checkout with Nix available, run the normal fast validation gate:
 
