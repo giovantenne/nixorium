@@ -18,6 +18,13 @@ guided packages and their explicit scopes in `lab-software.json`. Public
 keys, assets and local modules also belong in the private repository generated
 from `templates/site`.
 
+## Public language
+
+Write all code comments and public documentation in English, including guides,
+examples, and agent instructions shipped with the site template. Preserve proper
+names and intentional configuration/test data. Private planning documents are
+not public documentation and must not be copied into this repository.
+
 ## Project Structure
 
 ```

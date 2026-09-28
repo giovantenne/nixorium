@@ -4,6 +4,11 @@ Nixorium combines a Go management application, NixOS modules, installers and a
 private-deployment template. Keep a change in the smallest layer that owns the
 behavior and validate the boundary it affects.
 
+Write code comments and public documentation in English, including documentation
+and examples shipped with the deployment template. Preserve proper names and
+intentional configuration or test data; keep private planning out of the public
+repository.
+
 ## Start a development checkout
 
 You need Git and Nix with flakes enabled. A host Go installation is optional;
