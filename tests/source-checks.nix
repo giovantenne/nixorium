@@ -22,6 +22,10 @@ let
   workspaceSchemaTest = import ./eval-workspace-profile.nix {
     inherit (pkgs) lib;
   };
+  workspaceResolutionTest = import ./resolve-workspace-profile.nix {
+    inherit (pkgs) lib;
+    realPkgs = import nixpkgs.outPath { inherit system; config.allowUnfree = true; };
+  };
   nixoriumPackage = pkgs.callPackage ../pkgs/nixorium.nix {};
   documentationGenerator = nixoriumPackage.overrideAttrs (_: {
     pname = "nixorium-docs";
@@ -50,6 +54,9 @@ in
   '';
   desktop-profile = import ./desktop-profile.nix { inherit pkgs; };
   workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
+    touch "$out"
+  '';
+  workspace-resolution = assert workspaceResolutionTest; pkgs.runCommand "nixorium-workspace-resolution-test" {} ''
     touch "$out"
   '';
   nixorium = nixoriumPackage;

@@ -90,6 +90,7 @@ run_quick_checks() {
     software-schema \
     software-preset-schema \
     workspace-schema \
+    workspace-resolution \
     documentation-check \
     nixorium \
     nixorium-runtime \
@@ -126,6 +127,7 @@ run_full_checks() {
     "path:${REPO_ROOT}#checks.x86_64-linux.software-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.software-preset-schema" \
     "path:${REPO_ROOT}#checks.x86_64-linux.workspace-schema" \
+    "path:${REPO_ROOT}#checks.x86_64-linux.workspace-resolution" \
     "path:${REPO_ROOT}#checks.x86_64-linux.mk-lab" \
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer" \
     "path:${REPO_ROOT}#checks.x86_64-linux.client-installer-vm" \

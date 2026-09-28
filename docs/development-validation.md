@@ -204,6 +204,13 @@ The evaluator takes JSON text, not an attrset: decoding it first would erase
 duplicate keys. These tests validate data only, not installed applications,
 extension loading, student-home changes, or a public management workflow.
 
+`workspace-resolution` checks the internal catalog/baseline resolver, complete
+target coverage (including controller-only), package and extension dependencies,
+and unavailable, blocked or mismatched package identities. Synthetic packages
+cover failure modes; a separate assertion resolves an extension from the locked
+package set. No manifest is read from a derivation during evaluation. Passing
+this check proves neither live installed state nor extension loading.
+
 After the automated milestone, follow the documented VirtualBox recipe with
 the official Minimal ISO. Keep that result separate from physical-hardware
 evidence; neither is replaced by a simulated NixOS VM pass.

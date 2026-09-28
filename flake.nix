@@ -50,6 +50,10 @@
       workspaceSchemaTest = import ./tests/eval-workspace-profile.nix {
         inherit (nixpkgs) lib;
       };
+      workspaceResolutionTest = import ./tests/resolve-workspace-profile.nix {
+        inherit (nixpkgs) lib;
+        realPkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
+      };
       mkLabTest = import ./tests/mk-lab.nix {
         inherit mkLab;
         deploymentSelf = self;
@@ -141,6 +145,9 @@
           touch "$out"
         '';
         workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
+          touch "$out"
+        '';
+        workspace-resolution = assert workspaceResolutionTest; pkgs.runCommand "nixorium-workspace-resolution-test" {} ''
           touch "$out"
         '';
         mk-lab = assert mkLabTest; pkgs.runCommand "nixorium-mk-lab-test" {} ''

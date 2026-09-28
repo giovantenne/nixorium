@@ -348,6 +348,12 @@ failure or timeout must block publication.
   with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.
   This internal schema alone does not enable a profile, resolve software or
   change a home; do not describe schema validation as deployment validation.
+- `lib/resolve-workspace-profile.nix` is the internal pure catalog/prerequisite
+  resolver. Its input inventory must include the controller and every client;
+  supplied host package attributes describe declarations, not live installation
+  evidence. Preserve explicit dependencies, pinned identity/version checks and
+  list-replacement semantics when composing the deployment baseline. It does
+  not install software or qualify plugin loading.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
