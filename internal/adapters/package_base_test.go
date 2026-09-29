@@ -85,6 +85,21 @@ esac
 				if !strings.Contains(string(log), "--update-input nixpkgs") || !strings.Contains(string(log), "#nixoriumOfflineCheck") || !strings.Contains(string(log), "#nixosConfigurations.pc02.config.system.build.toplevel") || proposal.PackageBase == nil || proposal.PackageBase.TargetRevision != strings.Repeat("d", 40) {
 					t.Fatalf("%+v\n%s", proposal, log)
 				}
+				if strings.Count(string(log), " build ") != 1 {
+					t.Fatalf("candidate builds did not share one evaluation:\n%s", log)
+				}
+				for _, id := range []string{"client", "controller", "netboot", "pxe-firmware", "installer-bundle", "host-pc02", "offline-equivalence"} {
+					found := false
+					for _, check := range proposal.Checks {
+						found = found || check.ID == id && check.State == "passed"
+					}
+					if !found {
+						t.Fatalf("grouped build omitted required check %s", id)
+					}
+				}
+			}
+			if mode == "build-failed" && (len(proposal.Checks) != 0 || len(proposal.LockContent) != 0) {
+				t.Fatal("failed grouped build produced an applicable proposal")
 			}
 		})
 	}

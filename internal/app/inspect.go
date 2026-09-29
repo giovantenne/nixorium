@@ -68,6 +68,20 @@ func (i *Inspector) Startup(ctx context.Context, repository string) (domain.Stat
 	return i.status(ctx, repository, false, false)
 }
 
+// Inventory supplies evaluated identities for selection, without making a
+// readiness claim. The selected operation performs its own complete preflight.
+func (i *Inspector) Inventory(ctx context.Context, repository string) (domain.StatusReport, error) {
+	report, err := i.Startup(ctx, repository)
+	if err != nil {
+		return report, err
+	}
+	report.Meta, err = i.source.LabMeta(ctx, report.Repository)
+	if err != nil {
+		return report, fmt.Errorf("evaluate labMeta: %w", err)
+	}
+	return report, nil
+}
+
 func (i *Inspector) status(ctx context.Context, repository string, full, evaluate bool) (domain.StatusReport, error) {
 	root, err := filepath.Abs(repository)
 	if err != nil {

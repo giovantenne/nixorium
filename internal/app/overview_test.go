@@ -63,6 +63,22 @@ func (startupGuard) DeploymentStatus(context.Context, string) (domain.Deployment
 	panic("startup must not evaluate deployment readiness")
 }
 
+type inventoryGuard struct{ overviewGuard }
+
+func (inventoryGuard) DeploymentStatus(context.Context, string) (domain.DeploymentStatus, error) {
+	panic("inventory selection must defer readiness to operation planning")
+}
+
+func TestInventoryLoadsIdentitiesWithoutClaimingReadiness(t *testing.T) {
+	source := &fakeSource{}
+	source.meta.Controller.Name = "pc99"
+	source.meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}}
+	report, err := NewInspector(inventoryGuard{overviewGuard{source}}).Inventory(t.Context(), "/repo")
+	if err != nil || report.State != "unchecked" || report.Deployment.Ready || report.Meta.Controller.Name != "pc99" || len(report.Meta.Clients.Hosts) != 1 {
+		t.Fatalf("inventory=%+v err=%v", report, err)
+	}
+}
+
 func TestStartupAvoidsAllNixEvaluationAndPreservesNetworkWarnings(t *testing.T) {
 	source := startupGuard{overviewGuard{readyFake()}}
 	source.services = map[string]domain.ServiceState{

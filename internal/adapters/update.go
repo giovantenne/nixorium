@@ -299,12 +299,23 @@ func validateUpdateCandidate(ctx context.Context, flake string, common []string,
 		}
 		builds = append(builds, updateCandidateBuild{"offline-equivalence", "nixoriumOfflineCheck"})
 	}
-	for index, build := range builds {
-		emitUpdateProgress(progress, domain.UpdatePlanPhaseBuild, "Building "+updateBuildLabel(build.id), index+1, len(builds))
-		arguments := append([]string{"build", flake + "#" + build.attribute, "--no-link"}, common...)
-		if _, err := runBoundedNix(ctx, 256*1024, arguments...); err != nil {
-			return domain.UpdateProposal{}, fmt.Errorf("build candidate %s: %w", build.id, err)
-		}
+	// One Nix invocation groups the complete reviewed output set. Do not mark individual checks passed until all succeed.
+	detail := fmt.Sprintf("Building all %d required outputs together", len(builds))
+	current := 0
+	if len(builds) == 1 {
+		detail = "Building " + updateBuildLabel(builds[0].id)
+		current = 1
+	}
+	emitUpdateProgress(progress, domain.UpdatePlanPhaseBuild, detail, current, len(builds))
+	arguments := []string{"build", "--no-link"}
+	for _, build := range builds {
+		arguments = append(arguments, flake+"#"+build.attribute)
+	}
+	arguments = append(arguments, common...)
+	if _, err := runBoundedNix(ctx, 256*1024, arguments...); err != nil {
+		return domain.UpdateProposal{}, fmt.Errorf("build candidate systems and installation outputs: %w", err)
+	}
+	for _, build := range builds {
 		checks = append(checks, domain.UpdateCheck{ID: build.id, State: "passed", Message: "candidate output built without a result link"})
 	}
 	emitUpdateProgress(progress, domain.UpdatePlanPhaseReview, "Preparing the bounded flake.nix and flake.lock review", 0, 0)

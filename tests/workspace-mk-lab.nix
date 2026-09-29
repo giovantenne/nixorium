@@ -7,6 +7,9 @@ let
     publicKeys = { cache = null; ssh = null; veyon = null; };
   };
   rejected = extra: !(builtins.tryEval (builtins.deepSeq (mkWorkspaceLab extra).nixoriumWorkspace true)).success;
+  discoveryLab = mkWorkspaceLab {
+    sharedModules = [ ./fixtures/workspace-forbid-host-evaluation.nix ];
+  };
   candidate = workspaceLab.nixoriumValidateWorkspaceCandidate;
   resolveCandidate = workspaceLab.nixoriumResolveWorkspaceCandidate;
   cleared = resolveCandidate ''{"schemaVersion":1,"desktop":{"favorites":[]}}'';
@@ -103,6 +106,11 @@ in
     true;
 
   candidate =
+    assert resolveCandidate (builtins.toJSON workspaceLab.nixoriumWorkspace.declared)
+      == workspaceLab.nixoriumWorkspace;
+    assert workspaceRuntimeLab.nixoriumResolveWorkspaceCandidate
+      (builtins.toJSON workspaceRuntimeLab.nixoriumWorkspace.declared)
+      == workspaceRuntimeLab.nixoriumWorkspace;
     assert candidate ''{"schemaVersion":1,"desktop":{"favorites":[]}}'';
     assert cleared.declared.desktop.favorites == [];
     assert cleared.effective.desktop.favorites == [];
@@ -124,6 +132,22 @@ in
     true;
 
   rejection =
+    # Reading identities and software must not evaluate any host. Every output
+    # that authorizes, validates or builds still fails on the same invalid lab.
+    assert discoveryLab.labMeta.clients.count == 2;
+    assert builtins.deepSeq discoveryLab.nixoriumSoftware true;
+    assert discoveryLab.nixoriumSoftwarePresets == null;
+    assert (discoveryLab.nixoriumResolveSoftwarePackage "hello").availability == "available";
+    assert builtins.deepSeq (discoveryLab.nixoriumSearchSoftwarePackages { query = "hello"; limit = 1; }) true;
+    assert builtins.deepSeq discoveryLab.nixoriumUpdateTargets true;
+    assert builtins.all (name: !(builtins.tryEval discoveryLab.${name}).success) [
+      "deploymentStatus" "nixosConfigurations" "colmena"
+      "nixoriumWorkspace" "nixoriumOfflineCheck"
+      "nixoriumValidateWorkspaceCandidate" "nixoriumResolveWorkspaceCandidate"
+      "nixoriumValidateControllerSoftwareCandidate"
+    ];
+    assert !(builtins.tryEval discoveryLab.packages.x86_64-linux.nixorium).success;
+    assert !(builtins.tryEval discoveryLab.apps.x86_64-linux.nixorium).success;
     assert !(builtins.tryEval (candidate ''{"schemaVersion":1,"vscode":{"extensions":["missing.extension"]}}'')).success;
     assert !(builtins.tryEval (candidate ''{"schemaVersion":1,"schemaVersion":1}'')).success;
     assert !(builtins.tryEval (candidate null)).success;

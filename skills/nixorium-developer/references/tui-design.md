@@ -89,13 +89,16 @@ must not execute shell commands, choose privileged units, reproduce domain
 validation, or infer success from visual progress.
 
 Keep startup free of Nix evaluation: check saved first-run fields, local Git and
-current service state only. Even labMeta can resolve the full workspace graph.
+current service state only. On older pins, labMeta can resolve the full workspace graph.
 Load evaluated inventory before client selection, with cancellation and rejection
 of late results. Load key reconciliation, controller closures and PXE artifact
 readiness only when opening the relevant task. Never
 turn deferred checks into a claim of readiness; operation planning retains its
 full validation. Keep each operation in one canonical area, with contextual
 follow-ups returning to their parent.
+
+Grouped update builds show the required output count and elapsed time, not a
+fabricated per-output percentage. Keep their check details expandable in place.
 
 ## Validate behavior and rendering
 

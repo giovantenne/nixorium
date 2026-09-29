@@ -934,7 +934,12 @@ list. `master` is clearly marked as the Development branch, stable releases are
 shown by default, and prereleases require explicit disclosure. The TUI has no
 editable target and does not offer downgrades. During validation it shows the
 candidate-lock, evaluation, representative-build, review, and final verification
-phases, including the current output and elapsed time. After validation, review
+phases, including the required output count and elapsed time. Required outputs
+share one Nix build and the exact candidate lock; all must succeed. PXE
+preparation evaluates all client systems and shared artifacts together, then builds
+their resolved derivations without repeating the deployment evaluation. Controller
+preflight also shares one fresh evaluation while preserving the separate checks
+before activation and after completion. After validation, review
 the scrollable two-file patch (`F4` expands candidate checks), then press Enter.
 The longer exact phrase remains part of the explicit CLI apply workflow.
 

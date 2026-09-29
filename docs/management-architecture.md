@@ -692,6 +692,22 @@ receipt. The original
 parameterless unit remains for first-run-compatible `setup apply` and now also
 pins/rechecks the revision it discovers internally.
 
+Each controller preflight evaluates identity, readiness and the desired closure
+in one Nix process, then observes the active system and activation receipt. It
+does not cache the observation between review, apply and verification. Lightweight
+inventory/package discovery does not evaluate host configurations; workspace
+prerequisite checks still guard readiness, validators and build/deployment
+outputs. Update planning passes the complete required output set to one Nix
+build with the exact candidate lock without dropping checks. PXE preparation
+resolves every shared artifact and client derivation in one fresh evaluation,
+then builds deduplicated derivation paths without further Flake evaluation. Its
+private temporary result roots retain outputs until permanent managed roots
+exist; exact client identities and canonical store paths are checked before
+publishing, and repository drift prevents manifest replacement.
+When a workspace hook receives the same decoded declaration, it reuses that
+evaluator's complete prerequisite resolution. This reuse cannot cross a process,
+source revision or input pin, and downstream validation hooks still run.
+
 Routine cache recovery uses `nixorium-restart-cache.service`. Polkit permits
 wheel administrators only to start that fixed capability-free oneshot; it does
 not authorize restarting `harmonia.service` or arbitrary units. The action

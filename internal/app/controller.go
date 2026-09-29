@@ -24,6 +24,10 @@ type ControllerManager struct {
 	source ControllerRebuildSource
 }
 
+type controllerInspectionSource interface {
+	InspectController(context.Context, string) (domain.ControllerInspection, error)
+}
+
 func NewControllerManager(source ControllerRebuildSource) *ControllerManager {
 	return &ControllerManager{source: source}
 }
@@ -40,13 +44,31 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 		return controllerIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
 	}
 	report.Repository = root
-	meta, err := m.source.LabMeta(ctx, root)
+	var inspection *domain.ControllerInspection
+	if source, ok := m.source.(controllerInspectionSource); ok {
+		observed, inspectErr := source.InspectController(ctx, root)
+		if inspectErr != nil {
+			return controllerIssue(report, "controller", inspectErr.Error())
+		}
+		inspection = &observed
+	}
+	var meta domain.LabMeta
+	if inspection != nil {
+		meta = inspection.Meta
+	} else {
+		meta, err = m.source.LabMeta(ctx, root)
+	}
 	if err != nil {
 		return controllerIssue(report, "configuration", fmt.Sprintf("evaluate labMeta: %v", err))
 	}
 	report.Controller = meta.Controller.Name
 	report.Confirmation = "REBUILD"
-	deployment, err := m.source.DeploymentStatus(ctx, root)
+	var deployment domain.DeploymentStatus
+	if inspection != nil {
+		deployment = inspection.Deployment
+	} else {
+		deployment, err = m.source.DeploymentStatus(ctx, root)
+	}
 	if err != nil {
 		report = controllerIssue(report, "readiness", fmt.Sprintf("evaluate deploymentStatus: %v", err))
 	} else if readiness := deployment.ControllerReadiness(); !readiness.Ready {
@@ -70,7 +92,12 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 	} else {
 		report.Revision = revision
 	}
-	report.Current, report.CurrentDetail, err = m.source.ControllerState(ctx, root)
+	if inspection != nil {
+		report.Current, report.CurrentDetail = inspection.Current, inspection.CurrentDetail
+		err = nil
+	} else {
+		report.Current, report.CurrentDetail, err = m.source.ControllerState(ctx, root)
+	}
 	if err != nil {
 		report = controllerIssue(report, "controller", err.Error())
 	}

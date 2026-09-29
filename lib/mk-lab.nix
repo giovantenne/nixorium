@@ -755,8 +755,23 @@ assert !workspaceRuntimeEnabled || validRuntimeEphemeralPaths
   || throw "workspace runtime requires bounded, canonical, non-overlapping ephemeral paths";
 assert !workspaceRuntimeEnabled || builtins.length labAssets.backgrounds <= 128
   || throw "workspace runtime supports at most 128 wallpapers";
-assert builtins.deepSeq workspaceResolution true;
-rec {
+# Discovery does not authorize an operation. Keep inventory and package queries
+# independent of all host module graphs; readiness, validators and every build
+# or deployment output still require the complete workspace prerequisite check.
+builtins.mapAttrs (name: value:
+  if builtins.elem name [
+    "labMeta" "nixoriumSoftware" "nixoriumSoftwarePresets"
+    "nixoriumSearchSoftwarePackages" "nixoriumResolveSoftwarePackage"
+    "nixoriumUpdateTargets"
+  ] then value
+  # Nix probes packages.<system>.<name> before a top-level installable. Keep
+  # those namespace lookups cheap; force validation when selecting an entry.
+  else if builtins.elem name [ "packages" "apps" ] then
+    builtins.mapAttrs (_: entries:
+      builtins.mapAttrs (_: entry: builtins.deepSeq workspaceResolution entry) entries
+    ) value
+  else builtins.deepSeq workspaceResolution value
+) (rec {
   nixosConfigurations = hostConfigurations // {
     netboot = nixpkgs.lib.nixosSystem {
       inherit system;
@@ -863,9 +878,17 @@ rec {
   # wrap that hook with additional local policy.
   nixoriumResolveWorkspaceCandidate = rawJSON:
     assert builtins.isString rawJSON || throw "workspace candidate must be JSON text";
-    let candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko veyon; }
-      (args // { workspaceProfileJSON = rawJSON; });
-    in builtins.deepSeq candidate.nixoriumWorkspace candidate.nixoriumWorkspace;
+    let
+      declared = (import ./eval-workspace-profile.nix { inherit lib; }) rawJSON;
+      candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko veyon; }
+        (args // { workspaceProfileJSON = rawJSON; });
+    in
+    # Update review validates the current declaration again through this hook.
+    # Reuse only this evaluator's fully checked resolution of the same profile;
+    # another process or changed source still resolves all prerequisites afresh.
+    if workspaceResolution != null && declared == workspaceResolution.declared then
+      nixoriumWorkspace
+    else builtins.deepSeq candidate.nixoriumWorkspace candidate.nixoriumWorkspace;
   nixoriumValidateWorkspaceCandidate = rawJSON:
     builtins.deepSeq (nixoriumResolveWorkspaceCandidate rawJSON) true;
 
@@ -943,4 +966,4 @@ rec {
     disko = runDisko;
     nixorium = nixoriumPackage;
   };
-}
+})

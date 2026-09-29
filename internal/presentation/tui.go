@@ -1468,7 +1468,11 @@ func (model dashboardModel) updateView() string {
 			}
 			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 			if model.updates.planProgress.Total > 0 {
-				lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total))
+				if model.updates.planProgress.Current == 0 {
+					lines = append(lines, fmt.Sprintf("Required outputs: %d · checking together", model.updates.planProgress.Total))
+				} else {
+					lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total))
+				}
 			}
 			if model.progressDetails {
 				detail := model.updates.planProgress.Detail
@@ -1632,6 +1636,9 @@ func updatePlanProgressDescription(progress domain.UpdatePlanProgress) string {
 	case domain.UpdatePlanPhaseEvaluate:
 		return "Checking the laboratory configuration"
 	case domain.UpdatePlanPhaseBuild:
+		if progress.Current == 0 && progress.Total > 1 {
+			return "Testing the required systems and installation files"
+		}
 		detail := strings.ToLower(progress.Detail)
 		switch {
 		case strings.Contains(detail, "representative client"):

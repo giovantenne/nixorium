@@ -148,6 +148,12 @@ operations until [reviewed recovery](docs/troubleshooting.md#interrupted-client-
 Controller builds also expose managed progress through `l`, including update
 and software-change follow-ups.
 
+Controller preflight shares one fresh Nix evaluation, and update validation
+builds its required outputs together. PXE preparation evaluates all configured
+clients and shared artifacts once, then builds their resolved derivations together.
+Inventory/package discovery stays light;
+readiness checks and verification still run before and after relevant changes.
+
 After installation, remove the USB, reboot, and sign in as `admin` using the
 password you chose. Open the management interface:
 

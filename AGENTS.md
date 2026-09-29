@@ -292,10 +292,21 @@ failure or timeout must block publication.
   excluded from pre-reset snapshots; never seed credentials into the shared
   home template.
 - Administrative TUI startup must not evaluate Nix outputs, including labMeta:
-  an enabled workspace can make even metadata evaluate every host. Observe
+  older pins can make even metadata evaluate every host. Observe
   local setup/Git/service state only, without claiming readiness. Load evaluated
   inventory before client selection; cancelled or failed reads must not resume
   actions or admit stale identities. Keep full operation validation unchanged.
+- Inventory/package discovery must remain independent of host module evaluation.
+  Keep workspace prerequisite guards on readiness, validators, configurations,
+  Colmena and individual app/package entries; Nix probes package namespaces even
+  when reading top-level metadata. Group a controller preflight into one fresh
+  evaluation, never a cached authorization. Repeat live revision, activation
+  receipt and system checks before/after apply. Update candidate builds share
+  one Nix invocation with the exact candidate lock and complete required output
+  set; report success only after the whole group succeeds.
+  The workspace hook may reuse an identical decoded declaration's complete
+  resolution within that evaluator only; always parse/validate candidate JSON
+  and retain downstream hooks and fresh evaluation after source or pin changes.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Deployment recovery composes the existing USB worker callbacks, preserves
   exact selected identities, and always returns to fresh planning and explicit
@@ -609,7 +620,11 @@ set -euo pipefail
   and reject active legacy operations; never delete a lock to unblock work.
 - `nixorium pxe prepare` may start only the fixed administrator-owned
   `nixorium-prepare-pxe.service`; keep its clean-Git, live-DHCP, healthy-cache,
-  canonical-store-path, and managed-GC-root checks intact
+  canonical-store-path, and managed-GC-root checks intact. Evaluate all shared
+  artifacts and all configured client derivations together, then build the
+  resolved derivation paths without repeating Flake evaluation. Bind validation
+  and builds to the same Git revision, reject repository drift before publishing,
+  and keep temporary result roots until permanent roots are installed
 - `nixorium-pxe-network.service` is an internal root boundary with only
   `CAP_NET_ADMIN`; preserve its root-owned session-before-mutation ordering,
   exact static-address restoration, and boot-time recovery semantics. The

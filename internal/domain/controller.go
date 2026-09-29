@@ -11,6 +11,15 @@ import (
 
 const ControllerActivationSchemaVersion = 1
 
+// ControllerInspection is a fresh evaluation and live activation observation
+// for one preflight. It is never retained as authorization for a later apply.
+type ControllerInspection struct {
+	Meta          LabMeta
+	Deployment    DeploymentStatus
+	Current       bool
+	CurrentDetail string
+}
+
 type ControllerActivationRecord struct {
 	SchemaVersion int       `json:"schemaVersion"`
 	Revision      string    `json:"revision"`

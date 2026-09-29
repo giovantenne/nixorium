@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,6 +24,42 @@ func (local Local) ControllerApplied(ctx context.Context, repository string) (bo
 	return applied, detail
 }
 
+// Share Nix's evaluator within each preflight, including the workspace guard.
+// No result is cached across reviews, activation or verification.
+func (local Local) InspectController(ctx context.Context, repository string) (domain.ControllerInspection, error) {
+	var inspection domain.ControllerInspection
+	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
+		return inspection, err
+	}
+	flake, err := deploymentFlakeReference(repository)
+	if err != nil {
+		return inspection, err
+	}
+	expression := `let f = builtins.getFlake ` + workspaceUpdateNixString(flake) + `; in {
+  meta = f.labMeta;
+  deployment = f.deploymentStatus;
+  desired = toString f.nixosConfigurations.${f.labMeta.controller.name}.config.system.build.toplevel;
+}`
+	output, err := runBoundedNix(ctx, 1024*1024, "eval", "--impure", "--json", "--no-write-lock-file", "--no-update-lock-file", "--expr", expression)
+	if err != nil {
+		return inspection, fmt.Errorf("evaluate controller preflight: %w", err)
+	}
+	var evaluated struct {
+		Meta       domain.LabMeta          `json:"meta"`
+		Deployment domain.DeploymentStatus `json:"deployment"`
+		Desired    string                  `json:"desired"`
+	}
+	if err := json.Unmarshal([]byte(output), &evaluated); err != nil {
+		return inspection, fmt.Errorf("decode controller preflight: %w", err)
+	}
+	if evaluated.Meta.Controller.Name == "" || !validSystemPath(evaluated.Desired) {
+		return inspection, fmt.Errorf("controller preflight returned no valid identity or system path")
+	}
+	inspection.Meta, inspection.Deployment = evaluated.Meta, evaluated.Deployment
+	inspection.Current, inspection.CurrentDetail, err = local.controllerStateForSystem(ctx, repository, evaluated.Desired)
+	return inspection, err
+}
+
 func (local Local) ControllerState(ctx context.Context, repository string) (bool, string, error) {
 	meta, err := local.LabMeta(ctx, repository)
 	if err != nil {
@@ -38,6 +75,10 @@ func (local Local) ControllerState(ctx context.Context, repository string) (bool
 		return false, "", fmt.Errorf("cannot evaluate desired controller generation: %w", err)
 	}
 	desired = strings.TrimSpace(desired)
+	return local.controllerStateForSystem(ctx, repository, desired)
+}
+
+func (local Local) controllerStateForSystem(ctx context.Context, repository, desired string) (bool, string, error) {
 	active, err := filepath.EvalSymlinks("/run/current-system")
 	if err != nil {
 		if os.IsNotExist(err) {

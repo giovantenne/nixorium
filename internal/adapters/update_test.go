@@ -245,13 +245,18 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 9 || strings.Count(string(log), " build ") != 5 || strings.Count(string(log), "--no-link") != 5 || strings.Count(string(log), "--reference-lock-file") != 7 || strings.Count(string(log), "--no-write-lock-file") != 8 {
+	if len(lines) != 5 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 3 || strings.Count(string(log), "--no-write-lock-file") != 4 {
 		t.Fatalf("unexpected Nix invocations (%d):\n%s", len(lines), log)
+	}
+	for _, output := range []string{"nixosConfigurations.pc01.config.system.build.toplevel", "nixosConfigurations.pc99.config.system.build.toplevel", "nixosConfigurations.netboot.config.system.build.netbootRamdisk", "pxeFirmware", "installerBundle"} {
+		if !strings.Contains(lines[4], "#"+output) {
+			t.Fatalf("required output %s missing from grouped build: %s", output, lines[4])
+		}
 	}
 	if strings.Contains(string(log), repository+"/secret-key") {
 		t.Fatalf("private path entered Nix arguments:\n%s", log)
 	}
-	if len(progress) != 10 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Phase != domain.UpdatePlanPhaseEvaluate || progress[2].Detail != "Evaluating candidate deployment readiness" || progress[3].Detail != "Comparing pinned student workspace dependencies" || progress[4].Phase != domain.UpdatePlanPhaseBuild || progress[4].Current != 1 || progress[4].Total != 5 || progress[8].Current != 5 || progress[9].Phase != domain.UpdatePlanPhaseReview {
+	if len(progress) != 6 || progress[0].Phase != domain.UpdatePlanPhaseLock || progress[1].Phase != domain.UpdatePlanPhaseEvaluate || progress[2].Detail != "Evaluating candidate deployment readiness" || progress[3].Detail != "Comparing pinned student workspace dependencies" || progress[4].Phase != domain.UpdatePlanPhaseBuild || progress[4].Current != 0 || progress[4].Total != 5 || progress[5].Phase != domain.UpdatePlanPhaseReview {
 		t.Fatalf("candidate progress = %+v", progress)
 	}
 }

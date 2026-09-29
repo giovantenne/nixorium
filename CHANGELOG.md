@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Reduced repeated Nix evaluation in controller preflight and grouped the complete
+  update build set into one invocation. Inventory and package discovery no longer
+  evaluate every workspace host; readiness and build guards remain enforced.
+- PXE preparation resolves all shared artifacts and client derivations together,
+  then builds the deduplicated derivation set without repeating Flake evaluation.
+  Temporary roots protect outputs until the revision-bound manifest is published.
 - Update validation details now expand in place with `l`, preserving the target,
   progress, elapsed time and safety notices for framework and package-base updates.
 

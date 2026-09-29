@@ -265,7 +265,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return report, setup, nil
 		},
 		LoadInventory: func(requestContext context.Context) (domain.StatusReport, error) {
-			return inspector.Overview(requestContext, repository)
+			return inspector.Inventory(requestContext, repository)
 		},
 		LoadDoctor: func() (domain.DoctorReport, error) {
 			return inspector.Doctor(ctx, repository, app.DoctorOptions{})

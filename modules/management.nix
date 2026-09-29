@@ -374,6 +374,7 @@ let
     name = "nixorium-prepare-pxe";
     runtimeInputs = [
       pkgs.coreutils
+      pkgs.findutils
       pkgs.curl
       pkgs.gawk
       pkgs.git
@@ -396,6 +397,7 @@ let
       PROGRESS_RECENT='[]'
       CLIENTS_FILE=""
       MANIFEST_TEMP=""
+      BUILD_DIRECTORY=""
 
       publish_progress() {
         local state="$1"
@@ -444,6 +446,7 @@ let
         local status="$?"
         [[ -z "$CLIENTS_FILE" ]] || rm -f -- "$CLIENTS_FILE"
         [[ -z "$MANIFEST_TEMP" ]] || rm -f -- "$MANIFEST_TEMP"
+        [[ -z "$BUILD_DIRECTORY" ]] || rm -rf -- "$BUILD_DIRECTORY"
         if [[ "$status" -ne 0 && "$PROGRESS_STATE" == running ]]; then
           publish_progress failed "$PROGRESS_PHASE" \
             "Preparation stopped unexpectedly" "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" || true
@@ -485,12 +488,14 @@ let
       export XDG_CACHE_HOME=/var/cache/nixorium/admin
       export NIX_CONFIG="experimental-features = nix-command flakes"
 
+      REVISION="$(git -C "$REPOSITORY" rev-parse HEAD)" \
+        || fail "could not resolve deployment revision"
+      FLAKE_URL="$FLAKE_URL?rev=$REVISION"
+
       nixorium config validate --repo "$REPOSITORY" --json >/dev/null \
         || fail "deployment configuration validation failed"
       [[ "$(nix eval "$FLAKE_URL#deploymentStatus.ready" --json --no-write-lock-file)" == true ]] \
         || fail "deploymentStatus.ready must be true before PXE preparation"
-      REVISION="$(git -C "$REPOSITORY" rev-parse HEAD)" \
-        || fail "could not resolve deployment revision"
 
       publish_progress running validate "Validated deployment configuration" 0 0
       publish_progress running network "Checking controller network and binary cache" 0 0
@@ -540,45 +545,24 @@ let
 
       publish_progress running network "Controller network and binary cache are ready" 0 0
 
-      build_one() {
-        local reference="$1"
-        local output
-        output="$(nix build "$reference" --no-write-lock-file --no-link --print-out-paths)" \
-          || fail "Nix build failed for $reference"
-        [[ "$output" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ && -e "$output" ]] \
-          || fail "Nix build returned an invalid store path for $reference"
-        printf '%s' "$output"
-      }
+      ${builtins.readFile ../scripts/lib/pxe-build.sh}
 
-      publish_progress running artifacts "Building shared netboot artifacts" 0 4
-      KERNEL_PATH="$(build_one "$FLAKE_URL#nixosConfigurations.netboot.config.system.build.kernel")"
-      publish_progress running artifacts "Built netboot kernel (1/4)" 1 4
-      INITRD_PATH="$(build_one "$FLAKE_URL#nixosConfigurations.netboot.config.system.build.netbootRamdisk")"
-      publish_progress running artifacts "Built netboot initrd (2/4)" 2 4
-      IPXE_SCRIPT_PATH="$(build_one "$FLAKE_URL#nixosConfigurations.netboot.config.system.build.netbootIpxeScript")"
-      publish_progress running artifacts "Built iPXE boot script (3/4)" 3 4
-      FIRMWARE_PATH="$(build_one "$FLAKE_URL#packages.x86_64-linux.pxeFirmware")"
-      publish_progress running artifacts "Built iPXE firmware (4/4)" 4 4
+      mapfile -t CLIENT_NAMES < <(jq -er '.clients.hosts[].name' <<<"$META")
+      publish_progress running clients \
+        "Building four shared artifacts and all client systems together" 0 "''${#CLIENT_NAMES[@]}"
+      build_pxe_outputs "$FLAKE_URL" "''${CLIENT_NAMES[@]}"
       [[ -f "$KERNEL_PATH/bzImage" ]] || fail "prepared kernel output lacks bzImage"
       [[ -f "$INITRD_PATH/initrd" ]] || fail "prepared initrd output lacks initrd"
       [[ -f "$IPXE_SCRIPT_PATH/netboot.ipxe" ]] || fail "prepared iPXE output lacks netboot.ipxe"
       [[ -f "$FIRMWARE_PATH/snponly.efi" ]] || fail "prepared firmware output lacks snponly.efi"
 
-      mapfile -t CLIENT_NAMES < <(jq -er '.clients.hosts[].name' <<<"$META")
-      ((''${#CLIENT_NAMES[@]} > 0)) || fail "labMeta contains no client hosts"
       CLIENTS_FILE="$(mktemp "$STATE_DIRECTORY/.clients.XXXXXX")"
       MANIFEST_TEMP="$(mktemp "$STATE_DIRECTORY/.prepared.XXXXXX")"
-      publish_progress running clients "Building client system closures" 0 "''${#CLIENT_NAMES[@]}"
-      client_index=0
-      for name in "''${CLIENT_NAMES[@]}"; do
-        [[ "$name" =~ ^pc[0-9]+$ ]] || fail "labMeta contains invalid client name"
-        client_path="$(build_one "$FLAKE_URL#nixosConfigurations.$name.config.system.build.toplevel")"
-        printf '%s\t%s\n' "$name" "$client_path" >>"$CLIENTS_FILE"
-        client_index=$((client_index + 1))
-        publish_progress running clients \
-          "Built client $name ($client_index/''${#CLIENT_NAMES[@]})" \
-          "$client_index" "''${#CLIENT_NAMES[@]}"
+      for index in "''${!CLIENT_NAMES[@]}"; do
+        printf '%s\t%s\n' "''${CLIENT_NAMES[$index]}" "''${CLIENT_PATHS[$index]}" >>"$CLIENTS_FILE"
       done
+      publish_progress running clients "Built shared artifacts and all client systems" \
+        "''${#CLIENT_NAMES[@]}" "''${#CLIENT_NAMES[@]}"
       CLIENTS="$(jq -Rn '[inputs | split("\t") | {name: .[0], storePath: .[1]}]' <"$CLIENTS_FILE")"
 
       publish_progress running publish "Retaining artifacts and publishing the manifest" 0 0
@@ -605,6 +589,10 @@ let
       while IFS=$'\t' read -r name client_path; do
         root_path "client-$name" "$client_path"
       done <"$CLIENTS_FILE"
+
+      [[ "$(git -C "$REPOSITORY" rev-parse HEAD)" == "$REVISION" \
+          && -z "$(git -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
+        || fail "deployment changed during preparation; prepare the reviewed revision again"
 
       jq -n \
         --arg revision "$REVISION" \
@@ -645,6 +633,8 @@ let
       publish_progress completed complete \
         "Prepared PXE artifacts for ''${#CLIENT_NAMES[@]} clients" \
         "''${#CLIENT_NAMES[@]}" "''${#CLIENT_NAMES[@]}"
+      rm -rf -- "$BUILD_DIRECTORY"
+      BUILD_DIRECTORY=""
       trap - EXIT
       echo "Prepared PXE artifacts at revision $REVISION"
     '';

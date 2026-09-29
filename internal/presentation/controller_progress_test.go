@@ -122,3 +122,21 @@ func TestCandidateControllerBuildExposesItsOwnDetails(t *testing.T) {
 		}
 	}
 }
+
+func TestGroupedUpdateBuildRetainsDetailsWithoutInventingCompletion(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		model := dashboardModel{screen: dashboardUpdate, busy: "Checking systems", width: size[0], height: size[1], progressDetails: true,
+			updates: updateModel{planning: true, target: "master", planStarted: time.Now(), planProgress: domain.UpdatePlanProgress{
+				Phase: domain.UpdatePlanPhaseBuild, Detail: "Building all 5 required outputs together", Total: 5,
+			}}}
+		view := demoANSI.ReplaceAllString(model.View().Content, "")
+		for _, expected := range []string{"Target: master", "Required outputs: 5", "checking together", "Current check details", "Building all 5 required outputs together", "elapsed", "current deployment remains unchanged", "Help"} {
+			if !strings.Contains(view, expected) {
+				t.Fatalf("%v grouped build lost %q:\n%s", size, expected, view)
+			}
+		}
+		if strings.Contains(view, "Safety check 0/") || strings.Contains(view, "100%") || lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+			t.Fatalf("%v grouped build has misleading progress or overflows:\n%s", size, view)
+		}
+	}
+}
