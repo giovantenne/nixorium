@@ -52,6 +52,36 @@ func TestSupportSnapshotClassification(t *testing.T) {
 	}
 }
 
+func TestSupportGuidanceUsesOnlyStaticRoutes(t *testing.T) {
+	input := supportFixture()
+	input.Doctor.Findings = nil
+	for _, id := range SupportFindingIDs() {
+		input.Doctor.Findings = append(input.Doctor.Findings, Finding{ID: id, Level: LevelWarning, Remediation: "SECRET"})
+		if SupportFindingGuide(id) == "" {
+			t.Fatalf("missing route for %s", id)
+		}
+	}
+	if SupportFindingGuide("COMMAND-SECRET") != "" {
+		t.Fatal("dynamic code produced a guide")
+	}
+	snapshot, err := NewSupportSnapshot(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report supportReport
+	if err := json.Unmarshal([]byte(snapshot.JSON()), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.GuidanceVersion != SupportGuidanceVersion || len(report.Doctor.Findings) != len(SupportFindingIDs()) {
+		t.Fatal("incomplete guidance catalog")
+	}
+	for _, finding := range report.Doctor.Findings {
+		if finding.Guide != SupportFindingGuide(finding.ID) {
+			t.Fatal("guide came from private remediation text")
+		}
+	}
+}
+
 // Populate every string leaf, including nested reports and future fields. Only
 // the explicitly restored codes below may cross the sharing boundary.
 func poisonSupportStrings(value reflect.Value, secret string) {

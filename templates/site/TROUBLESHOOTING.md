@@ -59,6 +59,35 @@ retains the previous manifest. Inspect them with
 or update the configured hint through `nixorium setup configure`, commit it,
 and apply the controller before retrying.
 
+## The controller network is inconsistent
+
+`NETWORK-INTERFACE` or `NETWORK-STATIC-IP` means the declared interface or
+local address ownership did not match observation (or could not be inspected).
+First inspect `nixorium status`, `nixorium doctor`, and `ip -4 -o addr show`.
+Compare only with the evaluated inventory, not a remembered interface name.
+The static controller address is intentionally absent during active PXE mode.
+
+If the configuration is wrong, propose a reviewed settings change and a
+separate controller activation. If PXE was interrupted, use the lifecycle
+recovery procedure instead. Stop when ownership is ambiguous or a session is
+unfinished; do not remove addresses, stop institutional DHCP, disable the
+firewall or start the internal network service to silence a finding.
+
+## Build resources and controller tools
+
+`DISK-FREE` warns below 10 GiB available or when the filesystem probe failed;
+it is not an estimate of the space required by the next build. `COMMAND-NIX`,
+`COMMAND-GIT`, `COMMAND-SYSTEMCTL`, `COMMAND-SSH` and `COMMAND-COLMENA` report
+missing executables in the command's environment. Neither condition starts
+a repair. Inspect `df -h /nix` and `command -v nix git systemctl ssh colmena`.
+
+Run the packaged command from the deployment's supported controller environment.
+A missing tool may require a separately reviewed controller rebuild. For low
+space, review retention, snapshots and backups before approving any cleanup.
+Stop if storage is failing or the required environment cannot be established.
+Do not run automatic garbage collection or delete store paths to make a
+diagnostic report pass.
+
 ## A PXE client does not appear
 
 First establish whether the client firmware sent a network-boot request or
@@ -298,6 +327,13 @@ the worktree manually. Never add `secret-key`, `admin-ssh`,
 
 ## Configuration is invalid
 
+`CONFIG-EVAL` and `NETWORK-SUBNET` normally record successful typed evaluation;
+when evaluation itself fails, the support report's status/doctor sections can
+be unavailable instead of carrying a failure finding. `DEPLOYMENT-READY` also
+covers placeholder values, keys and passwords. Inspect `nixorium status`,
+`nixorium config validate` and `nixorium setup status` locally first. Their error
+details are private and are deliberately absent from the shared payload.
+
 ```sh
 nixorium config validate
 nixorium setup configure
@@ -326,6 +362,10 @@ pair requires restoring the correct private backup or deliberately rotating the
 pair through a separately reviewed maintenance procedure.
 
 ## Controller apply failed
+
+`CONTROLLER-BUILD` comes only from an explicitly requested full doctor build,
+not support collection. A failed build does not authorize activation or retry;
+inspect its local Nix error and validate a corrected candidate before applying.
 
 Read `journalctl -u nixorium-apply-controller.service -b` (or the exact
 revision-instanced unit shown by routine `controller apply`). Fix the first

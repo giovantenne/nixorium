@@ -417,6 +417,7 @@ Minimized, not anonymous. No upload or remediation.
 
 {
   "schemaVersion": 1,
+  "guidanceVersion": 1,
   "operation": "support-report",
   "collectedAt": "2026-09-29T12:00:00Z",
   "commandVersion": "2.0.0",
@@ -428,9 +429,8 @@ Minimized, not anonymous. No upload or remediation.
     "gitDirty": false,
     "pxeMode": "stopped",
     "preparedPresent": false,
-    "preparedReady": false
 
-Lines 1–14 / 39 · Versions, revision, time and counts remain visible.
+Lines 1–14 / 41 · Versions, revision, time and counts remain visible.
 
 ↑/↓ Scroll  ·  Enter Save locally  ·  r Refresh  ·  Esc Cancel  ·  F1 Help
 ```
@@ -446,7 +446,7 @@ Minimized, not anonymous. No upload or remediation.
 ✓ SAVED
 Saved the exact preview locally. Nothing was uploaded.
 Local file: "/demo/state/nixorium/support/support-0123456789abcdef.json"
-SHA-256: ab1b3177c33d05ffcb351462fe01dc5ca4811caddf5b793089828ce21b2bf333
+SHA-256: e83aa5986a7231de21c579859bdc0b5a0c3f8caa60a1370050f21840bd25a30f
 
 Enter Diagnostics  ·  r New preview  ·  Esc Back  ·  F1 Help
 ```

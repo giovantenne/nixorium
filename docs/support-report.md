@@ -63,6 +63,7 @@ separate manual decision; ordinary diagnostic output is **not** share-safe.
 | Field | Retained data and reason |
 |---|---|
 | `schemaVersion`, `operation` | Fixed format identity; no deployment input |
+| `guidanceVersion`, `doctor.findings[].guide` | Fixed procedure-catalog version and canonical document/section reference; never supplied by a finding's free-text remediation |
 | `collectedAt` | UTC collection time, rounded to seconds; identifies an observation, not live state |
 | `commandVersion`, `status.deploymentVersion` | Numeric release or alpha/beta/rc version; unsupported custom version strings become `unknown` |
 | `deploymentRevision` | Full lowercase 40-character Git revision, when available; correlates the desired configuration, not proof of activation |
@@ -92,3 +93,27 @@ output is not covered by this sharing policy and must not be attached blindly.
 The snapshot is immutable after filtering. Preview and export must consume the
 same bytes; an empty snapshot is not exportable. Collection and export must not
 perform a controller build, upload, deploy, reset, or remediation.
+
+## Versioned procedure routes
+
+Guidance catalog **1** maps every exported finding ID to a section of the
+canonical [troubleshooting guide](troubleshooting.md). The report carries the
+command and deployment versions so operators can identify mismatches. Use the
+guide from the same product source revision as the running command, especially
+for unreleased or custom builds; the deployment Git revision is **not** the
+upstream product revision. A copied private deployment guide can be older than
+its framework pin. Unknown command versions or guidance catalogs require
+checking capability/version before following a remedy.
+
+The route is a reading reference, not an executable command or authorization.
+The canonical sections describe symptoms, local evidence, supported recovery
+and stopping conditions. Start with read-only observations; any settings save,
+service action, key operation, rebuild, deploy or cleanup needs separate review
+and authorization. Lab-network/cache/PXE findings may be inapplicable in
+controller-only mode. Raw evidence stays local.
+
+Routes cover configuration/readiness, Git changes, interface/address ownership,
+DHCP, prepared artifacts, PXE listeners/lifecycle, cache/signing keys, disk/tools,
+client SSH and explicitly requested full-doctor builds. Unknown/new IDs are
+omitted, never converted into a URL from unchecked input. The guidance check
+verifies that each fixed route resolves to an existing canonical section.

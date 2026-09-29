@@ -50,16 +50,17 @@ func (s SupportSnapshot) Digest() string {
 }
 
 type supportReport struct {
-	SchemaVersion int                `json:"schemaVersion"`
-	Operation     string             `json:"operation"`
-	CollectedAt   time.Time          `json:"collectedAt"`
-	Version       string             `json:"commandVersion"`
-	Revision      string             `json:"deploymentRevision,omitempty"`
-	Status        *supportStatus     `json:"status"`
-	Doctor        *supportDoctor     `json:"doctor"`
-	Hosts         *supportHosts      `json:"hosts"`
-	Operations    *supportOperations `json:"operations"`
-	Excluded      []string           `json:"excluded"`
+	SchemaVersion   int                `json:"schemaVersion"`
+	GuidanceVersion int                `json:"guidanceVersion"`
+	Operation       string             `json:"operation"`
+	CollectedAt     time.Time          `json:"collectedAt"`
+	Version         string             `json:"commandVersion"`
+	Revision        string             `json:"deploymentRevision,omitempty"`
+	Status          *supportStatus     `json:"status"`
+	Doctor          *supportDoctor     `json:"doctor"`
+	Hosts           *supportHosts      `json:"hosts"`
+	Operations      *supportOperations `json:"operations"`
+	Excluded        []string           `json:"excluded"`
 }
 
 type supportStatus struct {
@@ -76,6 +77,7 @@ type supportStatus struct {
 type supportFinding struct {
 	ID    string `json:"id"`
 	Level Level  `json:"level"`
+	Guide string `json:"guide"`
 }
 
 type supportDoctor struct {
@@ -107,28 +109,14 @@ type supportOperations struct {
 
 var supportVersion = regexp.MustCompile(`^(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})(-(alpha|beta|rc)\.(0|[1-9][0-9]{0,3}))?$`)
 
-// SupportFindingIDs is a closed list, not a prefix match: artifact names,
-// service names and future finding IDs can otherwise carry private data.
-func SupportFindingIDs() []string {
-	return []string{
-		"CONFIG-EVAL", "NETWORK-SUBNET", "DEPLOYMENT-READY", "GIT-WORKTREE",
-		"NETWORK-INTERFACE", "NETWORK-DHCP-IP", "NETWORK-STATIC-IP",
-		"PXE-PREPARATION", "ARTIFACT-KERNEL", "ARTIFACT-INITRD",
-		"ARTIFACT-IPXE-SCRIPT", "ARTIFACT-IPXE-FIRMWARE",
-		"SERVICE-HARMONIA", "SERVICE-PXE", "SERVICE-PXE-NETWORK", "PXE-LIFECYCLE",
-		"CACHE-SIGNING-KEY", "CACHE-HEALTH", "PXE-PORTS", "DISK-FREE",
-		"COMMAND-NIX", "COMMAND-GIT", "COMMAND-SYSTEMCTL", "COMMAND-SSH",
-		"COMMAND-COLMENA", "CLIENT-SSH", "CONTROLLER-BUILD",
-	}
-}
-
 func NewSupportSnapshot(input SupportInput) (SupportSnapshot, error) {
 	if input.Collected.IsZero() || input.Collected.Year() < 1970 || input.Collected.Year() > 9999 {
 		return SupportSnapshot{}, errors.New("support collection time is invalid")
 	}
 	report := supportReport{
-		SchemaVersion: SupportSchemaVersion,
-		Operation:     "support-report", CollectedAt: input.Collected.UTC().Truncate(time.Second),
+		SchemaVersion:   SupportSchemaVersion,
+		GuidanceVersion: SupportGuidanceVersion,
+		Operation:       "support-report", CollectedAt: input.Collected.UTC().Truncate(time.Second),
 		Version:  safeSupportVersion(input.Version),
 		Excluded: []string{"identities", "addresses", "paths", "credentials", "free-text", "configuration", "homes", "raw-logs", "operation-identifiers-and-times"},
 	}
@@ -148,13 +136,14 @@ func NewSupportSnapshot(input SupportInput) (SupportSnapshot, error) {
 		result := &supportDoctor{Findings: []supportFinding{}}
 		seen := map[string]bool{}
 		for _, finding := range source.Findings[:min(len(source.Findings), SupportMaxFindings)] {
-			if supportEnum(finding.ID, SupportFindingIDs()...) == "unknown" ||
+			guide := SupportFindingGuide(finding.ID)
+			if guide == "" ||
 				(finding.Level != LevelOK && finding.Level != LevelWarning && finding.Level != LevelError) || seen[finding.ID] {
 				result.Omitted++
 				continue
 			}
 			seen[finding.ID] = true
-			result.Findings = append(result.Findings, supportFinding{ID: finding.ID, Level: finding.Level})
+			result.Findings = append(result.Findings, supportFinding{ID: finding.ID, Level: finding.Level, Guide: guide})
 		}
 		result.Omitted += max(0, len(source.Findings)-SupportMaxFindings)
 		sort.Slice(result.Findings, func(i, j int) bool { return result.Findings[i].ID < result.Findings[j].ID })

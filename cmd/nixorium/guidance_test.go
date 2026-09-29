@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 // Compiled separately from the product; documentation is read at runtime so
@@ -26,7 +28,7 @@ func guidanceRoot(t *testing.T) string {
 
 func guidanceFiles(t *testing.T, root string) []string {
 	t.Helper()
-	files := []string{"AGENTS.md", "CONTRIBUTING.md", "templates/site/AGENTS.md", "docs/agent-guidance.md"}
+	files := []string{"AGENTS.md", "CONTRIBUTING.md", "templates/site/AGENTS.md", "docs/agent-guidance.md", "docs/support-report.md"}
 	err := filepath.WalkDir(filepath.Join(root, "skills"), func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -192,6 +194,26 @@ func TestAgentGuidanceLinks(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(root, filepath.Dir(path), target)); err != nil {
 				t.Errorf("%s: broken relative link %s: %v", path, target, err)
 			}
+		}
+	}
+}
+
+func TestAgentGuidanceSupportRoutes(t *testing.T) {
+	root := guidanceRoot(t)
+	for _, id := range domain.SupportFindingIDs() {
+		path, fragment, ok := strings.Cut(domain.SupportFindingGuide(id), "#")
+		if !ok || path != "docs/troubleshooting.md" || fragment == "" {
+			t.Fatalf("invalid static guide for %s", id)
+		}
+		body := guidanceRead(t, filepath.Join(root, path))
+		found := false
+		for _, line := range strings.Split(string(body), "\n") {
+			if strings.HasPrefix(line, "## ") && strings.Join(strings.Fields(strings.ToLower(strings.TrimPrefix(line, "## "))), "-") == fragment {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s points to a missing guide fragment: %s", id, fragment)
 		}
 	}
 }
