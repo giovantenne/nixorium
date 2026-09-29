@@ -1207,6 +1207,8 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 		}
 	case dashboardDiagnostics:
 		switch key.String() {
+		case "e":
+			return model.openSupportPreview()
 		case "esc", "left":
 			model.screen = model.diagnosticReturn
 			model.message = ""

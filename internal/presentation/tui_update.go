@@ -13,6 +13,10 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case dashboardSupportPreviewMsg:
+		return model.finishSupportPreview(message)
+	case dashboardSupportExportMsg:
+		return model.finishSupportExport(message)
 	case dashboardWorkspacePlanMsg:
 		return model.finishWorkspacePlan(message)
 	case dashboardWorkspaceSaveMsg:
@@ -898,6 +902,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.pageScroll = max(0, model.pageScroll-1)
 		return model, nil
 	}
+	if model.screen == dashboardSupport && key.String() != "ctrl+c" && key.String() != "q" {
+		return model.updateSupportKey(key)
+	}
 	if model.updates.packageBase && model.updates.baseEditing && model.screen == dashboardUpdate && model.busy == "" && key.String() != "ctrl+c" {
 		return model.updatePackageBaseKey(key)
 	}
@@ -938,7 +945,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -956,6 +963,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	}
 	if exitKey {
 		model.workspace.cancelRead()
+		model.support.cancelRead()
 		model.software.cancelSearch()
 		return model, tea.Quit
 	}

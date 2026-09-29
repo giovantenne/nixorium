@@ -262,6 +262,15 @@ func (model dashboardModel) helpView() string {
 		}
 	case dashboardDiagnostics:
 		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")
+		if model.actions.PreviewSupport != nil && !model.actions.ClassroomMode {
+			lines = append(lines, "e  Preview a minimized support report; no save or upload yet")
+		}
+	case dashboardSupport:
+		lines = append(lines, "↑/↓, PgUp/PgDown, Home/End scroll the exact filtered JSON.",
+			"Enter saves this preview to a private local file; nothing is uploaded.",
+			"Esc cancels collection or leaves without saving. r collects a fresh preview.",
+			"Versions, revision, time and counts remain visible. Review before sharing.",
+			"Unavailable sections are not healthy results. Detailed logs are not included.")
 	case dashboardSoftware:
 		lines = append(lines, "F2 selected   F3 package search   F4 suggestions   Tab next view", "p add a deployment-owned profile   / search", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
 	default:
@@ -308,6 +317,9 @@ func (model dashboardModel) diagnosticsView() string {
 		back = "Inventory"
 	}
 	actions = append(actions, tuiAction{key: "r", label: "Check again"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
+	if model.actions.PreviewSupport != nil && !model.actions.ClassroomMode {
+		actions = append([]tuiAction{{key: "e", label: "Support report"}}, actions...)
+	}
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 

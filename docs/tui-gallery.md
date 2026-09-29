@@ -406,4 +406,48 @@ No client deploy or home reset. Verify runtime on one client.
 
 ↑/↓ Scroll  ·  F4 Details  ·  Enter Apply update  ·  Esc Cancel  ·  F1 Help
 ```
+
+## Local support report preview
+
+```text
+Nixorium  /  Maintenance  /  Diagnostics  /  Support report
+
+Local support report
+Minimized, not anonymous. No upload or remediation.
+
+{
+  "schemaVersion": 1,
+  "operation": "support-report",
+  "collectedAt": "2026-09-29T12:00:00Z",
+  "commandVersion": "2.0.0",
+  "status": {
+    "deploymentVersion": "2.0.0",
+    "deploymentMode": "laboratory",
+    "deploymentReady": false,
+    "gitAvailable": true,
+    "gitDirty": false,
+    "pxeMode": "stopped",
+    "preparedPresent": false,
+    "preparedReady": false
+
+Lines 1–14 / 39 · Versions, revision, time and counts remain visible.
+
+↑/↓ Scroll  ·  Enter Save locally  ·  r Refresh  ·  Esc Cancel  ·  F1 Help
+```
+
+## Local support report saved without upload
+
+```text
+Nixorium  /  Maintenance  /  Diagnostics  /  Support report
+
+Local support report
+Minimized, not anonymous. No upload or remediation.
+
+✓ SAVED
+Saved the exact preview locally. Nothing was uploaded.
+Local file: "/demo/state/nixorium/support/support-0123456789abcdef.json"
+SHA-256: ab1b3177c33d05ffcb351462fe01dc5ca4811caddf5b793089828ce21b2bf333
+
+Enter Diagnostics  ·  r New preview  ·  Esc Back  ·  F1 Help
+```
 <!-- END GENERATED: tui-gallery -->

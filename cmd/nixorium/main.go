@@ -197,6 +197,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	configurationStateManager := app.NewConfigurationStateManager(inspector, controllerManager)
 	serviceManager := app.NewServiceManager(local)
 	operationLogManager := app.NewOperationLogManager(local)
+	supportManager := app.NewSupportManager(local)
 	gitReviewManager := app.NewGitReviewManager(local)
 	gitCommitManager := app.NewGitCommitManager(local)
 	updateManager := app.NewUpdateManager(local)
@@ -255,6 +256,12 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		LoadDoctor: func() (domain.DoctorReport, error) {
 			return inspector.Doctor(ctx, repository, app.DoctorOptions{})
+		},
+		PreviewSupport: func(requestContext context.Context) (domain.SupportSnapshot, error) {
+			return supportManager.Preview(requestContext, repository, nixoriumVersion)
+		},
+		ExportSupport: func(snapshot domain.SupportSnapshot) domain.SupportExportResult {
+			return supportManager.Export(ctx, snapshot)
 		},
 		Refresh: func() (domain.StatusReport, error) {
 			return inspector.Status(ctx, repository)

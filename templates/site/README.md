@@ -563,8 +563,9 @@ the target instead of retrying blindly.
 ### Operation logs
 
 To prepare a minimized support report, run `nixorium support preview --json`
-or interactively review and save with `nixorium support export`. The latter
-saves only the displayed JSON under the administrator's private local state
+or open **Maintenance → Diagnostics → Support report** in the administrator
+TUI. The CLI equivalent is `nixorium support export`. Both export paths
+save only the displayed JSON under the administrator's private local state
 directory; it never uploads, builds, deploys or repairs anything. Versions,
 revision, time and aggregate counts remain visible: review before sharing.
 Detailed logs below are not automatically safe to share. See the upstream

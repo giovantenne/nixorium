@@ -307,6 +307,9 @@ failure or timeout must block publication.
   export share exact bytes. Preserve unavailable/omitted evidence, no-build
   collection, private no-follow create-new publication and honest durability
   reporting. No upload, automatic remediation, raw logs or unreviewed export.
+  The administrator TUI uses typed preview/export callbacks, cancels pending
+  collection, ignores stale replies and exports only the displayed snapshot.
+  Keep the entire payload scrollable and the feature out of classroom mode.
 - The USB worker may write only the dedicated `.ssh/nixorium-known-hosts`
   directory for atomic host-trust updates; the enclosing `.ssh`, keys, and
   configuration remain read-only. Activation preserves existing entries and

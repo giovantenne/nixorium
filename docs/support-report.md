@@ -6,6 +6,14 @@ Its schema version is independent of the ordinary management report schema.
 
 ## Preview and save
 
+In the administrator TUI, open **Maintenance → Diagnostics**, then **Support
+report**. Collection is cancellable. Scroll the complete filtered JSON with
+arrows, Page Up/Down or Home/End; Enter saves this exact preview locally.
+Escape leaves without saving and discards a pending preview; Help cannot
+confirm an export. A new collection replaces the old preview. During the
+short file write, wait for its result before leaving. This capability is not
+available in the restricted teacher dashboard.
+
 From the administrator's deployment checkout:
 
 ```sh

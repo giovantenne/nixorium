@@ -15,6 +15,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   diagnostic observations without builds or raw log reads. Export saves the
   exact reviewed JSON to a private create-new local file, never uploads or
   remediates, and distinguishes unavailable data and unconfirmed durability.
+- Added an administrator TUI support-report preview under Diagnostics, with
+  cancellable collection, bounded full-payload scrolling, exact local export
+  and stale-response protection. The restricted teacher dashboard is unchanged.
 - Added an opt-in workspace preparation API with strict preference validation,
   deployment-owned catalog/baseline resolution, pinned extension metadata and
   prerequisite checks on the controller and every client. Preparation metadata

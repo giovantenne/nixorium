@@ -18,6 +18,8 @@ type DashboardActions struct {
 	RunningVersion         string
 	LoadInitial            func() (domain.StatusReport, domain.SetupReport, error)
 	LoadDoctor             func() (domain.DoctorReport, error)
+	PreviewSupport         func(context.Context) (domain.SupportSnapshot, error)
+	ExportSupport          func(domain.SupportSnapshot) domain.SupportExportResult
 	Refresh                func() (domain.StatusReport, error)
 	LoadSetup              func() domain.SetupReport
 	LoadSetupKeys          func() domain.KeyReconcileReport
@@ -114,6 +116,7 @@ const (
 	dashboardShutdownReview
 	dashboardShutdownResult
 	dashboardWorkspace
+	dashboardSupport
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -304,6 +307,7 @@ type dashboardModel struct {
 	updates                updateModel
 	settings               settingsModel
 	workspace              workspaceModel
+	support                supportModel
 	software               softwareModel
 	internet               internetModel
 	shutdown               shutdownModel
@@ -939,6 +943,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.administrationView()
 	case dashboardDiagnostics:
 		content = model.diagnosticsView()
+	case dashboardSupport:
+		content = model.supportView()
 	case dashboardSoftware:
 		content = model.softwareView()
 	case dashboardWorkspace:

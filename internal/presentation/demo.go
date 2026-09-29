@@ -64,8 +64,47 @@ func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) 
 			renderUSBInstallationDemo(sourceCommit, width, height),
 			renderClassroomDemo(sourceCommit, width, height),
 			renderWorkspaceDemo(sourceCommit, width, height),
+			renderSupportDemo(sourceCommit, width, height),
 		},
 	}
+}
+
+func demoSupportSnapshot() domain.SupportSnapshot {
+	status := domain.StatusReport{SchemaVersion: domain.SchemaVersion}
+	status.Meta.Version, status.Meta.DeploymentMode, status.PXE.Mode = "2.0.0", "laboratory", "stopped"
+	status.Git.Available = true
+	doctor := domain.DoctorReport{SchemaVersion: domain.SchemaVersion, Findings: []domain.Finding{{ID: "CACHE-HEALTH", Level: domain.LevelWarning}}}
+	snapshot, err := domain.NewSupportSnapshot(domain.SupportInput{Version: "2.0.0", Collected: time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC), Status: &status, Doctor: &doctor})
+	if err != nil {
+		panic(err)
+	}
+	return snapshot
+}
+
+func renderSupportDemo(revision string, width, height int) DemoScenario {
+	actions := demoActions()
+	actions.LoadDoctor = func() (domain.DoctorReport, error) {
+		return domain.DoctorReport{SchemaVersion: domain.SchemaVersion, Findings: []domain.Finding{{ID: "CACHE-HEALTH", Level: domain.LevelWarning, Summary: "Binary cache could not be reached", Remediation: "Inspect the local cache service before retrying deployment."}}}, nil
+	}
+	actions.PreviewSupport = func(context.Context) (domain.SupportSnapshot, error) { return demoSupportSnapshot(), nil }
+	actions.ExportSupport = func(snapshot domain.SupportSnapshot) domain.SupportExportResult {
+		return domain.SupportExportResult{State: "saved", Path: "/demo/state/nixorium/support/support-0123456789abcdef.json", SHA256: snapshot.Digest(), Message: "Saved the exact preview locally. Nothing was uploaded."}
+	}
+	r := newDemoRecorder(actions, revision, width, height)
+	r.capture("Overview", 1000)
+	r.pressAndCapture(demoText("a"), "Open Maintenance", 800)
+	r.command(r.key(demoText("i")))
+	r.capture("Open diagnostic observations", 1000)
+	command := r.key(demoText("e"))
+	r.capture("Collect diagnostics without saving or uploading", 900)
+	r.command(command)
+	r.capture("Review the filtered local report", 2500)
+	r.pressAndCapture(demoCode(tea.KeyEnd), "Inspect the excluded data categories", 1600)
+	command = r.key(demoCode(tea.KeyEnter))
+	r.capture("Save only the reviewed snapshot", 800)
+	r.command(command)
+	r.capture("Local report saved without upload", 3000)
+	return DemoScenario{ID: "local-support", Title: "Prepare a local support report", Description: "Preview the filtered payload and explicitly save a private local file without uploading or remediating.", Frames: r.frames}
 }
 
 func renderClassroomDemo(revision string, width, height int) DemoScenario {

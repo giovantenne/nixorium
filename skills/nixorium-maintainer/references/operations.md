@@ -196,6 +196,9 @@ checkout-specific. See the upstream
 [support-report contract](https://github.com/giovantenne/nixorium/blob/master/docs/support-report.md).
 Authorization to diagnose or export is not permission to send the result to
 another person, service or model. Do not automate terminal consent.
+The administrator TUI's **Maintenance → Diagnostics → Support report** uses
+the same snapshot: arrows/Page Up/Down/Home/End inspect it, Enter saves locally,
+and Escape cancels. No export capability is exposed to the teacher dashboard.
 
 Review deployment changes without mutating the index or worktree:
 
