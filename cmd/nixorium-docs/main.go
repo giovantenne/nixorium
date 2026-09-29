@@ -129,6 +129,9 @@ func renderGallery() string {
 		{title: "Workspace versions in system update review", scenarioID: "student-workspace", label: "Compare workspace versions during a system update"},
 		{title: "Local support report preview", scenarioID: "local-support", label: "Review the filtered local report"},
 		{title: "Local support report saved without upload", scenarioID: "local-support", label: "Local report saved without upload"},
+		{title: "Deployment template reset review", scenarioID: "template-reset", label: "Review replacement and preserved files"},
+		{title: "Deployment template reset losses", scenarioID: "template-reset", label: "Review all removed and replaced paths"},
+		{title: "Deployment reset saved without activation", scenarioID: "template-reset", label: "Local reset saved without activation"},
 	}
 	var output strings.Builder
 	for index, selection := range frames {

@@ -15,8 +15,10 @@ printf '%s\n' "reference" > "$TEMP_DIR/skills/nixorium-maintainer/references/exa
 cp -a "$TEMP_DIR/skills/nixorium-maintainer/." "$TEMP_DIR/templates/site/skills/nixorium-maintainer/"
 printf '%s\n' "troubleshooting" > "$TEMP_DIR/docs/troubleshooting.md"
 printf '%s\n' "updates" > "$TEMP_DIR/docs/updates.md"
+printf '%s\n' "template reset" > "$TEMP_DIR/docs/deployment-template-reset.md"
 cp "$TEMP_DIR/docs/troubleshooting.md" "$TEMP_DIR/templates/site/TROUBLESHOOTING.md"
 cp "$TEMP_DIR/docs/updates.md" "$TEMP_DIR/templates/site/UPDATES.md"
+cp "$TEMP_DIR/docs/deployment-template-reset.md" "$TEMP_DIR/templates/site/DEPLOYMENT-RESET.md"
 
 NIXORIUM_SYNC_ROOT="$TEMP_DIR" "$REPO_ROOT/scripts/sync-canonical-copies.sh" --check
 

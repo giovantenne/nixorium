@@ -205,6 +205,23 @@ Nix store garbage collection.
 
 ## Maintaining the pyramid
 
+Deployment-template reset has real-Git transaction tests (backup, ignored files,
+stale snapshots and interrupted-checkout recovery), plus unprivileged real-Nix
+and coordination-gate checks in the management VM. The explicit network-enabled
+legacy migration test starts from the public `v2.0.0` template and locks the
+published revision at HEAD of the supplied upstream checkout. Run it before
+advancing HEAD to an unpublished commit, or supply a separate published checkout:
+
+```sh
+NIXORIUM_TEST_PINNED_RESET_REPO="$PWD" ./scripts/test-go.sh \
+  ./internal/adapters -run '^TestTemplateResetPinnedLegacyMigration$' -count=1 -v
+```
+
+This uses disposable repositories and public inputs; it must reproduce the old
+workspace-load failure, preserve the exact lock and private-file sentinel, and
+load the enabled workspace after resetting. It does not build/apply a system
+or qualify live student homes.
+
 New regression tests belong at the lowest level that proves the invariant:
 
 1. pure Go or shell unit test;

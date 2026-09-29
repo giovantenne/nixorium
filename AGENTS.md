@@ -390,6 +390,14 @@ failure or timeout must block publication.
   JSON without writing it. Review consumers must also compose the deployment's
   `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base
   identity; resolved metadata by itself is not save authorization.
+- Deployment template reset is a separate administrator workflow, not additive
+  software selection or workspace declaration save. It uses the exact locked
+  upstream template, preserves settings/lock/keys/ignore rules and all untracked
+  files, evaluates protected effective identity, enables the guided home, and
+  requires `RESET DEPLOYMENT` before a backup and local commit. No implicit
+  update, apply, deploy, reboot or push. Keep interrupted-reset evidence and
+  block operational preflight until reviewed recovery. See
+  `docs/deployment-template-reset.md` and the template's `DEPLOYMENT-RESET.md`.
 - `internal/app/workspace.go` owns the declaration-only workspace review/save
   contract. Bind review to the normalized candidate, complete resolved metadata,
   base-file presence/content/mode, Git source, revision and pin. Always regenerate

@@ -306,6 +306,16 @@ in
       User = "admin";
       ExecStart = "${sandboxCheck}/bin/sandbox-check -test.run ^TestSupportExport -test.v";
     };
+    systemd.services.nixorium-template-reset-check = {
+      path = [ pkgs.git pkgs.nix pkgs.coreutils ];
+      environment.NIXORIUM_TEST_TEMPLATE_RESET_NIX = "1";
+      environment.NIXORIUM_TEST_TEMPLATE_RESET_GATE = "1";
+      serviceConfig = {
+        Type = "oneshot";
+        User = "admin";
+        ExecStart = "${sandboxCheck}/bin/sandbox-check -test.run ^TestTemplateReset -test.v -test.skip CandidatePreservesPin";
+      };
+    };
     systemd.services.nixorium-worker-sandbox-check.serviceConfig =
       config.systemd.services.nixorium-remote-install.serviceConfig // {
         Type = "oneshot";
@@ -754,6 +764,8 @@ in
     controller.succeed("systemctl start nixorium-workspace-save-check.service")
     controller.succeed("journalctl -u nixorium-workspace-save-check.service --no-pager | grep -F -- '--- PASS: TestWorkspaceRealNixSave'")
     controller.succeed("journalctl -u nixorium-workspace-save-check.service --no-pager | grep -F -- '--- PASS: TestWorkspaceRealCLI'")
+    controller.succeed("systemctl start nixorium-template-reset-check.service")
+    controller.succeed("journalctl -u nixorium-template-reset-check.service --no-pager | grep -F -- '--- PASS: TestTemplateResetRealNixCandidate'")
     controller.succeed("systemctl start nixorium-support-export-check.service")
     controller.succeed("journalctl -u nixorium-support-export-check.service --no-pager | grep -F -- '--- PASS: TestSupportExportPrivateExactAndNeverOverwrites'")
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")

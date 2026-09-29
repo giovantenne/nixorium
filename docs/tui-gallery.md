@@ -450,4 +450,77 @@ SHA-256: e83aa5986a7231de21c579859bdc0b5a0c3f8caa60a1370050f21840bd25a30f
 
 Enter Diagnostics  ·  r New preview  ·  Esc Back  ·  F1 Help
 ```
+
+## Deployment template reset review
+
+```text
+Nixorium  /  Maintenance  /  Reset template
+
+Reset deployment template
+Replace local customizations. Keep settings, keys and exact input pins.
+
+Pinned upstream: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Replace software with: Essential (shared: controller and clients)
+Packages: chromium, ghostty, libreoffice
+Discard current custom software, home preferences, assets and modules listed below.
+Guided home: enabled with the template's initial desktop/dock/browser profile; VS Code favorite when included.
+Effect on student homes requires separate system application and reboot.
+Backup: a durable local Git ref to the current committed deployment, before replacement.
+Only tracked, committed files enter the backup. Untracked/ignored files remain in place.
+No input update, activation, client deployment, live home reset, reboot or push.
+
+
+Preserved tracked files:
+  lab-settings.json
+  flake.lock
+Lines 1–14 / 21
+Type RESET DEPLOYMENT:
+
+↑/↓ Scroll  ·  Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
+```
+
+## Deployment template reset losses
+
+```text
+Nixorium  /  Maintenance  /  Reset template
+
+Reset deployment template
+Replace local customizations. Keep settings, keys and exact input pins.
+
+Only tracked, committed files enter the backup. Untracked/ignored files remain in place.
+No input update, activation, client deployment, live home reset, reboot or push.
+
+
+Preserved tracked files:
+  lab-settings.json
+  flake.lock
+  keys/admin-ssh.pub
+  .gitignore
+
+Changes (local modules and assets may contain policies that will be lost):
+  replace flake.nix
+  remove  modules/local.nix
+  add     workspace-profile.json
+Lines 8–21 / 21
+Type RESET DEPLOYMENT:
+
+↑/↓ Scroll  ·  Enter Back up and reset  ·  Esc Cancel  ·  F1 Help
+```
+
+## Deployment reset saved without activation
+
+```text
+Nixorium  /  Maintenance  /  Reset template
+
+Reset deployment template
+Replace local customizations. Keep settings, keys and exact input pins.
+
+✓ SAVED
+Saved and committed locally. Apply systems and reboot separately; nothing pushed.
+
+Backup: refs/nixorium/template-backups/demo
+Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+Enter Maintenance  ·  Esc Back  ·  F1 Help
+```
 <!-- END GENERATED: tui-gallery -->

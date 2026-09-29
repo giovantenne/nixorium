@@ -208,6 +208,14 @@ checkout is needed while installing clients without internet access.
 
 ## Occasional interventions
 
+Updating the framework does not refresh copied deployment files. On supporting
+versions, **Maintenance → Reset deployment template** replaces those files from
+the exact pinned upstream, lets you select a new software preset, and enables
+the guided home with an initial profile. It preserves settings, keys, ignored
+files and input pins, with a recoverable local backup and explicit loss review.
+No activation, client deployment, reboot or push is included. See
+[template reset and recovery](DEPLOYMENT-RESET.md) before using it.
+
 The template supplies `workspace-catalog.nix` and an inactive
 `workspace-profile.example.json` matching Essential without requiring VS Code.
 It never reads the example as an active profile. With a supporting pin, the

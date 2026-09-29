@@ -19,6 +19,7 @@ an explicit product decision.
 | Privilege, keys, PXE or USB/SSH recovery | Management/PXE modules, remote worker/helper, adapters, integration tests | Core invariants; maintainer configuration/operations; troubleshooting |
 | Local support export and diagnostic-code routes | `internal/domain/support.go`, `support_guidance.go`, app/adapter/TUI support tests | Support-report contract; canonical troubleshooting; maintainer operations; administrator guide |
 | Input ownership and updates | Update adapters/tests, Flake/template contract | Maintainer software/framework-update guidance; deployment AGENTS |
+| Deployment template reset and recovery | `template_reset*.go` domain/app/adapters, TUI and real-Git/Nix tests | Reset guide; both READMEs/AGENTS; maintainer operations; canonical copies; TUI gallery |
 | Bootstrap prompts, sequencing, and netboot keyboard | `install.sh`, bootstrap CLI, `lib/mk-lab.nix`, controller-bootstrap and mkLab tests | Root README; deployment README; system reference; controller-first ADR; changelog |
 | Validation or skill distribution | `scripts/validate.sh`, `tests/source-checks.nix`, package source fileset | Both AGENTS files; developer validation reference |
 | Generated TUI gallery | `cmd/nixorium-docs`, real fixtures in `internal/presentation/demo.go`, `scripts/generate-docs.sh` | TUI tour, README and contributor guide |

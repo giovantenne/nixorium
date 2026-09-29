@@ -12,6 +12,9 @@ import (
 )
 
 type DashboardActions struct {
+	LoadTemplateReset      func(context.Context) domain.TemplateResetCatalog
+	PlanTemplateReset      func(context.Context, string, func(string)) domain.TemplateResetPlan
+	ApplyTemplateReset     func(domain.TemplateResetPlan) domain.TemplateResetResult
 	ClassroomMode          bool
 	PlanInternet           func(string, domain.InternetAction) domain.InternetPlan
 	ApplyInternet          func(domain.InternetPlan) domain.InternetReport
@@ -117,6 +120,7 @@ const (
 	dashboardShutdownResult
 	dashboardWorkspace
 	dashboardSupport
+	dashboardTemplateReset
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -308,6 +312,7 @@ type dashboardModel struct {
 	settings               settingsModel
 	workspace              workspaceModel
 	support                supportModel
+	templateReset          templateResetModel
 	software               softwareModel
 	internet               internetModel
 	shutdown               shutdownModel
@@ -945,6 +950,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.diagnosticsView()
 	case dashboardSupport:
 		content = model.supportView()
+	case dashboardTemplateReset:
+		content = model.templateResetView()
 	case dashboardSoftware:
 		content = model.softwareView()
 	case dashboardWorkspace:

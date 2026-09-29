@@ -36,6 +36,9 @@ func (Local) DeploymentStatus(ctx context.Context, repository string) (domain.De
 }
 
 func (Local) GitState(ctx context.Context, repository string) (domain.GitState, error) {
+	if err := checkTemplateResetPending(repository); err != nil {
+		return domain.GitState{}, err
+	}
 	output, err := run(ctx, "git", "-C", repository, "status", "--porcelain=v1", "--untracked-files=normal")
 	if err != nil {
 		return domain.GitState{}, err

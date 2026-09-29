@@ -94,4 +94,5 @@ status=0
 sync_tree "skills/nixorium-maintainer" "templates/site/skills/nixorium-maintainer" || status=1
 sync_file "docs/troubleshooting.md" "templates/site/TROUBLESHOOTING.md" || status=1
 sync_file "docs/updates.md" "templates/site/UPDATES.md" || status=1
+sync_file "docs/deployment-template-reset.md" "templates/site/DEPLOYMENT-RESET.md" || status=1
 exit "$status"

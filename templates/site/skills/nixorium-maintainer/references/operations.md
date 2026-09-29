@@ -185,6 +185,20 @@ editor extensions, desktop preferences, and content that must survive resets.
 
 ## Git review and operation logs
 
+On supporting versions, **Maintenance → Reset deployment template** is an
+explicit destructive replacement of copied deployment files, not a framework
+update or additive software profile. Use it only when the operator has approved
+losing local software, home, asset and module customizations. Choose a preset
+from the exact locked upstream and review all paths before `RESET DEPLOYMENT`.
+The action preserves committed settings/lock/keys/ignore rules and all untracked
+files, creates a backup ref and a local commit, and enables the initial guided
+home in configuration only. Apply/deploy/reboot/push remain separate decisions.
+Resolve dirty tracked files, collisions and unsupported layouts explicitly;
+never force the operation with a hard reset or clean. Keep
+`.git/nixorium-template-reset.json` if interrupted and stop normal operations
+until recovery. See the upstream
+[template reset guide](https://github.com/giovantenne/nixorium/blob/master/docs/deployment-template-reset.md).
+
 For a shareable diagnostic snapshot on supporting pins, use
 `nixorium support preview --json`; `nixorium support export` requires an
 interactive preview and consent before writing a private local file. It never

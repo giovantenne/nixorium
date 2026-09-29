@@ -55,6 +55,7 @@ var installationAreaTasks = []dashboardTask{
 var administrationTasks = []dashboardTask{
 	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
 	{id: "package-base", shortcut: "b", title: "Update system and packages", description: "Refresh the NixOS base or review a channel migration"},
+	{id: "template-reset", shortcut: "t", title: "Reset deployment template", description: "Replace local customizations from the locked upstream; preserve settings and keys with a backup"},
 	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git and controller keys"},
 	{id: "controller", shortcut: "c", title: "Rebuild controller", description: "Review and activate the committed controller revision"},
 	{id: "services", shortcut: "s", title: "Controller services", description: "Check software delivery services or restart the signed cache when troubleshooting"},

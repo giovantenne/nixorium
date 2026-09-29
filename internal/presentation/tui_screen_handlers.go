@@ -49,6 +49,8 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 
 func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.Cmd) {
 	switch action {
+	case "t":
+		return model.openTemplateReset()
 	case "s":
 		model.screen = dashboardServices
 		model.busy = "Checking managed controller services"

@@ -242,6 +242,15 @@ func (model dashboardModel) helpView() string {
 			"Type SAVE and Enter only after review. No commit, runtime opt-in, deploy or reset is included.",
 			"A saved profile can open the existing Git review; commit uses separate authorization.")
 		lines = append(lines, "Extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
+	case dashboardTemplateReset:
+		lines = append(lines,
+			"Choose a software preset from the exact framework revision already locked in this deployment.",
+			"Review all removed/replaced paths with arrows or Page Up/Down; no file contents are exposed.",
+			"Existing custom software, home preferences, assets and modules are replaced, not merged.",
+			"Settings, lock, keys, ignore rules and untracked files are preserved; collisions block the reset.",
+			"Type RESET DEPLOYMENT and Enter to create a backup and a local reset commit. Esc cancels review.",
+			"The guided home is enabled in configuration only. Apply systems and reboot separately; no push.",
+			"An interrupted reset requires recovery; preserve the backup ref and .git/nixorium-template-reset.json.")
 	case dashboardSettingsPasswords:
 		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
 	case dashboardPXE:
@@ -424,6 +433,8 @@ func (model dashboardModel) textEntry() bool {
 		return model.software.acceptsText()
 	case dashboardWorkspace:
 		return model.workspace.textEntry()
+	case dashboardTemplateReset:
+		return model.templateReset.stage == "review"
 	default:
 		return false
 	}

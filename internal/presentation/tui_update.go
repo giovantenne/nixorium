@@ -13,6 +13,18 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case templateResetCatalogMsg:
+		return model.finishTemplateResetCatalog(message)
+	case templateResetPlanMsg:
+		return model.finishTemplateResetPlan(message)
+	case templateResetProgressMsg:
+		if model.screen == dashboardTemplateReset && message.id == model.templateReset.requestID && model.busy != "" {
+			model.busy = message.detail
+			return model, waitForUpdatePlanEvent(model.templateReset.events)
+		}
+		return model, nil
+	case templateResetResultMsg:
+		return model.finishTemplateResetResult(message)
 	case dashboardSupportPreviewMsg:
 		return model.finishSupportPreview(message)
 	case dashboardSupportExportMsg:
@@ -894,6 +906,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	if model.screen == dashboardWorkspace && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
 		return model.updateWorkspaceKey(key)
 	}
+	if model.screen == dashboardTemplateReset && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
+		return model.updateTemplateResetKey(key)
+	}
 	if key.String() == "shift+down" {
 		model.pageScroll++
 		return model, nil
@@ -945,7 +960,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.progressDetails = !model.progressDetails
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -962,6 +977,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	if exitKey {
+		model.templateReset.cancelRead()
 		model.workspace.cancelRead()
 		model.support.cancelRead()
 		model.software.cancelSearch()

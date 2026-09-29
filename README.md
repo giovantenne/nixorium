@@ -135,6 +135,12 @@ real Linux TTY may work, but the Minimal ISO is the supported bootstrap path.
 
 ### 2. Configure the laboratory
 
+For an existing deployment whose copied files are obsolete, supporting versions
+offer **Maintenance → Reset deployment template**: a reviewed replacement from
+the already locked upstream, with preset selection, guided home and a local
+backup. It preserves settings, keys and input pins; it does not apply or deploy.
+Read the [reset and recovery guide](docs/deployment-template-reset.md) first.
+
 After installation, remove the USB, reboot, and sign in as `admin` using the
 password you chose. Open the management interface:
 

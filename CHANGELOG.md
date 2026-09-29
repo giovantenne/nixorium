@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Added an administrator TUI deployment-template reset with pinned upstream
+  preset selection, an initial active guided-home profile, explicit loss review,
+  exact confirmation and a recoverable local Git backup/commit. Settings, keys,
+  private files and input pins are preserved. Interrupted resets block normal
+  operational preflight; no activation, deployment, reboot or push is included.
+- Fixed private template output forwarding so an active guided-home profile can
+  resolve flake revision metadata without infinite recursion. Reset also adapts
+  the affected older template form without changing its locked framework.
+
 ### Added
 
 - Added an internal bounded support-report schema with immutable snapshots,

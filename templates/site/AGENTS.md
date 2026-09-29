@@ -17,6 +17,14 @@ configuration, software, home customization, diagnostics, and operations.
 
 ## Ownership and safety
 
+- Template reset is a separate destructive administrator action on supporting
+  versions. It replaces local software, workspace, assets and modules using the
+  exact locked upstream, while preserving settings, keys, ignore rules, private
+  files and input pins. Require a reviewed loss list and `RESET DEPLOYMENT`
+  confirmation before the local backup/commit. It enables the initial guided
+  home in configuration only; apply/deploy/reboot/push require separate consent.
+  Keep interrupted-reset evidence and follow `DEPLOYMENT-RESET.md` for recovery.
+
 - Keep identities, network data, password hashes, public keys, assets, packages,
   and local policy here. Do not edit/vendor upstream modules or merge upstream
   Git history. Use the existing module extension points.

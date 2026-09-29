@@ -210,12 +210,22 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	baseSaveManager := app.NewUpdateSaveManager(baseManager, baseSource, gitReviewManager, configurationSaveManager)
 	softwareManager := app.NewSoftwareManager(local)
 	workspaceManager := app.NewWorkspaceManager(local)
+	templateResetManager := app.NewTemplateResetManager(adapters.TemplateReset{})
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	softwarePresetSaveManager := app.NewSoftwarePresetSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
 	internetManager := app.NewInternetManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
+		LoadTemplateReset: func(requestContext context.Context) domain.TemplateResetCatalog {
+			return templateResetManager.Catalog(requestContext, repository)
+		},
+		PlanTemplateReset: func(requestContext context.Context, preset string, progress func(string)) domain.TemplateResetPlan {
+			return templateResetManager.Plan(requestContext, repository, preset, progress)
+		},
+		ApplyTemplateReset: func(plan domain.TemplateResetPlan) domain.TemplateResetResult {
+			return templateResetManager.Apply(ctx, plan)
+		},
 		LoadWorkspace: func(requestContext context.Context) domain.WorkspacePlanReport {
 			return workspaceManager.Load(requestContext, repository)
 		},

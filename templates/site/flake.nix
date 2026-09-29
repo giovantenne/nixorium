@@ -114,7 +114,10 @@
         # forcing the complete laboratory inventory for each plan and save.
         builtins.deepSeq ([ candidate.nixoriumSoftware ] ++ representativeClientSystem) true;
     in
-    deployment // {
+    # Discover output names without forcing the active profile before flake
+    # self exists. Each value still evaluates the full deployment and guards.
+    builtins.mapAttrs (name: _: deployment.${name})
+      (nixorium.lib.mkLab { deploymentSelf = ./.; inherit labConfig; }) // {
       nixoriumPackageBase = {
         schemaVersion = 2;
         # Support advice is distinct from the effective locked input.

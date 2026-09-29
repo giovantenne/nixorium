@@ -29,6 +29,20 @@ let
   legacyArguments = templateArguments {};
   preparedArguments = templateArguments { workspaceProfileSchemaVersion = 1; };
   runtimeArguments = templateArguments { workspaceProfileSchemaVersion = 1; workspaceRuntimeVersion = 1; };
+  # Workspace validation can inspect system packages, whose modules need flake
+  # revision metadata. Output names must exist before that guarded value runs.
+  recursiveOutputs = (import ../templates/site/flake.nix).outputs {
+    self = recursiveOutputs // { rev = "fixture-revision"; outPath = ../templates/site; };
+    nixpkgs = {};
+    nixorium.lib = {
+      packageBase = {};
+      evalLabSettings = settings: settings.lab;
+      workspaceProfileSchemaVersion = 1;
+      mkLab = args:
+        assert !(args ? workspaceCatalog) || args.deploymentSelf.rev == "fixture-revision";
+        { guarded = true; validationStillRuns = throw "fixture guard"; };
+    };
+  };
   homeArgs = {
     inherit pkgs lib;
     labSettings = { studentUser = "learner"; teacherUser = "instructor"; };
@@ -47,6 +61,8 @@ let
   ) (lib.splitString "\n" script);
 in
 assert !(builtins.pathExists ../templates/site/workspace-profile.json);
+assert recursiveOutputs.guarded;
+assert rejects recursiveOutputs.validationStillRuns;
 assert !(legacyArguments ? workspaceCatalog) && !(legacyArguments ? workspaceProfileJSON)
   && !(legacyArguments ? workspaceRuntimeEnabled);
 assert preparedArguments.workspaceCatalog == catalog;
