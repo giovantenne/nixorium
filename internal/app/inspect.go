@@ -226,7 +226,10 @@ func (i *Inspector) Doctor(ctx context.Context, repository string, options Docto
 	if err != nil {
 		return domain.DoctorReport{}, err
 	}
+	return i.doctorFromStatus(ctx, status, options), nil
+}
 
+func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusReport, options DoctorOptions) domain.DoctorReport {
 	report := domain.DoctorReport{
 		SchemaVersion: domain.SchemaVersion,
 		Operation:     "doctor",
@@ -331,7 +334,7 @@ func (i *Inspector) Doctor(ctx context.Context, repository string, options Docto
 		}
 	}
 
-	return report, nil
+	return report
 }
 
 func (i *Inspector) addNetworkFindings(status domain.StatusReport, add func(domain.Finding)) {

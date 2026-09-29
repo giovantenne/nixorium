@@ -367,9 +367,13 @@ func probeCurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout t
 }
 
 func probeCurrentSystem(ctx context.Context, host domain.HostMeta, timeout time.Duration) domain.HostSystemProbe {
+	return probeCurrentSystemArguments(ctx, timeout, sshCurrentSystemArguments(host, timeout))
+}
+
+func probeCurrentSystemArguments(ctx context.Context, timeout time.Duration, arguments []string) domain.HostSystemProbe {
 	probeContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	command := exec.CommandContext(probeContext, "ssh", sshCurrentSystemArguments(host, timeout)...)
+	command := exec.CommandContext(probeContext, "ssh", arguments...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		detail := strings.TrimSpace(string(output))

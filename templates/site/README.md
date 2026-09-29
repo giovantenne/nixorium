@@ -562,6 +562,14 @@ the target instead of retrying blindly.
 
 ### Operation logs
 
+To prepare a minimized support report, run `nixorium support preview --json`
+or interactively review and save with `nixorium support export`. The latter
+saves only the displayed JSON under the administrator's private local state
+directory; it never uploads, builds, deploys or repairs anything. Versions,
+revision, time and aggregate counts remain visible: review before sharing.
+Detailed logs below are not automatically safe to share. See the upstream
+[support-report contract](https://github.com/giovantenne/nixorium/blob/master/docs/support-report.md).
+
 ```sh
 nix run .#nixorium -- logs
 nix run .#nixorium -- logs show OPERATION_LOG_ID

@@ -17,6 +17,13 @@ expected state.
 
 ## First diagnostics
 
+When preparing information to share, use `nixorium support preview --json`
+or `nixorium support export` for an interactive review and private local save.
+The [support-report contract](https://github.com/giovantenne/nixorium/blob/master/docs/support-report.md)
+describes retained metadata and limitations. There is no upload or automatic
+fix. The detailed commands below may display private values and raw errors;
+do not attach their output without a separate review.
+
 Run these read-only commands from the deployment repository:
 
 ```sh

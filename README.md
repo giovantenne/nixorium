@@ -267,6 +267,7 @@ the versioned operational and contributor references.
 | Set up and manage a lab | [Administrator guide](templates/site/README.md) |
 | Understand the management interface | [TUI guide and generated renderer gallery](docs/tui-gallery.md) |
 | Diagnose a failure or restore a backup | [Troubleshooting](docs/troubleshooting.md) |
+| Preview and export a minimized local diagnostic report | [Support reports](docs/support-report.md) |
 | Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
 | Measure software-profile closure sizes | [Profile measurement](docs/system-reference.md#measuring-profile-size) |
 | Update the core, NixOS or packages; adopt older deployments | [Update and recovery guide](docs/updates.md) |

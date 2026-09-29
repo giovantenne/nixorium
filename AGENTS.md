@@ -302,6 +302,11 @@ failure or timeout must block publication.
   deployment mode 0700, exclude the student, reject repository/address/command
   selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
+- Support export must use the separate immutable allowlisted snapshot, never
+  serialize detailed reports or error strings. Preview and confirmed local
+  export share exact bytes. Preserve unavailable/omitted evidence, no-build
+  collection, private no-follow create-new publication and honest durability
+  reporting. No upload, automatic remediation, raw logs or unreviewed export.
 - The USB worker may write only the dedicated `.ssh/nixorium-known-hosts`
   directory for atomic host-trust updates; the enclosing `.ssh`, keys, and
   configuration remain read-only. Activation preserves existing entries and

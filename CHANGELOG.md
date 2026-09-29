@@ -11,6 +11,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Added an internal bounded support-report schema with immutable snapshots,
   explicit data classification, fixed diagnostic/operation allowlists and
   adversarial tests excluding private fields and free-form error text.
+- Added `support preview` and interactive `support export`, reusing ordinary
+  diagnostic observations without builds or raw log reads. Export saves the
+  exact reviewed JSON to a private create-new local file, never uploads or
+  remediates, and distinguishes unavailable data and unconfirmed durability.
 - Added an opt-in workspace preparation API with strict preference validation,
   deployment-owned catalog/baseline resolution, pinned extension metadata and
   prerequisite checks on the controller and every client. Preparation metadata

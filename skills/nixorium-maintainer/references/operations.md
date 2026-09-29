@@ -185,6 +185,18 @@ editor extensions, desktop preferences, and content that must survive resets.
 
 ## Git review and operation logs
 
+For a shareable diagnostic snapshot on supporting pins, use
+`nixorium support preview --json`; `nixorium support export` requires an
+interactive preview and consent before writing a private local file. It never
+uploads, runs doctor full, or remediates. Do not redirect detailed doctor/log
+output into an attachment: free text may contain secrets. Retained versions,
+revision, collection time and aggregate counts are not anonymous. Missing
+sections mean unavailable, not healthy. History counts are user-wide, not
+checkout-specific. See the upstream
+[support-report contract](https://github.com/giovantenne/nixorium/blob/master/docs/support-report.md).
+Authorization to diagnose or export is not permission to send the result to
+another person, service or model. Do not automate terminal consent.
+
 Review deployment changes without mutating the index or worktree:
 
 ```sh

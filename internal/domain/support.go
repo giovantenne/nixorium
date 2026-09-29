@@ -34,6 +34,14 @@ type SupportInput struct {
 // below. Saving this value exports the exact bytes shown in the preview.
 type SupportSnapshot struct{ content string }
 
+// SupportExportResult is local feedback, not part of the shareable payload.
+type SupportExportResult struct {
+	State   string `json:"state"`
+	Path    string `json:"path,omitempty"`
+	SHA256  string `json:"sha256,omitempty"`
+	Message string `json:"message"`
+}
+
 func (s SupportSnapshot) JSON() string { return s.content }
 func (s SupportSnapshot) Valid() bool  { return s.content != "" && len(s.content) <= SupportMaxBytes }
 func (s SupportSnapshot) Digest() string {

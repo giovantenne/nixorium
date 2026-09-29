@@ -301,6 +301,11 @@ in
         ExecStart = "${sandboxCheck}/bin/sandbox-check -test.run ^TestWorkspace -test.v";
       };
     };
+    systemd.services.nixorium-support-export-check.serviceConfig = {
+      Type = "oneshot";
+      User = "admin";
+      ExecStart = "${sandboxCheck}/bin/sandbox-check -test.run ^TestSupportExport -test.v";
+    };
     systemd.services.nixorium-worker-sandbox-check.serviceConfig =
       config.systemd.services.nixorium-remote-install.serviceConfig // {
         Type = "oneshot";
@@ -749,6 +754,8 @@ in
     controller.succeed("systemctl start nixorium-workspace-save-check.service")
     controller.succeed("journalctl -u nixorium-workspace-save-check.service --no-pager | grep -F -- '--- PASS: TestWorkspaceRealNixSave'")
     controller.succeed("journalctl -u nixorium-workspace-save-check.service --no-pager | grep -F -- '--- PASS: TestWorkspaceRealCLI'")
+    controller.succeed("systemctl start nixorium-support-export-check.service")
+    controller.succeed("journalctl -u nixorium-support-export-check.service --no-pager | grep -F -- '--- PASS: TestSupportExportPrivateExactAndNeverOverwrites'")
     controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")
     controller.succeed("systemctl reset-failed harmonia.service harmonia.socket; systemctl restart harmonia.socket nixorium-harmonia.service")
     controller.wait_for_unit("nixorium-harmonia.service")
@@ -887,6 +894,25 @@ in
       controller.succeed("token=$(jq -r .reviewToken /tmp/shared-plan.json); su - admin -c \"nixorium software apply --repo ~/nixorium-deployment --package hello --scope shared --expect $token --yes --json\" | jq -e '.state == \"applied\" and .affectedController == \"pc99\"'; jq -e 'any(.packages[]; .package == \"hello\" and .scope.kind == \"shared\")' /home/admin/nixorium-deployment/lab-software.json")
       controller.succeed("su - admin -c 'nixorium software plan --repo ~/nixorium-deployment --package hello --scope shared --remove --json' > /tmp/shared-remove.json; jq -e '.state == \"ready\" and .affectedController == \"pc99\" and .candidate.packages == []' /tmp/shared-remove.json")
       controller.succeed("token=$(jq -r .reviewToken /tmp/shared-remove.json); su - admin -c \"nixorium software apply --repo ~/nixorium-deployment --package hello --scope shared --remove --expect $token --yes --json\" | jq -e '.state == \"applied\"'; jq -e '.packages == []' /home/admin/nixorium-deployment/lab-software.json")
+    with subtest("private local support reports without build or upload"):
+      controller.succeed("su - admin -c 'nixorium support preview --repo ~/nixorium-deployment --json' > /tmp/support-preview.json")
+      support = json.loads(controller.succeed("cat /tmp/support-preview.json"))
+      assert support["schemaVersion"] == 1 and support["operation"] == "support-report", support
+      assert support["status"]["deploymentMode"] == "controller", support
+      assert support["hosts"]["observed"] == 0, support
+      assert "CONTROLLER-BUILD" not in json.dumps(support)
+      assert "192.0.2." not in json.dumps(support) and "/home/admin" not in json.dumps(support)
+      controller.fail("su - admin -c 'nixorium support export --repo ~/nixorium-deployment' </dev/null")
+      controller.succeed("test ! -e /home/admin/.local/state/nixorium/support")
+      controller.succeed("(sleep 2; printf 'y\\n') | TERM=xterm timeout 60s script -qefc \"su - admin -c 'nixorium support export --repo ~/nixorium-deployment'\" /tmp/support-export-terminal.log")
+      controller.succeed("set -- /home/admin/.local/state/nixorium/support/support-*.json; test \"$#\" = 1; test -f \"$1\"; test $(stat -c '%a' /home/admin/.local/state/nixorium/support) = 700; test $(stat -c '%a' \"$1\") = 600")
+      exported = json.loads(controller.succeed("cat /home/admin/.local/state/nixorium/support/*.json"))
+      assert exported["status"]["deploymentMode"] == "controller", exported
+      controller.succeed("mkdir -p /tmp/support-invalid")
+      controller.succeed("printf %s " + shlex.quote('{ outputs = _: throw "SUPPORT-SYNTHETIC-SECRET"; }') + " > /tmp/support-invalid/flake.nix")
+      invalid = json.loads(controller.succeed("nixorium support preview --repo /tmp/support-invalid --json"))
+      assert invalid["status"] is None and invalid["doctor"] is None and invalid["hosts"] is None, invalid
+      assert "SUPPORT-SYNTHETIC-SECRET" not in json.dumps(invalid)
     with subtest("completed USB installation does not block controller repair"):
       controller.succeed("su - admin -c 'cd ~/nixorium-deployment; git add lab-software.json; git diff --cached --quiet || git -c user.name=Test -c user.email=test@example.invalid commit -qm software-fixture'")
       controller.succeed("install -m 0600 -o admin -g users /tmp/controller-only-secrets/installed-ssh /home/admin/.ssh/id_ed25519")
