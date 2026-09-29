@@ -258,11 +258,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			if setupStartsBeforeDashboardInspection(setup) {
 				return domain.StatusReport{}, setup, nil
 			}
-			report, err := inspector.Overview(ctx, repository)
+			report, err := inspector.Startup(ctx, repository)
 			if err != nil {
 				return domain.StatusReport{}, domain.SetupReport{}, err
 			}
 			return report, setup, nil
+		},
+		LoadInventory: func(requestContext context.Context) (domain.StatusReport, error) {
+			return inspector.Overview(requestContext, repository)
 		},
 		LoadDoctor: func() (domain.DoctorReport, error) {
 			return inspector.Doctor(ctx, repository, app.DoctorOptions{})

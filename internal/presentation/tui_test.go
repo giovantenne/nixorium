@@ -359,6 +359,7 @@ func TestDashboardSoftwareResultDistinguishesNoChangeAndUncertainSave(t *testing
 func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
 	requested := ""
 	report := domain.StatusReport{}
+	report.Meta.Controller.Name = "pc99"
 	report.Meta.Clients.Hosts = []domain.HostMeta{
 		{Name: "pc01", IP: "10.0.0.1"},
 		{Name: "pc03", IP: "10.0.0.3"},
@@ -409,6 +410,7 @@ func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
 
 func TestSoftwareDeploymentDoesNotExpandMissingTargets(t *testing.T) {
 	report := domain.StatusReport{}
+	report.Meta.Controller.Name = "pc99"
 	report.Meta.Clients.Hosts = []domain.HostMeta{
 		{Name: "pc01", IP: "10.0.0.1"},
 		{Name: "pc02", IP: "10.0.0.2"},

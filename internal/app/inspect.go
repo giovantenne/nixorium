@@ -53,28 +53,38 @@ func NewInspector(source Source) *Inspector {
 }
 
 func (i *Inspector) Status(ctx context.Context, repository string) (domain.StatusReport, error) {
-	return i.status(ctx, repository, true)
+	return i.status(ctx, repository, true, true)
 }
 
 // Overview loads evaluated identities and current PXE unit state, without
 // evaluating system closures, installation artifacts or client reachability.
 func (i *Inspector) Overview(ctx context.Context, repository string) (domain.StatusReport, error) {
-	return i.status(ctx, repository, false)
+	return i.status(ctx, repository, false, true)
 }
 
-func (i *Inspector) status(ctx context.Context, repository string, full bool) (domain.StatusReport, error) {
+// Startup observes only local Git and service state. Even labMeta evaluation can
+// resolve every workspace target, so no Nix output belongs on this path.
+func (i *Inspector) Startup(ctx context.Context, repository string) (domain.StatusReport, error) {
+	return i.status(ctx, repository, false, false)
+}
+
+func (i *Inspector) status(ctx context.Context, repository string, full, evaluate bool) (domain.StatusReport, error) {
 	root, err := filepath.Abs(repository)
 	if err != nil {
 		return domain.StatusReport{}, fmt.Errorf("resolve repository path: %w", err)
 	}
 
-	meta, err := i.source.LabMeta(ctx, root)
-	if err != nil {
-		return domain.StatusReport{}, fmt.Errorf("evaluate labMeta: %w", err)
-	}
-	deployment, err := i.source.DeploymentStatus(ctx, root)
-	if err != nil {
-		return domain.StatusReport{}, fmt.Errorf("evaluate deploymentStatus: %w", err)
+	var meta domain.LabMeta
+	var deployment domain.DeploymentStatus
+	if evaluate {
+		meta, err = i.source.LabMeta(ctx, root)
+		if err != nil {
+			return domain.StatusReport{}, fmt.Errorf("evaluate labMeta: %w", err)
+		}
+		deployment, err = i.source.DeploymentStatus(ctx, root)
+		if err != nil {
+			return domain.StatusReport{}, fmt.Errorf("evaluate deploymentStatus: %w", err)
+		}
 	}
 	gitState, err := i.source.GitState(ctx, root)
 	if err != nil {
@@ -116,7 +126,9 @@ func (i *Inspector) status(ctx context.Context, repository string, full bool) (d
 		PXEPreparation: preparation,
 		Artifacts:      artifacts,
 	}
-	if !deployment.Ready {
+	if !evaluate {
+		report.State = "unchecked"
+	} else if !deployment.Ready {
 		report.State = "action-required"
 	}
 	if gitState.Dirty {

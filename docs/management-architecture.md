@@ -179,6 +179,15 @@ message from an older job cannot update the current operation. Cross-feature
 continuations pass only typed reports or target identities, never cursors,
 scroll positions or confirmation text.
 
+The administrative dashboard opens using saved setup fields, local Git and
+service state only. Nix evaluation, including `labMeta`, may resolve a complete
+student workspace and must stay outside this initial path. The startup report
+is explicitly unchecked. Before selecting clients, a cancellable inventory
+read supplies evaluated identities; failures keep the originating view and late
+responses cannot resume cancelled actions. Software and single-host deployment
+follow-ups use the same inventory boundary. Reviewed operations retain their
+complete validation independently of navigation.
+
 The CLI composition root parses arguments, resolves the deployment and selects
 a command family. Family handlers live in `commands_software.go`,
 `commands_operations.go` and `commands_setup.go`; reviewed apply boundaries

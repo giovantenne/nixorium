@@ -19,6 +19,7 @@ type DashboardActions struct {
 	PlanInternet           func(string, domain.InternetAction) domain.InternetPlan
 	ApplyInternet          func(domain.InternetPlan) domain.InternetReport
 	RunningVersion         string
+	LoadInventory          func(context.Context) (domain.StatusReport, error)
 	LoadInitial            func() (domain.StatusReport, domain.SetupReport, error)
 	LoadDoctor             func() (domain.DoctorReport, error)
 	PreviewSupport         func(context.Context) (domain.SupportSnapshot, error)
@@ -325,6 +326,7 @@ type dashboardModel struct {
 	isDark                 bool
 	activitySpinner        spinner.Model
 
+	inventory    inventoryLoad
 	initializing bool
 	initialError bool
 }
@@ -931,6 +933,15 @@ func (model dashboardModel) loadControllerProgress(id uint64) tea.Cmd {
 }
 
 func (model dashboardModel) View() tea.View {
+	if model.inventory.cancel != nil && !model.helpOpen {
+		view := tea.NewView(model.frame(model.renderShell(tuiShell{
+			path:    []string{"Computers"},
+			body:    model.busyView(),
+			actions: []tuiAction{{key: "Esc", label: "Cancel"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
+		})))
+		view.AltScreen = true
+		return view
+	}
 	if model.helpOpen {
 		view := tea.NewView(model.frame(model.helpView()))
 		view.AltScreen = true

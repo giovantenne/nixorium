@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Administrative TUI startup no longer waits for Nix evaluation of enabled
+  student workspaces. Client inventory loads when needed, supports cancellation,
+  and retains full validation before reviewed operations.
+
 - Fixed controller progress tracking after framework, package-base and software
   updates: `l` now expands the managed phase details in each entry point.
 - Bounded Colmena process/pipe waits and enabled SSH connection/liveness limits.

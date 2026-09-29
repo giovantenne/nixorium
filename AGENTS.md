@@ -291,6 +291,11 @@ failure or timeout must block publication.
   Student npm globals and Pi/OpenCode state/credentials are ephemeral and
   excluded from pre-reset snapshots; never seed credentials into the shared
   home template.
+- Administrative TUI startup must not evaluate Nix outputs, including labMeta:
+  an enabled workspace can make even metadata evaluate every host. Observe
+  local setup/Git/service state only, without claiming readiness. Load evaluated
+  inventory before client selection; cancelled or failed reads must not resume
+  actions or admit stale identities. Keep full operation validation unchanged.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
 - Deployment recovery composes the existing USB worker callbacks, preserves
   exact selected identities, and always returns to fresh planning and explicit

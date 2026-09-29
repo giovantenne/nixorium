@@ -86,9 +86,11 @@ Presentation receives typed callbacks from the command composition root. It
 must not execute shell commands, choose privileged units, reproduce domain
 validation, or infer success from visual progress.
 
-Keep startup observational and small: check saved first-run fields, evaluated
-inventory and current service state. Load key reconciliation, controller
-closures and PXE artifact readiness only when opening the relevant task. Never
+Keep startup free of Nix evaluation: check saved first-run fields, local Git and
+current service state only. Even labMeta can resolve the full workspace graph.
+Load evaluated inventory before client selection, with cancellation and rejection
+of late results. Load key reconciliation, controller closures and PXE artifact
+readiness only when opening the relevant task. Never
 turn deferred checks into a claim of readiness; operation planning retains its
 full validation. Keep each operation in one canonical area, with contextual
 follow-ups returning to their parent.

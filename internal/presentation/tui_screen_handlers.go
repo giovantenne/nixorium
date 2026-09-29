@@ -19,6 +19,11 @@ func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd) {
+	if model.report.Meta.Controller.Name == "" {
+		return model.loadInventoryThen(func(ready dashboardModel) (tea.Model, tea.Cmd) {
+			return ready.openComputerTask(action)
+		})
+	}
 	switch action {
 	case "i":
 		model.screen = dashboardInternet
@@ -604,11 +609,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			hosts := model.filteredHosts()
 			if len(hosts) > 0 {
-				model.screen = dashboardDeploy
-				model.deployment.result = domain.DeploymentExecutionReport{}
-				model.deployment.context = ""
-				model.deployment.chosen = map[string]bool{hosts[min(model.computers.hostCursor, len(hosts)-1)].Name: true}
-				model.deployment.cursor = 0
+				return model.openHostDeployment(hosts[min(model.computers.hostCursor, len(hosts)-1)].Name)
 			}
 		case "r":
 			model.busy = "Refreshing computer status"

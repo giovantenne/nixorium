@@ -529,6 +529,11 @@ func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeReque
 }
 
 func (model dashboardModel) openSoftwareDeployment() (tea.Model, tea.Cmd) {
+	if model.report.Meta.Controller.Name == "" {
+		return model.loadInventoryThen(func(ready dashboardModel) (tea.Model, tea.Cmd) {
+			return ready.openSoftwareDeployment()
+		})
+	}
 	configured := map[string]bool{}
 	for _, host := range model.report.Meta.Clients.Hosts {
 		configured[host.Name] = true

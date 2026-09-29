@@ -53,3 +53,29 @@ func TestOverviewKeepsEvaluatedInventoryAndActivePXEWithoutFleetProbes(t *testin
 		t.Fatalf("overview: %+v error=%v", report, err)
 	}
 }
+
+type startupGuard struct{ overviewGuard }
+
+func (startupGuard) LabMeta(context.Context, string) (domain.LabMeta, error) {
+	panic("startup must not evaluate even metadata")
+}
+func (startupGuard) DeploymentStatus(context.Context, string) (domain.DeploymentStatus, error) {
+	panic("startup must not evaluate deployment readiness")
+}
+
+func TestStartupAvoidsAllNixEvaluationAndPreservesNetworkWarnings(t *testing.T) {
+	source := startupGuard{overviewGuard{readyFake()}}
+	source.services = map[string]domain.ServiceState{
+		PXEListenerUnit: {Loaded: true, Active: true, State: "active"},
+		PXENetworkUnit:  {Loaded: true, Active: true, State: "active"},
+	}
+	report, err := NewInspector(source).Startup(context.Background(), ".")
+	if err != nil || report.State != "unchecked" || report.Deployment.Ready || report.Meta.Controller.Name != "" || report.PXE.Mode != "active" || !report.Git.Available {
+		t.Fatalf("startup claimed readiness or lost local state: %+v err=%v", report, err)
+	}
+	source.services[PXEListenerUnit] = domain.ServiceState{Loaded: true, State: "inactive"}
+	report, err = NewInspector(source).Startup(context.Background(), ".")
+	if err != nil || report.PXE.Mode != "recovery-required" || len(report.Warnings) == 0 {
+		t.Fatalf("startup lost interrupted PXE warning: %+v err=%v", report, err)
+	}
+}

@@ -13,6 +13,8 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case dashboardInventoryMsg:
+		return model.finishInventory(message)
 	case templateResetCatalogMsg:
 		return model.finishTemplateResetCatalog(message)
 	case templateResetPlanMsg:
@@ -561,6 +563,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 
 func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
+	case dashboardInventoryMsg:
+		return model.finishInventory(message)
 	case dashboardSettingsMsg:
 		model.busy = ""
 		if message.err != nil {
@@ -984,6 +988,14 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	exitKey := key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry())
+	if model.inventory.cancel != nil && (exitKey || key.String() == "esc") {
+		model.inventory.cancelRead()
+		model.busy = ""
+		if !exitKey {
+			model.message = ""
+			return model, nil
+		}
+	}
 	if exitKey && model.screen == dashboardUSBInstall {
 		model.installation.remote.password = ""
 	}
