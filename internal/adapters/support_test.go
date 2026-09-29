@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -119,5 +120,27 @@ func TestSupportExportDetectsRenamedDirectory(t *testing.T) {
 	})
 	if result.State != "partial" {
 		t.Fatal("renamed destination claimed verified publication")
+	}
+}
+
+func TestSupportExportRejectsSpecialHistoryWithoutBlocking(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", root)
+	directory := filepath.Join(root, "nixorium", "operations")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(filepath.Join(directory, "records.json"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	finished := make(chan error, 1)
+	go func() { _, err := (Local{}).OperationRecords(domain.SupportMaxOperations); finished <- err }()
+	select {
+	case err := <-finished:
+		if err == nil {
+			t.Fatal("special history file accepted")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("special history file blocked diagnostic collection")
 	}
 }

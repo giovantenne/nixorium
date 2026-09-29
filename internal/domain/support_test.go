@@ -211,6 +211,25 @@ func TestSupportSnapshotOperationLimitAndStableOrder(t *testing.T) {
 	}
 }
 
+func TestSupportRetainsKnownSettingsAndKeyOutcomes(t *testing.T) {
+	input := supportFixture()
+	input.Operations = &[]OperationRecord{
+		{Operation: "config-apply", State: "applied"}, {Operation: "config-apply", State: "conflict"},
+		{Operation: "config-apply", State: "invalid"}, {Operation: "setup-keys", State: "action-required"},
+	}
+	snapshot, err := NewSupportSnapshot(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report supportReport
+	if err := json.Unmarshal([]byte(snapshot.JSON()), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Operations.Omitted != 0 || len(report.Operations.Outcomes) != 4 {
+		t.Fatal("known configuration outcomes were lost")
+	}
+}
+
 func FuzzSupportSnapshotPrivateStrings(f *testing.F) {
 	f.Add("secret-token")
 	f.Add("PRIVATE-192.0.2.83")

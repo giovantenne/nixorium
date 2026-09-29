@@ -49,9 +49,10 @@ collection does not repair trust or import credentials.
 No support service, AI provider, upload or telemetry endpoint is contacted.
 No controller build, service change, deploy, reset or remediation is invoked.
 Observations are sequential, not an atomic fleet snapshot; a detected checkout
-revision change removes the revision and host section. Counts do not certify
-controller activation. In controller-only mode, lab-specific doctor findings
-may be inapplicable: do not enable lab services merely to silence them.
+revision change or interrupted revision recheck removes the revision and host
+section. Counts do not certify controller activation. In controller-only mode,
+lab-specific doctor findings may be inapplicable: do not enable lab services
+merely to silence them.
 
 The terminal displays the local filename and SHA-256 after saving. The filename
 is not part of the shared JSON. A saved report remains an observation from the
@@ -68,7 +69,7 @@ separate manual decision; ordinary diagnostic output is **not** share-safe.
 | `commandVersion`, `status.deploymentVersion` | Numeric release or alpha/beta/rc version; unsupported custom version strings become `unknown` |
 | `deploymentRevision` | Full lowercase 40-character Git revision, when available; correlates the desired configuration, not proof of activation |
 | `status` | Allowlisted deployment/PXE modes and readiness, Git and preparation booleans |
-| `doctor` | Exact known finding IDs and severity only; no summary, evidence or remediation strings |
+| `doctor` | Exact known finding IDs, severity and static guide route; no summary, evidence or remediation strings |
 | `hosts` | Aggregate SSH/deployment counts; no host identity, individual revision, address or saved deployment history |
 | `operations` | Counts by known operation and outcome for at most the newest 50 records; no subjects, IDs, timestamps, messages or raw logs |
 | `excluded` | Fixed disclosure of intentionally excluded categories |
@@ -79,6 +80,9 @@ and entries beyond the collection limits are counted as omitted. Unknown host
 states count as unknown. Host counts are derived from the observed entries,
 not copied from a potentially inconsistent summary. A report is bounded to
 32 KiB, 128 input findings, 1,024 input hosts and 50 input operation records.
+SSH availability counts describe TCP reachability, not successful authentication.
+Deployment currency comes from the authenticated fixed host-state helper;
+an untrusted key can leave currency unknown even when the SSH port is available.
 
 All free text, repository/store/home paths, hostnames, IP addresses, interface
 names, configuration, credentials, key material, student files, operation IDs
@@ -117,3 +121,21 @@ DHCP, prepared artifacts, PXE listeners/lifecycle, cache/signing keys, disk/tool
 client SSH and explicitly requested full-doctor builds. Unknown/new IDs are
 omitted, never converted into a URL from unchecked input. The guidance check
 verifies that each fixed route resolves to an existing canonical section.
+
+## Qualification and limitations
+
+Deterministic fault fixtures cover unavailable cache, unsafe key permissions,
+missing interface, low free space, dirty Git, offline clients, stale PXE
+preparation and deployment readiness blockers. They verify the retained code,
+severity and static guide while injecting private text into excluded fields.
+Separate tests cover unknown schemas/codes/states, size limits, cancelled or
+moving checkouts, and unavailable configuration/history. Fuzz tests verify
+that private strings cannot change the exported snapshot.
+
+The management VM exercises the packaged interactive CLI, rejected unattended
+export, non-root private publication, permissions, symlink refusal and an
+evaluation failure containing a synthetic secret. Special operation-history
+files are refused without blocking. TUI state/renderer tests cover cancellation,
+stale replies, single confirmed export, failure/partial results and supported
+terminal sizes/themes/color profiles. These are synthetic regression checks,
+not evidence from a customer's laboratory or a guarantee of anonymity.

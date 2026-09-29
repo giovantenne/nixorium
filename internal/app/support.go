@@ -65,6 +65,9 @@ func (m *SupportManager) Preview(ctx context.Context, repository, version string
 			input.Revision = ""
 			input.Hosts = nil
 		}
+	} else {
+		input.Revision = ""
+		input.Hosts = nil
 	}
 	return domain.NewSupportSnapshot(input)
 }

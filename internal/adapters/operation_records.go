@@ -147,7 +147,7 @@ func ensureOperationRecordDirectory(stateRoot string) (*os.File, error) {
 }
 
 func readOperationRecordFile(directory *os.File) (operationRecordFile, error) {
-	descriptor, err := syscall.Openat(int(directory.Fd()), "records.json", syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	descriptor, err := syscall.Openat(int(directory.Fd()), "records.json", syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return operationRecordFile{}, fmt.Errorf("open operation records: %w", err)
 	}

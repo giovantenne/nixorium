@@ -74,6 +74,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Operation-summary reads now reject special files without blocking local
+  diagnostics. Interrupted support collection also drops unchecked revision
+  consistency, and known configuration/key outcomes remain in aggregate counts.
 - Full and evaluation-only validation now use bounded groups of related checks,
   with exact coverage validation and separate base/workspace API evaluators,
   to avoid retaining every NixOS test graph in one memory-heavy process.

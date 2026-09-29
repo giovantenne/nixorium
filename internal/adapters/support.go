@@ -44,7 +44,7 @@ func (Local) WriteSupport(ctx context.Context, snapshot domain.SupportSnapshot) 
 }
 
 func supportExportFailure() domain.SupportExportResult {
-	return domain.SupportExportResult{State: "failed", Message: "Could not export to the private local state directory. Check ownership, permissions, symlinks and free space; no report was published."}
+	return domain.SupportExportResult{State: "failed", Message: "Could not export to the private local state directory. Check ownership, permissions, symlinks, free space and unnamed-file support; no report was published."}
 }
 
 func writeSupport(ctx context.Context, stateRoot string, snapshot domain.SupportSnapshot, syncDirectory func(*os.File) error) domain.SupportExportResult {
