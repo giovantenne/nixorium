@@ -1447,22 +1447,10 @@ func (model dashboardModel) updateView() string {
 	if model.controller.applying {
 		return model.controllerProgressView(path)
 	}
-	if model.updates.planning && model.progressDetails {
-		lines := []string{tuiTitle("Current check details", model.isDark), "Target: " + model.updates.target, "",
-			model.updates.planProgress.Detail,
-			fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total)}
-		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"),
-			notices: []tuiNotice{{kind: tuiStatusNeutral, title: "Candidate validation only", detail: "No deployment files have been saved and controller activation has not started."}},
-			actions: []tuiAction{{key: "l", label: "Progress overview"}, {key: "F1", label: "Help"}},
-		})
-	}
 	lines := []string{tuiTitle(model.updateTitle(), model.isDark), ""}
 	if model.busy != "" {
 		if model.updates.planning {
-			lines = append(lines,
-				"Target: "+model.updates.target,
-				tuiMuted("Checking whether this version can replace the current one. Nothing is saved or activated yet.", model.isDark),
-			)
+			lines = append(lines, "Target: "+model.updates.target)
 			phaseLabels := updatePlanPhaseLabels()
 			phaseIndex := updatePlanPhaseIndex(model.updates.planProgress.Phase)
 			if model.height > 0 && model.height < 28 {
@@ -1481,6 +1469,13 @@ func (model dashboardModel) updateView() string {
 			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
 			if model.updates.planProgress.Total > 0 {
 				lines = append(lines, fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total))
+			}
+			if model.progressDetails {
+				detail := model.updates.planProgress.Detail
+				if detail == "" {
+					detail = "Waiting for check details…"
+				}
+				lines = append(lines, "", tuiSection("Current check details: ", model.isDark)+detail)
 			}
 		} else {
 			lines = append(lines, model.busyView())

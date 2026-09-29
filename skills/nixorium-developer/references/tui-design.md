@@ -30,6 +30,8 @@ Every routine screen should use the same regions:
 Do not mix status, transient feedback, instructions, and key legends into the
 same paragraph. Preserve the operator's context while work is running; show
 progress in place instead of replacing the whole screen with unrelated text.
+The `l` progress toggle expands details in the current operation view, including
+update candidate validation; retain the target, phase, elapsed time and notices.
 Long content must have an explicit scroll surface while the primary action and
 cancellation path remain visible.
 

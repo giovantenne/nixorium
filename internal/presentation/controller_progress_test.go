@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -91,13 +92,33 @@ func TestControllerProgressReadFailureIsVisibleAndCanRecover(t *testing.T) {
 }
 
 func TestCandidateControllerBuildExposesItsOwnDetails(t *testing.T) {
-	model := dashboardModel{screen: dashboardUpdate, busy: "Building candidate", width: 80, height: 24,
-		updates: updateModel{planning: true, planStarted: time.Now(), planProgress: domain.UpdatePlanProgress{
-			Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the candidate controller", Current: 2, Total: 5,
-		}}}
-	updated, _ := model.Update(keyPress("l"))
-	model = updated.(dashboardModel)
-	if !strings.Contains(model.View().Content, "Current check details") || !strings.Contains(model.View().Content, "Building the candidate controller") || model.controller.applying {
-		t.Fatalf("candidate build details are missing or imply activation:\n%s", model.View().Content)
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		for _, packageBase := range []bool{false, true} {
+			model := dashboardModel{screen: dashboardUpdate, busy: "Building candidate", width: size[0], height: size[1],
+				updates: updateModel{planning: true, packageBase: packageBase, target: "master", planStarted: time.Now(), planProgress: domain.UpdatePlanProgress{
+					Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the candidate controller", Current: 2, Total: 5,
+				}}}
+			for _, expanded := range []bool{true, false, true} {
+				updated, command := model.Update(keyPress("l"))
+				model = updated.(dashboardModel)
+				view := demoANSI.ReplaceAllString(model.View().Content, "")
+				if command != nil || model.screen != dashboardUpdate || !model.updates.planning || model.controller.applying || model.updates.applying {
+					t.Fatal("toggling details changed the running operation")
+				}
+				for _, expected := range []string{model.updateTitle(), "Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "elapsed", "current deployment remains unchanged", "Progress details", "Help"} {
+					if !strings.Contains(view, expected) {
+						t.Fatalf("%v details=%t lost %q:\n%s", size, expanded, expected, view)
+					}
+				}
+				for _, detail := range []string{"Current check details", "Building the candidate controller"} {
+					if strings.Contains(view, detail) != expanded {
+						t.Fatalf("%v details=%t did not toggle %q in place:\n%s", size, expanded, detail, view)
+					}
+				}
+				if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+					t.Fatalf("update details overflow at %v:\n%s", size, view)
+				}
+			}
+		}
 	}
 }

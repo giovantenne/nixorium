@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Update validation details now expand in place with `l`, preserving the target,
+  progress, elapsed time and safety notices for framework and package-base updates.
+
 - Administrative TUI startup no longer waits for Nix evaluation of enabled
   student workspaces. Client inventory loads when needed, supports cancellation,
   and retains full validation before reviewed operations.
