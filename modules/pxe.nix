@@ -36,6 +36,8 @@ let
           && "$(stat -c '%U:%G:%a' "$COORDINATION_LOCK")" == root:nixorium-operations:660 ]] \
         || fail "managed operation lock is unsafe"
       if [[ "$ACTION" == start ]]; then
+        [[ ! -e "$COORDINATION_DIRECTORY/deployment-pending.json" && ! -L "$COORDINATION_DIRECTORY/deployment-pending.json" ]] \
+          || fail "an unfinished client deployment blocks PXE start"
         [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
           || fail "a USB installation remains reserved; PXE start is blocked"
       fi
@@ -43,6 +45,8 @@ let
       flock -n 9 \
         || fail "another Nixorium controller or client operation is already running"
       if [[ "$ACTION" == start ]]; then
+        [[ ! -e "$COORDINATION_DIRECTORY/deployment-pending.json" && ! -L "$COORDINATION_DIRECTORY/deployment-pending.json" ]] \
+          || fail "an unfinished client deployment blocks PXE start"
         [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
           || fail "a USB installation remains reserved; PXE start is blocked"
       fi

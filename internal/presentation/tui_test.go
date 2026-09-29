@@ -975,7 +975,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 				Targets:         []domain.DeploymentTarget{{Name: "pc01"}, {Name: "pc02"}},
 			}
 		},
-		ApplyDeployment: func(plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+		ApplyDeployment: func(_ context.Context, plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 			applied++
 			observe(domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4, Activity: "Building configurations for 2 selected computer(s)"})
 			observe(domain.DeploymentProgress{Phase: domain.DeploymentPhaseVerify, Completed: 3, Total: 4, TargetCurrent: 2, TargetTotal: 2, Activity: "Checked authenticated state for 2/2 computer(s)"})

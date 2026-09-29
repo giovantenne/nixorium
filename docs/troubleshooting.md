@@ -310,12 +310,66 @@ loss can interrupt the foreground deployment and uses this same recovery path.
 1. Read the operation-log ID from the result and run
    `nixorium logs show OPERATION_LOG_ID`.
 2. Run `nixorium hosts` to obtain fresh authenticated state for every target.
-3. Fix the reported build, reachability, or activation problem.
+3. If the result requires recovery or a pending deployment exists, follow
+   [Interrupted client deployment](#interrupted-client-deployment) first.
+   Otherwise fix the reported build, reachability, or activation problem.
 4. Make a fresh `nixorium deploy plan --on ...` against a clean revision.
 5. Retry the full build-first `deploy apply` workflow.
 
-Only hosts that report the reviewed revision and a concrete system path are
-recorded as successful. Historical success never overrides the live result.
+After an uncertain apply, matching revisions are observations only and do not
+update successful history. Historical success never overrides the live result.
+
+## Interrupted client deployment
+
+The distribution percentage counts phases, not bytes or updated computers.
+During build/apply, `l` shows a bounded, terminal-safe tail of the private
+Colmena log and the time since its last output. Silence alone is not failure.
+SSH connects with a 10-second limit and one attempt; unanswered server-alive
+checks use a 10-second interval and a count of three. Phase supervision has
+generous upper bounds of six hours for build and two hours for apply. These
+are safety ceilings, not progress estimates or proof that a remote job stopped.
+
+If waiting is no longer useful, `s` opens a separate **Stop waiting** review.
+Only typing `STOP WAITING` confirms termination of local Colmena/SSH processes.
+Nixorium then attempts bounded authenticated client observations. This is not
+a remote cancellation or rollback; activation may still be running.
+
+Before dispatching apply, Nixorium durably creates the administrator-owned
+mode-0600 `/var/lib/nixorium/coordination/deployment-pending.json`, containing
+the repository, reviewed revision, selected names/addresses and start time.
+A normal successful Colmena return clears it. A failed/disconnected/timed-out
+apply, terminal loss or process death retains it, even across controller reboot.
+New managed deployments, controller applies, installation starts and fleet
+mutations are refused. Inventory and logs remain readable. Malformed or unsafe
+pending evidence also blocks operations rather than being silently removed.
+
+Recovery is deliberately manual; there is no automatic retry or force-unlock:
+
+1. Read the private operation log and pending record locally. Do not post either
+   without reviewing sensitive values. Do not overwrite or delete the evidence.
+2. Confirm the original controller process and its Colmena/SSH children have
+   exited. A stored PID is only a hint, not proof of identity or completion.
+3. Inspect **every recorded client**, through authenticated SSH or its physical
+   console, for still-running activation processes and pending systemd jobs.
+   Resolve any unfinished activation first. A matching `/run/current-system`,
+   an inventory “current” label, or loss of connectivity is insufficient.
+   If a client cannot be inspected, keep the reservation and do not retry.
+4. With explicit administrator approval and no operation still running, hold
+   the existing fleet `operation.lock` exclusively and archive the exact pending
+   record to a new private, non-overwriting recovery file. Preserve the record
+   and log for investigation; sync the directory before releasing the lock.
+   Never delete/recreate `operation.lock` or `deploy.lock` to bypass ownership.
+   This step acknowledges reviewed recovery; it does not declare the old apply
+   successful. Do not run old Nixorium binaries or raw Colmena to bypass it.
+5. Inspect live client state again, correct the underlying problem and authorize
+   a fresh reviewed deployment. Reboots, if needed, are separate disruptive
+   actions and require their own approval.
+
+For controller builds, `l` expands managed phase details in both the dedicated
+controller screen and framework/package/software update follow-ups. These
+phases are not raw Nix output; the full log remains in the controller service
+journal. Consult the exact unit named in the result, or inspect current units
+with `systemctl list-units 'nixorium-apply-controller*' --all` while it runs.
 
 ## The Git tree is dirty
 

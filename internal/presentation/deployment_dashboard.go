@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -33,6 +34,9 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 		case "l":
 			return model, deploymentIntent{kind: deploymentLogsIntent}
 		case "r":
+			if model.result.RecoveryRequired {
+				return model, deploymentIntent{}
+			}
 			model.result = domain.DeploymentExecutionReport{}
 			model.progress = domain.DeploymentProgress{}
 			model.recent = nil
@@ -141,7 +145,10 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		plan := model.deployment.plan
 		events := make(chan tea.Msg)
 		model.deployment.events = events
-		return model, startDeployment(model.actions.ApplyDeployment, plan, events)
+		ctx, cancel := context.WithCancel(context.Background())
+		model.deployment.cancel = cancel
+		model.deployment.stopReview, model.deployment.stopRequested = false, false
+		return model, startDeployment(ctx, model.actions.ApplyDeployment, plan, events)
 	case deploymentLogsIntent:
 		if model.actions.LoadLogs == nil {
 			model.message = "Operation logs are not available in this deployment."

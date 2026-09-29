@@ -429,6 +429,9 @@ func DeploymentExecutionText(writer io.Writer, report domain.DeploymentExecution
 	if report.HasErrors() && report.RetrySafe {
 		fmt.Fprintln(writer, "Retry:           safe after reviewing current host state and a fresh deploy plan")
 	}
+	if report.RecoveryRequired {
+		fmt.Fprintln(writer, "Recovery:        required before another operation; see TROUBLESHOOTING.md: Interrupted client deployment")
+	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)
 	}

@@ -114,6 +114,9 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 		return nil, err
 	}
 	defer directory.Close()
+	if err := checkDeploymentPendingAt(directory); err != nil {
+		return nil, err
+	}
 	if present, markerErr := inspectReservationAt(directory); present {
 		if markerErr != nil {
 			return nil, fmt.Errorf("USB installation reservation blocks new operations: %w", markerErr)
@@ -133,6 +136,10 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 		lock.Close()
 		return nil, errors.New("another Nixorium controller or client operation is already running")
 	}
+	if err := checkDeploymentPendingAt(directory); err != nil {
+		lock.Close()
+		return nil, err
+	}
 	if present, markerErr := inspectReservationAt(directory); present {
 		_ = syscall.Flock(descriptor, syscall.LOCK_UN)
 		lock.Close()
@@ -150,6 +157,9 @@ func operationActiveAt(directoryPath string, managed bool) (bool, error) {
 		return false, err
 	}
 	defer directory.Close()
+	if err := checkDeploymentPendingAt(directory); err != nil {
+		return true, err
+	}
 	if present, markerErr := inspectReservationAt(directory); present {
 		if markerErr != nil {
 			return true, markerErr
@@ -347,6 +357,9 @@ func acquireRecoveryGateAt(directoryPath string, managed bool) (*operationGate, 
 		return nil, err
 	}
 	defer directory.Close()
+	if err := checkDeploymentPendingAt(directory); err != nil {
+		return nil, err
+	}
 	descriptor, err := syscall.Openat(int(directory.Fd()), coordinationLockName, syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, fmt.Errorf("open managed operation lock: %w", err)
@@ -361,6 +374,10 @@ func acquireRecoveryGateAt(directoryPath string, managed bool) (*operationGate, 
 		return nil, errors.New("another Nixorium controller or client operation is already running")
 	}
 	gate := &operationGate{file: lock}
+	if err := checkDeploymentPendingAt(directory); err != nil {
+		gate.Close()
+		return nil, err
+	}
 	if managed {
 		legacy, legacyErr := acquireLegacyDeploymentLock()
 		if legacyErr != nil {

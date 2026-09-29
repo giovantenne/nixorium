@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -38,7 +39,7 @@ func deploymentUSBModel(t *testing.T, response domain.RemoteInstallResponse) das
 				t.Fatal("unexpected deployment plan")
 				return domain.DeploymentPlanReport{}
 			},
-			ApplyDeployment: func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+			ApplyDeployment: func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 				t.Error("unexpected deployment apply")
 				return domain.DeploymentExecutionReport{}
 			},

@@ -348,8 +348,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
 			return deploymentManager.Plan(ctx, repository, requested)
 		},
-		ApplyDeployment: func(plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
-			return executeDeploymentOperationWithProgress(ctx, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard, observe)
+		ApplyDeployment: func(requestContext context.Context, plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+			return executeDeploymentOperationWithProgress(requestContext, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard, observe)
 		},
 		PlanController: func() domain.ControllerRebuildPlanReport {
 			return controllerManager.Plan(ctx, repository)

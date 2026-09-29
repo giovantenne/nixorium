@@ -317,6 +317,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardDeployReview
 		return model, nil
 	case dashboardDeploymentResultMsg:
+		if model.deployment.cancel != nil {
+			model.deployment.cancel()
+			model.deployment.cancel = nil
+		}
+		model.deployment.stopReview = false
 		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
 		model.deployment.applying = false
@@ -340,7 +345,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 		model.deployment.progress = message.progress
-		model.deployment.recent = appendBoundedActivity(model.deployment.recent, message.progress.Activity, 5)
+		if message.progress.Activity != "" {
+			model.deployment.recent = appendBoundedActivity(model.deployment.recent, message.progress.Activity, 5)
+		}
 		return model, waitForDeploymentEvent(model.deployment.events)
 	case dashboardControllerPlanMsg:
 		model.busy = ""
@@ -416,6 +423,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.id != model.controller.progressID {
 			return model, nil
 		}
+		model.controller.progressUnavailable = message.err != nil
 		if message.err == nil && (model.controller.started.IsZero() || !message.progress.StartedAt.Before(model.controller.started)) {
 			model.controller.progress = message.progress
 		}
@@ -535,6 +543,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardUpdateControllerMsg:
 		model.busy = ""
+		model.controller.applying = false
 		model.updates.applying = false
 		model.controller.plan = message.plan
 		model.controller.result = message.report
@@ -778,6 +787,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSoftwareControllerMsg:
 		model.busy = ""
+		model.controller.applying = false
 		model.controller.plan = message.plan
 		model.controller.result = message.report
 		software, result := model.software.finishController(message.plan, message.report)
@@ -956,8 +966,17 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			return model, input.command
 		}
 	}
-	if key.String() == "l" && (model.deployment.applying || model.controller.applying || model.installation.pxePreparing) {
+	if key.String() == "l" && (model.deployment.applying || model.controller.applying || model.installation.pxePreparing || model.updates.planning) {
 		model.progressDetails = !model.progressDetails
+		model.pageScroll = 0
+		return model, nil
+	}
+	if model.deployment.applying && model.deployment.stopReview {
+		return model.updateDeploymentStop(key)
+	}
+	if key.String() == "s" && model.deployment.applying && !model.deployment.stopRequested && model.deployment.cancel != nil {
+		model.deployment.stopReview = true
+		model.deployment.confirmation = ""
 		return model, nil
 	}
 	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {

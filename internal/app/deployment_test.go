@@ -72,9 +72,9 @@ func (f *fakeDeploymentSource) InterfaceAddresses(string) ([]string, error) {
 	return f.addresses, f.addressErr
 }
 
-func (f *fakeDeploymentSource) RunDeploymentPhase(_ context.Context, _ string, phase domain.DeploymentPhase, selector string, output io.Writer) error {
+func (f *fakeDeploymentSource) RunDeploymentPhase(_ context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer) error {
 	f.runPhases = append(f.runPhases, phase)
-	if selector == "" {
+	if plan.ColmenaSelector == "" {
 		return errors.New("empty selector")
 	}
 	fmtOutput := "colmena " + string(phase) + " output\n"

@@ -129,7 +129,7 @@ func TestConfigureColmenaSSHUsesPrivateSupportedConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"Host *", "BatchMode yes", "PasswordAuthentication no", "StrictHostKeyChecking accept-new"} {
+	for _, expected := range []string{"Host *", "BatchMode yes", "PasswordAuthentication no", "StrictHostKeyChecking accept-new", "KbdInteractiveAuthentication no", "ConnectTimeout 10", "ConnectionAttempts 1", "ServerAliveInterval 10", "ServerAliveCountMax 3"} {
 		if !strings.Contains(string(content), expected) {
 			t.Fatalf("SSH config omits %q:\n%s", expected, content)
 		}

@@ -507,13 +507,15 @@ func (model dashboardModel) startSoftwareControllerApply() (tea.Model, tea.Cmd) 
 	model.software.applying = true
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
-	return model, func() tea.Msg {
+	operation := func() tea.Msg {
 		plan := model.actions.PlanController()
 		if plan.HasErrors() {
 			return dashboardSoftwareControllerMsg{plan: plan}
 		}
 		return dashboardSoftwareControllerMsg{plan: plan, report: model.actions.ApplyController(plan)}
 	}
+	command := model.trackControllerApply(operation)
+	return model, command
 }
 
 func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeRequest) (tea.Model, tea.Cmd) {
@@ -577,6 +579,9 @@ func (model dashboardModel) openConfigurationState() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) softwareView() string {
+	if model.controller.applying {
+		return model.controllerProgressView([]string{"Software", "Controller"})
+	}
 	context := softwareViewContext{
 		width:            model.width,
 		height:           model.height,

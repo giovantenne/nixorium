@@ -70,27 +70,8 @@ func (Local) GitRevision(ctx context.Context, repository string) (string, error)
 	return revision, nil
 }
 
-func (Local) RunDeploymentPhase(ctx context.Context, repository string, phase domain.DeploymentPhase, selector string, output io.Writer) error {
-	arguments, err := deploymentCommand(phase, selector)
-	if err != nil {
-		return err
-	}
-	command := exec.CommandContext(ctx, "colmena", arguments...)
-	cleanup := func() {}
-	if phase == domain.DeploymentPhaseApply {
-		cleanup, err = configureColmenaSSH(command)
-		if err != nil {
-			return fmt.Errorf("prepare Colmena SSH policy: %w", err)
-		}
-	}
-	defer cleanup()
-	command.Dir = repository
-	command.Stdout = output
-	command.Stderr = output
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("colmena %s: %w", phase, err)
-	}
-	return nil
+func (Local) RunDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, phase domain.DeploymentPhase, output io.Writer) error {
+	return runDeploymentPhase(ctx, plan, phase, output, managedCoordinationDirectory, true, deploymentPhaseTimeout(phase))
 }
 
 func deploymentCommand(phase domain.DeploymentPhase, selector string) ([]string, error) {
@@ -116,7 +97,7 @@ func configureColmenaSSH(command *exec.Cmd) (func(), error) {
 	cleanup := func() {
 		_ = os.Remove(path)
 	}
-	content := "Host *\n  BatchMode yes\n  PasswordAuthentication no\n  StrictHostKeyChecking accept-new\n"
+	content := "Host *\n  BatchMode yes\n  PasswordAuthentication no\n  KbdInteractiveAuthentication no\n  StrictHostKeyChecking accept-new\n  ConnectTimeout 10\n  ConnectionAttempts 1\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n"
 	if _, err := io.WriteString(config, content); err != nil {
 		_ = config.Close()
 		cleanup()

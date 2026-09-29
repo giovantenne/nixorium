@@ -74,11 +74,19 @@ Planning requires a ready deployment and clean Git worktree, records HEAD, and
 rejects unknown or duplicate clients. Use the exact command and revision shown
 by the plan. Apply revalidates the review, requires the one-word `DEPLOY` confirmation, runs a
 verbose build before activation, and records a private durable log. If apply
-fails, some targets may already have changed. After every attempt, Nixorium
-authenticates to the selected hosts and records only those reporting the
-reviewed revision and a concrete system path; the private per-repository
-history lives under `~/.local/state/nixorium/deployments/`. Inspect the
-reported log and host state, make a fresh plan, and retry. The interactive
+fails, some targets may already have changed or still be activating. On
+supporting versions, an uncertain apply retains fleet-wide
+`deployment-pending.json` evidence and forbids new mutations, even after reboot.
+Authenticated revision observations do not clear it or update successful
+history. Follow **Interrupted client deployment** in `TROUBLESHOOTING.md` before
+any retry; never delete locks or bypass the gate with raw commands. During
+distribution, `l` shows the bounded private output tail; `s` offers a separately
+confirmed stop of local supervision, not remote cancellation. The private
+per-repository history lives under `~/.local/state/nixorium/deployments/`.
+After reviewed recovery, inspect host state and authorize a fresh plan.
+Controller follow-ups after software/framework/package updates also support
+`l` for managed phase details; full controller output remains in journald.
+The interactive
 apply confirmation is the single word `DEPLOY`; `--yes` is only for
 explicit automation. The raw commands below remain advanced manual operations
 and bypass these safeguards.

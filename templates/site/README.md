@@ -300,6 +300,10 @@ step—prepare files, start PXE, boot/install a client, or recover networking—
 shows only controls relevant to the observed mode.
 
 Long PXE, controller, and deployment work displays typed phase progress.
+Press `l` for details, including controller builds started after an update or
+software change. Deployment details include recent private command output;
+`s` reviews stopping local supervision, not remote activation. An uncertain
+apply reserves the fleet until [reviewed recovery](TROUBLESHOOTING.md#interrupted-client-deployment).
 Operations without a meaningful percentage—such as host checks, settings
 validation, Git/service loading, or update planning—display a shared animated
 spinner and the current plain-language action.

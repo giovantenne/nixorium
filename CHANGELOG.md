@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Fixed controller progress tracking after framework, package-base and software
+  updates: `l` now expands the managed phase details in each entry point.
+- Bounded Colmena process/pipe waits and enabled SSH connection/liveness limits.
+  Deployment details show a private, bounded command-output tail and its age;
+  a separately confirmed stop ends local supervision without claiming remote
+  cancellation. Uncertain applies retain durable fleet-wide pending evidence,
+  block conflicting operations and do not record observed revisions as success.
 - Added an administrator TUI deployment-template reset with pinned upstream
   preset selection, an initial active guided-home profile, explicit loss review,
   exact confirmation and a recoverable local Git backup/commit. Settings, keys,

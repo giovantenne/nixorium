@@ -356,6 +356,8 @@ func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario 
 	actions.ApplyController = func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 		return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Controller: plan.Controller, Revision: plan.Revision, Applied: true, Verified: true, Issues: []domain.ValidationIssue{}}
 	}
+	// This deterministic scenario completes the callback without polling time.
+	actions.LoadControllerProgress = nil
 
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)
@@ -684,7 +686,7 @@ func demoActions() DashboardActions {
 			return domain.ShutdownApplyReport{}
 		},
 		PlanDeployment: func(string) domain.DeploymentPlanReport { fail("PlanDeployment"); return domain.DeploymentPlanReport{} },
-		ApplyDeployment: func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+		ApplyDeployment: func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 			fail("ApplyDeployment")
 			return domain.DeploymentExecutionReport{}
 		},

@@ -18,6 +18,8 @@ let
         && "$(stat -c '%U:%G:%a' "$COORDINATION_LOCK")" == root:nixorium-operations:660 ]] \
       || fail "managed operation lock is unsafe"
     check_usb_reservation() {
+      [[ ! -e "$COORDINATION_DIRECTORY/deployment-pending.json" && ! -L "$COORDINATION_DIRECTORY/deployment-pending.json" ]] \
+        || fail "an unfinished client deployment requires reviewed recovery before another operation"
       if [[ -e "$USB_RESERVATION" || -L "$USB_RESERVATION" ]]; then
         ${if allowCompletedUSB then ''
           runuser -u admin -- ${nixoriumPackage}/bin/nixorium-remote-worker --controller-rebuild-check \

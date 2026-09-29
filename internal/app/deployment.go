@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -17,7 +18,7 @@ type DeploymentSource interface {
 	GitState(context.Context, string) (domain.GitState, error)
 	GitRevision(context.Context, string) (string, error)
 	InterfaceAddresses(string) ([]string, error)
-	RunDeploymentPhase(context.Context, string, domain.DeploymentPhase, string, io.Writer) error
+	RunDeploymentPhase(context.Context, domain.DeploymentPlanReport, domain.DeploymentPhase, io.Writer) error
 	CurrentSystems(context.Context, []domain.HostMeta, time.Duration) map[string]domain.HostSystemProbe
 	RecordSuccessfulDeployments(string, map[string]domain.LastSuccessfulDeployment) error
 }
@@ -52,7 +53,7 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 	})
 	fmt.Fprintf(output, "Deployment revision: %s\nTargets: %s\n\n", report.Revision, report.ColmenaSelector)
 	fmt.Fprintln(output, "==> Building selected configurations with Colmena")
-	if err := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseBuild, report.ColmenaSelector, output); err != nil {
+	if err := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseBuild, Total: 4}, output, observe); err != nil {
 		report.State = "failed"
 		report.Message = fmt.Sprintf("build failed before any deployment was started: %v", err)
 		return report
@@ -84,7 +85,10 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		Activity: fmt.Sprintf("Applying built configurations to %d selected computer(s)", len(report.Targets)),
 	})
 	fmt.Fprintln(output, "\n==> Applying the built configurations with Colmena")
-	applyErr := m.source.RunDeploymentPhase(ctx, report.Repository, domain.DeploymentPhaseApply, report.ColmenaSelector, output)
+	applyErr := m.runPhase(ctx, plan, domain.DeploymentProgress{Phase: domain.DeploymentPhaseApply, Completed: 2, Total: 4}, output, observe)
+	var unconfirmed *domain.DeploymentUnconfirmedError
+	report.RecoveryRequired = errors.As(applyErr, &unconfirmed)
+	report.RetrySafe = !report.RecoveryRequired
 	if applyErr == nil {
 		report.ApplyCompleted = true
 	}
@@ -93,11 +97,15 @@ func (m *DeploymentManager) ExecuteWithProgress(ctx context.Context, repository,
 		TargetTotal: len(report.Targets), Activity: "Verifying authenticated client state",
 	})
 	fmt.Fprintln(output, "\n==> Verifying selected computers through authenticated host state")
-	recordErr := m.verifySuccessfulDeployments(ctx, &report, output, observe)
+	// Local cancellation must not skip the separately time-bounded observations.
+	recordErr := m.verifySuccessfulDeployments(context.WithoutCancel(ctx), &report, output, observe)
 	if applyErr != nil {
 		report.State = "failed"
 		report.Phase = domain.DeploymentPhaseApply
 		report.Message = fmt.Sprintf("apply failed; authenticated reconciliation verified %d/%d targets at the reviewed revision: %v", report.Verification.Verified, report.Verification.Attempted, applyErr)
+		if report.RecoveryRequired {
+			report.Message = fmt.Sprintf("remote activation completion is unconfirmed; %d/%d targets expose the reviewed revision, but this is not completion evidence. New operations are blocked by the pending deployment marker; review the private log and deployment recovery guide: %v", report.Verification.Verified, report.Verification.Attempted, applyErr)
+		}
 		if recordErr != nil {
 			report.Message += fmt.Sprintf("; recording verified targets also failed: %v", recordErr)
 		}
@@ -177,6 +185,10 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 			TargetCurrent: index + 1, TargetTotal: len(report.Targets),
 			Activity: fmt.Sprintf("Checked authenticated state for %d/%d computer(s)", index+1, len(report.Targets)),
 		})
+	}
+	if report.RecoveryRequired {
+		report.Verification.Detail = "revision observations do not confirm activation completion; deployment history was not changed"
+		return nil
 	}
 	if len(updates) == 0 {
 		report.Verification.Detail = "no target was authenticated at the reviewed revision; deployment history was not changed"

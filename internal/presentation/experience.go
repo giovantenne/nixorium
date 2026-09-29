@@ -220,7 +220,7 @@ func (model dashboardModel) helpView() string {
 				"Esc keeps your selection. Successful recovery creates a fresh review requiring DEPLOY again.")
 			break
 		}
-		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l progress details; q cannot interrupt", "After result: l logs   r new review   Enter Computers")
+		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   r new review when no recovery is required   Enter Computers")
 	case dashboardInternet:
 		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:

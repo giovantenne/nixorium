@@ -18,8 +18,8 @@ type DeploymentTarget struct {
 }
 
 // DeploymentProgress is an in-process, bounded update authored by the
-// application while a foreground deployment is running. Raw Colmena output
-// remains in the private deployment log and never crosses this boundary.
+// application while a foreground deployment is running. Output is a bounded,
+// terminal-safe tail for the administrator; full output stays in the private log.
 type DeploymentProgress struct {
 	Phase         DeploymentPhase
 	Completed     int
@@ -27,7 +27,16 @@ type DeploymentProgress struct {
 	TargetCurrent int
 	TargetTotal   int
 	Activity      string
+	Output        []string
+	LastOutputAt  time.Time
 }
+
+// DeploymentUnconfirmedError means a durable pending marker must be recovered
+// before another operation. A disconnected command is not remote cancellation.
+type DeploymentUnconfirmedError struct{ Err error }
+
+func (e *DeploymentUnconfirmedError) Error() string { return e.Err.Error() }
+func (e *DeploymentUnconfirmedError) Unwrap() error { return e.Err }
 
 type DeploymentPlanReport struct {
 	SchemaVersion   int                `json:"schemaVersion"`
@@ -47,22 +56,23 @@ func (r DeploymentPlanReport) HasErrors() bool {
 }
 
 type DeploymentExecutionReport struct {
-	SchemaVersion   int                           `json:"schemaVersion"`
-	Operation       string                        `json:"operation"`
-	State           string                        `json:"state"`
-	Repository      string                        `json:"repository"`
-	Requested       string                        `json:"requested"`
-	Revision        string                        `json:"revision,omitempty"`
-	ColmenaSelector string                        `json:"colmenaSelector,omitempty"`
-	Targets         []DeploymentTarget            `json:"targets"`
-	Phase           DeploymentPhase               `json:"phase"`
-	BuildCompleted  bool                          `json:"buildCompleted"`
-	ApplyCompleted  bool                          `json:"applyCompleted"`
-	Verification    DeploymentVerificationSummary `json:"verification"`
-	RetrySafe       bool                          `json:"retrySafe"`
-	LogPath         string                        `json:"logPath,omitempty"`
-	Message         string                        `json:"message,omitempty"`
-	Issues          []ValidationIssue             `json:"issues"`
+	SchemaVersion    int                           `json:"schemaVersion"`
+	Operation        string                        `json:"operation"`
+	State            string                        `json:"state"`
+	Repository       string                        `json:"repository"`
+	Requested        string                        `json:"requested"`
+	Revision         string                        `json:"revision,omitempty"`
+	ColmenaSelector  string                        `json:"colmenaSelector,omitempty"`
+	Targets          []DeploymentTarget            `json:"targets"`
+	Phase            DeploymentPhase               `json:"phase"`
+	BuildCompleted   bool                          `json:"buildCompleted"`
+	ApplyCompleted   bool                          `json:"applyCompleted"`
+	Verification     DeploymentVerificationSummary `json:"verification"`
+	RetrySafe        bool                          `json:"retrySafe"`
+	RecoveryRequired bool                          `json:"recoveryRequired,omitempty"`
+	LogPath          string                        `json:"logPath,omitempty"`
+	Message          string                        `json:"message,omitempty"`
+	Issues           []ValidationIssue             `json:"issues"`
 }
 
 type LastSuccessfulDeployment struct {
@@ -94,5 +104,5 @@ type DeploymentHistory struct {
 }
 
 func (r DeploymentExecutionReport) HasErrors() bool {
-	return r.State == "blocked" || r.State == "failed" || r.State == "partial" || len(r.Issues) > 0
+	return r.RecoveryRequired || r.State == "blocked" || r.State == "failed" || r.State == "partial" || len(r.Issues) > 0
 }

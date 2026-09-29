@@ -43,7 +43,7 @@ type DashboardActions struct {
 	PlanPower              func(string, domain.ShutdownSessionPolicy, domain.ClientPowerAction) domain.ShutdownPlanReport
 	ApplyShutdown          func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
 	PlanDeployment         func(string) domain.DeploymentPlanReport
-	ApplyDeployment        func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
+	ApplyDeployment        func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
 	PlanController         func() domain.ControllerRebuildPlanReport
 	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
 	LoadControllerProgress func() (domain.OperationProgress, error)
@@ -126,32 +126,36 @@ const (
 // deploymentModel owns target selection and the lifecycle of one reviewed
 // client deployment. The dashboard root only routes its messages and effects.
 type deploymentModel struct {
-	cursor       int
-	chosen       map[string]bool
-	plan         domain.DeploymentPlanReport
-	result       domain.DeploymentExecutionReport
-	context      string
-	applying     bool
-	progress     domain.DeploymentProgress
-	recent       []string
-	started      time.Time
-	events       <-chan tea.Msg
-	confirmation string
-	usbRecovery  *deploymentUSBRecovery
-	usbRequestID uint64
+	cursor        int
+	chosen        map[string]bool
+	plan          domain.DeploymentPlanReport
+	result        domain.DeploymentExecutionReport
+	context       string
+	applying      bool
+	progress      domain.DeploymentProgress
+	recent        []string
+	started       time.Time
+	events        <-chan tea.Msg
+	confirmation  string
+	usbRecovery   *deploymentUSBRecovery
+	usbRequestID  uint64
+	cancel        context.CancelFunc
+	stopReview    bool
+	stopRequested bool
 }
 
 // controllerModel is the shared activation boundary used after settings,
 // software and update saves. It owns job identity so stale progress messages
 // cannot be mistaken for the current activation.
 type controllerModel struct {
-	plan       domain.ControllerRebuildPlanReport
-	result     domain.ControllerRebuildExecutionReport
-	applying   bool
-	progress   domain.OperationProgress
-	started    time.Time
-	progressID uint64
-	details    bool
+	plan                domain.ControllerRebuildPlanReport
+	result              domain.ControllerRebuildExecutionReport
+	applying            bool
+	progress            domain.OperationProgress
+	started             time.Time
+	progressID          uint64
+	details             bool
+	progressUnavailable bool
 }
 
 // settingsModel owns the settings editor and its reviewed local save. The
@@ -800,10 +804,10 @@ func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
-func startDeployment(action func(domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport, plan domain.DeploymentPlanReport, events chan tea.Msg) tea.Cmd {
+func startDeployment(ctx context.Context, action func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport, plan domain.DeploymentPlanReport, events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		go func() {
-			report := action(plan, func(progress domain.DeploymentProgress) {
+			report := action(ctx, plan, func(progress domain.DeploymentProgress) {
 				events <- dashboardDeploymentProgressMsg{progress: progress}
 			})
 			events <- dashboardDeploymentResultMsg{report: report}
@@ -1429,6 +1433,18 @@ func maximumGitCommitPlanScroll(report domain.GitCommitPlanReport, height int) i
 
 func (model dashboardModel) updateView() string {
 	path := []string{"Maintenance", model.updateTitle()}
+	if model.controller.applying {
+		return model.controllerProgressView(path)
+	}
+	if model.updates.planning && model.progressDetails {
+		lines := []string{tuiTitle("Current check details", model.isDark), "Target: " + model.updates.target, "",
+			model.updates.planProgress.Detail,
+			fmt.Sprintf("Safety check %d/%d", model.updates.planProgress.Current, model.updates.planProgress.Total)}
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"),
+			notices: []tuiNotice{{kind: tuiStatusNeutral, title: "Candidate validation only", detail: "No deployment files have been saved and controller activation has not started."}},
+			actions: []tuiAction{{key: "l", label: "Progress overview"}, {key: "F1", label: "Help"}},
+		})
+	}
 	lines := []string{tuiTitle(model.updateTitle(), model.isDark), ""}
 	if model.busy != "" {
 		if model.updates.planning {
@@ -1464,7 +1480,11 @@ func (model dashboardModel) updateView() string {
 		} else {
 			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "No deployment files or running systems change during these checks. The controller may download or build software locally, so this can take several minutes."})
 		}
-		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "F1", label: "Help"}}})
+		actions := []tuiAction{{key: "F1", label: "Help"}}
+		if model.updates.planning {
+			actions = append([]tuiAction{{key: "l", label: "Progress details"}}, actions...)
+		}
+		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	if model.updates.result.Operation != "" {
 		success := !model.updates.result.HasErrors() && model.updates.result.Updated && model.controller.result.Operation != "" && !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified
@@ -1716,13 +1736,15 @@ func (model dashboardModel) startUpdateControllerApply() (tea.Model, tea.Cmd) {
 	model.updates.applying = true
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
-	return model, func() tea.Msg {
+	operation := func() tea.Msg {
 		plan := model.actions.PlanController()
 		if plan.HasErrors() {
 			return dashboardUpdateControllerMsg{plan: plan}
 		}
 		return dashboardUpdateControllerMsg{plan: plan, report: model.actions.ApplyController(plan)}
 	}
+	command := model.trackControllerApply(operation)
+	return model, command
 }
 
 func (model dashboardModel) updateReviewHeight() int {
@@ -1802,14 +1824,7 @@ func (model dashboardModel) controllerView() string {
 	lines := []string{tuiTitle("Controller configuration", model.isDark)}
 	notices := []tuiNotice{}
 	if model.controller.applying {
-		elapsed := time.Since(model.controller.started).Truncate(time.Second)
-		if elapsed < 0 {
-			elapsed = 0
-		}
-		lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
-		lines = append(lines, model.operationProgressView(model.controller.progress, "Current progress")...)
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller update is running", detail: "Wait for the verified result before closing Nixorium."})
-		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}})
+		return model.controllerProgressView(path)
 	}
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
@@ -2100,6 +2115,9 @@ func (model dashboardModel) deployView() string {
 		return model.deploymentUSBRecoveryView(shell)
 	}
 	if model.deployment.applying {
+		if model.deployment.stopReview {
+			return model.deploymentStopView()
+		}
 		elapsed := time.Since(model.deployment.started).Truncate(time.Second)
 		if elapsed < 0 {
 			elapsed = 0
@@ -2116,7 +2134,14 @@ func (model dashboardModel) deployView() string {
 			title:  "Deployment is running",
 			detail: "Detailed output is saved in the private log. Closing is disabled until this foreground operation returns.",
 		}}
-		shell.actions = []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}
+		if model.deployment.stopRequested {
+			shell.notices[0].detail = "Stopping local supervision and checking client state. Remote activation may continue; do not start another deployment."
+		}
+		shell.actions = []tuiAction{{key: "l", label: "Progress details"}}
+		if !model.deployment.stopRequested && model.deployment.cancel != nil {
+			shell.actions = append(shell.actions, tuiAction{key: "s", label: "Stop waiting"})
+		}
+		shell.actions = append(shell.actions, tuiAction{key: "F1", label: "Help"})
 		return model.renderShell(shell)
 	}
 	if model.busy != "" {
@@ -2172,6 +2197,10 @@ func (model dashboardModel) deployView() string {
 		}
 		shell.body = strings.Join(lines, "\n")
 		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
+		if model.deployment.result.RecoveryRequired {
+			shell.actions = shell.actions[1:]
+			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: "Recovery required before another operation", detail: "An active revision alone does not prove activation completed. See TROUBLESHOOTING.md: Interrupted client deployment."})
+		}
 		return model.renderShell(shell)
 	}
 
@@ -2237,9 +2266,28 @@ func (model dashboardModel) deploymentProgressView() []string {
 		index = 4
 	}
 	lines := phaseSteps([]string{"Building configurations", "Revalidating reviewed configuration", "Updating computers", "Verifying computers"}, index, progressState.Phase == domain.DeploymentPhaseComplete, model.isDark)
+	if model.progressDetails && len(progressState.Output) > 0 {
+		// Show actual activity above the fold in an 80x24 terminal instead of
+		// repeating the four-step overview and hiding the log below it.
+		lines = []string{"", fmt.Sprintf("Phase: %s · %d/%d steps complete", phaseLabels[progressState.Phase], progressState.Completed, progressState.Total)}
+	}
+	if !progressState.LastOutputAt.IsZero() {
+		quiet := max(time.Duration(0), time.Since(progressState.LastOutputAt).Truncate(time.Second))
+		lines = append(lines, fmt.Sprintf("Last command output: %s ago", quiet))
+		if quiet >= time.Minute {
+			lines = append(lines, tuiMuted("No recent output; this alone does not mean the operation has stopped.", model.isDark))
+		}
+	}
 	if !model.progressDetails {
 		if progressState.TargetTotal > 0 {
 			lines = append(lines, "", fmt.Sprintf("Computers checked: %d/%d", progressState.TargetCurrent, progressState.TargetTotal))
+		}
+		return lines
+	}
+	if len(progressState.Output) > 0 {
+		lines = append(lines, "Recent command output (private log tail):")
+		for _, line := range progressState.Output {
+			lines = append(lines, "  "+line)
 		}
 		return lines
 	}

@@ -141,6 +141,13 @@ the already locked upstream, with preset selection, guided home and a local
 backup. It preserves settings, keys and input pins; it does not apply or deploy.
 Read the [reset and recovery guide](docs/deployment-template-reset.md) first.
 
+Long-running deployments expose private output details with `l` and a reviewed
+**Stop waiting** action. Stopping local supervision does not cancel remote
+activation: uncertain applies retain pending evidence and block conflicting
+operations until [reviewed recovery](docs/troubleshooting.md#interrupted-client-deployment).
+Controller builds also expose managed progress through `l`, including update
+and software-change follow-ups.
+
 After installation, remove the USB, reboot, and sign in as `admin` using the
 password you chose. Open the management interface:
 

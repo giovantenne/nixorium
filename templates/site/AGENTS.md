@@ -78,6 +78,10 @@ configuration, software, home customization, diagnostics, and operations.
 - Create/verify keys with `nixorium setup keys`; never overwrite mismatched
   pairs. Install verified secrets only through `nixorium setup install-secrets`.
 - Use managed controller, deployment, PXE, and USB/SSH installation operations.
+  A pending client deployment blocks new operations on supporting versions.
+  Stopping local supervision does not cancel remote activation. Preserve its
+  durable evidence, inspect every selected client, and follow the interrupted
+  deployment procedure in `TROUBLESHOOTING.md` before any authorized retry.
   USB/SSH can use Ethernet or Wi-Fi on supporting pins; keep the declared
   interface/live-address binding and signed-cache reachability checks. Configure
   wireless access in the live ISO and installed system separately; do not copy
