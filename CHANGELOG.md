@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added an internal bounded support-report schema with immutable snapshots,
+  explicit data classification, fixed diagnostic/operation allowlists and
+  adversarial tests excluding private fields and free-form error text.
 - Added an opt-in workspace preparation API with strict preference validation,
   deployment-owned catalog/baseline resolution, pinned extension metadata and
   prerequisite checks on the controller and every client. Preparation metadata
