@@ -46,9 +46,10 @@ next step and for the evidence format.
 - Local access to both VM consoles. Use a new VM folder for this evaluation;
   attach no raw host disks, physical disks, shared folders, or existing VM disks.
 
-**Ethernet for physical PXE:** when a test involves physical PCs or a
-VirtualBox adapter bridged to a physical network, use wired Ethernet, not
-Wi-Fi; PXE may fail over Wi-Fi or a wireless bridge. The recipe below uses
+**PXE network compatibility:** use Ethernet as the baseline for physical PCs or
+a VirtualBox adapter bridged to a physical network. Wi-Fi may be incompatible
+with PXE depending on hardware, firmware, and network setup; wireless bridging
+can introduce additional limitations. The recipe below uses
 only an internal virtual provisioning network: host Wi-Fi, if used for the
 controller's Internet uplink, does not carry the PXE exchange. Do not switch
 this recipe to bridged networking to troubleshoot a boot failure.

@@ -158,11 +158,19 @@ client records also expose their effective interface explicitly.
 ## USB/SSH client installation boundary
 
 The supported remote-install environment is the official NixOS 26.05 Minimal
-ISO for `x86_64-linux`, booted with UEFI and wired Ethernet. The controller
-must be a configured laboratory controller with a healthy signed Harmonia
+ISO for `x86_64-linux`, booted with UEFI and Ethernet or Wi-Fi connectivity.
+The controller must be a configured laboratory controller with a healthy signed Harmonia
 cache; controller-only deployments and arbitrary rescue environments are not
 accepted. This workflow does not depend on PXE services or alter the
 controller's static address.
+
+The declared client interface must carry the reviewed live IPv4 address.
+Connect Wi-Fi in the live ISO before the SSH workflow and arrange persistent
+system connectivity separately; live profiles and credentials are not copied.
+After reboot, the configured static client address must be reachable for
+verification. Keep Wi-Fi secrets out of Git and the Nix store. PXE may be
+incompatible with Wi-Fi depending on hardware, firmware, and network setup;
+that restriction is not part of USB/SSH transport.
 
 `packages.x86_64-linux.remoteInstallerBundle` contains the target-independent
 remote helper, metadata, and Disko programs. It deliberately excludes a client

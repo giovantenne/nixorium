@@ -819,8 +819,8 @@ secret in the public netboot closure.
 
 The USB path is a controller-orchestrated installation for one configured host,
 not a second deployment transport. The client boots the official NixOS 26.05
-Minimal ISO for `x86_64-linux` in UEFI mode on wired Ethernet. The operator
-reads its canonical IPv4 address from the physical console and sets a temporary
+Minimal ISO for `x86_64-linux` in UEFI mode with Ethernet or Wi-Fi connectivity.
+The operator reads its canonical IPv4 address from the physical console and sets a temporary
 live password. The controller performs a credential-free SSH host-key exchange,
 shows the observed Ed25519 fingerprint, and requires the operator to compare it
 with the value on the still-visible physical console. Only after the explicit
@@ -829,6 +829,12 @@ is therefore pinned before the password is attempted. A short-lived operation
 key replaces password authentication as
 soon as the live boot is verified; neither secret is stored in Git, a Nix
 derivation, process arguments, durable session JSON, or the operation log.
+
+The live IPv4 address must belong to the declared client interface; its wired
+or wireless type is not an eligibility condition. Network policy must allow
+controller-to-client SSH and client-to-controller signed-cache traffic. Live
+Wi-Fi profiles are not imported into the installed system, so connectivity
+after reboot remains an explicit deployment/operator responsibility.
 
 `packages.x86_64-linux.remoteInstallerBundle` is target-independent. It
 contains the fixed remote helper, strict metadata, and precompiled Disko

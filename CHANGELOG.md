@@ -74,6 +74,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- USB/SSH client installation no longer rejects Wi-Fi interfaces. Network
+  reachability, reviewed interface/address and boot identity, signed-cache
+  verification, and exact disk review remain required. Live Wi-Fi credentials
+  are not automatically transferred to the installed system. Documentation
+  distinguishes USB networking from hardware-dependent Wi-Fi PXE compatibility.
 - Operation-summary reads now reject special files without blocking local
   diagnostics. Interrupted support collection also drops unchecked revision
   consistency, and known configuration/key outcomes remain in aggregate counts.

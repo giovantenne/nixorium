@@ -30,7 +30,6 @@ type remotePreparationSSH interface {
 	VerifySignedClosure(context.Context, domain.RemoteInstallCache, string) error
 	PullBundle(context.Context, domain.RemoteInstallCache, string) error
 	Probe(context.Context, string) (domain.RemoteMachineFacts, error)
-	VerifyWiredInterface(context.Context, string) error
 }
 
 type RemoteInstallPreparer struct {
@@ -276,9 +275,6 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 		return result, err
 	}
 	if err := connection.PullBundle(ctx, cache, artifacts.BundlePath); err != nil {
-		return result, err
-	}
-	if err := connection.VerifyWiredInterface(ctx, host.Interface); err != nil {
 		return result, err
 	}
 	facts, err := connection.Probe(ctx, artifacts.BundlePath)

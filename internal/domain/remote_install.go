@@ -714,10 +714,6 @@ func ValidRemoteFingerprint(value string) bool {
 	return remoteFingerprintPattern.MatchString(value)
 }
 
-func ValidRemoteInterfaceName(value string) bool {
-	return remoteInterfacePattern.MatchString(value)
-}
-
 func ValidRemoteHostName(value string) bool {
 	return remoteHostPattern.MatchString(value)
 }

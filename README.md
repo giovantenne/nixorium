@@ -68,18 +68,21 @@ describes the site; the controller supplies the systems over the local network.
 
 - **Hardware:** the supported target is `x86_64-linux`. Controller and clients
   require UEFI. PXE needs working UEFI network boot; USB/SSH needs USB boot and
-  wired Ethernet. Start with a disposable controller and one client, using VMs
-  or dedicated test hardware.
+  network connectivity over Ethernet or Wi-Fi. Start with a disposable controller
+  and one client, using VMs or dedicated test hardware.
 - **Controller:** bootstrap from the official [NixOS Minimal
   ISO](https://nixos.org/download/#nixos-iso) in UEFI mode with Internet access.
   It provides the predictable Linux text console required while choosing the
   keyboard and entering passwords. Allow storage for the deployment, build
   outputs, and prepared client systems; requirements depend on the software
   selected.
-- **Network:** keep the controller and client on the same wired lab segment.
+- **Network:** allow controller-to-client SSH and client-to-controller cache
+  traffic over the configured lab network; USB/SSH does not require Ethernet.
   PXE additionally needs an existing DHCP server and permission to run
   ProxyDHCP services. Choose a static lab address range that does not conflict
   with the existing network.
+  Wi-Fi may not be compatible with PXE: support depends on hardware, firmware,
+  and network configuration. Use USB/SSH when network boot is unavailable.
 - **Internet:** the controller fetches inputs and packages during preparation
   and updates. Prepared client installations and system deployments use the
   LAN only; applications and user sessions may have their own Internet needs.
@@ -152,7 +155,8 @@ The client console owns identity, disk selection, `ERASE` confirmation, and the
 separate reboot confirmation.
 
 For USB/SSH, boot that client from the official **NixOS 26.05 Minimal ISO** in
-UEFI mode with wired Ethernet. At its local console run:
+UEFI mode with Ethernet or Wi-Fi connectivity to the controller. For Wi-Fi,
+connect from the live console with `nmtui` before continuing. At that console run:
 
 ```sh
 passwd
@@ -173,10 +177,17 @@ installed revision after the client starts from disk.
 
 The password is read only from the controlling terminal and is never a root
 password for the installed system. A fingerprint mismatch is rejected before
-password authentication. Wi-Fi, legacy BIOS boot, graphical ISOs, arbitrary
+password authentication. Legacy BIOS boot, graphical ISOs, arbitrary
 live environments, and unattended USB installation are outside this supported
 path. Installation creates or replaces a machine; later configuration changes
 use the separate reviewed deployment workflow.
+
+The configured client interface must match the live interface carrying its
+reviewed address. Wi-Fi profiles and credentials are not copied from the ISO
+into the installed system: arrange persistent system connectivity separately,
+or reconnect locally as the administrator after boot before verification.
+Keep wireless secrets out of Git and the Nix store. Wireless isolation must
+not block SSH or the controller's signed cache.
 
 On the PXE path, review the network transition when prompted and confirm start;
 existing DHCP continues assigning leases. On either path, keep the generated

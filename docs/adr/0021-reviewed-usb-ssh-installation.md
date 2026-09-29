@@ -107,10 +107,17 @@ schemas are versioned, bounded, strict, and reject unknown or duplicate fields.
 ## Consequences
 
 USB installation requires local presence for boot, address observation,
-fingerprint comparison, and media removal. Wired networking, x86_64, UEFI, the qualified
-NixOS Minimal ISO, SATA/NVMe targets, and one operation at a time are the v1
-support boundary. Wi-Fi, arbitrary installers, Secure Boot certification,
+fingerprint comparison, and media removal. Reachable Ethernet or Wi-Fi networking,
+x86_64, UEFI, the qualified NixOS Minimal ISO, SATA/NVMe targets, and one operation
+at a time define the support boundary. Arbitrary installers, Secure Boot certification,
 parallel installation, and unattended discovery remain out of scope.
+
+The initial qualification used wired networking. The current USB/SSH policy
+does not reject Wi-Fi: it checks the declared interface and reviewed live
+address, SSH reachability, and signed-cache access instead. The operator must
+connect the live ISO first and arrange connectivity after installation; live
+wireless profiles and credentials are not copied into the installed system.
+Wi-Fi PXE compatibility is a separate hardware/firmware/network concern.
 
 The implementation is larger than a wrapper around an installer command: it
 adds a bundle protocol, worker state, operation receipts, strict SSH bootstrap,

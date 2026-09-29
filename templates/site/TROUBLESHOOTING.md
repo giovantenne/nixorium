@@ -149,7 +149,8 @@ either side until its provenance is understood.
 ## A USB/SSH live client cannot be verified
 
 Use only the official NixOS 26.05 Minimal ISO for `x86_64-linux`, booted in
-UEFI mode with wired Ethernet. Keep its physical console visible and recheck:
+UEFI mode with Ethernet or Wi-Fi connectivity. Connect Wi-Fi with `nmtui` in
+the live environment first. Keep its physical console visible and recheck:
 
 ```sh
 passwd
@@ -168,11 +169,15 @@ password also leaves no operation key. Correct the address or restart the live
 environment and make a fresh reviewed attempt; do not disable host-key checking
 or enable persistent root password access.
 
-If the address cannot be reached, confirm the live ISO and controller are on
-the same routed wired segment and that the address is not the controller or a
-configured static client address. USB/SSH does not need PXE, ProxyDHCP, or a
-controller address transition, but it still needs access to controller SSH and
-the signed Harmonia cache. Do not bridge an isolated trial onto an institutional
+If the address cannot be reached, check routing and wireless client isolation,
+and confirm that it is not the controller or a configured static client address.
+The declared client interface must carry that live address. USB/SSH does not
+need PXE, ProxyDHCP, or a controller address transition, but the controller must
+reach the live client's SSH server and the client must reach the signed Harmonia
+cache. Wi-Fi profiles and credentials are not copied into the installed system:
+arrange connectivity separately or reconnect locally as the administrator after
+boot before verifying the installed client. Keep secrets out of Git and the
+Nix store. Do not bridge an isolated trial onto an institutional
 LAN as a troubleshooting shortcut.
 
 ## USB installation refuses the disk or cache

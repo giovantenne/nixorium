@@ -92,9 +92,10 @@ behavior represented. Start with one disposable client, then add at least one
 different firmware/NIC family and a second simultaneous client. Include both a
 SATA/SCSI-style disk name and NVMe when hardware is available.
 
-Use wired Ethernet for PXE, including when VirtualBox participates through a
-physical bridged adapter. Wi-Fi and wireless bridging can prevent PXE discovery
-or boot; do not use them as the baseline. The isolated VM recipe uses virtual
+Use Ethernet as the PXE baseline, including when VirtualBox participates through a
+physical bridged adapter. Wi-Fi compatibility depends on hardware, firmware,
+and network setup; wireless bridging can also prevent PXE discovery or boot.
+Record any wireless PXE trial separately. The isolated VM recipe uses virtual
 Ethernet on an Internal Network and does not bridge DHCP/ProxyDHCP to the LAN.
 
 Before testing, identify the switch recovery path and confirm that stopping PXE
@@ -104,7 +105,9 @@ case the laboratory interface transition interrupts SSH.
 ### USB/SSH topology
 
 For each VirtualBox and physical family, repeat installation from the official
-NixOS 26.05 Minimal ISO for `x86_64-linux`, in UEFI mode over wired Ethernet.
+NixOS 26.05 Minimal ISO for `x86_64-linux`, in UEFI mode over Ethernet and,
+where hardware permits, Wi-Fi. A VM's virtual Ethernet adapter over host Wi-Fi
+does not qualify a physical client's wireless interface. Record those separately.
 Keep the physical/local console visible so the address and Ed25519 fingerprint
 are independent evidence for the controller's automatic host-key observation.
 Attach exactly one disposable SATA/SCSI or NVMe
@@ -112,6 +115,14 @@ target plus the boot medium; include a multi-disk case to prove that the review
 does not infer a target. Clients must reach the controller's SSH and signed
 Harmonia endpoints but need no Internet route. PXE must remain stopped during
 this scenario.
+
+For physical Wi-Fi, connect the ISO before starting, declare its actual
+wireless interface, and check AP isolation and bidirectional reachability.
+Arrange installed-system connectivity separately: the installer does not copy
+live Wi-Fi profiles or secrets. Verify the configured static address after boot,
+including reconnecting locally as the administrator when needed. Exercise a
+connection interruption and reconcile the original operation without replaying
+disk work. These are qualification steps, not a claim of completed hardware tests.
 
 ## Baseline capture
 

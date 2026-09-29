@@ -110,17 +110,6 @@ func (connection *StrictLiveSSH) VerifySignedClosure(ctx context.Context, cache 
 	return nil
 }
 
-func (connection *StrictLiveSSH) VerifyWiredInterface(ctx context.Context, interfaceName string) error {
-	if !domain.ValidRemoteInterfaceName(interfaceName) {
-		return errors.New("remote live interface name is invalid")
-	}
-	command := "/run/current-system/sw/bin/test ! -d /sys/class/net/" + interfaceName + "/wireless"
-	if _, err := connection.run(ctx, command, nil, 1024); err != nil {
-		return fmt.Errorf("remote installation requires the declared wired interface: %w", err)
-	}
-	return nil
-}
-
 func (connection *StrictLiveSSH) Probe(ctx context.Context, bundlePath string) (domain.RemoteMachineFacts, error) {
 	if !domain.ValidStorePath(bundlePath) {
 		return domain.RemoteMachineFacts{}, errors.New("remote installer bundle path is invalid")
@@ -206,9 +195,6 @@ func (connection *StrictLiveSSH) Revalidate(ctx context.Context, preparation dom
 		if err := connection.VerifySignedClosure(ctx, plan.Cache, storePath); err != nil {
 			return err
 		}
-	}
-	if err := connection.VerifyWiredInterface(ctx, plan.Host.Interface); err != nil {
-		return err
 	}
 	facts, err := connection.Probe(ctx, preparation.BundlePath)
 	if err != nil {

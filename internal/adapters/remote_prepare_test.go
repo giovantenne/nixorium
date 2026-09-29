@@ -37,7 +37,6 @@ func (*fakePreparationSSH) PullBundle(context.Context, domain.RemoteInstallCache
 func (*fakePreparationSSH) Probe(context.Context, string) (domain.RemoteMachineFacts, error) {
 	return domain.RemoteMachineFacts{}, nil
 }
-func (*fakePreparationSSH) VerifyWiredInterface(context.Context, string) error { return nil }
 
 func TestRemotePreparationCacheSelectionPrefersConfiguredObservedDHCP(t *testing.T) {
 	preparer, err := NewRemoteInstallPreparer("/tmp/deployment", "/tmp/state")
@@ -73,13 +72,6 @@ func TestRemotePreparationCacheSelectionRejectsUnresolvedAmbiguity(t *testing.T)
 		"cache.example:YWJjZA==", &fakePreparationSSH{unreachable: map[string]bool{}})
 	if err == nil || !strings.Contains(err.Error(), "multiple") {
 		t.Fatalf("ambiguity error=%v", err)
-	}
-}
-
-func TestStrictLiveSSHRejectsUnsafeInterfaceBeforeExecution(t *testing.T) {
-	connection := strictLiveSSHFixture(t)
-	if err := connection.VerifyWiredInterface(context.Background(), "eth0;reboot"); err == nil {
-		t.Fatal("unsafe interface reached strict SSH")
 	}
 }
 

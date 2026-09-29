@@ -215,8 +215,13 @@ failure or timeout must block publication.
   host numbers are validated offsets. Each PC gets DHCP plus its static address
   on its resolved interface.
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
-- USB/SSH installation supports only the official NixOS 26.05 Minimal ISO on
-  `x86_64-linux`, UEFI, and wired Ethernet. Preserve physical-console
+- USB/SSH installation supports the official NixOS 26.05 Minimal ISO on
+  `x86_64-linux`, UEFI, and reachable Ethernet or Wi-Fi networking. Bind the
+  reviewed live address to the declared interface, not its wired/wireless type.
+  Wi-Fi credentials are not imported from the live ISO; arrange installed-system
+  connectivity separately without putting secrets in Git or the Nix store.
+  PXE compatibility over Wi-Fi depends on hardware, firmware and networking.
+  Preserve physical-console
   credential-free host-key observation, physical-console fingerprint
   confirmation and pinning before password use, terminal-only masked secret
   input that consumes printable characters before global shortcuts,

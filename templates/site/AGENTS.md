@@ -70,6 +70,11 @@ configuration, software, home customization, diagnostics, and operations.
 - Create/verify keys with `nixorium setup keys`; never overwrite mismatched
   pairs. Install verified secrets only through `nixorium setup install-secrets`.
 - Use managed controller, deployment, PXE, and USB/SSH installation operations.
+  USB/SSH can use Ethernet or Wi-Fi on supporting pins; keep the declared
+  interface/live-address binding and signed-cache reachability checks. Configure
+  wireless access in the live ISO and installed system separately; do not copy
+  credentials into Git or the Nix store. Older pins may retain the Ethernet-only
+  restriction. Wi-Fi PXE compatibility depends on hardware and network setup.
   For USB, physically compare the live ISO address/fingerprint, select only an
   eligible non-boot disk, and reconcile an existing operation ID after
   interruption; never rerun an uncertain install or reboot. Do not work around

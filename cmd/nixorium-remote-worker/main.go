@@ -806,7 +806,7 @@ func (worker *remoteWorker) handlePrepare(ctx context.Context, request domain.Re
 	session.State = "prepared"
 	session.Events = append(session.Events,
 		domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseTransfer, Detail: "verified signed cache metadata and imported the immutable installer bundle"},
-		domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseProbe, Detail: "completed final wired-NIC, resource, and disk inventory probe"},
+		domain.RemoteInstallProgress{Phase: domain.RemoteInstallPhaseProbe, Detail: "completed final network-interface, resource, and disk inventory probe"},
 	)
 	if err := worker.state.Save(session); err != nil {
 		response.State = "reconciliation-required"

@@ -286,12 +286,22 @@ operations. `--yes` is only for intentional automation.
 Use USB/SSH only when the admin explicitly authorizes destructive installation
 of one configured client and the pinned deployment exposes `install usb`. The
 supported live environment is the official NixOS 26.05 Minimal ISO for
-`x86_64-linux`, UEFI, and wired Ethernet. Ask the operator to keep its physical
+`x86_64-linux`, UEFI, and Ethernet or Wi-Fi connectivity. Ask the operator to
+connect Wi-Fi in the live ISO first when needed and keep its physical
 console visible, set a temporary password, and read the canonical IPv4 address
 and Ed25519 `SHA256:` fingerprint there. In the guided TUI, enter only the
 address: Nixorium observes the live key without credentials, displays its
 fingerprint, and asks for `MATCH` after a complete physical-console comparison.
 Never approve the fingerprint using DNS, a previous boot, or `known_hosts`.
+
+Use the declared client interface and verify that it carries the reviewed live
+address. Wi-Fi is not refused solely for being wireless; routing/firewall/AP
+policy must allow SSH to the client and signed-cache access to the controller.
+Live Wi-Fi profiles are not copied into the installed system. Arrange persistent
+connectivity separately or reconnect locally as the administrator after boot,
+then verify the configured static address. Never commit wireless secrets or
+put them in the Nix store. Older pins may still reject wireless interfaces;
+use a reviewed upstream update rather than bypassing their checks.
 
 The ordinary guided TUI owns host selection, secret input, hardware review,
 disk selection, and confirmation. For CLI operation, `start` must be run by the

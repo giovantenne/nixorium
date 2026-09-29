@@ -766,7 +766,8 @@ client-side fallback fetch.
 
 Use this path when UEFI network boot is unavailable. On the selected computer,
 boot the official **NixOS 26.05 Minimal ISO** for `x86_64-linux` in UEFI mode
-with wired Ethernet. At its physical console run:
+with Ethernet or Wi-Fi connectivity to the controller. Connect Wi-Fi from the
+live console with `nmtui` first when needed. At its physical console run:
 
 ```sh
 passwd
@@ -785,6 +786,13 @@ operation-specific ephemeral key, probes hardware, and shows only eligible
 non-boot disks. Enter the exact disk path and the content-bound confirmation
 shown by the review. Do not remove the USB, reboot, or reuse the address while
 the install is running.
+
+The declared client interface must carry the reviewed live address. Wi-Fi
+profiles and credentials are not copied from the ISO into the installed system:
+arrange persistent connectivity separately, or reconnect locally as the
+administrator after boot before verifying the configured static address.
+Keep wireless secrets out of Git and the Nix store. Wi-Fi may not support PXE
+on the selected hardware, firmware, or network; USB/SSH does not require PXE.
 
 The controller prepares only target-independent installer content before it
 contacts the live ISO; the target closure is then built and served by the
