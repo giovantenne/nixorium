@@ -20,7 +20,7 @@ func demoTemplateResetPlan() domain.TemplateResetPlan {
 func renderTemplateResetDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
-		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("b", 40)}
+		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("b", 40), ChangesKnown: true, Changes: []string{"Software selection", "Student preferences", "Local modules, assets and other files"}}
 	}
 	plan := demoTemplateResetPlan()
 	actions.LoadTemplateReset = func(context.Context) domain.TemplateResetCatalog {

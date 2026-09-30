@@ -64,7 +64,7 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 		return domain.WorkspaceApplyReport{Operation: "workspace-save", State: "saved", Recorded: true, Revision: revision, Message: "Profile saved and recorded locally. No computer or student home changed."}
 	}
 	actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
-		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision}
+		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision, ChangesKnown: true, Changes: []string{"Student preferences"}}
 	}
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)

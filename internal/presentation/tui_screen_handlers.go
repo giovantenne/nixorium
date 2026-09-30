@@ -716,7 +716,14 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				model.controller.fromSave = false
 			}
 			model.message = "Controller rebuild cancelled; no action was started."
+			if controllerPlanCurrent(model.controller.plan) {
+				model.message = ""
+			}
 		case "enter":
+			if controllerPlanCurrent(model.controller.plan) {
+				model.message = "This controller is already up to date; nothing was started."
+				return model, nil
+			}
 			model.busy = "Building and activating the reviewed controller revision"
 			model.controller.applying = true
 			model.controller.progress = domain.OperationProgress{}

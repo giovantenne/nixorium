@@ -563,19 +563,24 @@ Enter Apply to this controller  ·  Esc Settings  ·  F1 Help
 ```text
 Nixorium  /  Maintenance  /  Controller  /  Review
 
-Update this controller?
+Apply the saved configuration to this controller?
 
-Affects   pc99 (this controller only)
-Revision  0123456789abcdef0123456789abcdef01234567
+What changes since the last verified activation:
+  • Student preferences
+
+Affects   pc99 (this controller only; client computers are not changed)
 
 Press Enter to build, activate, and verify this controller.
+
+Technical details
+Revision  0123456789abcdef0123456789abcdef01234567
 
 NOTICE
 ! Services and networking may restart
   This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot
 is not normally required.
 
-Enter Update controller  ·  Esc Cancel  ·  F1 Help
+Enter Apply to controller  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Workspace versions in system update review

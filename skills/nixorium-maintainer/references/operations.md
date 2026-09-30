@@ -156,7 +156,11 @@ sync with the running system. Failed activation still requires inspection;
 profile registration alone is not evidence of success. The
 TUI's **Rebuild controller** task uses the same
 typed operation with an Enter confirmation after review; the systemd job and
-journal survive closing the dashboard. Keep `setup apply` for first-run
+journal survive closing the dashboard. The review names what changed since the
+last verified activation (saved settings, software, student preferences,
+Nixorium version, system and packages, other files) from Git alone, says when
+that is unknown, and offers no application when the controller is already
+current. The plan's `changes` list is not evidence of a built system. Keep `setup apply` for first-run
 compatibility, not as a replacement for routine reviewed controller plans.
 
 The TUI's client distribution task invokes the same plan/apply

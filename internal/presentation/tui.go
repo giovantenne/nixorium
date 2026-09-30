@@ -1922,19 +1922,28 @@ func (model dashboardModel) controllerView() string {
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
 	}
 	if model.screen == dashboardControllerReview {
-		body := strings.Join([]string{
-			tuiTitle("Update this controller?", model.isDark),
-			"",
-			"Affects   " + model.controller.plan.Controller + " (this controller only)",
-			"Revision  " + model.controller.plan.Revision,
-			"",
-			"Press Enter to build, activate, and verify this controller.",
-		}, "\n")
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Services and networking may restart", detail: "This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot is not normally required."})
+		plan := model.controller.plan
+		details := []string{"", tuiMuted("Technical details", model.isDark), tuiMuted("Revision  "+plan.Revision, model.isDark)}
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return model.renderShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Update controller"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
+		if controllerPlanCurrent(plan) {
+			body := strings.Join(append([]string{
+				tuiResult("This controller is up to date", true, model.isDark),
+				"",
+				plan.Controller + " already runs the saved configuration and its activation",
+				"was verified. There is nothing to apply.",
+			}, details...), "\n")
+			return model.renderShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}})
+		}
+		lines := []string{tuiTitle("Apply the saved configuration to this controller?", model.isDark), "", "What changes since the last verified activation:"}
+		for _, line := range controllerChangeLines(plan) {
+			lines = append(lines, "  • "+line)
+		}
+		lines = append(lines, "", "Affects   "+plan.Controller+" (this controller only; client computers are not changed)", "", "Press Enter to build, activate, and verify this controller.")
+		body := strings.Join(append(lines, details...), "\n")
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Services and networking may restart", detail: "This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot is not normally required."})
+		return model.renderShell(tuiShell{path: append(path, "Review"), body: body, notices: notices, actions: []tuiAction{{key: "Enter", label: "Apply to controller"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}})
 	}
 	if model.controller.result.Operation != "" {
 		resultTitle := "Controller action needs attention"

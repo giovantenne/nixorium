@@ -40,3 +40,23 @@ func (model dashboardModel) controllerProgressView(path []string) string {
 		actions: []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}},
 	})
 }
+
+// controllerPlanCurrent reports a verified controller that already runs the
+// reviewed revision: its review offers only a way back.
+func controllerPlanCurrent(plan domain.ControllerRebuildPlanReport) bool {
+	return !plan.HasErrors() && plan.State == "current" && plan.Current
+}
+
+// controllerChangeLines states in plain words what a controller application
+// changes, or why that is unknown. It never infers live client state.
+func controllerChangeLines(plan domain.ControllerRebuildPlanReport) []string {
+	switch {
+	case controllerPlanCurrent(plan):
+		return []string{"Nothing: this controller already runs the saved configuration."}
+	case !plan.ChangesKnown:
+		return []string{"Unknown: no readable record of the last verified activation. The saved configuration is applied as a whole."}
+	case len(plan.Changes) == 0:
+		return []string{"No configuration files changed; the activation is repeated to verify this controller."}
+	}
+	return append([]string{}, plan.Changes...)
+}

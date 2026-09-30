@@ -18,6 +18,11 @@ type ControllerInspection struct {
 	Deployment    DeploymentStatus
 	Current       bool
 	CurrentDetail string
+	// Changes names, in operator terms, what differs from the revision this
+	// controller last activated successfully; ChangesKnown is false when that
+	// cannot be read. It describes the declaration, not the built system.
+	Changes      []string
+	ChangesKnown bool
 }
 
 type ControllerActivationRecord struct {
@@ -70,6 +75,8 @@ type ControllerRebuildPlanReport struct {
 	Revision      string            `json:"revision,omitempty"`
 	Current       bool              `json:"current"`
 	CurrentDetail string            `json:"currentDetail,omitempty"`
+	Changes       []string          `json:"changes,omitempty"`
+	ChangesKnown  bool              `json:"changesKnown"`
 	Confirmation  string            `json:"confirmation,omitempty"`
 	Issues        []ValidationIssue `json:"issues"`
 }

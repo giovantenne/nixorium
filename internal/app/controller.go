@@ -94,6 +94,7 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 	}
 	if inspection != nil {
 		report.Current, report.CurrentDetail = inspection.Current, inspection.CurrentDetail
+		report.Changes, report.ChangesKnown = inspection.Changes, inspection.ChangesKnown
 		err = nil
 	} else {
 		report.Current, report.CurrentDetail, err = m.source.ControllerState(ctx, root)

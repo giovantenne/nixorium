@@ -147,3 +147,38 @@ func TestGroupedUpdateBuildRetainsDetailsWithoutInventingCompletion(t *testing.T
 		}
 	}
 }
+
+func TestControllerReviewStatesChangesOrUpToDate(t *testing.T) {
+	m := experienceFixture(1)
+	m.screen = dashboardControllerReview
+	m.controller.plan = domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("a", 40), ChangesKnown: true, Changes: []string{"Saved settings", "Nixorium version"}}
+	view := m.View().Content
+	for _, want := range []string{"Apply the saved configuration", "• Saved settings", "• Nixorium version", "Technical details", strings.Repeat("a", 40), "Apply to controller"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("review lacks %q:\n%s", want, view)
+		}
+	}
+	m.controller.plan.ChangesKnown, m.controller.plan.Changes = false, nil
+	if !strings.Contains(m.View().Content, "Unknown: no readable record") {
+		t.Fatal("unknown changes are not explained")
+	}
+	m.controller.plan.State, m.controller.plan.Current = "current", true
+	view = m.View().Content
+	if !strings.Contains(view, "This controller is up to date") || strings.Contains(view, "Apply to controller") || strings.Contains(view, "Press Enter") {
+		t.Fatalf("current controller still offers application:\n%s", view)
+	}
+	applied := 0
+	m.actions.ApplyController = func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+		applied++
+		return domain.ControllerRebuildExecutionReport{}
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if cmd != nil || applied != 0 || m.controller.applying || !strings.Contains(m.message, "already up to date") {
+		t.Fatalf("Enter started an unnecessary application: %q", m.message)
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if next.(dashboardModel).screen == dashboardControllerReview {
+		t.Fatal("Esc did not leave the up-to-date review")
+	}
+}

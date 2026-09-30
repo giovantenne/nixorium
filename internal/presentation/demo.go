@@ -456,7 +456,7 @@ func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario 
 		}
 	}
 	actions.PlanController = func(ctx context.Context) domain.ControllerRebuildPlanReport {
-		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision, Issues: []domain.ValidationIssue{}}
+		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision, ChangesKnown: true, Changes: []string{"Saved settings", "Software selection"}, Issues: []domain.ValidationIssue{}}
 	}
 	actions.ApplyController = func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 		return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Controller: plan.Controller, Revision: plan.Revision, Applied: true, Verified: true, Issues: []domain.ValidationIssue{}}

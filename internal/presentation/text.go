@@ -457,6 +457,9 @@ func ControllerRebuildPlanText(writer io.Writer, report domain.ControllerRebuild
 	if report.CurrentDetail != "" {
 		fmt.Fprintf(writer, "Current-state detail:    %s\n", report.CurrentDetail)
 	}
+	for _, line := range controllerChangeLines(report) {
+		fmt.Fprintf(writer, "Changes:                 %s\n", line)
+	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "  ERROR %-12s %s\n", issue.Field, issue.Message)
 	}

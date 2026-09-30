@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The controller review states in plain words what changes since the last
+  verified activation (saved settings, software selection, student preferences,
+  Nixorium version, system and packages, other files), reading only Git
+  objects, and moves the revision under technical details. When the
+  controller already runs the saved configuration it says so and offers only
+  a way back. `controller plan` reports the same `changes`.
+
 - Breaking: remove the public `mkLab.workspaceRuntimeEnabled` argument. A
   supplied workspace profile always configures student preferences at normal
   boot after system application. The site template ships active Essential

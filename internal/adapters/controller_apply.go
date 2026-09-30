@@ -57,7 +57,13 @@ func (local Local) InspectController(ctx context.Context, repository string) (do
 	}
 	inspection.Meta, inspection.Deployment = evaluated.Meta, evaluated.Deployment
 	inspection.Current, inspection.CurrentDetail, err = local.controllerStateForSystem(ctx, repository, evaluated.Desired)
-	return inspection, err
+	if err != nil {
+		return inspection, err
+	}
+	if reviewed, revisionErr := local.GitRevision(ctx, repository); revisionErr == nil {
+		inspection.Changes, inspection.ChangesKnown = controllerChanges(ctx, repository, recordedControllerRevision(), strings.TrimSpace(reviewed))
+	}
+	return inspection, nil
 }
 
 func (local Local) ControllerState(ctx context.Context, repository string) (bool, string, error) {
