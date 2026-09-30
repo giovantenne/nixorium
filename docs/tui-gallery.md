@@ -438,11 +438,11 @@ Eligible  2
 Controller  excluded
 Session safety  unknown states protected
 
-! pc02 · Active user session · will shut down
-✓ pc04 · Ready
+! pc02 · In use · will shut down
+✓ pc04 · Logged in, not in use · Ready
 ○ pc05 · Not reachable · not sent
 
-! Active user sessions will be shut down; unsaved work may be lost.
+! 1 computer(s) are in use: those sessions will be shut down and unsaved work may be lost.
 Access and session state are checked again immediately before requests are sent.
 An accepted request does not prove that a computer is physically off.
 

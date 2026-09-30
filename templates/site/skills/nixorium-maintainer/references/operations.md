@@ -246,7 +246,10 @@ nixorium restart apply --on pc05 --expect REVIEW_TOKEN
 The controller is never a valid target. Planning checks evaluated client
 identity, management access, interactive sessions, PXE/controller-network
 state, and concurrent client operations. An active user session remains
-eligible after a prominent warning that unsaved work may be lost. Unknown
+eligible after a prominent warning that unsaved work may be lost. A session
+that is logged in without keyboard or mouse input for ten minutes or since it
+started, such as an untouched automatic login, is reported as not in use and
+does not carry that warning; older client generations report it as active. Unknown
 session state remains blocked unless both plan and apply use
 `--acknowledge-unknown-sessions` after explicit review. Unreachable targets are
 shown as not sent and are never queued for later.

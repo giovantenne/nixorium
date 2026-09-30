@@ -712,7 +712,7 @@ func renderShutdownDemo(revision string, width, height int) DemoScenario {
 			SchemaVersion: domain.SchemaVersion, Operation: "shutdown-plan", State: "ready", Repository: "/demo/lab", Requested: requested, Policy: domain.ShutdownProtectUnknown,
 			Targets: []domain.ShutdownTargetPlan{
 				{Name: "pc02", IP: "10.42.0.12", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive, Eligible: true, Detail: "Interactive student session active; unsaved work may be lost"},
-				{Name: "pc04", IP: "10.42.0.14", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true},
+				{Name: "pc04", IP: "10.42.0.14", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionUnused, Eligible: true, Detail: "logged in but not in use (no recent keyboard or mouse input)"},
 				{Name: "pc05", IP: "10.42.0.15", Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnavailable, Session: domain.ShutdownSessionUnknown, Eligible: false, Detail: "No management connection"},
 			},
 			Eligible: 2, ReviewToken: "sha256:demo", Confirmation: "SHUTDOWN", Message: "pc02 and pc04 are eligible; pc02 has an active session.", Issues: []domain.ValidationIssue{},

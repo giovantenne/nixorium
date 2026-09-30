@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-09-15
-- Amended: 2026-09-19
+- Amended: 2026-09-19, 2026-09-30
 
 ## Context
 
@@ -30,8 +30,12 @@ Unreachable clients remain visible but ineligible and no request is
 queued for later.
 
 Install a fixed `nixorium-session-state` helper in managed host generations.
-Its output is limited to `active` or `idle`; errors or invalid output become
-unknown. An active session remains eligible after the review presents an
+Its output is limited to `active`, `unused` or `idle`; errors or invalid output
+become unknown. `unused` (amended 2026-09-30) means every user session is a
+local graphical session whose GNOME Shell reports no keyboard or mouse input
+for ten minutes or since the session started, such as an untouched automatic
+login; anything the helper cannot observe stays `active`. Only sessions in use
+carry the data-loss wording. Older helpers print only `active` or `idle`. An active session remains eligible after the review presents an
 explicit warning that unsaved work may be lost. Unknown session state is
 blocked by default and becomes eligible only in a newly reviewed
 `acknowledge-unknown` plan.

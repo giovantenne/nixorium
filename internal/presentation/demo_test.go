@@ -120,7 +120,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 			t.Fatalf("profile demo omits %q", expected)
 		}
 	}
-	for _, expected := range []string{"Active user session · will shut down", "Type SHUTDOWN to confirm shutdown of active sessions", "pc02       accepted", "Accepted  2"} {
+	for _, expected := range []string{"In use · will shut down", "Type SHUTDOWN to confirm shutdown of active sessions", "pc02       accepted", "Accepted  2"} {
 		if !strings.Contains(shutdownText, expected) {
 			t.Fatalf("shutdown demo omits %q", expected)
 		}

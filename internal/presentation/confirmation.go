@@ -173,6 +173,9 @@ func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPl
 	if active := shutdownActiveCount(report); active > 0 {
 		fmt.Fprintf(output, "Explicit confirmation: %s authorizes %s of %d computer(s) with an active user session\n", report.Confirmation, label, active)
 	}
+	if unused := shutdownUnusedCount(report); unused > 0 {
+		fmt.Fprintf(output, "Logged in but not in use: %d computer(s) without recent keyboard or mouse input\n", unused)
+	}
 	fmt.Fprintln(output, "Outcome: acceptance confirms only that the operating system received the request, not physical power state")
 	fmt.Fprintln(output, "Retry: do not retry an unconfirmed request blindly")
 	fmt.Fprintf(output, "Type %s to continue: ", report.Confirmation)

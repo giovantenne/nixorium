@@ -38,8 +38,12 @@ const (
 type ShutdownSessionState string
 
 const (
-	ShutdownSessionIdle    ShutdownSessionState = "idle"
-	ShutdownSessionActive  ShutdownSessionState = "active"
+	ShutdownSessionIdle   ShutdownSessionState = "idle"
+	ShutdownSessionActive ShutdownSessionState = "active"
+	// ShutdownSessionUnused is a logged-in session without keyboard or mouse
+	// input recently or since it started, such as an untouched autologin.
+	// Helpers before this state report such sessions as active.
+	ShutdownSessionUnused  ShutdownSessionState = "unused"
 	ShutdownSessionUnknown ShutdownSessionState = "unknown"
 )
 

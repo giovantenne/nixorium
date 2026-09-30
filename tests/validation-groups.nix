@@ -16,6 +16,7 @@
   checks-home-reset = [ "home-reset-filesystem-vm" "workspace-reset-service-vm" ];
   checks-editor = [ "workspace-editor-vm" "programming-profile-vm" ];
   checks-management = [ "management-vm" ];
+  checks-session = [ "session-state-vm" ];
   checks-installer = [ "client-installer" "client-installer-vm" ];
   checks-remote-installer = [ "remote-client-installer-vm" ];
 }

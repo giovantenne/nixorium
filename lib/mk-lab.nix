@@ -546,21 +546,8 @@ let
   };
   hostSessionState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-session-state";
-    runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.systemd ];
-    text = ''
-      sessions="$(loginctl list-sessions --no-legend --no-pager)" \
-        || { echo "session inventory is unavailable" >&2; exit 2; }
-      while read -r session uid _rest; do
-        [[ -z "''${session:-}" ]] && continue
-        [[ "$uid" =~ ^[0-9]+$ ]] \
-          || { echo "session inventory is invalid" >&2; exit 2; }
-        if (( uid >= 1000 )); then
-          printf 'active\n'
-          exit 0
-        fi
-      done <<< "$sessions"
-      printf 'idle\n'
-    '';
+    runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.systemd bootstrapPkgs.util-linux bootstrapPkgs.glib ];
+    text = builtins.readFile (upstreamRoot + "/scripts/session-state.sh");
   };
 
   installerFlake = bootstrapPkgs.writeText "nixorium-installer-flake.nix" ''

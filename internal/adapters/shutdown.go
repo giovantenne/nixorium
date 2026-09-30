@@ -91,6 +91,8 @@ func observeShutdownSession(ctx context.Context, host domain.HostMeta, timeout t
 		return domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle}
 	case string(domain.ShutdownSessionActive):
 		return domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionActive, Detail: "an interactive user session is active"}
+	case string(domain.ShutdownSessionUnused):
+		return domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionUnused, Detail: "a user is logged in without recent keyboard or mouse input"}
 	default:
 		return domain.ShutdownObservation{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionUnknown, Detail: "session helper returned an invalid response"}
 	}

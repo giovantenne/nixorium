@@ -20,7 +20,8 @@ func TestGalleryRenderingIsDeterministicAndSemantic(t *testing.T) {
 		"Opened from a saved software change",
 		"Deployment completed and verified",
 		"Type START to continue",
-		"Active user sessions will be shut down",
+		"are in use: those sessions will be shut down",
+		"Logged in, not in use",
 		"Restricted teacher dashboard",
 	} {
 		if !strings.Contains(first, expected) {

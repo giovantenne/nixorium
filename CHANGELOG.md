@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Power reviews distinguish a computer someone is using from an untouched
+  login. The client session helper now reports `unused` when every user
+  session is a local graphical session without keyboard or mouse input for ten
+  minutes or since it started (for example the student's automatic login), and
+  keeps `active` whenever it cannot tell. Only sessions in use carry the
+  data-loss warning; older clients still report `active` or `idle`.
+
 - Software removal is deliberate: in Selected, Enter opens a package's details
   with explicit actions to change where it applies (current scope preselected)
   or review its removal; `r` no longer removes. Removing a package that reaches

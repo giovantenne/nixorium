@@ -61,7 +61,7 @@ func TestShutdownSessionObservationAcceptsOnlyExactHelperStates(t *testing.T) {
 	}
 	t.Setenv("PATH", directory)
 	host := domain.HostMeta{Name: "pc01", IP: "192.0.2.1"}
-	for value, expected := range map[string]domain.ShutdownSessionState{"idle": domain.ShutdownSessionIdle, "active": domain.ShutdownSessionActive, "garbage": domain.ShutdownSessionUnknown} {
+	for value, expected := range map[string]domain.ShutdownSessionState{"idle": domain.ShutdownSessionIdle, "active": domain.ShutdownSessionActive, "unused": domain.ShutdownSessionUnused, "garbage": domain.ShutdownSessionUnknown, "Unused": domain.ShutdownSessionUnknown} {
 		t.Setenv("NIXORIUM_TEST_SESSION", value)
 		observation := observeShutdownSession(context.Background(), host, time.Second)
 		if observation.Session != expected || observation.SSH != domain.SSHAvailable {

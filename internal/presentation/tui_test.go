@@ -598,7 +598,7 @@ func TestDashboardShutdownIncludesActiveSessionAndAcknowledgesUnknownSession(t *
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardShutdownReview || !strings.Contains(model.View().Content, "Active user session · will shut down") || !strings.Contains(model.View().Content, "Session unknown · not sent") || !strings.Contains(model.View().Content, "Controller  excluded") || !strings.Contains(model.View().Content, "Type SHUTDOWN to confirm shutdown of active sessions") {
+	if model.screen != dashboardShutdownReview || !strings.Contains(model.View().Content, "In use · will shut down") || !strings.Contains(model.View().Content, "Session unknown · not sent") || !strings.Contains(model.View().Content, "Controller  excluded") || !strings.Contains(model.View().Content, "Type SHUTDOWN to confirm shutdown of active sessions") {
 		t.Fatalf("shutdown review is incomplete:\n%s", model.View().Content)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Text: "u"})

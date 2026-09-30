@@ -249,6 +249,8 @@ func shutdownObservationEligible(observation domain.ShutdownObservation, policy 
 		return true, "no interactive user session detected"
 	case domain.ShutdownSessionActive:
 		return true, "interactive user session active; unsaved work may be lost"
+	case domain.ShutdownSessionUnused:
+		return true, "logged in but not in use (no recent keyboard or mouse input)"
 	case domain.ShutdownSessionUnknown:
 		if policy == domain.ShutdownAcknowledgeUnknown {
 			return true, "session state is unknown; risk explicitly acknowledged"

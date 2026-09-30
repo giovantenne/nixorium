@@ -296,9 +296,12 @@ surface.
 
 `shutdown plan --on` and `restart plan --on` accept the same explicit client selector grammar as
 deployment but never permits the controller. It observes TCP reachability,
-authenticated SSH access, and the exact `active`/`idle` output of the fixed
-`nixorium-session-state` helper installed in every managed host generation.
-The helper treats interactive sessions for normal UIDs as active. Unreachable
+authenticated SSH access, and the exact `active`/`unused`/`idle` output of the
+fixed `nixorium-session-state` helper installed in every managed host
+generation. A normal-UID session is `unused` only when it is a local graphical
+session whose GNOME Shell reports no keyboard or mouse input for ten minutes or
+since the session started; anything it cannot observe stays `active`. Older
+helpers print only `active` or `idle`. Unreachable
 targets remain visible but ineligible and are never queued for later. Active
 sessions remain eligible after an explicit data-loss warning; unknown session
 state requires the distinct `acknowledge-unknown` policy and a new reviewed

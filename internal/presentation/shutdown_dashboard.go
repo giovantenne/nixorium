@@ -312,11 +312,13 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		lines = append(lines, tuiMuted(fmt.Sprintf("Showing %d of %d reviewed targets", end, len(plan.Targets)), context.dark))
 	}
 	warning := "Selected computers will be " + pastVerb + "; unsaved user work may be lost."
-	if shutdownHasActive(plan) {
-		warning = "Active user sessions will be shut down; unsaved work may be lost."
+	if active := shutdownActiveCount(plan); active > 0 {
+		warning = fmt.Sprintf("%d computer(s) are in use: those sessions will be shut down and unsaved work may be lost.", active)
 		if plan.Action == domain.ClientRestart {
-			warning = "Active user sessions will be interrupted by the restart; unsaved work may be lost."
+			warning = fmt.Sprintf("%d computer(s) are in use: the restart interrupts those sessions and unsaved work may be lost.", active)
 		}
+	} else if shutdownUnusedCount(plan) > 0 {
+		warning = "Nobody is using the selected computers now; logged-in sessions without recent input are closed."
 	}
 	finalEvidence := "An accepted request does not prove that a computer is physically off."
 	if plan.Action == domain.ClientRestart {
@@ -393,7 +395,9 @@ func shutdownTargetStatus(target domain.ShutdownTargetPlan, dark bool) string {
 	case target.Eligible && target.Session == domain.ShutdownSessionIdle:
 		return tuiStatus(target.Name+" · Ready", tuiStatusSuccess, dark)
 	case target.Eligible && target.Session == domain.ShutdownSessionActive:
-		return tuiStatus(target.Name+" · Active user session · will shut down", tuiStatusAttention, dark)
+		return tuiStatus(target.Name+" · In use · will shut down", tuiStatusAttention, dark)
+	case target.Eligible && target.Session == domain.ShutdownSessionUnused:
+		return tuiStatus(target.Name+" · Logged in, not in use · Ready", tuiStatusSuccess, dark)
 	case target.Eligible:
 		return tuiStatus(target.Name+" · Session unknown · risk acknowledged", tuiStatusAttention, dark)
 	case target.Reachability != domain.ReachabilityReachable:
@@ -403,8 +407,14 @@ func shutdownTargetStatus(target domain.ShutdownTargetPlan, dark bool) string {
 	}
 }
 
-func shutdownHasActive(plan domain.ShutdownPlanReport) bool {
-	return shutdownActiveCount(plan) > 0
+func shutdownUnusedCount(plan domain.ShutdownPlanReport) int {
+	count := 0
+	for _, target := range plan.Targets {
+		if target.Eligible && target.Session == domain.ShutdownSessionUnused {
+			count++
+		}
+	}
+	return count
 }
 
 func shutdownActiveCount(plan domain.ShutdownPlanReport) int {

@@ -572,7 +572,9 @@ unreachable, or lack authenticated management access remain visible as not
 sent; Nixorium does not queue a request for later.
 
 An interactive user session remains eligible, with a prominent warning that
-unsaved work may be lost. Unknown session state is ineligible by default. The
+unsaved work may be lost. A computer where the student is logged in but has
+not touched keyboard or mouse for ten minutes (or since the automatic login)
+is shown as "Logged in, not in use" without that warning. Unknown session state is ineligible by default. The
 TUI can explicitly acknowledge unknown-session risk with `u`, which creates a
 new reviewed plan. The same operation is available from the CLI:
 

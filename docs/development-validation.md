@@ -324,7 +324,18 @@ nix --extra-experimental-features 'nix-command flakes' \
 ```
 
 Both checks also belong to `--full`; ordinary `--quick` and `--eval` do not run
-the editor or the VM. Existing lower-level seed/resolution tests retain fast
+the editor or the VM.
+
+`session-state-vm` boots a real GNOME automatic login and checks the
+power-control session helper: an untouched login reports `unused`, keyboard
+input reports `active`, and the user's systemd manager session is not counted
+as a login. The shell regressions cover the helper's other branches without a
+VM:
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' \
+  build --file tests/source-checks.nix session-state-vm --no-link
+``` Existing lower-level seed/resolution tests retain fast
 failure coverage without launching the graphical application.
 
 After the automated milestone, follow the documented VirtualBox recipe with
