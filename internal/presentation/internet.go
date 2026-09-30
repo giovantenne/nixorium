@@ -68,7 +68,7 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 		return model, nil
 	}
 	if m.stage == 2 {
-		if key.String() == "r" {
+		if key.String() == "n" {
 			m.stage = 0
 			m.plan = domain.InternetPlan{}
 		}
@@ -186,7 +186,7 @@ func (model dashboardModel) internetView() string {
 		for _, t := range m.result.Targets {
 			lines = append(lines, t.Name+"  "+internetStateWords(t.State), t.Detail)
 		}
-		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "n", label: "New review"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
 	default:
 		lines = append(lines, "Action: "+string(m.action)+" Internet", tuiMuted(observationHeading(m.observedAt), model.isDark), "")
 		hosts := model.report.Meta.Clients.Hosts

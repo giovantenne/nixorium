@@ -98,7 +98,7 @@ No pending work observed locally; clients have not been checked.
   [w] Software
   [a] Maintenance
 
-Inventory, system deployment, Internet access and shutdown
+Inventory, updating computers, Internet access and power
 
 ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```
@@ -111,7 +111,7 @@ Nixorium  /  Software
 Software
 
 [F2] Selected   [F3] Search packages   [F4] Suggestions
-Choose desired software here. Running clients change only when you deploy them.
+Choose desired software here. Running clients change only when you update them.
 
 Search packages
 Uses this deployment's locked Nix packages and overlays; inputs are never updated.
@@ -121,7 +121,7 @@ Package name  inkscape_
 › Inkscape
     Create and edit vector graphics · inkscape · 1.4.2
 
-This is desired configuration; deploy from Computers to update clients.
+This is desired configuration; use Computers → Update computers to change clients.
 
 Type Search  ·  ↑/↓ Results  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
 ```
@@ -146,7 +146,7 @@ Clients      5 affected by new declarations
   + pi-coding-agent · add for this controller and all current or future clients
 
 Now          Save one update to lab-software.json
-Later        Build the controller and deploy affected clients through their normal reviews
+Later        Apply to the controller and update affected computers through their normal reviews
 
 ↑/↓ Inspect  ·  Enter Add profile  ·  Esc Scope  ·  F1 Help
 ```
@@ -154,9 +154,9 @@ Later        Build the controller and deploy affected clients through their norm
 ## Contextual client deployment selection
 
 ```text
-Nixorium  /  Computers  /  Distribute
+Nixorium  /  Computers  /  Update computers
 
-Distribute the prepared system
+Update computers
 Select → Review → Deploy → Verify
 
 Choose where to apply the saved configuration.
@@ -178,12 +178,12 @@ Space Select  ·  a All  ·  n Those needing update  ·  r Check computers  ·  
 F1 Help
 ```
 
-## Client deployment review
+## Update computers review
 
 ```text
-Nixorium  /  Computers  /  Distribute
+Nixorium  /  Computers  /  Update computers
 
-Distribute the system?
+Update these computers?
 
 Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)
 
@@ -204,13 +204,13 @@ NOTICE
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
 interrupted apply may require recovery before another operation.
 
-Enter Deploy  ·  Esc Selection  ·  F1 Help
+Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
 
 ## Verified deployment result
 
 ```text
-Nixorium  /  Computers  /  Distribute
+Nixorium  /  Computers  /  Update computers
 
 ✓ Deployment completed and verified
 
@@ -235,15 +235,15 @@ Shift ↑/↓ scroll · ? help
 NOTICE
 ○ All five clients report the reviewed revision.
 
-r New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
+n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ```
 
 ## Availability before client deployment
 
 ```text
-Nixorium  /  Computers  /  Distribute
+Nixorium  /  Computers  /  Update computers
 
-Distribute the system?
+Update these computers?
 
 Affects  pc01,pc02 · 2 computer(s)
 
@@ -261,15 +261,15 @@ NOTICE
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
 interrupted apply may require recovery before another operation.
 
-F2 Reachable only  ·  Enter Deploy  ·  Esc Selection  ·  F1 Help
+F2 Reachable only  ·  Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
 
 ## A new review for reachable computers only
 
 ```text
-Nixorium  /  Computers  /  Distribute
+Nixorium  /  Computers  /  Update computers
 
-Distribute the system?
+Update these computers?
 
 Affects  pc01 · 1 computer(s)
 
@@ -286,13 +286,13 @@ NOTICE
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
 interrupted apply may require recovery before another operation.
 
-Enter Deploy  ·  Esc Selection  ·  F1 Help
+Enter Update computers  ·  Esc Selection  ·  F1 Help
 ```
 
 ## Per-computer deployment outcomes
 
 ```text
-Nixorium  /  Computers  /  Distribute
+Nixorium  /  Computers  /  Update computers
 
 ! Some computers were not reached
 
@@ -308,13 +308,13 @@ pc02 — Not reached
   Check power and networking. The update outcome is not known; this does not prove the computer is off or
 unchanged.
 
-r New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
+n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
 ```
 
 ## Unreachable computers do not waive recovery
 
 ```text
-Nixorium  /  Computers  /  Distribute
+Nixorium  /  Computers  /  Update computers
 
 ! Deployment requires recovery — some computers were not reached
 
@@ -780,7 +780,7 @@ physical-console fingerprint and review this computer's SSH trust.
 
 Address  10.42.0.11
 
-h Review changed SSH key  ·  d Deploy  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  F1 Help
+h Review changed SSH key  ·  d Update this computer  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  F1 Help
 ```
 
 ## Cancellable SSH trust inspection
@@ -841,7 +841,7 @@ Pending work / last observations — select a numbered row
   [w] Software
   [a] Maintenance
 
-Inventory, system deployment, Internet access and shutdown
+Inventory, updating computers, Internet access and power
 
 v View progress  ·  ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```

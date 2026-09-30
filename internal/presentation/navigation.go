@@ -33,6 +33,9 @@ func (model dashboardModel) taskMenu(tasks []dashboardTask, cursor int) string {
 	}
 	for index := start; index < end; index++ {
 		task := tasks[index]
+		if task.advanced && (index == 0 || !tasks[index-1].advanced) {
+			lines = append(lines, "", tuiMuted("  Advanced", model.isDark))
+		}
 		if index == cursor {
 			lines = append(lines, tuiSelection(lipgloss.NewStyle().Width(rowWidth).Render(menuTitle(task.shortcut, task.title)), true, model.isDark))
 		} else {

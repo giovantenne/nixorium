@@ -106,7 +106,7 @@ func renderDeploymentAvailabilityDemo(revision string, width, height int) DemoSc
 	r.model.deployment.result.ApplyCompleted = false
 	r.model.deployment.result.Verification.Recorded = 0
 	r.capture("Uncertain activation still requires recovery", 2500)
-	return DemoScenario{ID: "deployment-availability", Title: "Distribute when some computers cannot be reached", Description: "A brief selected-target check offers a new subset review. Full-selection results remain honest about individual outcomes and recovery.", Frames: r.frames}
+	return DemoScenario{ID: "deployment-availability", Title: "Update computers when some cannot be reached", Description: "A brief selected-target check offers a new subset review. Full-selection results remain honest about individual outcomes and recovery.", Frames: r.frames}
 }
 
 func renderManagedJobsDemo(revision string, width, height int) DemoScenario {

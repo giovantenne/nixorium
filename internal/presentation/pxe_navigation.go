@@ -33,13 +33,13 @@ func (model dashboardModel) openNetworkInstallation() (tea.Model, tea.Cmd) {
 
 func (model dashboardModel) pxePrimaryAction() tuiAction {
 	if model.installation.stateError {
-		return tuiAction{key: "f", label: "Retry status"}
+		return tuiAction{key: "r", label: "Retry status"}
 	}
 	switch model.report.PXE.Mode {
 	case "active":
 		return tuiAction{key: "x", label: "Finish installation"}
 	case "degraded", "recovery-required":
-		return tuiAction{key: "r", label: "Recover network"}
+		return tuiAction{key: "n", label: "Recover network"}
 	}
 	if model.report.PXEPreparation.Ready {
 		return tuiAction{key: "s", label: "Review start"}

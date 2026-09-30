@@ -15,6 +15,8 @@ type dashboardTask struct {
 	shortcut    string
 	title       string
 	description string
+	// advanced tasks are listed after a separator in their menu.
+	advanced bool
 }
 
 func (task dashboardTask) Title() string       { return menuTitle(task.shortcut, task.title) }
@@ -22,7 +24,7 @@ func (task dashboardTask) Description() string { return task.description }
 func (task dashboardTask) FilterValue() string { return task.title + " " + task.description }
 
 var dashboardTasks = []dashboardTask{
-	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, system deployment, Internet access and shutdown"},
+	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, updating computers, Internet access and power"},
 	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab and install computers by PXE or the official USB ISO over SSH"},
 	{id: "software", shortcut: "w", title: "Software", description: "Review configured choices or search this lab's pinned packages"},
 	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
@@ -30,7 +32,7 @@ var dashboardTasks = []dashboardTask{
 
 var computersAreaTasks = []dashboardTask{
 	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Check reachability and compare observed systems with the intended revision"},
-	{id: "deploy", shortcut: "d", title: "Distribute the prepared system", description: "Update only the computers selected for this intervention"},
+	{id: "deploy", shortcut: "d", title: "Update computers", description: "Make the selected client computers run the saved configuration"},
 	{id: "shutdown", shortcut: "x", title: "Power controls", description: "Shut down or restart selected client computers after review"},
 	{id: "internet", shortcut: "i", title: "Internet access", description: "Temporarily block or restore Internet on selected clients"},
 }
@@ -53,16 +55,18 @@ var installationAreaTasks = []dashboardTask{
 	{id: "usb", shortcut: "u", title: "USB over SSH", description: "Install one physically identified computer using the official Minimal ISO"},
 }
 
+// Maintenance lists frequent tasks first; advanced tools follow in a
+// visually separate group so the default selection is never destructive.
 var administrationTasks = []dashboardTask{
-	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
-	{id: "package-base", shortcut: "b", title: "Update system and packages", description: "Refresh the NixOS base or review a channel migration"},
-	{id: "template-reset", shortcut: "t", title: "Reset deployment template", description: "Replace local customizations from the locked upstream; preserve settings and keys with a backup"},
 	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git and controller keys"},
-	{id: "controller", shortcut: "c", title: "Rebuild controller", description: "Review and activate the committed controller revision"},
-	{id: "services", shortcut: "s", title: "Controller services", description: "Check software delivery services or restart the signed cache when troubleshooting"},
-	{id: "git", shortcut: "g", title: "Review Git changes", description: "Inspect and commit selected safe deployment files"},
-	{id: "logs", shortcut: "l", title: "View operation logs", description: "Recent outcomes and bounded deployment log tails"},
 	{id: "diagnostics", shortcut: "i", title: "Diagnostics", description: "Check the lab and see recovery instructions"},
+	{id: "package-base", shortcut: "b", title: "Update system and packages", description: "Refresh the NixOS base or review a channel migration"},
+	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
+	{id: "logs", shortcut: "l", title: "View operation logs", description: "Recent outcomes and bounded deployment log tails"},
+	{id: "controller", shortcut: "c", title: "Apply to controller", description: "Make this controller run the saved configuration, after review", advanced: true},
+	{id: "services", shortcut: "s", title: "Controller services", description: "Check software delivery services or restart the signed cache when troubleshooting", advanced: true},
+	{id: "git", shortcut: "g", title: "Review Git changes", description: "Inspect and commit selected safe deployment files", advanced: true},
+	{id: "template-reset", shortcut: "t", title: "Reset deployment template", description: "Replace local customizations from the locked upstream; preserve settings and keys with a backup", advanced: true},
 }
 
 type dashboardTaskMenu struct {
@@ -199,7 +203,7 @@ func setupOverviewNotice(setup domain.SetupReport) (tuiNotice, bool) {
 		notice.detail = "Open Maintenance > Review Git changes to review and save them."
 	case domain.SetupStageApply:
 		notice.title = "Saved configuration needs applying to this controller"
-		notice.detail = "Open Maintenance > Rebuild controller for a fresh review."
+		notice.detail = "Open Maintenance > Apply to controller for a fresh review."
 	case domain.SetupStageArtifacts:
 		notice.title = "Installation files need preparing"
 		notice.detail = "Open Installation > Network boot (PXE) before installing computers."

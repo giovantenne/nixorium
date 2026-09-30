@@ -295,7 +295,7 @@ func TestControllerMaintenanceShellKeepsValidActionsVisible(t *testing.T) {
 					screen:     dashboardController,
 					controller: controllerModel{result: domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}},
 				},
-				expected: []string{"Controller updated and verified", "Enter", "Maintenance", "Show details", "Logs", "New review", "Help"},
+				expected: []string{"Applied to this controller and verified", "Enter", "Maintenance", "Show details", "Logs", "New review", "Help"},
 			},
 			{
 				name:     "services",

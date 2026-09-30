@@ -34,7 +34,7 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 			return model, deploymentIntent{kind: deploymentCloseIntent, destination: dashboardComputersArea}
 		case "l":
 			return model, deploymentIntent{kind: deploymentLogsIntent}
-		case "r":
+		case "n":
 			if model.result.RecoveryRequired {
 				return model, deploymentIntent{}
 			}

@@ -9,6 +9,15 @@ show the time of the last session observation, not live state. Refresh local
 state updates only saved configuration and local observations; open inventory
 to check clients. An empty list is not evidence that the fleet is current.
 
+In the TUI, `r` refreshes observed state on every screen that has a refresh;
+it never removes, retries a save or starts a review. After a result, `n` starts
+a new review; `s` completes an interrupted local save; PXE recovery is `n`
+(Recover network) and a cache restart review is `c`. Every acting key is in
+the action bar. Maintenance lists frequent tasks first (settings, diagnostics,
+system and Nixorium updates, logs) and groups controller application,
+services, Git review and template reset under **Advanced**. Computers →
+**Update computers** is the client deployment task.
+
 When preparing PXE on a configured laboratory, the saved-settings summary lets
 the operator continue or edit. It proves only form completeness: continuation
 still checks keys, configuration, controller and installation files, and does
@@ -156,7 +165,7 @@ reviewed generation is registered in the persistent NixOS system profile before
 activation, keeping boot configuration, rollback history, and GC retention in
 sync with the running system. Failed activation still requires inspection;
 profile registration alone is not evidence of success. The
-TUI's **Rebuild controller** task uses the same
+TUI's **Maintenance → Apply to controller** task uses the same
 typed operation with an Enter confirmation after review; the systemd job and
 journal survive closing the dashboard. The review names what changed since the
 last verified activation (saved settings, software, student preferences,

@@ -318,7 +318,7 @@ func (model dashboardModel) settingsView() string {
 		actions := model.saveFollowupActions(returnLabel)
 		actions = append(actions, tuiAction{key: "e", label: "Edit more"})
 		if model.settings.result.RecoveryRequired {
-			actions = append(actions, tuiAction{key: "r", label: "Retry save"})
+			actions = append(actions, tuiAction{key: "s", label: "Retry save"})
 		}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}

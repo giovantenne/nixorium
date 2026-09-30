@@ -32,7 +32,7 @@ func ConfirmControllerApply(input io.Reader, output io.Writer, controller string
 }
 
 func ConfirmControllerRebuild(input io.Reader, output io.Writer, report domain.ControllerRebuildPlanReport) (bool, error) {
-	fmt.Fprintln(output, "Controller rebuild review")
+	fmt.Fprintln(output, "Apply to controller: review")
 	fmt.Fprintf(output, "Machine: %s (this controller only)\n", report.Controller)
 	fmt.Fprintf(output, "Revision: %s\n", report.Revision)
 	fmt.Fprintln(output, "Action: validate, build, activate, and verify the reviewed Git configuration")
@@ -76,7 +76,7 @@ func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecyc
 }
 
 func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.DeploymentPlanReport) (bool, error) {
-	fmt.Fprintln(output, "Client deployment review")
+	fmt.Fprintln(output, "Update computers: review")
 	fmt.Fprintf(output, "Revision: %s\n", report.Revision)
 	fmt.Fprintf(output, "Targets: %s (%d computer(s))\n", report.ColmenaSelector, len(report.Targets))
 	fmt.Fprintln(output, "Action: build every selected configuration, then apply it with Colmena")

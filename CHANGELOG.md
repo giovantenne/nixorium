@@ -6,6 +6,21 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Consistent TUI keys: `r` refreshes on every screen that has a refresh
+  (services, logs, Git review and network boot used `f`). Keys that did
+  something else with `r` moved: `n` starts a new review after a result and
+  recovers the network in PXE, `s` retries or completes an interrupted local
+  save, and `c` reviews the cache restart. Every acting key is in the action
+  bar.
+
+- Maintenance lists everyday tasks first (settings, diagnostics, system and
+  Nixorium updates, logs) and groups controller application, services, Git
+  review and template reset under a separate **Advanced** heading.
+
+- Plainer labels: **Distribute the prepared system** is now **Update
+  computers**, **Rebuild controller** is **Apply to controller**, and related
+  titles and hints follow. Typed confirmation words are unchanged.
+
 - The PXE installer starts by itself once on the client's first console,
   still asking for the identity and the typed erase confirmation (nothing runs
   unattended; `sudo /installer/setup.sh` starts it again). Both installers ask

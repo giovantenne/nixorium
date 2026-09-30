@@ -194,7 +194,7 @@ func TestDashboardSoftwareProfileUsesBatchCallbacksAndControllerFollowUp(t *test
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if requests != 1 || saves != 1 || controllerPlans != 1 || controllerApplies != 1 || !strings.Contains(view, "ready on this controller") || !strings.Contains(view, "Distribute affected computers") {
+	if requests != 1 || saves != 1 || controllerPlans != 1 || controllerApplies != 1 || !strings.Contains(view, "ready on this controller") || !strings.Contains(view, "Update affected computers") {
 		t.Fatalf("composed profile flow callbacks=%d/%d/%d/%d:\n%s", requests, saves, controllerPlans, controllerApplies, view)
 	}
 }
@@ -245,7 +245,7 @@ func TestControllerOnlyProfileResultDoesNotOfferClientDistribution(t *testing.T)
 	model.software = software
 	model.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Revision: strings.Repeat("a", 40), Applied: true, Verified: true}
 	view := model.View().Content
-	if strings.Contains(view, "Distribute affected computers") || !strings.Contains(view, "No client deployment is required") {
+	if strings.Contains(view, "Update affected computers") || !strings.Contains(view, "No client deployment is required") {
 		t.Fatalf("controller-only result offers client deployment:\n%s", view)
 	}
 }
@@ -257,7 +257,7 @@ func TestSoftwareProfilePartialResultRetriesTheBatchSave(t *testing.T) {
 		Preset: domain.SoftwarePreset{ID: "essential", Label: "Essential"},
 		Issues: []domain.ValidationIssue{{Field: "storage", Message: "recording failed"}},
 	})
-	_, intent := model.update(keyPress("r"))
+	_, intent := model.update(keyPress("s"))
 	if intent.kind != softwarePresetSaveIntent {
 		t.Fatalf("profile recovery intent = %+v", intent)
 	}

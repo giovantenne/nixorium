@@ -539,7 +539,7 @@ revision.
 The report also shows the most recent successful post-apply verification, but
 history never overrides live authenticated state.
 
-### Distribute the prepared system
+### Update computers
 
 ```sh
 nix run .#nixorium -- deploy plan --on pc01
@@ -634,6 +634,13 @@ The log browser:
 
 The same list and detail views are available under **View operation logs**.
 
+In every administrator screen, `r` refreshes what is shown (computer states,
+services, logs, Git review, network boot). After a result, `n` starts a new
+review and `s` completes an interrupted save; all keys that act are listed at
+the bottom of the screen. Maintenance shows everyday tasks first and groups
+**Apply to controller**, **Controller services**, **Review Git changes** and
+**Reset deployment template** under **Advanced**.
+
 ### Review and commit Git changes
 
 ```sh
@@ -656,7 +663,7 @@ and oversized content, then binds apply to the reviewed token and confirmation.
 Unselected worktree/index changes remain untouched. Hooks, signing, remotes,
 and push are never invoked.
 
-### Rebuild the controller
+### Apply to the controller
 
 ```sh
 nix run .#nixorium -- controller plan
@@ -671,7 +678,8 @@ time, four typed phases, recent activity, and a progress bar; CLI text/JSON
 flows write the same safe activity to stderr. When the job ends, the dashboard
 refreshes reconciled state and shows a compact result with explicit actions to
 return home, reveal the activity detail, inspect logs, or create a new review.
-The TUI uses Enter after showing the reviewed revision and restart impact.
+The TUI task is **Maintenance → Advanced → Apply to controller**; it uses
+Enter after showing what changes and the restart impact.
 Use `setup apply` for the equivalent first-run action with identical progress
 feedback.
 

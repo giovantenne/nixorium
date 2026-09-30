@@ -363,7 +363,7 @@ func runControllerApply(ctx context.Context, manager *app.ControllerManager, rep
 			return 1
 		}
 		if !approved {
-			fmt.Fprintln(confirmationOutput, "Controller rebuild cancelled; no action started.")
+			fmt.Fprintln(confirmationOutput, "Apply to controller cancelled; nothing was started.")
 			return 0
 		}
 	}

@@ -192,7 +192,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Validated against the pinned package set", "Destination", "Clients", "Update lab-software.json locally", "Deploy clients"} {
+	for _, expected := range []string{"Validated against the pinned package set", "Destination", "Clients", "Update lab-software.json locally", "Update computers to install"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
@@ -381,7 +381,7 @@ func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
 	}
 
 	view := model.View().Content
-	if !strings.Contains(view, "Distribute affected computers") || !strings.Contains(view, "Later") {
+	if !strings.Contains(view, "Update affected computers") || !strings.Contains(view, "Later") {
 		t.Fatalf("software result omits contextual deployment action:\n%s", view)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "d"})
@@ -454,7 +454,7 @@ func TestSoftwareDeploymentWaitsForControllerActivation(t *testing.T) {
 		},
 	}
 
-	if strings.Contains(model.View().Content, "Distribute affected computers") {
+	if strings.Contains(model.View().Content, "Update affected computers") {
 		t.Fatalf("client deployment was offered before controller activation:\n%s", model.View().Content)
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Text: "d"})
@@ -1160,7 +1160,7 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	}
 	updated, _ = model.Update(batch[0]())
 	model = updated.(dashboardModel)
-	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Controller updated and verified") || !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Maintenance") {
+	if applied != 1 || refreshed != 1 || !model.report.Deployment.Ready || model.screen != dashboardController || !strings.Contains(model.View().Content, "Applied to this controller and verified") || !strings.Contains(model.View().Content, "Enter") || !strings.Contains(model.View().Content, "Maintenance") {
 		t.Fatalf("controller result missing: applied=%d refreshed=%d\n%s", applied, refreshed, model.View().Content)
 	}
 	model.controller.progress = domain.OperationProgress{
@@ -1543,7 +1543,7 @@ func TestNixoriumUpdatePartialSaveOffersInPlaceRecovery(t *testing.T) {
 	if !strings.Contains(model.View().Content, "Complete save") || strings.Contains(model.View().Content, "review Git changes") {
 		t.Fatalf("partial save does not expose bounded recovery:\n%s", model.View().Content)
 	}
-	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
+	updated, command := model.Update(tea.KeyPressMsg{Text: "s"})
 	model = updated.(dashboardModel)
 	if command == nil || !model.updates.applying || !strings.Contains(model.View().Content, "Completing the local update save") {
 		t.Fatalf("recovery did not start in place: %+v", model)
@@ -1690,7 +1690,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 	if model.screen != dashboardServices || !strings.Contains(model.View().Content, "healthy") || !strings.Contains(model.View().Content, "Installation → Network boot (PXE)") {
 		t.Fatalf("services screen missing:\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "r"})
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardServicesRestartReview || !strings.Contains(model.View().Content, "Type RESTART to continue") {
 		t.Fatalf("restart review missing:\n%s", model.View().Content)
@@ -1802,7 +1802,7 @@ func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	if !strings.Contains(model.View().Content, "line-07") || strings.Contains(model.View().Content, "lab-settings.json") {
 		t.Fatalf("Git review did not scroll:\n%s", model.View().Content)
 	}
-	updated, command = model.Update(tea.KeyPressMsg{Text: "f"})
+	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -2041,13 +2041,13 @@ func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 			return domain.PXELifecycleReport{Message: "recovered"}
 		},
 	}
-	for key, expected := range map[string]string{"p": "configure", "x": "stop", "r": "recover"} {
+	for key, expected := range map[string]string{"p": "configure", "x": "stop", "n": "recover"} {
 		called = ""
 		mode := "active"
 		if key == "p" {
 			mode = "stopped"
 		}
-		if key == "r" {
+		if key == "n" {
 			mode = "recovery-required"
 		}
 		model := dashboardModel{report: testDashboardReport(mode), actions: actions, screen: dashboardPXE}

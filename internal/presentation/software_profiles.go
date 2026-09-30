@@ -319,12 +319,12 @@ func (model softwareModel) profileReviewView(context softwareViewContext) []stri
 	} else if start > 0 || end < len(rows) {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d reviewed packages", displayedLineStart(start, len(rows)), end, len(rows)), context.dark))
 	}
-	lines = append(lines, "", "Now          Save one update to "+plan.ManagedFile, "Later        Build the controller and deploy affected clients through their normal reviews")
+	lines = append(lines, "", "Now          Save one update to "+plan.ManagedFile, "Later        Apply to the controller and update affected computers through their normal reviews")
 	if plan.AffectedController == "" {
-		lines[len(lines)-1] = "Later        Deploy affected clients through a fresh review"
+		lines[len(lines)-1] = "Later        Update affected computers through a fresh review"
 	}
 	if len(plan.AffectedClients) == 0 {
-		lines[len(lines)-1] = "Later        No client deployment required"
+		lines[len(lines)-1] = "Later        No computer update required"
 	}
 	return lines
 }

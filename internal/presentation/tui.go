@@ -1392,7 +1392,7 @@ func (model dashboardModel) gitReviewView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "f", label: "Refresh review"}, {key: "F1", label: "Help"}}})
+		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: returnLabel}, {key: "r", label: "Refresh review"}, {key: "F1", label: "Help"}}})
 	}
 	content := gitReviewContentLines(model.maintenance.gitReview)
 	height := model.gitReviewHeight()
@@ -1419,7 +1419,7 @@ func (model dashboardModel) gitReviewView() string {
 	if len(model.maintenance.gitReview.Changes) > 0 && !model.maintenance.gitReview.HasErrors() {
 		actions = append(actions, tuiAction{key: "c", label: "Select commit paths"})
 	}
-	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: backLabel}, tuiAction{key: "F1", label: "Help"})
+	actions = append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: backLabel}, tuiAction{key: "F1", label: "Help"})
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
@@ -1609,9 +1609,9 @@ func (model dashboardModel) updateView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		retryLabel := "New update"
+		retry := tuiAction{key: "n", label: "New update"}
 		if model.updates.result.RecoveryRequired {
-			retryLabel = "Complete save"
+			retry = tuiAction{key: "s", label: "Complete save"}
 		}
 		actions := []tuiAction{}
 		if success {
@@ -1620,7 +1620,7 @@ func (model dashboardModel) updateView() string {
 		if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired && !success {
 			actions = append(actions, tuiAction{key: "Enter", label: "Retry controller"}, tuiAction{key: "a", label: "Retry controller"})
 		}
-		actions = append(actions, tuiAction{key: "r", label: retryLabel}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+		actions = append(actions, retry, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	if model.screen == dashboardUpdateReview {
@@ -1954,7 +1954,7 @@ func (model dashboardModel) controllerView() string {
 	if model.controller.result.Operation != "" {
 		resultTitle := "Controller action needs attention"
 		if !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified {
-			resultTitle = "Controller updated and verified"
+			resultTitle = "Applied to this controller and verified"
 		}
 		lines = append(lines,
 			tuiResult(resultTitle, !model.controller.result.HasErrors(), model.isDark),
@@ -1977,7 +1977,7 @@ func (model dashboardModel) controllerView() string {
 		if model.setupMode {
 			returnLabel = "Setup"
 		}
-		actions := []tuiAction{{key: "Enter", label: returnLabel}, {key: "d", label: detailsLabel}, {key: "l", label: "Logs"}, {key: "r", label: "New review"}, {key: "F1", label: "Help"}}
+		actions := []tuiAction{{key: "Enter", label: returnLabel}, {key: "d", label: detailsLabel}, {key: "l", label: "Logs"}, {key: "n", label: "New review"}, {key: "F1", label: "Help"}}
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	lines = append(lines,
@@ -1987,7 +1987,7 @@ func (model dashboardModel) controllerView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "r", label: "Create review"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}})
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "n", label: "Create review"}, {key: "Esc", label: "Maintenance"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) servicesView() string {
@@ -2015,7 +2015,7 @@ func (model dashboardModel) servicesView() string {
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "l", label: "Logs"}, {key: "r", label: "Restart again"}, {key: "F1", label: "Help"}}})
+		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "l", label: "Logs"}, {key: "c", label: "Restart again"}, {key: "F1", label: "Help"}}})
 	}
 	if model.screen == dashboardServicesRestartReview {
 		body := strings.Join([]string{
@@ -2061,9 +2061,9 @@ func (model dashboardModel) servicesView() string {
 	}
 	actions := []tuiAction{}
 	if model.serviceRestartAvailable() {
-		actions = append(actions, tuiAction{key: "r", label: "Review cache restart"})
+		actions = append(actions, tuiAction{key: "c", label: "Review cache restart"})
 	}
-	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+	actions = append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
@@ -2112,7 +2112,7 @@ func (model dashboardModel) logsView() string {
 	if model.setupMode {
 		back = "Setup"
 	}
-	actions = append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
+	actions = append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: back}, tuiAction{key: "F1", label: "Help"})
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 }
 
@@ -2215,7 +2215,7 @@ func gitReviewStatusKind(report domain.GitReviewReport) tuiStatusKind {
 }
 
 func (model dashboardModel) deployView() string {
-	path := []string{"Computers", "Distribute"}
+	path := []string{"Computers", "Update computers"}
 	shell := tuiShell{path: path}
 	if model.deployment.usbRecovery != nil {
 		return model.deploymentUSBRecoveryView(shell)
@@ -2256,7 +2256,7 @@ func (model dashboardModel) deployView() string {
 	}
 	if model.screen == dashboardDeployReview {
 		lines := []string{
-			tuiTitle("Distribute the system?", model.isDark),
+			tuiTitle("Update these computers?", model.isDark),
 			"",
 			fmt.Sprintf("Affects  %s · %d computer(s)", model.deployment.plan.ColmenaSelector, len(model.deployment.plan.Targets)),
 			"",
@@ -2276,7 +2276,7 @@ func (model dashboardModel) deployView() string {
 		if model.message != "" {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
-		shell.actions = []tuiAction{{key: "Enter", label: "Deploy"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "Enter", label: "Update computers"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
 		if model.actions.PlanReachableDeployment != nil && model.deployment.plan.ReachableRequested != "" {
 			shell.actions = append([]tuiAction{{key: "F2", label: "Reachable only"}}, shell.actions...)
 		}
@@ -2305,7 +2305,7 @@ func (model dashboardModel) deployView() string {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 		}
 		shell.body = strings.Join(lines, "\n")
-		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "n", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
 		if model.deployment.result.RecoveryRequired {
 			shell.actions = shell.actions[1:]
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: "Recovery required before another operation", detail: "An active revision alone does not prove activation completed. See TROUBLESHOOTING.md: Interrupted client deployment."})
@@ -2314,7 +2314,7 @@ func (model dashboardModel) deployView() string {
 	}
 
 	lines := []string{
-		tuiTitle("Distribute the prepared system", model.isDark),
+		tuiTitle("Update computers", model.isDark),
 		tuiMuted("Select → Review → Deploy → Verify", model.isDark),
 		"",
 	}
@@ -2619,7 +2619,7 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	primary := model.pxePrimaryAction()
 	actions := []tuiAction{{key: "Enter", label: primary.label}}
 	if model.installation.stateError {
-		return append(actions, tuiAction{key: "f", label: "Refresh"}, tuiAction{key: "Esc", label: "Installation"}, tuiAction{key: "F1", label: "Help"})
+		return append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: "Installation"}, tuiAction{key: "F1", label: "Help"})
 	}
 	recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
 	if model.report.PXE.Mode != "active" && !recovery {
@@ -2633,10 +2633,10 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	}
 	backLabel := "Installation"
 	if recovery {
-		actions = append(actions, tuiAction{key: "r", label: "Recover network"})
+		actions = append(actions, tuiAction{key: "n", label: "Recover network"})
 	}
 	return append(actions,
-		tuiAction{key: "f", label: "Refresh"},
+		tuiAction{key: "r", label: "Refresh"},
 		tuiAction{key: "Esc", label: backLabel},
 		tuiAction{key: "q", label: "Quit"},
 		tuiAction{key: "F1", label: "Help"},

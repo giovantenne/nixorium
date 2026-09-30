@@ -37,7 +37,7 @@ func (model dashboardModel) updateDeploymentStop(key tea.KeyPressMsg) (tea.Model
 
 func (model dashboardModel) deploymentStopView() string {
 	return model.renderShell(tuiShell{
-		path: []string{"Computers", "Distribute", "Stop waiting"},
+		path: []string{"Computers", "Update computers", "Stop waiting"},
 		body: strings.Join([]string{
 			tuiTitle("Stop supervising this deployment?", model.isDark), "",
 			"This stops the local Colmena/SSH processes, not a remote rollback.",

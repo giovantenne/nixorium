@@ -401,7 +401,7 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 		return model.updateProfileReview(key)
 	case softwareResult:
 		switch key.String() {
-		case "r":
+		case "s":
 			if !model.result.RecoveryRequired {
 				return model, softwareIntent{}
 			}
@@ -726,13 +726,13 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 	}
 	if model.stage == softwareResult {
 		if model.result.State == "partial" {
-			return []tuiAction{{key: "r", label: "Retry save"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "s", label: "Retry save"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 		}
 		if model.result.State == "saved" && !model.result.HasErrors() && !model.result.RecoveryRequired && model.result.AffectedController != "" && !controllerVerifiedForSave(model.result.Revision, context.controllerResult) {
 			return []tuiAction{{key: "Enter", label: "Retry controller"}, {key: "a", label: "Retry controller"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canDistribute(context.controllerResult) {
-			return []tuiAction{{key: "Enter", label: "Update computers"}, {key: "d", label: "Distribute affected computers"}, {key: "v", label: "Check systems"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "Enter", label: "Update computers"}, {key: "d", label: "Update affected computers"}, {key: "v", label: "Check systems"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canInspectState() {
 			return []tuiAction{{key: "v", label: "Check systems"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
@@ -790,7 +790,7 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		tuiTitle("Software", context.dark),
 		"",
 		softwareModeTabs(model.mode, context.dark),
-		tuiMuted("Choose desired software here. Running clients change only when you deploy them.", context.dark),
+		tuiMuted("Choose desired software here. Running clients change only when you update them.", context.dark),
 		"",
 	}
 	switch model.mode {
@@ -843,7 +843,7 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 	if len(items) == 0 && model.mode == softwareConfigured {
 		lines = append(lines, "No software is selected through this screen yet.", "", "Open Suggestions or Search packages to add one.")
 	}
-	lines = append(lines, "", "This is desired configuration; deploy from Computers to update clients.")
+	lines = append(lines, "", "This is desired configuration; use Computers → Update computers to change clients.")
 	return lines
 }
 
@@ -942,11 +942,11 @@ func (model softwareModel) reviewView(context softwareViewContext) []string {
 	plan := model.plan
 	action := "Add"
 	changeNow := "Save now"
-	later := "Later        Deploy clients to install this change"
+	later := "Later        Update computers to install this change"
 	if !plan.Request.Present {
 		action = "Remove"
 		changeNow = "Remove now"
-		later = "Later        Deploy clients to remove this software"
+		later = "Later        Update computers to remove this software"
 	}
 	item := model.item(plan.Request.Package)
 	lines := []string{
@@ -964,7 +964,7 @@ func (model softwareModel) reviewView(context softwareViewContext) []string {
 		lines[len(lines)-2] = fmt.Sprintf("%-12s Update %s and rebuild %s", changeNow, plan.ManagedFile, plan.AffectedController)
 	}
 	if len(plan.AffectedClients) == 0 {
-		lines[len(lines)-1] = "Later        No client deployment required"
+		lines[len(lines)-1] = "Later        No computer update required"
 	}
 	if plan.AffectedController != "" && !plan.Request.Present {
 		lines = append(lines, "", tuiStatus("Saving removes it from "+plan.AffectedController+" now: the controller is rebuilt right away", tuiStatusAttention, context.dark))

@@ -131,7 +131,7 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 		switch key.String() {
 		case "enter", "esc", "left":
 			return model, shutdownIntent{kind: shutdownCloseIntent}
-		case "r":
+		case "n":
 			model.plan = domain.ShutdownPlanReport{}
 			model.result = domain.ShutdownApplyReport{}
 			return model, shutdownIntent{kind: shutdownSelectionIntent}
@@ -265,7 +265,7 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 		}
 	case dashboardShutdownResult:
 		shell.body = strings.Join(model.resultView(context), "\n")
-		shell.actions = []tuiAction{{key: "r", label: "New review"}}
+		shell.actions = []tuiAction{{key: "n", label: "New review"}}
 		if context.historyAvailable {
 			shell.actions = append(shell.actions, tuiAction{key: "l", label: "History"})
 		}

@@ -87,7 +87,7 @@ func TestPXEFailedObservationCannotActOnPreviousReadiness(t *testing.T) {
 	if !m.installation.stateError || !strings.Contains(m.View().Content, "Retry status") {
 		t.Fatal("observation failure is not actionable")
 	}
-	for _, key := range []string{"p", "s", "x", "r"} {
+	for _, key := range []string{"p", "s", "x", "n"} {
 		_, command = m.Update(tea.KeyPressMsg{Text: key})
 		if command != nil {
 			t.Fatalf("stale state authorized %s", key)

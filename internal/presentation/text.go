@@ -445,7 +445,7 @@ func DeploymentExecutionText(writer io.Writer, report domain.DeploymentExecution
 }
 
 func ControllerRebuildPlanText(writer io.Writer, report domain.ControllerRebuildPlanReport) {
-	fmt.Fprintf(writer, "Controller rebuild plan: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Apply to controller plan: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Repository:              %s\n", report.Repository)
 	if report.Controller != "" {
 		fmt.Fprintf(writer, "Controller:              %s\n", report.Controller)
@@ -469,7 +469,7 @@ func ControllerRebuildPlanText(writer io.Writer, report domain.ControllerRebuild
 }
 
 func ControllerRebuildExecutionText(writer io.Writer, report domain.ControllerRebuildExecutionReport) {
-	fmt.Fprintf(writer, "Controller rebuild: %s\n", strings.ToUpper(report.State))
+	fmt.Fprintf(writer, "Apply to controller: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintf(writer, "Phase:      %s\n", report.Phase)
 	fmt.Fprintf(writer, "Controller: %s\n", report.Controller)
 	fmt.Fprintf(writer, "Revision:   %s\n", report.Revision)

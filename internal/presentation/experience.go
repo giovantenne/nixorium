@@ -113,7 +113,7 @@ func (model dashboardModel) computersView() string {
 		lines = append(lines, model.computerDetail(hosts[min(model.computers.hostCursor, len(hosts)-1)]))
 		actions = []tuiAction{{key: "t", label: "Technical"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		if !model.actions.ClassroomMode {
-			actions = append([]tuiAction{{key: "d", label: "Deploy"}, {key: "i", label: "Diagnostics"}}, actions...)
+			actions = append([]tuiAction{{key: "d", label: "Update this computer"}, {key: "i", label: "Diagnostics"}}, actions...)
 			if hosts[min(model.computers.hostCursor, len(hosts)-1)].HostKeyCondition == domain.HostKeyChanged && model.actions.PlanHostTrust != nil && model.actions.ApplyHostTrust != nil && !model.actions.ClassroomMode {
 				actions = append([]tuiAction{{key: "h", label: "Review changed SSH key"}}, actions...)
 			}
@@ -237,7 +237,7 @@ func (model dashboardModel) helpView() string {
 				"Esc keeps your selection. Successful recovery creates a fresh review requiring DEPLOY again.")
 			break
 		}
-		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   r new review when no recovery is required   Enter Computers")
+		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers")
 	case dashboardInternet:
 		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "r checks Internet access on all clients (read-only); n selects those the chosen action would change.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
 	case dashboardDeployReview:
@@ -282,21 +282,21 @@ func (model dashboardModel) helpView() string {
 	case dashboardSettingsPasswords:
 		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
 	case dashboardPXE:
-		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   r recover   f refresh", "l progress details while preparing; q closes only the view")
+		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   n recover network   r refresh", "l progress details while preparing; q closes only the view")
 	case dashboardController:
-		lines = append(lines, "r new review   d result details   l logs / progress detail", "q closes the view; systemd-owned work continues")
+		lines = append(lines, "n new review   d result details   l logs / progress detail", "q closes the view; systemd-owned work continues")
 	case dashboardServices:
-		lines = append(lines, "r review cache restart   f refresh   l logs after result")
+		lines = append(lines, "c review cache restart   r refresh   l logs after result")
 	case dashboardLogs, dashboardLogDetail:
-		lines = append(lines, "Enter open log   f refresh list   ↑/↓/pg scroll detail")
+		lines = append(lines, "Enter open log   r refresh list   ↑/↓/pg scroll detail")
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
-		lines = append(lines, "c select commit paths   Space select   a all safe paths", "f refresh review   ↑/↓/pg scroll patch", "Exact confirmation creates a local commit; nothing is pushed.")
+		lines = append(lines, "c select commit paths   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "Exact confirmation creates a local commit; nothing is pushed.")
 	case dashboardUpdate, dashboardUpdateReview:
 		lines = append(lines, "During validation: l expands or collapses current check details in place.")
 		if model.updates.packageBase {
 			lines = append(lines, "Enter check current channel   m change channel   r inspect pin", "In the channel form, type nixos-YY.MM and Space to acknowledge unverified compatibility.", "Review/build precedes saving and controller activation. Client distribution is separate.", "Build success does not verify runtime or hardware; check boot and services afterwards.")
 		} else {
-			lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation prepares the selected version, checks the lab configuration and tests required systems without saving it.", "On the review, Enter saves and activates; Esc cancels.", "After result: r new update")
+			lines = append(lines, "↑/↓ select release   Enter validate   p show prereleases", "Validation prepares the selected version, checks the lab configuration and tests required systems without saving it.", "On the review, Enter saves and activates; Esc cancels.", "After result: n new update; s completes an interrupted save")
 		}
 	case dashboardDiagnostics:
 		lines = append(lines, "↑/↓ move   Enter technical evidence   r run checks again")

@@ -115,7 +115,7 @@ func renderGallery() string {
 		{title: "Pinned package search", scenarioID: "software-all-clients", label: "Find Inkscape in the pinned package set"},
 		{title: "Additive software profile review", scenarioID: "software-profile", label: "Review the complete profile addition"},
 		{title: "Contextual client deployment selection", scenarioID: "software-all-clients", label: "Open contextual client selection"},
-		{title: "Client deployment review", scenarioID: "software-all-clients", label: "Review deployment to all five current clients"},
+		{title: "Update computers review", scenarioID: "software-all-clients", label: "Review deployment to all five current clients"},
 		{title: "Verified deployment result", scenarioID: "software-all-clients", label: "Deployment completed and verified"},
 		{title: "Availability before client deployment", scenarioID: "deployment-availability", label: "Review selected computer availability"},
 		{title: "A new review for reachable computers only", scenarioID: "deployment-availability", label: "Reachable-only subset still requires confirmation"},

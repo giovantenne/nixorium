@@ -435,7 +435,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				return model.continueSavedConfiguration()
 			case "esc", "left":
 				return model.returnFromSettings()
-			case "r":
+			case "s":
 				if !model.settings.result.RecoveryRequired || model.actions.SaveSettings == nil {
 					return model, nil
 				}
@@ -705,7 +705,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			return model.startRead(func(ctx context.Context) tea.Msg {
 				return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)}
 			})
-		} else if key.String() == "r" {
+		} else if key.String() == "n" {
 			model.busy = "Reviewing controller revision and active system"
 			model.message = ""
 			return model.startRead(func(ctx context.Context) tea.Msg {
@@ -720,7 +720,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				model.screen = model.controller.saveOrigin
 				model.controller.fromSave = false
 			}
-			model.message = "Controller rebuild cancelled; no action was started."
+			model.message = "Apply to controller cancelled; nothing was started."
 			if controllerPlanCurrent(model.controller.plan) {
 				model.message = ""
 			}
@@ -760,7 +760,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				return model.startRead(func(ctx context.Context) tea.Msg {
 					return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)}
 				})
-			case "r":
+			case "c":
 				model.maintenance.serviceResult = domain.ServiceActionReport{}
 				model.confirmation = ""
 				model.message = ""
@@ -772,13 +772,13 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		case "esc", "left":
 			model.screen = dashboardHome
 			model.message = ""
-		case "f":
+		case "r":
 			model.busy = "Refreshing managed controller services"
 			model.message = ""
 			return model.startRead(func(ctx context.Context) tea.Msg {
 				return dashboardServicesMsg{report: model.actions.LoadServices(ctx)}
 			})
-		case "r":
+		case "c":
 			if len(model.maintenance.services.Services) == 0 || model.maintenance.services.Services[0].ID != "cache" || len(model.maintenance.services.Services[0].Units) == 0 || !model.maintenance.services.Services[0].Units[0].Loaded {
 				model.message = "Binary cache restart is unavailable because the managed unit is not installed."
 				return model, nil
@@ -838,7 +838,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			if model.maintenance.logCursor+1 < len(model.maintenance.logs.Logs) {
 				model.maintenance.logCursor++
 			}
-		case "f":
+		case "r":
 			model.busy = "Refreshing private operation logs"
 			model.message = ""
 			return model.startRead(func(ctx context.Context) tea.Msg {
@@ -913,7 +913,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 					model.screen = dashboardHome
 					model.message = ""
 				}
-			case "f":
+			case "r":
 				model.maintenance.gitCommitResult = domain.GitCommitReport{}
 				model.busy = "Refreshing the read-only Git review"
 				model.message = ""
@@ -963,7 +963,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.maintenance.gitScroll = 0
 		case "end":
 			model.maintenance.gitScroll = maximum
-		case "f":
+		case "r":
 			model.busy = "Refreshing the read-only Git review"
 			model.message = ""
 			return model.startRead(func(ctx context.Context) tea.Msg {
@@ -1078,7 +1078,10 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			case "esc":
 				model.screen = dashboardHome
 				model.message = ""
-			case "r":
+			case "s", "n":
+				if model.updates.result.RecoveryRequired != (key.String() == "s") {
+					return model, nil
+				}
 				if model.updates.result.RecoveryRequired {
 					model.busy = "Completing the local update save"
 					model.updates.applying = true
@@ -1215,7 +1218,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 		if action == "enter" {
 			action = model.pxePrimaryAction().key
 		}
-		if model.installation.stateError && action != "f" && action != "esc" && action != "left" {
+		if model.installation.stateError && action != "r" && action != "esc" && action != "left" {
 			return model, nil
 		}
 		switch action {
@@ -1237,7 +1240,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 				model.busy = "Refreshing first-run progress"
 				return model.loadSetup()
 			}
-		case "f":
+		case "r":
 			return model.openNetworkInstallation()
 		case "p":
 			if model.report.PXE.Mode == "active" || model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required" {
@@ -1262,7 +1265,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			return model, model.runAction(func() string {
 				return model.actions.StopPXE().Message
 			}, dashboardPXE)
-		case "r":
+		case "n":
 			if model.report.PXE.Mode != "degraded" && model.report.PXE.Mode != "recovery-required" {
 				return model, nil
 			}
