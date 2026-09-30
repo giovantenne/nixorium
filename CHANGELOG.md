@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Fixed empty-field handling in shell metadata, including controller-only labs;
+  legacy home reset now discovers common image formats and skips empty folders.
+  Setup cancellation names the correct workflow, background quit describes its
+  effect, and update discovery initially selects the newest stable release.
+
 - Corrected regional-settings guidance: guided forms select time zone and
   keyboard, while desktop locales use the reviewed configuration workflow.
 

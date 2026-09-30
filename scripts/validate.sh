@@ -78,6 +78,7 @@ bash tests/software-profile-bootstrap.sh
 bash tests/canonical-copy-sync.sh
 bash tests/known-hosts-migration.sh
 bash tests/pxe-build.sh
+bash tests/ux-shell-regressions.sh
 bash scripts/sync-canonical-copies.sh --check
 test -e .agents/skills/nixorium-developer/SKILL.md
 test -e .claude/skills/nixorium-developer/SKILL.md

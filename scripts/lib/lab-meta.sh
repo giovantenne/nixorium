@@ -40,7 +40,7 @@ load_lab_meta() {
     )
   fi
 
-  IFS=$'\t' read -r \
+  IFS=$'\x1f' read -r \
     LAB_META_SCHEMA_VERSION \
     LAB_CONTROLLER_NAME \
     LAB_CONTROLLER_NUMBER \
@@ -69,7 +69,7 @@ load_lab_meta() {
         (.network.pxeHttpPort | tostring),
         .users.student,
         .users.teacher
-      ] | @tsv
+      ] | map(if . == null then "" else tostring end) | join("\u001f")
     ')"
 
   if [[ "${LAB_META_SCHEMA_VERSION}" != "2" ]]; then
@@ -78,8 +78,8 @@ load_lab_meta() {
   fi
 
   LAB_CLIENT_HOSTS_JSON=$(printf '%s' "${LAB_META_JSON}" | jq -ce '
-    .clients.hosts
-    | if type == "array" and length > 0 and
+    . as $meta | .clients.hosts
+    | if type == "array" and length == $meta.clients.count and
         all(.[]; (.name | type == "string") and (.ip | type == "string"))
       then .
       else error("invalid client host inventory")

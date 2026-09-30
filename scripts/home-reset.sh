@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+nixorium_collect_wallpapers() (
+  local BACKGROUNDS_DIR="$1" WALLPAPER
+  shopt -s nullglob nocaseglob
+  for WALLPAPER in "$BACKGROUNDS_DIR"/*.{jpg,jpeg,png,webp,avif}; do
+    [[ -f "$WALLPAPER" ]] || continue
+    printf '%s\0' "$WALLPAPER"
+  done
+)
+
+# Allow deterministic discovery tests without running the home-reset engine.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return 0
+fi
+
 if [[ $# -ne 5 ]]; then
   echo "Usage: home-reset.sh <snapshots-dir> <home-dir> <template-dir> <owner> <ephemeral-paths-file>" >&2
   exit 1
@@ -106,7 +120,7 @@ cp -a "$TEMPLATE_DIR/." "$HOME_DIR/"
 # Pick a random wallpaper and write dconf user database
 BACKGROUNDS_DIR="/etc/lab/backgrounds"
 if [ -d "$BACKGROUNDS_DIR" ]; then
-  WALLPAPERS=("$BACKGROUNDS_DIR"/*.jpg)
+  mapfile -d '' -t WALLPAPERS < <(nixorium_collect_wallpapers "$BACKGROUNDS_DIR")
   if [ ${#WALLPAPERS[@]} -gt 0 ]; then
     PICK="${WALLPAPERS[$((RANDOM % ${#WALLPAPERS[@]}))]}"
     DCONF_DIR="$HOME_DIR/.config/dconf"

@@ -2513,13 +2513,13 @@ func (model dashboardModel) pxeActions() []tuiAction {
 		return []tuiAction{{key: "x", label: "Stop and exit"}, {key: "Enter", label: "Leave active"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	}
 	if model.installation.pxePreparing {
-		return []tuiAction{{key: "l", label: "Progress details"}, {key: "q", label: "Close view"}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "l", label: "Progress details"}, {key: "q", label: "Quit Nixorium; work continues"}, {key: "F1", label: "Help"}}
 	}
 	if model.controller.applying {
 		return []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}}
 	}
 	if model.busy != "" {
-		return []tuiAction{{key: "q", label: "Close view"}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "q", label: "Quit Nixorium; work continues"}, {key: "F1", label: "Help"}}
 	}
 	if model.installation.flow && model.installation.failed {
 		return []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}

@@ -495,6 +495,17 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.updates.check = message.report
 		model.updates.cursor = 0
+		if len(message.report.Stable) > 0 {
+			model.updates.cursor = len(message.report.Development)
+		} else {
+			model.updates.prerelease = message.report.CurrentChannel == domain.UpdateChannelPrerelease
+			for index, release := range model.availableUpdateReleases() {
+				if release.Tag == message.report.CurrentRef {
+					model.updates.cursor = index
+					break
+				}
+			}
+		}
 		model.updates.target = ""
 		if message.report.HasErrors() {
 			model.message = operationLogIssues(message.report.Issues)

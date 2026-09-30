@@ -512,12 +512,13 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 					model.installation.flow = false
 					model.installation.failed = false
 					model.screen = dashboardHome
+					model.message = "Computer installation cancelled; no setting was changed."
 				} else {
 					model.screen = dashboardSetup
+					model.message = "Setup cancelled; no setting was changed."
 				}
 				model.settings.returnScreen = dashboardHome
 				model.settings.collectPasswords = false
-				model.message = "Computer installation cancelled; no setting was changed."
 			case "enter":
 				if model.actions.ChangePassword == nil {
 					model.message = "Password setup is not available in this deployment."
