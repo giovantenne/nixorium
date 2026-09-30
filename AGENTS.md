@@ -421,6 +421,15 @@ failure or timeout must block publication.
   Never silently replace a missing/invalid profile with the example. Expose the
   seed path without claiming it is built, deployed or active. Preserve offline
   profile/catalog equivalence and the profile-free standalone composition.
+  `vscode.extraSettings` carries reviewed free-form editor defaults; keep its
+  refused keys identical in the Go and Nix decoders through the shared corpus.
+  Extension IDs stay lowercase while packaged identities compare without case.
+  The extension catalog adds prerequisites but is not an allowlist; any
+  extension of the pinned set is selectable and linked. Catalog `writable`
+  entries are copied into the seed instead: debug adapters create files in
+  their own folder, and a directory of per-file links breaks the editor's
+  attribution of running code to its extension. The reset validator accepts
+  exactly one link to the payload or a copy with an identical manifest.
   `nixoriumResolveWorkspaceCandidate` returns the same metadata for raw candidate
   JSON without writing it. Review consumers must also compose the deployment's
   `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base

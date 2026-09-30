@@ -250,15 +250,19 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "After saving, Enter opens a separate controller review; after verified application it opens client selection. Esc leaves the result.")
 	case dashboardWorkspace:
 		lines = append(lines,
-			"Choose Desktop, Dock, Editor or Browser, then a supported field.",
+			"Choose Desktop, Dock, VSCode or Browser, then a supported field.",
 			"Inherit keeps the deployment baseline; Clear means an explicit empty list.",
 			"In a list: Space toggles, i inherits, c clears; Shift arrows reorder favorites.",
+			"Extensions: / searches every packaged extension of the pinned package set, not only the catalog.",
+			"Dependencies of searched extensions are checked when the system is built.",
 			"Enter keeps a field in the draft; Esc cancels that field edit.",
+			"Other settings: a adds a name and value, e edits, d removes, p takes a pasted settings file.",
+			"Guided fields, update settings and settings that can start programs cannot be added there.",
 			"v reviews the complete draft, dependencies and student destinations.",
 			"Type SAVE and Enter only after review to save and record just the workspace profile locally.",
 			"Enter then opens a separate controller review. Runtime opt-in, deployment and home reset are never automatic.",
 			"A partial save opens Git review for inspection; do not replay the old save or apply systems before recovery.")
-		lines = append(lines, "Extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
+		lines = append(lines, "Packaged extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
 	case dashboardTemplateReset:
 		lines = append(lines,
 			"Choose a software preset from the exact framework revision already locked in this deployment.",

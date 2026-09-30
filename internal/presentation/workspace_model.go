@@ -34,10 +34,15 @@ type workspaceModel struct {
 	selected                      []string
 	inherit                       bool
 	number                        string
-	confirmation                  string
-	requestID                     uint64
-	cancel                        context.CancelFunc
-	saving                        bool
+	settings                      workspaceSettingsEditor
+	// Extension search in the pinned package set, beyond the catalog.
+	searching    bool
+	query        string
+	choiceNotes  map[string]string
+	confirmation string
+	requestID    uint64
+	cancel       context.CancelFunc
+	saving       bool
 }
 
 func (model *workspaceModel) cancelRead() {
@@ -49,18 +54,23 @@ func (model *workspaceModel) cancelRead() {
 }
 
 func (model workspaceModel) textEntry() bool {
-	return model.stage == workspaceReview || (model.stage == workspaceFieldEdit && model.field.kind == "number")
+	return model.stage == workspaceReview || (model.stage == workspaceFieldEdit &&
+		(model.field.kind == "number" || model.searching || (model.field.kind == "settings" && model.settings.textEntry())))
 }
 
 func (model *workspaceModel) startField() {
 	model.field = workspaceGroupFields(model.group)[model.cursor]
 	model.choice = 0
 	model.choices = nil
+	model.choiceNotes = map[string]string{}
+	model.searching, model.query = false, ""
 	model.selected = []string{}
 	model.number = ""
 	value := workspaceValue(model.candidate, model.field)
 	model.inherit = value == nil
-	if model.field.kind == "number" {
+	if model.field.kind == "settings" {
+		model.settings = newWorkspaceSettingsEditor(value)
+	} else if model.field.kind == "number" {
 		if value != nil {
 			model.number = fmt.Sprint(value)
 		}
@@ -80,6 +90,12 @@ func (model *workspaceModel) startField() {
 		} else {
 			for _, item := range model.loaded.Inspection.Resolution.Catalog.Extensions {
 				model.choices = append(model.choices, item.ID)
+			}
+			// Extensions found by an earlier search stay visible when selected.
+			for _, id := range model.selected {
+				if !slices.Contains(model.choices, id) {
+					model.choices = append(model.choices, id)
+				}
 			}
 		}
 	} else {
@@ -120,6 +136,8 @@ func (model *workspaceModel) acceptField() error {
 		if !model.inherit {
 			value = append([]string{}, model.selected...)
 		}
+	case "settings":
+		value = model.settings.result()
 	default:
 		if model.choice > 0 {
 			value = model.choices[model.choice]
@@ -139,6 +157,23 @@ func (model *workspaceModel) acceptField() error {
 }
 
 func (model *workspaceModel) editField(key tea.KeyPressMsg) string {
+	if model.field.kind == "settings" {
+		action, message := model.settings.update(key)
+		switch action {
+		case "cancel":
+			model.stage = workspaceFieldList
+			return "Field edit cancelled; the draft is unchanged."
+		case "keep":
+			if err := model.acceptField(); err != nil {
+				return err.Error()
+			}
+			return "Draft updated; nothing has been saved."
+		}
+		return message
+	}
+	if model.searching {
+		return model.editSearch(key)
+	}
 	if key.String() == "esc" {
 		model.stage = workspaceFieldList
 		return "Field edit cancelled; the draft is unchanged."
@@ -174,6 +209,10 @@ func (model *workspaceModel) editField(key tea.KeyPressMsg) string {
 		return ""
 	}
 	switch key.String() {
+	case "/":
+		if model.field.kind == "extensions" {
+			model.searching, model.query = true, ""
+		}
 	case "i":
 		model.inherit = true
 		model.selected = []string{}

@@ -118,7 +118,7 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 		if key.String() == "esc" {
 			model.workspace.cancelRead()
 			model.busy = ""
-			model.message = "Workspace review cancelled; no file changed."
+			model.message = "Cancelled; no file changed."
 			if model.workspace.loaded.Inspection == nil {
 				model.screen = dashboardSettings
 			}
@@ -169,6 +169,9 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 			return model.startWorkspaceRead(false)
 		}
 	case workspaceFieldEdit:
+		if model.workspace.searching && key.String() == "enter" {
+			return model.startWorkspaceSearch()
+		}
 		model.message = model.workspace.editField(key)
 	case workspaceReview:
 		switch key.String() {
@@ -251,7 +254,7 @@ func (model dashboardModel) workspaceView() string {
 		resolved := w.loaded.Inspection.Resolution
 		switch w.stage {
 		case workspaceOverview:
-			fixed = "Pinned extensions update through Maintenance → Update system and packages."
+			fixed = "Packaged extensions update with Maintenance → Update system and packages."
 			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), workspaceApplicationText(resolved.RuntimeEnabled), "")
 			if w.loaded.Inspection.Base == nil {
 				lines = append(lines, "No saved profile; this is a new draft.")
@@ -273,10 +276,21 @@ func (model dashboardModel) workspaceView() string {
 		case workspaceFieldEdit:
 			lines = append(lines, w.field.label, "")
 			actions = []tuiAction{{key: "Enter", label: "Keep draft"}, {key: "Esc", label: "Cancel field"}, {key: "F1", label: "Help"}}
-			if w.field.kind == "number" {
+			if w.field.kind == "settings" {
+				settingLines, settingFixed, settingActions := w.settings.view(width, capacity, model.isDark)
+				lines = append(lines, settingLines...)
+				fixed = settingFixed
+				actions = append(settingActions, tuiAction{key: "F1", label: "Help"})
+			} else if w.field.kind == "number" {
 				lines = append(lines, "Value: "+w.number+"_", "Leave empty to inherit the deployment baseline.")
 			} else {
 				multiple := w.field.kind == "favorites" || w.field.kind == "extensions"
+				if w.searching {
+					lines = append(lines, "Search packaged extensions: "+w.query+"_", "Type part of a name, for example python or java, then press Enter.", "")
+					actions = []tuiAction{{key: "Enter", label: "Search"}, {key: "Esc", label: "Close search"}, {key: "F1", label: "Help"}}
+				} else if w.field.kind == "extensions" {
+					actions = append([]tuiAction{{key: "/", label: "Search"}}, actions...)
+				}
 				if multiple {
 					mode := "Explicit selection"
 					if w.inherit {
@@ -298,6 +312,9 @@ func (model dashboardModel) workspaceView() string {
 							}
 						}
 						label = marker + label
+						if note := w.choiceNotes[w.choices[index]]; note != "" {
+							label += "  " + note
+						}
 					}
 					lines = append(lines, tuiSelection(workspaceShort(label, width-2), index == w.choice, model.isDark))
 				}

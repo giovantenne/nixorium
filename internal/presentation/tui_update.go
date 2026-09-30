@@ -73,6 +73,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.finishWorkspacePlan(message)
 	case dashboardWorkspaceSaveMsg:
 		return model.finishWorkspaceSave(message)
+	case dashboardWorkspaceSearchMsg:
+		return model.finishWorkspaceSearch(message)
 	case dashboardRemoteFingerprintMsg:
 		return model.handleRemoteFingerprintMessage(message)
 	case dashboardRemoteInstallMsg:
@@ -979,6 +981,10 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		if model.screen == dashboardHome {
 			model.ensureHomeMenu()
 			model.homeMenu, _ = model.homeMenu.update(message)
+		}
+		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardWorkspace && !model.helpOpen &&
+			model.workspace.stage == workspaceFieldEdit && model.workspace.field.kind == "settings" {
+			model.message = model.workspace.settings.paste(paste.Content)
 		}
 		if model.screen == dashboardSettings {
 			model.settings.menu, _ = model.settings.menu.update(message)

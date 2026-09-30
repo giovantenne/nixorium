@@ -6,7 +6,11 @@
     { "name": "ordered favorites sorted extensions", "json": "{\"schemaVersion\":1,\"desktop\":{\"favorites\":[\"org.gnome.TextEditor.desktop\",\"code.desktop\"],\"colorScheme\":\"dark\",\"enableAnimations\":true,\"dock\":{\"position\":\"bottom\",\"iconSize\":40,\"autoHide\":true,\"extendHeight\":false,\"showTrash\":false,\"showMounts\":true}},\"vscode\":{\"extensions\":[\"vscjava.vscode-java-pack\",\"redhat.java\"],\"settings\":{\"editor.fontSize\":14,\"editor.tabSize\":4,\"editor.insertSpaces\":true,\"editor.wordWrap\":\"on\",\"editor.formatOnSave\":false,\"editor.minimap.enabled\":false,\"files.autoSave\":\"off\"}},\"browser\":{\"defaultApplication\":\"chromium-browser.desktop\"}}", "normalized": { "schemaVersion": 1, "desktop": { "favorites": ["org.gnome.TextEditor.desktop", "code.desktop"], "colorScheme": "dark", "enableAnimations": true, "dock": { "position": "bottom", "iconSize": 40, "autoHide": true, "extendHeight": false, "showTrash": false, "showMounts": true } }, "vscode": { "extensions": ["redhat.java", "vscjava.vscode-java-pack"], "settings": { "editor.fontSize": 14, "editor.tabSize": 4, "editor.insertSpaces": true, "editor.wordWrap": "on", "editor.formatOnSave": false, "editor.minimap.enabled": false, "files.autoSave": "off" } }, "browser": { "defaultApplication": "chromium-browser.desktop" } } },
     { "name": "lower bounds", "json": "{\"schemaVersion\":1,\"desktop\":{\"colorScheme\":\"light\",\"dock\":{\"position\":\"top\",\"iconSize\":16}},\"vscode\":{\"settings\":{\"editor.fontSize\":8,\"editor.tabSize\":1,\"editor.wordWrap\":\"bounded\",\"files.autoSave\":\"onFocusChange\"}}}", "normalized": { "schemaVersion": 1, "desktop": { "colorScheme": "light", "dock": { "position": "top", "iconSize": 16 } }, "vscode": { "settings": { "editor.fontSize": 8, "editor.tabSize": 1, "editor.wordWrap": "bounded", "files.autoSave": "onFocusChange" } } } },
     { "name": "upper bounds", "json": "{\"schemaVersion\":1,\"desktop\":{\"dock\":{\"position\":\"left\",\"iconSize\":128}},\"vscode\":{\"settings\":{\"editor.fontSize\":40,\"editor.tabSize\":8,\"editor.wordWrap\":\"wordWrapColumn\",\"files.autoSave\":\"onWindowChange\"}}}", "normalized": { "schemaVersion": 1, "desktop": { "dock": { "position": "left", "iconSize": 128 } }, "vscode": { "settings": { "editor.fontSize": 40, "editor.tabSize": 8, "editor.wordWrap": "wordWrapColumn", "files.autoSave": "onWindowChange" } } } },
-    { "name": "escaped field", "json": "{\"schemaVersion\":1,\"desktop\":{\"color\\u0053cheme\":\"dark\",\"dock\":{\"position\":\"right\"}}}", "normalized": { "schemaVersion": 1, "desktop": { "colorScheme": "dark", "dock": { "position": "right" } } } }
+    { "name": "escaped field", "json": "{\"schemaVersion\":1,\"desktop\":{\"color\\u0053cheme\":\"dark\",\"dock\":{\"position\":\"right\"}}}", "normalized": { "schemaVersion": 1, "desktop": { "colorScheme": "dark", "dock": { "position": "right" } } } },
+    {"name": "extra settings", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"workbench.colorTheme\":\"Default Dark+\",\"[python]\":{\"editor.formatOnSave\":true},\"editor.lineHeight\":1.5,\"files.exclude\":{\"**/.git\":true},\"editor.rulers\":[80,120],\"telemetry.telemetryLevel\":\"off\"}}}", "normalized": {"schemaVersion": 1, "vscode": {"extraSettings": {"workbench.colorTheme": "Default Dark+", "[python]": {"editor.formatOnSave": true}, "editor.lineHeight": 1.5, "files.exclude": {"**/.git": true}, "editor.rulers": [80, 120], "telemetry.telemetryLevel": "off"}}}},
+    {"name": "empty extra settings", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{}}}", "normalized": {"schemaVersion": 1, "vscode": {"extraSettings": {}}}},
+    {"name": "extra settings nesting limit", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":{\"f\":1}}}}}}}}", "normalized": {"schemaVersion": 1, "vscode": {"extraSettings": {"a": {"b": {"c": {"d": {"e": {"f": 1}}}}}}}}},
+    {"name": "extra settings unordered nested keys", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"z.b\":{\"y\":1,\"x\":\"a: b\"},\"a.c\":false}}}", "normalized": {"schemaVersion": 1, "vscode": {"extraSettings": {"a.c": false, "z.b": {"x": "a: b", "y": 1}}}}}
   ],
   "invalid": [
     { "name": "UTF-8 BOM", "json": "\ufeff{\"schemaVersion\":1}" },
@@ -63,6 +67,24 @@
     { "name": "autosave enum", "json": "{\"schemaVersion\":1,\"vscode\":{\"settings\":{\"files.autoSave\":\"afterDelay\"}}}" },
     { "name": "browser url", "json": "{\"schemaVersion\":1,\"browser\":{\"defaultApplication\":\"https://example.invalid\"}}" },
     { "name": "unknown browser setting", "json": "{\"schemaVersion\":1,\"browser\":{\"homepage\":\"https://example.invalid\"}}" },
-    { "name": "string punctuation cannot hide duplicate", "json": "{\"schemaVersion\":1,\"desktop\":{\"colorScheme\":\"x: \\\"key\\\": y\",\"colorScheme\":\"dark\"}}" }
+    { "name": "string punctuation cannot hide duplicate", "json": "{\"schemaVersion\":1,\"desktop\":{\"colorScheme\":\"x: \\\"key\\\": y\",\"colorScheme\":\"dark\"}}" },
+    {"name": "extra settings type", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":[]}}"},
+    {"name": "extra settings scalar", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":\"x\"}}"},
+    {"name": "extra typed setting", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"editor.fontSize\":12}}}"},
+    {"name": "extra managed update setting", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"update.mode\":\"default\"}}}"},
+    {"name": "extra extension auto update", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"extensions.autoUpdate\":true}}}"},
+    {"name": "extra workspace trust", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"security.workspace.trust.enabled\":false}}}"},
+    {"name": "extra terminal profile", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"terminal.integrated.profiles.linux\":{\"x\":{\"path\":\"/tmp/x\"}}}}}"},
+    {"name": "extra terminal environment", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"terminal.integrated.env.linux\":{\"A\":\"b\"}}}}"},
+    {"name": "extra automatic tasks", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"task.allowAutomaticTasks\":\"on\"}}}"},
+    {"name": "extra setting name whitespace", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a b\":1}}}"},
+    {"name": "extra setting name empty", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"\":1}}}"},
+    {"name": "extra setting name control", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\\nb\":1}}}"},
+    {"name": "extra setting null", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\":null}}}"},
+    {"name": "extra setting nested null", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\":{\"b\":[null]}}}}"},
+    {"name": "extra setting nested duplicate", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\":{\"b\":1,\"b\":2}}}}"},
+    {"name": "extra setting duplicate", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\":1,\"a\":2}}}"},
+    {"name": "extra settings too deep", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":{\"f\":{\"g\":1}}}}}}}}}"},
+    {"name": "extra setting integer too large", "json": "{\"schemaVersion\":1,\"vscode\":{\"extraSettings\":{\"a\":9007199254740993}}}"}
   ]
 }

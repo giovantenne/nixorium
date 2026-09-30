@@ -22,6 +22,11 @@ assert accepts { browser.defaultApplication = "${repeated 120}.desktop"; };
 assert !(accepts { browser.defaultApplication = "${repeated 121}.desktop"; });
 assert accepts { vscode.extensions = [ "a.${repeated 126}" ]; };
 assert !(accepts { vscode.extensions = [ "a.${repeated 127}" ]; });
+assert accepts { vscode.extraSettings = lib.genAttrs (builtins.genList (i: "setting.${toString i}") 256) (_: true); };
+assert !(accepts { vscode.extraSettings = lib.genAttrs (builtins.genList (i: "setting.${toString i}") 257) (_: true); });
+assert accepts { vscode.extraSettings.${repeated 128} = true; };
+assert !(accepts { vscode.extraSettings.${repeated 129} = true; });
+assert accepts { vscode.extraSettings.a = 9007199254740992; };
 assert (evaluate (''{"schemaVersion":1}'' + lib.concatStrings (builtins.genList (_: " ") (65536 - 19)))).success;
 assert !(evaluate (''{"schemaVersion":1}'' + lib.concatStrings (builtins.genList (_: " ") (65537 - 19)))).success;
 true

@@ -37,7 +37,9 @@ type WorkspaceExtension struct {
 	Package            string   `json:"package"`
 	RequiredPackages   []string `json:"requiredPackages"`
 	RequiredExtensions []string `json:"requiredExtensions"`
-	Version            string   `json:"version,omitempty"`
+	// Writable extensions are copied into the home instead of linked.
+	Writable bool   `json:"writable"`
+	Version  string `json:"version,omitempty"`
 }
 
 type WorkspaceCatalog struct {

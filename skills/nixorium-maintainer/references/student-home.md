@@ -61,18 +61,38 @@ profile, or invoke the helper as a retry. Request separately authorized recovery
 based on the actual snapshot/home state. Sanitized, read-only managed snapshots
 under `/var/lib/home-snapshots/workspace` are not external backups.
 
+The managed seed supports VS Code through the typed settings, reviewed
+`vscode.extraSettings` (themes, telemetry, chat and extension preferences;
+terminal profile, shell and environment keys are refused), selected extensions
+and fixed `.vscode/argv.json` launch defaults (basic password store, no crash
+reporter). `assets/vscode-settings.json` configures staff and legacy homes
+only; nothing is imported from it automatically.
+
 ## Review and save a profile
 
 In the administrative TUI, open **Maintenance → Settings → Student workspace**.
 It loads the saved declaration, never the example. The supplied template already
 has a profile; preserve its defaults and any existing customization.
-Choose Desktop, Dock, Editor or Browser, then a supported field:
+Choose Desktop, Dock, VSCode or Browser, then a supported field:
 
 - Use “Inherit” (or an empty numeric field) to omit an override. “Clear” on a
   list means an explicit empty list, not inheritance.
-- Favorites and extensions come from the pinned deployment catalog. Space
-  toggles entries; Shift arrows reorder selected favorites. Adding catalog
-  entries or required software is a separate deployment change.
+- Favorites come from the pinned deployment catalog. Extensions list the
+  catalog, and `/` searches every packaged extension of the pinned package
+  set by name. Space toggles entries; Shift arrows reorder selected
+  favorites. A searched extension has no catalog prerequisites: install the
+  language tools it needs through the software workflow, select the
+  extensions it depends on, and expect a missing dependency to stop the
+  system build. Catalog entries (prerequisites, `writable` for extensions
+  that create files in their own folder) remain a deployment change.
+- VSCode → Other settings holds further editor defaults as name and value:
+  `a` adds one, `e` edits, `d` removes, and `p` takes a pasted settings file
+  (comments and trailing commas are accepted). Plain text is stored as text;
+  `true`, numbers, lists and objects keep their JSON meaning. Guided fields,
+  update keys, workspace trust, automatic tasks and integrated-terminal
+  profile/shell/environment keys are refused or skipped by name. These are
+  starting values, not policy: students can change them until the next reset.
+  Never paste tokens or account data; the profile enters the Nix store.
 - Enter keeps a field in the draft; Esc cancels that field. Leaving the editor
   discards unsaved changes. Use the visible Review action (`v`) to evaluate the
   complete candidate without writing it, then inspect the scrollable review.

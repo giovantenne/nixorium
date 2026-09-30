@@ -16,7 +16,7 @@ type workspaceField struct {
 	choices []string
 }
 
-var workspaceGroups = []string{"Desktop", "Dock", "Editor", "Browser"}
+var workspaceGroups = []string{"Desktop", "Dock", "VSCode", "Browser"}
 
 var workspaceFields = []workspaceField{
 	{"Desktop", "Favorite applications (ordered)", []string{"desktop", "favorites"}, "favorites", nil},
@@ -28,14 +28,15 @@ var workspaceFields = []workspaceField{
 	{"Dock", "Extend to screen edge", []string{"desktop", "dock", "extendHeight"}, "boolean", nil},
 	{"Dock", "Show trash", []string{"desktop", "dock", "showTrash"}, "boolean", nil},
 	{"Dock", "Show mounts", []string{"desktop", "dock", "showMounts"}, "boolean", nil},
-	{"Editor", "Pinned VS Code extensions", []string{"vscode", "extensions"}, "extensions", nil},
-	{"Editor", "Font size (8–40)", []string{"vscode", "settings", "editor.fontSize"}, "number", nil},
-	{"Editor", "Tab size (1–8)", []string{"vscode", "settings", "editor.tabSize"}, "number", nil},
-	{"Editor", "Insert spaces", []string{"vscode", "settings", "editor.insertSpaces"}, "boolean", nil},
-	{"Editor", "Word wrap", []string{"vscode", "settings", "editor.wordWrap"}, "choice", []string{"off", "on", "wordWrapColumn", "bounded"}},
-	{"Editor", "Format on save", []string{"vscode", "settings", "editor.formatOnSave"}, "boolean", nil},
-	{"Editor", "Minimap", []string{"vscode", "settings", "editor.minimap.enabled"}, "boolean", nil},
-	{"Editor", "Auto save", []string{"vscode", "settings", "files.autoSave"}, "choice", []string{"off", "onFocusChange", "onWindowChange"}},
+	{"VSCode", "Pinned VS Code extensions", []string{"vscode", "extensions"}, "extensions", nil},
+	{"VSCode", "Font size (8–40)", []string{"vscode", "settings", "editor.fontSize"}, "number", nil},
+	{"VSCode", "Tab size (1–8)", []string{"vscode", "settings", "editor.tabSize"}, "number", nil},
+	{"VSCode", "Insert spaces", []string{"vscode", "settings", "editor.insertSpaces"}, "boolean", nil},
+	{"VSCode", "Word wrap", []string{"vscode", "settings", "editor.wordWrap"}, "choice", []string{"off", "on", "wordWrapColumn", "bounded"}},
+	{"VSCode", "Format on save", []string{"vscode", "settings", "editor.formatOnSave"}, "boolean", nil},
+	{"VSCode", "Minimap", []string{"vscode", "settings", "editor.minimap.enabled"}, "boolean", nil},
+	{"VSCode", "Auto save", []string{"vscode", "settings", "files.autoSave"}, "choice", []string{"off", "onFocusChange", "onWindowChange"}},
+	{"VSCode", "Other settings", []string{"vscode", "extraSettings"}, "settings", nil},
 	{"Browser", "Default browser", []string{"browser", "defaultApplication"}, "browser", nil},
 }
 
@@ -99,6 +100,9 @@ func workspaceSetValue(profile domain.WorkspaceProfile, field workspaceField, va
 func workspaceValueText(value any) string {
 	if value == nil {
 		return "Inherit"
+	}
+	if settings, ok := value.(map[string]any); ok {
+		return fmt.Sprintf("%d setting(s)", len(settings))
 	}
 	if entries, ok := value.([]any); ok {
 		if len(entries) == 0 {

@@ -45,6 +45,43 @@ let
     else let checked = map check value; in
       if builtins.length (lib.unique checked) != builtins.length checked then fail "duplicate list entry"
       else checked;
+  # Free-form editor defaults are reviewed text, not typed policy. Keep the
+  # typed fields, managed update keys and program-launching settings out of it.
+  typedSettings = [
+    "editor.fontSize" "editor.tabSize" "editor.insertSpaces" "editor.wordWrap"
+    "editor.formatOnSave" "editor.minimap.enabled" "files.autoSave"
+  ];
+  deniedSettings = typedSettings ++ [
+    "update.mode" "extensions.autoUpdate" "extensions.autoCheckUpdates"
+    "task.allowAutomaticTasks"
+  ];
+  deniedSettingPrefixes = [
+    "security.workspace.trust."
+    "terminal.integrated.profiles."
+    "terminal.integrated.automationProfile."
+    "terminal.integrated.shell."
+    "terminal.integrated.shellArgs."
+    "terminal.integrated.env."
+  ];
+  settingValue = value:
+    if value == null then fail "null is not supported"
+    else if builtins.isInt value && (value > 9007199254740992 || value < -9007199254740992)
+    then fail "integer outside supported range"
+    else if builtins.isAttrs value then builtins.mapAttrs (_: settingValue) value
+    else if builtins.isList value then map settingValue value
+    else value;
+  extraSettings = value:
+    if !builtins.isAttrs value then fail "expected an object"
+    else if builtins.length (builtins.attrNames value) > 256 then fail "too many extra settings"
+    else builtins.mapAttrs (key: item:
+      if builtins.stringLength key > 128
+        || builtins.match "[[A-Za-z0-9][]A-Za-z0-9_.[-]*" key == null
+      then fail "invalid setting name"
+      else if builtins.elem key deniedSettings
+        || builtins.any (prefix: lib.hasPrefix prefix key) deniedSettingPrefixes
+      then fail "setting is not supported as an extra setting"
+      else settingValue item
+    ) value;
   profile = object {
     schemaVersion = integer 1 1;
     desktop = object {
@@ -71,6 +108,7 @@ let
         "editor.minimap.enabled" = boolean;
         "files.autoSave" = enum [ "off" "onFocusChange" "onWindowChange" ];
       };
+      inherit extraSettings;
     };
     browser = object { defaultApplication = desktopID; };
   } raw;

@@ -2,15 +2,18 @@
 let
   inherit (pkgs) lib;
   extensionID = "ritwickdey.liveserver";
+  # Packaged extensions keep the publisher's capitalization; profile IDs are
+  # lowercase. The synthetic fixture covers that difference.
+  fixtureDirectory = "RitwickDey.LiveServer";
   fixtureExtension = manifest: pkgs.runCommand "workspace-extension-fixture" {
     version = "1.0.0";
-    passthru.vscodeExtUniqueId = extensionID;
+    passthru.vscodeExtUniqueId = fixtureDirectory;
   } ''
-    mkdir -p "$out/share/vscode/extensions/${extensionID}"
+    mkdir -p "$out/share/vscode/extensions/${fixtureDirectory}"
     cp ${pkgs.writeText "package.json" (builtins.toJSON manifest)} \
-      "$out/share/vscode/extensions/${extensionID}/package.json"
+      "$out/share/vscode/extensions/${fixtureDirectory}/package.json"
   '';
-  fixtureManifest = { publisher = "ritwickdey"; name = "liveserver"; version = "1.0.0"; };
+  fixtureManifest = { publisher = "RitwickDey"; name = "LiveServer"; version = "1.0.0"; };
   extension = if usePinnedExtension then pkgs.vscode-extensions.ritwickdey.liveserver
     else fixtureExtension fixtureManifest;
   # The synthetic editor keeps this artifact check independent of an editor
@@ -63,9 +66,16 @@ let
         "editor.minimap.enabled" = false;
         "files.autoSave" = "onFocusChange";
       };
+      extraSettings = {
+        "telemetry.telemetryLevel" = "off";
+        "[python]"."editor.rulers" = [ 80 ];
+      };
     };
   };
   seed = build resolved;
+  writableSeed = build (resolved // {
+    extensions = map (entry: entry // { writable = true; }) resolved.extensions;
+  });
   home = import ../lib/build-workspace-home.nix { inherit lib; pkgs = seedPackages; } {
     resolution = resolved;
     labSettings = { studentGitName = "Student"; studentGitEmail = "student@example.invalid"; };
@@ -117,6 +127,9 @@ pkgs.runCommand "nixorium-workspace-seed${lib.optionalString usePinnedExtension 
   cmp ${seed}/manifest.json ${home}/manifest.json
   cmp ${seed}/home/.config/Code/User/settings.json ${home}/home/.config/Code/User/settings.json
   test -L ${home}/home/.vscode/extensions/${extensionID}
+  jq -e '."password-store" == "basic" and ."enable-crash-reporter" == false and length == 2' \
+    ${seed}/home/.vscode/argv.json
+  test ! -e ${emptySeed}/home/.vscode
   export XDG_CONFIG_HOME="$TMPDIR/student-config"
   export XDG_CACHE_HOME="$TMPDIR/student-cache"
   export GSETTINGS_BACKEND=dconf
@@ -144,8 +157,18 @@ pkgs.runCommand "nixorium-workspace-seed${lib.optionalString usePinnedExtension 
     and ."editor.wordWrap" == "bounded" and ."editor.formatOnSave" == false
     and ."editor.minimap.enabled" == false and ."files.autoSave" == "onFocusChange"
     and ."extensions.autoUpdate" == false and ."extensions.autoCheckUpdates" == false
-    and ."update.mode" == "none" and length == 10' ${seed}/home/.config/Code/User/settings.json
-  test "$(readlink ${seed}/home/.vscode/extensions/${extensionID})" = ${extension}/share/vscode/extensions/${extensionID}
+    and ."update.mode" == "none"
+    and ."telemetry.telemetryLevel" == "off" and ."[python]"."editor.rulers" == [80]
+    and length == 12' ${seed}/home/.config/Code/User/settings.json
+  test "$(readlink ${seed}/home/.vscode/extensions/${extensionID})" = ${extension}/share/vscode/extensions/${extension.vscodeExtUniqueId}
+  # A writable extension is a read-only copy in the seed, not a link.
+  test -f ${writableSeed}/home/.vscode/extensions/${extensionID}/package.json
+  test ! -L ${writableSeed}/home/.vscode/extensions/${extensionID}
+  cmp ${writableSeed}/home/.vscode/extensions/${extensionID}/package.json \
+    ${extension}/share/vscode/extensions/${extension.vscodeExtUniqueId}/package.json
+  test -z "$(find ${writableSeed}/home -type l -print -quit)"
+  test -z "$(find ${writableSeed}/home -perm /222 -print -quit)"
+  jq -e '.extensions | length == 1 and (.[0] | has("writable") | not)' ${writableSeed}/manifest.json
   test "$(jq -r '.extensions[0].version' ${seed}/manifest.json)" = ${lib.escapeShellArg extension.version}
   for MIME in text/html x-scheme-handler/http x-scheme-handler/https; do
     grep -Fx "$MIME=chromium-browser.desktop;" ${seed}/home/.config/mimeapps.list
@@ -182,7 +205,8 @@ pkgs.runCommand "nixorium-workspace-seed${lib.optionalString usePinnedExtension 
   test "$(gsettings get org.gnome.desktop.background picture-uri)" = "'file:///etc/lab/backgrounds/fixture.jpg'"
 
   for BUILDER in ${invalidBuilder (fixtureManifest // { publisher = "unexpected"; })} \
-    ${invalidBuilder (fixtureManifest // { version = "9.9.9"; })}; do
+    ${invalidBuilder (fixtureManifest // { version = "9.9.9"; })} \
+    ${invalidBuilder (fixtureManifest // { extensionDependencies = [ "Another.Extension" ]; })}; do
     INVALID_OUTPUT=$(mktemp -d)
     if env out="$INVALID_OUTPUT" ${pkgs.bash}/bin/bash -e "$BUILDER"; then
       echo 'Invalid extension payload was accepted' >&2

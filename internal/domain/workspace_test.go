@@ -67,6 +67,13 @@ func TestWorkspaceLimits(t *testing.T) {
 		}
 		return result
 	}
+	settings := func(n int) map[string]any {
+		result := make(map[string]any, n)
+		for i := range n {
+			result[fmt.Sprintf("setting.%d", i)] = i
+		}
+		return result
+	}
 	for _, c := range []struct {
 		name    string
 		profile map[string]any
@@ -80,6 +87,11 @@ func TestWorkspaceLimits(t *testing.T) {
 		{"desktop ID over limit", map[string]any{"browser": map[string]any{"defaultApplication": strings.Repeat("a", 121) + ".desktop"}}, false},
 		{"extension ID at limit", map[string]any{"vscode": map[string]any{"extensions": []string{"a." + strings.Repeat("a", 126)}}}, true},
 		{"extension ID over limit", map[string]any{"vscode": map[string]any{"extensions": []string{"a." + strings.Repeat("a", 127)}}}, false},
+		{"extra settings at limit", map[string]any{"vscode": map[string]any{"extraSettings": settings(256)}}, true},
+		{"extra settings over limit", map[string]any{"vscode": map[string]any{"extraSettings": settings(257)}}, false},
+		{"extra setting name at limit", map[string]any{"vscode": map[string]any{"extraSettings": map[string]any{strings.Repeat("a", 128): true}}}, true},
+		{"extra setting name over limit", map[string]any{"vscode": map[string]any{"extraSettings": map[string]any{strings.Repeat("a", 129): true}}}, false},
+		{"extra setting integer at limit", map[string]any{"vscode": map[string]any{"extraSettings": map[string]any{"a": 1 << 53}}}, true},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			c.profile["schemaVersion"] = 1

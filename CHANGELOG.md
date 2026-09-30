@@ -40,6 +40,28 @@ The project follows [Semantic Versioning](https://semver.org/).
   computers from update failures without weakening pending-evidence recovery,
   authenticated verification, exact targets or the required confirmation.
 
+- Student workspace profiles accept `vscode.extraSettings`: reviewed free-form
+  editor defaults such as theme, telemetry and extension preferences. Typed
+  settings, managed update keys, workspace-trust overrides, automatic tasks and
+  integrated-terminal profile/shell/environment keys are refused. The managed
+  seed also writes the fixed `.vscode/argv.json` launch defaults.
+
+- Packaged VS Code extensions whose identity contains uppercase letters, such
+  as Pylance, can now be selected by their lowercase ID. The seed build refuses
+  an extension whose declared dependency is not selected.
+
+- The workspace extension catalog is no longer an allowlist: `/` in VSCode →
+  extensions searches every packaged extension of the pinned package set by
+  name, and package search matches `vscode-extensions.<text>` across
+  publishers. Catalog entries may set `writable` so an extension that creates
+  files in its own folder (the Python and Java debuggers) is copied into the
+  reset home instead of linked; the reset helper accepts either form.
+
+- The student workspace editor names its editor section VSCode and adds
+  **Other settings**: add, edit or remove further editor defaults by name and
+  value, or take them from a pasted settings file. Refused names are reported
+  without echoing their values.
+
 - Reopening the administrator TUI discovers surviving controller/PXE jobs from
   local systemd state and bounded progress records, including revision-bound
   controller instances. Overview offers read-only attachment; stale running

@@ -95,6 +95,11 @@ let
   empty = resolve ((profile { desktop.favorites = []; vscode.extensions = []; }) // {
     catalog = catalog // { baseline = catalog.baseline // { vscode.extensions = [ "redhat.java" ]; }; };
   });
+  # The catalog is not an allowlist: a packaged extension without an entry is
+  # linked with no prerequisites. It must still exist in the pinned set.
+  uncatalogued = resolve ((profile { vscode.extensions = [ "vscjava.vscode-java-pack" ]; }) // {
+    catalog = catalog // { extensions = [ (builtins.head catalog.extensions) ]; };
+  });
   controllerOnly = resolve (args // { clientNames = []; hostPackages = { pc99 = software; }; });
   minimal = resolve {
     catalog = catalog // { baseline = { schemaVersion = 1; }; };
@@ -128,9 +133,17 @@ assert map (entry: entry.id) result.extensions == [ "redhat.java" "vscjava.vscod
 assert builtins.all (entry: entry.version == "1.2.3") result.extensions;
 assert empty.effective.desktop.favorites == [] && empty.effective.vscode.extensions == [];
 assert !(builtins.elem "jdk" empty.requiredPackages);
+assert map (entry: { inherit (entry) id writable requiredPackages; }) uncatalogued.extensions
+  == [ { id = "vscjava.vscode-java-pack"; writable = false; requiredPackages = []; } ];
+assert !(accepted ((profile { vscode.extensions = [ "not.packaged" ]; }) // { catalog = catalog // { extensions = []; }; }));
+assert !(accepted (args // { catalog = catalog // { extensions = [ ((builtins.head catalog.extensions) // { writable = "yes"; }) ]; }; }));
+assert (builtins.head result.extensions).writable == false;
 assert controllerOnly.targets == [ { name = "pc99"; role = "controller"; } ];
 assert minimal.requiredPackages == [] && minimal.extensions == [];
+# Marketplace identities are case-insensitive; lowercase profile IDs match.
+assert (builtins.head (withExtension (java // { vscodeExtUniqueId = "RedHat.Java"; })).extensions).id == "redhat.java";
 assert rejectsValue (withExtension (java // { vscodeExtUniqueId = "another.extension"; }));
+assert rejectsValue (withExtension (builtins.removeAttrs java [ "vscodeExtUniqueId" ]));
 assert rejectsValue (withExtension (java // { version = ""; }));
 assert rejectsValue (withExtension (java // { meta = java.meta // { broken = true; }; }));
 assert rejectsValue (withExtension (java // { meta = java.meta // { knownVulnerabilities = [ "test advisory" ]; }; }));

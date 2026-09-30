@@ -365,8 +365,10 @@ On supporting pins, [`workspace plan` and `workspace apply`](skills/nixorium-mai
 review and save a candidate JSON with source/pin conflict checks. Saving changes
 only the declaration, not any current home.
 The administrative TUI offers the same reviewed save under **Maintenance →
-Settings → Student workspace**, with guided desktop, dock, editor/extension and
-browser fields. Catalog changes and unsupported application settings remain
+Settings → Student workspace**, with guided desktop, dock, VS Code and
+browser fields, including further reviewed VS Code settings by name and value
+and a search across packaged extensions.
+Catalog changes and unsupported application settings remain
 explicit deployment edits; no whole-home capture is performed.
 For an existing profile, system/package update reviews also compare pinned
 editor/extension versions and preferences. This does not certify plugin loading

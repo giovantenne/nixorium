@@ -64,7 +64,25 @@ let
       paths = map
         (name: builtins.concatStringsSep "." (parentPath ++ [ name ]))
         matchingNames;
-      results = builtins.filter (item: item != null) (map describe paths);
+      # Editor extensions are grouped by publisher, so "vscode-extensions.<text>"
+      # also matches publisher.name across every publisher. Only extensions
+      # selectable by their lowercase identifier are listed.
+      extensionPaths = lib.concatMap (publisher:
+        let
+          group = builtins.tryEval (
+            let value = parent.${publisher}; in
+            if builtins.isAttrs value && !(lib.isDerivation value) then builtins.attrNames value else []
+          );
+        in
+        builtins.filter (path:
+          let identity = builtins.tryEval ((resolve path).vscodeExtUniqueId or null); in
+          identity.success && builtins.isString identity.value
+          && "vscode-extensions.${lib.toLower identity.value}" == path
+        ) (map (name: "vscode-extensions.${publisher}.${name}") (builtins.filter
+          (name: validSegment name && lib.hasInfix (lib.toLower needle) (lib.toLower "${publisher}.${name}"))
+          (if group.success then group.value else [])))
+      ) (if parentPath == [ "vscode-extensions" ] then builtins.filter validSegment names else []);
+      results = builtins.filter (item: item != null) (map describe (paths ++ extensionPaths));
     in
     if !validPath query || !builtins.isInt limit || limit < 1 || limit > 100 then
       []

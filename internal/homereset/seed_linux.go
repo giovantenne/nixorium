@@ -81,8 +81,10 @@ func immutableStoreFile(name string) error {
 	return nil
 }
 
-// validateSeed inspects the entire small preference/scaffold payload before
-// mutation. Only declared, identity-checked extension links may leave the seed.
+// validateSeed inspects the entire preference/scaffold payload before mutation.
+// Each declared extension is either one link to its identity-checked payload
+// or a copy of it (for extensions that write into their own directory); no
+// other link may leave the seed.
 // The Nix store is a trusted input, never a user-writable home template.
 func validateSeed(seed string) error {
 	if !storePath.MatchString(seed) || filepath.Dir(seed) != "/nix/store" {
@@ -122,15 +124,19 @@ func validateSeed(seed string) error {
 		wanted = *profile.VSCode.Extensions
 	}
 	var ids []string
-	links := make(map[string]string)
+	// Extension directory in the home -> store payload directory.
+	sources := make(map[string]string)
+	present := make(map[string]bool)
 	for _, extension := range manifest.Extensions {
 		if extension.Path != ".vscode/extensions/"+extension.ID || extension.Version == "" || !storePath.MatchString(extension.Source) || filepath.Clean(extension.Source) != extension.Source {
 			return errors.New("invalid extension manifest entry")
 		}
-		if !strings.HasSuffix(extension.Source, "/share/vscode/extensions/"+extension.ID) {
+		// Identifiers are lowercase; packaged directories keep publisher case.
+		if !strings.HasSuffix(filepath.Dir(extension.Source), "/share/vscode/extensions") ||
+			!strings.EqualFold(filepath.Base(extension.Source), extension.ID) {
 			return errors.New("unexpected extension payload path")
 		}
-		if _, exists := links[extension.Path]; exists {
+		if _, exists := sources[extension.Path]; exists {
 			return errors.New("duplicate extension manifest entry")
 		}
 		if err := immutableStoreFile(extension.Source + "/package.json"); err != nil {
@@ -152,7 +158,7 @@ func validateSeed(seed string) error {
 			return errors.New("extension payload identity mismatch")
 		}
 		ids = append(ids, extension.ID)
-		links[extension.Path] = extension.Source
+		sources[extension.Path] = extension.Source
 	}
 	if !slices.Equal(ids, wanted) {
 		return errors.New("seed extensions differ from the profile")
@@ -163,7 +169,7 @@ func validateSeed(seed string) error {
 			return walkErr
 		}
 		count++
-		if count > 512 {
+		if count > 8192 {
 			return errors.New("seed has too many entries")
 		}
 		info, err := entry.Info()
@@ -182,17 +188,28 @@ func validateSeed(seed string) error {
 			if err != nil {
 				return err
 			}
-			if links[relative] == "" || links[relative] != target {
+			if sources[relative] == "" || sources[relative] != target {
 				return errors.New("undeclared seed link")
 			}
-			delete(links, relative)
+			present[relative] = true
 			return nil
 		}
 		if info.Mode().Perm()&0222 != 0 || (!entry.IsDir() && !info.Mode().IsRegular()) {
 			return errors.New("unsupported or writable seed entry")
 		}
+		if source := sources[filepath.Dir(seedRelative(seed, name))]; source != "" && filepath.Base(name) == "package.json" {
+			copied, err := readBounded(name, 4*1024*1024)
+			if err != nil {
+				return err
+			}
+			original, err := readBounded(source+"/package.json", 4*1024*1024)
+			if err != nil || !bytes.Equal(copied, original) {
+				return errors.New("copied extension differs from its payload")
+			}
+			present[filepath.Dir(seedRelative(seed, name))] = true
+		}
 		size += info.Size()
-		if size > 16*1024*1024 {
+		if size > 256*1024*1024 {
 			return errors.New("seed exceeds the supported size")
 		}
 		return nil
@@ -200,10 +217,18 @@ func validateSeed(seed string) error {
 	if err != nil {
 		return err
 	}
-	if len(links) != 0 {
-		return errors.New("declared extension link is missing")
+	if len(present) != len(sources) {
+		return errors.New("declared extension payload is missing")
 	}
 	return nil
+}
+
+func seedRelative(seed, name string) string {
+	result, err := filepath.Rel(seed+"/home", name)
+	if err != nil {
+		return ""
+	}
+	return result
 }
 
 // copyTree reads only a previously checked immutable/private tree. The caller

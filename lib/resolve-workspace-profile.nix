@@ -46,13 +46,16 @@ let
     else { id = desktopID item.id; package = packagePath item.package; inherit browser; };
   normalizeExtension = raw:
     let
-      item = object [ "id" "package" "requiredPackages" "requiredExtensions" ] [ "id" "package" ] raw;
+      item = object [ "id" "package" "requiredPackages" "requiredExtensions" "writable" ] [ "id" "package" ] raw;
       id = extensionID item.id;
       package = packagePath item.package;
+      # Copied rather than linked: the extension writes into its own folder.
+      writable = item.writable or false;
     in
     if package != "vscode-extensions.${id}" then fail "extension package must match its pinned vscode-extensions ID"
+    else if !builtins.isBool writable then fail "extension.writable must be boolean"
     else {
-      inherit id package;
+      inherit id package writable;
       requiredPackages = packageList (item.requiredPackages or []);
       requiredExtensions = extensionList (item.requiredExtensions or []);
     };
@@ -63,7 +66,15 @@ let
   applicationsByID = builtins.listToAttrs (map (entry: { name = entry.id; value = entry; }) applications);
   extensionsByID = builtins.listToAttrs (map (entry: { name = entry.id; value = entry; }) extensions);
   application = id: applicationsByID.${id} or (fail "desktop application is not in the deployment catalog");
-  extension = id: extensionsByID.${id} or (fail "extension is not in the deployment catalog");
+  # The catalog records what a packaged extension needs; it is not an
+  # allowlist. Any other ID must still be an extension of the pinned set.
+  extension = id: extensionsByID.${id} or {
+    inherit id;
+    package = "vscode-extensions.${id}";
+    requiredPackages = [];
+    requiredExtensions = [];
+    writable = false;
+  };
   favorites = map application (effective.desktop.favorites or []);
   browser = if effective ? browser.defaultApplication
     then application effective.browser.defaultApplication else null;
@@ -88,7 +99,8 @@ let
       info = describe entry.package;
       pkg = packageTools.resolve entry.package;
     in
-    if (pkg.vscodeExtUniqueId or null) != entry.id
+    # Marketplace identities are case-insensitive; profile IDs are lowercase.
+    if !builtins.isString (pkg.vscodeExtUniqueId or null) || lib.toLower pkg.vscodeExtUniqueId != entry.id
     then fail "extension identity does not match its package metadata"
     else entry // { inherit (info) version; }
   ) selectedExtensions;

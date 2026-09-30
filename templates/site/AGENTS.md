@@ -54,11 +54,12 @@ configuration, software, home customization, diagnostics, and operations.
   prepared candidate and source-bound JSON save; this does not authorize
   deployment or a home reset. The administrative TUI can edit supported fields
   under Maintenance → Settings → Student workspace using the same review/save
-  boundary. On supporting pins its confirmed save also records just the profile
-  locally, preserving unrelated changes. CLI apply remains file-only. Partial
-  save/record results require Git inspection, not blind retry. A successful TUI
-  save offers controller review and later client selection; neither is implicit.
-  Catalog changes remain explicit deployment edits.
+  boundary, including search across packaged extensions. On supporting pins its
+  confirmed save also records just the profile locally, preserving unrelated
+  changes. CLI apply remains file-only. Partial save/record results require Git
+  inspection, not blind retry. A successful TUI save offers controller review
+  and later client selection; neither is implicit. Catalog changes
+  remain explicit deployment edits.
   Existing profiles appear in input-update review with current/proposed pinned
   versions and dependencies. Use package-base updates for packaged extensions;
   qualify loading on a selected client before broader distribution.

@@ -2,9 +2,11 @@ package presentation
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -99,6 +101,14 @@ func workspaceChangesText(writer io.Writer, inspection domain.WorkspaceInspectio
 		if reflect.DeepEqual(before, after) {
 			continue
 		}
+		if field.kind == "settings" {
+			// Name each changed setting rather than a count.
+			for _, line := range workspaceEntryChanges(field, before, after) {
+				changes++
+				fmt.Fprintf(writer, "  %s / %s / %s\n", field.group, field.label, safeWorkspaceText(line))
+			}
+			continue
+		}
 		changes++
 		fmt.Fprintf(writer, "  %s / %s: %s → %s\n", field.group, field.label,
 			safeWorkspaceText(workspaceValueText(before)), safeWorkspaceText(workspaceValueText(after)))
@@ -110,6 +120,58 @@ func workspaceChangesText(writer io.Writer, inspection domain.WorkspaceInspectio
 			fmt.Fprintln(writer, "  Additional profile settings changed; see the declarations below.")
 		}
 	}
+}
+
+// workspaceEntryChanges compares extra settings by name.
+func workspaceEntryChanges(field workspaceField, before, after any) []string {
+	entries := func(value any) map[string]string {
+		result := map[string]string{}
+		switch items := value.(type) {
+		case map[string]any:
+			for name, item := range items {
+				result[name] = workspaceShortValue(item)
+			}
+		}
+		return result
+	}
+	old, updated := entries(before), entries(after)
+	names := []string{}
+	for name := range old {
+		names = append(names, name)
+	}
+	for name := range updated {
+		if _, ok := old[name]; !ok {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	lines := []string{}
+	for _, name := range names {
+		previous, had := old[name]
+		next, has := updated[name]
+		switch {
+		case !had:
+			previous = "(none)"
+		case !has:
+			next = "removed"
+		case previous == next:
+			continue
+		}
+		lines = append(lines, name+": "+previous+" → "+next)
+	}
+	return lines
+}
+
+func workspaceShortValue(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return "?"
+	}
+	text := string(data)
+	if len(text) > 60 {
+		text = strings.ToValidUTF8(text[:60], "") + "…"
+	}
+	return text
 }
 
 func safeWorkspaceText(value string) string {

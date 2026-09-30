@@ -49,6 +49,7 @@ let
     };
     hostSoftwarePackages = [ "chromium" "vscode" "nodejs" ];
   };
+  packageSearch = (import ../lib/software-packages.nix { inherit lib pkgs; allowUnfree = true; }).search;
   home = enabled: import ../templates/site/modules/home-profile.nix
     (homeArgs // { workspaceRuntimeEnabled = enabled; });
   legacyHome = (home false).system.activationScripts.siteHomeProfile.text;
@@ -75,6 +76,11 @@ assert !(builtins.elem "io.veyon.desktop" example.effective.desktop.favorites);
 assert rejects (resolveFor (lib.remove "chromium" initialPackages) [] profileJSON);
 assert rejects (resolveFor initialPackages [] ''{"schemaVersion":1,"vscode":{"extensions":["ritwickdey.liveserver"]}}'');
 assert builtins.deepSeq (resolveFor (initialPackages ++ [ "vscode" ]) [] ''{"schemaVersion":1,"vscode":{"extensions":["ritwickdey.liveserver"]}}'') true;
+# Extension search spans publishers and lists only selectable identifiers.
+assert builtins.elem "vscode-extensions.ms-python.vscode-pylance"
+  (map (item: item.id) (packageSearch { query = "vscode-extensions.pylance"; limit = 40; }));
+assert builtins.all (item: builtins.length (lib.splitString "." item.id) == 3)
+  (packageSearch { query = "vscode-extensions.python"; limit = 40; });
 assert lib.hasInfix "/var/lib/home-template/learner" legacyHome;
 assert !(lib.hasInfix "/var/lib/home-template/learner" managedHome);
 assert staffLines legacyHome != [] && staffLines legacyHome == staffLines managedHome;

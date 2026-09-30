@@ -423,14 +423,14 @@ distribution action when no client is affected.
 
 ### Workspace preparation
 
-Preparation and runtime activation are separate. The template ships a catalog
-and an inactive Essential example, never an active `workspace-profile.json`.
-With no `workspaceProfileJSON`, `nixoriumWorkspace`
-is `null` and existing home/template/login behavior remains unchanged. With a
-profile, the output reports `state = "prepared"`, the configured `studentUser`,
-all target hosts, declared/effective preferences, normalized catalog and pinned
-package/extension versions. `runtimeEnabled` records the separate runtime
-choice; `seed` is the immutable build-output path when enabled, otherwise null.
+The template ships a catalog, an active `workspace-profile.json` with Essential
+defaults and `workspace-profile.example.json`, a proposal with the same defaults
+that is never read as the declaration. With no `workspaceProfileJSON` (hand-written callers),
+`nixoriumWorkspace` is `null` and the legacy home/template/login behavior
+remains. With a profile, the output reports `state = "prepared"`, the
+configured `studentUser`, all target hosts, declared/effective preferences,
+normalized catalog and pinned package/extension versions. `runtimeEnabled` is
+derived from profile presence and `seed` is the immutable build-output path.
 Neither field reports live installed or active state.
 
 `workspaceProfileJSON` must be raw JSON text, limited to 64 KiB, with integer
@@ -446,20 +446,32 @@ nulls and wrong types are rejected. Optional sections are:
   (8–40), `editor.tabSize` (1–8), booleans `editor.insertSpaces`,
   `editor.formatOnSave`, `editor.minimap.enabled`, `editor.wordWrap`
   (`off`/`on`/`wordWrapColumn`/`bounded`), and `files.autoSave`
-  (`off`/`onFocusChange`/`onWindowChange`).
+  (`off`/`onFocusChange`/`onWindowChange`). Optional `extraSettings` holds up
+  to 256 further editor settings as reviewed free-form JSON values. It refuses
+  the typed settings above, the managed update keys, workspace-trust overrides,
+  automatic tasks and integrated-terminal profile, shell and environment keys.
 - `browser`: `defaultApplication`, a desktop ID catalogued as a browser.
 
 Identifiers have a 128-byte ASCII limit. Desktop IDs end in `.desktop` and
 cannot contain paths, whitespace or control characters. There are no arbitrary
 files, commands, account selectors, download URLs, or whole-home imports.
+Extra settings are initial editor preferences only; they are not policy and
+the student can change them until the next reset.
 
 The catalog is a Nix attribute set containing `schemaVersion = 1`, `baseline`
 (a profile attribute set using the same schema), `applications` and `extensions`.
 Both lists are limited to 128 unique entries. Applications contain `id`
 (desktop ID), `package` (pinned package attribute) and optional boolean `browser`.
 Extensions contain `id`, matching `package = "vscode-extensions.<id>"`, and
-optional `requiredPackages` and `requiredExtensions` lists. Dependencies must
-be present explicitly; they are never installed or selected automatically.
+optional `requiredPackages` and `requiredExtensions` lists and boolean
+`writable`. IDs are lowercase; the packaged identity is compared without
+regard to case. The extension catalog is not an allowlist: a profile may select
+any extension of the pinned package set, which then has no prerequisites.
+Dependencies must be present explicitly; they are never installed or selected
+automatically, and the seed build fails when a declared one is missing.
+Extensions are linked to their store payload; `writable` ones are copied into
+the home instead, because some debug adapters create files in their own folder
+and the editor identifies an extension by the real path of its running code.
 Fields omitted from the profile inherit the baseline; explicit lists replace
 baseline lists, including `[]` to clear them. An empty section does not erase
 baseline fields. Catalog declarations do not prove plugin compatibility or
@@ -502,11 +514,18 @@ controller, including controller-only mode, without changing controller autologi
 or staff preferences. Profile/catalog and seed metadata survive offline
 reconstruction. Evaluation and saving do not activate a system or reset a home.
 
+Package search accepts `vscode-extensions.<text>` and then matches
+`publisher.name` across all publishers, listing only extensions selectable by
+their lowercase ID. The TUI uses it for extension search.
+
 The immutable seed combines supported preferences with a neutral shell/Git/XDG
 scaffold. XDG folders use stable English names. It does not copy a live home,
 the writable legacy template, or arbitrary application assets. Extension links
 point to identity-checked pinned store payloads, and editor update checks start
-disabled as editable session defaults. This is not proof that every plugin
+disabled as editable session defaults. The seed build fails when a selected
+extension declares a dependency that is not selected. With a `vscode` section
+the seed also writes `.vscode/argv.json` with the basic password store and no
+crash reporter. This is not proof that every plugin
 loads correctly or works offline; qualify each supported plugin separately.
 Wallpapers are composed with the profile dconf source before restoration.
 

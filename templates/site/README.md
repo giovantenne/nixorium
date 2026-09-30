@@ -254,11 +254,15 @@ build, deploy or reset. See the
 [save procedure](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
 for requirements and conflict/durability handling. The administrative TUI exposes
 the same save boundary at **Maintenance → Settings → Student workspace**.
-Choose desktop, dock, editor/extensions or browser, keep each change in the
+Choose Desktop, Dock, VSCode or Browser, keep each change in the
 draft, then review the complete proposal and confirm the save. “Inherit” uses
-the deployment baseline; “Clear” is an explicit empty list. Saving includes
+the deployment baseline; “Clear” is an explicit empty list. VSCode → Other
+settings adds further editor defaults by name and value, or from a pasted
+settings file; settings that can start programs are refused. Saving includes
 an automatic local commit of just the profile, then a separate controller
-review and client selection; it never deploys automatically. Catalog additions and
+review and client selection; it never deploys automatically. In VSCode →
+extensions, `/` searches every packaged extension of the pinned package set;
+the catalog only adds prerequisites to common ones. Catalog additions and
 unsupported fields remain manual deployment edits. Older pins/commands may not
 provide this workflow; the inactive example is never loaded automatically.
 Existing profiles are also compared during input-update review: current versus

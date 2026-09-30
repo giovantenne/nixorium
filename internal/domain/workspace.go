@@ -43,6 +43,9 @@ type WorkspaceDock struct {
 type WorkspaceVSCode struct {
 	Extensions *[]string                `json:"extensions,omitempty"`
 	Settings   *WorkspaceVSCodeSettings `json:"settings,omitempty"`
+	// ExtraSettings are reviewed free-form editor defaults. Typed fields,
+	// managed update keys and program-launching settings are refused.
+	ExtraSettings *map[string]any `json:"extraSettings,omitempty"`
 }
 
 type WorkspaceVSCodeSettings struct {
@@ -62,12 +65,50 @@ type WorkspaceBrowser struct {
 var workspaceDesktopID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*\.desktop$`)
 var workspaceExtensionID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$`)
 
+var workspaceSettingName = regexp.MustCompile(`^[\[A-Za-z0-9][\]A-Za-z0-9_.\[-]*$`)
+
+const workspaceMaxExtraSettings = 256
+const workspaceMaxSettingInteger = 1 << 53
+
+var workspaceDeniedSettings = []string{
+	"editor.fontSize", "editor.tabSize", "editor.insertSpaces", "editor.wordWrap",
+	"editor.formatOnSave", "editor.minimap.enabled", "files.autoSave",
+	"update.mode", "extensions.autoUpdate", "extensions.autoCheckUpdates",
+	"task.allowAutomaticTasks",
+}
+
+var workspaceDeniedSettingPrefixes = []string{
+	"security.workspace.trust.",
+	"terminal.integrated.profiles.",
+	"terminal.integrated.automationProfile.",
+	"terminal.integrated.shell.",
+	"terminal.integrated.shellArgs.",
+	"terminal.integrated.env.",
+}
+
+// WorkspaceExtraSettingIssue explains why a name cannot be an extra setting,
+// or returns an empty string. Values are checked by the profile decoder.
+func WorkspaceExtraSettingIssue(name string) string {
+	if len(name) > 128 || !workspaceSettingName.MatchString(name) {
+		return "invalid setting name"
+	}
+	if slices.Contains(workspaceDeniedSettings, name) {
+		return "setting is not supported as an extra setting"
+	}
+	for _, prefix := range workspaceDeniedSettingPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return "setting is not supported as an extra setting"
+		}
+	}
+	return ""
+}
+
 // Exact names also prevent encoding/json's case-insensitive field matching.
 var workspaceFields = map[string][]string{
 	"$":                 {"schemaVersion", "desktop", "vscode", "browser"},
 	"$.desktop":         {"favorites", "colorScheme", "enableAnimations", "dock"},
 	"$.desktop.dock":    {"position", "iconSize", "autoHide", "extendHeight", "showTrash", "showMounts"},
-	"$.vscode":          {"extensions", "settings"},
+	"$.vscode":          {"extensions", "settings", "extraSettings"},
 	"$.vscode.settings": {"editor.fontSize", "editor.tabSize", "editor.insertSpaces", "editor.wordWrap", "editor.formatOnSave", "editor.minimap.enabled", "files.autoSave"},
 	"$.browser":         {"defaultApplication"},
 }
@@ -116,6 +157,12 @@ func checkWorkspaceJSON(decoder *json.Decoder, path string, depth int) error {
 		return errors.New("null is not supported")
 	}
 	delim, container := token.(json.Delim)
+	if path == workspaceExtraSettingsPath {
+		if !container || delim != '{' {
+			return errors.New("expected an object")
+		}
+		return checkWorkspaceFreeObject(decoder, depth, true)
+	}
 	if !container {
 		if _, object := workspaceFields[path]; object {
 			return errors.New("expected an object")
@@ -160,6 +207,80 @@ func checkWorkspaceJSON(decoder *json.Decoder, path string, depth int) error {
 	}
 	if _, err := decoder.Token(); err != nil {
 		return errors.New("malformed JSON")
+	}
+	return nil
+}
+
+const workspaceExtraSettingsPath = "$.vscode.extraSettings"
+
+// checkWorkspaceFreeObject consumes the members of an already opened object.
+// Free-form values keep the shared rules: no null, no duplicates, same depth.
+func checkWorkspaceFreeObject(decoder *json.Decoder, depth int, settings bool) error {
+	seen := make(map[string]bool)
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		key, ok := keyToken.(string)
+		if err != nil || !ok {
+			return errors.New("malformed object")
+		}
+		if seen[key] {
+			return errors.New("duplicate field")
+		}
+		seen[key] = true
+		if settings {
+			if len(seen) > workspaceMaxExtraSettings {
+				return errors.New("too many extra settings")
+			}
+			if issue := WorkspaceExtraSettingIssue(key); issue != "" {
+				return errors.New(issue)
+			}
+		}
+		if err := checkWorkspaceFreeValue(decoder, depth+1); err != nil {
+			return err
+		}
+	}
+	if _, err := decoder.Token(); err != nil {
+		return errors.New("malformed JSON")
+	}
+	return nil
+}
+
+func checkWorkspaceFreeValue(decoder *json.Decoder, depth int) error {
+	if depth > 8 {
+		return errors.New("nesting limit exceeded")
+	}
+	token, err := decoder.Token()
+	if err != nil {
+		return errors.New("malformed JSON")
+	}
+	switch value := token.(type) {
+	case nil:
+		return errors.New("null is not supported")
+	case json.Number:
+		// Integers beyond 2^53 would change when the profile is normalized.
+		if integer, err := value.Int64(); err == nil {
+			if integer > workspaceMaxSettingInteger || integer < -workspaceMaxSettingInteger {
+				return errors.New("integer outside supported range")
+			}
+		} else if !strings.ContainsAny(value.String(), ".eE") {
+			return errors.New("integer outside supported range")
+		}
+	case json.Delim:
+		switch value {
+		case '{':
+			return checkWorkspaceFreeObject(decoder, depth, false)
+		case '[':
+			for decoder.More() {
+				if err := checkWorkspaceFreeValue(decoder, depth+1); err != nil {
+					return err
+				}
+			}
+			if _, err := decoder.Token(); err != nil {
+				return errors.New("malformed JSON")
+			}
+		default:
+			return errors.New("unexpected delimiter")
+		}
 	}
 	return nil
 }
