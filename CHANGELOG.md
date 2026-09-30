@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Save results now separate configuration, controller and client status and
+  offer the next independently reviewed action. Settings, template reset and
+  workspace do not apply systems automatically. The ordinary workspace editor
+  now records only its reviewed saved profile locally, preserving unrelated
+  staged changes; partial writes/commits require inspection. CLI workspace
+  apply remains file-only, and no save deploys clients or reboots them.
+
 - Deployment reviews now probe only selected computers with the inventory's
   bounded SSH-port check and offer a freshly reviewed reachable-only subset.
   Results show each computer's outcome and guidance, distinguishing unavailable

@@ -21,9 +21,13 @@ reinstallation. Do not use it merely to refresh an application.
 5. Type `RESET DEPLOYMENT` exactly and press Enter. The operation creates a
    durable local backup ref before replacing tracked files and creating a new
    local commit. Escape cancels selection/review without writing the deployment.
-6. Keep the backup ref shown in the result. Review the new configuration, then
-   apply the controller and distribute to clients through their normal,
-   separately confirmed operations. Reboot normally to seed student homes.
+6. Keep the backup ref shown in the result. The three status lines distinguish
+   the saved configuration, controller application and unobserved client state.
+   The primary action offers a separate controller review; nothing activates
+   just by finishing the reset. After verified application at the saved revision,
+   the next action opens fresh client selection and normal deployment review.
+   Esc leaves either follow-up without starting it. Reboot normally after system
+   application to seed student homes; this is never done automatically.
 
 The reset never pushes, changes the framework/package-base pins, activates a
 system, deploys clients, reboots or resets a live home. Review evaluates the

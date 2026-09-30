@@ -19,6 +19,9 @@ func demoTemplateResetPlan() domain.TemplateResetPlan {
 
 func renderTemplateResetDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
+	actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
+		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("b", 40)}
+	}
 	plan := demoTemplateResetPlan()
 	actions.LoadTemplateReset = func(context.Context) domain.TemplateResetCatalog {
 		return domain.TemplateResetCatalog{UpstreamRevision: plan.UpstreamRevision, Catalog: domain.SoftwarePresetCatalog{Presets: []domain.SoftwarePreset{plan.Preset}}}
@@ -43,5 +46,8 @@ func renderTemplateResetDemo(revision string, width, height int) DemoScenario {
 	r.capture("Create the backup before local replacement", 1200)
 	r.command(save)
 	r.capture("Local reset saved without activation", 2000)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Review controller application after the reset", 2000)
+	r.key(demoCode(tea.KeyEsc))
 	return DemoScenario{ID: "template-reset", Title: "Reset a private deployment template", Description: "Choose a pinned preset, review losses and preserve a recoverable local backup without activation.", Frames: r.frames}
 }

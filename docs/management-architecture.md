@@ -500,7 +500,7 @@ standalone compatibility.
 
 The internal workspace application boundary adds a separate, declaration-only
 plan/save contract for `workspace-profile.json`, exposed through `workspace
-plan`/`apply` and the administrative TUI's student workspace editor. Review binds the normalized
+plan`/`apply` and composed by the administrative TUI's student workspace editor. Review binds the normalized
 candidate and full resolved preparation
 metadata to the repository, Git revision/source, lock and original file identity.
 Absence of the file remains legacy mode, not an empty managed profile. Apply
@@ -527,8 +527,14 @@ from interactive prompts. The TUI feature model edits only a local typed draft;
 all reads, resolution and writes use typed application callbacks. Cancellation
 invalidates read request IDs, late results cannot reopen a screen, and an atomic
 save must finish before quitting. The review rejects a base file changed while
-editing. A saved result can open the canonical Git review with its own token
-and return to the profile; neither save nor navigation invokes deployment.
+editing. The ordinary TUI composes this file-only boundary with a local commit
+of exactly the just-written candidate. Pre-existing profile edits are refused;
+the commit rechecks the reviewed HEAD and immutable candidate blob, preserving
+other staged paths and the existing disabled hooks/signing/remote boundary.
+Only a confirmed record exposes the next controller review. An uncertain
+write/commit opens Git inspection, never automatic token replay. CLI apply
+remains file-only. Controller application is offered, not chained, and client
+selection requires fresh inventory and independent deployment confirmation.
 
 ## Computer-installation state machine
 

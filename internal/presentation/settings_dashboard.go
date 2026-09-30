@@ -303,6 +303,8 @@ func (model dashboardModel) settingsView() string {
 			"",
 			fmt.Sprintf("State: %s   Changed fields: %d", model.settings.result.State, len(model.settings.result.Changes)),
 		)
+		lines = append(lines, saveStatusLines(model.settings.result.State, model.settings.result.RecoveryRequired, true, true, controllerVerifiedForSave(model.settings.result.Revision, model.controller.result))...)
+		lines = append(lines, "", "Apply to this controller first, then review which computers to update.", "Keyboard and student-home changes may take effect at the next computer start.")
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
@@ -310,11 +312,11 @@ func (model dashboardModel) settingsView() string {
 		if model.settings.returnScreen == dashboardSetup {
 			returnLabel = "Setup"
 		}
-		actions := []tuiAction{{key: "e", label: "Edit more"}}
+		actions := model.saveFollowupActions(returnLabel)
+		actions = append(actions, tuiAction{key: "e", label: "Edit more"})
 		if model.settings.result.RecoveryRequired {
 			actions = append(actions, tuiAction{key: "r", label: "Retry save"})
 		}
-		actions = append(actions, tuiAction{key: "Enter", label: returnLabel}, tuiAction{key: "F1", label: "Help"})
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	lines = append(lines,

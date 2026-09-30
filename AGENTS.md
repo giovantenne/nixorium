@@ -438,8 +438,13 @@ failure or timeout must block publication.
   non-blocking for special files. The administrative TUI uses typed
   load/plan/save callbacks for its draft editor, with a source-bound review and
   explicit save confirmation. Preserve inherit versus empty values, ordered
-  favorites, cancellation and late-message checks. Do not activate, commit or
-  opt into runtime from the save callback; Git review is a separate follow-up.
+  favorites, cancellation and late-message checks. The ordinary TUI save also
+  records exactly the just-written profile through WorkspaceSaveManager;
+  CLI Apply stays file-only. Refuse pre-existing profile edits, bind the commit
+  to the reviewed HEAD and exact candidate blob, preserve unrelated index paths,
+  and use the existing no-hooks/no-signing/no-remote commit boundary. A partial
+  write/record requires inspection, never token replay or inferred completion.
+  Do not activate or opt into runtime from the save callback.
   The initial editor load reads the current declaration (absence stays legacy),
   resolves it, and rejects concurrent changes. Never load the example implicitly.
   Git review classifies the profile as managed; a separately authorized exact-path
@@ -449,6 +454,12 @@ failure or timeout must block publication.
   the update token; do not silently change reset opt-in, identity or targets.
   Legacy absence stays outside this comparison. Extension versions come from
   the package base, not independent home downloads or vendor-latest promises.
+- Save results distinguish local configuration, controller verification at the
+  saved revision, and unobserved client state. Settings, workspace and template
+  reset offer a separate controller review, never automatic activation; later
+  client selection requires fresh inventory, planning and confirmation. Preserve
+  existing automatic controller follow-up for Software/Update only. Never infer
+  activation from an unchanged declaration or reuse stale success from a prior save.
 - `lib/build-workspace-seed.nix` builds the internal preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing

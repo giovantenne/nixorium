@@ -97,6 +97,7 @@ func (model dashboardModel) finishRead(message activityResultMsg) (tea.Model, te
 }
 
 func (model dashboardModel) cancelActivity() dashboardModel {
+	model.controller.fromSave = false
 	model.screen = model.read.returnScreen
 	model.read.cancelRead()
 	model.inventory.cancelRead()

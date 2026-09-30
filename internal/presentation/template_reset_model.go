@@ -212,7 +212,7 @@ func (model dashboardModel) updateTemplateResetKey(key tea.KeyPressMsg) (tea.Mod
 		m.scroll = max(0, min(m.scroll, len(model.templateResetLines())-model.templateResetViewport()))
 	case "result":
 		if key.String() == "enter" {
-			model.screen = dashboardAdministration
+			return model.continueSavedConfiguration()
 		}
 	}
 	return model, nil
@@ -277,13 +277,16 @@ func (model dashboardModel) templateResetView() string {
 			kind = tuiStatusSuccess
 		}
 		lines = append(lines, tuiStatus(strings.ToUpper(m.result.State), kind, model.isDark), m.result.Message)
+		lines = append(lines, "")
+		lines = append(lines, saveStatusLines(m.result.State, m.result.RecoveryRequired, true, true, controllerVerifiedForSave(m.result.Revision, model.controller.result))...)
+		lines = append(lines, "", "Student-home changes take effect at the next computer start after system application.", "Applying the controller is optional here; no client deployment or reboot starts automatically.")
 		if m.result.BackupRef != "" {
 			lines = append(lines, "", "Backup: "+m.result.BackupRef)
 		}
 		if m.result.Revision != "" {
 			lines = append(lines, "Local commit: "+m.result.Revision)
 		}
-		actions = []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		actions = model.saveFollowupActions("Maintenance")
 	case m.catalog.Error != "" || len(m.catalog.Catalog.Presets) == 0:
 		lines = append(lines, "The pinned template catalog could not be loaded. No file was changed.")
 		actions = append([]tuiAction{{key: "r", label: "Retry"}}, actions...)

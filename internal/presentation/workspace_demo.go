@@ -60,7 +60,10 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 		return plan
 	}
 	actions.SaveWorkspace = func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport {
-		return domain.WorkspaceApplyReport{State: "saved", Message: "Profile saved. No computer or student home changed."}
+		return domain.WorkspaceApplyReport{Operation: "workspace-save", State: "saved", Recorded: true, Revision: revision, Message: "Profile saved and recorded locally. No computer or student home changed."}
+	}
+	actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
+		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision}
 	}
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Overview", 1000)
@@ -80,11 +83,14 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	r.key(demoCode(tea.KeyEnter))
 	r.command(r.key(demoText("v")))
 	r.capture("Review the declaration without activating a system", 2200)
-	r.typeAndCapture("SAVE", "Type the declaration-only save confirmation")
+	r.typeAndCapture("SAVE", "Confirm the profile save and local record")
 	save := r.key(demoCode(tea.KeyEnter))
 	r.capture("Recheck before the atomic save", 900)
 	r.command(save)
-	r.capture("Saved does not mean committed or deployed", 2500)
+	r.capture("Saved and recorded does not mean deployed", 2500)
+	r.command(r.key(demoCode(tea.KeyEnter)))
+	r.capture("Review controller application separately after saving", 2000)
+	r.key(demoCode(tea.KeyEsc))
 	r.key(demoCode(tea.KeyEsc))
 	r.key(demoCode(tea.KeyEsc))
 	r.command(r.key(demoText("b")))
@@ -94,7 +100,7 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	r.capture("Compare workspace versions during a system update", 2500)
 	return DemoScenario{
 		ID: "student-workspace", Title: "Customize the initial student workspace",
-		Description: "Edit ordered favorites, review one laboratory-wide profile, and save only the declaration. Runtime opt-in, Git commit, system deployment and boot reset remain separate.",
+		Description: "Edit ordered favorites, review and save one laboratory-wide profile with its local commit. Controller application is offered separately; runtime opt-in, client deployment and boot reset remain separate.",
 		Frames:      r.frames,
 	}
 }

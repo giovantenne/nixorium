@@ -126,6 +126,14 @@ an aggregate error alone cannot identify a failed client activation.
 
 ## Validate behavior and rendering
 
+Save results share separate configuration/controller/client rows. A successful
+controller result must match the saved revision before it is presented as up
+to date. Settings, workspace and reset results offer a fresh controller review
+without applying automatically, return to their result after completion, and
+then offer ordinary client selection with fresh inventory. Never infer live
+state from an unchanged declaration or weaken recovery gating. TUI workspace
+confirmation includes its confined local record; CLI apply remains file-only.
+
 Put interaction and state-transition coverage in deterministic Go tests. Keep
 VM scenarios only for real terminal, process, filesystem, privilege, network,
 or systemd boundaries. Maintain a render gallery of representative states at

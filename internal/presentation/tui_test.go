@@ -74,7 +74,7 @@ func TestSoftwareSaveAutomaticallyAppliesAffectedController(t *testing.T) {
 		},
 		actions: DashboardActions{
 			SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
-				return domain.SoftwareChangeApplyReport{State: "saved", Repository: plan.Repository, AffectedController: plan.AffectedController}
+				return domain.SoftwareChangeApplyReport{Revision: strings.Repeat("a", 40), State: "saved", Repository: plan.Repository, AffectedController: plan.AffectedController}
 			},
 			PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 				planCalls++
@@ -82,7 +82,7 @@ func TestSoftwareSaveAutomaticallyAppliesAffectedController(t *testing.T) {
 			},
 			ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 				applyCalls++
-				return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
+				return domain.ControllerRebuildExecutionReport{Revision: strings.Repeat("a", 40), Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
 			},
 		},
 	}
@@ -1258,13 +1258,13 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 			if plan.ReviewToken != token || plan.Target != target {
 				t.Fatalf("applied unexpected update plan: %+v", plan)
 			}
-			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: target, Updated: true, Message: "Nixorium update saved locally. Running systems were not changed."}
+			return domain.UpdateApplyReport{Revision: strings.Repeat("b", 40), Operation: "update-save", State: "saved", Target: target, Updated: true, Message: "Nixorium update saved locally. Running systems were not changed."}
 		},
 		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("b", 40)}
 		},
 		ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
-			return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
+			return domain.ControllerRebuildExecutionReport{Revision: strings.Repeat("b", 40), Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
 		},
 	}
 	actions.RunningVersion = "2.0.0-test"
@@ -1333,7 +1333,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	if applied != 1 || model.updates.applying || model.screen != dashboardUpdate || !strings.Contains(model.View().Content, "Nixorium and this controller are updated") || strings.Contains(model.View().Content, "review Git changes") || !strings.Contains(model.View().Content, "Running interface: 2.0.0-test") || !strings.Contains(model.View().Content, "Reopen Nixorium") || !strings.Contains(model.View().Content, "New update") {
 		t.Fatalf("update result missing: applied=%d\n%s", applied, model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	model = updated.(dashboardModel)
 	if model.screen != dashboardAdministration {
 		t.Fatalf("update result did not return to Maintenance: screen=%d", model.screen)
@@ -1522,11 +1522,11 @@ func TestNixoriumUpdatePartialSaveOffersInPlaceRecovery(t *testing.T) {
 		},
 		actions: DashboardActions{SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
 			calls++
-			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: plan.Target, Updated: true, Message: "Nixorium update saved locally."}
+			return domain.UpdateApplyReport{Revision: strings.Repeat("c", 40), Operation: "update-save", State: "saved", Target: plan.Target, Updated: true, Message: "Nixorium update saved locally."}
 		}, PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("c", 40)}
 		}, ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
-			return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
+			return domain.ControllerRebuildExecutionReport{Revision: strings.Repeat("c", 40), Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
 		}},
 	}
 	if !strings.Contains(model.View().Content, "Complete save") || strings.Contains(model.View().Content, "review Git changes") {

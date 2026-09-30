@@ -412,6 +412,14 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 }
 
 func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.software.stage == softwareResult && key.String() == "enter" {
+		if model.software.canDistribute(model.controller.result) {
+			return model.openSoftwareDeployment()
+		}
+		if model.software.result.State == "saved" && !model.software.result.HasErrors() && !model.software.result.RecoveryRequired && model.software.result.AffectedController != "" && !controllerVerifiedForSave(model.software.result.Revision, model.controller.result) {
+			return model.startSoftwareControllerApply()
+		}
+	}
 	software, intent := model.software.update(key)
 	model.software = software
 	if intent.setMessage {
@@ -436,6 +444,9 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 		plan := model.software.plan
 		return model, func() tea.Msg { return dashboardSoftwareApplyMsg{report: model.actions.SaveSoftware(plan)} }
 	case softwareControllerIntent:
+		if model.software.result.State != "saved" || model.software.result.HasErrors() || model.software.result.RecoveryRequired {
+			return model, nil
+		}
 		if model.actions.PlanController == nil || model.actions.ApplyController == nil {
 			model.message = "Controller activation is not available in this deployment. The software selection remains saved."
 			return model, nil
@@ -487,13 +498,13 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 }
 
 func (model softwareModel) canDistribute(controller domain.ControllerRebuildExecutionReport) bool {
-	if model.result.State != "saved" || len(model.result.AffectedClients) == 0 {
+	if model.result.State != "saved" || model.result.HasErrors() || model.result.RecoveryRequired || len(model.result.AffectedClients) == 0 {
 		return false
 	}
 	if model.result.AffectedController == "" {
 		return true
 	}
-	return controller.Operation != "" && !controller.HasErrors() && controller.Applied && controller.Verified
+	return controllerVerifiedForSave(model.result.Revision, controller)
 }
 
 func (model softwareModel) canInspectState() bool {
@@ -688,11 +699,11 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		if model.result.State == "partial" {
 			return []tuiAction{{key: "r", label: "Retry save"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 		}
-		if model.result.State == "saved" && model.result.AffectedController != "" && (context.controllerResult.Operation == "" || context.controllerResult.HasErrors() || !context.controllerResult.Applied || !context.controllerResult.Verified) {
-			return []tuiAction{{key: "a", label: "Retry controller"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
+		if model.result.State == "saved" && !model.result.HasErrors() && !model.result.RecoveryRequired && model.result.AffectedController != "" && !controllerVerifiedForSave(model.result.Revision, context.controllerResult) {
+			return []tuiAction{{key: "Enter", label: "Retry controller"}, {key: "a", label: "Retry controller"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canDistribute(context.controllerResult) {
-			return []tuiAction{{key: "d", label: "Distribute affected computers"}, {key: "v", label: "Check systems"}, {key: "Enter", label: "Later"}, {key: "F1", label: "Help"}}
+			return []tuiAction{{key: "Enter", label: "Update computers"}, {key: "d", label: "Distribute affected computers"}, {key: "v", label: "Check systems"}, {key: "Esc", label: "Later"}, {key: "F1", label: "Help"}}
 		}
 		if model.canInspectState() {
 			return []tuiAction{{key: "v", label: "Check systems"}, {key: "Enter", label: "Overview"}, {key: "F1", label: "Help"}}
@@ -884,30 +895,41 @@ func (model softwareModel) reviewView(context softwareViewContext) []string {
 }
 
 func (model softwareModel) resultView(context softwareViewContext) []string {
-	if model.profileResult.Operation != "" {
-		return model.profileResultView(context)
-	}
 	result := model.result
-	switch result.State {
-	case "saved":
-		if result.AffectedController != "" {
-			if context.controllerResult.Operation != "" && !context.controllerResult.HasErrors() && context.controllerResult.Applied && context.controllerResult.Verified {
-				return []string{tuiResult("Software is ready on this controller", true, context.dark), "", "✓ Software selection saved locally", "✓ Controller built, activated, and verified", "○ No client changed", "", "Use Distribute the prepared system when you want clients to receive it."}
-			}
-			detail := context.message
-			if detail == "" {
-				detail = "Controller activation did not complete."
-			}
-			return []string{tuiResult("Software saved; controller needs attention", false, context.dark), "", "✓ Software selection saved locally", "! Controller build or activation did not complete", "○ No client changed", "", detail, "The saved selection is safe; retrying the controller does not duplicate it."}
+	verified := controllerVerifiedForSave(result.Revision, context.controllerResult)
+	title := "Software save needs attention"
+	if result.State == "saved" && !result.HasErrors() && !result.RecoveryRequired {
+		title = "Software configuration saved"
+		if result.AffectedController != "" && verified {
+			title = "Software is ready on this controller"
+		} else if result.AffectedController != "" {
+			title = "Software saved; controller needs attention"
 		}
-		return []string{tuiResult("Software configuration saved", true, context.dark), "", "✓ Software selection saved locally", "○ System not prepared", "○ No client changed", "", "You can apply this configuration to selected computers now or later."}
-	case "unchanged":
-		return []string{tuiResult("Software declaration already current", true, context.dark), "", "✓ The requested declaration is already present", "○ No file changed", "○ No system built or deployed"}
-	case "partial":
-		return []string{tuiResult("Software save needs attention", false, context.dark), result.Message, "", softwareResultIssue(result), "", "No system was built or deployed.", "Retry completes the local save without duplicating the software change."}
-	default:
-		return []string{tuiResult("Software declaration was not saved", false, context.dark), result.Message, "", softwareResultIssue(result), "", "Create a fresh proposal; no system was built or deployed."}
+	} else if result.State == "unchanged" {
+		title = "Software declaration already current"
 	}
+	success := !result.HasErrors() && !result.RecoveryRequired && (result.AffectedController == "" || verified || result.State == "unchanged")
+	lines := []string{tuiResult(title, success, context.dark), ""}
+	lines = append(lines, saveStatusLines(result.State, result.RecoveryRequired, result.AffectedController != "", len(result.AffectedClients) > 0, verified)...)
+	if model.profileResult.Operation != "" {
+		lines = append(lines, "", fmt.Sprintf("%s: %d package declarations; existing scopes preserved.", model.profileResult.Preset.Label, len(model.profileResult.Additions)))
+	}
+	if result.RecoveryRequired || result.State == "partial" {
+		lines = append(lines, "", result.Message, "No system was built or deployed.", "Retry completes the local save without duplicating the change.", softwareResultIssue(result))
+	} else if result.State == "saved" {
+		if result.AffectedController != "" && !verified {
+			lines = append(lines, "", "The configuration remains saved; retrying the controller does not duplicate it.", context.message)
+		} else if len(result.AffectedClients) > 0 {
+			lines = append(lines, "", "Select computers and confirm a fresh deployment review; no client changed here.")
+		} else {
+			lines = append(lines, "", "No client deployment is required.")
+		}
+	} else if result.State == "unchanged" {
+		lines = append(lines, "", "No file changed; live system state has not been checked.")
+	} else if result.HasErrors() {
+		lines = append(lines, "", result.Message, softwareResultIssue(result))
+	}
+	return lines
 }
 
 func softwareResultIssue(result domain.SoftwareChangeApplyReport) string {

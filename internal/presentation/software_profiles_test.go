@@ -239,10 +239,11 @@ func TestControllerOnlyProfileResultDoesNotOfferClientDistribution(t *testing.T)
 	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, software: softwareModel{stage: softwareResult}}
 	software, _ := model.software.finishProfileApply(domain.SoftwarePresetApplyReport{
 		Operation: "software-preset-save", State: "saved", Preset: domain.SoftwarePreset{ID: "essential", Label: "Essential"},
+		Revision:           strings.Repeat("a", 40),
 		AffectedController: "pc99", AffectedClients: []string{}, Issues: []domain.ValidationIssue{},
 	})
 	model.software = software
-	model.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Applied: true, Verified: true}
+	model.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Revision: strings.Repeat("a", 40), Applied: true, Verified: true}
 	view := model.View().Content
 	if strings.Contains(view, "Distribute affected computers") || !strings.Contains(view, "No client deployment is required") {
 		t.Fatalf("controller-only result offers client deployment:\n%s", view)

@@ -145,9 +145,14 @@ Choose Desktop, Dock, Editor or Browser, then a supported field:
 - Enter keeps a field in the draft; Esc cancels that field. Leaving the editor
   discards unsaved changes. Use the visible Review action (`v`) to evaluate the
   complete candidate without writing it, then inspect the scrollable review.
-- Only confirmed `SAVE` writes the JSON. A saved result can open Git review,
-  where path selection and commit confirmation are separate. No callback
-  enables runtime, builds, deploys or resets a home.
+- On supporting pins, confirmed `SAVE` writes and records only the reviewed
+  profile locally. Pre-existing profile edits are refused; unrelated staged
+  files remain untouched. The result offers a separate controller review,
+  then fresh client selection after verified application. No save enables
+  runtime, applies a system, deploys clients or resets a home.
+- If writing or recording is unconfirmed, inspect the file and Git state
+  through the result's Git review action. Do not replay the old save token or
+  apply systems before recovery. Older pins may leave recording separate.
 
 Review may be cancelled while metadata is loading; a save already in progress
 must finish before quitting. If the original profile changed during editing,
@@ -175,7 +180,7 @@ apply requires an interactive terminal and confirmation for a changed profile.
 It re-evaluates the candidate and rejects stale source, pin, catalog or file
 identity; do not automatically renew a failed token and retry the write.
 
-This operation writes only `workspace-profile.json`, mode `0600`. It does not
+The CLI operation writes only `workspace-profile.json`, mode `0600`. It does not
 stage or commit it, edit the catalog/lock/modules, enable runtime, build systems,
 deploy or reset any home. `saved` and `unchanged` are declaration states, not
 evidence of live preferences. Review/commit and activation/distribution remain

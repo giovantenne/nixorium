@@ -198,7 +198,7 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 			model.workspace.saving = true
 			model.workspace.requestID++
 			id, plan := model.workspace.requestID, model.workspace.plan
-			model.busy = "Rechecking the reviewed source and saving only workspace-profile.json"
+			model.busy = "Rechecking, saving and recording workspace-profile.json"
 			model.message = ""
 			return model, func() tea.Msg { return dashboardWorkspaceSaveMsg{id: id, report: model.actions.SaveWorkspace(plan)} }
 		default:
@@ -208,7 +208,9 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 		}
 	case workspaceResult:
 		switch key.String() {
-		case "esc", "enter":
+		case "enter":
+			return model.continueSavedConfiguration()
+		case "esc":
 			model.screen = dashboardSettings
 			model.message = ""
 		case "r":
@@ -216,7 +218,7 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 				return model.openWorkspace()
 			}
 		case "g":
-			if model.workspace.result.State == "saved" && model.actions.LoadGitReview != nil {
+			if workspaceRecordNeedsInspection(model.workspace.result) && model.actions.LoadGitReview != nil {
 				return model.openMaintenanceTask("g")
 			}
 		}
@@ -308,12 +310,16 @@ func (model dashboardModel) workspaceView() string {
 			}
 		case workspaceReview:
 			var review bytes.Buffer
-			WorkspacePlanText(&review, w.plan)
+			displayed := w.plan
+			if displayed.State == "ready" {
+				displayed.Message = "Save and record only workspace-profile.json locally. No runtime opt-in, system application, deployment or home reset is included."
+			}
+			WorkspacePlanText(&review, displayed)
 			wrapped := strings.Split(lipgloss.NewStyle().Width(width).Render(strings.TrimSpace(review.String())), "\n")
 			start := min(w.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Only the profile JSON is saved; no commit, deploy or reset.\nType SAVE: " + w.confirmation + "_"
+			fixed = "Save and record only the profile JSON; no apply, runtime opt-in or reset.\nType SAVE: " + w.confirmation + "_"
 			label := "Save JSON"
 			if w.plan.State == "unchanged" {
 				fixed = "Declaration unchanged; live home state is not inferred."
@@ -326,16 +332,19 @@ func (model dashboardModel) workspaceView() string {
 				level = tuiStatusAttention
 			}
 			lines = append(lines, tuiStatus(strings.ToUpper(w.result.State), level, model.isDark), "", safeWorkspaceText(w.result.Message))
+			lines = append(lines, saveStatusLines(w.result.State, w.result.RecoveryRequired, true, true, controllerVerifiedForSave(w.result.Revision, model.controller.result))...)
+			actions = model.saveFollowupActions("Settings")
 			for _, issue := range w.result.Issues {
 				lines = append(lines, safeWorkspaceText(issue.Message))
 			}
 			if w.result.State == "saved" {
-				lines = append(lines, "", "Next: separate Git review/commit, then reviewed system deployment.", "With runtime opt-in enabled, preferences apply at the next boot reset.")
-				if model.actions.LoadGitReview != nil {
-					actions = append([]tuiAction{{key: "g", label: "Git review"}}, actions...)
-				}
+				lines = append(lines, "", "Apply to this controller, then review the computers to update.", "Runtime opt-in is not changed here; when enabled, preferences take effect at the next computer start after system application.")
 			} else if !w.result.RecoveryRequired {
 				actions = append([]tuiAction{{key: "r", label: "Reload"}}, actions...)
+			}
+			if workspaceRecordNeedsInspection(w.result) && model.actions.LoadGitReview != nil {
+				lines = append(lines, "Inspect and finish the local record in Git review before applying systems.")
+				actions = append([]tuiAction{{key: "g", label: "Inspect Git state"}}, actions...)
 			}
 		}
 	}

@@ -236,11 +236,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return workspaceManager.Plan(requestContext, repository, data)
 		},
 		SaveWorkspace: func(plan domain.WorkspacePlanReport) domain.WorkspaceApplyReport {
-			var data []byte
-			if plan.Candidate != nil {
-				data, _ = domain.MarshalWorkspaceProfile(*plan.Candidate)
-			}
-			return workspaceManager.Apply(ctx, repository, data, plan.ReviewToken)
+			return app.NewWorkspaceSaveManager(local, gitReviewManager).Save(ctx, plan)
 		},
 		RunningVersion:  nixoriumVersion,
 		LoadPackageBase: func(ctx context.Context) domain.PackageBaseStatus { return baseManager.PackageBaseStatus(repository) },

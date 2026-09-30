@@ -328,38 +328,3 @@ func (model softwareModel) profileReviewView(context softwareViewContext) []stri
 	}
 	return lines
 }
-
-func (model softwareModel) profileResultView(context softwareViewContext) []string {
-	result := model.profileResult
-	label := result.Preset.Label
-	if label == "" {
-		label = "Software profile"
-	}
-	switch result.State {
-	case "saved":
-		if result.AffectedController != "" {
-			if context.controllerResult.Operation != "" && !context.controllerResult.HasErrors() && context.controllerResult.Applied && context.controllerResult.Verified {
-				later := "Distribute the complete current configuration when clients should receive it."
-				if len(result.AffectedClients) == 0 {
-					later = "No client deployment is required."
-				}
-				return []string{tuiResult(label+" is ready on this controller", true, context.dark), "", fmt.Sprintf("✓ %d package declarations saved together", len(result.Additions)), "✓ Existing package scopes preserved", "✓ Controller built, activated, and verified", "○ No client changed", "", later}
-			}
-			return []string{tuiResult(label+" saved; controller needs attention", false, context.dark), "", "✓ Software profile saved locally", "✓ Existing package scopes preserved", "! Controller build or activation did not complete", "○ No client changed", "", context.message, "Retrying the controller does not add the profile again."}
-		}
-		return []string{tuiResult(label+" saved", true, context.dark), "", fmt.Sprintf("✓ %d package declarations saved together", len(result.Additions)), "✓ Existing package scopes preserved", "○ No system prepared or deployed", "", "You can distribute the complete current configuration now or later."}
-	case "unchanged":
-		return []string{tuiResult(label+" is already represented", true, context.dark), "", "✓ Every selected package is already declared", "✓ Existing scopes were preserved", "○ No file or system changed"}
-	case "partial":
-		return []string{tuiResult("Software profile save needs attention", false, context.dark), result.Message, "", softwarePresetResultIssue(result), "", "No system was built or deployed.", "Retry completes the local save without adding the profile twice."}
-	default:
-		return []string{tuiResult("Software profile was not saved", false, context.dark), result.Message, "", softwarePresetResultIssue(result), "", "Create a fresh review; no system was built or deployed."}
-	}
-}
-
-func softwarePresetResultIssue(result domain.SoftwarePresetApplyReport) string {
-	if len(result.Issues) == 0 {
-		return "Technical detail unavailable."
-	}
-	return "Technical detail: " + result.Issues[0].Message
-}

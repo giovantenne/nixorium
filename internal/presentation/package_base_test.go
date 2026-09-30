@@ -32,7 +32,7 @@ func TestPackageBaseRenderGallery(t *testing.T) {
 					required = append(required, "legacy", "Refresh")
 				case "recovery":
 					model.updates.result = domain.UpdateApplyReport{Operation: "update-save", State: "partial", Updated: true, RecoveryRequired: true, Message: "Saving needs recovery"}
-					required = []string{"Update system and packages", "recovery", "Complete save", "Enter", "Maintenance", "Help"}
+					required = []string{"Update system and packages", "recovery", "Complete save", "Esc", "Maintenance", "Help"}
 				}
 				view := model.View().Content
 				if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

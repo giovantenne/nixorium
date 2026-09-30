@@ -139,6 +139,7 @@ func (m SettingsSaveManager) Save(ctx context.Context, repository string, candid
 	currentFingerprint := domain.SettingsFingerprint(currentData)
 	if currentFingerprint == reviewed.CandidateFingerprint {
 		if !targetChanged {
+			report.Revision = repositoryReview.Revision
 			if reviewed.BaseFingerprint != currentFingerprint {
 				report.State = "saved"
 				report.Message = "Configuration was already saved locally."

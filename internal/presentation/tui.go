@@ -163,6 +163,8 @@ type deploymentModel struct {
 // software and update saves. It owns job identity so stale progress messages
 // cannot be mistaken for the current activation.
 type controllerModel struct {
+	fromSave            bool
+	saveOrigin          dashboardScreen
 	plan                domain.ControllerRebuildPlanReport
 	result              domain.ControllerRebuildExecutionReport
 	applying            bool
@@ -1561,7 +1563,7 @@ func (model dashboardModel) updateView() string {
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	if model.updates.result.Operation != "" {
-		success := !model.updates.result.HasErrors() && model.updates.result.Updated && model.controller.result.Operation != "" && !model.controller.result.HasErrors() && model.controller.result.Applied && model.controller.result.Verified
+		success := !model.updates.result.HasErrors() && model.updates.result.Updated && !model.updates.result.RecoveryRequired && controllerVerifiedForSave(model.updates.result.Revision, model.controller.result)
 		title := "Nixorium update needs attention"
 		if success {
 			title = "Nixorium and this controller are updated"
@@ -1575,12 +1577,13 @@ func (model dashboardModel) updateView() string {
 		lines = append(lines,
 			tuiResult(title, success, model.isDark),
 			"",
-			fmt.Sprintf("State: %s   Configuration updated: %t", model.updates.result.State, model.updates.result.Updated),
-			"Configured target: "+model.updates.result.Target,
-			"Running interface: "+displayRunningVersion(model.actions.RunningVersion),
-			fmt.Sprintf("Controller activated and verified: %t", success),
-			"Client computers are unchanged until you distribute the prepared system.",
 		)
+		saveState := model.updates.result.State
+		if model.updates.result.Updated && !model.updates.result.HasErrors() {
+			saveState = "saved"
+		}
+		lines = append(lines, saveStatusLines(saveState, model.updates.result.RecoveryRequired, true, true, success)...)
+		lines = append(lines, "", "Configured target: "+model.updates.result.Target, "Running interface: "+displayRunningVersion(model.actions.RunningVersion))
 		if success && model.updates.packageBase {
 			lines = append(lines, "Check boot, networking, desktop and services before client distribution; a reboot may be needed.")
 		} else if success {
@@ -1599,10 +1602,13 @@ func (model dashboardModel) updateView() string {
 			retryLabel = "Complete save"
 		}
 		actions := []tuiAction{}
-		if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired && !success {
-			actions = append(actions, tuiAction{key: "a", label: "Retry controller"})
+		if success {
+			actions = append(actions, tuiAction{key: "Enter", label: "Update computers"})
 		}
-		actions = append(actions, tuiAction{key: "r", label: retryLabel}, tuiAction{key: "Enter", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
+		if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired && !success {
+			actions = append(actions, tuiAction{key: "Enter", label: "Retry controller"}, tuiAction{key: "a", label: "Retry controller"})
+		}
+		actions = append(actions, tuiAction{key: "r", label: retryLabel}, tuiAction{key: "Esc", label: "Maintenance"}, tuiAction{key: "F1", label: "Help"})
 		return model.renderShell(tuiShell{path: append(path, "Result"), body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 	if model.screen == dashboardUpdateReview {

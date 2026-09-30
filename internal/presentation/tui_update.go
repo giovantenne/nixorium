@@ -429,6 +429,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.report.HasErrors() {
 			model.message = controllerPlanIssues(message.report)
 			model.screen = dashboardController
+			if model.controller.fromSave {
+				model.screen = model.controller.saveOrigin
+				model.controller.fromSave = false
+			}
 			return model, nil
 		}
 		model.confirmation = ""
@@ -460,6 +464,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model.loadSetup()
 		}
 		model.screen = dashboardController
+		if model.controller.fromSave {
+			model.screen = model.controller.saveOrigin
+			model.controller.fromSave = false
+		}
 		if model.actions.LoadControllerProgress != nil {
 			return model, model.loadControllerProgress(model.controller.progressID)
 		}

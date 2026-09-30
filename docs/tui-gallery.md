@@ -508,15 +508,15 @@ Destinations:
 Current declaration: absent (legacy mode)
 Proposed declaration:
 {
-Review lines 1–13 of 31
+Review lines 1–13 of 32
 
-Only the profile JSON is saved; no commit, deploy or reset.
+Save and record only the profile JSON; no apply, runtime opt-in or reset.
 Type SAVE: _
 
 ↑/↓ Scroll  ·  Enter Save JSON  ·  Esc Cancel  ·  F1 Help
 ```
 
-## Student workspace saved, not deployed
+## Student workspace saved and recorded, not deployed
 
 ```text
 Nixorium  /  Settings  /  Student workspace
@@ -524,12 +524,36 @@ Nixorium  /  Settings  /  Student workspace
 Student workspace
 ✓ SAVED
 
-Profile saved. No computer or student home changed.
+Profile saved and recorded locally. No computer or student home changed.
+✓ Configuration — Saved locally
+! This controller — Needs applying
+○ Client computers — Not updated here; unknown until checked
 
-Next: separate Git review/commit, then reviewed system deployment.
-With runtime opt-in enabled, preferences apply at the next boot reset.
+Apply to this controller, then review the computers to update.
+Runtime opt-in is not changed here; when enabled, preferences take effect at the next computer start after system
+application.
 
-g Git review  ·  Esc Settings  ·  F1 Help
+Enter Apply to this controller  ·  Esc Settings  ·  F1 Help
+```
+
+## Separate controller review after a workspace save
+
+```text
+Nixorium  /  Maintenance  /  Controller  /  Review
+
+Update this controller?
+
+Affects   pc99 (this controller only)
+Revision  0123456789abcdef0123456789abcdef01234567
+
+Press Enter to build, activate, and verify this controller.
+
+NOTICE
+! Services and networking may restart
+  This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot
+is not normally required.
+
+Enter Update controller  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Workspace versions in system update review
@@ -703,10 +727,17 @@ Replace local customizations. Keep settings, keys and exact input pins.
 ✓ SAVED
 Saved and committed locally. Apply systems and reboot separately; nothing pushed.
 
+✓ Configuration — Saved locally
+! This controller — Needs applying
+○ Client computers — Not updated here; unknown until checked
+
+Student-home changes take effect at the next computer start after system application.
+Applying the controller is optional here; no client deployment or reboot starts automatically.
+
 Backup: refs/nixorium/template-backups/demo
 Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
-Enter Maintenance  ·  Esc Back  ·  F1 Help
+Enter Apply to this controller  ·  Esc Maintenance  ·  F1 Help
 ```
 
 ## Changed client SSH key

@@ -11,6 +11,7 @@ import (
 )
 
 func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
+	model.controller.fromSave = false
 	if reason := model.managedJobConflict(); reason != "" {
 		model.message = reason
 		return model, nil
@@ -416,7 +417,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 	case dashboardSettings:
 		if model.settings.result.Operation != "" {
 			switch key.String() {
-			case "enter", "esc", "left":
+			case "enter":
+				return model.continueSavedConfiguration()
+			case "esc", "left":
 				return model.returnFromSettings()
 			case "r":
 				if !model.settings.result.RecoveryRequired || model.actions.SaveSettings == nil {
@@ -694,6 +697,10 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		switch key.String() {
 		case "esc":
 			model.screen = dashboardController
+			if model.controller.fromSave {
+				model.screen = model.controller.saveOrigin
+				model.controller.fromSave = false
+			}
 			model.message = "Controller rebuild cancelled; no action was started."
 		case "enter":
 			model.busy = "Building and activating the reviewed controller revision"
@@ -1035,7 +1042,14 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 	case dashboardUpdate:
 		if model.updates.result.Operation != "" {
 			switch key.String() {
-			case "enter", "esc":
+			case "enter":
+				if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired {
+					if controllerVerifiedForSave(model.updates.result.Revision, model.controller.result) {
+						return model.openSavedDeployment()
+					}
+					return model.startUpdateControllerApply()
+				}
+			case "esc":
 				model.screen = dashboardHome
 				model.message = ""
 			case "r":

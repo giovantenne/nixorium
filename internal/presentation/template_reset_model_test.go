@@ -69,7 +69,7 @@ func TestTemplateResetUIRequiresExactConfirmationAndSavesOnce(t *testing.T) {
 	if saves != 1 || m.templateReset.result.State != "saved" {
 		t.Fatal("reset result missing")
 	}
-	m, command = workspaceKey(m, demoCode(tea.KeyEnter))
+	m, command = workspaceKey(m, demoCode(tea.KeyEscape))
 	if command != nil || saves != 1 || m.screen != dashboardAdministration {
 		t.Fatal("result replayed mutation")
 	}
@@ -138,6 +138,12 @@ func TestTemplateResetUIRendering(t *testing.T) {
 					view := m.View().Content
 					if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 						t.Fatalf("overflow:\n%s", view)
+					}
+					if m.templateReset.stage == "result" {
+						for range 15 {
+							m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
+							view += m.View().Content
+						}
 					}
 					for _, profile := range []colorprofile.Profile{colorprofile.ASCII, colorprofile.ANSI, colorprofile.ANSI256} {
 						var out bytes.Buffer

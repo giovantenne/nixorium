@@ -100,6 +100,8 @@ func (r WorkspacePlanReport) HasErrors() bool {
 }
 
 type WorkspaceApplyReport struct {
+	Recorded         bool              `json:"recorded,omitempty"`
+	Revision         string            `json:"revision,omitempty"`
 	SchemaVersion    int               `json:"schemaVersion"`
 	Operation        string            `json:"operation"`
 	State            string            `json:"state"`

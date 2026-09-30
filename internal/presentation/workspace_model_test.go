@@ -302,7 +302,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "review":
 						w.plan = demoWorkspacePlan()
 						w.stage = workspaceReview
-						want = append(want, "Type SAVE:", "Save JSON", "no commit, deploy or reset")
+						want = append(want, "Type SAVE:", "Save JSON", "no apply, runtime opt-in or reset")
 					case "loading":
 						m.busy = "Loading workspace metadata"
 						m.beginRead(dashboardReadTimeout)
@@ -318,7 +318,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "saved":
 						w.stage = workspaceResult
 						w.result = domain.WorkspaceApplyReport{State: "saved", Message: "Only the declaration was saved."}
-						want = append(want, "SAVED", "runtime opt-in")
+						want = append(want, "SAVED", "Runtime opt-in")
 					case "partial":
 						w.stage = workspaceResult
 						w.result = domain.WorkspaceApplyReport{State: "partial", RecoveryRequired: true, Message: "Replacement completed but durability is uncertain. Inspect the file before another change."}
@@ -327,6 +327,12 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					view := m.View().Content
 					if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 						t.Fatalf("overflow:\n%s", view)
+					}
+					if w.stage == workspaceResult {
+						for range 20 {
+							m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
+							view += m.View().Content
+						}
 					}
 					for _, profile := range []colorprofile.Profile{colorprofile.ASCII, colorprofile.ANSI, colorprofile.ANSI256} {
 						var output bytes.Buffer

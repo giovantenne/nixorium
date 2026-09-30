@@ -247,6 +247,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, group.shortcut+"  "+group.label)
 		}
 		lines = append(lines, "p  Account passwords", "y  Controller keys", "/  Search categories; Esc clears the search before leaving")
+		lines = append(lines, "After saving, Enter opens a separate controller review; after verified application it opens client selection. Esc leaves the result.")
 	case dashboardWorkspace:
 		lines = append(lines,
 			"Choose Desktop, Dock, Editor or Browser, then a supported field.",
@@ -254,8 +255,9 @@ func (model dashboardModel) helpView() string {
 			"In a list: Space toggles, i inherits, c clears; Shift arrows reorder favorites.",
 			"Enter keeps a field in the draft; Esc cancels that field edit.",
 			"v reviews the complete draft, dependencies and student destinations.",
-			"Type SAVE and Enter only after review. No commit, runtime opt-in, deploy or reset is included.",
-			"A saved profile can open the existing Git review; commit uses separate authorization.")
+			"Type SAVE and Enter only after review to save and record just the workspace profile locally.",
+			"Enter then opens a separate controller review. Runtime opt-in, deployment and home reset are never automatic.",
+			"A partial save opens Git review for inspection; do not replay the old save or apply systems before recovery.")
 		lines = append(lines, "Extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
 	case dashboardTemplateReset:
 		lines = append(lines,
@@ -265,6 +267,7 @@ func (model dashboardModel) helpView() string {
 			"Settings, lock, keys, ignore rules and untracked files are preserved; collisions block the reset.",
 			"Type RESET DEPLOYMENT and Enter to create a backup and a local reset commit. Esc cancels review.",
 			"The guided home is enabled in configuration only. Apply systems and reboot separately; no push.",
+			"The result offers a separate controller review, then client selection after verified application. Esc leaves without applying.",
 			"An interrupted reset requires recovery; preserve the backup ref and .git/nixorium-template-reset.json.")
 	case dashboardSettingsPasswords:
 		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
@@ -298,6 +301,7 @@ func (model dashboardModel) helpView() string {
 			"Unavailable sections are not healthy results. Detailed logs are not included.")
 	case dashboardSoftware:
 		lines = append(lines, "F2 selected   F3 package search   F4 suggestions   Tab next view", "p add a deployment-owned profile   / search", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
+		lines = append(lines, "After saving: Enter takes the displayed next step; Esc leaves it for later. Client deployment always has its own review and confirmation.")
 	default:
 		lines = append(lines, "Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help.")
 	}
