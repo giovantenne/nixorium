@@ -309,7 +309,21 @@ nix --extra-experimental-features 'nix-command flakes' \
   build --file tests/source-checks.nix workspace-editor-vm --no-link
 ```
 
-The check also belongs to `--full`; ordinary `--quick` and `--eval` do not run
+`programming-profile-vm` qualifies the template's Programming profile the same
+way: the managed reset restores its extensions (linked, or copied for the
+debuggers that write into their own folder), every one activates offline in
+the pinned VS Code, the C/C++, Java, Python and PHP toolchains run as the
+student, PHP loads Xdebug and mysqli, and the teaching MySQL server listens on
+loopback only, survives a rebuild-time tmpfiles pass and is empty after boot.
+It does not cover GNOME, MySQL Workbench or Marketplace pins, which depend on
+an external service; check a Marketplace extension on one computer instead.
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' \
+  build --file tests/source-checks.nix programming-profile-vm --no-link
+```
+
+Both checks also belong to `--full`; ordinary `--quick` and `--eval` do not run
 the editor or the VM. Existing lower-level seed/resolution tests retain fast
 failure coverage without launching the graphical application.
 

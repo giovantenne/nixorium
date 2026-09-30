@@ -187,8 +187,13 @@ func TestTemplateResetCandidatePreservesPinAndEnablesGuidedHome(t *testing.T) {
 		if strings.Contains(string(candidate["flake.nix"].Data), "workspaceRuntimeEnabled") || !strings.Contains(string(candidate["flake.nix"].Data), snapshot.SourceURL) {
 			t.Fatal("pin/runtime not preserved")
 		}
-		if _, issues := domain.DecodeWorkspaceProfile(candidate[domain.WorkspaceFileName].Data); len(issues) != 0 {
+		profile, issues := domain.DecodeWorkspaceProfile(candidate[domain.WorkspaceFileName].Data)
+		if len(issues) != 0 {
 			t.Fatalf("profile: %v", issues)
+		}
+		// Only the tailored Programming profile preinstalls editor extensions.
+		if (profile.VSCode != nil && len(*profile.VSCode.Extensions) != 0) != (preset.ID == "programming") {
+			t.Fatalf("%s: unexpected initial editor selection", preset.ID)
 		}
 		if string(candidate["flake.lock"].Data) != "exact lock" || string(candidate["keys/admin-ssh.pub"].Data) != "existing key" {
 			t.Fatal("lost pin/key")

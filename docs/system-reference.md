@@ -405,6 +405,14 @@ never rewritten when they update Nixorium. Profile metadata is serialized into
 the offline installer source alongside the effective package declarations.
 All seven profiles include `git`, `nodejs`, `pi-coding-agent`, and `opencode`;
 only Programming includes `vscode` and its toolchain-coupled extension payload.
+Programming also carries the C/C++ (`gcc`, `gdb`, `gnumake`, `cmake`), Java,
+Python and PHP toolchains, `mysql84` and `mysql-workbench`. Where `mysql84` is
+selected, the site development module runs a teaching MySQL server that
+listens on loopback only, leaves `root` without a password and discards every
+database at boot; where `php` is selected it adds a PHP build with Xdebug.
+Where `apacheHttpd` is selected it runs Apache with that PHP as the student
+account, on loopback only, serving the student's `~/public_html` (recreated
+empty after the boot reset) with `.htaccess` overrides and folder listings.
 The controller management module also installs Git independently of profile
 selection, and the packaged Nixorium command carries it in its runtime PATH.
 Global npm uses each user's `~/.local/npm`, which precedes the system PATH.
@@ -424,8 +432,11 @@ distribution action when no client is affected.
 ### Workspace preparation
 
 The template ships a catalog, an active `workspace-profile.json` with Essential
-defaults and `workspace-profile.example.json`, a proposal with the same defaults
-that is never read as the declaration. With no `workspaceProfileJSON` (hand-written callers),
+defaults and two proposals that are never read as the declaration:
+`workspace-profile.example.json` (the same Essential defaults) and
+`workspace-profile.programming.example.json`, which bootstrap and template
+reset copy to `workspace-profile.json` when the Programming software profile
+is selected. With no `workspaceProfileJSON` (hand-written callers),
 `nixoriumWorkspace` is `null` and the legacy home/template/login behavior
 remains. With a profile, the output reports `state = "prepared"`, the
 configured `studentUser`, all target hosts, declared/effective preferences,

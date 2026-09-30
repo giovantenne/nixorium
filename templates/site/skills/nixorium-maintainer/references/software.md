@@ -106,4 +106,21 @@ matching package. Use the [student-home guide](student-home.md) for editor
 extensions and persistent defaults. System packages, project environments, and
 VS Code extensions are distinct configuration layers.
 
+## Local MySQL and web server for exercises
+
+The supplied Programming profile selects `mysql84`, `mysql-workbench` and `php`.
+With `mysql84` present, `modules/development.nix` runs a MySQL server that
+listens on loopback only, leaves `root` without a password and discards all
+databases at every boot. This matches common course material and the reset
+student home; it is not a place to keep data. Explain that before a teacher
+relies on it, and keep durable work as exported SQL files. Do not open the
+port, add remote accounts or remove the boot-time discard without an explicit
+decision: a persistent database shared by successive students is a different
+service with different privacy and backup needs. The same module adds a PHP
+build with Xdebug for step debugging from VS Code, and with `apacheHttpd` a
+XAMPP-style Apache that serves the student's `~/public_html` at
+`http://localhost/`. It runs as the student account, listens on loopback only
+and is reset with the home. Do not make it listen on the network, run it as
+another account or point it at staff homes without an explicit decision.
+
 Follow [operations](operations.md) for validation and explicit activation.

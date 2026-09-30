@@ -40,6 +40,20 @@ The project follows [Semantic Versioning](https://semver.org/).
   computers from update failures without weakening pending-evidence recovery,
   authenticated verification, exact targets or the required confirmation.
 
+- The Programming software profile now prepares a complete development
+  workstation: C/C++ (`gcc`, `gdb`, `gnumake`, `cmake`), Java, Python and PHP
+  toolchains, MySQL 8.4 and MySQL Workbench. Where `mysql84` is selected the
+  site module runs a teaching server that listens on loopback only, leaves
+  `root` without a password and discards all databases at every boot; where
+  `php` is selected it adds Xdebug; where `apacheHttpd` is selected a
+  XAMPP-style Apache with PHP serves the student's `~/public_html` at
+  `http://localhost/`, as the student and on loopback only. Student homes receive VS Code extensions
+  for web/PHP, C/C++, Python and Java: bootstrap and template reset copy the new
+  `workspace-profile.programming.example.json` when Programming is chosen, and
+  the legacy home of profile-less deployments installs the same set. A new `programming-profile-vm`
+  check activates every one of those extensions offline and exercises the
+  toolchains and database.
+
 - Student workspace profiles accept `vscode.extraSettings`: reviewed free-form
   editor defaults such as theme, telemetry and extension preferences. Typed
   settings, managed update keys, workspace-trust overrides, automatic tasks and

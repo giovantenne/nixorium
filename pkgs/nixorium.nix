@@ -18,6 +18,7 @@ buildGoModule {
       ../templates/site/lab-settings.json
       ../templates/site/software-presets.json
       ../templates/site/workspace-profile.example.json
+      ../templates/site/workspace-profile.programming.example.json
       ../tests/lab-settings-validation-cases.json
       ../tests/software-preset-validation-cases.json
       ../tests/workspace-validation-cases.json

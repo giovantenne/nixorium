@@ -21,6 +21,7 @@ configure_site_software_profile() {
   local PRESET_LABEL
   local SELECTED_ID
   local SOFTWARE_DIRECTORY
+  local TAILORED_PROFILE
   local TEMPORARY_FILE
 
   if ! command -v jq >/dev/null 2>&1; then
@@ -140,6 +141,19 @@ configure_site_software_profile() {
   fi
   chmod 0644 "$TEMPORARY_FILE"
   mv -- "$TEMPORARY_FILE" "$SOFTWARE_FILE"
+  # A profile may ship its own starting student home, such as Programming's
+  # editor extensions. Others keep the template's common profile.
+  TAILORED_PROFILE="${SOFTWARE_DIRECTORY}/workspace-profile.${SELECTED_ID}.example.json"
+  if [[ -f "$TAILORED_PROFILE" && -f "${SOFTWARE_DIRECTORY}/workspace-profile.json" ]]; then
+    TEMPORARY_FILE="$(mktemp "${SOFTWARE_DIRECTORY}/.workspace-profile.json.tmp.XXXXXX")"
+    if ! jq -e '.schemaVersion == 1' "$TAILORED_PROFILE" > /dev/null || ! cp -- "$TAILORED_PROFILE" "$TEMPORARY_FILE"; then
+      rm -f "$TEMPORARY_FILE"
+      echo "Error: could not prepare the student home for ${PRESET_LABEL}." >&2
+      return 1
+    fi
+    chmod 0644 "$TEMPORARY_FILE"
+    mv -- "$TEMPORARY_FILE" "${SOFTWARE_DIRECTORY}/workspace-profile.json"
+  fi
   echo
   echo "  [ OK ] Selected ${PRESET_LABEL}; applications are ready for the first controller build."
 }

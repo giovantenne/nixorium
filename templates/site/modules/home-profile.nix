@@ -24,14 +24,33 @@ let
     password-store = "basic";
     enable-crash-reporter = false;
   });
-  vscodeExtensions = [
-    { pkg = pkgs.vscode-extensions.ritwickdey.liveserver; dir = "ritwickdey.liveserver"; }
-    { pkg = pkgs.vscode-extensions.vscjava.vscode-java-pack; dir = "vscjava.vscode-java-pack"; }
-    { pkg = pkgs.vscode-extensions.redhat.java; dir = "redhat.java"; }
-    { pkg = pkgs.vscode-extensions.vscjava.vscode-java-debug; dir = "vscjava.vscode-java-debug"; }
-    { pkg = pkgs.vscode-extensions.vscjava.vscode-java-test; dir = "vscjava.vscode-java-test"; }
-    { pkg = pkgs.vscode-extensions.vscjava.vscode-maven; dir = "vscjava.vscode-maven"; }
-    { pkg = pkgs.vscode-extensions.vscjava.vscode-java-dependency; dir = "vscjava.vscode-java-dependency"; }
+  # Keep this list equal to workspace-profile.programming.example.json, which
+  # seeds the guided home. Packaged directories keep the publisher's case.
+  # Copied extensions write into their own folder (Live Server's manifest is
+  # edited below; debug adapters create files); the others stay linked.
+  vscodeExtension = copy: pkg: {
+    inherit copy;
+    inherit pkg;
+    dir = pkg.vscodeExtUniqueId;
+    name = lib.toLower pkg.vscodeExtUniqueId;
+  };
+  vscodeExtensions = map (vscodeExtension true) [
+    pkgs.vscode-extensions.ritwickdey.liveserver
+    pkgs.vscode-extensions.ms-python.debugpy
+    pkgs.vscode-extensions.vscjava.vscode-java-debug
+  ] ++ map (vscodeExtension false) [
+    pkgs.vscode-extensions.ecmel.vscode-html-css
+    pkgs.vscode-extensions.esbenp.prettier-vscode
+    pkgs.vscode-extensions.bmewburn.vscode-intelephense-client
+    pkgs.vscode-extensions.xdebug.php-debug
+    pkgs.vscode-extensions.ms-vscode.cpptools
+    pkgs.vscode-extensions.ms-python.python
+    pkgs.vscode-extensions.ms-python.vscode-pylance
+    pkgs.vscode-extensions.vscjava.vscode-java-pack
+    pkgs.vscode-extensions.redhat.java
+    pkgs.vscode-extensions.vscjava.vscode-java-test
+    pkgs.vscode-extensions.vscjava.vscode-maven
+    pkgs.vscode-extensions.vscjava.vscode-java-dependency
   ];
 in
 {
@@ -55,9 +74,14 @@ in
           install -D -m 0644 ${labAssets.vscodeSettings} "${studentTemplate}/.config/Code/User/settings.json"
           install -d -m 0755 "${studentTemplate}/.vscode/extensions"
           ${builtins.concatStringsSep "\n          " (map (extension:
-            ''cp -a "${extension.pkg}/share/vscode/extensions/${extension.dir}" "${studentTemplate}/.vscode/extensions/"''
+            if extension.copy then
+              ''cp -a "${extension.pkg}/share/vscode/extensions/${extension.dir}" "${studentTemplate}/.vscode/extensions/${extension.name}"''
+            else
+              ''ln -s "${extension.pkg}/share/vscode/extensions/${extension.dir}" "${studentTemplate}/.vscode/extensions/${extension.name}"''
           ) vscodeExtensions)}
-          chmod -R u+w "${studentTemplate}/.vscode/extensions"
+          ${builtins.concatStringsSep "\n          " (map (extension:
+            ''chmod -R u+w "${studentTemplate}/.vscode/extensions/${extension.name}"''
+          ) (builtins.filter (extension: extension.copy) vscodeExtensions))}
           ${pkgs.jq}/bin/jq 'del(.announcement)' \
             "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json" \
             > "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp"

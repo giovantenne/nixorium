@@ -224,6 +224,11 @@ The template supplies `workspace-catalog.nix` and an active
 `workspace-profile.json` matching Essential without requiring VS Code.
 Leave it unchanged for the defaults, or customize it under **Maintenance →
 Settings → Student workspace**. There is no separate personalization switch.
+Choosing Programming at installation (or in a template reset) copies
+`workspace-profile.programming.example.json` over it: VS Code and MySQL
+Workbench in the dock, editor defaults, and extensions for web/PHP, C/C++,
+Python and Java. Adding Programming later from the software screen leaves the
+saved profile unchanged; select VS Code and its extensions in the editor.
 The example file is only a reset proposal, never a fallback for a missing or
 invalid saved profile. Validation checks preferences and prerequisites for
 the student on the controller and every client, including offline evaluation.
@@ -395,6 +400,19 @@ set exposes Kdenlive as `kdePackages.kdenlive`, so that exact pinned attribute
 is used by the audio/video profile. `lab-software.json` initially matches
 Essential at `shared` scope; this default affects newly generated repositories
 only and does not migrate existing deployments.
+
+Programming adds VS Code, the C/C++, Java, Python and PHP toolchains, a local
+MySQL server and MySQL Workbench. That server is for exercises only: it accepts
+connections from the same computer, `root` has no password, and all databases
+are discarded at every boot, like the student home. Keep work that must
+survive as exported SQL files. `modules/development.nix` holds this policy.
+
+Programming also runs Apache with PHP in the XAMPP style: files saved in the
+student's `~/public_html` open at `http://localhost/` (for example
+`~/public_html/sito/index.php` at `http://localhost/sito/`), with `.htaccess`
+rules and folder listings. The server runs as the student account and listens
+on this computer only; the folder is emptied with the rest of the home at every
+boot, and on the controller it serves the student account's folder.
 
 Every profile includes Git, the Ghostty/TTE lab screensaver, Node.js (and npm),
 Pi and OpenCode. Git is available to every user and is also a runtime

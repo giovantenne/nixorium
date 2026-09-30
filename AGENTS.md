@@ -421,6 +421,12 @@ failure or timeout must block publication.
   Never silently replace a missing/invalid profile with the example. Expose the
   seed path without claiming it is built, deployed or active. Preserve offline
   profile/catalog equivalence and the profile-free standalone composition.
+  Bootstrap and template reset copy `workspace-profile.<preset>.example.json`
+  to `workspace-profile.json` when the template ships one for the selected
+  software profile; only Programming does. Additive software-profile changes
+  never rewrite a saved workspace profile. Keep its
+  extension list equal to the legacy list in `modules/home-profile.nix`, and
+  every extension prerequisite inside the Programming package list.
   `vscode.extraSettings` carries reviewed free-form editor defaults; keep its
   refused keys identical in the Go and Nix decoders through the shared corpus.
   Extension IDs stay lowercase while packaged identities compare without case.

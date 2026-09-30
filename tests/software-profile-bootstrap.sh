@@ -11,8 +11,11 @@ trap cleanup EXIT
 
 CATALOG="$TEST_ROOT/software-presets.json"
 SOFTWARE="$TEST_ROOT/lab-software.json"
+PROFILE="$TEST_ROOT/workspace-profile.json"
 cp "$REPO_ROOT/templates/site/software-presets.json" "$CATALOG"
 cp "$REPO_ROOT/templates/site/lab-software.json" "$SOFTWARE"
+cp "$REPO_ROOT/templates/site/workspace-profile.json" "$PROFILE"
+cp "$REPO_ROOT/templates/site/workspace-profile.programming.example.json" "$TEST_ROOT/"
 
 printf '\n\n' | bash "$REPO_ROOT/templates/site/scripts/configure-software-profile.sh" \
   "$CATALOG" "$SOFTWARE" > "$TEST_ROOT/default.out"
@@ -20,6 +23,8 @@ jq -S . "$REPO_ROOT/templates/site/lab-software.json" > "$TEST_ROOT/default-expe
 jq -S . "$SOFTWARE" > "$TEST_ROOT/default-actual.json"
 cmp "$TEST_ROOT/default-expected.json" "$TEST_ROOT/default-actual.json"
 grep -F 'Selected Essential' "$TEST_ROOT/default.out" >/dev/null
+# Essential keeps the common student profile.
+cmp "$REPO_ROOT/templates/site/workspace-profile.json" "$PROFILE"
 
 cp "$REPO_ROOT/templates/site/lab-software.json" "$SOFTWARE"
 printf '3\n\n' | bash \
@@ -36,6 +41,11 @@ jq -e '
   any(.packages[]; .package == "gcc")
 ' "$SOFTWARE" >/dev/null
 grep -F 'Profile:    Programming' "$TEST_ROOT/programming.out" >/dev/null
+# Programming starts from its own student profile, with editor extensions.
+cmp "$REPO_ROOT/templates/site/workspace-profile.programming.example.json" "$PROFILE"
+test "$(stat -c %a "$PROFILE")" = 644
+test -z "$(find "$TEST_ROOT" -maxdepth 1 -name '.workspace-profile.json.tmp.*' -print -quit)"
+cp "$REPO_ROOT/templates/site/workspace-profile.json" "$PROFILE"
 if grep -F 'package IDs' "$TEST_ROOT/programming.out" >/dev/null; then
   echo "bootstrap exposed package IDs to the operator" >&2
   exit 1

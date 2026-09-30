@@ -61,6 +61,15 @@ profile, or invoke the helper as a retry. Request separately authorized recovery
 based on the actual snapshot/home state. Sanitized, read-only managed snapshots
 under `/var/lib/home-snapshots/workspace` are not external backups.
 
+The Programming software profile has its own starting profile,
+`workspace-profile.programming.example.json`: VS Code and MySQL Workbench in the
+dock, the lab's editor defaults as `vscode.extraSettings`, and extensions for
+web/PHP, C/C++, Python and Java. Bootstrap copies it to `workspace-profile.json`
+when Programming is chosen, and a template reset to Programming uses it too.
+Adding the Programming software later does not change a saved profile: select
+VS Code and its extensions in the editor. The profile needs every Programming
+package on every destination.
+
 The managed seed supports VS Code through the typed settings, reviewed
 `vscode.extraSettings` (themes, telemetry, chat and extension preferences;
 terminal profile, shell and environment keys are refused), selected extensions

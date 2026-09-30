@@ -68,6 +68,8 @@ configuration, software, home customization, diagnostics, and operations.
   disable the profile to bypass failed-reset recovery.
   `workspace-profile.example.json` is a reset proposal, never a fallback for a
   missing saved profile. The supplied catalog does not install applications.
+  `workspace-profile.programming.example.json` is the one bootstrap and a
+  template reset copy to `workspace-profile.json` for the Programming profile.
   On supporting pins, `nixoriumResolveWorkspaceCandidate` can preview effective
   values and destinations without writing a profile. Keep any local validation
   hook in the review path; preview success is not permission to save or deploy.

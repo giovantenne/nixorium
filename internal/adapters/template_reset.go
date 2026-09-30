@@ -380,11 +380,17 @@ func prepareResetFiles(original, template map[string]domain.TemplateFile, snapsh
 		return nil, selected, err
 	}
 	files["lab-software.json"] = domain.TemplateFile{Mode: "100644", Data: softwareJSON}
-	profile, issues := domain.DecodeWorkspaceProfile(files["workspace-profile.example.json"].Data)
+	// A template may tailor the initial home to one software profile, for
+	// example its editor extensions. Other profiles start from the common one.
+	example, tailored := files["workspace-profile."+selected.ID+".example.json"]
+	if !tailored {
+		example = files["workspace-profile.example.json"]
+	}
+	profile, issues := domain.DecodeWorkspaceProfile(example.Data)
 	if len(issues) != 0 {
 		return nil, selected, errors.New("the pinned template has no supported initial workspace profile")
 	}
-	if slices.Contains(selected.Packages, "vscode") && profile.Desktop != nil && profile.Desktop.Favorites != nil {
+	if !tailored && slices.Contains(selected.Packages, "vscode") && profile.Desktop != nil && profile.Desktop.Favorites != nil {
 		favorites := append([]string{}, (*profile.Desktop.Favorites)...)
 		if !slices.Contains(favorites, "code.desktop") {
 			favorites = append(favorites, "code.desktop")
