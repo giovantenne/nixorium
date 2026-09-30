@@ -17,6 +17,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 - PXE enrollment refuses a missing configured client interface before the erase
   review, lists detected interfaces and explains how to prepare corrected files.
   Installation settings now edit the client override and show controller context.
+  The installer VM covers refusal before disk changes and a matching interface.
 
 - Preserved exact changed Git paths, including unstaged settings, renames and
   whitespace, so setup cannot treat uncommitted managed configuration as saved.

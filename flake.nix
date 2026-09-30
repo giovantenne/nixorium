@@ -81,7 +81,7 @@
       });
       installerTestLab = mkLab {
         deploymentSelf = self;
-        labConfig = import ./lab-config.nix;
+        labConfig = (import ./lab-config.nix) // { clientIfaceName = "eth1"; };
         homeResetEphemeralPaths = [
           ".cache/opencode"
           ".config/opencode"
