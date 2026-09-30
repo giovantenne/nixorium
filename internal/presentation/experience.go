@@ -225,6 +225,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "h review changed SSH trust in a computer's details, after verifying its physical fingerprint")
 		}
 	case dashboardDeploy:
+		lines = append(lines, "Review probes only selected computers; it does not prove power state or authenticated identity.", "Results list each computer; Shift+arrows scroll long results and l opens private logs.")
 		if model.deployment.usbRecovery != nil {
 			lines = append(lines, "Enter runs the visible recovery action; it never starts deployment.",
 				"For an installed computer awaiting its final check: turn it on, boot from its disk, and connect the network cable.",
@@ -235,6 +236,8 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   r new review when no recovery is required   Enter Computers")
 	case dashboardInternet:
 		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
+	case dashboardDeployReview:
+		lines = append(lines, "The brief availability check is not authentication or proof of power state.", "F2, when offered, creates a new review for only the reachable computers with an open SSH port.", "The new review requires a fresh DEPLOY confirmation; it never starts automatically.", "Esc during replanning keeps the original review and clears its confirmation.")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		lines = append(lines, "Space select   a select/deselect all   Tab shutdown/restart   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state or a completed restart.")
 	case dashboardSetup:

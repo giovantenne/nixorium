@@ -60,6 +60,7 @@ in
         pkgs.diffutils
         pkgs.git
         pkgs.gnugrep
+        pkgs.gnused
         pkgs.iproute2
         pkgs.jq
         pkgs.nix
@@ -256,7 +257,7 @@ in
     # sources across reboot rather than losing the writable store's tmpfs.
     virtualisation.writableStoreUseTmpfs = internetOnly;
     virtualisation.memorySize = if internetOnly then 2048 else 1024;
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnused pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit ];
     users.groups.veyon-master = {};
     system.activationScripts.createHomeTemplates = "";
     system.activationScripts.siteHomeProfile = {
@@ -880,7 +881,10 @@ in
     controller.succeed("su - admin -c 'nixorium services restart cache --repo /home/admin/nixorium-deployment --yes --json' > /tmp/service-restart.json || { cat /tmp/service-restart.json; false; }; jq -e '.operation == \"service-restart\" and .state == \"completed\" and .service == \"cache\" and .unit == \"nixorium-restart-cache.service\" and .verified and .current.active' /tmp/service-restart.json || { cat /tmp/service-restart.json; false; }")
     controller.succeed("su - admin -c 'nixorium hosts --repo /home/admin/nixorium-deployment --json' > /tmp/hosts-current.json; jq -e '.operation == \"hosts\" and .state == \"available\" and .deployment.current == 1 and .deployment.outdated == 0 and .deployment.unknown == 0 and (.hosts | length) == 1 and .hosts[0].name == \"pc01\" and .hosts[0].role == \"client\" and .hosts[0].reachability == \"reachable\" and .hosts[0].ssh == \"available\" and .hosts[0].deployment == \"current\" and (.hosts[0].currentSystem | startswith(\"/nix/store/\")) and .hosts[0].currentRevision == .hosts[0].desiredRevision' /tmp/hosts-current.json || { cat /tmp/hosts-current.json; false; }")
     controller.succeed("nixorium deploy plan --repo /tmp/deployment --on @lab --json | jq -e '.operation == \"deploy-plan\" and .state == \"ready\" and .requested == \"@lab\" and .colmenaSelector == \"@lab\" and .buildFirst and (.revision | length) == 40 and (.targets | length) == 1 and .targets[0].name == \"pc01\"'")
-    controller.succeed("nixorium deploy plan --repo /tmp/deployment --on pc01 --json | jq -e '.state == \"ready\" and .colmenaSelector == \"pc01\"'")
+    controller.succeed("nixorium deploy plan --repo /tmp/deployment --on pc01 --json | jq -e '.state == \"ready\" and .colmenaSelector == \"pc01\" and (.availability | length) == 1 and .availability[0].name == \"pc01\" and .availability[0].reachability == \"reachable\" and .availability[0].ssh == \"available\"'")
+    with subtest("deployment availability does not silently omit an offline computer"):
+      controller.succeed("su - admin -c 'set -eu; cp -a ~/nixorium-deployment /tmp/offline-plan-deployment; /run/current-system/sw/bin/sed -i s/127.0.0.1/192.0.2.250/g /tmp/offline-plan-deployment/flake.nix; git -C /tmp/offline-plan-deployment add flake.nix; git -C /tmp/offline-plan-deployment -c user.name=Test -c user.email=test@example.invalid commit -qm offline-fixture; nixorium deploy plan --repo /tmp/offline-plan-deployment --on pc01 --json' > /tmp/offline-plan.json")
+      controller.succeed("jq -e '.state == \"ready\" and (.targets | length) == 1 and .targets[0].name == \"pc01\" and .availability[0].reachability == \"unreachable\" and (.reachableRequested // \"\") == \"\"' /tmp/offline-plan.json")
     controller.fail("nixorium deploy plan --repo /tmp/deployment --on pc02 --json")
     controller.succeed("su - admin -c 'revision=$(git -C /home/admin/nixorium-deployment rev-parse HEAD); NIXORIUM_TEST_COLMENA_INVOCATIONS=/tmp/colmena-success PATH=/tmp/fake-colmena-bin:$PATH nixorium deploy apply --repo /home/admin/nixorium-deployment --on pc01 --expect \"$revision\" --yes --json >/tmp/deploy-success.json 2>/tmp/deploy-success.progress' || { cat /tmp/deploy-success.json /tmp/deploy-success.progress; false; }")
     controller.succeed("jq -e '.operation == \"deploy-apply\" and .state == \"completed\" and .phase == \"complete\" and .buildCompleted and .applyCompleted and .retrySafe and .colmenaSelector == \"pc01\" and .verification.attempted == 1 and .verification.verified == 1 and .verification.recorded == 1 and .verification.targets[0].name == \"pc01\" and .verification.targets[0].state == \"verified\" and (.logPath | startswith(\"/home/admin/.local/state/nixorium/operations/deploy-\"))' /tmp/deploy-success.json")

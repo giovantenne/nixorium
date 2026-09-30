@@ -39,16 +39,27 @@ func (e *DeploymentUnconfirmedError) Error() string { return e.Err.Error() }
 func (e *DeploymentUnconfirmedError) Unwrap() error { return e.Err }
 
 type DeploymentPlanReport struct {
-	SchemaVersion   int                `json:"schemaVersion"`
-	Operation       string             `json:"operation"`
-	State           string             `json:"state"`
-	Repository      string             `json:"repository"`
-	Requested       string             `json:"requested"`
-	Revision        string             `json:"revision,omitempty"`
-	ColmenaSelector string             `json:"colmenaSelector,omitempty"`
-	Targets         []DeploymentTarget `json:"targets"`
-	BuildFirst      bool               `json:"buildFirst"`
-	Issues          []ValidationIssue  `json:"issues"`
+	Availability       []DeploymentTargetAvailability `json:"availability,omitempty"`
+	ReachableRequested string                         `json:"reachableRequested,omitempty"`
+	SchemaVersion      int                            `json:"schemaVersion"`
+	Operation          string                         `json:"operation"`
+	State              string                         `json:"state"`
+	Repository         string                         `json:"repository"`
+	Requested          string                         `json:"requested"`
+	Revision           string                         `json:"revision,omitempty"`
+	ColmenaSelector    string                         `json:"colmenaSelector,omitempty"`
+	Targets            []DeploymentTarget             `json:"targets"`
+	BuildFirst         bool                           `json:"buildFirst"`
+	Issues             []ValidationIssue              `json:"issues"`
+}
+
+// Availability is a best-effort TCP/SSH-port observation, not authentication,
+// power-state evidence or permission to change the reviewed target set.
+type DeploymentTargetAvailability struct {
+	Name         string          `json:"name"`
+	IP           string          `json:"ip"`
+	Reachability Reachability    `json:"reachability"`
+	SSH          SSHAvailability `json:"ssh"`
 }
 
 func (r DeploymentPlanReport) HasErrors() bool {
@@ -82,6 +93,8 @@ type LastSuccessfulDeployment struct {
 }
 
 type DeploymentTargetVerification struct {
+	Reachability     Reachability     `json:"reachability,omitempty"`
+	SSH              SSHAvailability  `json:"ssh,omitempty"`
 	HostKeyCondition HostKeyCondition `json:"hostKeyCondition,omitempty"`
 	Name             string           `json:"name"`
 	State            string           `json:"state"`

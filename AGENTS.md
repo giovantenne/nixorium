@@ -314,6 +314,12 @@ failure or timeout must block publication.
   from a completion label in presentation code.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist fleet-wide pending evidence before apply. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new operations and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
+- Deployment availability is advisory: probe only selected identities with the
+  bounded inventory probe; an open SSH port is not authenticated identity or
+  proof of power state. A reachable-only choice creates a fresh explicit-target
+  plan and confirmation, never edits or silently shrinks an approved execution.
+  Per-computer outcomes must retain uncertainty and recovery requirements;
+  never infer individual activation success from an aggregate batch result.
 - Client shutdown expands only evaluated client identities and never the controller. Active sessions remain eligible after an explicit data-loss warning; when any are present, the review must state that the one-word `SHUTDOWN` confirmation authorizes their interruption. Preserve explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the same non-blocking lock used by deployment. Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.
 - Client restart shares the shutdown review and safety boundary but binds the
   distinct action and `RESTART` confirmation; its adapter may additionally

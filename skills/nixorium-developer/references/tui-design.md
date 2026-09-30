@@ -116,6 +116,14 @@ this TUI, accept earlier matching progress when attaching, report abandoned
 running records as interrupted and refuse conflicting starts. Observation is
 bounded, local-only and unavailable to the restricted teacher dashboard.
 
+Deployment review shows bounded selected-target availability and can request a
+fresh reachable-only plan through a typed callback. Keep subset computation in
+the application; clear confirmation and never reuse the wider authorization.
+Cancel/late-result handling must preserve the original review, not a half-edited
+selector. Per-computer results use typed evidence and remain scrollable with
+logs/recovery actions visible. A TCP probe is not authentication or power state;
+an aggregate error alone cannot identify a failed client activation.
+
 ## Validate behavior and rendering
 
 Put interaction and state-transition coverage in deterministic Go tests. Keep

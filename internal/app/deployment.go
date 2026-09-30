@@ -20,6 +20,7 @@ type DeploymentSource interface {
 	InterfaceAddresses(string) ([]string, error)
 	RunDeploymentPhase(context.Context, domain.DeploymentPlanReport, domain.DeploymentPhase, io.Writer) error
 	CurrentSystems(context.Context, []domain.HostMeta, time.Duration) map[string]domain.HostSystemProbe
+	SSHStatus(context.Context, []domain.HostMeta, time.Duration) map[string]domain.SSHProbe
 	RecordSuccessfulDeployments(string, map[string]domain.LastSuccessfulDeployment) error
 }
 
@@ -144,11 +145,14 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 		hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP})
 	}
 	observed := m.source.CurrentSystems(ctx, hosts, deploymentVerificationTimeout)
+	availability := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
 	updates := map[string]domain.LastSuccessfulDeployment{}
 	verifiedAt := m.now().UTC()
 	for index, target := range report.Targets {
 		probe, found := observed[target.Name]
 		verification := domain.DeploymentTargetVerification{
+			Reachability:     availability[target.Name].Reachability,
+			SSH:              availability[target.Name].SSH,
 			HostKeyCondition: probe.HostKeyCondition,
 			Name:             target.Name,
 			State:            "unverified",
@@ -307,9 +311,58 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		report = deploymentIssue(report, "selector", issue)
 	}
 	if !report.HasErrors() {
+		hosts := make([]domain.HostMeta, 0, len(targets))
+		for _, target := range targets {
+			hosts = append(hosts, domain.HostMeta{Name: target.Name, IP: target.IP})
+		}
+		probes := m.source.SSHStatus(ctx, hosts, sshProbeTimeout)
+		for _, target := range targets {
+			probe, found := probes[target.Name]
+			if !found {
+				probe = domain.SSHProbe{Reachability: domain.ReachabilityUnknown, SSH: domain.SSHUnknown}
+			}
+			report.Availability = append(report.Availability, domain.DeploymentTargetAvailability{Name: target.Name, IP: target.IP, Reachability: probe.Reachability, SSH: probe.SSH})
+		}
+		if err := ctx.Err(); err != nil {
+			return deploymentIssue(report, "availability", "computer availability check cancelled or timed out")
+		}
+		// A probe can take time. Do not present a clean revision observed before
+		// it as a current review when the repository changed during that wait.
+		git, gitErr := m.source.GitState(ctx, root)
+		revision, revisionErr := m.source.GitRevision(ctx, root)
+		if gitErr != nil || git.Dirty || revisionErr != nil || revision != report.Revision {
+			return deploymentIssue(report, "review", "deployment changed during availability checks; create a fresh plan")
+		}
+		reachable := reachableDeploymentNames(report)
+		if len(reachable) > 0 && len(reachable) < len(targets) {
+			report.ReachableRequested = strings.Join(reachable, ",")
+		}
 		report.State = "ready"
 	}
 	return report
+}
+
+// PlanReachable creates a new review for an explicit subset. It neither edits
+// the old plan nor starts an operation; execution still revalidates normally.
+func (m *DeploymentManager) PlanReachable(ctx context.Context, repository string, reviewed domain.DeploymentPlanReport) domain.DeploymentPlanReport {
+	names := reachableDeploymentNames(reviewed)
+	if reviewed.HasErrors() || reviewed.State != "ready" || len(names) == 0 || len(names) >= len(reviewed.Targets) {
+		return deploymentIssue(domain.DeploymentPlanReport{SchemaVersion: domain.SchemaVersion, Operation: "deploy-plan", State: "blocked", BuildFirst: true}, "selector", "no reachable-only subset is available; review the selected computers again")
+	}
+	return m.Plan(ctx, repository, strings.Join(names, ","))
+}
+
+func reachableDeploymentNames(plan domain.DeploymentPlanReport) []string {
+	names := []string{}
+	for _, target := range plan.Targets {
+		for _, observed := range plan.Availability {
+			if observed.Name == target.Name && observed.IP == target.IP && observed.Reachability == domain.ReachabilityReachable && observed.SSH == domain.SSHAvailable {
+				names = append(names, target.Name)
+				break
+			}
+		}
+	}
+	return names
 }
 
 func selectDeploymentTargets(hosts []domain.HostMeta, requested string) ([]domain.DeploymentTarget, string, []string) {

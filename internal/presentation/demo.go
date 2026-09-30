@@ -68,8 +68,45 @@ func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) 
 			renderTemplateResetDemo(sourceCommit, width, height),
 			renderHostTrustDemo(sourceCommit, width, height),
 			renderManagedJobsDemo(sourceCommit, width, height),
+			renderDeploymentAvailabilityDemo(sourceCommit, width, height),
 		},
 	}
+}
+
+func renderDeploymentAvailabilityDemo(revision string, width, height int) DemoScenario {
+	targets := demoDeploymentTargets()[:2]
+	plan := domain.DeploymentPlanReport{Operation: "deploy-plan", State: "ready", Requested: "pc01,pc02", ColmenaSelector: "pc01,pc02", Revision: revision, Targets: targets, ReachableRequested: "pc01", BuildFirst: true, Availability: []domain.DeploymentTargetAvailability{{Name: targets[0].Name, IP: targets[0].IP, Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}, {Name: targets[1].Name, IP: targets[1].IP, Reachability: domain.ReachabilityUnreachable, SSH: domain.SSHUnknown}}}
+	actions := demoActions()
+	actions.PlanReachableDeployment = func(context.Context, domain.DeploymentPlanReport) domain.DeploymentPlanReport {
+		subset := plan
+		subset.Targets = targets[:1]
+		subset.Availability = plan.Availability[:1]
+		subset.Requested = "pc01"
+		subset.ColmenaSelector = "pc01"
+		subset.ReachableRequested = ""
+		return subset
+	}
+	r := newDemoRecorder(actions, revision, width, height)
+	r.capture("Overview", 1000)
+	r.model.screen = dashboardDeployReview
+	r.model.deployment.plan = plan
+	r.capture("Review selected computer availability", 2400)
+	read := r.key(demoCode(tea.KeyF2))
+	r.capture("Create a new reachable-only plan", 1000)
+	r.command(read)
+	r.capture("Reachable-only subset still requires confirmation", 2200)
+	r.key(demoCode(tea.KeyEscape))
+	r.capture("Return to the exact subset selection", 1300)
+	r.model.message = ""
+	r.model.deployment.result = domain.DeploymentExecutionReport{Operation: "deploy-apply", State: "partial", Revision: revision, Targets: targets, Phase: domain.DeploymentPhaseVerify, BuildCompleted: true, ApplyCompleted: true, Verification: domain.DeploymentVerificationSummary{Attempted: 2, Verified: 1, Recorded: 1, Targets: []domain.DeploymentTargetVerification{{Name: "pc01", State: "verified"}, {Name: "pc02", State: "unverified", Reachability: domain.ReachabilityUnreachable}}}, LogPath: "/demo/state/deploy-mixed.log"}
+	r.capture("Alternative full-selection result with an unreachable computer", 2800)
+	r.model.deployment.result.State = "failed"
+	r.model.deployment.result.RecoveryRequired = true
+	r.model.deployment.result.Phase = domain.DeploymentPhaseApply
+	r.model.deployment.result.ApplyCompleted = false
+	r.model.deployment.result.Verification.Recorded = 0
+	r.capture("Uncertain activation still requires recovery", 2500)
+	return DemoScenario{ID: "deployment-availability", Title: "Distribute when some computers cannot be reached", Description: "A brief selected-target check offers a new subset review. Full-selection results remain honest about individual outcomes and recovery.", Frames: r.frames}
 }
 
 func renderManagedJobsDemo(revision string, width, height int) DemoScenario {
@@ -308,7 +345,7 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 	actions.PlanDeployment = func(ctx context.Context, requested string) domain.DeploymentPlanReport {
 		return domain.DeploymentPlanReport{
 			SchemaVersion: domain.SchemaVersion, Operation: "deploy-plan", State: "ready", Repository: "/demo/lab", Requested: requested,
-			Revision: revision, ColmenaSelector: requested, Targets: demoDeploymentTargets(), BuildFirst: true, Issues: []domain.ValidationIssue{},
+			Revision: revision, ColmenaSelector: requested, Targets: demoDeploymentTargets(), Availability: demoDeploymentAvailability(), BuildFirst: true, Issues: []domain.ValidationIssue{},
 		}
 	}
 
@@ -362,7 +399,7 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 	r.message(dashboardDeploymentResultMsg{report: domain.DeploymentExecutionReport{
 		SchemaVersion: domain.SchemaVersion, Operation: "deploy-apply", State: "completed", Repository: "/demo/lab", Requested: "@lab", Revision: revision, ColmenaSelector: "@lab",
 		Targets: demoDeploymentTargets(), Phase: domain.DeploymentPhaseComplete, BuildCompleted: true, ApplyCompleted: true,
-		Verification: domain.DeploymentVerificationSummary{Attempted: 5, Verified: 5, Recorded: 5}, LogPath: "/demo/state/deploy-lab.log", Message: "All five clients report the reviewed revision.", Issues: []domain.ValidationIssue{},
+		Verification: domain.DeploymentVerificationSummary{Attempted: 5, Verified: 5, Recorded: 5, Targets: demoDeploymentVerification()}, LogPath: "/demo/state/deploy-lab.log", Message: "All five clients report the reviewed revision.", Issues: []domain.ValidationIssue{},
 	}})
 	r.capture("Deployment completed and verified", 3500)
 
@@ -457,6 +494,22 @@ func demoDeploymentTargets() []domain.DeploymentTarget {
 		{Name: "pc04", IP: "10.42.0.14"},
 		{Name: "pc05", IP: "10.42.0.15"},
 	}
+}
+
+func demoDeploymentAvailability() []domain.DeploymentTargetAvailability {
+	result := []domain.DeploymentTargetAvailability{}
+	for _, target := range demoDeploymentTargets() {
+		result = append(result, domain.DeploymentTargetAvailability{Name: target.Name, IP: target.IP, Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable})
+	}
+	return result
+}
+
+func demoDeploymentVerification() []domain.DeploymentTargetVerification {
+	result := []domain.DeploymentTargetVerification{}
+	for _, target := range demoDeploymentTargets() {
+		result = append(result, domain.DeploymentTargetVerification{Name: target.Name, State: "verified"})
+	}
+	return result
 }
 
 func renderInstallationDemo(revision string, width, height int) DemoScenario {

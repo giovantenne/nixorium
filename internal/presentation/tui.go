@@ -20,77 +20,78 @@ import (
 // stop action, not the read-only Esc path. PreparePXE is systemd-owned;
 // ApplyController waits for a managed job while the foreground UI stays protected.
 type DashboardActions struct {
-	LoadManagedJobs        func(context.Context) ([]domain.ManagedJob, error)
-	PlanHostTrust          func(context.Context, string) domain.HostTrustPlan
-	ApplyHostTrust         func(domain.HostTrustPlan) domain.HostTrustResult
-	LoadTemplateReset      func(context.Context) domain.TemplateResetCatalog
-	PlanTemplateReset      func(context.Context, string, func(string)) domain.TemplateResetPlan
-	ApplyTemplateReset     func(domain.TemplateResetPlan) domain.TemplateResetResult
-	ClassroomMode          bool
-	PlanInternet           func(context.Context, string, domain.InternetAction) domain.InternetPlan
-	ApplyInternet          func(domain.InternetPlan) domain.InternetReport
-	RunningVersion         string
-	LoadInventory          func(context.Context) (domain.StatusReport, error)
-	LoadInitial            func(context.Context) (domain.StatusReport, domain.SetupReport, error)
-	LoadDoctor             func(context.Context) (domain.DoctorReport, error)
-	PreviewSupport         func(context.Context) (domain.SupportSnapshot, error)
-	ExportSupport          func(domain.SupportSnapshot) domain.SupportExportResult
-	Refresh                func(context.Context) (domain.StatusReport, error)
-	LoadSetup              func(context.Context) domain.SetupReport
-	LoadSetupKeys          func(context.Context) domain.KeyReconcileReport
-	ReconcileSetupKeys     func() (domain.KeyReconcileReport, error)
-	ImportSetupKey         func(string, string) (domain.KeyImportReport, error)
-	SaveSetupConfiguration func() domain.ConfigurationSaveReport
-	InstallSetupSecrets    func() domain.ActionReport
-	LoadHosts              func(context.Context) (domain.HostsReport, error)
-	LoadConfigurationState func(context.Context) domain.ConfigurationStateReport
-	LoadSoftware           func(context.Context) domain.SoftwareCatalogReport
-	SearchSoftware         func(context.Context, string) domain.SoftwareSearchReport
-	PlanSoftware           func(context.Context, domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
-	SaveSoftware           func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
-	LoadSoftwarePresets    func(context.Context) domain.SoftwarePresetCatalogReport
-	PlanSoftwarePreset     func(context.Context, domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport
-	SaveSoftwarePreset     func(domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport
-	PlanShutdown           func(context.Context, string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
-	PlanPower              func(context.Context, string, domain.ShutdownSessionPolicy, domain.ClientPowerAction) domain.ShutdownPlanReport
-	ApplyShutdown          func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
-	PlanDeployment         func(context.Context, string) domain.DeploymentPlanReport
-	ApplyDeployment        func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
-	PlanController         func(context.Context) domain.ControllerRebuildPlanReport
-	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
-	LoadControllerProgress func() (domain.OperationProgress, error)
-	LoadServices           func(context.Context) domain.ServicesReport
-	RestartService         func(string) domain.ServiceActionReport
-	LoadLogs               func(context.Context) domain.OperationLogsReport
-	LoadLog                func(context.Context, string) domain.OperationLogReport
-	LoadGitReview          func(context.Context) domain.GitReviewReport
-	PlanGitCommit          func(context.Context, string) domain.GitCommitPlanReport
-	ApplyGitCommit         func(domain.GitCommitPlanReport) domain.GitCommitReport
-	CheckUpdate            func(context.Context) domain.UpdateCheckReport
-	PlanUpdate             func(context.Context, string, bool, bool) domain.UpdatePlanReport
-	PlanUpdateWithProgress func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
-	SaveUpdate             func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadPackageBase        func(context.Context) domain.PackageBaseStatus
-	PlanPackageBase        func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
-	SavePackageBase        func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadSettings           func(context.Context) (domain.LabSettingsFile, error)
-	LoadWorkspace          func(context.Context) domain.WorkspacePlanReport
-	PlanWorkspace          func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
-	SaveWorkspace          func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
-	PlanSettings           func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
-	SaveSettings           func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
-	ChangePassword         SettingsPasswordAction
-	PreparePXE             func() domain.ActionReport
-	LoadPXEProgress        func() (domain.OperationProgress, error)
-	PlanPXEStart           func(context.Context) domain.PXELifecycleReport
-	StartPXE               func() domain.PXELifecycleReport
-	StopPXE                func() domain.PXELifecycleReport
-	RecoverPXE             func() domain.PXELifecycleReport
-	PrepareRemoteInstall   func(string) (domain.RemoteInstallResponse, error)
-	ObserveRemoteInstall   func(context.Context, string) (string, error)
-	BootstrapRemoteInstall func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
-	RemoteInstallRequest   func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
-	LoadRemoteInstall      func(context.Context) (domain.RemoteInstallResponse, error)
+	LoadManagedJobs         func(context.Context) ([]domain.ManagedJob, error)
+	PlanHostTrust           func(context.Context, string) domain.HostTrustPlan
+	ApplyHostTrust          func(domain.HostTrustPlan) domain.HostTrustResult
+	LoadTemplateReset       func(context.Context) domain.TemplateResetCatalog
+	PlanTemplateReset       func(context.Context, string, func(string)) domain.TemplateResetPlan
+	ApplyTemplateReset      func(domain.TemplateResetPlan) domain.TemplateResetResult
+	ClassroomMode           bool
+	PlanInternet            func(context.Context, string, domain.InternetAction) domain.InternetPlan
+	ApplyInternet           func(domain.InternetPlan) domain.InternetReport
+	RunningVersion          string
+	LoadInventory           func(context.Context) (domain.StatusReport, error)
+	LoadInitial             func(context.Context) (domain.StatusReport, domain.SetupReport, error)
+	LoadDoctor              func(context.Context) (domain.DoctorReport, error)
+	PreviewSupport          func(context.Context) (domain.SupportSnapshot, error)
+	ExportSupport           func(domain.SupportSnapshot) domain.SupportExportResult
+	Refresh                 func(context.Context) (domain.StatusReport, error)
+	LoadSetup               func(context.Context) domain.SetupReport
+	LoadSetupKeys           func(context.Context) domain.KeyReconcileReport
+	ReconcileSetupKeys      func() (domain.KeyReconcileReport, error)
+	ImportSetupKey          func(string, string) (domain.KeyImportReport, error)
+	SaveSetupConfiguration  func() domain.ConfigurationSaveReport
+	InstallSetupSecrets     func() domain.ActionReport
+	LoadHosts               func(context.Context) (domain.HostsReport, error)
+	LoadConfigurationState  func(context.Context) domain.ConfigurationStateReport
+	LoadSoftware            func(context.Context) domain.SoftwareCatalogReport
+	SearchSoftware          func(context.Context, string) domain.SoftwareSearchReport
+	PlanSoftware            func(context.Context, domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
+	SaveSoftware            func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
+	LoadSoftwarePresets     func(context.Context) domain.SoftwarePresetCatalogReport
+	PlanSoftwarePreset      func(context.Context, domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport
+	SaveSoftwarePreset      func(domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport
+	PlanShutdown            func(context.Context, string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
+	PlanPower               func(context.Context, string, domain.ShutdownSessionPolicy, domain.ClientPowerAction) domain.ShutdownPlanReport
+	ApplyShutdown           func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
+	PlanDeployment          func(context.Context, string) domain.DeploymentPlanReport
+	PlanReachableDeployment func(context.Context, domain.DeploymentPlanReport) domain.DeploymentPlanReport
+	ApplyDeployment         func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
+	PlanController          func(context.Context) domain.ControllerRebuildPlanReport
+	ApplyController         func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
+	LoadControllerProgress  func() (domain.OperationProgress, error)
+	LoadServices            func(context.Context) domain.ServicesReport
+	RestartService          func(string) domain.ServiceActionReport
+	LoadLogs                func(context.Context) domain.OperationLogsReport
+	LoadLog                 func(context.Context, string) domain.OperationLogReport
+	LoadGitReview           func(context.Context) domain.GitReviewReport
+	PlanGitCommit           func(context.Context, string) domain.GitCommitPlanReport
+	ApplyGitCommit          func(domain.GitCommitPlanReport) domain.GitCommitReport
+	CheckUpdate             func(context.Context) domain.UpdateCheckReport
+	PlanUpdate              func(context.Context, string, bool, bool) domain.UpdatePlanReport
+	PlanUpdateWithProgress  func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	SaveUpdate              func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadPackageBase         func(context.Context) domain.PackageBaseStatus
+	PlanPackageBase         func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	SavePackageBase         func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadSettings            func(context.Context) (domain.LabSettingsFile, error)
+	LoadWorkspace           func(context.Context) domain.WorkspacePlanReport
+	PlanWorkspace           func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
+	SaveWorkspace           func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
+	PlanSettings            func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
+	SaveSettings            func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
+	ChangePassword          SettingsPasswordAction
+	PreparePXE              func() domain.ActionReport
+	LoadPXEProgress         func() (domain.OperationProgress, error)
+	PlanPXEStart            func(context.Context) domain.PXELifecycleReport
+	StartPXE                func() domain.PXELifecycleReport
+	StopPXE                 func() domain.PXELifecycleReport
+	RecoverPXE              func() domain.PXELifecycleReport
+	PrepareRemoteInstall    func(string) (domain.RemoteInstallResponse, error)
+	ObserveRemoteInstall    func(context.Context, string) (string, error)
+	BootstrapRemoteInstall  func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
+	RemoteInstallRequest    func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
+	LoadRemoteInstall       func(context.Context) (domain.RemoteInstallResponse, error)
 }
 
 type dashboardScreen int
@@ -2234,28 +2235,32 @@ func (model dashboardModel) deployView() string {
 			"",
 			tuiMuted("Reviewed revision  "+model.deployment.plan.Revision, model.isDark),
 		}
+		lines = append(lines, "", "Selected computers — latest availability check:")
+		for _, target := range model.deployment.plan.Targets {
+			lines = append(lines, fmt.Sprintf("%s  %s  %s", target.Name, target.IP, deploymentAvailabilityLabel(model.deployment.plan, target.Name, target.IP)))
+		}
 		shell.body = strings.Join(lines, "\n")
 		shell.fixedBody = tuiSection("Type DEPLOY to continue:", model.isDark) + "\n> " + model.deployment.confirmation + "_"
 		shell.notices = append(shell.notices, tuiNotice{
 			kind:   tuiStatusAttention,
 			title:  "Target services may restart; unreachable computers may remain unchanged",
-			detail: "Every selected configuration is built first. A failed apply may leave mixed target state; a fresh full retry is safe.",
+			detail: "Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or interrupted apply may require recovery before another operation.",
 		})
 		if model.message != "" {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		shell.actions = []tuiAction{{key: "Enter", label: "Deploy"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+		if model.actions.PlanReachableDeployment != nil && model.deployment.plan.ReachableRequested != "" {
+			shell.actions = append([]tuiAction{{key: "F2", label: "Reachable only"}}, shell.actions...)
+		}
 		return model.renderShell(shell)
 	}
 
 	if model.deployment.result.Operation != "" {
 		success := !model.deployment.result.HasErrors()
-		resultTitle := "Deployment needs attention"
-		if success {
-			resultTitle = "Deployment completed and verified"
-		}
+		summary := model.deployment.result.ResultSummary()
 		lines := []string{
-			tuiResult(resultTitle, success, model.isDark),
+			tuiResult(summary.Headline, success, model.isDark),
 			"",
 			fmt.Sprintf("State: %s   Phase: %s", model.deployment.result.State, model.deployment.result.Phase),
 			fmt.Sprintf("Build complete: %t   Apply complete: %t", model.deployment.result.BuildCompleted, model.deployment.result.ApplyCompleted),
@@ -2265,6 +2270,9 @@ func (model dashboardModel) deployView() string {
 		}
 		if model.deployment.result.LogPath != "" {
 			lines = append(lines, "Detailed log: "+model.deployment.result.LogPath)
+		}
+		for _, computer := range summary.Computers {
+			lines = append(lines, "", computer.Name+" — "+computer.Outcome, "  "+computer.Guidance)
 		}
 		if model.message != "" {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
@@ -2298,7 +2306,7 @@ func (model dashboardModel) deployView() string {
 		if model.deployment.chosen[host.Name] {
 			checked = "x"
 		}
-		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s", checked, host.Name, host.IP), index == model.deployment.cursor, model.isDark))
+		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s · %s", checked, host.Name, host.IP, deploymentAvailabilityLabel(model.deployment.plan, host.Name, host.IP)), index == model.deployment.cursor, model.isDark))
 	}
 	if len(hosts) > end || start > 0 {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d", start+1, end, len(hosts)), model.isDark))

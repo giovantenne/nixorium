@@ -15,6 +15,7 @@ const (
 	deploymentNoIntent deploymentIntentKind = iota
 	deploymentCloseIntent
 	deploymentPlanIntent
+	deploymentReachableIntent
 	deploymentApplyIntent
 	deploymentLogsIntent
 )
@@ -81,6 +82,11 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 		}
 	case dashboardDeployReview:
 		switch key.String() {
+		case "f2":
+			if model.plan.ReachableRequested != "" {
+				model.confirmation = ""
+				return model, deploymentIntent{kind: deploymentReachableIntent}
+			}
 		case "esc":
 			model.confirmation = ""
 			return model, deploymentIntent{kind: deploymentCloseIntent, destination: dashboardDeploy, message: "Deployment cancelled; no build or apply was started."}
@@ -121,6 +127,20 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		model.message = intent.message
 	}
 	switch intent.kind {
+	case deploymentReachableIntent:
+		if model.actions.PlanReachableDeployment == nil {
+			model.message = "Reachable-only planning is not available in this session."
+			return model, nil
+		}
+		// Retain the original plan until the new read succeeds. Cancelling this
+		// read returns to that review with its confirmation cleared, never a
+		// partly edited selector or the authorization from the larger plan.
+		previous := model.deployment.plan
+		model.busy = "Creating a fresh review for the reachable computers"
+		model.message = ""
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardDeploymentPlanMsg{report: model.actions.PlanReachableDeployment(ctx, previous)}
+		})
 	case deploymentCloseIntent:
 		model.screen = intent.destination
 		if intent.message == "" {
@@ -159,4 +179,23 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		return model.startRead(func(ctx context.Context) tea.Msg { return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)} })
 	}
 	return model, nil
+}
+
+func deploymentAvailabilityLabel(plan domain.DeploymentPlanReport, name, ip string) string {
+	for _, observed := range plan.Availability {
+		if observed.Name != name || observed.IP != ip {
+			continue
+		}
+		switch {
+		case observed.Reachability == domain.ReachabilityUnreachable:
+			return "Not reached at last check"
+		case observed.Reachability == domain.ReachabilityReachable && observed.SSH == domain.SSHAvailable:
+			return "Reachable at last check"
+		case observed.Reachability == domain.ReachabilityReachable:
+			return "Reachable; SSH port unavailable"
+		default:
+			return "Availability unknown"
+		}
+	}
+	return "Not checked; review to probe"
 }

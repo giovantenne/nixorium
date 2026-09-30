@@ -392,9 +392,13 @@ func DeploymentPlanText(writer io.Writer, report domain.DeploymentPlanReport) {
 	if len(report.Targets) > 0 {
 		fmt.Fprintf(writer, "Targets:         %s\n", report.ColmenaSelector)
 		for _, target := range report.Targets {
-			fmt.Fprintf(writer, "  %-10s %s\n", target.Name, target.IP)
+			fmt.Fprintf(writer, "  %-10s %s  %s\n", target.Name, target.IP, deploymentAvailabilityLabel(report, target.Name, target.IP))
+		}
+		if report.ReachableRequested != "" {
+			fmt.Fprintf(writer, "Reachable only:  create a new review with nixorium deploy plan --on %s\n", report.ReachableRequested)
 		}
 		fmt.Fprintln(writer, "Plan:            build selected configurations, then deploy with Colmena")
+		fmt.Fprintln(writer, "Availability:    brief SSH-port check, not authenticated identity or proof of power state")
 		if report.State == "ready" && report.Revision != "" {
 			fmt.Fprintf(writer, "Next:            nixorium deploy apply --on %s --expect %s\n", report.ColmenaSelector, report.Revision)
 		}

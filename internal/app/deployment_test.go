@@ -13,6 +13,9 @@ import (
 )
 
 type fakeDeploymentSource struct {
+	ssh         map[string]domain.SSHProbe
+	probeHosts  []domain.HostMeta
+	afterProbe  func()
 	meta        domain.LabMeta
 	deployment  domain.DeploymentStatus
 	git         domain.GitState
@@ -26,6 +29,21 @@ type fakeDeploymentSource struct {
 	current     map[string]domain.HostSystemProbe
 	recorded    map[string]domain.LastSuccessfulDeployment
 	recordErr   error
+}
+
+func (f *fakeDeploymentSource) SSHStatus(_ context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.SSHProbe {
+	f.probeHosts = append([]domain.HostMeta(nil), hosts...)
+	if f.afterProbe != nil {
+		f.afterProbe()
+	}
+	if f.ssh != nil {
+		return f.ssh
+	}
+	result := map[string]domain.SSHProbe{}
+	for _, host := range hosts {
+		result[host.Name] = domain.SSHProbe{Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable}
+	}
+	return result
 }
 
 func readyDeploymentSource() *fakeDeploymentSource {

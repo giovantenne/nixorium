@@ -9,7 +9,7 @@ with `scripts/generate-docs.sh --write`.
 ## Workflow guide
 
 The overview opens Computers, Installation, Software and Maintenance. Startup
-reads configuration, inventory and service state; client probes and expensive
+reads saved configuration and local service/Git state; inventory, client probes and expensive
 readiness checks run when the selected task needs them. Deferred checks never
 imply that installation or deployment is ready.
 
@@ -28,6 +28,15 @@ client-affecting changes can open a fresh deployment review. Saving alone does
 not update running clients. Computers also offers ordinary system distribution
 without reinstalling disks, authenticated inventory, Internet access and power
 controls. The restricted teacher dashboard exposes only classroom controls.
+
+Client distribution review probes only selected computers with the inventory's
+bounded SSH-port check. **F2 — Reachable only**, when offered, creates a fresh
+explicit-target plan; it does not start deployment or reuse the old confirmation.
+Esc during replanning keeps the original review with its confirmation cleared.
+Availability is not authenticated identity or proof that a computer is powered
+off. Results list each selected computer with an outcome and guidance; use
+Shift+arrows to scroll and **l** for logs. A not-reached result does not imply
+unchanged state, and required recovery still blocks retries.
 
 Maintenance contains settings, updates, history and recovery. Update validation
 may build candidate systems before presenting its review. The ordinary TUI
@@ -151,11 +160,11 @@ Choose where to apply the saved configuration.
 
 5 of 5 computers selected
 
-› [x] pc01       10.42.0.11
-  [x] pc02       10.42.0.12
-  [x] pc03       10.42.0.13
-  [x] pc04       10.42.0.14
-  [x] pc05       10.42.0.15
+› [x] pc01       10.42.0.11 · Not checked; review to probe
+  [x] pc02       10.42.0.12 · Not checked; review to probe
+  [x] pc03       10.42.0.13 · Not checked; review to probe
+  [x] pc04       10.42.0.14 · Not checked; review to probe
+  [x] pc05       10.42.0.15 · Not checked; review to probe
 
 NOTICE
 ○ Opened from a saved software change. Review deploys the complete current configuration.
@@ -175,13 +184,20 @@ Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
+Selected computers — latest availability check:
+pc01  10.42.0.11  Reachable at last check
+pc02  10.42.0.12  Reachable at last check
+pc03  10.42.0.13  Reachable at last check
+pc04  10.42.0.14  Reachable at last check
+pc05  10.42.0.15  Reachable at last check
+
 Type DEPLOY to continue:
 > _
 
 NOTICE
 ! Target services may restart; unreachable computers may remain unchanged
-  Every selected configuration is built first. A failed apply may leave mixed target state; a fresh full retry is
-safe.
+  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
+interrupted apply may require recovery before another operation.
 
 Enter Deploy  ·  Esc Selection  ·  F1 Help
 ```
@@ -198,10 +214,124 @@ Build complete: true   Apply complete: true
 Authenticated: 5/5   Recorded: 5
 Detailed log: /demo/state/deploy-lab.log
 
+pc01 — Updated
+  Authenticated at the reviewed revision.
+
+pc02 — Updated
+  Authenticated at the reviewed revision.
+
+pc03 — Updated
+  Authenticated at the reviewed revision.
+
+pc04 — Updated
+  Authenticated at the reviewed revision.
+Shift ↑/↓ scroll · ? help
+
 NOTICE
 ○ All five clients report the reviewed revision.
 
 r New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
+```
+
+## Availability before client deployment
+
+```text
+Nixorium  /  Computers  /  Distribute
+
+Distribute the system?
+
+Affects  pc01,pc02 · 2 computer(s)
+
+Reviewed revision  0123456789abcdef0123456789abcdef01234567
+
+Selected computers — latest availability check:
+pc01  10.42.0.11  Reachable at last check
+pc02  10.42.0.12  Not reached at last check
+
+Type DEPLOY to continue:
+> _
+
+NOTICE
+! Target services may restart; unreachable computers may remain unchanged
+  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
+interrupted apply may require recovery before another operation.
+
+F2 Reachable only  ·  Enter Deploy  ·  Esc Selection  ·  F1 Help
+```
+
+## A new review for reachable computers only
+
+```text
+Nixorium  /  Computers  /  Distribute
+
+Distribute the system?
+
+Affects  pc01 · 1 computer(s)
+
+Reviewed revision  0123456789abcdef0123456789abcdef01234567
+
+Selected computers — latest availability check:
+pc01  10.42.0.11  Reachable at last check
+
+Type DEPLOY to continue:
+> _
+
+NOTICE
+! Target services may restart; unreachable computers may remain unchanged
+  Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
+interrupted apply may require recovery before another operation.
+
+Enter Deploy  ·  Esc Selection  ·  F1 Help
+```
+
+## Per-computer deployment outcomes
+
+```text
+Nixorium  /  Computers  /  Distribute
+
+! Some computers were not reached
+
+State: partial   Phase: verify
+Build complete: true   Apply complete: true
+Authenticated: 1/2   Recorded: 1
+Detailed log: /demo/state/deploy-mixed.log
+
+pc01 — Updated
+  Authenticated at the reviewed revision.
+
+pc02 — Not reached
+  Check power and networking. The update outcome is not known; this does not prove the computer is off or
+unchanged.
+
+r New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
+```
+
+## Unreachable computers do not waive recovery
+
+```text
+Nixorium  /  Computers  /  Distribute
+
+! Deployment requires recovery — some computers were not reached
+
+State: failed   Phase: apply
+Build complete: true   Apply complete: false
+Authenticated: 1/2   Recorded: 0
+Detailed log: /demo/state/deploy-mixed.log
+
+pc01 — Not verified
+  Inspect authenticated computer state and the private log before a fresh review. Activation completion is
+unconfirmed; use reviewed recovery, not a retry.
+
+pc02 — Not reached
+  Check power and networking. The update outcome is not known; this does not prove the computer is off or
+unchanged. Activation completion is unconfirmed; use reviewed recovery, not a retry.
+
+NOTICE
+! Recovery required before another operation
+  An active revision alone does not prove activation completed. See TROUBLESHOOTING.md: Interrupted client
+deployment.
+
+l Logs  ·  Enter Computers  ·  F1 Help
 ```
 
 ## PXE network-impact review

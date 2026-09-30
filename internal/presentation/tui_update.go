@@ -356,6 +356,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 		model.deployment.confirmation = ""
+		model.deployment.chosen = map[string]bool{}
+		for _, target := range message.report.Targets {
+			model.deployment.chosen[target.Name] = true
+		}
 		model.message = ""
 		model.screen = dashboardDeployReview
 		return model, nil

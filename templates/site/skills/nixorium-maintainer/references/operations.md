@@ -138,6 +138,17 @@ Select the intended computers, review the resolved revision and
 targets, and enter the exact phrase shown. Do not close the controller terminal
 until the final result, authenticated/recorded counts, and log path appear.
 
+On supporting pins, review probes only selected computers with a brief SSH-port
+check. **F2 — Reachable only** creates a new plan for the observed reachable
+subset with an open SSH port; review the new revision/targets and confirm again.
+Esc during that read retains the original review with its confirmation cleared.
+No target is silently skipped, queued or retried. CLI plans show the same
+observations and, when available, an explicit selector for another `deploy plan`.
+A port check does not authenticate identity or prove whether a computer is off.
+Results list each computer; scroll long reports and retain the private log.
+Not reached means the outcome is unknown, not unchanged. Recovery-required
+results still block retries even if a client reports the reviewed revision.
+
 ```sh
 colmena apply --on pc05
 colmena apply --on @lab
