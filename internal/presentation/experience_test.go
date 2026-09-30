@@ -139,7 +139,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 			{
 				name:     "configured",
 				model:    dashboardModel{screen: dashboardSoftware, software: softwareModel{catalog: catalog}},
-				expected: []string{"Software", "Selected", "Review removal", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
+				expected: []string{"Software", "Selected", "Details", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
 			},
 			{
 				name: "search input",
@@ -235,7 +235,7 @@ func TestConfiguredSoftwareViewportKeepsFocusedItemVisible(t *testing.T) {
 			if !strings.Contains(view, tuiSelection(label, true, true)) {
 				t.Fatalf("focused software %d hidden at %dx%d:\n%s", index+1, size[0], size[1], view)
 			}
-			if !strings.Contains(view, "software selections") || !strings.Contains(view, "Enter") || !strings.Contains(view, "Review removal") {
+			if !strings.Contains(view, "software selections") || !strings.Contains(view, "Enter") || !strings.Contains(view, "Details") {
 				t.Fatalf("software viewport context or actions hidden at %dx%d:\n%s", size[0], size[1], view)
 			}
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

@@ -124,7 +124,9 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 		return domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "REMOVE"}
 	}
 
-	updated, command := model.Update(tea.KeyPressMsg{Text: "r"})
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Text: "x"})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
@@ -133,7 +135,7 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftware || model.software.selected != "vlc" || model.software.cursor != 1 {
+	if model.screen != dashboardSoftware || model.software.stage != softwareDetails || model.software.selected != "vlc" || model.software.cursor != 1 {
 		t.Fatalf("removal cancellation lost its origin: screen=%d selected=%q cursor=%d", model.screen, model.software.selected, model.software.cursor)
 	}
 	if strings.Contains(model.View().Content, "Add VLC") {

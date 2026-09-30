@@ -306,7 +306,8 @@ func (model dashboardModel) helpView() string {
 			"Versions, revision, time and counts remain visible. Review before sharing.",
 			"Unavailable sections are not healthy results. Detailed logs are not included.")
 	case dashboardSoftware:
-		lines = append(lines, "F2 selected   F3 package search   F4 suggestions   Tab next view", "p add a deployment-owned profile   / search", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
+		lines = append(lines, "F2 selected   F3 package search   F4 suggestions   Tab next view", "p add a deployment-owned profile   / search",
+			"Selected software: Enter opens details; c changes where it applies, x reviews its removal.", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
 		lines = append(lines, "After saving: Enter takes the displayed next step; Esc leaves it for later. Client deployment always has its own review and confirmation.")
 	default:
 		lines = append(lines, "Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help.")

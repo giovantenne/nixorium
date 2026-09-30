@@ -677,7 +677,18 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	model = updated.(dashboardModel)
+	// Removal is explicit: Enter opens details and x reviews removal; r does not remove.
 	updated, command = model.Update(tea.KeyPressMsg{Text: "r"})
+	model = updated.(dashboardModel)
+	if command != nil {
+		t.Fatal("r still requests a software removal")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if model.software.stage != softwareDetails || !strings.Contains(model.View().Content, "Remove") {
+		t.Fatalf("Enter did not open package details:\n%s", model.View().Content)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "x"})
 	model = updated.(dashboardModel)
 	if command == nil {
 		t.Fatal("managed software removal did not request a plan")

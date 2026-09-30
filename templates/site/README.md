@@ -373,6 +373,9 @@ The first two choices require an upstream exposing controller-software support;
 older upstreams retain their client-only choices. Existing declarations are not
 migrated or expanded automatically. Clients may all remain powered off, and
 shared/controller declarations work before any clients are configured.
+In **Selected**, Enter opens a package's details: `c` changes where it applies
+and `x` reviews its removal. Removing or moving a package that reaches this
+controller rebuilds the controller right after saving.
 
 Software profiles and the suggestion list belong to this private repository.
 When `software-presets.json` is present, each profile is a versioned list of

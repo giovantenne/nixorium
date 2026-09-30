@@ -31,6 +31,8 @@ const (
 	softwareProfilePackages
 	softwareProfileScope
 	softwareProfileReview
+	// softwareDetails shows one selected package with explicit actions.
+	softwareDetails
 )
 
 type softwareScopeOption struct {
@@ -42,17 +44,19 @@ type softwareScopeOption struct {
 // dashboard keeps one named instance so feature state cannot be mistaken for
 // global navigation state.
 type softwareModel struct {
-	stage                softwareStage
-	catalog              domain.SoftwareCatalogReport
-	mode                 softwareListMode
-	cursor               int
-	query                string
-	searching            bool
-	search               domain.SoftwareSearchReport
-	searchID             uint64
-	searchBusy           bool
-	searchCancel         context.CancelFunc
-	selected             string
+	stage        softwareStage
+	catalog      domain.SoftwareCatalogReport
+	mode         softwareListMode
+	cursor       int
+	query        string
+	searching    bool
+	search       domain.SoftwareSearchReport
+	searchID     uint64
+	searchBusy   bool
+	searchCancel context.CancelFunc
+	selected     string
+	// changingScope marks a scope stage opened from package details.
+	changingScope        bool
 	scopeCursor          int
 	clientCursor         int
 	clients              map[string]bool
@@ -211,6 +215,8 @@ func (model softwareModel) finishPlan(report domain.SoftwareChangePlanReport) (s
 	if report.HasErrors() || report.State == "unchanged" {
 		if report.Request.Present {
 			model.stage = softwareScope
+		} else if _, found := model.declaration(report.Request.Package); found {
+			model.stage = softwareDetails
 		} else {
 			model.stage = softwareCatalog
 		}
@@ -314,43 +320,53 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 			}
 			item := items[min(model.cursor, len(items)-1)]
 			if model.mode == softwareConfigured {
-				entry, found := model.declaration(item.ID)
-				if !found {
+				if _, found := model.declaration(item.ID); !found {
 					return model, softwareIntent{}
 				}
 				model.selected = item.ID
-				return model, softwareIntent{kind: softwarePlanIntent, request: domain.SoftwareChangeRequest{Package: item.ID, Present: false, Scope: entry.Scope}}
+				model.stage = softwareDetails
+				return model, softwareIntent{setMessage: true}
 			}
 			if item.Availability != "available" {
 				return model, softwareIntent{message: softwareAvailabilityMessage(item), setMessage: true}
 			}
 			model.selected = item.ID
+			model.changingScope = false
 			model.scopeCursor = 0
 			model.clientCursor = 0
 			model.clients = map[string]bool{}
 			model.plan = domain.SoftwareChangePlanReport{}
 			model.stage = softwareScope
 			return model, softwareIntent{setMessage: true}
-		case "r":
-			if len(items) == 0 {
-				return model, softwareIntent{}
-			}
-			item := items[min(model.cursor, len(items)-1)]
-			entry, found := model.declaration(item.ID)
-			if !found {
-				return model, softwareIntent{message: item.Label + " is not managed by lab-software.json.", setMessage: true}
-			}
-			model.selected = item.ID
-			return model, softwareIntent{kind: softwarePlanIntent, request: domain.SoftwareChangeRequest{Package: item.ID, Present: false, Scope: entry.Scope}}
 		case "v":
 			return model, softwareIntent{kind: softwareStateIntent}
 		case "p":
 			return model, softwareIntent{kind: softwareProfilesIntent}
 		}
+	case softwareDetails:
+		entry, found := model.declaration(model.selected)
+		switch key.String() {
+		case "esc", "left":
+			model.stage = softwareCatalog
+			return model, softwareIntent{setMessage: true}
+		case "c":
+			if found {
+				model = model.startScopeChange(entry.Scope)
+			}
+			return model, softwareIntent{setMessage: true}
+		case "x":
+			if !found {
+				return model, softwareIntent{}
+			}
+			return model, softwareIntent{kind: softwarePlanIntent, request: domain.SoftwareChangeRequest{Package: model.selected, Present: false, Scope: entry.Scope}}
+		}
 	case softwareScope:
 		switch key.String() {
 		case "esc", "left":
 			model.stage = softwareCatalog
+			if model.changingScope {
+				model.stage = softwareDetails
+			}
 			return model, softwareIntent{setMessage: true}
 		case "enter":
 			scope, notice := model.selectedScope()
@@ -366,6 +382,8 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 		case "esc":
 			if model.plan.Request.Present {
 				model.stage = softwareScope
+			} else if _, found := model.declaration(model.selected); found {
+				model.stage = softwareDetails
 			} else {
 				model.stage = softwareCatalog
 			}
@@ -620,7 +638,9 @@ func (model dashboardModel) softwareView() string {
 
 func (model softwareModel) view(context softwareViewContext) tuiShell {
 	path := []string{"Software"}
-	if model.stage == softwareScope {
+	if model.stage == softwareDetails {
+		path = append(path, "Details")
+	} else if model.stage == softwareScope {
 		path = append(path, "Scope")
 	} else if model.stage == softwareReview {
 		path = append(path, "Review")
@@ -645,6 +665,8 @@ func (model softwareModel) view(context softwareViewContext) tuiShell {
 		}
 	}
 	switch model.stage {
+	case softwareDetails:
+		lines = append(lines, model.detailsView(context)...)
 	case softwareScope:
 		lines = append(lines, model.scopeView(context)...)
 	case softwareReview:
@@ -674,20 +696,27 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 	if model.stage == softwareProfiles || model.stage == softwareProfilePackages || model.stage == softwareProfileScope || model.stage == softwareProfileReview {
 		return model.profileActions(context)
 	}
+	if model.stage == softwareDetails {
+		return []tuiAction{{key: "c", label: "Change where it applies"}, {key: "x", label: "Remove"}, {key: "Esc", label: "Selected software"}, {key: "F1", label: "Help"}}
+	}
 	if model.stage == softwareScope {
 		actions := []tuiAction{{key: "↑/↓", label: "Select"}}
 		options := model.scopeOptions()
 		if len(options) > 0 && options[min(model.scopeCursor, len(options)-1)].scope.Kind == domain.SoftwareScopeClients {
 			actions = append(actions, tuiAction{key: "Space", label: "Toggle"})
 		}
+		back := "Catalog"
+		if model.changingScope {
+			back = "Details"
+		}
 		return append(actions,
 			tuiAction{key: "Enter", label: "Review"},
-			tuiAction{key: "Esc", label: "Catalog"},
+			tuiAction{key: "Esc", label: back},
 			tuiAction{key: "F1", label: "Help"},
 		)
 	}
 	if model.stage == softwareReview {
-		back := "Catalog"
+		back := "Details"
 		primary := "Remove"
 		if model.plan.Request.Present {
 			back = "Scope"
@@ -722,7 +751,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 	if len(model.items()) > 0 {
 		primary := "Choose scope"
 		if model.mode == softwareConfigured {
-			primary = "Review removal"
+			primary = "Details"
 		} else {
 			items := model.items()
 			if items[min(model.cursor, len(items)-1)].Availability != "available" {
@@ -766,7 +795,7 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 	}
 	switch model.mode {
 	case softwareConfigured:
-		lines = append(lines, tuiSection("Selected software", context.dark), tuiMuted("Enter reviews removing the highlighted item. Use Search or Suggestions to add software.", context.dark), "")
+		lines = append(lines, tuiSection("Selected software", context.dark), tuiMuted("Enter opens the highlighted item: change where it applies or remove it. Use Search or Suggestions to add software.", context.dark), "")
 	case softwareSearch:
 		cursor := ""
 		if model.searching {
@@ -840,9 +869,55 @@ func (model softwareModel) catalogListCapacity(context softwareViewContext, pref
 	return max(1, available/2)
 }
 
+// startScopeChange opens the scope choice for a selected package with its
+// current scope preselected.
+func (model softwareModel) startScopeChange(current domain.SoftwareScope) softwareModel {
+	model.changingScope = true
+	model.scopeCursor, model.clientCursor = 0, 0
+	model.clients = map[string]bool{}
+	model.plan = domain.SoftwareChangePlanReport{}
+	for index, option := range model.scopeOptions() {
+		if option.scope.Kind == current.Kind && option.scope.Group == current.Group {
+			model.scopeCursor = index
+		}
+	}
+	for _, name := range current.Clients {
+		model.clients[name] = true
+	}
+	model.stage = softwareScope
+	return model
+}
+
+func softwareScopeAffectsController(scope domain.SoftwareScope) bool {
+	return scope.Kind == domain.SoftwareScopeShared || scope.Kind == domain.SoftwareScopeController
+}
+
+func (model softwareModel) detailsView(context softwareViewContext) []string {
+	item := model.item(model.selected)
+	entry, _ := model.declaration(model.selected)
+	version := ""
+	if item.Version != "" {
+		version = " · " + item.Version
+	}
+	lines := []string{
+		tuiTitle(item.Label, context.dark),
+		tuiMuted(item.Summary+" · "+item.ID+version, context.dark),
+		"",
+		"Applies to   " + softwareScopeLabel(entry.Scope),
+	}
+	if softwareScopeAffectsController(entry.Scope) {
+		lines = append(lines, "", "Removing it or changing where it applies rebuilds this controller right after saving.")
+	}
+	return append(lines, "Client computers change only when you update them from Computers.")
+}
+
 func (model softwareModel) scopeView(context softwareViewContext) []string {
 	item := model.item(model.selected)
-	lines := []string{tuiTitle("Add "+item.Label, context.dark), "Choose where this declaration applies. This is not the set of computers deployed today.", ""}
+	title := "Add " + item.Label
+	if model.changingScope {
+		title = "Change where " + item.Label + " applies"
+	}
+	lines := []string{tuiTitle(title, context.dark), "Choose where this declaration applies. This is not the set of computers deployed today.", ""}
 	options := model.scopeOptions()
 	for index, option := range options {
 		lines = append(lines, tuiSelection(option.label, index == model.scopeCursor, context.dark))
@@ -890,6 +965,9 @@ func (model softwareModel) reviewView(context softwareViewContext) []string {
 	}
 	if len(plan.AffectedClients) == 0 {
 		lines[len(lines)-1] = "Later        No client deployment required"
+	}
+	if plan.AffectedController != "" && !plan.Request.Present {
+		lines = append(lines, "", tuiStatus("Saving removes it from "+plan.AffectedController+" now: the controller is rebuilt right away", tuiStatusAttention, context.dark))
 	}
 	return lines
 }

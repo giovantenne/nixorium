@@ -262,3 +262,59 @@ func TestSoftwareProfilePartialResultRetriesTheBatchSave(t *testing.T) {
 		t.Fatalf("profile recovery intent = %+v", intent)
 	}
 }
+
+func TestSoftwareDetailsChangeScopeAndControllerRemovalWarning(t *testing.T) {
+	model := experienceFixture(2)
+	model.screen = dashboardSoftware
+	model.software.catalog = testSoftwareCatalogReport()
+	model.software.catalog.Controller = "pc99"
+	model.software.catalog.Packages[0].Scope = domain.SoftwareScope{Kind: domain.SoftwareScopeShared}
+	var requests []domain.SoftwareChangeRequest
+	model.actions.PlanSoftware = func(_ context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+		requests = append(requests, request)
+		report := domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "SAVE", ManagedFile: "lab-software.json"}
+		if request.Scope.Kind == domain.SoftwareScopeShared {
+			report.AffectedController = "pc99"
+		}
+		return report
+	}
+	selected := model.software.catalog.Packages[0].Package
+	model.software.cursor = 0
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	view := model.View().Content
+	for _, want := range []string{"Applies to", "this controller and all current or future clients", "rebuilds this controller", "Change where it applies", "Remove"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("details lack %q:\n%s", want, view)
+		}
+	}
+	// Change scope starts from the current scope and plans a present package.
+	updated, _ = model.Update(tea.KeyPressMsg{Text: "c"})
+	model = updated.(dashboardModel)
+	if model.software.stage != softwareScope || !strings.Contains(model.View().Content, "Change where") || model.software.scopeOptions()[model.software.scopeCursor].scope.Kind != domain.SoftwareScopeShared {
+		t.Fatalf("scope change did not preselect the current scope:\n%s", model.View().Content)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = updated.(dashboardModel)
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if len(requests) != 1 || !requests[0].Present || requests[0].Package != selected || requests[0].Scope.Kind != domain.SoftwareScopeController {
+		t.Fatalf("scope change request = %+v", requests)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	model = updated.(dashboardModel)
+	if model.software.stage != softwareDetails {
+		t.Fatalf("Esc from a scope change did not return to details: %d", model.software.stage)
+	}
+	updated, command = model.Update(tea.KeyPressMsg{Text: "x"})
+	model = updated.(dashboardModel)
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if view := model.View().Content; !strings.Contains(view, "the controller is rebuilt right away") {
+		t.Fatalf("controller removal does not say it rebuilds now:\n%s", view)
+	}
+}

@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Software removal is deliberate: in Selected, Enter opens a package's details
+  with explicit actions to change where it applies (current scope preselected)
+  or review its removal; `r` no longer removes. Removing a package that reaches
+  the controller states that the controller is rebuilt right after saving.
+
 - The controller review states in plain words what changes since the last
   verified activation (saved settings, software selection, student preferences,
   Nixorium version, system and packages, other files), reading only Git
