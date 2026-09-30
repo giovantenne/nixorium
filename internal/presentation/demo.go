@@ -66,8 +66,38 @@ func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) 
 			renderWorkspaceDemo(sourceCommit, width, height),
 			renderSupportDemo(sourceCommit, width, height),
 			renderTemplateResetDemo(sourceCommit, width, height),
+			renderHostTrustDemo(sourceCommit, width, height),
 		},
 	}
+}
+
+func renderHostTrustDemo(revision string, width, height int) DemoScenario {
+	actions := demoActions()
+	actions.PlanHostTrust = func(context.Context, string) domain.HostTrustPlan {
+		return domain.HostTrustPlan{State: "ready", Host: domain.HostMeta{Name: "pc01", IP: "10.42.0.11"}, Inspection: domain.HostTrustInspection{Recorded: []string{"SHA256:previous-physical-client"}, Offered: "SHA256:reinstalled-physical-client"}, Confirmation: "ROTATE HOST KEY", Message: "Compare the offered fingerprint with this deliberately reinstalled computer's physical console. Other entries are preserved."}
+	}
+	actions.ApplyHostTrust = func(domain.HostTrustPlan) domain.HostTrustResult {
+		return domain.HostTrustResult{Operation: "host-key-apply", State: "saved", Host: "pc01", Message: "Reviewed trust saved for pc01 only. Refresh Computers before reviewing deployment."}
+	}
+	r := newDemoRecorder(actions, revision, width, height)
+	r.capture("Overview", 1000)
+	r.model.screen = dashboardHosts
+	r.model.computers.hostDetail = true
+	r.model.computers.hosts.Hosts = []domain.HostStatus{{Name: "pc01", IP: "10.42.0.11", HostKeyCondition: domain.HostKeyChanged, Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentUnknown}}
+	r.capture("Changed SSH key in computer details", 1600)
+	read := r.key(demoText("h"))
+	// Keep exported waiting frames deterministic while exercising the real read.
+	r.model.hostTrust.started = time.Now().Add(time.Hour)
+	r.capture("Read-only fingerprint inspection", 700)
+	r.command(read)
+	r.capture("Review recorded and offered fingerprints", 2400)
+	r.typeAndCapture("ROTATE HOST KEY", "Type the exact key-rotation confirmation")
+	write := r.key(demoCode(tea.KeyEnter))
+	r.model.hostTrust.started = time.Now().Add(time.Hour)
+	r.capture("Recheck identity before saving trust", 600)
+	r.command(write)
+	r.capture("Single-client trust saved without system update", 2400)
+	return DemoScenario{ID: "host-trust", Title: "Review a reinstalled computer's changed SSH key", Description: "Physical identity and exact confirmation precede a single-client trust update; deployment remains a separate review.", Frames: r.frames}
 }
 
 func demoSupportSnapshot() domain.SupportSnapshot {

@@ -642,6 +642,13 @@ The TUI uses Enter after showing the reviewed revision and restart impact.
 Use `setup apply` for the equivalent first-run action with identical progress
 feedback.
 
+### Review changed client SSH trust
+
+After a deliberate client reinstall, a changed SSH key needs a separate
+physical-fingerprint review, not a relaxed SSH policy. Use the administrator
+computer details or `host-key plan`/`host-key apply`; see
+[reviewed client trust recovery](TROUBLESHOOTING.md#a-client-was-deliberately-reinstalled-and-its-ssh-key-changed).
+
 ### Manage services
 
 ```sh

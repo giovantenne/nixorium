@@ -365,6 +365,9 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 	}
 	for _, host := range report.Hosts {
 		fmt.Fprintf(writer, "  %-10s %-15s network=%-12s ssh=%-11s deployment=%s\n", host.Name, host.IP, host.Reachability, host.SSH, host.Deployment)
+		if host.HostKeyCondition == domain.HostKeyChanged {
+			fmt.Fprintln(writer, "    SSH key changed: verify physical identity before a reviewed host-key plan. Never bypass host-key checking.")
+		}
 		if host.CurrentSystem != "" {
 			fmt.Fprintf(writer, "    current: %s\n", host.CurrentSystem)
 		}

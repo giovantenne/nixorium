@@ -132,6 +132,10 @@ func renderGallery() string {
 		{title: "Deployment template reset review", scenarioID: "template-reset", label: "Review replacement and preserved files"},
 		{title: "Deployment template reset losses", scenarioID: "template-reset", label: "Review all removed and replaced paths"},
 		{title: "Deployment reset saved without activation", scenarioID: "template-reset", label: "Local reset saved without activation"},
+		{title: "Changed client SSH key", scenarioID: "host-trust", label: "Changed SSH key in computer details"},
+		{title: "Cancellable SSH trust inspection", scenarioID: "host-trust", label: "Read-only fingerprint inspection"},
+		{title: "Single-client SSH trust review", scenarioID: "host-trust", label: "Review recorded and offered fingerprints"},
+		{title: "SSH trust saved without deployment", scenarioID: "host-trust", label: "Single-client trust saved without system update"},
 	}
 	var output strings.Builder
 	for index, selection := range frames {

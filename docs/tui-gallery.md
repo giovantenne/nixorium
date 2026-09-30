@@ -523,4 +523,64 @@ Local commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 Enter Maintenance  ·  Esc Back  ·  F1 Help
 ```
+
+## Changed client SSH key
+
+```text
+Nixorium  /  Computers  /  Inventory
+
+Computer inventory
+
+pc01
+× SSH key changed
+
+Do not update this computer until its identity is verified. If it was deliberately reinstalled, compare its
+physical-console fingerprint and review this computer's SSH trust.
+
+Address  10.42.0.11
+
+h Review changed SSH key  ·  d Deploy  ·  i Diagnostics  ·  t Technical  ·  Esc Back  ·  F1 Help
+```
+
+## Cancellable SSH trust inspection
+
+```text
+Nixorium  /  Computers  /  SSH trust
+
+Review this computer's changed SSH key
+⣾  Reading the recorded and offered SSH fingerprints
+Elapsed: 0s
+Read-only; Esc cancels without changes.
+
+Esc Cancel  ·  F1 Help
+```
+
+## Single-client SSH trust review
+
+```text
+Nixorium  /  Computers  /  SSH trust
+
+Review this computer's changed SSH key
+Computer: pc01 (10.42.0.11)
+Recorded: SHA256:previous-physical-client
+Offered: SHA256:reinstalled-physical-client
+
+Compare the offered fingerprint with this deliberately reinstalled computer's physical console. Other entries are
+preserved.
+
+Type ROTATE HOST KEY: _
+
+Enter Save reviewed trust  ·  Esc Cancel  ·  F1 Help
+```
+
+## SSH trust saved without deployment
+
+```text
+Nixorium  /  Computers  /  SSH trust
+
+Review this computer's changed SSH key
+Reviewed trust saved for pc01 only. Refresh Computers before reviewing deployment.
+
+Enter Computer details  ·  Esc Back  ·  F1 Help
+```
 <!-- END GENERATED: tui-gallery -->

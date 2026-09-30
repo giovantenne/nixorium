@@ -301,6 +301,35 @@ a changed host key as a security event; do not delete `known_hosts` entries
 blindly. Clients installed before the fixed host-state helper remain `unknown`
 until their next normal deployment.
 
+## A client was deliberately reinstalled and its SSH key changed
+
+An address match does not prove identity. Save and commit the declared inventory.
+Stop PXE first and finish or reconcile
+any protected USB installation or interrupted deployment. On the physical
+console of the reinstalled computer, run
+`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` and compare its SHA256
+fingerprint with the offered fingerprint in a fresh review:
+
+```sh
+nixorium host-key plan --host pc01
+nixorium host-key apply --host pc01 --expect REVIEW_TOKEN
+```
+
+Replace `REVIEW_TOKEN` with the plan's exact token. Interactive apply requires
+the exact confirmation shown in the review. `--yes` is available only for an
+explicitly authorized, already physically verified review; it does not bypass
+the token or rechecks. The administrator TUI offers **Review changed SSH key** in
+the changed-key computer's details. Esc cancels inspection/review without
+changes; saving cannot be interrupted.
+
+The operation re-observes the offered key, rechecks inventory and Git revision,
+then replaces only that client's recorded address under the normal operation
+gate. Unrelated entries/aliases are preserved and the old file is backed up
+privately. A changed review is refused. This does not update the client's
+system or certify its installed revision: refresh Computers before a fresh
+deployment plan. Unexpected key changes require investigation, not rotation.
+Never delete the whole trust file or disable host-key verification.
+
 ## A deployment failed
 
 A Colmena failure can leave selected machines at different generations.

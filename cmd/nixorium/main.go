@@ -123,6 +123,8 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		} else {
 			presentation.HostsText(stdout, report)
 		}
+	case "host-key":
+		return runHostTrustCommand(ctx, repository, options, stdout, stderr)
 	case "deploy":
 		return runDeploymentCommand(ctx, repository, options, stdout, stderr)
 	case "controller":
@@ -306,6 +308,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		LoadHosts: func() (domain.HostsReport, error) {
 			return inspector.Hosts(ctx, repository)
+		},
+		PlanHostTrust: func(readContext context.Context, name string) domain.HostTrustPlan {
+			return app.NewHostTrustManager(local).Plan(readContext, repository, name)
+		},
+		ApplyHostTrust: func(plan domain.HostTrustPlan) domain.HostTrustResult {
+			report := app.NewHostTrustManager(local).Apply(ctx, plan, plan.ReviewToken)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
 		},
 		LoadConfigurationState: func() domain.ConfigurationStateReport {
 			return configurationStateManager.Load(ctx, repository)
@@ -534,6 +544,9 @@ func commandRequiresRepository(options options) bool {
 }
 
 func parseArguments(arguments []string) (options, error) {
+	if len(arguments) > 0 && arguments[0] == "host-key" {
+		return parseHostTrustArguments(arguments[1:])
+	}
 	result := options{}
 	for index := 0; index < len(arguments); index++ {
 		switch arguments[index] {
@@ -1094,6 +1107,8 @@ func readCandidateSettings(path string) ([]byte, error) {
 func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
+	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
+	fmt.Fprintln(writer, "       host-key apply --host <pcNN> --expect <review-token> [--yes] rotates only the reviewed key")
 	fmt.Fprintln(writer, "       support preview [--json] shows the filtered diagnostic payload without saving")
 	fmt.Fprintln(writer, "       support export reviews and confirms a private local file; no upload or build")
 	fmt.Fprintln(writer, "       workspace apply --file <candidate.json> --expect <review-token> [--yes] saves only the profile JSON")

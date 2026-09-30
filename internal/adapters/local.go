@@ -369,13 +369,21 @@ func probeCurrentSystemArguments(ctx context.Context, timeout time.Duration, arg
 		if len(detail) > 512 {
 			detail = detail[:512]
 		}
-		return domain.HostSystemProbe{Detail: "authenticated system observation failed: " + detail}
+		return domain.HostSystemProbe{HostKeyCondition: sshHostKeyCondition(string(output)), Detail: "authenticated system observation failed: " + detail}
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	if len(lines) != 2 || !validSystemPath(lines[0]) || !validGitRevision(lines[1]) {
 		return domain.HostSystemProbe{Detail: "authenticated system observation returned invalid state"}
 	}
 	return domain.HostSystemProbe{SystemPath: lines[0], Revision: lines[1]}
+}
+
+func sshHostKeyCondition(output string) domain.HostKeyCondition {
+	if strings.Contains(output, "REMOTE HOST IDENTIFICATION HAS CHANGED") ||
+		strings.Contains(output, "has changed and you have requested strict checking") {
+		return domain.HostKeyChanged
+	}
+	return ""
 }
 
 func sshCurrentSystemArguments(host domain.HostMeta, timeout time.Duration) []string {

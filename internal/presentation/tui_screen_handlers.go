@@ -573,6 +573,14 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		}
 	case dashboardHosts:
 		switch key.String() {
+		case "h":
+			hosts := model.filteredHosts()
+			if !model.actions.ClassroomMode && model.computers.hostDetail && len(hosts) > 0 {
+				host := hosts[min(model.computers.hostCursor, len(hosts)-1)]
+				if host.HostKeyCondition == domain.HostKeyChanged {
+					return model.openHostTrust(host.Name)
+				}
+			}
 		case "esc", "left":
 			if model.computers.hostDetail {
 				model.computers.hostDetail = false

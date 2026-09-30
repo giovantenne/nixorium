@@ -149,15 +149,18 @@ func (m *DeploymentManager) verifySuccessfulDeployments(ctx context.Context, rep
 	for index, target := range report.Targets {
 		probe, found := observed[target.Name]
 		verification := domain.DeploymentTargetVerification{
-			Name:       target.Name,
-			State:      "unverified",
-			Revision:   probe.Revision,
-			SystemPath: probe.SystemPath,
-			Detail:     probe.Detail,
+			HostKeyCondition: probe.HostKeyCondition,
+			Name:             target.Name,
+			State:            "unverified",
+			Revision:         probe.Revision,
+			SystemPath:       probe.SystemPath,
+			Detail:           probe.Detail,
 		}
 		switch {
 		case !found:
 			verification.Detail = "authenticated host state returned no result"
+		case probe.HostKeyCondition == domain.HostKeyChanged:
+			verification.Detail = "SSH host key changed; verify physical identity and review this computer's host-key plan before retrying."
 		case probe.Revision == "" || probe.SystemPath == "":
 			if verification.Detail == "" {
 				verification.Detail = "authenticated host state is unavailable"

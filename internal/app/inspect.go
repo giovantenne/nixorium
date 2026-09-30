@@ -515,6 +515,7 @@ func hostStatuses(hosts []domain.HostMeta, probes map[string]domain.SSHProbe, cu
 			DesiredRevision: revision,
 		}
 		observed, observedFound := current[host.Name]
+		status.HostKeyCondition = observed.HostKeyCondition
 		status.CurrentSystem = observed.SystemPath
 		status.CurrentRevision = observed.Revision
 		if last, found := lastSuccessful[host.Name]; found {

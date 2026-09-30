@@ -13,6 +13,23 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case hostTrustPlanMsg:
+		if model.screen != dashboardHostTrust || model.hostTrust.cancel == nil || model.hostTrust.id != message.id {
+			return model, nil
+		}
+		model.hostTrust.cancel()
+		model.hostTrust.cancel = nil
+		model.hostTrust.plan = message.plan
+		model.busy = ""
+		return model, nil
+	case hostTrustResultMsg:
+		if model.screen != dashboardHostTrust || !model.hostTrust.applying || message.id != model.hostTrust.id {
+			return model, nil
+		}
+		model.hostTrust.applying = false
+		model.busy = ""
+		model.hostTrust.result = message.result
+		return model, nil
 	case dashboardInventoryMsg:
 		return model.finishInventory(message)
 	case templateResetCatalogMsg:
@@ -994,7 +1011,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.deployment.confirmation = ""
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && (model.hostTrust.applying || model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -1019,11 +1036,19 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	if exitKey {
+		if model.hostTrust.cancel != nil {
+			model.hostTrust.cancel()
+			model.hostTrust.cancel = nil
+			model.hostTrust.id++
+		}
 		model.templateReset.cancelRead()
 		model.workspace.cancelRead()
 		model.support.cancelRead()
 		model.software.cancelSearch()
 		return model, tea.Quit
+	}
+	if model.screen == dashboardHostTrust {
+		return model.updateHostTrustKey(key)
 	}
 	if model.busy != "" {
 		return model, nil

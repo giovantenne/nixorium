@@ -113,6 +113,9 @@ func (model dashboardModel) computersView() string {
 		actions = []tuiAction{{key: "t", label: "Technical"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		if !model.actions.ClassroomMode {
 			actions = append([]tuiAction{{key: "d", label: "Deploy"}, {key: "i", label: "Diagnostics"}}, actions...)
+			if hosts[min(model.computers.hostCursor, len(hosts)-1)].HostKeyCondition == domain.HostKeyChanged && model.actions.PlanHostTrust != nil && model.actions.ApplyHostTrust != nil && !model.actions.ClassroomMode {
+				actions = append([]tuiAction{{key: "h", label: "Review changed SSH key"}}, actions...)
+			}
 		}
 	} else {
 		available, total := hostAvailability(model.computers.hosts.Hosts)
@@ -195,6 +198,8 @@ func (model dashboardModel) administrationView() string {
 func (model dashboardModel) helpView() string {
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
+	case dashboardHostTrust:
+		lines = append(lines, "Compare the offered fingerprint with this computer's physical console.", "Only a deliberately reinstalled client is eligible for reviewed key rotation.", "Esc cancels the read or review without changes; saving cannot be interrupted.")
 	case dashboardHome:
 		lines = append(lines, taskHelp(dashboardTasks)...)
 	case dashboardComputersArea:
@@ -211,6 +216,7 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail", "Search owns all text keys until Enter or Esc.")
 		if !model.actions.ClassroomMode {
 			lines = append(lines, "d review a deployment for the focused computer")
+			lines = append(lines, "h review changed SSH trust in a computer's details, after verifying its physical fingerprint")
 		}
 	case dashboardDeploy:
 		if model.deployment.usbRecovery != nil {
@@ -409,6 +415,9 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 }
 
 func (model dashboardModel) textEntry() bool {
+	if model.screen == dashboardHostTrust {
+		return model.hostTrust.cancel == nil && !model.hostTrust.applying && model.hostTrust.result.Operation == "" && !model.hostTrust.plan.HasErrors()
+	}
 	if model.screen == dashboardUSBInstall {
 		switch model.installation.remote.stage {
 		case remoteInstallConsole, remoteInstallRotateHostKey, remoteInstallPassword, remoteInstallReview, remoteInstallConfirmReboot, remoteInstallConfirmClose:

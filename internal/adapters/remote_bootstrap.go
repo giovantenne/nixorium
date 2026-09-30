@@ -170,6 +170,18 @@ func NewLiveBootstrap() LiveBootstrap {
 // with the key shown on the physical live-ISO console before it is trusted by
 // Establish.
 func (bootstrap LiveBootstrap) ObserveHostFingerprint(ctx context.Context, address string) (string, error) {
+	public, err := bootstrap.observeHostPublicKey(ctx, address)
+	if err != nil {
+		return "", err
+	}
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(public))
+	if err != nil {
+		return "", err
+	}
+	return ssh.FingerprintSHA256(key), nil
+}
+
+func (bootstrap LiveBootstrap) observeHostPublicKey(ctx context.Context, address string) (string, error) {
 	if err := validateLiveInstallerAddress(address); err != nil {
 		return "", err
 	}
@@ -183,7 +195,7 @@ func (bootstrap LiveBootstrap) ObserveHostFingerprint(ctx context.Context, addre
 			if key.Type() != ssh.KeyAlgoED25519 {
 				return fmt.Errorf("live installer offered unsupported host key algorithm %q", key.Type())
 			}
-			observed = ssh.FingerprintSHA256(key)
+			observed = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key)))
 			return nil
 		},
 		HostKeyAlgorithms: []string{ssh.KeyAlgoED25519},

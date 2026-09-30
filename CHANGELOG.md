@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Added explicit single-client SSH host-key review and rotation after deliberate
+  reinstall, in computer details and `host-key plan`/`apply`. Changed-key failures
+  are typed, physical fingerprint verification remains required, stale reviews
+  are refused, unrelated trust and private backups are preserved, and PXE or
+  protected client work blocks saving. No automatic rotation or weakened SSH.
+  Updated the management VM's existing update-build assertion to match the
+  grouped-build contract while checking every required output is retained.
+
 - Overview distinguishes incomplete configuration, uncommitted managed files,
   controller application and installation-file preparation, without adding
   startup evaluation or treating stale artifacts as an unconfigured lab.

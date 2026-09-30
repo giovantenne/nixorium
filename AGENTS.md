@@ -331,6 +331,12 @@ failure or timeout must block publication.
   The administrator TUI uses typed preview/export callbacks, cancels pending
   collection, ignores stale replies and exports only the displayed snapshot.
   Keep the entire payload scrollable and the feature out of classroom mode.
+- Reviewed client host-key rotation uses only the existing managed SSH trust
+  store, preserves unrelated entries and an atomic backup, and requires physical
+  fingerprint verification after deliberate reinstall. Recheck inventory, offered
+  key and recorded content under the fleet gate; refuse controller/ambiguous
+  targets, active PXE and pending client work. Never relax SSH checking or rotate
+  automatically after a changed-key error.
 - The USB worker may write only the dedicated `.ssh/nixorium-known-hosts`
   directory for atomic host-trust updates; the enclosing `.ssh`, keys, and
   configuration remain read-only. Activation preserves existing entries and

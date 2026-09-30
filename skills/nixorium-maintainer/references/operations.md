@@ -130,6 +130,18 @@ Host keys are accepted on first connection and verified on later connections.
 Investigate changed-key failures instead of deleting `known_hosts` entries
 blindly.
 
+For a deliberately reinstalled declared client, stop PXE and finish/reconcile
+protected client work first. Compare `ssh-keygen -lf
+/etc/ssh/ssh_host_ed25519_key.pub` on that client's physical console with
+`nixorium host-key plan --host pc01`. Only after explicit authorization, use
+`nixorium host-key apply --host pc01 --expect REVIEW_TOKEN` with the exact
+token and confirmation from the review. The TUI's changed-key client details
+offer the same reviewed operation. It rechecks identity, revision and both keys,
+preserves other entries and a private backup, and never weakens SSH checking.
+Refresh live inventory afterwards; trust rotation is not system verification.
+Never use this recovery for an unexplained key change or to bypass protected
+USB/deployment recovery.
+
 Use `nixorium hosts` to reconcile deployment state. It first distinguishes
 network/SSH availability, then uses the existing root deployment key to run the
 fixed read-only `nixorium-host-state` helper. `current` means the authenticated

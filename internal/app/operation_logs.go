@@ -77,6 +77,11 @@ func RecordOperationOutcome(sink OperationRecordSink, outcome any) error {
 func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 	record := domain.OperationRecord{}
 	switch report := outcome.(type) {
+	case domain.HostTrustResult:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = report.Host
+		record.Summary = "reviewed single-client SSH host trust update finished"
 	case domain.ConfigApplyReport:
 		record.Operation = report.Operation
 		record.State = report.State

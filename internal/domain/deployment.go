@@ -82,11 +82,12 @@ type LastSuccessfulDeployment struct {
 }
 
 type DeploymentTargetVerification struct {
-	Name       string `json:"name"`
-	State      string `json:"state"`
-	Revision   string `json:"revision,omitempty"`
-	SystemPath string `json:"systemPath,omitempty"`
-	Detail     string `json:"detail,omitempty"`
+	HostKeyCondition HostKeyCondition `json:"hostKeyCondition,omitempty"`
+	Name             string           `json:"name"`
+	State            string           `json:"state"`
+	Revision         string           `json:"revision,omitempty"`
+	SystemPath       string           `json:"systemPath,omitempty"`
+	Detail           string           `json:"detail,omitempty"`
 }
 
 type DeploymentVerificationSummary struct {

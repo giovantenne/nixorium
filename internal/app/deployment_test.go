@@ -241,6 +241,16 @@ func TestDeploymentExecuteRecordsOnlyAuthenticatedMatchingTargetsAfterPartialApp
 	}
 }
 
+func TestDeploymentReportsChangedHostKeyWithoutRecordingSuccess(t *testing.T) {
+	source := readyDeploymentSource()
+	source.runErrors = map[domain.DeploymentPhase]error{domain.DeploymentPhaseApply: errors.New("host-key checking rejected apply")}
+	source.current["pc01"] = domain.HostSystemProbe{HostKeyCondition: domain.HostKeyChanged}
+	r := NewDeploymentManager(source).Execute(context.Background(), "/deployment", "pc01", source.revision, "", io.Discard)
+	if r.State != "failed" || r.Verification.Verified != 0 || r.Verification.Recorded != 0 || len(r.Verification.Targets) != 1 || r.Verification.Targets[0].HostKeyCondition != domain.HostKeyChanged || !strings.Contains(r.Verification.Targets[0].Detail, "physical identity") {
+		t.Fatalf("incorrect trust failure: %+v", r)
+	}
+}
+
 func TestDeploymentExecuteReportsIncompleteVerificationAfterSuccessfulApply(t *testing.T) {
 	source := readyDeploymentSource()
 	delete(source.current, "pc02")

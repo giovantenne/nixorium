@@ -12,6 +12,8 @@ import (
 )
 
 type DashboardActions struct {
+	PlanHostTrust          func(context.Context, string) domain.HostTrustPlan
+	ApplyHostTrust         func(domain.HostTrustPlan) domain.HostTrustResult
 	LoadTemplateReset      func(context.Context) domain.TemplateResetCatalog
 	PlanTemplateReset      func(context.Context, string, func(string)) domain.TemplateResetPlan
 	ApplyTemplateReset     func(domain.TemplateResetPlan) domain.TemplateResetResult
@@ -122,6 +124,7 @@ const (
 	dashboardWorkspace
 	dashboardSupport
 	dashboardTemplateReset
+	dashboardHostTrust
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -281,6 +284,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	hostTrust              hostTrustModel
 	updateDetails          bool
 	returnAdmin            bool
 	computers              computersModel
@@ -949,6 +953,8 @@ func (model dashboardModel) View() tea.View {
 	}
 	content := ""
 	switch model.screen {
+	case dashboardHostTrust:
+		content = model.hostTrustView()
 	case dashboardComputersArea:
 		content = model.computersAreaView()
 	case dashboardInstallationArea:

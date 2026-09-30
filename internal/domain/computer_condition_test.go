@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestComputerConditionDoesNotConfuseConnectivityWithConfiguration(t *testing.T) {
 	for _, h := range []HostStatus{
@@ -12,5 +15,12 @@ func TestComputerConditionDoesNotConfuseConnectivityWithConfiguration(t *testing
 		if level == LevelOK || label == "" || guidance == "" {
 			t.Fatalf("invalid condition: %s %s %s", level, label, guidance)
 		}
+	}
+}
+
+func TestChangedHostKeyRequiresPhysicalIdentityReview(t *testing.T) {
+	level, label, guidance := ComputerCondition(HostStatus{HostKeyCondition: HostKeyChanged, SSH: SSHAvailable, Deployment: DeploymentCurrent})
+	if level != LevelError || label != "SSH key changed" || !strings.Contains(guidance, "physical-console fingerprint") {
+		t.Fatalf("unsafe condition: %s %s %s", level, label, guidance)
 	}
 }

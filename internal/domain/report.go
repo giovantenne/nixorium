@@ -74,9 +74,10 @@ const (
 )
 
 type HostSystemProbe struct {
-	SystemPath string `json:"systemPath,omitempty"`
-	Revision   string `json:"revision,omitempty"`
-	Detail     string `json:"detail,omitempty"`
+	HostKeyCondition HostKeyCondition `json:"hostKeyCondition,omitempty"`
+	SystemPath       string           `json:"systemPath,omitempty"`
+	Revision         string           `json:"revision,omitempty"`
+	Detail           string           `json:"detail,omitempty"`
 }
 
 type HostDeploymentSummary struct {
@@ -86,6 +87,7 @@ type HostDeploymentSummary struct {
 }
 
 type HostStatus struct {
+	HostKeyCondition     HostKeyCondition          `json:"hostKeyCondition,omitempty"`
 	Name                 string                    `json:"name"`
 	IP                   string                    `json:"ip"`
 	Role                 string                    `json:"role"`

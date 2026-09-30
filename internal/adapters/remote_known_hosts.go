@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
@@ -48,6 +49,10 @@ func KnownHostConflict(path, host, expectedPublicKey string) (bool, error) {
 }
 
 func MergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operationID string, allowRotation bool) error {
+	return mergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operationID, allowRotation, "")
+}
+
+func mergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operationID string, allowRotation bool, expectedBase string) error {
 	if !remoteStateID(operationID) || canonicalRemoteIPv4(host) == "" || !filepath.IsAbs(path) || filepath.Clean(path) != path ||
 		!filepath.IsAbs(backupRoot) || filepath.Clean(backupRoot) != backupRoot {
 		return errors.New("known-host merge identity is invalid")
@@ -70,7 +75,11 @@ func MergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operation
 	if err := validatePrivateOwnedFile(lock, syscall.S_IFREG, 0600); err != nil {
 		return err
 	}
-	if err := syscall.Flock(lockDescriptor, syscall.LOCK_EX); err != nil {
+	lockMode := syscall.LOCK_EX
+	if expectedBase != "" {
+		lockMode |= syscall.LOCK_NB
+	}
+	if err := syscall.Flock(lockDescriptor, lockMode); err != nil {
 		return err
 	}
 	defer syscall.Flock(lockDescriptor, syscall.LOCK_UN)
@@ -78,6 +87,9 @@ func MergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operation
 	content, err := readOptionalKnownHosts(path)
 	if err != nil {
 		return err
+	}
+	if expectedBase != "" && knownHostsFingerprint(content) != expectedBase {
+		return errors.New("known-hosts changed after review; create a fresh host-key plan")
 	}
 	lines := strings.Split(string(content), "\n")
 	filtered := make([]string, 0, len(lines)+1)
@@ -164,6 +176,10 @@ func MergeVerifiedKnownHost(path, backupRoot, host, expectedPublicKey, operation
 		_ = directory.Close()
 	}
 	return err
+}
+
+func knownHostsFingerprint(content []byte) string {
+	return fmt.Sprintf("sha256:%x", sha256.Sum256(content))
 }
 
 func preserveKnownHostsBackup(path string, content []byte) error {

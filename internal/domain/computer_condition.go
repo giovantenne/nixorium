@@ -3,6 +3,9 @@ package domain
 // ComputerCondition explains observation failures without claiming that an
 // unreachable computer is powered off or that an open SSH port authenticates it.
 func ComputerCondition(h HostStatus) (Level, string, string) {
+	if h.HostKeyCondition == HostKeyChanged {
+		return LevelError, "SSH key changed", "Do not update this computer until its identity is verified. If it was deliberately reinstalled, compare its physical-console fingerprint and review this computer's SSH trust."
+	}
 	if h.Reachability == ReachabilityUnreachable {
 		return LevelWarning, "Could not be reached", "Check that the computer is powered on and connected to the lab network."
 	}

@@ -93,6 +93,10 @@ configuration, software, home customization, diagnostics, and operations.
   a refusal with raw root commands, relaxed host-key checks, a second cache, or
   altered network state. Inspect `nixorium doctor`, operation status, and the
   reported journal instead.
+- A deliberately reinstalled client's changed SSH key requires a separate
+  administrator-authorized host-key plan/apply on supporting pins, with a
+  physical-console fingerprint comparison. Preserve protected work, unrelated
+  trust and backups; never rotate automatically or disable SSH verification.
 - The student intentionally cannot administer NetworkManager. Do not add that
   account to the `networkmanager` group or override its polkit denial without
   an explicit, reviewed change to the lab's security policy.
