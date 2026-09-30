@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -177,12 +178,12 @@ func (model settingsWizardModel) choiceWidth() int {
 }
 
 func (model settingsWizardModel) choiceHeight() int {
-	height := model.height - 8
-	if height < 8 {
-		return 8
+	height := model.height - 12
+	if height < 4 {
+		return 4
 	}
-	if height > 16 {
-		return 16
+	if height > 12 {
+		return 12
 	}
 	return height
 }
@@ -362,16 +363,19 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 }
 
 func (model settingsWizardModel) View() tea.View {
-	if model.helpOpen {
-		return tea.NewView(tuiTitle("First setup · Keyboard help", model.isDark) + "\n\nEnter continues after validation.\nShift Tab returns to the previous question.\nEsc cancels; existing settings are preserved.\n/ searches suggested values.\n\nEsc / F1 closes help.")
-	}
 	field := model.fields[model.index]
+	info := settingsHelp[field.id]
+	if model.helpOpen {
+		return tea.NewView(lipgloss.NewStyle().Width(max(20, model.width-4)).Render(tuiTitle(field.label, model.isDark) + "\n\n" + info.description + "\nExample: " + info.example + "\n\nEnter continues after validation.\nShift Tab returns to the previous question.\nEsc cancels; existing settings are preserved.\n/ searches suggested values.\n\nEsc / F1 closes help."))
+	}
 	lines := []string{
 		tuiTitle(model.title, model.isDark),
 		"",
 		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(model.fields), field.group),
 		field.label,
 	}
+	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-4)).Render(info.description+"\nExample: "+info.example))
+	lines = append(lines, model.networkPreview()...)
 	if field.group == "Network" {
 		lines = append(lines, "Controller network interface: "+model.settings.Lab.ControllerInterface())
 		if field.id == "lab.clientIfaceName" {

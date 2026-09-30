@@ -395,6 +395,9 @@ failure or timeout must block publication.
   through active-system verification and receipt creation.
 - `labMeta` is a public flake output containing the small set of non-sensitive operational values that tools need (controller IPs, network prefix, iface name, structured client hostname/IP inventory, ports, usernames). `deploymentStatus` separately reports whether placeholders, public default passwords, or public keys still block deployment. `nixoriumSoftware` is the typed non-secret catalog/scope/declaration contract; optional `nixoriumSoftwarePresets` is the versioned deployment-owned profile catalog. Scripts and documentation commands must consume these outputs instead of parsing Nix source files textually.
 - `lib/eval-lab-settings.nix` validates the versioned JSON envelope and delegates its `lab` object to `lib/eval-lab-config.nix`, whose private `lib.evalModules` schema remains the final type/semantic authority. Keep its semantic checks aligned with `internal/domain/settings.go` through `tests/lab-settings-validation-cases.json`. No custom NixOS options are added to host configurations.
+- Reject controller DHCP addresses inside the static lab prefix in both
+  validators; the placeholder remains preparation-only. Field guidance and
+  address previews do not replace complete candidate validation.
 - `lib/eval-workspace-profile.nix` accepts raw JSON text so duplicate keys are
   rejected before they can disappear in `builtins.fromJSON`. Keep it aligned
   with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.

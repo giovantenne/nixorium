@@ -145,6 +145,9 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	} else if prefix.Masked() != prefix {
 		add("lab.networkBase", fmt.Sprintf("must be aligned to /%d", lab.NetworkPrefix))
 	}
+	if address, err := netip.ParseAddr(lab.MasterDHCPIP); err == nil && address.Is4() && prefixErr == nil && prefix.Addr().Is4() && prefix.Contains(address) {
+		add("lab.network", "controller DHCP address must be outside the static laboratory network; choose a distinct laboratory subnet")
+	}
 	if lab.DeploymentMode != "" && lab.DeploymentMode != "laboratory" && lab.DeploymentMode != "controller" {
 		add("lab.deploymentMode", "must be laboratory or controller")
 	}

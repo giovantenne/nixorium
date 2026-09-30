@@ -66,7 +66,7 @@ func TestSettingsPasswordReviewIsRedacted(t *testing.T) {
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if model.screen != dashboardSettingsReview || !strings.Contains(view, "lab.teacherPassword: configured → updated") || strings.Contains(view, "$6$") {
+	if model.screen != dashboardSettingsReview || !strings.Contains(view, "Teacher password: configured → updated") || strings.Contains(view, "$6$") {
 		t.Fatalf("password review was not redacted:\n%s", view)
 	}
 }

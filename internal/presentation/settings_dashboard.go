@@ -378,7 +378,7 @@ func (model dashboardModel) settingsReviewView() string {
 			before = "configured"
 			after = "updated"
 		}
-		lines = append(lines, fmt.Sprintf("  %s: %v → %v", change.Field, before, after))
+		lines = append(lines, fmt.Sprintf("  %s: %v → %v", settingLabel(change.Field), before, after))
 	}
 	lines = append(lines,
 		"",

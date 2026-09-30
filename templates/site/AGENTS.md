@@ -31,6 +31,9 @@ configuration, software, home customization, diagnostics, and operations.
 - Use `lab-settings.json` for managed settings and `lab-software.json` for
   managed software. Prefer reviewed `config` and `software` plan/apply commands;
   application policy and home content belong in local modules/assets.
+- Keep the controller DHCP address outside the configured static laboratory
+  prefix. Supporting validators block overlap; change the planned subnet
+  through the reviewed settings workflow, never by ad-hoc live network edits.
 - Optional `software-presets.json` is a deployment-owned catalog of additive
   starting selections. Apply a profile through one reviewed preset plan/apply;
   preserve existing declarations and scopes, and do not treat the profile as

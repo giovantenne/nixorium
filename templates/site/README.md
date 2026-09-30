@@ -702,6 +702,10 @@ automatically; import of existing private keys is available only from
 `hostIfaceNames` can override a configured host. Precedence is host, role, then
 fallback. This permits different predictable interface names on controller and
 client hardware without changing existing deployments.
+The controller DHCP address must be outside the static lab prefix. Both
+validators block overlap; choose a distinct static subnet before saving or
+updating an overlapping deployment. Field help explains each value and the
+editor previews the first/last client and controller addresses from the draft.
 The installation form asks for the client computers' interface and shows the
 controller interface separately. On each PXE client, the installer checks the
 selected host's effective interface before the erase review. If it is absent,

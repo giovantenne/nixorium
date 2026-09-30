@@ -1,6 +1,18 @@
 {
   "invalid": [
     {
+      "name": "DHCP address overlaps static laboratory prefix",
+      "overrides": { "masterDhcpIp": "10.0.0.42", "networkBase": "10.0.0.0", "networkPrefixLength": 24 }
+    },
+    {
+      "name": "DHCP address equals static network base",
+      "overrides": { "masterDhcpIp": "10.0.0.0", "networkBase": "10.0.0.0", "networkPrefixLength": 24 }
+    },
+    {
+      "name": "DHCP address overlaps a larger static prefix",
+      "overrides": { "masterDhcpIp": "10.0.1.255", "networkBase": "10.0.0.0", "networkPrefixLength": 23 }
+    },
+    {
       "name": "homepage URL without a host",
       "overrides": {
         "homepageUrl": "http:///missing-host"

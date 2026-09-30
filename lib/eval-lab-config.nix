@@ -183,6 +183,10 @@ assert isIpv4 config.networkBase
   || throw "networkBase must be an IPv4 network address such as 10.0.0.0";
 assert lib.mod (ipv4ToInt config.networkBase) networkSize == 0
   || throw "networkBase (${config.networkBase}) is not aligned to /${toString config.networkPrefixLength}";
+assert config.masterDhcpIp == "MASTER_DHCP_IP"
+  || ipv4ToInt config.masterDhcpIp < ipv4ToInt config.networkBase
+  || ipv4ToInt config.masterDhcpIp >= ipv4ToInt config.networkBase + networkSize
+  || throw "controller DHCP address must be outside the static laboratory network; choose a distinct laboratory subnet";
 assert config.masterHostNumber < networkSize - 1
   || throw "masterHostNumber (${toString config.masterHostNumber}) does not fit in ${config.networkBase}/${toString config.networkPrefixLength}";
 assert isIfaceName config.ifaceName

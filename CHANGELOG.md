@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Settings fields now explain their purpose and show examples and draft network
+  addresses. Reviews use readable labels. Both validators reject a controller
+  DHCP address inside the static lab prefix; existing overlapping deployments
+  must select a distinct static subnet before an update can validate.
+
 - Configured PXE installations offer a compact saved-settings summary with
   Continue and Edit, keeping full preparation preflight without replaying the
   whole form. Incomplete settings still open the guided form.

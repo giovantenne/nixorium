@@ -66,6 +66,24 @@ func TestLabSettingsValidation(t *testing.T) {
 	}
 }
 
+func TestDHCPMustStayOutsideTheStaticLabPrefix(t *testing.T) {
+	for _, address := range []string{"10.0.0.0", "10.0.0.1", "10.0.0.255"} {
+		s := validSettings()
+		s.Lab.MasterDHCPIP = address
+		issues := s.Validate()
+		if len(issues) != 1 || issues[0].Field != "lab.network" {
+			t.Fatalf("overlap %s: %+v", address, issues)
+		}
+	}
+	for _, address := range []string{"9.255.255.255", "10.0.1.0", MasterDHCPPlaceholder} {
+		s := validSettings()
+		s.Lab.MasterDHCPIP = address
+		if len(s.Validate()) != 0 {
+			t.Fatal("non-overlap rejected")
+		}
+	}
+}
+
 func TestInstallationSettingsCompleteIsNotDeploymentReadiness(t *testing.T) {
 	if !validSettings().InstallationSettingsComplete() {
 		t.Fatal("complete form rejected")

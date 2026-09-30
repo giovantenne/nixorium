@@ -85,6 +85,11 @@ are offsets within that network. The controller number must be greater than
 the client count, and every generated address must fit before the broadcast
 address.
 
+On supporting pins, both Go and Nix validation reject a controller DHCP
+address inside that static prefix. The draft preview is guidance, not readiness
+evidence. Correct an overlapping subnet through a reviewed settings change;
+do not bypass validation or change the live network to make an update pass.
+
 `masterDhcpIp` is the initial address/hint used only during PXE installation.
 Preparation prefers it while assigned, otherwise captures the only usable
 non-static, non-link-local IPv4 address on the configured interface. Update the

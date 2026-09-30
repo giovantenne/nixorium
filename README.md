@@ -80,7 +80,8 @@ describes the site; the controller supplies the systems over the local network.
   traffic over the configured lab network; USB/SSH does not require Ethernet.
   PXE additionally needs an existing DHCP server and permission to run
   ProxyDHCP services. Choose a static lab address range that does not conflict
-  with the existing network.
+  with the existing network. Validators reject a controller DHCP address inside
+  the static lab prefix; the TUI previews the planned host addresses.
   Wi-Fi may not be compatible with PXE: support depends on hardware, firmware,
   and network configuration. Use USB/SSH when network boot is unavailable.
 - **Internet:** the controller fetches inputs and packages during preparation
