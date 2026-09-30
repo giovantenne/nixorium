@@ -20,6 +20,8 @@ type fakeHostTrustSource struct {
 	dirty                bool
 	pxeActive            bool
 	writes, observations int
+	onObserve            func()
+	onMeta               func()
 }
 
 func (f *fakeHostTrustSource) GitState(context.Context, string) (domain.GitState, error) {
@@ -27,6 +29,9 @@ func (f *fakeHostTrustSource) GitState(context.Context, string) (domain.GitState
 }
 
 func (f *fakeHostTrustSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
+	if f.onMeta != nil {
+		f.onMeta()
+	}
 	return f.meta, nil
 }
 func (f *fakeHostTrustSource) GitRevision(context.Context, string) (string, error) {
@@ -34,6 +39,9 @@ func (f *fakeHostTrustSource) GitRevision(context.Context, string) (string, erro
 }
 func (f *fakeHostTrustSource) ObserveHostTrust(context.Context, domain.HostMeta) (domain.HostTrustInspection, error) {
 	f.observations++
+	if f.onObserve != nil {
+		f.onObserve()
+	}
 	return f.inspection, nil
 }
 func (f *fakeHostTrustSource) ReplaceHostTrust(context.Context, domain.HostMeta, domain.HostTrustInspection) error {
@@ -52,9 +60,14 @@ func hostTrustFixture() *fakeHostTrustSource {
 	f.meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}, {Name: "pc02", IP: "10.0.0.2"}}
 	return f
 }
+func hostTrustTestManager(f *fakeHostTrustSource) HostTrustManager {
+	m := NewHostTrustManager(f)
+	m.now = func() time.Time { return time.Unix(1000, 0) }
+	return m
+}
 func TestHostTrustReviewAndSingleClientApply(t *testing.T) {
 	f := hostTrustFixture()
-	m := NewHostTrustManager(f)
+	m := hostTrustTestManager(f)
 	p := m.Plan(context.Background(), "/deployment", "pc01")
 	if p.HasErrors() || p.Confirmation != "ROTATE HOST KEY" || p.ReviewToken == "" || f.writes != 0 {
 		t.Fatalf("plan: %+v", p)
@@ -67,7 +80,7 @@ func TestHostTrustRejectsStaleOrUnapprovedReviews(t *testing.T) {
 	for _, change := range []string{"revision", "offered", "recorded", "base", "address", "controller", "expired", "confirmation", "token", "gate", "pxe", "dirty", "pending-reset"} {
 		t.Run(change, func(t *testing.T) {
 			f := hostTrustFixture()
-			m := NewHostTrustManager(f)
+			m := hostTrustTestManager(f)
 			p := m.Plan(context.Background(), "/deployment", "pc01")
 			token := p.ReviewToken
 			switch change {
@@ -84,7 +97,7 @@ func TestHostTrustRejectsStaleOrUnapprovedReviews(t *testing.T) {
 			case "controller":
 				f.meta.Controller.Name = "pc01"
 			case "expired":
-				p.ExpiresAt = time.Now().Add(-time.Second)
+				p.ExpiresAt = m.now().Add(-time.Second)
 			case "confirmation":
 				p.Confirmation = "yes"
 			case "token":
@@ -127,7 +140,7 @@ func TestHostTrustRefusesUnknownMatchingAndAmbiguousIdentities(t *testing.T) {
 			case "no-record":
 				f.inspection.Recorded = nil
 			}
-			if p := NewHostTrustManager(f).Plan(context.Background(), "/deployment", name); !p.HasErrors() || f.writes != 0 {
+			if p := hostTrustTestManager(f).Plan(context.Background(), "/deployment", name); !p.HasErrors() || f.writes != 0 {
 				t.Fatalf("unsafe plan: %+v", p)
 			}
 			if condition != "same-key" && condition != "no-record" && f.observations != 0 {
@@ -139,7 +152,7 @@ func TestHostTrustRefusesUnknownMatchingAndAmbiguousIdentities(t *testing.T) {
 func TestHostTrustReportsUnconfirmedWriteAndSafeHistory(t *testing.T) {
 	f := hostTrustFixture()
 	f.replaceErr = errors.New("private raw error")
-	m := NewHostTrustManager(f)
+	m := hostTrustTestManager(f)
 	p := m.Plan(context.Background(), "/deployment", "pc01")
 	r := m.Apply(context.Background(), p, p.ReviewToken)
 	if r.State != "unconfirmed" {
@@ -153,7 +166,7 @@ func TestHostTrustReportsUnconfirmedWriteAndSafeHistory(t *testing.T) {
 
 func TestHostTrustTokenCannotRenewAnExpiredReview(t *testing.T) {
 	f := hostTrustFixture()
-	m := NewHostTrustManager(f)
+	m := hostTrustTestManager(f)
 	now := time.Unix(1000, 0)
 	m.now = func() time.Time { return now }
 	p := m.Plan(context.Background(), "/deployment", "pc01")
@@ -169,5 +182,44 @@ func TestHostTrustTokenCannotRenewAnExpiredReview(t *testing.T) {
 	p.ExpiresAt = now.Add(time.Hour)
 	if r := m.Apply(context.Background(), p, p.ReviewToken); !r.HasErrors() || f.writes != 0 {
 		t.Fatal("altered expiry accepted an old token")
+	}
+}
+
+func TestHostTrustRejectsRepositoryChangesDuringInspection(t *testing.T) {
+	for _, phase := range []string{"inventory", "fingerprint"} {
+		for _, change := range []string{"revision", "dirty", "pending-reset"} {
+			t.Run(phase+"/"+change, func(t *testing.T) {
+				f := hostTrustFixture()
+				m := hostTrustTestManager(f)
+				p := m.Plan(context.Background(), "/deployment", "pc01")
+				if p.HasErrors() {
+					t.Fatalf("initial review: %+v", p)
+				}
+				mutate := func() {
+					switch change {
+					case "revision":
+						f.revision = strings.Repeat("b", 40)
+					case "dirty":
+						f.dirty = true
+					case "pending-reset":
+						f.gitErr = errors.New("reset recovery required")
+					}
+				}
+				if phase == "inventory" {
+					f.onMeta = mutate
+				} else {
+					f.onObserve = mutate
+				}
+				if r := m.Apply(context.Background(), p, p.ReviewToken); !r.HasErrors() || f.writes != 0 {
+					t.Fatalf("repository changed during recheck but trust was written: %+v", r)
+				}
+				// A standalone plan must not publish authorization from mixed
+				// repository snapshots either.
+				f.revision, f.dirty, f.gitErr = strings.Repeat("a", 40), false, nil
+				if next := m.Plan(context.Background(), "/deployment", "pc01"); !next.HasErrors() || next.ReviewToken != "" {
+					t.Fatalf("repository changed during planning: %+v", next)
+				}
+			})
+		}
 	}
 }

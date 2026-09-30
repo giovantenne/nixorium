@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/netip"
@@ -34,6 +35,14 @@ func (m HostTrustManager) Plan(ctx context.Context, repository, name string) dom
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	p := domain.HostTrustPlan{SchemaVersion: domain.SchemaVersion, Operation: "host-key-plan", State: "blocked", Repository: repository}
+	// Capture the revision before reading inventory, then check it again after
+	// network observation so a slow handshake cannot authorize stale identity.
+	var err error
+	p.Revision, err = m.source.GitRevision(ctx, repository)
+	if err != nil {
+		p.Message = err.Error()
+		return p
+	}
 	git, err := m.source.GitState(ctx, repository)
 	if err != nil {
 		p.Message = err.Error()
@@ -59,12 +68,20 @@ func (m HostTrustManager) Plan(ctx context.Context, repository, name string) dom
 		p.Message = "Stop network installation and resolve any PXE recovery before reviewing host trust."
 		return p
 	}
-	p.Revision, err = m.source.GitRevision(ctx, repository)
-	if err != nil {
-		p.Message = err.Error()
-		return p
-	}
 	p.Inspection, err = m.source.ObserveHostTrust(ctx, host)
+	if err == nil {
+		git, err = m.source.GitState(ctx, repository)
+		if err == nil && (!git.Available || git.Dirty) {
+			err = errors.New("Deployment changed during host-key inspection; save and commit the inventory, then create a fresh plan")
+		}
+	}
+	if err == nil {
+		var revision string
+		revision, err = m.source.GitRevision(ctx, repository)
+		if err == nil && revision != p.Revision {
+			err = errors.New("Deployment revision changed during host-key inspection; create a fresh plan")
+		}
+	}
 	if err == nil {
 		err = ctx.Err()
 	}

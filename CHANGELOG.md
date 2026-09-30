@@ -13,6 +13,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   protected client work blocks saving. No automatic rotation or weakened SSH.
   Updated the management VM's existing update-build assertion to match the
   grouped-build contract while checking every required output is retained.
+  Recheck clean Git state and revision after inventory and fingerprint reads,
+  refusing concurrent edits, commits and interrupted template resets before trust
+  can be saved.
 
 - Overview distinguishes incomplete configuration, uncommitted managed files,
   controller application and installation-file preparation, without adding
