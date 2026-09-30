@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Preserved exact changed Git paths, including unstaged settings, renames and
+  whitespace, so setup cannot treat uncommitted managed configuration as saved.
+  Git warnings are kept separate from parsed status records.
+
 - **Breaking:** removed the obsolete `veyonNativeHosts` setting. Every
   laboratory host already uses native Veyon capture, so the key selected
   nothing. `lab-settings.json` (or a legacy `lab-config.nix`) that still

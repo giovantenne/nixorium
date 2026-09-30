@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -74,6 +75,44 @@ func TestGitRevisionReturnsCommittedHead(t *testing.T) {
 	revision, err := (Local{}).GitRevision(context.Background(), directory)
 	if err != nil || revision != strings.TrimSpace(want) {
 		t.Fatalf("revision = %q, error = %v, want %q", revision, err, strings.TrimSpace(want))
+	}
+}
+
+func TestGitStatePreservesPorcelainPaths(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		status string
+		paths  []string
+	}{
+		{"unstaged", " M lab-settings.json\x00", []string{"lab-settings.json"}},
+		{"staged", "M  lab-settings.json\x00", []string{"lab-settings.json"}},
+		{"both", "MM lab-settings.json\x00", []string{"lab-settings.json"}},
+		{"untracked", "?? lab-settings.json\x00", []string{"lab-settings.json"}},
+		{"rename", "R  renamed.json\x00lab-settings.json\x00", []string{"renamed.json", "lab-settings.json"}},
+		{"spaces", " M path with spaces.json\x00", []string{"path with spaces.json"}},
+		{"controls", " M path\nwith\ttabs\x00", []string{"path\nwith\ttabs"}},
+		{"clean", "", []string{}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := t.TempDir()
+			// Git diagnostics must never become status records.
+			script := "#!/bin/sh\nprintf '%s' '" + test.status + "'\necho 'warning: test diagnostic' >&2\n"
+			// A shell script cannot contain NUL bytes; printf interprets the escapes.
+			script = strings.ReplaceAll(script, "\x00", "\\0")
+			script = strings.Replace(script, "printf '%s'", "printf '%b'", 1)
+			if err := os.WriteFile(filepath.Join(directory, "git"), []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+			state, err := (Local{}).GitState(context.Background(), t.TempDir())
+			count := 1
+			if test.status == "" {
+				count = 0
+			}
+			if err != nil || !state.Available || state.Dirty != (count > 0) || state.Changes != count || !reflect.DeepEqual(state.Paths, test.paths) {
+				t.Fatalf("state = %+v, err = %v, want paths %q", state, err, test.paths)
+			}
+		})
 	}
 }
 

@@ -39,23 +39,25 @@ func (Local) GitState(ctx context.Context, repository string) (domain.GitState, 
 	if err := checkTemplateResetPending(repository); err != nil {
 		return domain.GitState{}, err
 	}
-	output, err := run(ctx, "git", "-C", repository, "status", "--porcelain=v1", "--untracked-files=normal")
+	output, truncated, err := runBoundedGit(ctx, repository, maximumGitStatusBytes, "status", "--porcelain=v1", "-z", "--untracked-files=normal")
 	if err != nil {
 		return domain.GitState{}, err
 	}
-	trimmed := strings.TrimSpace(output)
-	changes := 0
+	if truncated {
+		return domain.GitState{}, errors.New("Git worktree status exceeds the 1 MiB safety limit")
+	}
+	changes, err := parseRawGitPorcelain(output)
+	if err != nil {
+		return domain.GitState{}, err
+	}
 	paths := []string{}
-	if trimmed != "" {
-		lines := strings.Split(trimmed, "\n")
-		changes = len(lines)
-		for _, line := range lines {
-			if len(line) >= 4 {
-				paths = append(paths, line[3:])
-			}
+	for _, change := range changes {
+		paths = append(paths, change.Path)
+		if change.OriginalPath != "" {
+			paths = append(paths, change.OriginalPath)
 		}
 	}
-	return domain.GitState{Available: true, Dirty: changes > 0, Changes: changes, Paths: paths}, nil
+	return domain.GitState{Available: true, Dirty: len(changes) > 0, Changes: len(changes), Paths: paths}, nil
 }
 
 func (Local) GitRevision(ctx context.Context, repository string) (string, error) {

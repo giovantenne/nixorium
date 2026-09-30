@@ -112,6 +112,17 @@ func gitReviewDiffArguments(staged bool) []string {
 }
 
 func parseGitPorcelain(output string) ([]domain.GitChange, error) {
+	changes, err := parseRawGitPorcelain(output)
+	for index := range changes {
+		changes[index].Path = sanitizeOperationLog([]byte(changes[index].Path))
+		changes[index].OriginalPath = sanitizeOperationLog([]byte(changes[index].OriginalPath))
+	}
+	return changes, err
+}
+
+// Keep exact paths for operational decisions; review output sanitizes them
+// separately before rendering potentially hostile filenames in a terminal.
+func parseRawGitPorcelain(output string) ([]domain.GitChange, error) {
 	records := strings.Split(output, "\x00")
 	changes := make([]domain.GitChange, 0, len(records))
 	for index := 0; index < len(records); index++ {
@@ -133,8 +144,8 @@ func parseGitPorcelain(output string) ([]domain.GitChange, error) {
 			original = records[index]
 		}
 		change := domain.GitChange{
-			Path:         sanitizeOperationLog([]byte(path)),
-			OriginalPath: sanitizeOperationLog([]byte(original)),
+			Path:         path,
+			OriginalPath: original,
 			Managed:      managedDeploymentPaths[filepath.ToSlash(path)] || managedDeploymentPaths[filepath.ToSlash(original)],
 			Private:      isPrivateDeploymentPath(path) || isPrivateDeploymentPath(original),
 		}

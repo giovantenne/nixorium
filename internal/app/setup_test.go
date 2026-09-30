@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -17,6 +20,41 @@ type fakeSetupSource struct {
 	preparation domain.PXEPreparationState
 	keyCalls    *int
 	metaCalls   *int
+}
+
+type realSetupGitSource struct{ fakeSetupSource }
+
+func (realSetupGitSource) GitState(ctx context.Context, repository string) (domain.GitState, error) {
+	return (adapters.Local{}).GitState(ctx, repository)
+}
+
+func TestUnstagedSettingsKeepSetupReviewIncomplete(t *testing.T) {
+	repository := t.TempDir()
+	data, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
+	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	path := filepath.Join(repository, "lab-settings.json")
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init", "-q"}, {"add", "lab-settings.json"},
+		{"-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"},
+	} {
+		if output, err := exec.Command("git", append([]string{"-C", repository}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	report := NewSetupManager(realSetupGitSource{fakeSetupSource{data: data}}).Status(context.Background(), repository)
+	if report.CurrentStage != domain.SetupStageReview {
+		t.Fatalf("unstaged settings skipped local review: %+v", report)
+	}
 }
 
 func (f fakeSetupSource) ReadSettings(string) ([]byte, error) {
