@@ -496,9 +496,9 @@ destructive action or uncertain target.
 ## Native Veyon and client access
 
 Every laboratory host uses native PipeWire/Wayland capture. The external VNC
-bridge and shared password are removed; `veyonNativeHosts` is compatibility
-data only and cannot restore the old backend. GNOME needs one local approval of screen
-sharing and input access; token persistence does not bypass initial consent.
+bridge and shared password are removed, and so is the `veyonNativeHosts`
+setting: validation rejects a settings file that still contains it. GNOME
+needs one local approval of screen sharing and input access; token persistence does not bypass initial consent.
 Validate monitoring, control, locking, demo, service restart, logout/login and
 reboot/home reset after deployment. The controller needs its own consent when
 broadcasting its screen. Client SSH/Veyon ports accept only the controller's

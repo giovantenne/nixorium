@@ -85,7 +85,6 @@ let
   inherit (config) extraLocale;
   inherit (config) keyboardLayout;
   inherit (config) consoleKeyMap;
-  inherit (config) veyonNativeHosts;
 
   networkOctets = map lib.toInt (lib.splitString "." networkBase);
   networkAddress =
@@ -182,7 +181,6 @@ let
     inherit extraLocale;
     inherit keyboardLayout;
     inherit consoleKeyMap;
-    inherit veyonNativeHosts;
     inherit cachePublicKey;
     inherit cachePort;
     inherit pxeHttpPort;
@@ -339,7 +337,6 @@ let
       (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages)));
     interface = ifaceForHost name;
   }) validClientNames;
-  unknownVeyonNativeHosts = builtins.filter (name: !builtins.elem name validHostNames) veyonNativeHosts;
   defaultPasswordHash = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
   credentialIssues =
     lib.optional (teacherPassword == defaultPasswordHash) "teacherPassword still uses the public default"
@@ -743,8 +740,6 @@ assert builtins.isList updateValidationHosts && builtins.all
   || throw "updateValidationHosts must contain configured host names";
 assert unknownHostModuleNames == []
   || throw "hostModules contains unknown hosts: ${builtins.concatStringsSep ", " unknownHostModuleNames}";
-assert unknownVeyonNativeHosts == []
-  || throw "veyonNativeHosts contains unknown hosts: ${builtins.concatStringsSep ", " unknownVeyonNativeHosts}";
 assert workspaceProfileJSON == null || workspaceCatalog != null
   || throw "workspaceProfileJSON requires a deployment-owned workspaceCatalog";
 assert builtins.isBool workspaceRuntimeEnabled

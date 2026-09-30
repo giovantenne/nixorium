@@ -18,6 +18,10 @@ const (
 	DefaultPasswordHash   = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0"
 )
 
+// The decoder rejects unknown fields; name this removed one explicitly so an
+// older settings file fails with an actionable instruction.
+const removedVeyonNativeHostsMessage = "lab.veyonNativeHosts was removed because every laboratory host uses native Veyon capture; delete this key from lab-settings.json"
+
 var (
 	interfaceNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,14}$`)
 	userNamePattern      = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
@@ -55,7 +59,6 @@ type LabSettings struct {
 	ExtraLocale             string            `json:"extraLocale"`
 	KeyboardLayout          string            `json:"keyboardLayout"`
 	ConsoleKeyMap           string            `json:"consoleKeyMap"`
-	VeyonNativeHosts        []string          `json:"veyonNativeHosts,omitempty"`
 }
 
 func (l LabSettings) ControllerInterface() string {
@@ -104,6 +107,9 @@ func DecodeLabSettings(data []byte) (LabSettingsFile, []ValidationIssue) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&settings); err != nil {
+		if strings.Contains(err.Error(), `unknown field "veyonNativeHosts"`) {
+			return settings, []ValidationIssue{{Field: "$", Message: removedVeyonNativeHostsMessage}}
+		}
 		return settings, []ValidationIssue{{Field: "$", Message: fmt.Sprintf("invalid settings JSON: %v", err)}}
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
@@ -225,11 +231,6 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 			add("lab.hostIfaceNames."+host, "must name a configured client or controller")
 		} else if !interfaceNamePattern.MatchString(interfaceName) {
 			add("lab.hostIfaceNames."+host, "must be a valid Linux interface name of at most 15 characters")
-		}
-	}
-	for index, host := range lab.VeyonNativeHosts {
-		if !validHosts[host] {
-			add(fmt.Sprintf("lab.veyonNativeHosts[%d]", index), "must name a configured client or controller")
 		}
 	}
 	return issues

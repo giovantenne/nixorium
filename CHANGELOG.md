@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Breaking:** removed the obsolete `veyonNativeHosts` setting. Every
+  laboratory host already uses native Veyon capture, so the key selected
+  nothing. `lab-settings.json` (or a legacy `lab-config.nix`) that still
+  contains it is now rejected with a message naming the key. Delete the key
+  and commit before updating to this release.
 - Reduced repeated Nix evaluation in controller preflight and grouped the complete
   update build set into one invocation. Inventory and package discovery no longer
   evaluate every workspace host; readiness and build guards remain enforced.

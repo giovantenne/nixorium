@@ -240,7 +240,6 @@ in
         cachePort = 5000;
         pxeHttpPort = 8080;
         cachePublicKey = null;
-        veyonNativeHosts = [];
         teacherUser = "teacher";
         studentUser = "student";
         teacherPassword = "!";

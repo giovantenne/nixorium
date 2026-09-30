@@ -139,11 +139,6 @@ let
             type = lib.types.str;
             description = "Linux console keymap";
           };
-          veyonNativeHosts = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
-            default = [];
-            description = "Deprecated compatibility field; all laboratory hosts now use native PipeWire capture";
-          };
         };
       }
       {
@@ -173,10 +168,10 @@ let
   emptyRequiredFields = builtins.filter
     (name: !isNonEmpty config.${name})
     requiredNonEmptyFields;
-  unknownVeyonNativeHosts = builtins.filter
-    (name: !(builtins.elem name validHostNames))
-    config.veyonNativeHosts;
 in
+# Name the removed key before the module system reports an unknown option.
+assert !(builtins.isAttrs rawConfig && rawConfig ? veyonNativeHosts)
+  || throw "veyonNativeHosts was removed because every laboratory host uses native Veyon capture; delete this key from the deployment settings";
 assert (config.deploymentMode == "controller" && config.pcCount == 0)
   || (config.deploymentMode == "laboratory" && config.pcCount > 0)
   || throw "pcCount must be zero in controller mode and positive in laboratory mode";
@@ -202,8 +197,6 @@ assert unknownInterfaceHosts == []
   || throw "hostIfaceNames contains unknown hosts: ${builtins.concatStringsSep ", " unknownInterfaceHosts}";
 assert emptyRequiredFields == []
   || throw "settings must not be empty: ${builtins.concatStringsSep ", " emptyRequiredFields}";
-assert unknownVeyonNativeHosts == []
-  || throw "veyonNativeHosts contains unknown hosts: ${builtins.concatStringsSep ", " unknownVeyonNativeHosts}";
 assert isUserName config.teacherUser
   || throw "teacherUser must be a valid Unix user name";
 assert isUserName config.studentUser

@@ -161,7 +161,7 @@ func (m SetupManager) status(ctx context.Context, repository string, initial boo
 
 	facts.Identity.Complete = !invalidJSON && !hasIssuePrefix(issues,
 		"lab.teacherUser", "lab.studentUser", "lab.homepageUrl", "lab.studentGit", "lab.adminGit",
-		"lab.timeZone", "lab.defaultLocale", "lab.extraLocale", "lab.keyboardLayout", "lab.consoleKeyMap", "lab.veyonNativeHosts")
+		"lab.timeZone", "lab.defaultLocale", "lab.extraLocale", "lab.keyboardLayout", "lab.consoleKeyMap")
 	if facts.Identity.Complete {
 		facts.Identity.Detail = fmt.Sprintf("users %s/%s; timezone %s", settings.Lab.TeacherUser, settings.Lab.StudentUser, settings.Lab.TimeZone)
 	} else {

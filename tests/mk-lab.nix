@@ -33,11 +33,7 @@ let
       hostIfaceNames.pc02 = "enp3s0";
     };
   });
-  nativeVeyonLab = mkLab (baseArgs // {
-    labConfig = labConfig // {
-      veyonNativeHosts = [ "pc01" ];
-    };
-  });
+  nativeVeyonLab = mkLab baseArgs;
   keyboardLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       keyboardLayout = "it";
@@ -149,10 +145,10 @@ let
       hostModules.pc00 = [ ../modules/common.nix ];
     })).labMeta
     true)).success;
-  rejectsUnknownVeyonHost = !(builtins.tryEval (builtins.deepSeq
+  rejectsRemovedVeyonNativeHosts = !(builtins.tryEval (builtins.deepSeq
     (mkLab (baseArgs // {
       labConfig = labConfig // {
-        veyonNativeHosts = [ "pc00" ];
+        veyonNativeHosts = [];
       };
     })).labMeta
     true)).success;
@@ -448,7 +444,7 @@ assert nestedSoftware.availability == "available";
 assert allowedUnfreeSoftware.availability == "available";
 assert bambuStudioSoftware.availability == "available";
 assert rejectsUnknownHost;
-assert rejectsUnknownVeyonHost;
+assert rejectsRemovedVeyonNativeHosts;
 assert rejectsInvalidSoftwareCatalog;
 assert rejectsUnsafeHomeResetPath;
 true

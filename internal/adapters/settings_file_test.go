@@ -35,7 +35,6 @@ func adapterSettings() domain.LabSettingsFile {
 			ExtraLocale:      "it_IT.UTF-8",
 			KeyboardLayout:   "it",
 			ConsoleKeyMap:    "it2",
-			VeyonNativeHosts: []string{},
 		},
 	}
 }

@@ -61,11 +61,9 @@
       }
     },
     {
-      "name": "unknown Veyon native host",
+      "name": "removed Veyon native host list",
       "overrides": {
-        "veyonNativeHosts": [
-          "pc00"
-        ]
+        "veyonNativeHosts": []
       }
     }
   ]

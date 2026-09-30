@@ -551,8 +551,6 @@ func settingFieldValue(settings domain.LabSettingsFile, field string) string {
 		return settings.Lab.KeyboardLayout
 	case "lab.consoleKeyMap":
 		return settings.Lab.ConsoleKeyMap
-	case "lab.veyonNativeHosts":
-		return strings.Join(settings.Lab.VeyonNativeHosts, ",")
 	default:
 		return ""
 	}
@@ -623,13 +621,6 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		}
 	case "lab.consoleKeyMap":
 		settings.Lab.ConsoleKeyMap = value
-	case "lab.veyonNativeHosts":
-		settings.Lab.VeyonNativeHosts = []string{}
-		for _, host := range strings.Split(value, ",") {
-			if host = strings.TrimSpace(host); host != "" {
-				settings.Lab.VeyonNativeHosts = append(settings.Lab.VeyonNativeHosts, host)
-			}
-		}
 	default:
 		return settings, errors.New("unsupported setting")
 	}

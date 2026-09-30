@@ -805,6 +805,6 @@ func demoSettings() domain.LabSettingsFile {
 		InterfaceName: "enp1s0", TeacherUser: "teacher", StudentUser: "student", TeacherPassword: domain.DefaultPasswordHash, StudentPassword: domain.DefaultPasswordHash,
 		AdminPassword: domain.DefaultPasswordHash, HomepageURL: "https://school.example/", StudentGitName: "Student", StudentGitEmail: "student@example.invalid",
 		AdminGitName: "Lab Administrator", AdminGitEmail: "admin@example.invalid", TimeZone: "Europe/Rome", DefaultLocale: "en_US.UTF-8", ExtraLocale: "it_IT.UTF-8",
-		KeyboardLayout: "it", ConsoleKeyMap: "it2", VeyonNativeHosts: []string{},
+		KeyboardLayout: "it", ConsoleKeyMap: "it2",
 	}}
 }

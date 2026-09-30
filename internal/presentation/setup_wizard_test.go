@@ -19,7 +19,6 @@ func wizardSettings() domain.LabSettingsFile {
 			HomepageURL: "https://example.org", StudentGitName: "Student", StudentGitEmail: "student@example.org",
 			AdminGitName: "Admin", AdminGitEmail: "admin@example.org", TimeZone: "Europe/Rome",
 			DefaultLocale: "en_US.UTF-8", ExtraLocale: "it_IT.UTF-8", KeyboardLayout: "it", ConsoleKeyMap: "it2",
-			VeyonNativeHosts: []string{},
 		},
 	}
 }
@@ -58,9 +57,6 @@ func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
 	}
 	if !model.accepted || model.cancelled {
 		t.Fatalf("wizard did not accept valid defaults: %+v", model)
-	}
-	if model.settings.Lab.VeyonNativeHosts == nil {
-		t.Fatal("empty Veyon host list became null")
 	}
 }
 

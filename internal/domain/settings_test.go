@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -47,7 +48,6 @@ func validSettings() LabSettingsFile {
 			ExtraLocale:      "it_IT.UTF-8",
 			KeyboardLayout:   "it",
 			ConsoleKeyMap:    "it2",
-			VeyonNativeHosts: []string{"pc01"},
 		},
 	}
 }
@@ -60,10 +60,9 @@ func TestLabSettingsValidation(t *testing.T) {
 
 	settings.Lab.NetworkBase = "10.0.0.1"
 	settings.Lab.StudentUser = settings.Lab.TeacherUser
-	settings.Lab.VeyonNativeHosts = []string{"pc98"}
 	issues := settings.Validate()
-	if len(issues) != 3 {
-		t.Fatalf("got %d issues, want 3: %#v", len(issues), issues)
+	if len(issues) != 2 {
+		t.Fatalf("got %d issues, want 2: %#v", len(issues), issues)
 	}
 }
 
@@ -116,10 +115,21 @@ func TestSharedLabSettingsValidationCases(t *testing.T) {
 	}
 }
 
+func TestRemovedVeyonNativeHostsKeyIsNamedInTheError(t *testing.T) {
+	data, err := MarshalLabSettings(validSettings())
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := strings.Replace(string(data), `"lab": {`, `"lab": {"veyonNativeHosts": [],`, 1)
+	_, issues := DecodeLabSettings([]byte(legacy))
+	if len(issues) != 1 || issues[0].Field != "$" || !strings.Contains(issues[0].Message, "lab.veyonNativeHosts was removed") {
+		t.Fatalf("removed key did not produce the actionable error: %#v", issues)
+	}
+}
+
 func TestControllerOnlySettingsAreExplicitAndRoundTrip(t *testing.T) {
 	settings := validSettings()
 	settings.Lab.PCCount = 0
-	settings.Lab.VeyonNativeHosts = nil
 	if issues := settings.Validate(); len(issues) == 0 {
 		t.Fatal("legacy laboratory accepted zero clients")
 	}

@@ -1332,7 +1332,6 @@ func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, se
 	candidate.Lab.ConsoleKeyMap = consoleKeyMap
 	candidate.Lab.DefaultLocale = "en_US.UTF-8"
 	candidate.Lab.ExtraLocale = "en_US.UTF-8"
-	candidate.Lab.VeyonNativeHosts = []string{}
 	if err := collectSetupCredentials(ctx, secrets, hasher, output, candidate); err != nil {
 		return err
 	}
