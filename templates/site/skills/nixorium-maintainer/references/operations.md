@@ -9,6 +9,11 @@ show the time of the last session observation, not live state. Refresh local
 state updates only saved configuration and local observations; open inventory
 to check clients. An empty list is not evidence that the fleet is current.
 
+When preparing PXE on a configured laboratory, the saved-settings summary lets
+the operator continue or edit. It proves only form completeness: continuation
+still checks keys, configuration, controller and installation files, and does
+not replace the separately reviewed start of network installation.
+
 ## After saving configuration
 
 On supporting pins, result screens separate local configuration, this

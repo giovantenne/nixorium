@@ -710,11 +710,11 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 	}
 	updated, command = m.Update(command())
 	m = updated.(dashboardModel)
-	if command != nil || m.screen != dashboardSettingsEdit {
+	if command != nil || m.screen != dashboardSettings || !m.installation.savedSummary {
 		t.Fatalf("installation settings did not open: screen=%d", m.screen)
 	}
 	m = press(m, "esc")
-	if m.screen != dashboardInstallationArea || m.installation.flow {
+	if m.screen != dashboardPXE || m.installation.flow {
 		t.Fatalf("cancelled installation returned to %d", m.screen)
 	}
 }

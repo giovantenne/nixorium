@@ -665,6 +665,11 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		if model.installation.startingLabSetup {
 			model.installation.startingLabSetup = false
+			if model.installation.method == "pxe" && message.settings.InstallationSettingsComplete() {
+				model.installation.savedSummary = true
+				model.screen, model.message = dashboardSettings, ""
+				return model, nil
+			}
 			model.settings.current.Lab.DeploymentMode = "laboratory"
 			if model.settings.current.Lab.PCCount == 0 {
 				model.settings.current.Lab.PCCount = 20

@@ -98,6 +98,12 @@ type ConfigValidationReport struct {
 	Issues        []ValidationIssue `json:"issues"`
 }
 
+// InstallationSettingsComplete describes saved form completeness only. Keys,
+// deployment hooks, controller state and PXE readiness still require preflight.
+func (s LabSettingsFile) InstallationSettingsComplete() bool {
+	return len(s.Validate()) == 0 && s.Lab.DeploymentMode != "controller" && s.Lab.PCCount > 0 && s.Lab.MasterDHCPIP != MasterDHCPPlaceholder && s.Lab.AdminPassword != DefaultPasswordHash && s.Lab.TeacherPassword != DefaultPasswordHash && s.Lab.StudentPassword != DefaultPasswordHash
+}
+
 func (r ConfigValidationReport) HasErrors() bool {
 	return len(r.Issues) > 0
 }

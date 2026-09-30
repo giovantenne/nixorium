@@ -263,6 +263,9 @@ func (command *settingsPasswordCommand) Run() error {
 }
 
 func (model dashboardModel) settingsView() string {
+	if model.installation.savedSummary && model.screen == dashboardSettings {
+		return model.installationSummaryView()
+	}
 	path := []string{"Maintenance", "Settings"}
 	title := "Laboratory settings"
 	intro := "Choose one area to edit. Values are validated before any file changes."

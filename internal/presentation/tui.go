@@ -233,6 +233,7 @@ type maintenanceModel struct {
 // installationModel owns guided installation and PXE lifecycle state,
 // including progress identity for delayed service messages.
 type installationModel struct {
+	savedSummary     bool
 	startPlan        domain.PXELifecycleReport
 	startingLabSetup bool
 	flow             bool
@@ -713,6 +714,7 @@ func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstal
 	model.installation.failed = false
 	model.setupMode = false
 	model.installation.startingLabSetup = true
+	model.installation.savedSummary = false
 	model.settings.returnScreen = dashboardHome
 	model.settings.collectPasswords = false
 	model.settings.result = domain.ConfigurationSaveReport{}

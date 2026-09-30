@@ -229,7 +229,7 @@ func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if settingsLoads != 1 || model.screen != dashboardSettingsEdit || strings.Contains(model.View().Content, "Step 1 of 5") {
+	if settingsLoads != 1 || model.screen != dashboardSettings || !model.installation.savedSummary || strings.Contains(model.View().Content, "Step 1 of 5") {
 		t.Fatalf("install exposed the old setup menu: settingsLoads=%d screen=%d\n%s", settingsLoads, model.screen, model.View().Content)
 	}
 }

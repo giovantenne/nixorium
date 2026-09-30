@@ -122,6 +122,9 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 }
 
 func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.screen == dashboardSettings && model.installation.savedSummary {
+		return model.updateInstallationSummary(key)
+	}
 	if model.screen == dashboardSettings && model.settings.result.Operation == "" {
 		if model.settings.menu.filtering() {
 			var command tea.Cmd

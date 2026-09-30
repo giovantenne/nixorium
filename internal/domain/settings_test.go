@@ -66,6 +66,26 @@ func TestLabSettingsValidation(t *testing.T) {
 	}
 }
 
+func TestInstallationSettingsCompleteIsNotDeploymentReadiness(t *testing.T) {
+	if !validSettings().InstallationSettingsComplete() {
+		t.Fatal("complete form rejected")
+	}
+	for _, change := range []func(*LabSettingsFile){
+		func(s *LabSettingsFile) { s.Lab.DeploymentMode = "controller"; s.Lab.PCCount = 0 },
+		func(s *LabSettingsFile) { s.Lab.MasterDHCPIP = MasterDHCPPlaceholder },
+		func(s *LabSettingsFile) { s.Lab.AdminPassword = DefaultPasswordHash },
+		func(s *LabSettingsFile) { s.Lab.StudentPassword = DefaultPasswordHash },
+		func(s *LabSettingsFile) { s.Lab.TeacherPassword = DefaultPasswordHash },
+		func(s *LabSettingsFile) { s.Lab.NetworkBase = "invalid" },
+	} {
+		s := validSettings()
+		change(&s)
+		if s.InstallationSettingsComplete() {
+			t.Fatal("incomplete settings skipped form")
+		}
+	}
+}
+
 func TestSharedLabSettingsValidationCases(t *testing.T) {
 	type validationCase struct {
 		Name      string         `json:"name"`

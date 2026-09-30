@@ -356,6 +356,26 @@ reboot recovery restores normal addressing.
 Enter Start PXE  ·  Esc Cancel  ·  F1 Help
 ```
 
+## Saved PXE settings
+
+```text
+Nixorium  /  Installation  /  Network boot  /  Saved settings
+
+Use the saved installation settings?
+
+Laboratory network  10.42.0.0/24
+Controller DHCP     192.168.1.123
+Client interface    enp1s0
+Client computers    5
+Accounts            admin / teacher / student
+
+Continue the guided preparation using these saved values.
+Keys, configuration, controller and installation files are checked next.
+This summary is not a readiness check. Starting network installation still requires its own review.
+
+Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
+```
+
 ## USB SSH disk review
 
 ```text

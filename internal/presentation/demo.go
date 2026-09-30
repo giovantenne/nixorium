@@ -514,7 +514,12 @@ func demoDeploymentVerification() []domain.DeploymentTargetVerification {
 
 func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
-	actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return demoSettings(), nil }
+	actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) {
+		settings := demoSettings()
+		settings.Lab.DeploymentMode = "laboratory"
+		settings.Lab.AdminPassword, settings.Lab.TeacherPassword, settings.Lab.StudentPassword = "$6$demo$admin", "$6$demo$teacher", "$6$demo$student"
+		return settings, nil
+	}
 	actions.Refresh = func(ctx context.Context) (domain.StatusReport, error) {
 		report := demoStatus("stopped", revision)
 		report.PXEPreparation.Ready = false
@@ -528,6 +533,10 @@ func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	r.command(r.key(demoCode(tea.KeyEnter)))
 	r.capture("Choose network boot", 1500)
 	r.command(r.key(demoCode(tea.KeyEnter)))
+	if r.model.installation.savedSummary {
+		r.capture("Reuse saved installation settings", 1800)
+		r.key(tea.KeyPressMsg{Code: 'e', Text: "e"})
+	}
 	r.capture("Review laboratory network settings", 2300)
 	r.model.settings.editor = r.model.settings.editor.moveToField(4)
 	r.capture("Configure five client computers", 2300)

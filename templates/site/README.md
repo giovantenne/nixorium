@@ -94,6 +94,9 @@ You can press `q` at any safe point. While PXE is active, leaving it active is a
 separate exact-confirmation choice; stopping PXE restores normal controller
 networking. Running the installation flow again revalidates the settings and
 skips already current prerequisites before preparing the clients.
+On supporting versions, complete saved PXE settings appear in a compact summary:
+continue without replaying the form, or choose Edit. Incomplete settings still
+open the form; the summary never replaces the remaining preparation checks.
 
 The bootstrap installer already created and committed this private deployment.
 It preserved the selected update channel in `flake.nix` while binding the

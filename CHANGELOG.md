@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Configured PXE installations offer a compact saved-settings summary with
+  Continue and Edit, keeping full preparation preflight without replaying the
+  whole form. Incomplete settings still open the guided form.
+
 - Overview now lists selectable pending local work and timestamped client
   observations, including low Nix-store space. Local refresh never probes
   clients or evaluates Nix; every follow-up retains its normal review.
