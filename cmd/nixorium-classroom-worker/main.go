@@ -34,7 +34,10 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	local := adapters.Local{}
+	local := newCachedLocal()
+	// Evaluate the laboratory identities while no teacher is waiting, so the
+	// first classroom dashboard opens from the cache.
+	go func() { _, _ = local.LabMeta(ctx, repository) }()
 	worker := classroomWorker{
 		repository: repository,
 		inspector:  app.NewInspector(local),
@@ -56,15 +59,10 @@ type classroomWorker struct {
 func (worker classroomWorker) handle(ctx context.Context, request domain.ClassroomRequest) domain.ClassroomResponse {
 	response := domain.ClassroomResponse{State: "completed"}
 	switch request.Operation {
-	case domain.ClassroomOverviewOperation:
-		report, err := worker.inspector.Overview(ctx, worker.repository)
-		if err != nil {
-			return classroomFailure(err)
-		}
-		report = classroomStatus(report)
-		response.Status = &report
-	case domain.ClassroomStatusOperation:
-		report, err := worker.inspector.Status(ctx, worker.repository)
+	case domain.ClassroomOverviewOperation, domain.ClassroomStatusOperation:
+		// Classroom controls show only identities and the PXE state, so
+		// deployment readiness and installation artifacts are not evaluated.
+		report, err := worker.inspector.Inventory(ctx, worker.repository)
 		if err != nil {
 			return classroomFailure(err)
 		}

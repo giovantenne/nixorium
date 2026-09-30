@@ -16,22 +16,12 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 	if _, err := os.Stat(adapters.ClassroomSocketPath); err != nil {
 		return false, 0
 	}
-	initial, initialErr := classroomRequest(ctx, domain.ClassroomOverviewOperation, nil)
-	usedInitial := false
+	// The overview is requested from inside the dashboard, which shows its
+	// loading screen at once instead of a blank terminal.
 	actions := presentation.DashboardActions{
 		ClassroomMode:  true,
 		RunningVersion: nixoriumVersion,
 		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
-			if !usedInitial {
-				usedInitial = true
-				if initialErr != nil {
-					return domain.StatusReport{}, domain.SetupReport{}, initialErr
-				}
-				if initial.Status == nil {
-					return domain.StatusReport{}, domain.SetupReport{}, errors.New("classroom worker returned no laboratory overview")
-				}
-				return *initial.Status, classroomSetupReport(), nil
-			}
 			response, err := classroomRequest(ctx, domain.ClassroomOverviewOperation, nil)
 			if err != nil || response.Status == nil {
 				if err == nil {

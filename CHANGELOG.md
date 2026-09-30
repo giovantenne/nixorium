@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Classroom controls open faster for the teacher: the dashboard appears at
+  once and loads inside, the classroom worker no longer evaluates deployment
+  readiness it does not show, and it reuses the laboratory identities for an
+  unchanged clean revision (evaluated in advance when the worker starts).
+
 - Consistent TUI keys: `r` refreshes on every screen that has a refresh
   (services, logs, Git review and network boot used `f`). Keys that did
   something else with `r` moved: `n` starts a new review after a result and

@@ -597,6 +597,9 @@ func RunLoadingDashboard(actions DashboardActions, setupMode bool) error {
 	model.setupMode = setupMode
 	model.initializing = true
 	model.busy = "Opening the laboratory and checking setup progress"
+	if actions.ClassroomMode {
+		model.busy = "Opening classroom controls"
+	}
 	_, err := tea.NewProgram(model).Run()
 	return err
 }
