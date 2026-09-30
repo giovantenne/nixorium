@@ -51,6 +51,7 @@ func (Local) ValidateCandidate(ctx context.Context, repository string, settings 
 	}
 
 	command := exec.CommandContext(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--expr", candidateValidationExpression)
+	configureCommandCancellation(command)
 	command.Env = append(os.Environ(),
 		"NIXORIUM_DEPLOYMENT_FLAKE="+flake,
 		"NIXORIUM_CANDIDATE_FILE="+path,

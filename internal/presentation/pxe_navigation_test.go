@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -28,13 +29,16 @@ func TestPXEHasOneEntryAndStateSpecificPrimaryAction(t *testing.T) {
 			m := experienceFixture(2)
 			m.screen = dashboardInstallationArea
 			m.actions = DashboardActions{
-				LoadRemoteInstall: func() (domain.RemoteInstallResponse, error) {
+				LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 					t.Fatal("PXE must not wait for the USB worker")
 					return domain.RemoteInstallResponse{}, nil
 				},
-				Refresh:      func() (domain.StatusReport, error) { return report, nil },
-				LoadSettings: func() (domain.LabSettingsFile, error) { called = "configure"; return wizardSettings(), nil },
-				PlanPXEStart: func() domain.PXELifecycleReport {
+				Refresh: func(ctx context.Context) (domain.StatusReport, error) { return report, nil },
+				LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
+					called = "configure"
+					return wizardSettings(), nil
+				},
+				PlanPXEStart: func(ctx context.Context) domain.PXELifecycleReport {
 					called = "start-review"
 					return domain.PXELifecycleReport{State: "ready"}
 				},
@@ -74,7 +78,9 @@ func TestPXEFailedObservationCannotActOnPreviousReadiness(t *testing.T) {
 	m := experienceFixture(2)
 	m.screen = dashboardInstallationArea
 	m.report.PXEPreparation.Ready = true
-	m.actions.Refresh = func() (domain.StatusReport, error) { return domain.StatusReport{}, errors.New("unavailable") }
+	m.actions.Refresh = func(ctx context.Context) (domain.StatusReport, error) {
+		return domain.StatusReport{}, errors.New("unavailable")
+	}
 	next, command := m.Update(tea.KeyPressMsg{Text: "p"})
 	next, _ = next.Update(command())
 	m = next.(dashboardModel)

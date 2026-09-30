@@ -34,8 +34,8 @@ func deploymentUSBModel(t *testing.T, response domain.RemoteInstallResponse) das
 	return dashboardModel{screen: dashboardDeploy, report: report, width: 80, height: 24,
 		deployment: deploymentModel{chosen: map[string]bool{"pc01": true, "pc02": true}},
 		actions: DashboardActions{
-			LoadRemoteInstall: func() (domain.RemoteInstallResponse, error) { return response, nil },
-			PlanDeployment: func(string) domain.DeploymentPlanReport {
+			LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) { return response, nil },
+			PlanDeployment: func(ctx context.Context, _ string) domain.DeploymentPlanReport {
 				t.Fatal("unexpected deployment plan")
 				return domain.DeploymentPlanReport{}
 			},
@@ -69,7 +69,7 @@ func TestDeploymentUSBRecoveryVerifiesThenRequiresFreshReview(t *testing.T) {
 	response := completedDeploymentUSB(t)
 	model := deploymentUSBModel(t, response)
 	probes, verifies, plans := 0, 0, 0
-	model.actions.LoadRemoteInstall = func() (domain.RemoteInstallResponse, error) {
+	model.actions.LoadRemoteInstall = func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 		probes++
 		if verifies == 0 {
 			return response, nil
@@ -85,7 +85,7 @@ func TestDeploymentUSBRecoveryVerifiesThenRequiresFreshReview(t *testing.T) {
 		verified.BootVerified = true
 		return domain.RemoteInstallResponse{State: "verified", OperationID: response.OperationID, Session: &verified}, nil
 	}
-	model.actions.PlanDeployment = func(requested string) domain.DeploymentPlanReport {
+	model.actions.PlanDeployment = func(ctx context.Context, requested string) domain.DeploymentPlanReport {
 		plans++
 		if requested != "pc01,pc02" {
 			t.Fatalf("selection changed to %q", requested)
@@ -230,7 +230,7 @@ func TestDeploymentUSBRecoveryRechecksForNewReservation(t *testing.T) {
 	next := completedDeploymentUSB(t)
 	next.Session.OperationID = strings.Repeat("f", 32)
 	next.OperationID = next.Session.OperationID
-	model.actions.LoadRemoteInstall = func() (domain.RemoteInstallResponse, error) { return next, nil }
+	model.actions.LoadRemoteInstall = func(ctx context.Context) (domain.RemoteInstallResponse, error) { return next, nil }
 	model.actions.RemoteInstallRequest = func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
 		verified := *original.Session
 		verified.BootVerified = true
@@ -246,7 +246,7 @@ func TestDeploymentUSBRecoveryUnknownStatusNeverPlans(t *testing.T) {
 	for _, state := range []string{"transport-error", "blocked", "future-state"} {
 		model := deploymentUSBModel(t, domain.RemoteInstallResponse{State: state})
 		if state == "transport-error" {
-			model.actions.LoadRemoteInstall = func() (domain.RemoteInstallResponse, error) {
+			model.actions.LoadRemoteInstall = func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 				return domain.RemoteInstallResponse{}, errors.New("worker unavailable")
 			}
 		}

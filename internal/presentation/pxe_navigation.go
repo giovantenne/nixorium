@@ -1,6 +1,8 @@
 package presentation
 
 import (
+	"context"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -23,10 +25,10 @@ func (model dashboardModel) openNetworkInstallation() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	model.busy = "Checking network installation state"
-	return model, func() tea.Msg {
-		report, err := model.actions.Refresh()
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		report, err := model.actions.Refresh(ctx)
 		return dashboardPXEOverviewMsg{report: report, err: err}
-	}
+	})
 }
 
 func (model dashboardModel) pxePrimaryAction() tuiAction {

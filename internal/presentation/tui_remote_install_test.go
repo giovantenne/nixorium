@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -195,7 +196,7 @@ func TestUSBChoiceDetectsAndReattachesKnownOperation(t *testing.T) {
 	prepared := remoteTUITestPreparedResponse("prepared")
 	statusRequests := 0
 	model := dashboardModel{actions: DashboardActions{
-		LoadRemoteInstall: func() (domain.RemoteInstallResponse, error) { return prepared, nil },
+		LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) { return prepared, nil },
 		RemoteInstallRequest: func(request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
 			if request.Operation == domain.RemoteInstallStatusOperation && request.OperationID == remoteTUITestOperationID {
 				statusRequests++
@@ -291,7 +292,7 @@ func TestUSBInstallObservesFingerprintBeforePasswordEntry(t *testing.T) {
 			stage: remoteInstallConsole, host: "pc01", operationID: remoteTUITestOperationID, address: "192.0.2.20",
 		}},
 		actions: DashboardActions{
-			ObserveRemoteInstall: func(address string) (string, error) {
+			ObserveRemoteInstall: func(ctx context.Context, address string) (string, error) {
 				observedAddress = address
 				return "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", nil
 			},

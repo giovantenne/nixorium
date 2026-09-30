@@ -11,6 +11,14 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// Loads, plans, discovery, previews and fingerprint observations are cancellable
+// reads. They may evaluate/build isolated candidates, but never activate or save
+// deployment state. SearchSoftware has its own debounced, bounded context.
+// The two progress loaders only read bounded local records of independent jobs.
+// All other callbacks are protected mutations, including the mixed-operation
+// RemoteInstallRequest. ApplyDeployment's context is for its separately reviewed
+// stop action, not the read-only Esc path. PreparePXE is systemd-owned;
+// ApplyController waits for a managed job while the foreground UI stays protected.
 type DashboardActions struct {
 	PlanHostTrust          func(context.Context, string) domain.HostTrustPlan
 	ApplyHostTrust         func(domain.HostTrustPlan) domain.HostTrustResult
@@ -18,70 +26,70 @@ type DashboardActions struct {
 	PlanTemplateReset      func(context.Context, string, func(string)) domain.TemplateResetPlan
 	ApplyTemplateReset     func(domain.TemplateResetPlan) domain.TemplateResetResult
 	ClassroomMode          bool
-	PlanInternet           func(string, domain.InternetAction) domain.InternetPlan
+	PlanInternet           func(context.Context, string, domain.InternetAction) domain.InternetPlan
 	ApplyInternet          func(domain.InternetPlan) domain.InternetReport
 	RunningVersion         string
 	LoadInventory          func(context.Context) (domain.StatusReport, error)
-	LoadInitial            func() (domain.StatusReport, domain.SetupReport, error)
-	LoadDoctor             func() (domain.DoctorReport, error)
+	LoadInitial            func(context.Context) (domain.StatusReport, domain.SetupReport, error)
+	LoadDoctor             func(context.Context) (domain.DoctorReport, error)
 	PreviewSupport         func(context.Context) (domain.SupportSnapshot, error)
 	ExportSupport          func(domain.SupportSnapshot) domain.SupportExportResult
-	Refresh                func() (domain.StatusReport, error)
-	LoadSetup              func() domain.SetupReport
-	LoadSetupKeys          func() domain.KeyReconcileReport
+	Refresh                func(context.Context) (domain.StatusReport, error)
+	LoadSetup              func(context.Context) domain.SetupReport
+	LoadSetupKeys          func(context.Context) domain.KeyReconcileReport
 	ReconcileSetupKeys     func() (domain.KeyReconcileReport, error)
 	ImportSetupKey         func(string, string) (domain.KeyImportReport, error)
 	SaveSetupConfiguration func() domain.ConfigurationSaveReport
 	InstallSetupSecrets    func() domain.ActionReport
-	LoadHosts              func() (domain.HostsReport, error)
-	LoadConfigurationState func() domain.ConfigurationStateReport
-	LoadSoftware           func() domain.SoftwareCatalogReport
+	LoadHosts              func(context.Context) (domain.HostsReport, error)
+	LoadConfigurationState func(context.Context) domain.ConfigurationStateReport
+	LoadSoftware           func(context.Context) domain.SoftwareCatalogReport
 	SearchSoftware         func(context.Context, string) domain.SoftwareSearchReport
-	PlanSoftware           func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
+	PlanSoftware           func(context.Context, domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport
 	SaveSoftware           func(domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport
-	LoadSoftwarePresets    func() domain.SoftwarePresetCatalogReport
-	PlanSoftwarePreset     func(domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport
+	LoadSoftwarePresets    func(context.Context) domain.SoftwarePresetCatalogReport
+	PlanSoftwarePreset     func(context.Context, domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport
 	SaveSoftwarePreset     func(domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport
-	PlanShutdown           func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
-	PlanPower              func(string, domain.ShutdownSessionPolicy, domain.ClientPowerAction) domain.ShutdownPlanReport
+	PlanShutdown           func(context.Context, string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport
+	PlanPower              func(context.Context, string, domain.ShutdownSessionPolicy, domain.ClientPowerAction) domain.ShutdownPlanReport
 	ApplyShutdown          func(domain.ShutdownPlanReport) domain.ShutdownApplyReport
-	PlanDeployment         func(string) domain.DeploymentPlanReport
+	PlanDeployment         func(context.Context, string) domain.DeploymentPlanReport
 	ApplyDeployment        func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
-	PlanController         func() domain.ControllerRebuildPlanReport
+	PlanController         func(context.Context) domain.ControllerRebuildPlanReport
 	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
 	LoadControllerProgress func() (domain.OperationProgress, error)
-	LoadServices           func() domain.ServicesReport
+	LoadServices           func(context.Context) domain.ServicesReport
 	RestartService         func(string) domain.ServiceActionReport
-	LoadLogs               func() domain.OperationLogsReport
-	LoadLog                func(string) domain.OperationLogReport
-	LoadGitReview          func() domain.GitReviewReport
-	PlanGitCommit          func(string) domain.GitCommitPlanReport
+	LoadLogs               func(context.Context) domain.OperationLogsReport
+	LoadLog                func(context.Context, string) domain.OperationLogReport
+	LoadGitReview          func(context.Context) domain.GitReviewReport
+	PlanGitCommit          func(context.Context, string) domain.GitCommitPlanReport
 	ApplyGitCommit         func(domain.GitCommitPlanReport) domain.GitCommitReport
-	CheckUpdate            func() domain.UpdateCheckReport
-	PlanUpdate             func(string, bool, bool) domain.UpdatePlanReport
-	PlanUpdateWithProgress func(string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	CheckUpdate            func(context.Context) domain.UpdateCheckReport
+	PlanUpdate             func(context.Context, string, bool, bool) domain.UpdatePlanReport
+	PlanUpdateWithProgress func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
 	SaveUpdate             func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadPackageBase        func() domain.PackageBaseStatus
-	PlanPackageBase        func(string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	LoadPackageBase        func(context.Context) domain.PackageBaseStatus
+	PlanPackageBase        func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
 	SavePackageBase        func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadSettings           func() (domain.LabSettingsFile, error)
+	LoadSettings           func(context.Context) (domain.LabSettingsFile, error)
 	LoadWorkspace          func(context.Context) domain.WorkspacePlanReport
 	PlanWorkspace          func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
 	SaveWorkspace          func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
-	PlanSettings           func(domain.LabSettingsFile) domain.ConfigPlanReport
+	PlanSettings           func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
 	SaveSettings           func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
 	ChangePassword         SettingsPasswordAction
 	PreparePXE             func() domain.ActionReport
 	LoadPXEProgress        func() (domain.OperationProgress, error)
-	PlanPXEStart           func() domain.PXELifecycleReport
+	PlanPXEStart           func(context.Context) domain.PXELifecycleReport
 	StartPXE               func() domain.PXELifecycleReport
 	StopPXE                func() domain.PXELifecycleReport
 	RecoverPXE             func() domain.PXELifecycleReport
 	PrepareRemoteInstall   func(string) (domain.RemoteInstallResponse, error)
-	ObserveRemoteInstall   func(string) (string, error)
+	ObserveRemoteInstall   func(context.Context, string) (string, error)
 	BootstrapRemoteInstall func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
 	RemoteInstallRequest   func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
-	LoadRemoteInstall      func() (domain.RemoteInstallResponse, error)
+	LoadRemoteInstall      func(context.Context) (domain.RemoteInstallResponse, error)
 }
 
 type dashboardScreen int
@@ -284,6 +292,8 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	read                   readActivity
+	busyStarted            time.Time
 	hostTrust              hostTrustModel
 	updateDetails          bool
 	returnAdmin            bool
@@ -345,6 +355,8 @@ type dashboardInitialMsg struct {
 	setup  domain.SetupReport
 	err    error
 }
+
+type dashboardBeginInitialMsg struct{}
 
 type dashboardDoctorMsg struct {
 	report domain.DoctorReport
@@ -584,7 +596,7 @@ func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, act
 func (model dashboardModel) Init() tea.Cmd {
 	commands := []tea.Cmd{tea.RequestBackgroundColor, model.activitySpinner.Tick}
 	if model.initializing && model.actions.LoadInitial != nil {
-		commands = append(commands, model.loadInitial())
+		commands = append(commands, func() tea.Msg { return dashboardBeginInitialMsg{} })
 	}
 	return tea.Batch(commands...)
 }
@@ -592,6 +604,12 @@ func (model dashboardModel) Init() tea.Cmd {
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	updated, command := model.updateState(message)
 	next := updated.(dashboardModel)
+	if next.read.cancel != nil && next.read.id != model.read.id {
+		next.read.returnScreen = model.screen
+	}
+	if next.busy != "" && model.busy == "" {
+		next.busyStarted = time.Now()
+	}
 	if model.areaReturn != dashboardHome && model.screen != model.areaReturn && next.screen == dashboardHome {
 		next.screen = model.areaReturn
 	}
@@ -611,7 +629,9 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 func (model dashboardModel) runAction(operation func() string, screen dashboardScreen) tea.Cmd {
 	return func() tea.Msg {
 		message := operation()
-		report, err := model.actions.Refresh()
+		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+		defer cancel()
+		report, err := model.actions.Refresh(ctx)
 		return dashboardOperationMsg{message: message, report: report, err: err, screen: screen}
 	}
 }
@@ -638,10 +658,10 @@ func (model dashboardModel) openSetupSettings() (tea.Model, tea.Cmd) {
 	model.settings.candidate = domain.LabSettingsFile{}
 	model.busy = "Loading laboratory settings"
 	model.message = ""
-	return model, func() tea.Msg {
-		settings, err := model.actions.LoadSettings()
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		settings, err := model.actions.LoadSettings(ctx)
 		return dashboardSettingsMsg{settings: settings, err: err}
-	}
+	})
 }
 
 func (model dashboardModel) startComputerInstallation() (tea.Model, tea.Cmd) {
@@ -660,10 +680,10 @@ func (model dashboardModel) openUSBInstallation() (tea.Model, tea.Cmd) {
 	model.areaReturn = dashboardInstallationArea
 	model.busy = "Checking for an existing USB installation operation"
 	model.message = ""
-	return model, func() tea.Msg {
-		response, err := model.actions.LoadRemoteInstall()
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		response, err := model.actions.LoadRemoteInstall(ctx)
 		return dashboardRemoteInstallMsg{action: "open-usb", response: response, err: err}
-	}
+	})
 }
 
 func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstallMethod) (tea.Model, tea.Cmd) {
@@ -689,10 +709,10 @@ func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstal
 	model.screen = dashboardSettings
 	model.busy = "Loading laboratory settings"
 	model.message = ""
-	return model, func() tea.Msg {
-		settings, err := model.actions.LoadSettings()
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		settings, err := model.actions.LoadSettings(ctx)
 		return dashboardSettingsMsg{settings: settings, err: err}
-	}
+	})
 }
 
 func (model dashboardModel) failComputerInstallation(message string) (tea.Model, tea.Cmd) {
@@ -739,9 +759,9 @@ func (model dashboardModel) continueComputerInstallation(report domain.SetupRepo
 		}
 		model.installation.stage = 3
 		model.busy = "Checking the controller configuration"
-		return model, func() tea.Msg {
-			return dashboardControllerPlanMsg{report: model.actions.PlanController()}
-		}
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardControllerPlanMsg{report: model.actions.PlanController(ctx)}
+		})
 	case domain.SetupStageArtifacts:
 		if model.installation.method == "" {
 			return model.startComputerInstallation()
@@ -762,9 +782,9 @@ func (model dashboardModel) continueComputerInstallation(report domain.SetupRepo
 		}
 		model.installation.stage = 4
 		model.busy = "Checking PXE readiness"
-		return model, func() tea.Msg {
-			return dashboardPlanMsg{report: model.actions.PlanPXEStart()}
-		}
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardPlanMsg{report: model.actions.PlanPXEStart(ctx)}
+		})
 	default:
 		return model.failComputerInstallation("Laboratory configuration is still incomplete: " + setupCurrentAction(report) + ".")
 	}
@@ -786,7 +806,9 @@ func (model dashboardModel) startComputerInstallationPreparation() (tea.Model, t
 		status := domain.StatusReport{}
 		var err error
 		if model.actions.Refresh != nil {
-			status, err = model.actions.Refresh()
+			ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+			defer cancel()
+			status, err = model.actions.Refresh(ctx)
 		}
 		return dashboardInstallationPrepareMsg{report: report, status: status, statusErr: err}
 	}
@@ -802,7 +824,7 @@ func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
 		model.screen = dashboardSetup
 		if model.actions.LoadSetup != nil && (model.settings.result.State == "saved" || model.settings.result.State == "unchanged") {
 			model.busy = "Refreshing setup progress"
-			return model, model.loadSetup()
+			return model.loadSetup()
 		}
 		return model, nil
 	}
@@ -833,26 +855,46 @@ func waitForDeploymentEvent(events <-chan tea.Msg) tea.Cmd {
 	}
 }
 
-func startUpdatePlan(action func(string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport, target string, allowPrerelease, allowDowngrade bool, events chan tea.Msg) tea.Cmd {
-	return func() tea.Msg {
+func (model dashboardModel) startUpdatePlan(action func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport, target string, allowPrerelease, allowDowngrade bool) (tea.Model, tea.Cmd) {
+	ctx, id := model.beginRead(dashboardBuildTimeout)
+	events := make(chan tea.Msg, 8)
+	model.updates.planEvents = events
+	model.updates.planning = true
+	model.updates.planStarted = time.Now().UTC()
+	return model, func() tea.Msg {
 		go func() {
-			report := action(target, allowPrerelease, allowDowngrade, func(progress domain.UpdatePlanProgress) {
-				events <- dashboardUpdatePlanProgressMsg{progress: progress}
+			defer close(events)
+			report := action(ctx, target, allowPrerelease, allowDowngrade, func(progress domain.UpdatePlanProgress) {
+				select {
+				case events <- dashboardUpdatePlanProgressMsg{progress: progress}:
+				case <-ctx.Done():
+				}
 			})
-			events <- dashboardUpdatePlanMsg{report: report}
-			close(events)
+			select {
+			case events <- dashboardUpdatePlanMsg{report: report}:
+			case <-ctx.Done():
+			}
 		}()
-		return <-events
+		return waitForActivityEvent(ctx, id, events)()
 	}
 }
 
-func waitForUpdatePlanEvent(events <-chan tea.Msg) tea.Cmd {
+func waitForActivityEvent(ctx context.Context, id uint64, events <-chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
-		message, ok := <-events
-		if !ok {
-			return nil
+		select {
+		case message, ok := <-events:
+			if !ok {
+				return activityResultMsg{id: id, err: ctx.Err()}
+			}
+			progress := false
+			switch message.(type) {
+			case dashboardUpdatePlanProgressMsg, templateResetProgressMsg:
+				progress = true
+			}
+			return activityResultMsg{id: id, message: message, more: progress, err: ctx.Err()}
+		case <-ctx.Done():
+			return activityResultMsg{id: id, err: ctx.Err()}
 		}
-		return message
 	}
 }
 
@@ -867,17 +909,17 @@ func appendBoundedActivity(recent []string, activity string, maximum int) []stri
 	return recent
 }
 
-func (model dashboardModel) loadHosts() tea.Cmd {
-	return func() tea.Msg {
-		report, err := model.actions.LoadHosts()
+func (model dashboardModel) loadHosts() (tea.Model, tea.Cmd) {
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		report, err := model.actions.LoadHosts(ctx)
 		return dashboardHostsMsg{report: report, err: err}
-	}
+	})
 }
 
-func (model dashboardModel) loadConfigurationState() tea.Cmd {
-	return func() tea.Msg {
-		return dashboardConfigurationStateMsg{report: model.actions.LoadConfigurationState()}
-	}
+func (model dashboardModel) loadConfigurationState() (tea.Model, tea.Cmd) {
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardConfigurationStateMsg{report: model.actions.LoadConfigurationState(ctx)}
+	})
 }
 
 func (model *dashboardModel) ensureHomeMenu() {
@@ -897,17 +939,17 @@ func (model dashboardModel) busyView() string {
 	return model.activitySpinner.View() + " " + model.busy
 }
 
-func (model dashboardModel) loadSetup() tea.Cmd {
-	return func() tea.Msg {
-		return dashboardSetupMsg{report: model.actions.LoadSetup()}
-	}
+func (model dashboardModel) loadSetup() (tea.Model, tea.Cmd) {
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardSetupMsg{report: model.actions.LoadSetup(ctx)}
+	})
 }
 
-func (model dashboardModel) loadInitial() tea.Cmd {
-	return func() tea.Msg {
-		report, setup, err := model.actions.LoadInitial()
+func (model dashboardModel) loadInitial() (tea.Model, tea.Cmd) {
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		report, setup, err := model.actions.LoadInitial(ctx)
 		return dashboardInitialMsg{report: report, setup: setup, err: err}
-	}
+	})
 }
 
 func schedulePXEProgressTick(id uint64) tea.Cmd {
@@ -1464,15 +1506,11 @@ func (model dashboardModel) updateView() string {
 			} else {
 				lines = append(lines, phaseSteps(phaseLabels, phaseIndex, false, model.isDark)...)
 			}
-			elapsed := time.Since(model.updates.planStarted).Truncate(time.Second)
-			if elapsed < 0 {
-				elapsed = 0
-			}
 			model.busy = updatePlanProgressDescription(model.updates.planProgress)
 			if model.updates.packageBase && model.updates.planProgress.Phase == domain.UpdatePlanPhaseLock {
 				model.busy = "Preparing the selected system and package base"
 			}
-			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
+			lines = append(lines, "", model.busyView())
 			if model.updates.planProgress.Total > 0 {
 				if model.updates.planProgress.Current == 0 {
 					lines = append(lines, fmt.Sprintf("Required outputs: %d · checking together", model.updates.planProgress.Total))
@@ -1494,7 +1532,7 @@ func (model dashboardModel) updateView() string {
 		if model.updates.applying {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Update save is running", detail: "Wait for the atomic two-file result before closing Nixorium."})
 		} else {
-			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "No deployment files or running systems change during these checks. The controller may download or build software locally, so this can take several minutes."})
+			notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The current deployment remains unchanged", detail: "Downloads and local builds can take several minutes."})
 		}
 		actions := []tuiAction{{key: "F1", label: "Help"}}
 		if model.updates.planning {
@@ -1740,10 +1778,10 @@ func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
 	return releases
 }
 
-func (model dashboardModel) checkUpdates() tea.Cmd {
-	return func() tea.Msg {
-		return dashboardUpdateCheckMsg{report: model.actions.CheckUpdate()}
-	}
+func (model dashboardModel) checkUpdates() (tea.Model, tea.Cmd) {
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardUpdateCheckMsg{report: model.actions.CheckUpdate(ctx)}
+	})
 }
 
 func (model dashboardModel) startUpdateControllerApply() (tea.Model, tea.Cmd) {
@@ -1756,7 +1794,9 @@ func (model dashboardModel) startUpdateControllerApply() (tea.Model, tea.Cmd) {
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	operation := func() tea.Msg {
-		plan := model.actions.PlanController()
+		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+		defer cancel()
+		plan := model.actions.PlanController(ctx)
 		if plan.HasErrors() {
 			return dashboardUpdateControllerMsg{plan: plan}
 		}
@@ -2137,14 +2177,10 @@ func (model dashboardModel) deployView() string {
 		if model.deployment.stopReview {
 			return model.deploymentStopView()
 		}
-		elapsed := time.Since(model.deployment.started).Truncate(time.Second)
-		if elapsed < 0 {
-			elapsed = 0
-		}
 		lines := []string{
 			tuiTitle("Distributing the prepared system", model.isDark),
 			"",
-			fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed),
+			model.busyView(),
 		}
 		lines = append(lines, model.deploymentProgressView()...)
 		shell.body = strings.Join(lines, "\n")
@@ -2381,17 +2417,16 @@ func (model dashboardModel) pxeView() string {
 		}
 	}
 	if model.controller.applying {
+		// Keep live progress ahead of static installation steps. At 80x24 the
+		// safety footer must not push the actual running phase off screen.
+		lines = []string{tuiTitle(title, model.isDark)}
 		if model.controller.progress.State != "completed" {
-			elapsed := time.Since(model.controller.started).Truncate(time.Second)
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
+			lines = append(lines, "", model.busyView())
 		} else {
 			lines = append(lines, "")
 		}
 		lines = append(lines, model.operationProgressView(model.controller.progress, "Controller progress")...)
-		notice := tuiNotice{kind: tuiStatusAttention, title: "Controller activation is running", detail: "Services and networking may restart while the reviewed configuration is activated and verified."}
+		notice := tuiNotice{kind: tuiStatusAttention, title: "Controller activation is running", detail: "The managed job survives a lost terminal; services and networking may restart."}
 		if model.controller.progress.State == "completed" {
 			notice = tuiNotice{kind: tuiStatusSuccess, title: "Controller activation and verification completed", detail: "Continuing with client-system preparation."}
 		}
@@ -2404,11 +2439,7 @@ func (model dashboardModel) pxeView() string {
 	}
 	if model.installation.pxePreparing {
 		if model.installation.pxeProgress.State != "completed" {
-			elapsed := time.Since(model.installation.pxeStarted).Truncate(time.Second)
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			lines = append(lines, "", fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed))
+			lines = append(lines, "", model.busyView())
 		} else {
 			lines = append(lines, "")
 		}

@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -16,7 +17,9 @@ func TestControllerFollowUpsExposeProgressAndDetails(t *testing.T) {
 		t.Run(entry, func(t *testing.T) {
 			applies := 0
 			model := dashboardModel{width: 100, height: 30, screen: dashboardUpdate, actions: DashboardActions{
-				PlanController: func() domain.ControllerRebuildPlanReport { return domain.ControllerRebuildPlanReport{State: "ready"} },
+				PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
+					return domain.ControllerRebuildPlanReport{State: "ready"}
+				},
 				ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 					applies++
 					return domain.ControllerRebuildExecutionReport{State: "completed", Applied: true, Verified: true}
@@ -98,6 +101,8 @@ func TestCandidateControllerBuildExposesItsOwnDetails(t *testing.T) {
 				updates: updateModel{planning: true, packageBase: packageBase, target: "master", planStarted: time.Now(), planProgress: domain.UpdatePlanProgress{
 					Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the candidate controller", Current: 2, Total: 5,
 				}}}
+			model.beginRead(dashboardBuildTimeout)
+			t.Cleanup(model.read.cancel)
 			for _, expanded := range []bool{true, false, true} {
 				updated, command := model.Update(keyPress("l"))
 				model = updated.(dashboardModel)
@@ -105,7 +110,7 @@ func TestCandidateControllerBuildExposesItsOwnDetails(t *testing.T) {
 				if command != nil || model.screen != dashboardUpdate || !model.updates.planning || model.controller.applying || model.updates.applying {
 					t.Fatal("toggling details changed the running operation")
 				}
-				for _, expected := range []string{model.updateTitle(), "Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "elapsed", "current deployment remains unchanged", "Progress details", "Help"} {
+				for _, expected := range []string{model.updateTitle(), "Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "Elapsed:", "current deployment remains unchanged", "Progress details", "Help"} {
 					if !strings.Contains(view, expected) {
 						t.Fatalf("%v details=%t lost %q:\n%s", size, expanded, expected, view)
 					}
@@ -129,8 +134,10 @@ func TestGroupedUpdateBuildRetainsDetailsWithoutInventingCompletion(t *testing.T
 			updates: updateModel{planning: true, target: "master", planStarted: time.Now(), planProgress: domain.UpdatePlanProgress{
 				Phase: domain.UpdatePlanPhaseBuild, Detail: "Building all 5 required outputs together", Total: 5,
 			}}}
+		model.beginRead(dashboardBuildTimeout)
+		t.Cleanup(model.read.cancel)
 		view := demoANSI.ReplaceAllString(model.View().Content, "")
-		for _, expected := range []string{"Target: master", "Required outputs: 5", "checking together", "Current check details", "Building all 5 required outputs together", "elapsed", "current deployment remains unchanged", "Help"} {
+		for _, expected := range []string{"Target: master", "Required outputs: 5", "checking together", "Current check details", "Building all 5 required outputs together", "Elapsed:", "current deployment remains unchanged", "Help"} {
 			if !strings.Contains(view, expected) {
 				t.Fatalf("%v grouped build lost %q:\n%s", size, expected, view)
 			}

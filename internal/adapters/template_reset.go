@@ -35,6 +35,7 @@ func resetGit(ctx context.Context, repository string, input []byte, limit int, a
 		"-c", "core.fsync=committed,index,reference", "-c", "commit.gpgSign=false",
 		"-c", "core.autocrlf=false", "-c", "core.fileMode=true", "-c", "core.symlinks=true",
 		"-c", "core.sparseCheckout=false", "-c", "core.attributesFile=/dev/null"}, args...)...)
+	configureCommandCancellation(command)
 	command.Env = append(workspaceEnvironment(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
 		"GIT_NO_REPLACE_OBJECTS=1",
 		"GIT_AUTHOR_NAME=Nixorium", "GIT_AUTHOR_EMAIL=nixorium@localhost",
@@ -61,6 +62,7 @@ func resetNix(ctx context.Context, repository, expression string) ([]byte, error
 		"--impure", "--json", "--no-write-lock-file", "--no-update-lock-file",
 		"--option", "allow-import-from-derivation", "false", "--option", "accept-flake-config", "false",
 		"--expr", `let f = builtins.getFlake (builtins.getEnv "NIXORIUM_DEPLOYMENT_FLAKE"); in `+expression)
+	configureCommandCancellation(command)
 	command.Env = append(workspaceEnvironment(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake)
 	out := &boundedCommandBuffer{limit: 2 * 1024 * 1024}
 	command.Stdout, command.Stderr = out, &boundedCommandBuffer{limit: 64 * 1024}

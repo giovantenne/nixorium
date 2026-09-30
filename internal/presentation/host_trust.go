@@ -55,8 +55,8 @@ func (model dashboardModel) openHostTrust(name string) (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	model.hostTrust.id++
-	ctx, cancel := context.WithCancel(context.Background())
-	model.hostTrust.cancel = cancel
+	ctx, activityID := model.beginRead(dashboardReadTimeout)
+	model.hostTrust.cancel = model.read.cancel
 	model.hostTrust.confirmation = ""
 	model.hostTrust.result = domain.HostTrustResult{}
 	model.hostTrust.plan = domain.HostTrustPlan{}
@@ -66,7 +66,9 @@ func (model dashboardModel) openHostTrust(name string) (tea.Model, tea.Cmd) {
 	model.screen = dashboardHostTrust
 	model.busy = "Reading the recorded and offered SSH fingerprints"
 	id := model.hostTrust.id
-	return model, func() tea.Msg { return hostTrustPlanMsg{id: id, plan: model.actions.PlanHostTrust(ctx, name)} }
+	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg {
+		return hostTrustPlanMsg{id: id, plan: model.actions.PlanHostTrust(ctx, name)}
+	})
 }
 
 func (model dashboardModel) updateHostTrustKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -134,13 +136,7 @@ func (model dashboardModel) hostTrustView() string {
 	actions := []tuiAction{{key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	fixed := ""
 	if model.busy != "" {
-		lines = append(lines, model.busyView(), "Elapsed: "+max(time.Duration(0), time.Since(trust.started)).Round(time.Second).String())
-		if trust.applying {
-			lines = append(lines, "Saving cannot be interrupted.")
-			actions = actions[1:]
-		} else {
-			lines = append(lines, "Read-only; Esc cancels without changes.")
-		}
+		lines = append(lines, model.busyView())
 	} else if trust.result.Operation != "" {
 		lines = append(lines, sanitizeRemoteInstallText(trust.result.Message))
 		actions[0].label = "Back"

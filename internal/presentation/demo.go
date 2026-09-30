@@ -114,7 +114,7 @@ func demoSupportSnapshot() domain.SupportSnapshot {
 
 func renderSupportDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
-	actions.LoadDoctor = func() (domain.DoctorReport, error) {
+	actions.LoadDoctor = func(ctx context.Context) (domain.DoctorReport, error) {
 		return domain.DoctorReport{SchemaVersion: domain.SchemaVersion, Findings: []domain.Finding{{ID: "CACHE-HEALTH", Level: domain.LevelWarning, Summary: "Binary cache could not be reached", Remediation: "Inspect the local cache service before retrying deployment."}}}, nil
 	}
 	actions.PreviewSupport = func(context.Context) (domain.SupportSnapshot, error) { return demoSupportSnapshot(), nil }
@@ -126,8 +126,11 @@ func renderSupportDemo(revision string, width, height int) DemoScenario {
 	r.pressAndCapture(demoText("a"), "Open Maintenance", 800)
 	r.command(r.key(demoText("i")))
 	r.capture("Open diagnostic observations", 1000)
-	command := r.key(demoText("e"))
+	r.key(demoText("e"))
 	r.capture("Collect diagnostics without saving or uploading", 900)
+	r.key(demoCode(tea.KeyEscape))
+	r.capture("Cancel the read without changing the laboratory", 1700)
+	command := r.key(demoText("e"))
 	r.command(command)
 	r.capture("Review the filtered local report", 2500)
 	r.pressAndCapture(demoCode(tea.KeyEnd), "Inspect the excluded data categories", 1600)
@@ -141,7 +144,7 @@ func renderSupportDemo(revision string, width, height int) DemoScenario {
 func renderClassroomDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	actions.ClassroomMode = true
-	actions.PlanPower = func(requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
+	actions.PlanPower = func(ctx context.Context, requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
 		return domain.ShutdownPlanReport{
 			SchemaVersion: domain.SchemaVersion, Operation: "restart-plan", State: "ready", Repository: "/demo/lab", Requested: requested,
 			Action: action, Policy: policy, Targets: []domain.ShutdownTargetPlan{{Name: "pc01", IP: "10.42.0.11", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Session: domain.ShutdownSessionIdle, Eligible: true}},
@@ -192,7 +195,12 @@ func newDemoRecorder(actions DashboardActions, revision string, width, height in
 }
 
 func (r *demoRecorder) capture(label string, durationMS int) {
-	ansi := strings.TrimRight(r.model.View().Content, " \n")
+	viewModel := r.model
+	viewModel.busyStarted = time.Time{}
+	viewModel.controller.started = time.Time{}
+	viewModel.deployment.started = time.Time{}
+	viewModel.installation.pxeStarted = time.Time{}
+	ansi := strings.TrimRight(viewModel.View().Content, " \n")
 	text := demoANSI.ReplaceAllString(ansi, "")
 	r.frames = append(r.frames, DemoFrame{Label: label, DurationMS: durationMS, Text: text, ANSI: ansi})
 }
@@ -243,7 +251,7 @@ func (r *demoRecorder) typeAndCapture(value, label string) {
 func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	catalog := demoSoftwareCatalog()
-	actions.LoadSoftware = func() domain.SoftwareCatalogReport { return catalog }
+	actions.LoadSoftware = func(ctx context.Context) domain.SoftwareCatalogReport { return catalog }
 	actions.SearchSoftware = func(_ context.Context, query string) domain.SoftwareSearchReport {
 		return domain.SoftwareSearchReport{
 			SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-search", State: "ready", Repository: "/demo/lab", Query: query,
@@ -251,7 +259,7 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 			Issues:  []domain.ValidationIssue{},
 		}
 	}
-	actions.PlanSoftware = func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+	actions.PlanSoftware = func(ctx context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 		confirmation := "SAVE"
 		if !request.Present {
 			confirmation = "REMOVE"
@@ -267,7 +275,7 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 			Request: plan.Request, AffectedClients: plan.AffectedClients, Revision: revision, Message: "Software selection saved locally.", Issues: []domain.ValidationIssue{},
 		}
 	}
-	actions.PlanDeployment = func(requested string) domain.DeploymentPlanReport {
+	actions.PlanDeployment = func(ctx context.Context, requested string) domain.DeploymentPlanReport {
 		return domain.DeploymentPlanReport{
 			SchemaVersion: domain.SchemaVersion, Operation: "deploy-plan", State: "ready", Repository: "/demo/lab", Requested: requested,
 			Revision: revision, ColmenaSelector: requested, Targets: demoDeploymentTargets(), BuildFirst: true, Issues: []domain.ValidationIssue{},
@@ -348,11 +356,11 @@ func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario 
 			{ID: "stem", Label: "STEM and scientific computing", Description: "Numerical, plotting and symbolic mathematics tools", Packages: []string{"gnuplot", "maxima", "nodejs", "octave", "opencode", "pi-coding-agent"}},
 		},
 	}
-	actions.LoadSoftware = func() domain.SoftwareCatalogReport { return catalog }
-	actions.LoadSoftwarePresets = func() domain.SoftwarePresetCatalogReport {
+	actions.LoadSoftware = func(ctx context.Context) domain.SoftwareCatalogReport { return catalog }
+	actions.LoadSoftwarePresets = func(ctx context.Context) domain.SoftwarePresetCatalogReport {
 		return domain.SoftwarePresetCatalogReport{SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-presets", State: "ready", Repository: "/demo/lab", Catalog: &profiles, Fingerprint: "sha256:demo-profiles", Issues: []domain.ValidationIssue{}}
 	}
-	actions.PlanSoftwarePreset = func(request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+	actions.PlanSoftwarePreset = func(ctx context.Context, request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
 		preset := profiles.Presets[0]
 		selected := []domain.SoftwareCatalogItem{}
 		additions := []domain.SoftwareDeclaration{}
@@ -380,7 +388,7 @@ func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario 
 			AffectedController: plan.AffectedController, AffectedClients: plan.AffectedClients, Revision: revision, Issues: []domain.ValidationIssue{},
 		}
 	}
-	actions.PlanController = func() domain.ControllerRebuildPlanReport {
+	actions.PlanController = func(ctx context.Context) domain.ControllerRebuildPlanReport {
 		return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision, Issues: []domain.ValidationIssue{}}
 	}
 	actions.ApplyController = func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
@@ -423,8 +431,8 @@ func demoDeploymentTargets() []domain.DeploymentTarget {
 
 func renderInstallationDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
-	actions.LoadSettings = func() (domain.LabSettingsFile, error) { return demoSettings(), nil }
-	actions.Refresh = func() (domain.StatusReport, error) {
+	actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return demoSettings(), nil }
+	actions.Refresh = func(ctx context.Context) (domain.StatusReport, error) {
 		report := demoStatus("stopped", revision)
 		report.PXEPreparation.Ready = false
 		return report, nil
@@ -607,7 +615,7 @@ func renderUSBInstallationDemo(revision string, width, height int) DemoScenario 
 
 func renderShutdownDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
-	actions.PlanShutdown = func(requested string, _ domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+	actions.PlanShutdown = func(ctx context.Context, requested string, _ domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 		return domain.ShutdownPlanReport{
 			SchemaVersion: domain.SchemaVersion, Operation: "shutdown-plan", State: "ready", Repository: "/demo/lab", Requested: requested, Policy: domain.ShutdownProtectUnknown,
 			Targets: []domain.ShutdownTargetPlan{
@@ -656,14 +664,23 @@ func demoActions() DashboardActions {
 	fail := func(name string) { panic("demo callback invoked without a synthetic implementation: " + name) }
 	return DashboardActions{
 		RunningVersion: "demo",
-		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			fail("LoadInitial")
 			return domain.StatusReport{}, domain.SetupReport{}, nil
 		},
-		LoadDoctor:    func() (domain.DoctorReport, error) { fail("LoadDoctor"); return domain.DoctorReport{}, nil },
-		Refresh:       func() (domain.StatusReport, error) { fail("Refresh"); return domain.StatusReport{}, nil },
-		LoadSetup:     func() domain.SetupReport { fail("LoadSetup"); return domain.SetupReport{} },
-		LoadSetupKeys: func() domain.KeyReconcileReport { fail("LoadSetupKeys"); return domain.KeyReconcileReport{} },
+		LoadDoctor: func(ctx context.Context) (domain.DoctorReport, error) {
+			fail("LoadDoctor")
+			return domain.DoctorReport{}, nil
+		},
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) {
+			fail("Refresh")
+			return domain.StatusReport{}, nil
+		},
+		LoadSetup: func(ctx context.Context) domain.SetupReport { fail("LoadSetup"); return domain.SetupReport{} },
+		LoadSetupKeys: func(ctx context.Context) domain.KeyReconcileReport {
+			fail("LoadSetupKeys")
+			return domain.KeyReconcileReport{}
+		},
 		ReconcileSetupKeys: func() (domain.KeyReconcileReport, error) {
 			fail("ReconcileSetupKeys")
 			return domain.KeyReconcileReport{}, nil
@@ -677,17 +694,23 @@ func demoActions() DashboardActions {
 			return domain.ConfigurationSaveReport{}
 		},
 		InstallSetupSecrets: func() domain.ActionReport { fail("InstallSetupSecrets"); return domain.ActionReport{} },
-		LoadHosts:           func() (domain.HostsReport, error) { fail("LoadHosts"); return domain.HostsReport{}, nil },
-		LoadConfigurationState: func() domain.ConfigurationStateReport {
+		LoadHosts: func(ctx context.Context) (domain.HostsReport, error) {
+			fail("LoadHosts")
+			return domain.HostsReport{}, nil
+		},
+		LoadConfigurationState: func(ctx context.Context) domain.ConfigurationStateReport {
 			fail("LoadConfigurationState")
 			return domain.ConfigurationStateReport{}
 		},
-		LoadSoftware: func() domain.SoftwareCatalogReport { fail("LoadSoftware"); return domain.SoftwareCatalogReport{} },
+		LoadSoftware: func(ctx context.Context) domain.SoftwareCatalogReport {
+			fail("LoadSoftware")
+			return domain.SoftwareCatalogReport{}
+		},
 		SearchSoftware: func(context.Context, string) domain.SoftwareSearchReport {
 			fail("SearchSoftware")
 			return domain.SoftwareSearchReport{}
 		},
-		PlanSoftware: func(domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+		PlanSoftware: func(ctx context.Context, _ domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 			fail("PlanSoftware")
 			return domain.SoftwareChangePlanReport{}
 		},
@@ -695,11 +718,11 @@ func demoActions() DashboardActions {
 			fail("SaveSoftware")
 			return domain.SoftwareChangeApplyReport{}
 		},
-		LoadSoftwarePresets: func() domain.SoftwarePresetCatalogReport {
+		LoadSoftwarePresets: func(ctx context.Context) domain.SoftwarePresetCatalogReport {
 			fail("LoadSoftwarePresets")
 			return domain.SoftwarePresetCatalogReport{}
 		},
-		PlanSoftwarePreset: func(domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+		PlanSoftwarePreset: func(ctx context.Context, _ domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
 			fail("PlanSoftwarePreset")
 			return domain.SoftwarePresetPlanReport{}
 		},
@@ -707,7 +730,7 @@ func demoActions() DashboardActions {
 			fail("SaveSoftwarePreset")
 			return domain.SoftwarePresetApplyReport{}
 		},
-		PlanShutdown: func(string, domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+		PlanShutdown: func(ctx context.Context, _ string, _ domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 			fail("PlanShutdown")
 			return domain.ShutdownPlanReport{}
 		},
@@ -715,12 +738,15 @@ func demoActions() DashboardActions {
 			fail("ApplyShutdown")
 			return domain.ShutdownApplyReport{}
 		},
-		PlanDeployment: func(string) domain.DeploymentPlanReport { fail("PlanDeployment"); return domain.DeploymentPlanReport{} },
+		PlanDeployment: func(ctx context.Context, _ string) domain.DeploymentPlanReport {
+			fail("PlanDeployment")
+			return domain.DeploymentPlanReport{}
+		},
 		ApplyDeployment: func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 			fail("ApplyDeployment")
 			return domain.DeploymentExecutionReport{}
 		},
-		PlanController: func() domain.ControllerRebuildPlanReport {
+		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			fail("PlanController")
 			return domain.ControllerRebuildPlanReport{}
 		},
@@ -732,19 +758,37 @@ func demoActions() DashboardActions {
 			fail("LoadControllerProgress")
 			return domain.OperationProgress{}, nil
 		},
-		LoadServices:   func() domain.ServicesReport { fail("LoadServices"); return domain.ServicesReport{} },
+		LoadServices:   func(ctx context.Context) domain.ServicesReport { fail("LoadServices"); return domain.ServicesReport{} },
 		RestartService: func(string) domain.ServiceActionReport { fail("RestartService"); return domain.ServiceActionReport{} },
-		LoadLogs:       func() domain.OperationLogsReport { fail("LoadLogs"); return domain.OperationLogsReport{} },
-		LoadLog:        func(string) domain.OperationLogReport { fail("LoadLog"); return domain.OperationLogReport{} },
-		LoadGitReview:  func() domain.GitReviewReport { fail("LoadGitReview"); return domain.GitReviewReport{} },
-		PlanGitCommit:  func(string) domain.GitCommitPlanReport { fail("PlanGitCommit"); return domain.GitCommitPlanReport{} },
+		LoadLogs: func(ctx context.Context) domain.OperationLogsReport {
+			fail("LoadLogs")
+			return domain.OperationLogsReport{}
+		},
+		LoadLog: func(ctx context.Context, _ string) domain.OperationLogReport {
+			fail("LoadLog")
+			return domain.OperationLogReport{}
+		},
+		LoadGitReview: func(ctx context.Context) domain.GitReviewReport {
+			fail("LoadGitReview")
+			return domain.GitReviewReport{}
+		},
+		PlanGitCommit: func(ctx context.Context, _ string) domain.GitCommitPlanReport {
+			fail("PlanGitCommit")
+			return domain.GitCommitPlanReport{}
+		},
 		ApplyGitCommit: func(domain.GitCommitPlanReport) domain.GitCommitReport {
 			fail("ApplyGitCommit")
 			return domain.GitCommitReport{}
 		},
-		CheckUpdate: func() domain.UpdateCheckReport { fail("CheckUpdate"); return domain.UpdateCheckReport{} },
-		PlanUpdate:  func(string, bool, bool) domain.UpdatePlanReport { fail("PlanUpdate"); return domain.UpdatePlanReport{} },
-		PlanUpdateWithProgress: func(string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+		CheckUpdate: func(ctx context.Context) domain.UpdateCheckReport {
+			fail("CheckUpdate")
+			return domain.UpdateCheckReport{}
+		},
+		PlanUpdate: func(ctx context.Context, _ string, _ bool, _ bool) domain.UpdatePlanReport {
+			fail("PlanUpdate")
+			return domain.UpdatePlanReport{}
+		},
+		PlanUpdateWithProgress: func(ctx context.Context, _ string, _ bool, _ bool, _ func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
 			fail("PlanUpdateWithProgress")
 			return domain.UpdatePlanReport{}
 		},
@@ -752,8 +796,11 @@ func demoActions() DashboardActions {
 			fail("SaveUpdate")
 			return domain.UpdateApplyReport{}
 		},
-		LoadSettings: func() (domain.LabSettingsFile, error) { fail("LoadSettings"); return domain.LabSettingsFile{}, nil },
-		PlanSettings: func(domain.LabSettingsFile) domain.ConfigPlanReport {
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
+			fail("LoadSettings")
+			return domain.LabSettingsFile{}, nil
+		},
+		PlanSettings: func(ctx context.Context, _ domain.LabSettingsFile) domain.ConfigPlanReport {
 			fail("PlanSettings")
 			return domain.ConfigPlanReport{}
 		},
@@ -770,15 +817,18 @@ func demoActions() DashboardActions {
 			fail("LoadPXEProgress")
 			return domain.OperationProgress{}, nil
 		},
-		PlanPXEStart: func() domain.PXELifecycleReport { fail("PlanPXEStart"); return domain.PXELifecycleReport{} },
-		StartPXE:     func() domain.PXELifecycleReport { fail("StartPXE"); return domain.PXELifecycleReport{} },
-		StopPXE:      func() domain.PXELifecycleReport { fail("StopPXE"); return domain.PXELifecycleReport{} },
-		RecoverPXE:   func() domain.PXELifecycleReport { fail("RecoverPXE"); return domain.PXELifecycleReport{} },
+		PlanPXEStart: func(ctx context.Context) domain.PXELifecycleReport {
+			fail("PlanPXEStart")
+			return domain.PXELifecycleReport{}
+		},
+		StartPXE:   func() domain.PXELifecycleReport { fail("StartPXE"); return domain.PXELifecycleReport{} },
+		StopPXE:    func() domain.PXELifecycleReport { fail("StopPXE"); return domain.PXELifecycleReport{} },
+		RecoverPXE: func() domain.PXELifecycleReport { fail("RecoverPXE"); return domain.PXELifecycleReport{} },
 		PrepareRemoteInstall: func(string) (domain.RemoteInstallResponse, error) {
 			fail("PrepareRemoteInstall")
 			return domain.RemoteInstallResponse{}, nil
 		},
-		ObserveRemoteInstall: func(string) (string, error) {
+		ObserveRemoteInstall: func(ctx context.Context, _ string) (string, error) {
 			fail("ObserveRemoteInstall")
 			return "", nil
 		},
@@ -790,7 +840,7 @@ func demoActions() DashboardActions {
 			fail("RemoteInstallRequest")
 			return domain.RemoteInstallResponse{}, nil
 		},
-		LoadRemoteInstall: func() (domain.RemoteInstallResponse, error) {
+		LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 			return domain.RemoteInstallResponse{State: "ready"}, nil
 		},
 	}

@@ -243,8 +243,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return workspaceManager.Apply(ctx, repository, data, plan.ReviewToken)
 		},
 		RunningVersion:  nixoriumVersion,
-		LoadPackageBase: func() domain.PackageBaseStatus { return baseManager.PackageBaseStatus(repository) },
-		PlanPackageBase: func(target string, allowUnverified bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+		LoadPackageBase: func(ctx context.Context) domain.PackageBaseStatus { return baseManager.PackageBaseStatus(repository) },
+		PlanPackageBase: func(ctx context.Context, target string, allowUnverified bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
 			return baseManager.PlanWithProgress(ctx, repository, target, allowUnverified, false, progress)
 		},
 		SavePackageBase: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
@@ -252,7 +252,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			if setupMode {
 				return domain.StatusReport{}, setupManager.Status(ctx, repository), nil
 			}
@@ -269,7 +269,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadInventory: func(requestContext context.Context) (domain.StatusReport, error) {
 			return inspector.Inventory(requestContext, repository)
 		},
-		LoadDoctor: func() (domain.DoctorReport, error) {
+		LoadDoctor: func(ctx context.Context) (domain.DoctorReport, error) {
 			return inspector.Doctor(ctx, repository, app.DoctorOptions{})
 		},
 		PreviewSupport: func(requestContext context.Context) (domain.SupportSnapshot, error) {
@@ -278,13 +278,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		ExportSupport: func(snapshot domain.SupportSnapshot) domain.SupportExportResult {
 			return supportManager.Export(ctx, snapshot)
 		},
-		Refresh: func() (domain.StatusReport, error) {
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) {
 			return inspector.Status(ctx, repository)
 		},
-		LoadSetup: func() domain.SetupReport {
+		LoadSetup: func(ctx context.Context) domain.SetupReport {
 			return setupManager.Status(ctx, repository)
 		},
-		LoadSetupKeys: func() domain.KeyReconcileReport {
+		LoadSetupKeys: func(ctx context.Context) domain.KeyReconcileReport {
 			return setupManager.VerifyKeys(ctx, repository)
 		},
 		ReconcileSetupKeys: func() (domain.KeyReconcileReport, error) {
@@ -306,7 +306,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		LoadHosts: func() (domain.HostsReport, error) {
+		LoadHosts: func(ctx context.Context) (domain.HostsReport, error) {
 			return inspector.Hosts(ctx, repository)
 		},
 		PlanHostTrust: func(readContext context.Context, name string) domain.HostTrustPlan {
@@ -317,29 +317,31 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		LoadConfigurationState: func() domain.ConfigurationStateReport {
+		LoadConfigurationState: func(ctx context.Context) domain.ConfigurationStateReport {
 			return configurationStateManager.Load(ctx, repository)
 		},
-		LoadSoftware: func() domain.SoftwareCatalogReport { return softwareManager.Catalog(ctx, repository) },
+		LoadSoftware: func(ctx context.Context) domain.SoftwareCatalogReport {
+			return softwareManager.Catalog(ctx, repository)
+		},
 		SearchSoftware: func(searchContext context.Context, query string) domain.SoftwareSearchReport {
 			return softwareManager.Search(searchContext, repository, query)
 		},
-		PlanSoftware: func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+		PlanSoftware: func(ctx context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 			return softwareManager.Plan(ctx, repository, request)
 		},
 		SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 			return softwareSaveManager.Save(ctx, plan)
 		},
-		LoadSoftwarePresets: func() domain.SoftwarePresetCatalogReport {
+		LoadSoftwarePresets: func(ctx context.Context) domain.SoftwarePresetCatalogReport {
 			return softwareManager.Presets(ctx, repository)
 		},
-		PlanSoftwarePreset: func(request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+		PlanSoftwarePreset: func(ctx context.Context, request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
 			return softwareManager.PlanPreset(ctx, repository, request)
 		},
 		SaveSoftwarePreset: func(plan domain.SoftwarePresetPlanReport) domain.SoftwarePresetApplyReport {
 			return softwarePresetSaveManager.Save(ctx, plan)
 		},
-		PlanInternet: func(requested string, action domain.InternetAction) domain.InternetPlan {
+		PlanInternet: func(ctx context.Context, requested string, action domain.InternetAction) domain.InternetPlan {
 			return internetManager.Plan(ctx, repository, requested, action)
 		},
 		ApplyInternet: func(plan domain.InternetPlan) domain.InternetReport {
@@ -347,10 +349,10 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		PlanShutdown: func(requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+		PlanShutdown: func(ctx context.Context, requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 			return shutdownManager.Plan(ctx, repository, requested, policy)
 		},
-		PlanPower: func(requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
+		PlanPower: func(ctx context.Context, requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
 			return shutdownManager.PlanAction(ctx, repository, requested, policy, action)
 		},
 		ApplyShutdown: func(plan domain.ShutdownPlanReport) domain.ShutdownApplyReport {
@@ -358,13 +360,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
+		PlanDeployment: func(ctx context.Context, requested string) domain.DeploymentPlanReport {
 			return deploymentManager.Plan(ctx, repository, requested)
 		},
 		ApplyDeployment: func(requestContext context.Context, plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 			return executeDeploymentOperationWithProgress(requestContext, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard, observe)
 		},
-		PlanController: func() domain.ControllerRebuildPlanReport {
+		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			return controllerManager.Plan(ctx, repository)
 		},
 		ApplyController: func(plan domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
@@ -375,7 +377,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadControllerProgress: func() (domain.OperationProgress, error) {
 			return progressManager.Current("controller-apply")
 		},
-		LoadServices: func() domain.ServicesReport {
+		LoadServices: func(ctx context.Context) domain.ServicesReport {
 			return serviceManager.Status(ctx, repository)
 		},
 		RestartService: func(service string) domain.ServiceActionReport {
@@ -383,16 +385,16 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		LoadLogs: func() domain.OperationLogsReport {
+		LoadLogs: func(ctx context.Context) domain.OperationLogsReport {
 			return operationLogManager.List()
 		},
-		LoadLog: func(id string) domain.OperationLogReport {
+		LoadLog: func(ctx context.Context, id string) domain.OperationLogReport {
 			return operationLogManager.Show(id)
 		},
-		LoadGitReview: func() domain.GitReviewReport {
+		LoadGitReview: func(ctx context.Context) domain.GitReviewReport {
 			return gitReviewManager.Review(ctx, repository)
 		},
-		PlanGitCommit: func(paths string) domain.GitCommitPlanReport {
+		PlanGitCommit: func(ctx context.Context, paths string) domain.GitCommitPlanReport {
 			return gitCommitManager.Plan(ctx, repository, paths)
 		},
 		ApplyGitCommit: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
@@ -400,13 +402,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		CheckUpdate: func() domain.UpdateCheckReport {
+		CheckUpdate: func(ctx context.Context) domain.UpdateCheckReport {
 			return updateManager.Check(ctx, repository)
 		},
-		PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+		PlanUpdate: func(ctx context.Context, target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
 			return updateManager.Plan(ctx, repository, target, allowPrerelease, allowDowngrade)
 		},
-		PlanUpdateWithProgress: func(target string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+		PlanUpdateWithProgress: func(ctx context.Context, target string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
 			return updateManager.PlanWithProgress(ctx, repository, target, allowPrerelease, allowDowngrade, progress)
 		},
 		SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
@@ -414,7 +416,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
-		LoadSettings: func() (domain.LabSettingsFile, error) {
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
 			settings, err := settingsManager.Current(repository)
 			if err != nil {
 				return domain.LabSettingsFile{}, err
@@ -425,7 +427,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			}
 			return settings, nil
 		},
-		PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+		PlanSettings: func(ctx context.Context, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
 			return settingsManager.PlanSettings(ctx, repository, candidate)
 		},
 		SaveSettings: func(candidate domain.LabSettingsFile, plan domain.ConfigPlanReport) domain.ConfigurationSaveReport {
@@ -449,7 +451,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadPXEProgress: func() (domain.OperationProgress, error) {
 			return progressManager.Current("pxe-prepare")
 		},
-		PlanPXEStart: func() domain.PXELifecycleReport {
+		PlanPXEStart: func(ctx context.Context) domain.PXELifecycleReport {
 			return lifecycle.PlanStart(ctx, repository)
 		},
 		StartPXE: func() domain.PXELifecycleReport {
@@ -472,7 +474,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 				Operation: domain.RemoteInstallPrepareOperation, Host: host,
 			}, nil)
 		},
-		ObserveRemoteInstall: func(address string) (string, error) {
+		ObserveRemoteInstall: func(ctx context.Context, address string) (string, error) {
 			return adapters.NewLiveBootstrap().ObserveHostFingerprint(ctx, address)
 		},
 		BootstrapRemoteInstall: func(host, address, fingerprint string, password []byte) (domain.RemoteInstallResponse, error) {
@@ -483,7 +485,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		RemoteInstallRequest: func(request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
 			return dashboardRemoteInstallRequest(ctx, repository, request, nil)
 		},
-		LoadRemoteInstall: func() (domain.RemoteInstallResponse, error) {
+		LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation}, nil)
 		},
 	}

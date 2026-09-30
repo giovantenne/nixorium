@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -180,7 +181,7 @@ func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.
 		}
 		model.screen = dashboardLogs
 		model.busy = "Loading private operation history"
-		return model, func() tea.Msg { return dashboardLogsMsg{report: model.actions.LoadLogs()} }
+		return model.startRead(func(ctx context.Context) tea.Msg { return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)} })
 	}
 	return model, nil
 }
@@ -194,12 +195,12 @@ func (model dashboardModel) startShutdownPlan(requested string) (tea.Model, tea.
 	model.message = ""
 	policy := model.shutdown.policy
 	action := model.shutdown.action
-	return model, func() tea.Msg {
+	return model.startRead(func(ctx context.Context) tea.Msg {
 		if model.actions.PlanPower != nil {
-			return dashboardShutdownPlanMsg{report: model.actions.PlanPower(requested, policy, action)}
+			return dashboardShutdownPlanMsg{report: model.actions.PlanPower(ctx, requested, policy, action)}
 		}
-		return dashboardShutdownPlanMsg{report: model.actions.PlanShutdown(requested, policy)}
-	}
+		return dashboardShutdownPlanMsg{report: model.actions.PlanShutdown(ctx, requested, policy)}
+	})
 }
 
 func (model dashboardModel) shutdownView() string {

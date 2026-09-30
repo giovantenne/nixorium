@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -598,7 +599,7 @@ func TestUpdatePlanningProgressFitsSupportedTerminalSizes(t *testing.T) {
 		model.updates.planStarted = time.Now().Add(-2 * time.Minute)
 		model.updates.planProgress = domain.UpdatePlanProgress{Phase: domain.UpdatePlanPhaseBuild, Detail: "Building the controller", Current: 2, Total: 5}
 		view := model.View().Content
-		for _, expected := range []string{"Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "elapsed", "current deployment remains unchanged", "Help"} {
+		for _, expected := range []string{"Target: master", "Test systems before saving", "Testing the controller system", "Safety check 2/5", "Elapsed:", "current deployment remains unchanged", "Help"} {
 			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("update progress %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
@@ -636,7 +637,7 @@ func TestUpdateProgressExplainsSystemChecksInOperatorLanguage(t *testing.T) {
 func TestAdministrationBackAndDiagnosticsUseTypedCallback(t *testing.T) {
 	m := experienceFixture(2)
 	m = press(m, "a")
-	m.actions.LoadDoctor = func() (domain.DoctorReport, error) {
+	m.actions.LoadDoctor = func(ctx context.Context) (domain.DoctorReport, error) {
 		return domain.DoctorReport{Findings: []domain.Finding{{Level: domain.LevelWarning, Summary: "Check connection", Remediation: "Connect the network cable"}}}, nil
 	}
 	updated, command := m.Update(tea.KeyPressMsg{Text: "i"})
@@ -674,7 +675,7 @@ func TestNavigationRespectsSelectedTaskDuringSetup(t *testing.T) {
 
 func TestPrimaryAreasPreserveContext(t *testing.T) {
 	m := experienceFixture(2)
-	m.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return wizardSettings(), nil }
+	m.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return wizardSettings(), nil }
 	m = press(m, "enter")
 	if m.screen != dashboardComputersArea {
 		t.Fatalf("computers area did not open: screen=%d", m.screen)
@@ -707,7 +708,7 @@ func TestPrimaryAreasPreserveContext(t *testing.T) {
 	if command == nil || m.screen != dashboardSettings || m.areaReturn != dashboardInstallationArea {
 		t.Fatalf("PXE method did not start the common settings flow: screen=%d return=%d", m.screen, m.areaReturn)
 	}
-	updated, command = m.Update(dashboardSettingsMsg{settings: wizardSettings()})
+	updated, command = m.Update(command())
 	m = updated.(dashboardModel)
 	if command != nil || m.screen != dashboardSettingsEdit {
 		t.Fatalf("installation settings did not open: screen=%d", m.screen)

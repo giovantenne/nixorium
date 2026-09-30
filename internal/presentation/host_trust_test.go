@@ -31,6 +31,7 @@ func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 		t.Fatal("cancel triggered write")
 		return domain.HostTrustResult{}
 	}}, false)
+	model.screen = dashboardHosts
 	opened, read := model.openHostTrust("pc01")
 	model = opened.(dashboardModel)
 	late := read()

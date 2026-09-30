@@ -113,6 +113,8 @@ func ClassroomIPCRequest(ctx context.Context, socketPath string, request domain.
 		return response, fmt.Errorf("connect to classroom worker: %w", err)
 	}
 	defer connection.Close()
+	stopCancellation := context.AfterFunc(ctx, func() { _ = connection.Close() })
+	defer stopCancellation()
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = connection.SetDeadline(deadline)
 	} else {

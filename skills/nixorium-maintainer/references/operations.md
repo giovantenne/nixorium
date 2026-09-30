@@ -2,6 +2,14 @@
 
 ## Validation
 
+On supporting pins, TUI read-only waits show elapsed time and accept Esc back to
+their originating view. Ordinary reads have a two-minute limit; candidate build
+reviews allow one hour. Cancellation retains the settings draft, ignores late
+replies and never rolls back a prior save/activation. A timeout is not permission
+to apply: retry the read or inspect Diagnostics. Foreground mutations remain
+protected; independent systemd/remote work is not cancelled by closing a read
+or quitting an explicitly leave-safe view. Consult the current action bar.
+
 Evaluate before building. For settings changes, use the managed validator;
 for other changes, evaluate the affected outputs. Inspect mode, readiness, and
 inventory without writing the lock:

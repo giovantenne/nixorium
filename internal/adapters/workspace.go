@@ -321,6 +321,7 @@ func inspectWorkspaceSource(ctx context.Context, root *os.File, candidate []byte
 	command := exec.CommandContext(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval",
 		"--impure", "--json", "--no-write-lock-file", "--no-update-lock-file",
 		"--option", "allow-import-from-derivation", "false", "--option", "accept-flake-config", "false", "--expr", expression)
+	configureCommandCancellation(command)
 	command.Env = append(workspaceEnvironment(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake, "NIXORIUM_WORKSPACE_CANDIDATE="+string(candidate))
 	output := &boundedCommandBuffer{limit: 1024 * 1024}
 	diagnostics := &boundedCommandBuffer{limit: 64 * 1024}

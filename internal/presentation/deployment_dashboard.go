@@ -156,7 +156,7 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		}
 		model.busy = "Loading operation logs"
 		model.message = ""
-		return model, func() tea.Msg { return dashboardLogsMsg{report: model.actions.LoadLogs()} }
+		return model.startRead(func(ctx context.Context) tea.Msg { return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)} })
 	}
 	return model, nil
 }

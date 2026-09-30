@@ -92,7 +92,12 @@ func TestSupportUICancelAndStaleMessages(t *testing.T) {
 	}
 	m, command = workspaceKey(m, demoText("e"))
 	old := command()
-	m, newCommand := workspaceKey(m, demoText("r"))
+	m, unavailable := workspaceKey(m, demoText("r"))
+	if unavailable != nil || !strings.Contains(m.message, "Esc") {
+		t.Fatal("busy refresh did not explain how to cancel first")
+	}
+	m, _ = workspaceKey(m, demoCode(tea.KeyEscape))
+	m, newCommand := workspaceKey(m, demoText("e"))
 	next, _ = m.Update(old)
 	m = next.(dashboardModel)
 	if m.support.snapshot.Valid() {
@@ -145,6 +150,8 @@ func TestSupportUIRendering(t *testing.T) {
 						want = append(want, "Save locally", "operation-identifiers-and-times")
 					case "loading":
 						m.busy = "Collecting diagnostics"
+						m.beginRead(dashboardReadTimeout)
+						t.Cleanup(m.read.cancel)
 					case "empty", "failed":
 						m.support.snapshot = domain.SupportSnapshot{}
 						want = append(want, "Retry")

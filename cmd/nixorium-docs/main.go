@@ -127,6 +127,8 @@ func renderGallery() string {
 		{title: "Student workspace declaration review", scenarioID: "student-workspace", label: "Review the declaration without activating a system"},
 		{title: "Student workspace saved, not deployed", scenarioID: "student-workspace", label: "Saved does not mean committed or deployed"},
 		{title: "Workspace versions in system update review", scenarioID: "student-workspace", label: "Compare workspace versions during a system update"},
+		{title: "Cancellable read with elapsed time", scenarioID: "local-support", label: "Collect diagnostics without saving or uploading"},
+		{title: "Read cancelled without changes", scenarioID: "local-support", label: "Cancel the read without changing the laboratory"},
 		{title: "Local support report preview", scenarioID: "local-support", label: "Review the filtered local report"},
 		{title: "Local support report saved without upload", scenarioID: "local-support", label: "Local report saved without upload"},
 		{title: "Deployment template reset review", scenarioID: "template-reset", label: "Review replacement and preserved files"},

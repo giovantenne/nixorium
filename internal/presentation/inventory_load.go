@@ -37,16 +37,16 @@ func (model dashboardModel) loadInventoryThen(resume func(dashboardModel) (tea.M
 		return model, nil
 	}
 	model.inventory.cancelRead()
-	ctx, cancel := context.WithCancel(context.Background())
-	model.inventory.cancel = cancel
+	ctx, activityID := model.beginRead(dashboardReadTimeout)
+	model.inventory.cancel = model.read.cancel
 	model.inventory.resume = resume
 	model.busy = "Loading configured computers from the saved configuration"
 	model.message = ""
 	id := model.inventory.id
-	return model, func() tea.Msg {
+	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg {
 		report, err := model.actions.LoadInventory(ctx)
 		return dashboardInventoryMsg{id: id, report: report, err: err}
-	}
+	})
 }
 
 func (model dashboardModel) finishInventory(message dashboardInventoryMsg) (tea.Model, tea.Cmd) {

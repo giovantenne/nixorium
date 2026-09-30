@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -69,7 +70,7 @@ func TestInternetRenderGallery(t *testing.T) {
 func TestInternetReviewCancelAndApply(t *testing.T) {
 	applied := 0
 	actions := DashboardActions{
-		PlanInternet: func(requested string, a domain.InternetAction) domain.InternetPlan {
+		PlanInternet: func(ctx context.Context, requested string, a domain.InternetAction) domain.InternetPlan {
 			if requested != "pc01" || a != domain.InternetUnblock {
 				t.Fatalf("review %s %s", requested, a)
 			}

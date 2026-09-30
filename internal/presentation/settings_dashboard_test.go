@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"strings"
@@ -39,7 +40,7 @@ func TestSettingsPasswordReviewIsRedacted(t *testing.T) {
 	candidate := current
 	candidate.Lab.TeacherPassword = "$6$new$teacher"
 	actions := DashboardActions{
-		PlanSettings: func(received domain.LabSettingsFile) domain.ConfigPlanReport {
+		PlanSettings: func(ctx context.Context, received domain.LabSettingsFile) domain.ConfigPlanReport {
 			if received.Lab.TeacherPassword != candidate.Lab.TeacherPassword {
 				t.Fatalf("candidate hash was not passed to application plan")
 			}
@@ -91,7 +92,7 @@ func TestFirstSetupValidatesAndSavesTheCompleteCandidateOnce(t *testing.T) {
 			candidate:    candidate,
 		},
 		actions: DashboardActions{
-			PlanSettings: func(received domain.LabSettingsFile) domain.ConfigPlanReport {
+			PlanSettings: func(ctx context.Context, received domain.LabSettingsFile) domain.ConfigPlanReport {
 				plans++
 				if received.Lab.StudentPassword != candidate.Lab.StudentPassword {
 					t.Fatal("complete password candidate was not preserved")
@@ -102,7 +103,7 @@ func TestFirstSetupValidatesAndSavesTheCompleteCandidateOnce(t *testing.T) {
 				saves++
 				return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
 			},
-			LoadSetup: func() domain.SetupReport {
+			LoadSetup: func(ctx context.Context) domain.SetupReport {
 				refreshes++
 				return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}
 			},

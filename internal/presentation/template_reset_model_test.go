@@ -126,6 +126,9 @@ func TestTemplateResetUIRendering(t *testing.T) {
 						if state == "saving" {
 							m.templateReset.saving = true
 							want = []string{"Reset deployment template", "Help"}
+						} else {
+							m.beginRead(dashboardReadTimeout)
+							t.Cleanup(m.read.cancel)
 						}
 					default:
 						m.templateReset.stage = "result"

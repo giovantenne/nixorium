@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -26,9 +25,7 @@ func (model *dashboardModel) trackControllerApply(operation tea.Cmd) tea.Cmd {
 }
 
 func (model dashboardModel) controllerProgressView(path []string) string {
-	elapsed := max(time.Duration(0), time.Since(model.controller.started).Truncate(time.Second))
-	lines := []string{tuiTitle("Controller configuration", model.isDark), "",
-		fmt.Sprintf("%s  elapsed %s", model.busyView(), elapsed)}
+	lines := []string{tuiTitle("Controller configuration", model.isDark), "", model.busyView()}
 	lines = append(lines, model.operationProgressView(model.controller.progress, "Current progress")...)
 	if model.controller.progressUnavailable {
 		lines = append(lines, tuiStatus("Managed progress could not be refreshed; the operation may still be running.", tuiStatusAttention, model.isDark))
@@ -39,7 +36,7 @@ func (model dashboardModel) controllerProgressView(path []string) string {
 	}
 	return model.renderShell(tuiShell{
 		path: path, body: strings.Join(lines, "\n"),
-		notices: []tuiNotice{{kind: tuiStatusAttention, title: "Controller update is running", detail: "Wait for the verified result before closing Nixorium."}},
+		notices: []tuiNotice{{kind: tuiStatusAttention, title: "Controller update is running", detail: "Wait for verification. The managed job survives a lost terminal."}},
 		actions: []tuiAction{{key: "l", label: "Progress details"}, {key: "F1", label: "Help"}},
 	})
 }

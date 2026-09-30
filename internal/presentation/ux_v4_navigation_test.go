@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -72,7 +73,7 @@ func TestActivePXECanBeStoppedAndVerifiedBeforeExit(t *testing.T) {
 		stops++
 		return domain.PXELifecycleReport{State: "stopped", Mode: "stopped", Message: "Installation mode stopped."}
 	}
-	model.actions.Refresh = func() (domain.StatusReport, error) {
+	model.actions.Refresh = func(ctx context.Context) (domain.StatusReport, error) {
 		return testDashboardReport("stopped"), nil
 	}
 
@@ -101,7 +102,7 @@ func TestActivePXEStopFailureKeepsDashboardOpen(t *testing.T) {
 	model.actions.StopPXE = func() domain.PXELifecycleReport {
 		return domain.PXELifecycleReport{State: "failed", Mode: "active", Message: "network service did not stop"}
 	}
-	model.actions.Refresh = func() (domain.StatusReport, error) {
+	model.actions.Refresh = func(ctx context.Context) (domain.StatusReport, error) {
 		return domain.StatusReport{}, errors.New("unavailable")
 	}
 
@@ -119,7 +120,7 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 	model.screen = dashboardSoftware
 	model.software.catalog = testSoftwareCatalogReport()
 	model.software.cursor = 1
-	model.actions.PlanSoftware = func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+	model.actions.PlanSoftware = func(ctx context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 		return domain.SoftwareChangePlanReport{State: "ready", Request: request, Confirmation: "REMOVE"}
 	}
 
@@ -143,7 +144,7 @@ func TestCancelledSoftwareRemovalReturnsToSelectedPackage(t *testing.T) {
 func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 	model := experienceFixture(2)
 	model.updates.result = domain.UpdateApplyReport{Operation: "update-apply", State: "applied"}
-	model.actions.CheckUpdate = func() domain.UpdateCheckReport {
+	model.actions.CheckUpdate = func(ctx context.Context) domain.UpdateCheckReport {
 		return domain.UpdateCheckReport{Operation: "update-check", State: "current", CurrentRef: "v2.0.0"}
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Text: "a"})
@@ -153,11 +154,13 @@ func TestRoutineFlowsStartWithoutStaleResults(t *testing.T) {
 	if model.updates.result.Operation != "" || command == nil {
 		t.Fatal("Update retained a result from the previous session")
 	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
 
 	model.screen = dashboardHome
 	model.busy = ""
 	model.settings.result = domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
-	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return domain.LabSettingsFile{}, nil }
+	model.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return domain.LabSettingsFile{}, nil }
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "a"})
 	model = updated.(dashboardModel)
 	updated, command = model.Update(tea.KeyPressMsg{Text: "e"})
@@ -194,11 +197,11 @@ func TestIncompleteInitialConfigurationOpensSetupAndRemainsReachable(t *testing.
 func TestInstallComputersOpensSettingsWithoutSetupMenu(t *testing.T) {
 	setupLoads, settingsLoads := 0, 0
 	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{
-		LoadSetup: func() domain.SetupReport {
+		LoadSetup: func(ctx context.Context) domain.SetupReport {
 			setupLoads++
 			return domain.SetupReport{State: "ready"}
 		},
-		LoadSettings: func() (domain.LabSettingsFile, error) {
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
 			settingsLoads++
 			return wizardSettings(), nil
 		},
@@ -236,7 +239,7 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	settings.Lab.DeploymentMode = "controller"
 	settings.Lab.PCCount = 0
 	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}, DashboardActions{
-		LoadSettings: func() (domain.LabSettingsFile, error) { return settings, nil },
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) { return settings, nil },
 	}, false)
 	for index, task := range dashboardTasks {
 		if task.id == "installation" {
@@ -292,7 +295,7 @@ func TestInstallComputersSavesValidatedSettingsWithoutReviewScreen(t *testing.T)
 				}
 				return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved"}
 			},
-			LoadSetup: func() domain.SetupReport {
+			LoadSetup: func(ctx context.Context) domain.SetupReport {
 				setupLoads++
 				return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply}
 			},
@@ -323,7 +326,7 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 		screen:       dashboardPXE,
 		installation: installationModel{flow: true, method: "pxe"},
 		actions: DashboardActions{
-			PlanController: func() domain.ControllerRebuildPlanReport {
+			PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 				plans++
 				return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: revision}
 			},
@@ -331,12 +334,12 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 				applies++
 				return domain.ControllerRebuildExecutionReport{State: "completed", Applied: true, Verified: true, Revision: plan.Revision}
 			},
-			Refresh: func() (domain.StatusReport, error) {
+			Refresh: func(ctx context.Context) (domain.StatusReport, error) {
 				status := testDashboardReport("stopped")
 				status.PXEPreparation.Ready = true
 				return status, nil
 			},
-			LoadSetup: func() domain.SetupReport {
+			LoadSetup: func(ctx context.Context) domain.SetupReport {
 				return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageArtifacts}
 			},
 			PreparePXE: func() domain.ActionReport {
@@ -346,7 +349,7 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 			LoadPXEProgress: func() (domain.OperationProgress, error) {
 				return domain.OperationProgress{Operation: "pxe-prepare", State: "completed"}, nil
 			},
-			PlanPXEStart: func() domain.PXELifecycleReport {
+			PlanPXEStart: func(ctx context.Context) domain.PXELifecycleReport {
 				return domain.PXELifecycleReport{State: "ready", Mode: "stopped", Interface: "enp1s0", StaticCIDR: "10.0.0.99/24", DHCPAddress: "192.0.2.10"}
 			},
 			StartPXE: func() domain.PXELifecycleReport {
@@ -387,7 +390,11 @@ func TestInstallComputersAutomaticallyActivatesPreparesAndStopsAtPXEConfirmation
 	var planMessage tea.Msg
 	for _, next := range planBatch {
 		message := next()
-		if _, matches := message.(dashboardPlanMsg); matches {
+		payload := message
+		if wrapped, ok := message.(activityResultMsg); ok {
+			payload = wrapped.message
+		}
+		if _, matches := payload.(dashboardPlanMsg); matches {
 			planMessage = message
 		}
 	}
@@ -408,7 +415,7 @@ func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
-	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) {
+	model.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) {
 		loaded++
 		return wizardSettings(), nil
 	}
@@ -433,7 +440,7 @@ func TestSetupCredentialsFollowTheSameSettingsAndPasswordSequence(t *testing.T) 
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageCredentials}
-	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return wizardSettings(), nil }
+	model.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return wizardSettings(), nil }
 	model.actions.ChangePassword = func(string, domain.LabSettingsFile, *os.File, io.Writer) (domain.LabSettingsFile, error) {
 		return domain.LabSettingsFile{}, nil
 	}
@@ -466,8 +473,8 @@ func TestSetupValidationRetryKeepsAcceptedPasswords(t *testing.T) {
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageValidate}
-	model.actions.LoadSettings = func() (domain.LabSettingsFile, error) { return wizardSettings(), nil }
-	model.actions.PlanSettings = func(domain.LabSettingsFile) domain.ConfigPlanReport {
+	model.actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return wizardSettings(), nil }
+	model.actions.PlanSettings = func(ctx context.Context, _ domain.LabSettingsFile) domain.ConfigPlanReport {
 		plans++
 		return domain.ConfigPlanReport{Operation: "config-plan", State: "unchanged"}
 	}
@@ -498,7 +505,7 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	model.setupMode = true
 	model.screen = dashboardSetup
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}
-	model.actions.LoadSetupKeys = func() domain.KeyReconcileReport {
+	model.actions.LoadSetupKeys = func(ctx context.Context) domain.KeyReconcileReport {
 		return domain.KeyReconcileReport{Operation: "setup-keys-verify", State: "action-required", Keys: []domain.KeyMaterialState{
 			{Name: "cache", Problem: "missing"}, {Name: "ssh", Problem: "missing"}, {Name: "veyon", Problem: "missing"},
 		}}
@@ -515,7 +522,7 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 		installs++
 		return domain.ActionReport{Operation: "setup-install-secrets", State: "completed", Message: "installed"}
 	}
-	model.actions.LoadSetup = func() domain.SetupReport {
+	model.actions.LoadSetup = func(ctx context.Context) domain.SetupReport {
 		refreshes++
 		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageReview}
 	}
@@ -561,7 +568,7 @@ func TestInstallComputersCreatesMissingKeysWithoutOpeningKeyChoices(t *testing.T
 		installs++
 		return domain.ActionReport{Operation: "setup-install-secrets", State: "completed"}
 	}
-	model.actions.LoadSetup = func() domain.SetupReport {
+	model.actions.LoadSetup = func(ctx context.Context) domain.SetupReport {
 		setupLoads++
 		return domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply}
 	}
@@ -587,7 +594,7 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 	model := experienceFixture(2)
 	model.screen = dashboardSettings
 	model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
-	model.actions.LoadSetupKeys = func() domain.KeyReconcileReport {
+	model.actions.LoadSetupKeys = func(ctx context.Context) domain.KeyReconcileReport {
 		loads++
 		return domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
 			{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
@@ -636,7 +643,7 @@ func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 		importedName, importedPath = name, path
 		return domain.KeyImportReport{Operation: "setup-key-import", State: "imported", Key: name, Source: path, Fingerprint: "SHA256:verified", Message: "Existing key imported and verified."}, nil
 	}
-	model.actions.LoadSetupKeys = func() domain.KeyReconcileReport {
+	model.actions.LoadSetupKeys = func(ctx context.Context) domain.KeyReconcileReport {
 		return domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{{Name: "ssh", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true}}}
 	}
 
@@ -660,11 +667,11 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 	loads, settingsLoads := 0, 0
 	setup := domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageNetwork}
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
-		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			loads++
 			return testDashboardReport("stopped"), setup, nil
 		},
-		LoadSettings: func() (domain.LabSettingsFile, error) {
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
 			settingsLoads++
 			return wizardSettings(), nil
 		},
@@ -675,7 +682,8 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 		t.Fatalf("startup activity is not visible before inspection:\n%s", view)
 	}
 
-	updated, command := model.Update(model.loadInitial()())
+	loading, load := model.loadInitial()
+	updated, command := loading.(dashboardModel).Update(load())
 	model = updated.(dashboardModel)
 	if command == nil || loads != 1 || model.initializing || model.screen != dashboardSettings || !model.installation.flow {
 		t.Fatalf("initial result did not route to laboratory settings: loads=%d model=%+v", loads, model)
@@ -690,7 +698,7 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 func TestLoadingDashboardFailureHasInPlaceRetry(t *testing.T) {
 	attempts := 0
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
-		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			attempts++
 			if attempts == 1 {
 				return domain.StatusReport{}, domain.SetupReport{}, errors.New("evaluation unavailable")
@@ -701,7 +709,8 @@ func TestLoadingDashboardFailureHasInPlaceRetry(t *testing.T) {
 	model.initializing = true
 	model.busy = "Opening the laboratory and checking setup progress"
 
-	updated, _ := model.Update(model.loadInitial()())
+	loading, load := model.loadInitial()
+	updated, _ := loading.(dashboardModel).Update(load())
 	model = updated.(dashboardModel)
 	failureView := model.View().Content
 	if !model.initialError || !strings.Contains(failureView, "Enter") || !strings.Contains(failureView, "Try again") {

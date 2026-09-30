@@ -109,6 +109,7 @@ func (Local) DiscoverUpdateReleases(ctx context.Context, sourcePrefix string) ([
 		"ls-remote", "--refs", "--exit-code", upstream, "refs/heads/master", "refs/tags/v*",
 	)
 	command.Env = updateDiscoveryEnvironment()
+	configureCommandCancellation(command)
 	stdout := &boundedCommandBuffer{limit: updateDiscoveryBytes}
 	stderr := &boundedCommandBuffer{limit: 16 * 1024}
 	command.Stdout = stdout
@@ -473,6 +474,7 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 
 func runBoundedNix(ctx context.Context, limit int, arguments ...string) (string, error) {
 	command := exec.CommandContext(ctx, "nix", append([]string{"--extra-experimental-features", "nix-command flakes"}, arguments...)...)
+	configureCommandCancellation(command)
 	stdout := &boundedCommandBuffer{limit: limit}
 	stderr := &boundedCommandBuffer{limit: limit}
 	command.Stdout = stdout

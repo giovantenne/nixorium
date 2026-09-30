@@ -35,6 +35,14 @@ update candidate validation; retain the target, phase, elapsed time and notices.
 Long content must have an explicit scroll surface while the primary action and
 cancellation path remain visible.
 
+Use the shared bounded read activity for loads and proposals: two minutes for
+ordinary reads, one hour for isolated candidate build reviews. Pass its context
+through typed callbacks, discard late request IDs, retain the originating view
+and editable drafts, and never resume a mutation after cancellation or timeout.
+Every busy screen keeps the activity, elapsed time and exit/safety policy visible;
+unavailable keys produce feedback. Protected mutations and independent managed
+jobs are not read-only cancellation. IPC disconnect is not worker cancellation.
+
 ## Keep visual semantics restrained
 
 Define theme tokens centrally and use them by meaning rather than per screen.

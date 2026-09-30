@@ -149,6 +149,8 @@ func remoteInstallIPCRequest(ctx context.Context, socketPath string, request dom
 		return response, fmt.Errorf("connect to remote installation worker: %w", err)
 	}
 	defer connection.Close()
+	stopCancellation := context.AfterFunc(ctx, func() { _ = connection.Close() })
+	defer stopCancellation()
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = connection.SetDeadline(deadline)
 	} else {

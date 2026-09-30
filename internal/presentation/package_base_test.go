@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -58,10 +59,10 @@ func TestSystemUpdateJourneyRequiresReviewAndUsesSeparateSave(t *testing.T) {
 	planned, saved, activated := 0, 0, 0
 	model := dashboardModel{screen: dashboardAdministration, width: 80, height: 24,
 		actions: DashboardActions{
-			LoadPackageBase: func() domain.PackageBaseStatus {
+			LoadPackageBase: func(ctx context.Context) domain.PackageBaseStatus {
 				return domain.PackageBaseStatus{Channel: "nixos-26.05", Revision: strings.Repeat("a", 40)}
 			},
-			PlanPackageBase: func(target string, allow bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+			PlanPackageBase: func(ctx context.Context, target string, allow bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
 				planned++
 				if target != "nixos-26.11" || !allow {
 					t.Fatalf("target=%s allow=%t", target, allow)
@@ -77,7 +78,9 @@ func TestSystemUpdateJourneyRequiresReviewAndUsesSeparateSave(t *testing.T) {
 				t.Fatal("used framework save")
 				return domain.UpdateApplyReport{}
 			},
-			PlanController: func() domain.ControllerRebuildPlanReport { return domain.ControllerRebuildPlanReport{State: "ready"} },
+			PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
+				return domain.ControllerRebuildPlanReport{State: "ready"}
+			},
 			ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 				activated++
 				return domain.ControllerRebuildExecutionReport{State: "completed", Applied: true, Verified: true}

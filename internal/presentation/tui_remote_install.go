@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"unicode"
@@ -404,10 +405,10 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			remote.stage = remoteInstallFingerprint
 			model.busy = "Reading the live Ed25519 host key without sending a password"
 			address := remote.address
-			return model, func() tea.Msg {
-				fingerprint, err := model.actions.ObserveRemoteInstall(address)
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				fingerprint, err := model.actions.ObserveRemoteInstall(ctx, address)
 				return dashboardRemoteFingerprintMsg{fingerprint: fingerprint, err: err}
-			}
+			})
 		default:
 			model.remoteInstallAppendInput(key.Text)
 		}

@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"strings"
 	"time"
 	"unicode"
@@ -13,9 +14,9 @@ func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
 	model.screen = dashboardController
 	model.busy = "Reviewing controller revision and active system"
 	model.message = ""
-	return model, func() tea.Msg {
-		return dashboardControllerPlanMsg{report: model.actions.PlanController()}
-	}
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardControllerPlanMsg{report: model.actions.PlanController(ctx)}
+	})
 }
 
 func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd) {
@@ -47,7 +48,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.screen = dashboardHosts
 		model.busy = "Checking configured computers"
 		model.message = ""
-		return model, model.loadHosts()
+		return model.loadHosts()
 	}
 	return model, nil
 }
@@ -60,25 +61,25 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		model.screen = dashboardServices
 		model.busy = "Checking managed controller services"
 		model.message = ""
-		return model, func() tea.Msg {
-			return dashboardServicesMsg{report: model.actions.LoadServices()}
-		}
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardServicesMsg{report: model.actions.LoadServices(ctx)}
+		})
 	case "l":
 		model.screen = dashboardLogs
 		model.busy = "Loading private operation logs"
 		model.message = ""
-		return model, func() tea.Msg {
-			return dashboardLogsMsg{report: model.actions.LoadLogs()}
-		}
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)}
+		})
 	case "g":
 		model.maintenance.gitFromWorkspace = model.screen == dashboardWorkspace
 		model.maintenance.gitCommitResult = domain.GitCommitReport{}
 		model.screen = dashboardGitReview
 		model.busy = "Reviewing Git changes without modifying the worktree"
 		model.message = ""
-		return model, func() tea.Msg {
-			return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
-		}
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardGitReviewMsg{report: model.actions.LoadGitReview(ctx)}
+		})
 	case "u":
 		model.updates.packageBase = false
 		model.screen = dashboardUpdate
@@ -96,7 +97,7 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 			return model, nil
 		}
 		model.busy = "Fetching available Nixorium updates"
-		return model, model.checkUpdates()
+		return model.checkUpdates()
 	case "b":
 		return model.openPackageBase()
 	case "e":
@@ -107,10 +108,10 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		model.settings.candidate = domain.LabSettingsFile{}
 		model.busy = "Loading managed laboratory settings"
 		model.message = ""
-		return model, func() tea.Msg {
-			settings, err := model.actions.LoadSettings()
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			settings, err := model.actions.LoadSettings(ctx)
 			return dashboardSettingsMsg{settings: settings, err: err}
-		}
+		})
 	}
 	return model, nil
 }
@@ -152,7 +153,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.initializing = true
 				model.busy = "Opening the laboratory and checking setup progress"
 				model.message = ""
-				return model, model.loadInitial()
+				return model.loadInitial()
 			}
 			return model, nil
 		}
@@ -181,7 +182,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.message = "The supported software service is not available in this deployment."
 				return model, nil
 			}
-			return model, func() tea.Msg { return dashboardSoftwareCatalogMsg{report: model.actions.LoadSoftware()} }
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardSoftwareCatalogMsg{report: model.actions.LoadSoftware(ctx)}
+			})
 		case "n":
 			return model.startComputerInstallation()
 		default:
@@ -260,7 +263,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case domain.SetupStageInspectEnvironment:
 			model.diagnosticReturn = dashboardSetup
 			model.screen = dashboardDiagnostics
-			return model, model.startDiagnostics()
+			return model.startDiagnostics()
 		case domain.SetupStageNetwork:
 			return model.openSetupSettings()
 		case domain.SetupStageIdentity:
@@ -276,9 +279,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.setupKeysReturn = dashboardSetup
 			model.busy = "Checking existing controller keys"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys(ctx)}
+			})
 		case domain.SetupStageValidate:
 			return model.openSetupSettings()
 		case domain.SetupStageReview:
@@ -295,9 +298,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.screen = dashboardController
 			model.busy = "Reviewing controller revision and active system"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardControllerPlanMsg{report: model.actions.PlanController()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardControllerPlanMsg{report: model.actions.PlanController(ctx)}
+			})
 		case domain.SetupStageArtifacts:
 			model.screen = dashboardPXE
 			model.busy = "Preparing netboot artifacts and client closures"
@@ -346,7 +349,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.message = ""
 				return model, func() tea.Msg {
 					report, err := model.actions.ImportSetupKey(name, path)
-					return dashboardSetupKeyImportMsg{report: report, err: err, keys: model.actions.LoadSetupKeys()}
+					ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+					defer cancel()
+					return dashboardSetupKeyImportMsg{report: report, err: err, keys: model.actions.LoadSetupKeys(ctx)}
 				}
 			default:
 				if key.Text != "" && len(model.setupKeyPath) < 4096 {
@@ -456,9 +461,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.screen = dashboardSetupKeys
 			model.busy = "Checking existing controller keys"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardSetupKeyStatusMsg{report: model.actions.LoadSetupKeys(ctx)}
+			})
 		default:
 			model.settings.menu, _ = model.settings.menu.update(key)
 		}
@@ -497,9 +502,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.busy = "Validating the complete settings candidate through Nix"
 			model.message = ""
 			candidate := model.settings.candidate
-			return model, func() tea.Msg {
-				return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(ctx, candidate)}
+			})
 		}
 		return model, command
 	case dashboardSettingsPasswords:
@@ -625,9 +630,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.message = ""
 			if model.computers.configurationState.Operation != "" {
 				model.busy = "Refreshing desired and observed system state"
-				return model, model.loadConfigurationState()
+				return model.loadConfigurationState()
 			}
-			return model, model.loadHosts()
+			return model.loadHosts()
 		}
 	default:
 		return model.updateOperationScreenKey(key)
@@ -659,7 +664,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			}
 			if model.setupMode && model.actions.LoadSetup != nil {
 				model.busy = "Refreshing first-run progress"
-				return model, model.loadSetup()
+				return model.loadSetup()
 			}
 		} else if key.String() == "d" && model.controller.result.Operation != "" {
 			model.controller.details = !model.controller.details
@@ -667,15 +672,15 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			model.screen = dashboardLogs
 			model.busy = "Loading private operation logs"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardLogsMsg{report: model.actions.LoadLogs()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)}
+			})
 		} else if key.String() == "r" {
 			model.busy = "Reviewing controller revision and active system"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardControllerPlanMsg{report: model.actions.PlanController()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardControllerPlanMsg{report: model.actions.PlanController(ctx)}
+			})
 		}
 	case dashboardControllerReview:
 		switch key.String() {
@@ -695,7 +700,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				if model.actions.Refresh == nil {
 					return dashboardControllerResultMsg{report: report}
 				}
-				status, err := model.actions.Refresh()
+				ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+				defer cancel()
+				status, err := model.actions.Refresh(ctx)
 				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
 			}
 			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
@@ -709,9 +716,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			case "l":
 				model.busy = "Loading private operation logs"
 				model.message = ""
-				return model, func() tea.Msg {
-					return dashboardLogsMsg{report: model.actions.LoadLogs()}
-				}
+				return model.startRead(func(ctx context.Context) tea.Msg {
+					return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)}
+				})
 			case "r":
 				model.maintenance.serviceResult = domain.ServiceActionReport{}
 				model.confirmation = ""
@@ -727,9 +734,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		case "f":
 			model.busy = "Refreshing managed controller services"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardServicesMsg{report: model.actions.LoadServices()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardServicesMsg{report: model.actions.LoadServices(ctx)}
+			})
 		case "r":
 			if len(model.maintenance.services.Services) == 0 || model.maintenance.services.Services[0].ID != "cache" || len(model.maintenance.services.Services[0].Units) == 0 || !model.maintenance.services.Services[0].Units[0].Loaded {
 				model.message = "Binary cache restart is unavailable because the managed unit is not installed."
@@ -780,7 +787,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			model.message = ""
 			if model.setupMode && model.actions.LoadSetup != nil {
 				model.busy = "Refreshing first-run progress"
-				return model, model.loadSetup()
+				return model.loadSetup()
 			}
 		case "up", "k":
 			if model.maintenance.logCursor > 0 {
@@ -793,9 +800,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		case "f":
 			model.busy = "Refreshing private operation logs"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardLogsMsg{report: model.actions.LoadLogs()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardLogsMsg{report: model.actions.LoadLogs(ctx)}
+			})
 		case "enter":
 			if len(model.maintenance.logs.Logs) == 0 || !model.maintenance.logs.Logs[model.maintenance.logCursor].Available {
 				model.message = "The selected operation log is not available for safe reading."
@@ -804,9 +811,9 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			id := model.maintenance.logs.Logs[model.maintenance.logCursor].ID
 			model.busy = "Reading the bounded operation log tail"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardLogMsg{report: model.actions.LoadLog(id)}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardLogMsg{report: model.actions.LoadLog(ctx, id)}
+			})
 		}
 	case dashboardLogDetail:
 		maximum := maximumLogScroll(model.maintenance.logDetail, model.logDetailHeight())
@@ -859,7 +866,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 					model.message = ""
 					if model.actions.LoadSetup != nil {
 						model.busy = "Refreshing first-run progress"
-						return model, model.loadSetup()
+						return model.loadSetup()
 					}
 				} else {
 					model.screen = dashboardHome
@@ -869,9 +876,9 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				model.maintenance.gitCommitResult = domain.GitCommitReport{}
 				model.busy = "Refreshing the read-only Git review"
 				model.message = ""
-				return model, func() tea.Msg {
-					return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
-				}
+				return model.startRead(func(ctx context.Context) tea.Msg {
+					return dashboardGitReviewMsg{report: model.actions.LoadGitReview(ctx)}
+				})
 			}
 			return model, nil
 		}
@@ -891,7 +898,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.message = ""
 			if model.setupMode && model.actions.LoadSetup != nil {
 				model.busy = "Refreshing first-run progress"
-				return model, model.loadSetup()
+				return model.loadSetup()
 			}
 		case "up", "k":
 			if model.maintenance.gitScroll > 0 {
@@ -918,9 +925,9 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 		case "f":
 			model.busy = "Refreshing the read-only Git review"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardGitReviewMsg{report: model.actions.LoadGitReview()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardGitReviewMsg{report: model.actions.LoadGitReview(ctx)}
+			})
 		case "c":
 			if len(model.maintenance.gitReview.Changes) == 0 || model.maintenance.gitReview.HasErrors() {
 				model.message = "A clean, unblocked change review is required before selecting commit paths."
@@ -960,9 +967,9 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 			model.busy = "Building an isolated commit proposal from HEAD"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardGitCommitPlanMsg{report: model.actions.PlanGitCommit(paths)}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardGitCommitPlanMsg{report: model.actions.PlanGitCommit(ctx, paths)}
+			})
 		}
 	case dashboardGitCommitReview:
 		maximum := maximumGitCommitPlanScroll(model.maintenance.gitCommitPlan, model.gitReviewHeight())
@@ -1008,7 +1015,9 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			plan := model.maintenance.gitCommitPlan
 			return model, func() tea.Msg {
 				result := model.actions.ApplyGitCommit(plan)
-				return dashboardGitCommitResultMsg{report: result, review: model.actions.LoadGitReview()}
+				ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+				defer cancel()
+				return dashboardGitCommitResultMsg{report: result, review: model.actions.LoadGitReview(ctx)}
 			}
 		default:
 			if key.Text != "" {
@@ -1040,7 +1049,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				}
 				if model.actions.CheckUpdate != nil {
 					model.busy = "Fetching available Nixorium updates"
-					return model, model.checkUpdates()
+					return model.checkUpdates()
 				}
 			case "a":
 				if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired {
@@ -1069,7 +1078,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			model.updates.target = ""
 			model.message = ""
 			model.busy = "Fetching available Nixorium updates"
-			return model, model.checkUpdates()
+			return model.checkUpdates()
 		case "up", "k":
 			model.updates.cursor = max(0, model.updates.cursor-1)
 		case "down", "j":
@@ -1101,13 +1110,11 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				model.updates.planning = true
 				model.updates.planProgress = domain.UpdatePlanProgress{}
 				model.updates.planStarted = time.Now().UTC()
-				events := make(chan tea.Msg)
-				model.updates.planEvents = events
-				return model, startUpdatePlan(model.actions.PlanUpdateWithProgress, target, allowPrerelease, false, events)
+				return model.startUpdatePlan(model.actions.PlanUpdateWithProgress, target, allowPrerelease, false)
 			}
-			return model, func() tea.Msg {
-				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(target, allowPrerelease, false)}
-			}
+			return model.startBoundedRead(dashboardBuildTimeout, func(ctx context.Context) tea.Msg {
+				return dashboardUpdatePlanMsg{report: model.actions.PlanUpdate(ctx, target, allowPrerelease, false)}
+			})
 		}
 	case dashboardUpdateReview:
 		maximum := model.maximumUpdateScroll()
@@ -1180,7 +1187,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			model.message = ""
 			if model.setupMode && model.actions.LoadSetup != nil {
 				model.busy = "Refreshing first-run progress"
-				return model, model.loadSetup()
+				return model.loadSetup()
 			}
 		case "f":
 			return model.openNetworkInstallation()
@@ -1195,9 +1202,9 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			}
 			model.busy = "Checking PXE readiness"
 			model.message = ""
-			return model, func() tea.Msg {
-				return dashboardPlanMsg{report: model.actions.PlanPXEStart()}
-			}
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				return dashboardPlanMsg{report: model.actions.PlanPXEStart(ctx)}
+			})
 		case "x":
 			if model.actions.StopPXE == nil || model.actions.Refresh == nil || (model.report.PXE.Mode != "active" && model.report.PXE.Mode != "degraded" && model.report.PXE.Mode != "recovery-required") {
 				return model, nil
@@ -1231,8 +1238,7 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 		case "enter":
 			model.diagnosticDetails = !model.diagnosticDetails
 		case "r":
-			command := model.startDiagnostics()
-			return model, command
+			return model.startDiagnostics()
 		}
 	case dashboardPXEStartReview:
 		switch key.String() {
@@ -1294,7 +1300,9 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 			model.message = ""
 			return model, func() tea.Msg {
 				lifecycle := model.actions.StopPXE()
-				status, err := model.actions.Refresh()
+				ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+				defer cancel()
+				status, err := model.actions.Refresh(ctx)
 				return dashboardPXEExitMsg{lifecycle: lifecycle, status: status, statusErr: err}
 			}
 		default:

@@ -48,6 +48,21 @@ confirmation is retained for destructive operations. Progress reports phases,
 elapsed time and available logs without treating an accepted request as proof
 of completion. Renderer tests cover 80×24, 120×30 and 180×45 layouts.
 
+Every working view names the activity, shows elapsed time and states whether it
+can be cancelled. Esc cancels read-only loads and proposals, returns to the
+originating screen and discards late replies. Settings drafts remain editable;
+cancellation does not undo an earlier save or activation. Ordinary reads time
+out after two minutes; isolated update/package-base/template candidate build
+reviews allow one hour. Downloads and local builds can take several minutes.
+A timeout offers retry or Diagnostics, never an automatic apply.
+
+Foreground saves, activation and other mutations stay protected until their
+result. The separately reviewed deployment stop still stops local supervision,
+not remote work. PXE preparation explicitly allows quitting while its managed
+job continues. Cancelling an IPC read closes this client's connection, not a
+worker-owned operation. Unsupported keys explain the available action; F1 and
+scrolling remain available while waiting.
+
 <!-- BEGIN GENERATED: tui-gallery -->
 ## Overview
 
@@ -407,6 +422,37 @@ No client deploy or home reset. Verify runtime on one client.
 ↑/↓ Scroll  ·  F4 Details  ·  Enter Apply update  ·  Esc Cancel  ·  F1 Help
 ```
 
+## Cancellable read with elapsed time
+
+```text
+Nixorium  /  Maintenance  /  Diagnostics  /  Support report
+
+Local support report
+Minimized, not anonymous. No upload or remediation.
+
+⣾  Collecting local diagnostics; no build or upload
+
+Elapsed: 0s · Read-only; Esc cancels. Limit: 2m0s.
+
+Esc Cancel read  ·  F1 Help
+```
+
+## Read cancelled without changes
+
+```text
+Nixorium  /  Maintenance  /  Diagnostics
+
+Diagnostics
+
+› ! Binary cache could not be reached
+  Inspect the local cache service before retrying deployment.
+
+NOTICE
+! Cancelled; nothing was changed by this read.
+
+e Support report  ·  ↑/↓ Select  ·  Enter Evidence  ·  r Check again  ·  Esc Maintenance  ·  F1 Help
+```
+
 ## Local support report preview
 
 ```text
@@ -549,10 +595,10 @@ Nixorium  /  Computers  /  SSH trust
 
 Review this computer's changed SSH key
 ⣾  Reading the recorded and offered SSH fingerprints
-Elapsed: 0s
-Read-only; Esc cancels without changes.
 
-Esc Cancel  ·  F1 Help
+Elapsed: 0s · Read-only; Esc cancels. Limit: 2m0s.
+
+Esc Cancel read  ·  F1 Help
 ```
 
 ## Single-client SSH trust review

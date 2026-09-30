@@ -455,7 +455,9 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 		}
 		model.busy = "Loading deployment software profiles"
 		model.message = ""
-		return model, func() tea.Msg { return dashboardSoftwarePresetCatalogMsg{report: model.actions.LoadSoftwarePresets()} }
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardSoftwarePresetCatalogMsg{report: model.actions.LoadSoftwarePresets(ctx)}
+		})
 	case softwarePresetPlanIntent:
 		if model.actions.PlanSoftwarePreset == nil {
 			model.message = "Software profile planning is not available in this deployment."
@@ -464,9 +466,9 @@ func (model dashboardModel) updateSoftware(key tea.KeyPressMsg) (tea.Model, tea.
 		model.busy = "Checking every profile package and its destination"
 		model.message = ""
 		request := intent.presetRequest
-		return model, func() tea.Msg {
-			return dashboardSoftwarePresetPlanMsg{report: model.actions.PlanSoftwarePreset(request)}
-		}
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardSoftwarePresetPlanMsg{report: model.actions.PlanSoftwarePreset(ctx, request)}
+		})
 	case softwarePresetSaveIntent:
 		if model.actions.SaveSoftwarePreset == nil {
 			model.message = "Software profile saving is not available in this deployment."
@@ -508,7 +510,9 @@ func (model dashboardModel) startSoftwareControllerApply() (tea.Model, tea.Cmd) 
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	operation := func() tea.Msg {
-		plan := model.actions.PlanController()
+		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+		defer cancel()
+		plan := model.actions.PlanController(ctx)
 		if plan.HasErrors() {
 			return dashboardSoftwareControllerMsg{plan: plan}
 		}
@@ -525,7 +529,9 @@ func (model dashboardModel) startSoftwarePlan(request domain.SoftwareChangeReque
 	}
 	model.busy = "Checking the package and its destination"
 	model.message = ""
-	return model, func() tea.Msg { return dashboardSoftwarePlanMsg{report: model.actions.PlanSoftware(request)} }
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardSoftwarePlanMsg{report: model.actions.PlanSoftware(ctx, request)}
+	})
 }
 
 func (model dashboardModel) openSoftwareDeployment() (tea.Model, tea.Cmd) {
@@ -580,7 +586,7 @@ func (model dashboardModel) openConfigurationState() (tea.Model, tea.Cmd) {
 	model.computers.hostTechnical = false
 	model.busy = "Checking desired and observed system state"
 	model.message = ""
-	return model, model.loadConfigurationState()
+	return model.loadConfigurationState()
 }
 
 func (model dashboardModel) softwareView() string {

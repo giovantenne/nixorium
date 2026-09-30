@@ -50,13 +50,13 @@ func (model dashboardModel) openSupportPreview() (tea.Model, tea.Cmd) {
 	model.message = ""
 	model.screen = dashboardSupport
 	model.busy = "Collecting local diagnostics; no build or upload"
-	ctx, cancel := context.WithCancel(context.Background())
-	model.support.cancel = cancel
+	ctx, activityID := model.beginRead(dashboardReadTimeout)
+	model.support.cancel = model.read.cancel
 	id, action := model.support.requestID, model.actions.PreviewSupport
-	return model, func() tea.Msg {
+	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg {
 		snapshot, err := action(ctx)
 		return dashboardSupportPreviewMsg{id: id, snapshot: snapshot, err: err}
-	}
+	})
 }
 
 func (model dashboardModel) finishSupportPreview(message dashboardSupportPreviewMsg) (tea.Model, tea.Cmd) {
@@ -92,6 +92,7 @@ func (model dashboardModel) finishSupportExport(message dashboardSupportExportMs
 
 func (model dashboardModel) updateSupportKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if model.support.saving {
+		model.message = "The local export cannot be interrupted. Wait for its result; F1 opens help."
 		return model, nil
 	}
 	switch key.String() {

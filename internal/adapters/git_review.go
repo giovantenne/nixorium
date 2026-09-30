@@ -218,6 +218,7 @@ func runBoundedGit(ctx context.Context, repository string, limit int, arguments 
 
 func runBoundedGitWithEnvironment(ctx context.Context, repository string, environment []string, limit int, arguments ...string) (string, bool, error) {
 	command := exec.CommandContext(ctx, "git", append([]string{"-C", repository}, arguments...)...)
+	configureCommandCancellation(command)
 	if environment != nil {
 		command.Env = environment
 	}

@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -62,7 +63,9 @@ func (model dashboardModel) planSelectedDeployment(requested string) (tea.Model,
 	}
 	model.busy = "Validating revision and selected computers"
 	model.message = ""
-	return model, func() tea.Msg { return dashboardDeploymentPlanMsg{report: model.actions.PlanDeployment(requested)} }
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardDeploymentPlanMsg{report: model.actions.PlanDeployment(ctx, requested)}
+	})
 }
 
 func (model dashboardModel) checkDeploymentUSB(requested string, afterFailure bool) (tea.Model, tea.Cmd) {
@@ -74,10 +77,10 @@ func (model dashboardModel) checkDeploymentUSB(requested string, afterFailure bo
 	model.busy = "Checking for an unfinished USB installation"
 	model.deployment.usbRequestID++
 	id := model.deployment.usbRequestID
-	return model, func() tea.Msg {
-		response, err := model.actions.LoadRemoteInstall()
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		response, err := model.actions.LoadRemoteInstall(ctx)
 		return dashboardDeploymentUSBMsg{id: id, afterFailure: afterFailure, response: response, err: err}
-	}
+	})
 }
 
 func (model dashboardModel) handleDeploymentUSBMessage(message dashboardDeploymentUSBMsg) (tea.Model, tea.Cmd) {

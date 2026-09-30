@@ -516,6 +516,7 @@ func nixJSON(ctx context.Context, repository, attribute string, destination any)
 
 func run(ctx context.Context, name string, arguments ...string) (string, error) {
 	command := exec.CommandContext(ctx, name, arguments...)
+	configureCommandCancellation(command)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		message := strings.TrimSpace(string(output))
@@ -529,6 +530,7 @@ func run(ctx context.Context, name string, arguments ...string) (string, error) 
 
 func runOutput(ctx context.Context, name string, arguments ...string) (string, error) {
 	command := exec.CommandContext(ctx, name, arguments...)
+	configureCommandCancellation(command)
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	command.Stdout = stdout
@@ -545,6 +547,7 @@ func runOutput(ctx context.Context, name string, arguments ...string) (string, e
 
 func runWithInput(ctx context.Context, input []byte, name string, arguments ...string) (string, error) {
 	command := exec.CommandContext(ctx, name, arguments...)
+	configureCommandCancellation(command)
 	command.Stdin = bytes.NewReader(input)
 	output, err := command.CombinedOutput()
 	if err != nil {

@@ -55,12 +55,12 @@ func (model dashboardModel) openTemplateReset() (tea.Model, tea.Cmd) {
 	}
 	model.templateReset.cancelRead()
 	id := model.templateReset.requestID
-	ctx, cancel := context.WithCancel(context.Background())
-	model.templateReset = templateResetModel{requestID: id, cancel: cancel, stage: "select"}
+	ctx, activityID := model.beginRead(dashboardReadTimeout)
+	model.templateReset = templateResetModel{requestID: id, cancel: model.read.cancel, stage: "select"}
 	model.screen, model.pageScroll, model.message = dashboardTemplateReset, 0, ""
 	model.busy = "Reading the exact pinned upstream template; no files changed"
 	load := model.actions.LoadTemplateReset
-	return model, func() tea.Msg { return templateResetCatalogMsg{id, load(ctx)} }
+	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg { return templateResetCatalogMsg{id, load(ctx)} })
 }
 
 func (model dashboardModel) finishTemplateResetCatalog(msg templateResetCatalogMsg) (tea.Model, tea.Cmd) {
@@ -82,8 +82,8 @@ func (model dashboardModel) startTemplateResetPlan() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	m.cancelRead()
-	ctx, cancel := context.WithCancel(context.Background())
-	m.cancel, m.stage, m.confirmation, m.scroll = cancel, "planning", "", 0
+	ctx, activityID := model.beginRead(dashboardBuildTimeout)
+	m.cancel, m.stage, m.confirmation, m.scroll = model.read.cancel, "planning", "", 0
 	m.events = make(chan tea.Msg, 8)
 	id, events, preset, action := m.requestID, m.events, m.catalog.Catalog.Presets[m.cursor].ID, model.actions.PlanTemplateReset
 	model.busy, model.message = "Preparing an isolated template reset candidate", ""
@@ -101,11 +101,7 @@ func (model dashboardModel) startTemplateResetPlan() (tea.Model, tea.Cmd) {
 			case <-ctx.Done():
 			}
 		}()
-		message, ok := <-events
-		if !ok {
-			return nil
-		}
-		return message
+		return waitForActivityEvent(ctx, activityID, events)()
 	}
 }
 
@@ -142,6 +138,7 @@ func (model dashboardModel) finishTemplateResetResult(msg templateResetResultMsg
 func (model dashboardModel) updateTemplateResetKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m := &model.templateReset
 	if m.saving {
+		model.message = "The local reset cannot be interrupted. Wait for its result; F1 opens help."
 		return model, nil
 	}
 	if key.String() == "shift+down" || key.String() == "shift+up" {

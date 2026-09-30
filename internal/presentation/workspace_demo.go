@@ -37,14 +37,14 @@ func demoWorkspacePlan() domain.WorkspacePlanReport {
 
 func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
-	actions.LoadSettings = func() (domain.LabSettingsFile, error) { return demoSettings(), nil }
-	actions.LoadGitReview = func() domain.GitReviewReport {
+	actions.LoadSettings = func(ctx context.Context) (domain.LabSettingsFile, error) { return demoSettings(), nil }
+	actions.LoadGitReview = func(ctx context.Context) domain.GitReviewReport {
 		return domain.GitReviewReport{State: "changed"}
 	}
-	actions.LoadPackageBase = func() domain.PackageBaseStatus {
+	actions.LoadPackageBase = func(ctx context.Context) domain.PackageBaseStatus {
 		return domain.PackageBaseStatus{Channel: "nixos-26.05", Revision: revision}
 	}
-	actions.PlanPackageBase = func(string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+	actions.PlanPackageBase = func(ctx context.Context, _ string, _ bool, _ func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
 		return demoWorkspaceUpdatePlan()
 	}
 	actions.SavePackageBase = func(domain.UpdatePlanReport) domain.UpdateApplyReport {

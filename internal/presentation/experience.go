@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -361,6 +362,52 @@ func (model dashboardModel) frame(content string) string {
 }
 
 func (model dashboardModel) renderShell(shell tuiShell) string {
+	if model.busy != "" {
+		if !strings.Contains(shell.body, model.busy) && !strings.Contains(shell.fixedBody, model.busy) {
+			shell.fixedBody = strings.TrimSpace(model.busyView() + "\n" + shell.fixedBody)
+		}
+		if model.height > 0 && model.height < 28 {
+			lines := []string{}
+			for _, line := range strings.Split(shell.body, "\n") {
+				if strings.TrimSpace(line) != "" {
+					lines = append(lines, line)
+				}
+			}
+			shell.body = strings.Join(lines, "\n")
+		}
+		if shell.fixedBody != "" {
+			shell.fixedBody += "\n"
+		}
+		shell.fixedBody += model.activityStatus()
+		if model.message != "" {
+			present := false
+			for _, notice := range shell.notices {
+				present = present || strings.Contains(notice.title+notice.detail, model.message)
+			}
+			if !present {
+				shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+			}
+		}
+		if model.read.cancel != nil {
+			shell.actions = []tuiAction{{key: "Esc", label: "Cancel read"}, {key: "F1", label: "Help"}}
+			if model.updates.planning {
+				shell.actions = append([]tuiAction{{key: "l", label: "Progress details"}}, shell.actions...)
+			}
+		} else if !model.deployment.stopReview {
+			// The footer must not advertise navigation or repeat a mutation
+			// while its result is pending. Reviewed deployment stop is separate.
+			shell.actions = []tuiAction{{key: "F1", label: "Help"}}
+			if model.deployment.applying || model.controller.applying || model.installation.pxePreparing {
+				shell.actions = append([]tuiAction{{key: "l", label: "Progress details"}}, shell.actions...)
+			}
+			if model.deployment.applying && model.deployment.cancel != nil && !model.deployment.stopRequested {
+				shell.actions = append(shell.actions, tuiAction{key: "s", label: "Stop waiting"})
+			}
+			if model.installation.pxePreparing {
+				shell.actions = append(shell.actions, tuiAction{key: "q", label: "Quit Nixorium; work continues"})
+			}
+		}
+	}
 	width := min(116, max(20, model.width-6))
 	if model.width == 0 {
 		width = 100
@@ -450,15 +497,18 @@ func (model dashboardModel) textEntry() bool {
 	}
 }
 
-func (model *dashboardModel) startDiagnostics() tea.Cmd {
+func (model dashboardModel) startDiagnostics() (tea.Model, tea.Cmd) {
 	if model.actions.LoadDoctor == nil {
 		model.message = "Diagnostics are not available in this session."
-		return nil
+		return model, nil
 	}
 	model.busy = "Checking configuration, network and services"
 	model.message = ""
 	action := model.actions.LoadDoctor
-	return func() tea.Msg { report, err := action(); return dashboardDoctorMsg{report: report, err: err} }
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		report, err := action(ctx)
+		return dashboardDoctorMsg{report: report, err: err}
+	})
 }
 
 func phaseSteps(labels []string, current int, complete bool, dark bool) []string {

@@ -109,6 +109,7 @@ func nixSoftwareExpressionJSON(ctx context.Context, repository, expression, vari
 		return err
 	}
 	command := exec.CommandContext(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--expr", expression)
+	configureCommandCancellation(command)
 	command.Env = append(os.Environ(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake)
 	if variable != "" {
 		command.Env = append(command.Env, variable+"="+value)
@@ -175,6 +176,7 @@ func (Local) ValidateSoftwareCandidate(ctx context.Context, repository string, s
 		return fmt.Errorf("close software candidate: %w", err)
 	}
 	command := exec.CommandContext(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--expr", softwareCandidateValidationExpression)
+	configureCommandCancellation(command)
 	command.Env = append(os.Environ(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake, "NIXORIUM_SOFTWARE_CANDIDATE_FILE="+path)
 	output := &boundedCommandBuffer{limit: 64 * 1024}
 	command.Stdout = output

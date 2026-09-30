@@ -21,7 +21,7 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 	actions := presentation.DashboardActions{
 		ClassroomMode:  true,
 		RunningVersion: nixoriumVersion,
-		LoadInitial: func() (domain.StatusReport, domain.SetupReport, error) {
+		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			if !usedInitial {
 				usedInitial = true
 				if initialErr != nil {
@@ -41,7 +41,7 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			}
 			return *response.Status, classroomSetupReport(), nil
 		},
-		Refresh: func() (domain.StatusReport, error) {
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) {
 			response, err := classroomRequest(ctx, domain.ClassroomStatusOperation, nil)
 			if err != nil || response.Status == nil {
 				if err == nil {
@@ -51,7 +51,7 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			}
 			return *response.Status, nil
 		},
-		LoadHosts: func() (domain.HostsReport, error) {
+		LoadHosts: func(ctx context.Context) (domain.HostsReport, error) {
 			response, err := classroomRequest(ctx, domain.ClassroomHostsOperation, nil)
 			if err != nil || response.Hosts == nil {
 				if err == nil {
@@ -61,7 +61,7 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			}
 			return *response.Hosts, nil
 		},
-		PlanPower: func(requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
+		PlanPower: func(ctx context.Context, requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
 			response, err := classroomRequest(ctx, domain.ClassroomPowerPlanOperation, func(request *domain.ClassroomRequest) {
 				request.Requested = requested
 				request.SessionPolicy = policy
@@ -81,7 +81,7 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			}
 			return *response.PowerReport
 		},
-		PlanInternet: func(requested string, action domain.InternetAction) domain.InternetPlan {
+		PlanInternet: func(ctx context.Context, requested string, action domain.InternetAction) domain.InternetPlan {
 			response, err := classroomRequest(ctx, domain.ClassroomInternetPlanOperation, func(request *domain.ClassroomRequest) {
 				request.Requested = requested
 				request.InternetAction = action

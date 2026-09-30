@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -37,7 +38,9 @@ func (model dashboardModel) openPackageBase() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	model.busy = "Reading the system and package pin"
-	return model, func() tea.Msg { return dashboardPackageBaseMsg{report: model.actions.LoadPackageBase()} }
+	return model.startRead(func(ctx context.Context) tea.Msg {
+		return dashboardPackageBaseMsg{report: model.actions.LoadPackageBase(ctx)}
+	})
 }
 
 func (model dashboardModel) packageBaseView() string {
@@ -123,12 +126,10 @@ func (model dashboardModel) startPackageBasePlan(target string, allow bool) (tea
 	model.busy, model.updates.planning = "Validating system and package update", true
 	model.updates.planProgress = domain.UpdatePlanProgress{}
 	model.updates.planStarted = time.Now().UTC()
-	events := make(chan tea.Msg)
-	model.updates.planEvents = events
-	action := func(target string, acknowledge, _ bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
-		return model.actions.PlanPackageBase(target, acknowledge, progress)
+	action := func(ctx context.Context, target string, acknowledge, _ bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+		return model.actions.PlanPackageBase(ctx, target, acknowledge, progress)
 	}
-	return model, startUpdatePlan(action, target, allow, false, events)
+	return model.startUpdatePlan(action, target, allow, false)
 }
 func shortRevision(revision string) string {
 	if len(revision) > 12 {

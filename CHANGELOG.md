@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Unified TUI working states with elapsed time, visible safety/exit behavior and
+  feedback for unavailable keys. Read-only loads and proposals accept Esc,
+  retain editable drafts and ignore late replies; ordinary reads have a two-minute
+  limit and candidate build reviews have one hour. Foreground mutations remain
+  protected and PXE preparation still runs independently. Local Git/Nix helpers
+  bound process groups and inherited pipes; cancelling IPC closes the client
+  connection without claiming to stop a worker-owned operation.
+
 - Added explicit single-client SSH host-key review and rotation after deliberate
   reinstall, in computer details and `host-key plan`/`apply`. Changed-key failures
   are typed, physical fingerprint verification remains required, stale reviews

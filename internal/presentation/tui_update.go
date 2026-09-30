@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -13,6 +14,13 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case dashboardBeginInitialMsg:
+		if !model.initializing || model.actions.LoadInitial == nil {
+			return model, nil
+		}
+		return model.loadInitial()
+	case activityResultMsg:
+		return model.finishRead(message)
 	case hostTrustPlanMsg:
 		if model.screen != dashboardHostTrust || model.hostTrust.cancel == nil || model.hostTrust.id != message.id {
 			return model, nil
@@ -38,8 +46,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.finishTemplateResetPlan(message)
 	case templateResetProgressMsg:
 		if model.screen == dashboardTemplateReset && message.id == model.templateReset.requestID && model.busy != "" {
-			model.busy = message.detail
-			return model, waitForUpdatePlanEvent(model.templateReset.events)
+			if strings.TrimSpace(message.detail) != "" {
+				model.busy = message.detail
+			}
+			return model, waitForActivityEvent(model.read.ctx, model.read.id, model.templateReset.events)
 		}
 		return model, nil
 	case templateResetResultMsg:
@@ -148,7 +158,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model.failComputerInstallation("Controller keys are ready, but protected installation failed: " + message.install.Message)
 			}
 			model.busy = "Checking saved laboratory configuration"
-			return model, model.loadSetup()
+			return model.loadSetup()
 		}
 		if model.setupKeysReturn == dashboardSettings {
 			switch {
@@ -182,7 +192,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.screen = dashboardSetup
 		if model.actions.LoadSetup != nil {
 			model.busy = "Refreshing setup progress"
-			return model, model.loadSetup()
+			return model.loadSetup()
 		}
 		return model, nil
 	case dashboardSetupSaveMsg:
@@ -192,13 +202,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model.failComputerInstallation(message.report.Message)
 			}
 			model.busy = "Checking saved laboratory configuration"
-			return model, model.loadSetup()
+			return model.loadSetup()
 		}
 		model.message = message.report.Message
 		model.screen = dashboardSetup
 		if model.actions.LoadSetup != nil {
 			model.busy = "Refreshing setup progress"
-			return model, model.loadSetup()
+			return model.loadSetup()
 		}
 		return model, nil
 	case dashboardPlanMsg:
@@ -237,13 +247,13 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model.failComputerInstallation("PXE start validation is not available in this session.")
 		}
 		model.busy = "Checking PXE readiness"
-		plan := func() tea.Msg {
-			return dashboardPlanMsg{report: model.actions.PlanPXEStart()}
-		}
+		next, plan := model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardPlanMsg{report: model.actions.PlanPXEStart(ctx)}
+		})
 		if model.actions.LoadPXEProgress != nil {
-			return model, tea.Batch(model.loadPXEProgress(model.installation.pxeProgressID), plan)
+			return next, tea.Batch(model.loadPXEProgress(model.installation.pxeProgressID), plan)
 		}
-		return model, plan
+		return next, plan
 	case dashboardOperationMsg:
 		preparationFinished := model.installation.pxePreparing && message.screen == dashboardPXE
 		model.busy = ""
@@ -377,7 +387,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if message.report.Current {
 				model.busy = "Checking installation prerequisites"
-				return model, model.loadSetup()
+				return model.loadSetup()
 			}
 			model.busy = "Building and activating the laboratory controller"
 			model.controller.applying = true
@@ -390,7 +400,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				status := domain.StatusReport{}
 				var err error
 				if model.actions.Refresh != nil {
-					status, err = model.actions.Refresh()
+					ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+					defer cancel()
+					status, err = model.actions.Refresh(ctx)
 				}
 				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
 			}
@@ -424,9 +436,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			model.busy = "Checking installation prerequisites"
 			if model.actions.LoadControllerProgress != nil {
-				return model, tea.Batch(model.loadControllerProgress(model.controller.progressID), model.loadSetup())
+				next, read := model.loadSetup()
+				return next, tea.Batch(model.loadControllerProgress(model.controller.progressID), read)
 			}
-			return model, model.loadSetup()
+			return model.loadSetup()
 		}
 		model.screen = dashboardController
 		if model.actions.LoadControllerProgress != nil {
@@ -542,8 +555,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 		model.updates.planProgress = message.progress
-		model.busy = message.progress.Detail
-		return model, waitForUpdatePlanEvent(model.updates.planEvents)
+		if strings.TrimSpace(message.progress.Detail) != "" {
+			model.busy = message.progress.Detail
+		}
+		return model, waitForActivityEvent(model.read.ctx, model.read.id, model.updates.planEvents)
 	case dashboardUpdatePlanMsg:
 		model.updates.planning = false
 		model.updates.planEvents = nil
@@ -703,9 +718,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.busy = "Validating the password change through Nix"
 		model.message = ""
 		candidate := model.settings.candidate
-		return model, func() tea.Msg {
-			return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(candidate)}
-		}
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return dashboardSettingsPlanMsg{report: model.actions.PlanSettings(ctx, candidate)}
+		})
 	case dashboardSettingsApplyMsg:
 		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
@@ -734,7 +749,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			if model.actions.LoadSetup == nil {
 				return model.failComputerInstallation("Installation prerequisite checks are not available in this session.")
 			}
-			return model, model.loadSetup()
+			return model.loadSetup()
 		}
 		if model.settings.returnScreen == dashboardSetup && !message.report.HasErrors() && (message.report.State == "saved" || message.report.State == "unchanged") {
 			model.settings.returnScreen = dashboardHome
@@ -743,7 +758,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			model.busy = "Continuing first setup"
 			model.message = ""
 			if model.actions.LoadSetup != nil {
-				return model, model.loadSetup()
+				return model.loadSetup()
 			}
 			model.busy = ""
 			return model, nil
@@ -905,6 +920,12 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd) {
 	key, ok := message.(tea.KeyPressMsg)
 	if !ok {
+		if model.busy != "" {
+			if _, pasted := message.(tea.PasteMsg); pasted {
+				model.message = "Text cannot be changed while work is running. Use the available actions below."
+			}
+			return model, nil
+		}
 		if model.screen == dashboardHome {
 			model.ensureHomeMenu()
 			model.homeMenu, _ = model.homeMenu.update(message)
@@ -922,7 +943,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		}
 		return model, nil
 	}
-	if !model.helpOpen && model.screen == dashboardSettings && key.String() != "f1" && (model.settings.menu.list.FilterState() == list.Filtering || (model.settings.menu.list.FilterState() == list.FilterApplied && key.String() == "esc")) {
+	if model.busy == "" && !model.helpOpen && model.screen == dashboardSettings && key.String() != "f1" && (model.settings.menu.list.FilterState() == list.Filtering || (model.settings.menu.list.FilterState() == list.FilterApplied && key.String() == "esc")) {
 		var command tea.Cmd
 		model.settings.menu, command = model.settings.menu.update(key)
 		return model, command
@@ -945,10 +966,10 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.pageScroll = 0
 		return model, nil
 	}
-	if model.screen == dashboardWorkspace && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
+	if model.read.cancel == nil && model.screen == dashboardWorkspace && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
 		return model.updateWorkspaceKey(key)
 	}
-	if model.screen == dashboardTemplateReset && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
+	if model.read.cancel == nil && model.screen == dashboardTemplateReset && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
 		return model.updateTemplateResetKey(key)
 	}
 	if key.String() == "shift+down" {
@@ -958,6 +979,24 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	if key.String() == "shift+up" {
 		model.pageScroll = max(0, model.pageScroll-1)
 		return model, nil
+	}
+	if model.read.cancel != nil {
+		switch key.String() {
+		case "esc":
+			return model.cancelActivity(), nil
+		case "ctrl+c":
+			model = model.cancelActivity()
+			// Keep the ordinary active-PXE exit review below.
+		case "l":
+			if model.updates.planning {
+				model.progressDetails = !model.progressDetails
+				return model, nil
+			}
+			fallthrough
+		default:
+			model.message = "A read is running. Press Esc to cancel, or F1 for help."
+			return model, nil
+		}
 	}
 	if model.screen == dashboardSupport && key.String() != "ctrl+c" && key.String() != "q" {
 		return model.updateSupportKey(key)
@@ -1011,7 +1050,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.deployment.confirmation = ""
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && (model.hostTrust.applying || model.deployment.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && ((model.busy != "" && !model.hasCancellableRead() && !model.installation.pxePreparing) || model.hostTrust.applying || model.deployment.applying || model.controller.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
 		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
 		return model, nil
 	}
@@ -1051,6 +1090,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model.updateHostTrustKey(key)
 	}
 	if model.busy != "" {
+		model.message = "This action is unavailable while work is running. Wait for its result; F1 opens help."
 		return model, nil
 	}
 	if model.screen == dashboardAdministration {
@@ -1075,7 +1115,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		if key.String() == "i" {
 			model.diagnosticReturn = dashboardAdministration
 			model.screen = dashboardDiagnostics
-			return model, model.startDiagnostics()
+			return model.startDiagnostics()
 		}
 		known := false
 		for _, task := range administrationTasks {
@@ -1092,8 +1132,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	if key.String() == "i" && model.screen == dashboardHosts && !model.actions.ClassroomMode {
 		model.diagnosticReturn = model.screen
 		model.screen = dashboardDiagnostics
-		command := model.startDiagnostics()
-		return model, command
+		return model.startDiagnostics()
 	}
 	return model.updatePrimaryScreenKey(key)
 }

@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -119,7 +120,9 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 		requested, action := strings.Join(names, ","), m.action
 		model.busy = "Checking Internet access on selected clients"
 		model.message = ""
-		return model, func() tea.Msg { return internetPlanMsg{model.actions.PlanInternet(requested, action)} }
+		return model.startRead(func(ctx context.Context) tea.Msg {
+			return internetPlanMsg{model.actions.PlanInternet(ctx, requested, action)}
+		})
 	}
 	return model, nil
 }

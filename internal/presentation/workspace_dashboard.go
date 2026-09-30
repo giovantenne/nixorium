@@ -37,13 +37,13 @@ func (model dashboardModel) openWorkspace() (tea.Model, tea.Cmd) {
 
 func (model dashboardModel) startWorkspaceRead(initial bool) (tea.Model, tea.Cmd) {
 	model.workspace.cancelRead()
-	ctx, cancel := context.WithCancel(context.Background())
-	model.workspace.cancel = cancel
+	ctx, activityID := model.beginRead(dashboardReadTimeout)
+	model.workspace.cancel = model.read.cancel
 	id := model.workspace.requestID
 	candidate := model.workspace.candidate
 	model.message = ""
 	model.busy = "Reviewing student preferences, pinned dependencies and destinations"
-	return model, func() tea.Msg {
+	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg {
 		var report domain.WorkspacePlanReport
 		if initial {
 			report = model.actions.LoadWorkspace(ctx)
@@ -51,7 +51,7 @@ func (model dashboardModel) startWorkspaceRead(initial bool) (tea.Model, tea.Cmd
 			report = model.actions.PlanWorkspace(ctx, candidate)
 		}
 		return dashboardWorkspacePlanMsg{id: id, initial: initial, report: report}
-	}
+	})
 }
 
 func (model dashboardModel) finishWorkspacePlan(message dashboardWorkspacePlanMsg) (tea.Model, tea.Cmd) {
@@ -100,6 +100,7 @@ func (model dashboardModel) finishWorkspaceSave(message dashboardWorkspaceSaveMs
 
 func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if model.workspace.saving {
+		model.message = "The local save cannot be interrupted. Wait for its result; F1 opens help."
 		return model, nil
 	}
 	if (key.String() == "shift+up" || key.String() == "shift+down") && !(model.workspace.stage == workspaceFieldEdit && model.workspace.field.kind == "favorites") {

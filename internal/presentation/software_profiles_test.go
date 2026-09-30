@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -129,8 +130,8 @@ func TestDashboardSoftwareProfileUsesBatchCallbacksAndControllerFollowUp(t *test
 	controllerPlans := 0
 	controllerApplies := 0
 	actions := DashboardActions{
-		LoadSoftwarePresets: func() domain.SoftwarePresetCatalogReport { return testSoftwarePresetCatalog() },
-		PlanSoftwarePreset: func(request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+		LoadSoftwarePresets: func(ctx context.Context) domain.SoftwarePresetCatalogReport { return testSoftwarePresetCatalog() },
+		PlanSoftwarePreset: func(ctx context.Context, request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
 			requests++
 			preset := testSoftwarePresetCatalog().Catalog.Presets[0]
 			return domain.SoftwarePresetPlanReport{
@@ -150,7 +151,7 @@ func TestDashboardSoftwareProfileUsesBatchCallbacksAndControllerFollowUp(t *test
 				Revision: strings.Repeat("a", 40), Issues: []domain.ValidationIssue{},
 			}
 		},
-		PlanController: func() domain.ControllerRebuildPlanReport {
+		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			controllerPlans++
 			return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("a", 40), Issues: []domain.ValidationIssue{}}
 		},

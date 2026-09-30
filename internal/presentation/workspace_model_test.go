@@ -251,7 +251,7 @@ func TestWorkspaceResultRecoveryAndContextualGitReview(t *testing.T) {
 		t.Fatal("hidden retry after partial replacement")
 	}
 	m.workspace.result = domain.WorkspaceApplyReport{State: "saved"}
-	m.actions.LoadGitReview = func() domain.GitReviewReport { return domain.GitReviewReport{State: "clean"} }
+	m.actions.LoadGitReview = func(ctx context.Context) domain.GitReviewReport { return domain.GitReviewReport{State: "clean"} }
 	m.maintenance.gitCommitResult.Operation = "old-result"
 	m, cmd = workspaceKey(m, demoText("g"))
 	m = workspaceComplete(t, m, cmd)
@@ -305,6 +305,8 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 						want = append(want, "Type SAVE:", "Save JSON", "no commit, deploy or reset")
 					case "loading":
 						m.busy = "Loading workspace metadata"
+						m.beginRead(dashboardReadTimeout)
+						t.Cleanup(m.read.cancel)
 					case "failure":
 						w.loaded.State = "invalid"
 						m.message = "The deployment candidate hook is unavailable."

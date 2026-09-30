@@ -76,7 +76,7 @@ func TestSoftwareSaveAutomaticallyAppliesAffectedController(t *testing.T) {
 			SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 				return domain.SoftwareChangeApplyReport{State: "saved", Repository: plan.Repository, AffectedController: plan.AffectedController}
 			},
-			PlanController: func() domain.ControllerRebuildPlanReport {
+			PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 				planCalls++
 				return domain.ControllerRebuildPlanReport{State: "ready", Repository: "/deployment", Controller: "pc99", Revision: strings.Repeat("a", 40)}
 			},
@@ -141,8 +141,8 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	plans := 0
 	applies := 0
 	actions := DashboardActions{
-		LoadSoftware: func() domain.SoftwareCatalogReport { return catalog },
-		PlanSoftware: func(request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+		LoadSoftware: func(ctx context.Context) domain.SoftwareCatalogReport { return catalog },
+		PlanSoftware: func(ctx context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 			plans++
 			if request.Package != "gimp" || !request.Present || request.Scope.Kind != domain.SoftwareScopeAllClients {
 				t.Fatalf("software request = %+v", request)
@@ -373,7 +373,7 @@ func TestSoftwareResultOpensFreshDeploymentSelection(t *testing.T) {
 				State: "saved", AffectedClients: []string{"pc01", "pc03"},
 			},
 		},
-		actions: DashboardActions{PlanDeployment: func(value string) domain.DeploymentPlanReport {
+		actions: DashboardActions{PlanDeployment: func(ctx context.Context, value string) domain.DeploymentPlanReport {
 			requested = value
 			return domain.DeploymentPlanReport{State: "ready"}
 		}},
@@ -469,7 +469,7 @@ func TestSoftwareStateReconstructsCurrentSnapshot(t *testing.T) {
 	firstRevision := "0123456789abcdef0123456789abcdef01234567"
 	secondRevision := "89abcdef0123456789abcdef0123456789abcdef"
 	actions := DashboardActions{
-		LoadConfigurationState: func() domain.ConfigurationStateReport {
+		LoadConfigurationState: func(ctx context.Context) domain.ConfigurationStateReport {
 			loads++
 			revision := firstRevision
 			controller := domain.ControllerRebuildPlanReport{
@@ -551,7 +551,7 @@ func TestDashboardShutdownIncludesActiveSessionAndAcknowledgesUnknownSession(t *
 	plans := 0
 	applies := 0
 	actions := DashboardActions{
-		PlanShutdown: func(requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
+		PlanShutdown: func(ctx context.Context, requested string, policy domain.ShutdownSessionPolicy) domain.ShutdownPlanReport {
 			plans++
 			if requested != "@lab" {
 				t.Fatalf("shutdown requested = %q", requested)
@@ -656,7 +656,7 @@ func TestDashboardSoftwareSupportsSearchRemovalAndBoundedClientSelection(t *test
 			SearchSoftware: func(_ context.Context, query string) domain.SoftwareSearchReport {
 				return domain.SoftwareSearchReport{Operation: "software-search", State: "ready", Query: query, Results: []domain.SoftwareCatalogItem{{ID: "vlc", Label: "VLC", Summary: "Play audio and video", Availability: "available"}}, Issues: []domain.ValidationIssue{}}
 			},
-			PlanSoftware: func(candidate domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
+			PlanSoftware: func(ctx context.Context, candidate domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 				request = candidate
 				return domain.SoftwareChangePlanReport{State: "ready", Request: candidate, Confirmation: "SAVE"}
 			},
@@ -721,7 +721,7 @@ func TestDashboardGuidesAndResumesFirstSetup(t *testing.T) {
 			SaveSetupConfiguration: func() domain.ConfigurationSaveReport {
 				return domain.ConfigurationSaveReport{Operation: "configuration-save", State: "saved", Message: "Configuration saved locally."}
 			},
-			LoadSetup: func() domain.SetupReport {
+			LoadSetup: func(ctx context.Context) domain.SetupReport {
 				loads++
 				return testSetupReport(true, false, false, false)
 			},
@@ -860,7 +860,7 @@ func TestBusyScreensUseAnimatedSharedSpinner(t *testing.T) {
 func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 	loads := 0
 	actions := DashboardActions{
-		LoadHosts: func() (domain.HostsReport, error) {
+		LoadHosts: func(ctx context.Context) (domain.HostsReport, error) {
 			loads++
 			report := domain.HostsReport{State: "partial", Deployment: domain.HostDeploymentSummary{Current: 1, Unknown: 1}, Hosts: []domain.HostStatus{
 				{Name: "pc01", IP: "10.0.0.1", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, LastSuccessfulDeploy: &domain.LastSuccessfulDeployment{Revision: "0123456789abcdef", VerifiedAt: time.Date(2026, 9, 14, 10, 30, 0, 0, time.UTC)}},
@@ -966,7 +966,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	planned := ""
 	applied := 0
 	actions := DashboardActions{
-		PlanDeployment: func(requested string) domain.DeploymentPlanReport {
+		PlanDeployment: func(ctx context.Context, requested string) domain.DeploymentPlanReport {
 			planned = requested
 			return domain.DeploymentPlanReport{
 				Operation:       "deploy-plan",
@@ -1087,11 +1087,11 @@ func TestDashboardReviewsAndRunsControllerRebuild(t *testing.T) {
 	applied := 0
 	refreshed := 0
 	actions := DashboardActions{
-		Refresh: func() (domain.StatusReport, error) {
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) {
 			refreshed++
 			return domain.StatusReport{Deployment: domain.DeploymentStatus{Ready: true}}, nil
 		},
-		PlanController: func() domain.ControllerRebuildPlanReport {
+		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			return domain.ControllerRebuildPlanReport{
 				SchemaVersion: domain.SchemaVersion,
 				Operation:     "controller-plan",
@@ -1199,7 +1199,7 @@ func TestDashboardControllerProgressShowsTypedBuildState(t *testing.T) {
 		t.Fatal("controller apply did not schedule another progress poll")
 	}
 	view := model.View().Content
-	for _, expected := range []string{"Building system", "1/4", "Progress details", "Building the reviewed controller system", "elapsed"} {
+	for _, expected := range []string{"Building system", "1/4", "Progress details", "Building the reviewed controller system", "Elapsed:"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("controller progress omits %q:\n%s", expected, view)
 		}
@@ -1217,7 +1217,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	planned := 0
 	applied := 0
 	actions := DashboardActions{
-		CheckUpdate: func() domain.UpdateCheckReport {
+		CheckUpdate: func(ctx context.Context) domain.UpdateCheckReport {
 			checked++
 			return domain.UpdateCheckReport{
 				SchemaVersion: domain.SchemaVersion,
@@ -1233,7 +1233,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 				Prerelease: []domain.UpdateRelease{{Tag: "v2.4.0-beta.1", Channel: domain.UpdateChannelPrerelease}},
 			}
 		},
-		PlanUpdate: func(received string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+		PlanUpdate: func(ctx context.Context, received string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
 			planned++
 			if received != target || allowPrerelease || allowDowngrade {
 				t.Fatalf("update plan input = %q, prerelease=%t, downgrade=%t", received, allowPrerelease, allowDowngrade)
@@ -1260,7 +1260,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 			}
 			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: target, Updated: true, Message: "Nixorium update saved locally. Running systems were not changed."}
 		},
-		PlanController: func() domain.ControllerRebuildPlanReport {
+		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("b", 40)}
 		},
 		ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
@@ -1353,7 +1353,7 @@ func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
 			},
 		},
 		actions: DashboardActions{
-			PlanUpdateWithProgress: func(received string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
+			PlanUpdateWithProgress: func(ctx context.Context, received string, allowPrerelease, allowDowngrade bool, progress func(domain.UpdatePlanProgress)) domain.UpdatePlanReport {
 				if received != target || allowPrerelease || allowDowngrade {
 					t.Fatalf("update plan input = %q, prerelease=%t, downgrade=%t", received, allowPrerelease, allowDowngrade)
 				}
@@ -1376,9 +1376,13 @@ func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
 		message := command()
 		updated, command = model.Update(message)
 		model = updated.(dashboardModel)
-		if progress, ok := message.(dashboardUpdatePlanProgressMsg); ok && progress.progress.Phase == domain.UpdatePlanPhaseBuild {
+		payload := message
+		if wrapped, ok := message.(activityResultMsg); ok {
+			payload = wrapped.message
+		}
+		if progress, ok := payload.(dashboardUpdatePlanProgressMsg); ok && progress.progress.Phase == domain.UpdatePlanPhaseBuild {
 			view := model.View().Content
-			foundBuild = strings.Contains(view, "Test systems before saving") && strings.Contains(view, "Testing the controller system") && strings.Contains(view, "Safety check 2/5") && strings.Contains(view, "elapsed") && strings.Contains(view, "current deployment remains unchanged")
+			foundBuild = strings.Contains(view, "Test systems before saving") && strings.Contains(view, "Testing the controller system") && strings.Contains(view, "Safety check 2/5") && strings.Contains(view, "Elapsed:") && strings.Contains(view, "current deployment remains unchanged")
 		}
 	}
 	if !foundBuild || model.updates.planning || model.screen != dashboardUpdateReview {
@@ -1389,7 +1393,7 @@ func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
 func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 	model := dashboardModel{
 		report: testDashboardReport("ready"),
-		actions: DashboardActions{CheckUpdate: func() domain.UpdateCheckReport {
+		actions: DashboardActions{CheckUpdate: func(ctx context.Context) domain.UpdateCheckReport {
 			return domain.UpdateCheckReport{
 				Operation: "update-check",
 				State:     "failed",
@@ -1430,7 +1434,7 @@ func TestNixoriumMovingMasterCanAdvanceToNewRevision(t *testing.T) {
 				Tag: "master", ObjectID: remoteRevision, Channel: domain.UpdateChannelMoving,
 			}},
 		}},
-		actions: DashboardActions{PlanUpdate: func(target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
+		actions: DashboardActions{PlanUpdate: func(ctx context.Context, target string, allowPrerelease, allowDowngrade bool) domain.UpdatePlanReport {
 			planned++
 			if target != "master" || allowPrerelease || allowDowngrade {
 				t.Fatalf("moving update input = %q, prerelease=%t, downgrade=%t", target, allowPrerelease, allowDowngrade)
@@ -1481,7 +1485,7 @@ func TestNixoriumMovingMasterBlocksSameRevision(t *testing.T) {
 func TestNixoriumUpdateInputFailureIsNotPresentedAsNetworkFailure(t *testing.T) {
 	model := dashboardModel{
 		report: testDashboardReport("ready"),
-		actions: DashboardActions{CheckUpdate: func() domain.UpdateCheckReport {
+		actions: DashboardActions{CheckUpdate: func(ctx context.Context) domain.UpdateCheckReport {
 			return domain.UpdateCheckReport{
 				Operation: "update-check",
 				State:     "failed",
@@ -1519,7 +1523,7 @@ func TestNixoriumUpdatePartialSaveOffersInPlaceRecovery(t *testing.T) {
 		actions: DashboardActions{SaveUpdate: func(plan domain.UpdatePlanReport) domain.UpdateApplyReport {
 			calls++
 			return domain.UpdateApplyReport{Operation: "update-save", State: "saved", Target: plan.Target, Updated: true, Message: "Nixorium update saved locally."}
-		}, PlanController: func() domain.ControllerRebuildPlanReport {
+		}, PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			return domain.ControllerRebuildPlanReport{State: "ready", Controller: "pc99", Revision: strings.Repeat("c", 40)}
 		}, ApplyController: func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
 			return domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Phase: domain.ControllerRebuildPhaseComplete, Applied: true, Verified: true}
@@ -1550,10 +1554,10 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	planned := 0
 	applied := 0
 	actions := DashboardActions{
-		LoadSettings: func() (domain.LabSettingsFile, error) {
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
 			return current, nil
 		},
-		PlanSettings: func(candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+		PlanSettings: func(ctx context.Context, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
 			planned++
 			if candidate.Lab.StudentGitName != "Lab Student" {
 				t.Fatalf("unexpected settings candidate: %+v", candidate.Lab)
@@ -1656,7 +1660,7 @@ func TestDashboardReviewsAndRestartsOnlyCacheService(t *testing.T) {
 		},
 	}
 	actions := DashboardActions{
-		LoadServices: func() domain.ServicesReport { return serviceReport },
+		LoadServices: func(ctx context.Context) domain.ServicesReport { return serviceReport },
 		RestartService: func(service string) domain.ServiceActionReport {
 			restarts++
 			if service != "cache" {
@@ -1707,14 +1711,14 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 	id := "deploy-20260914T113000.000000000Z-11.log"
 	loaded := ""
 	actions := DashboardActions{
-		LoadLogs: func() domain.OperationLogsReport {
+		LoadLogs: func(ctx context.Context) domain.OperationLogsReport {
 			return domain.OperationLogsReport{Operation: "logs-list", State: "available", Records: []domain.OperationRecord{
 				{RecordedAt: time.Date(2026, 9, 14, 11, 31, 0, 0, time.UTC), Operation: "pxe-start", State: "completed", Subject: "active", Summary: "PXE lifecycle transition finished"},
 			}, Logs: []domain.OperationLogEntry{
 				{ID: id, Kind: "deployment", StartedAt: time.Date(2026, 9, 14, 11, 30, 0, 0, time.UTC), SizeBytes: 70000, State: "partial", Available: true},
 			}}
 		},
-		LoadLog: func(selected string) domain.OperationLogReport {
+		LoadLog: func(ctx context.Context, selected string) domain.OperationLogReport {
 			loaded = selected
 			lines := make([]string, 20)
 			for index := range lines {
@@ -1753,7 +1757,7 @@ func TestDashboardBrowsesBoundedOperationLogTail(t *testing.T) {
 func TestDashboardShowsScrollableReadOnlyGitReview(t *testing.T) {
 	loads := 0
 	actions := DashboardActions{
-		LoadGitReview: func() domain.GitReviewReport {
+		LoadGitReview: func(ctx context.Context) domain.GitReviewReport {
 			loads++
 			return domain.GitReviewReport{
 				Operation: "git-review",
@@ -1811,8 +1815,8 @@ func TestDashboardPlansAndCreatesExactLocalGitCommit(t *testing.T) {
 		},
 	}
 	actions := DashboardActions{
-		LoadGitReview: func() domain.GitReviewReport { return review },
-		PlanGitCommit: func(paths string) domain.GitCommitPlanReport {
+		LoadGitReview: func(ctx context.Context) domain.GitReviewReport { return review },
+		PlanGitCommit: func(ctx context.Context, paths string) domain.GitCommitPlanReport {
 			if paths != "lab-settings.json" {
 				t.Fatalf("planned paths = %q", paths)
 			}
@@ -1876,7 +1880,7 @@ func TestFirstSetupCommitResultReturnsToObservedChecklist(t *testing.T) {
 				Operation: "git-commit", State: "completed", Committed: true,
 			},
 		},
-		actions: DashboardActions{LoadSetup: func() domain.SetupReport {
+		actions: DashboardActions{LoadSetup: func(ctx context.Context) domain.SetupReport {
 			loads++
 			return testSetupReport(true, false, false, false)
 		}},
@@ -1908,7 +1912,7 @@ func TestDashboardDeploymentRejectsEmptySelectionAndBlockedPlan(t *testing.T) {
 	report := testDashboardReport("ready")
 	report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}}
 	actions := DashboardActions{
-		PlanDeployment: func(string) domain.DeploymentPlanReport {
+		PlanDeployment: func(ctx context.Context, _ string) domain.DeploymentPlanReport {
 			return domain.DeploymentPlanReport{State: "blocked", Issues: []domain.ValidationIssue{{Field: "git", Message: "worktree is dirty"}}}
 		},
 	}
@@ -1945,8 +1949,8 @@ func TestSelectedDeploymentTargetsPreservesInventoryOrder(t *testing.T) {
 func TestDashboardPXEStartRequiresExactTypedConfirmation(t *testing.T) {
 	starts := 0
 	actions := DashboardActions{
-		Refresh: func() (domain.StatusReport, error) { return testDashboardReport("active"), nil },
-		PlanPXEStart: func() domain.PXELifecycleReport {
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) { return testDashboardReport("active"), nil },
+		PlanPXEStart: func(ctx context.Context) domain.PXELifecycleReport {
 			return domain.PXELifecycleReport{
 				State:       "ready",
 				Mode:        "ready",
@@ -2012,8 +2016,11 @@ func TestDashboardPXEConfirmationRejectsLegacyMultiwordInput(t *testing.T) {
 func TestDashboardPXEPrepareStopAndRecoverUseCallbacks(t *testing.T) {
 	called := ""
 	actions := DashboardActions{
-		Refresh:      func() (domain.StatusReport, error) { return testDashboardReport("ready"), nil },
-		LoadSettings: func() (domain.LabSettingsFile, error) { called = "configure"; return wizardSettings(), nil },
+		Refresh: func(ctx context.Context) (domain.StatusReport, error) { return testDashboardReport("ready"), nil },
+		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
+			called = "configure"
+			return wizardSettings(), nil
+		},
 		StopPXE: func() domain.PXELifecycleReport {
 			called = "stop"
 			return domain.PXELifecycleReport{Message: "stopped"}
@@ -2103,7 +2110,7 @@ func TestDashboardPXEProgressShowsPhaseBarAndRecentActivity(t *testing.T) {
 		t.Fatal("running preparation did not schedule the next progress poll")
 	}
 	view := model.View().Content
-	for _, expected := range []string{"Building client systems", "2/10", "Progress details", "Built client pc02 (2/10)", "elapsed"} {
+	for _, expected := range []string{"Building client systems", "2/10", "Progress details", "Built client pc02 (2/10)", "Elapsed:"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("PXE progress omits %q:\n%s", expected, view)
 		}
