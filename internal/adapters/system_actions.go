@@ -26,6 +26,11 @@ func (Local) ControlSystemUnit(ctx context.Context, verb, unit string) error {
 	if !allowed[unit][verb] && !(verb == "start" && controllerApplyUnitPattern.MatchString(unit)) {
 		return fmt.Errorf("system unit action %q %q is not an allowed Nixorium action", verb, unit)
 	}
+	if verb == "start" && (managedUnitOperation(unit) != "" || unit == "nixorium-pxe.service") {
+		if err := checkManagedJobConflict(ctx); err != nil {
+			return err
+		}
+	}
 	// This also protects a newly launched command before the installed systemd
 	// scripts have been upgraded to recognize durable deployment evidence.
 	if verb == "start" && unit != "nixorium-pxe-recover.service" {

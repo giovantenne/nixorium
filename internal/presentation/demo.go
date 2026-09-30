@@ -67,8 +67,38 @@ func RenderDemoBundleAtSize(sourceCommit, sourceDate string, width, height int) 
 			renderSupportDemo(sourceCommit, width, height),
 			renderTemplateResetDemo(sourceCommit, width, height),
 			renderHostTrustDemo(sourceCommit, width, height),
+			renderManagedJobsDemo(sourceCommit, width, height),
 		},
 	}
+}
+
+func renderManagedJobsDemo(revision string, width, height int) DemoScenario {
+	jobs := []domain.ManagedJob{
+		{Operation: "controller-apply", Unit: "nixorium-apply-controller@" + revision + ".service", State: "running", Detail: "Managed work is still running; viewing it does not start another operation.", Progress: domain.OperationProgress{Operation: "controller-apply", State: "running", Phase: "build", Current: 1, Total: 4, Recent: []string{"Building the reviewed controller system"}}},
+		{Operation: "pxe-prepare", Unit: "nixorium-prepare-pxe.service", State: "idle"},
+	}
+	actions := demoActions()
+	actions.LoadManagedJobs = func(context.Context) ([]domain.ManagedJob, error) { return jobs, nil }
+	r := newDemoRecorder(actions, revision, width, height)
+	r.model.jobs.items = jobs
+	r.capture("Overview", 1500)
+	r.key(demoText("v"))
+	r.capture("Attach to the existing controller build", 2500)
+	r.key(demoCode(tea.KeyEscape))
+	blocked, _ := r.model.openControllerReview()
+	r.model = blocked.(dashboardModel)
+	r.capture("Conflicting controller start is refused", 2000)
+	r.key(demoText("v"))
+	jobs = append([]domain.ManagedJob(nil), jobs...)
+	jobs[0].State = "interrupted"
+	jobs[0].Detail = "Progress was left running, but no managed unit is running. Inspect the journal before a fresh review."
+	r.message(managedJobsMsg{jobs: jobs})
+	r.capture("Interrupted job with journal identity", 2500)
+	r.key(demoCode(tea.KeyTab))
+	r.capture("Inspect the other managed job", 1500)
+	r.key(demoCode(tea.KeyEscape))
+	r.capture("Return without resuming work", 2000)
+	return DemoScenario{ID: "managed-jobs", Title: "Reattach to existing managed work", Description: "Observe surviving controller/PXE jobs, refuse conflicting starts and identify interrupted progress without resuming or verifying an operation.", Frames: r.frames}
 }
 
 func renderHostTrustDemo(revision string, width, height int) DemoScenario {

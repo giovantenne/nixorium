@@ -108,6 +108,14 @@ follow-ups returning to their parent.
 Grouped update builds show the required output count and elapsed time, not a
 fabricated per-output percentage. Keep their check details expandable in place.
 
+Managed-job attachment combines adapter-owned unit state with bounded progress,
+including revision-bound controller units. It is a separate read-only view,
+not a synthetic apply result: never trigger verification or installation
+follow-ups from progress alone. Keep timestamp filtering for jobs started by
+this TUI, accept earlier matching progress when attaching, report abandoned
+running records as interrupted and refuse conflicting starts. Observation is
+bounded, local-only and unavailable to the restricted teacher dashboard.
+
 ## Validate behavior and rendering
 
 Put interaction and state-transition coverage in deterministic Go tests. Keep

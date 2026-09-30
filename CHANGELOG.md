@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Reopening the administrator TUI discovers surviving controller/PXE jobs from
+  local systemd state and bounded progress records, including revision-bound
+  controller instances. Overview offers read-only attachment; stale running
+  records with no running unit are marked interrupted with journal guidance.
+  Conflicting managed starts are refused, and observation never resumes a
+  workflow or replaces activation verification.
+
 - Unified TUI working states with elapsed time, visible safety/exit behavior and
   feedback for unavailable keys. Read-only loads and proposals accept Esc,
   retain editable drafts and ignore late replies; ordinary reads have a two-minute

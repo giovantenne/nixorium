@@ -291,6 +291,14 @@ in
       '';
     };
     services.openssh.enable = true;
+    systemd.services.nixorium-managed-jobs-check = {
+      path = [ pkgs.coreutils pkgs.systemd ];
+      environment.NIXORIUM_TEST_MANAGED_JOBS = "1";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${sandboxCheck}/bin/sandbox-check -test.run ^TestManagedJobsSystemdIntegration$ -test.v";
+      };
+    };
     systemd.services.nixorium-workspace-save-check = {
       path = [ pkgs.git pkgs.nix pkgs.coreutils nixoriumPackage ];
       environment.NIXORIUM_TEST_WORKSPACE_NIX = "1";
@@ -483,6 +491,8 @@ in
     controller.succeed("nft list ruleset | grep -F lab0 | grep -F 5000 | grep -F 8080; nft list ruleset | grep -F lab0 | grep -F 67")
     controller.succeed("command -v nixorium")
     controller.succeed("command -v colmena")
+    controller.succeed("systemctl start nixorium-managed-jobs-check.service")
+    controller.succeed("journalctl -u nixorium-managed-jobs-check.service --no-pager | grep -F -- '--- PASS: TestManagedJobsSystemdIntegration'")
     controller.succeed("id -nG admin | tr ' ' '\n' | grep -Fx nixorium-operations; id -nG admin | tr ' ' '\n' | grep -Fx nixorium-classroom; id -nG teacher | tr ' ' '\n' | grep -Fx nixorium-classroom; ! id -nG student | tr ' ' '\n' | grep -Fx nixorium-classroom; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination)\" = root:nixorium-operations:770; test \"$(stat -c '%U:%G:%a' /var/lib/nixorium/coordination/operation.lock)\" = root:nixorium-operations:660")
     controller.wait_for_unit("nixorium-classroom.service")
     controller.wait_until_succeeds("test \"$(stat -c '%U:%G:%a' /run/nixorium-classroom/control.sock)\" = admin:nixorium-classroom:660")

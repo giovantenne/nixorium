@@ -11,6 +11,10 @@ import (
 )
 
 func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
+	if reason := model.managedJobConflict(); reason != "" {
+		model.message = reason
+		return model, nil
+	}
 	model.screen = dashboardController
 	model.busy = "Reviewing controller revision and active system"
 	model.message = ""
@@ -302,6 +306,10 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				return dashboardControllerPlanMsg{report: model.actions.PlanController(ctx)}
 			})
 		case domain.SetupStageArtifacts:
+			if reason := model.managedJobConflict(); reason != "" {
+				model.message = reason
+				return model, nil
+			}
 			model.screen = dashboardPXE
 			model.busy = "Preparing netboot artifacts and client closures"
 			model.installation.pxePreparing = true

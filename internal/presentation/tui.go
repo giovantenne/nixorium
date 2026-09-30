@@ -20,6 +20,7 @@ import (
 // stop action, not the read-only Esc path. PreparePXE is systemd-owned;
 // ApplyController waits for a managed job while the foreground UI stays protected.
 type DashboardActions struct {
+	LoadManagedJobs        func(context.Context) ([]domain.ManagedJob, error)
 	PlanHostTrust          func(context.Context, string) domain.HostTrustPlan
 	ApplyHostTrust         func(domain.HostTrustPlan) domain.HostTrustResult
 	LoadTemplateReset      func(context.Context) domain.TemplateResetCatalog
@@ -133,6 +134,7 @@ const (
 	dashboardSupport
 	dashboardTemplateReset
 	dashboardHostTrust
+	dashboardManagedJobs
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -292,6 +294,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	jobs                   managedJobsModel
 	read                   readActivity
 	busyStarted            time.Time
 	hostTrust              hostTrustModel
@@ -351,9 +354,12 @@ type dashboardStatusMsg struct {
 }
 
 type dashboardInitialMsg struct {
-	report domain.StatusReport
-	setup  domain.SetupReport
-	err    error
+	jobs    []domain.ManagedJob
+	jobsErr error
+	jobsID  uint64
+	report  domain.StatusReport
+	setup   domain.SetupReport
+	err     error
 }
 
 type dashboardBeginInitialMsg struct{}
@@ -597,6 +603,8 @@ func (model dashboardModel) Init() tea.Cmd {
 	commands := []tea.Cmd{tea.RequestBackgroundColor, model.activitySpinner.Tick}
 	if model.initializing && model.actions.LoadInitial != nil {
 		commands = append(commands, func() tea.Msg { return dashboardBeginInitialMsg{} })
+	} else if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
+		commands = append(commands, model.loadManagedJobs(model.jobs.id))
 	}
 	return tea.Batch(commands...)
 }
@@ -687,6 +695,10 @@ func (model dashboardModel) openUSBInstallation() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstallMethod) (tea.Model, tea.Cmd) {
+	if reason := model.managedJobConflict(); reason != "" {
+		model.message = reason
+		return model, nil
+	}
 	if model.actions.LoadSettings == nil {
 		model.message = "Laboratory settings are not available in this session."
 		return model, nil
@@ -791,6 +803,9 @@ func (model dashboardModel) continueComputerInstallation(report domain.SetupRepo
 }
 
 func (model dashboardModel) startComputerInstallationPreparation() (tea.Model, tea.Cmd) {
+	// A guided follow-up can arrive before the background poll observes our
+	// completed controller job. The mutation adapter rechecks live conflicts;
+	// never fail this continuation from an older observational snapshot.
 	if model.actions.PreparePXE == nil {
 		return model.failComputerInstallation("Client preparation is not available in this session.")
 	}
@@ -946,9 +961,11 @@ func (model dashboardModel) loadSetup() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) loadInitial() (tea.Model, tea.Cmd) {
+	model.jobs.id++
 	return model.startRead(func(ctx context.Context) tea.Msg {
+		jobs, jobsErr := model.observeManagedJobs(ctx)
 		report, setup, err := model.actions.LoadInitial(ctx)
-		return dashboardInitialMsg{report: report, setup: setup, err: err}
+		return dashboardInitialMsg{report: report, setup: setup, err: err, jobs: jobs, jobsErr: jobsErr, jobsID: model.jobs.id}
 	})
 }
 
@@ -995,6 +1012,8 @@ func (model dashboardModel) View() tea.View {
 	}
 	content := ""
 	switch model.screen {
+	case dashboardManagedJobs:
+		content = model.managedJobsView()
 	case dashboardHostTrust:
 		content = model.hostTrustView()
 	case dashboardComputersArea:

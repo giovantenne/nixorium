@@ -10,6 +10,15 @@ to apply: retry the read or inspect Diagnostics. Foreground mutations remain
 protected; independent systemd/remote work is not cancelled by closing a read
 or quitting an explicitly leave-safe view. Consult the current action bar.
 
+On supporting pins, reopening the administrator TUI finds controller/PXE jobs
+that survived its terminal. Use **Overview → v (View progress)** to observe,
+and **Tab** to switch jobs. This never starts or resumes work. A running record
+without a running unit is interrupted: inspect the displayed journal unit,
+then use a fresh ordinary review. A completion record is not verification of
+the current configuration. Wait for running work before a conflicting start;
+unavailable unit state is not permission to retry. Observation uses local
+systemd/progress only, without startup Nix evaluation.
+
 Evaluate before building. For settings changes, use the managed validator;
 for other changes, evaluate the affected outputs. Inspect mode, readiness, and
 inventory without writing the lock:

@@ -199,10 +199,15 @@ func (model dashboardModel) administrationView() string {
 func (model dashboardModel) helpView() string {
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
+	case dashboardManagedJobs:
+		lines = append(lines, "Tab switches between controller and PXE jobs; status refreshes automatically.", "Esc leaves this read-only view; quitting does not cancel a managed job.", "Interrupted means a running progress record has no running unit.", "Inspect the named journal unit, then request a fresh review before retrying.", "Completion here is not verification of the current configuration.")
 	case dashboardHostTrust:
 		lines = append(lines, "Compare the offered fingerprint with this computer's physical console.", "Only a deliberately reinstalled client is eligible for reviewed key rotation.", "Esc cancels the read or review without changes; saving cannot be interrupted.")
 	case dashboardHome:
 		lines = append(lines, taskHelp(dashboardTasks)...)
+		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
+			lines = append(lines, "v  View existing managed work without starting or resuming it")
+		}
 	case dashboardComputersArea:
 		lines = append(lines, taskHelp(model.availableComputerTasks())...)
 	case dashboardInstallationArea:

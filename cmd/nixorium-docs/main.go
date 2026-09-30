@@ -138,6 +138,9 @@ func renderGallery() string {
 		{title: "Cancellable SSH trust inspection", scenarioID: "host-trust", label: "Read-only fingerprint inspection"},
 		{title: "Single-client SSH trust review", scenarioID: "host-trust", label: "Review recorded and offered fingerprints"},
 		{title: "SSH trust saved without deployment", scenarioID: "host-trust", label: "Single-client trust saved without system update"},
+		{title: "Overview finds an existing managed job", scenarioID: "managed-jobs", label: "Overview"},
+		{title: "Read-only attachment to existing progress", scenarioID: "managed-jobs", label: "Attach to the existing controller build"},
+		{title: "Interrupted managed job", scenarioID: "managed-jobs", label: "Interrupted job with journal identity"},
 	}
 	var output strings.Builder
 	for index, selection := range frames {

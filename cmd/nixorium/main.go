@@ -377,6 +377,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadControllerProgress: func() (domain.OperationProgress, error) {
 			return progressManager.Current("controller-apply")
 		},
+		LoadManagedJobs: local.ObserveManagedJobs,
 		LoadServices: func(ctx context.Context) domain.ServicesReport {
 			return serviceManager.Status(ctx, repository)
 		},

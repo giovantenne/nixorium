@@ -14,6 +14,17 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case managedJobsTickMsg:
+		if message.id != model.jobs.id {
+			return model, nil
+		}
+		return model, model.loadManagedJobs(message.id)
+	case managedJobsMsg:
+		if message.id != model.jobs.id {
+			return model, nil
+		}
+		model.jobs.items, model.jobs.err = message.jobs, message.err
+		return model, model.scheduleManagedJobsTick()
 	case dashboardBeginInitialMsg:
 		if !model.initializing || model.actions.LoadInitial == nil {
 			return model, nil
@@ -67,26 +78,29 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardRemoteInstallMsg:
 		return model.handleRemoteInstallMessage(message)
 	case dashboardInitialMsg:
+		model.jobs.items, model.jobs.err, model.jobs.id = message.jobs, message.jobsErr, message.jobsID
+		poll := model.scheduleManagedJobsTick()
 		model.busy = ""
 		model.initializing = false
 		if message.err != nil {
 			model.initialError = true
 			model.message = "The laboratory could not be opened: " + message.err.Error()
 			model.screen = dashboardHome
-			return model, nil
+			return model, poll
 		}
 		model.initialError = false
 		model.report = message.report
 		model.setup = message.setup
-		if model.setupMode || setupNeedsImmediateAttention(message.setup) {
-			return model.beginComputerInstallation("")
+		if (model.setupMode || setupNeedsImmediateAttention(message.setup)) && model.managedJobConflict() == "" {
+			next, command := model.beginComputerInstallation("")
+			return next, tea.Batch(command, poll)
 		} else if model.actions.ClassroomMode {
 			model.screen = dashboardComputersArea
 		} else {
 			model.screen = dashboardHome
 		}
 		model.message = ""
-		return model, nil
+		return model, poll
 	case dashboardPXEOverviewMsg:
 		model.busy = ""
 		model.installation.stateError = message.err != nil
@@ -1091,6 +1105,26 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	}
 	if model.busy != "" {
 		model.message = "This action is unavailable while work is running. Wait for its result; F1 opens help."
+		return model, nil
+	}
+	if model.screen == dashboardManagedJobs {
+		switch key.String() {
+		case "esc", "left":
+			model.screen = dashboardHome
+		case "tab", "down", "up":
+			model.jobs.cursor = (model.jobs.cursor + 1) % max(1, len(model.jobs.items))
+		}
+		return model, nil
+	}
+	if key.String() == "v" && model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode && model.screen == dashboardHome {
+		model.screen = dashboardManagedJobs
+		model.message = ""
+		for index, job := range model.jobs.items {
+			if job.State == "running" || job.State == "interrupted" {
+				model.jobs.cursor = index
+				break
+			}
+		}
 		return model, nil
 	}
 	if model.screen == dashboardAdministration {

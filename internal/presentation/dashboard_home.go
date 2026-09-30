@@ -132,15 +132,19 @@ func (model dashboardModel) homeView() string {
 		menu = newDashboardTaskMenu(model.isDark, model.width, model.height)
 	}
 	if model.initialError {
+		notices := append(model.managedJobNotices(), tuiNotice{
+			kind: tuiStatusFailure, title: "The laboratory could not be opened",
+			detail: model.message + " No configuration or computer was changed.",
+		})
+		actions := []tuiAction{{key: "Enter", label: "Try again"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
+		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
+			actions = append([]tuiAction{{key: "v", label: "View progress"}}, actions...)
+		}
 		return model.renderShell(tuiShell{
-			path: []string{"Overview"},
-			body: "The saved laboratory state is not available yet.",
-			notices: []tuiNotice{{
-				kind:   tuiStatusFailure,
-				title:  "The laboratory could not be opened",
-				detail: model.message + " No configuration or computer was changed.",
-			}},
-			actions: []tuiAction{{key: "Enter", label: "Try again"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
+			path:    []string{"Overview"},
+			body:    "The saved laboratory state is not available yet.",
+			notices: notices,
+			actions: actions,
 		})
 	}
 	if model.initializing {
@@ -155,7 +159,7 @@ func (model dashboardModel) homeView() string {
 		tuiMuted("Choose an area. Observed state is loaded only when the selected task needs it.", model.isDark),
 		"",
 	}
-	notices := []tuiNotice{}
+	notices := model.managedJobNotices()
 	if model.report.PXE.Mode == "recovery-required" {
 		notices = append(notices, tuiNotice{
 			kind:   tuiStatusAttention,
@@ -179,11 +183,15 @@ func (model dashboardModel) homeView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
+	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}}
+	if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
+		actions = append([]tuiAction{{key: "v", label: "View progress"}}, actions...)
+	}
 	return model.renderShell(tuiShell{
 		path:    []string{"Overview"},
 		body:    strings.Join(lines, "\n"),
 		notices: notices,
-		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}},
+		actions: actions,
 	})
 }
 

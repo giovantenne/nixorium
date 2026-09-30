@@ -63,6 +63,15 @@ job continues. Cancelling an IPC read closes this client's connection, not a
 worker-owned operation. Unsupported keys explain the available action; F1 and
 scrolling remain available while waiting.
 
+On reopening, Overview checks controller/PXE units and local progress without
+evaluating Nix. **v — View progress** attaches read-only to an existing job;
+**Tab** switches jobs. Leaving the view never cancels or resumes work. An
+inactive unit with a running record is **interrupted**, not still building:
+inspect the named journal unit before a fresh review. A completion record is
+not verification of the current configuration. Running units block conflicting
+starts; unavailable unit state is not treated as idle. Checks retry every two
+seconds after the previous bounded observation finishes.
+
 <!-- BEGIN GENERATED: tui-gallery -->
 ## Overview
 
@@ -628,5 +637,66 @@ Review this computer's changed SSH key
 Reviewed trust saved for pc01 only. Refresh Computers before reviewing deployment.
 
 Enter Computer details  ·  Esc Back  ·  F1 Help
+```
+
+## Overview finds an existing managed job
+
+```text
+Nixorium  /  Overview
+
+Laboratory overview
+Choose an area. Observed state is loaded only when the selected task needs it.
+
+› [c] Computers
+  [n] Installation
+  [w] Software
+  [a] Maintenance
+
+Inventory, system deployment, Internet access and shutdown
+
+NOTICE
+! Controller configuration — running
+  Press v to view progress and the journal unit. No job will be started.
+
+v View progress  ·  ↑/↓ Select  ·  Enter Open  ·  F1 Help  ·  q Quit
+```
+
+## Read-only attachment to existing progress
+
+```text
+Nixorium  /  Overview  /  Background work
+
+Managed background work
+Read-only attachment. Leaving this view does not stop the job.
+
+Controller configuration — running
+Managed work is still running; viewing it does not start another operation.
+
+● Building system · Running
+1/4 steps complete
+Building the reviewed controller system
+
+Journal unit: nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service
+
+Tab Other job  ·  Esc Overview  ·  q Quit  ·  F1 Help
+```
+
+## Interrupted managed job
+
+```text
+Nixorium  /  Overview  /  Background work
+
+Managed background work
+Read-only attachment. Leaving this view does not stop the job.
+
+Controller configuration — interrupted
+Progress was left running, but no managed unit is running. Inspect the journal before a fresh review.
+
+Last recorded phase: build
+Building the reviewed controller system
+
+Journal unit: nixorium-apply-controller@0123456789abcdef0123456789abcdef01234567.service
+
+Tab Other job  ·  Esc Overview  ·  q Quit  ·  F1 Help
 ```
 <!-- END GENERATED: tui-gallery -->

@@ -26,7 +26,7 @@ func TestDemoRendererFitsSupportedLayouts(t *testing.T) {
 
 func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	bundle := RenderDemoBundle(strings.Repeat("a", 40), "2026-09-19")
-	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 10 {
+	if bundle.Terminal != "120x30" || !bundle.Synthetic || len(bundle.Scenarios) != 11 {
 		t.Fatalf("unexpected bundle metadata: terminal=%s synthetic=%t scenarios=%d", bundle.Terminal, bundle.Synthetic, len(bundle.Scenarios))
 	}
 	for _, scenario := range bundle.Scenarios {
