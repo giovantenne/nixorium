@@ -671,8 +671,10 @@ nix run .#nixorium -- setup apply
 `setup configure` records the interface carrying the controller's default
 route as a controller-specific override and proposes its live DHCP address
 (not the controller's declarative static address), groups its essential
-questions by task, and provides searchable offline selectors for time zone,
-locale, and keyboard values while retaining validated custom entry. Optional
+questions by task, and provides searchable offline selectors for time zone
+and keyboard values while retaining validated custom entry. The desktop locale
+is set by `defaultLocale` and `extraLocale` in `lab-settings.json`; change those
+values through the reviewed `config plan` / `config apply` workflow. Optional
 Git identity is not requested during first run. The wizard supports backward
 navigation, collects passwords without echo, retries recoverable password
 mistakes in the current account without restarting configuration, validates

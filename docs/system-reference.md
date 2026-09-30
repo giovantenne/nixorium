@@ -76,6 +76,13 @@ controller-system transfer. Once Disko has mounted the target, the bootstrap
 places its evaluation cache and temporary swap there; `nixos-install` builds
 directly into the target store with one Nix job and one core per build.
 
+## Regional settings
+
+The guided settings forms offer time zone and keyboard selectors. Desktop
+locale is configured separately with `defaultLocale` and `extraLocale` in
+`lab-settings.json`, using a complete candidate and the reviewed `config plan`
+and `config apply` workflow. Bootstrap starts with `en_US.UTF-8`.
+
 ## Package-base ownership
 
 New deployments own a direct `nixpkgs` pin on the channel advertised by

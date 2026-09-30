@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Corrected regional-settings guidance: guided forms select time zone and
+  keyboard, while desktop locales use the reviewed configuration workflow.
+
 - PXE enrollment refuses a missing configured client interface before the erase
   review, lists detected interfaces and explains how to prepare corrected files.
   Installation settings now edit the client override and show controller context.

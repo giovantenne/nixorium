@@ -69,6 +69,14 @@ Do not make the application rewrite arbitrary Nix. Existing deployments that
 still import `lab-config.nix` remain supported but read-only until an explicit
 equivalence-checked migration is available.
 
+## Regional settings
+
+The guided forms offer time zone and keyboard selectors, not a locale selector.
+Bootstrap uses `en_US.UTF-8`. Change the desktop locale through `defaultLocale`
+and `extraLocale` in a complete `lab-settings.json` candidate, using the reviewed
+configuration plan/apply protocol above. Saving does not activate the locale;
+apply the controller and update client computers separately.
+
 ## Network settings
 
 `networkBase` is a full IPv4 network address, such as `10.0.0.0`, and
