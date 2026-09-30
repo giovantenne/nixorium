@@ -19,6 +19,20 @@ type workspaceCommandManager interface {
 }
 
 func runWorkspaceCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
+	if options.subcommand == "marketplace" {
+		report := app.NewWorkspaceMarketplace(adapters.Local{}).Resolve(ctx, repository, options.extension)
+		if options.json {
+			if err := presentation.JSON(stdout, report); err != nil {
+				return commandOutputError(err, stderr)
+			}
+		} else {
+			presentation.WorkspaceMarketplaceText(stdout, report)
+		}
+		if report.HasErrors() {
+			return 1
+		}
+		return 0
+	}
 	candidate, err := adapters.ReadWorkspaceCandidate(options.file)
 	if err != nil {
 		fmt.Fprintln(stderr, "Error: read workspace candidate:", err)

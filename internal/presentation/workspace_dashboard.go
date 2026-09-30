@@ -172,6 +172,18 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 		if model.workspace.searching && key.String() == "enter" {
 			return model.startWorkspaceSearch()
 		}
+		if model.workspace.field.kind == "extensions" && !model.workspace.searching && model.workspace.pending == nil && key.String() == "u" {
+			ids := []string{}
+			for id := range model.workspace.marketplace {
+				ids = append(ids, id)
+			}
+			if len(ids) == 0 {
+				model.message = "No Marketplace extensions are pinned in this draft."
+				return model, nil
+			}
+			slices.Sort(ids)
+			return model.startWorkspaceMarketplace(ids, true)
+		}
 		model.message = model.workspace.editField(key)
 	case workspaceReview:
 		switch key.String() {
@@ -254,7 +266,7 @@ func (model dashboardModel) workspaceView() string {
 		resolved := w.loaded.Inspection.Resolution
 		switch w.stage {
 		case workspaceOverview:
-			fixed = "Packaged extensions update with Maintenance → Update system and packages."
+			fixed = "Packaged extensions update with Maintenance → Update system and packages;\nMarketplace pins with u in VSCode → extensions."
 			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), workspaceApplicationText(resolved.RuntimeEnabled), "")
 			if w.loaded.Inspection.Base == nil {
 				lines = append(lines, "No saved profile; this is a new draft.")
@@ -285,11 +297,19 @@ func (model dashboardModel) workspaceView() string {
 				lines = append(lines, "Value: "+w.number+"_", "Leave empty to inherit the deployment baseline.")
 			} else {
 				multiple := w.field.kind == "favorites" || w.field.kind == "extensions"
-				if w.searching {
+				if w.pending != nil {
+					lines = append(lines, w.marketplaceView(width)...)
+					actions = []tuiAction{{key: "Enter", label: "Add to draft"}, {key: "Esc", label: "Do not add"}, {key: "F1", label: "Help"}}
+					break
+				}
+				if w.searching && w.searchMode == "marketplace" {
+					lines = append(lines, "Marketplace identifier: "+w.query+"_", "Type publisher.name exactly as on the Marketplace page, for example platformio.platformio-ide.", "The controller needs Internet access; the package is downloaded into its Nix store.", "")
+					actions = []tuiAction{{key: "Enter", label: "Download"}, {key: "Esc", label: "Close"}, {key: "F1", label: "Help"}}
+				} else if w.searching {
 					lines = append(lines, "Search packaged extensions: "+w.query+"_", "Type part of a name, for example python or java, then press Enter.", "")
 					actions = []tuiAction{{key: "Enter", label: "Search"}, {key: "Esc", label: "Close search"}, {key: "F1", label: "Help"}}
 				} else if w.field.kind == "extensions" {
-					actions = append([]tuiAction{{key: "/", label: "Search"}}, actions...)
+					actions = append([]tuiAction{{key: "/", label: "Search"}, {key: "m", label: "Marketplace"}, {key: "u", label: "Check updates"}}, actions...)
 				}
 				if multiple {
 					mode := "Explicit selection"

@@ -75,6 +75,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.finishWorkspaceSave(message)
 	case dashboardWorkspaceSearchMsg:
 		return model.finishWorkspaceSearch(message)
+	case dashboardWorkspaceMarketplaceMsg:
+		return model.finishWorkspaceMarketplace(message)
 	case dashboardRemoteFingerprintMsg:
 		return model.handleRemoteFingerprintMessage(message)
 	case dashboardRemoteInstallMsg:

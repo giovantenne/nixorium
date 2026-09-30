@@ -54,7 +54,8 @@ let
     password-store = "basic";
     enable-crash-reporter = false;
   });
-  packageTools = import ./software-packages.nix { inherit lib pkgs; allowUnfree = true; };
+  pinnedPkgs = import ./workspace-marketplace.nix { inherit lib pkgs; } (profile.vscode.marketplace or []);
+  packageTools = import ./software-packages.nix { inherit lib; pkgs = pinnedPkgs; allowUnfree = true; };
   extensions = map (entry:
     let
       package = packageTools.resolve entry.package;

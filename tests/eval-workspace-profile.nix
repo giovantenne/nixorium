@@ -11,6 +11,12 @@ let
   favorites = n: builtins.genList (i: "app${toString i}.desktop") n;
   extensions = n: builtins.genList (i: "publisher.extension${toString i}") n;
   accepts = profile: (evaluate (builtins.toJSON ({ schemaVersion = 1; } // profile))).success;
+  pins = n: builtins.genList (i: {
+    publisher = "publisher";
+    name = "extension${toString i}";
+    version = "1.0.0";
+    hash = "sha256-${lib.concatStrings (builtins.genList (_: "A") 43)}=";
+  }) n;
   repeated = n: lib.concatStrings (builtins.genList (_: "a") n);
 in
 assert builtins.all (checkCase true) cases.valid;
@@ -27,6 +33,8 @@ assert !(accepts { vscode.extraSettings = lib.genAttrs (builtins.genList (i: "se
 assert accepts { vscode.extraSettings.${repeated 128} = true; };
 assert !(accepts { vscode.extraSettings.${repeated 129} = true; });
 assert accepts { vscode.extraSettings.a = 9007199254740992; };
+assert accepts { vscode.marketplace = pins 32; };
+assert !(accepts { vscode.marketplace = pins 33; });
 assert (evaluate (''{"schemaVersion":1}'' + lib.concatStrings (builtins.genList (_: " ") (65536 - 19)))).success;
 assert !(evaluate (''{"schemaVersion":1}'' + lib.concatStrings (builtins.genList (_: " ") (65537 - 19)))).success;
 true

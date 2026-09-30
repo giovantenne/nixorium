@@ -82,6 +82,30 @@ let
       then fail "setting is not supported as an extra setting"
       else settingValue item
     ) value;
+  # Marketplace pins name exact bytes (hash) of one extension version. The
+  # download URL is derived by the builder; the profile never carries one.
+  marketplaceEntry = value:
+    let
+      entry = object {
+        publisher = identifier "[A-Za-z0-9][A-Za-z0-9-]*";
+        name = identifier "[A-Za-z0-9][A-Za-z0-9-]*";
+        version = identifier "[0-9]+(\\.[0-9]+){1,3}";
+        hash = identifier "sha256-[A-Za-z0-9+/]{43}=";
+        platform = enum [ "linux-x64" ];
+      } value;
+    in
+    if !(builtins.all (key: entry ? ${key}) [ "publisher" "name" "version" "hash" ])
+    then fail "incomplete Marketplace extension"
+    else entry;
+  marketplaceID = entry: lib.toLower "${entry.publisher}.${entry.name}";
+  marketplace = value:
+    let
+      entries = list 32 marketplaceEntry value;
+      ids = map marketplaceID entries;
+    in
+    if builtins.length ids != builtins.length (lib.unique ids) then fail "duplicate Marketplace extension"
+    else if !(builtins.all (id: builtins.stringLength id <= 128) ids) then fail "invalid identifier"
+    else lib.sort (a: b: marketplaceID a < marketplaceID b) entries;
   profile = object {
     schemaVersion = integer 1 1;
     desktop = object {
@@ -109,6 +133,7 @@ let
         "files.autoSave" = enum [ "off" "onFocusChange" "onWindowChange" ];
       };
       inherit extraSettings;
+      inherit marketplace;
     };
     browser = object { defaultApplication = desktopID; };
   } raw;

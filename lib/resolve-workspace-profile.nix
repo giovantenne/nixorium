@@ -6,7 +6,10 @@
 let
   fail = message: throw "workspace resolution: ${message}";
   decode = import ./eval-workspace-profile.nix { inherit lib; };
-  packageTools = import ./software-packages.nix { inherit lib pkgs; allowUnfree = true; };
+  # Selected Marketplace pins join the package set for this resolution only.
+  pinnedPkgs = import ./workspace-marketplace.nix { inherit lib pkgs; } (effective.vscode.marketplace or []);
+  packageTools = import ./software-packages.nix { inherit lib; pkgs = pinnedPkgs; allowUnfree = true; };
+  marketplaceIDs = map (entry: lib.toLower "${entry.publisher}.${entry.name}") (effective.vscode.marketplace or []);
   object = allowed: required: value:
     if !builtins.isAttrs value then fail "expected a catalog object"
     else if builtins.removeAttrs value allowed != {} then fail "unsupported catalog field"
@@ -146,6 +149,8 @@ assert builtins.all (entry:
   && builtins.all (id: builtins.elem id extensionIDs) entry.requiredExtensions
 ) extensions || fail "extension dependencies must name other catalog entries";
 assert browser == null || browser.browser || fail "default application is not catalogued as a browser";
+assert builtins.all (id: builtins.elem id selectedIDs) marketplaceIDs
+  || fail "every Marketplace pin must be a selected extension";
 assert builtins.all (entry: builtins.all (id: builtins.elem id selectedIDs) entry.requiredExtensions) selectedExtensions
   || fail "required extensions must be selected explicitly";
 builtins.deepSeq result result

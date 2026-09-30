@@ -430,6 +430,13 @@ failure or timeout must block publication.
   their own folder, and a directory of per-file links breaks the editor's
   attribution of running code to its extension. The reset validator accepts
   exactly one link to the payload or a copy with an identical manifest.
+  `vscode.marketplace` pins (publisher, name, stable version, SRI hash,
+  optional linux-x64) join the package set through
+  `lib/workspace-marketplace.nix`; keep the URL derived by the nixpkgs fetcher
+  and never accept one in the profile. `workspace marketplace` and the TUI
+  `m`/`u` actions are the only gallery clients: fixed endpoint, no redirects,
+  bounded answers, prefetch under the fetcher's name so builds stay offline,
+  and no deployment write. Every pin must be selected.
   `nixoriumResolveWorkspaceCandidate` returns the same metadata for raw candidate
   JSON without writing it. Review consumers must also compose the deployment's
   `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base
@@ -645,6 +652,9 @@ set -euo pipefail
 - `nixorium git commit apply` must never invoke broad `git add`, normal commit
   hooks, signing helpers, a remote, or push; commit only the exact reviewed tree
   and reconcile only selected index paths
+- `nixorium workspace marketplace` (and the TUI Marketplace actions) may
+  contact only the fixed public gallery and the pinned download URL, only
+  when invoked, and write only to the Nix store
 - `nixorium update` may use controller internet only when explicitly invoked;
   it must never accept an arbitrary replacement source URL, expose ignored
   private files to Nix, or introduce client-side network requirements

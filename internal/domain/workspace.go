@@ -46,6 +46,26 @@ type WorkspaceVSCode struct {
 	// ExtraSettings are reviewed free-form editor defaults. Typed fields,
 	// managed update keys and program-launching settings are refused.
 	ExtraSettings *map[string]any `json:"extraSettings,omitempty"`
+	// Marketplace pins supply extensions that are not in the package set.
+	Marketplace *[]WorkspaceMarketplaceExtension `json:"marketplace,omitempty"`
+}
+
+// WorkspaceMarketplaceExtension names the exact bytes of one Marketplace
+// version. The download location is derived by the builder, never stored.
+type WorkspaceMarketplaceExtension struct {
+	Publisher *string `json:"publisher,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	Version   *string `json:"version,omitempty"`
+	Hash      *string `json:"hash,omitempty"`
+	Platform  *string `json:"platform,omitempty"`
+}
+
+// ID is the lowercase extension identifier used in vscode.extensions.
+func (e WorkspaceMarketplaceExtension) ID() string {
+	if e.Publisher == nil || e.Name == nil {
+		return ""
+	}
+	return strings.ToLower(*e.Publisher + "." + *e.Name)
 }
 
 type WorkspaceVSCodeSettings struct {
@@ -64,6 +84,12 @@ type WorkspaceBrowser struct {
 
 var workspaceDesktopID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*\.desktop$`)
 var workspaceExtensionID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$`)
+
+var workspaceMarketplaceName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*$`)
+var workspaceMarketplaceVersion = regexp.MustCompile(`^[0-9]+(\.[0-9]+){1,3}$`)
+var workspaceMarketplaceHash = regexp.MustCompile(`^sha256-[A-Za-z0-9+/]{43}=$`)
+
+const WorkspaceMaxMarketplace = 32
 
 var workspaceSettingName = regexp.MustCompile(`^[\[A-Za-z0-9][\]A-Za-z0-9_.\[-]*$`)
 
@@ -105,12 +131,13 @@ func WorkspaceExtraSettingIssue(name string) string {
 
 // Exact names also prevent encoding/json's case-insensitive field matching.
 var workspaceFields = map[string][]string{
-	"$":                 {"schemaVersion", "desktop", "vscode", "browser"},
-	"$.desktop":         {"favorites", "colorScheme", "enableAnimations", "dock"},
-	"$.desktop.dock":    {"position", "iconSize", "autoHide", "extendHeight", "showTrash", "showMounts"},
-	"$.vscode":          {"extensions", "settings", "extraSettings"},
-	"$.vscode.settings": {"editor.fontSize", "editor.tabSize", "editor.insertSpaces", "editor.wordWrap", "editor.formatOnSave", "editor.minimap.enabled", "files.autoSave"},
-	"$.browser":         {"defaultApplication"},
+	"$":                      {"schemaVersion", "desktop", "vscode", "browser"},
+	"$.desktop":              {"favorites", "colorScheme", "enableAnimations", "dock"},
+	"$.desktop.dock":         {"position", "iconSize", "autoHide", "extendHeight", "showTrash", "showMounts"},
+	"$.vscode":               {"extensions", "settings", "extraSettings", "marketplace"},
+	"$.vscode.marketplace[]": {"publisher", "name", "version", "hash", "platform"},
+	"$.vscode.settings":      {"editor.fontSize", "editor.tabSize", "editor.insertSpaces", "editor.wordWrap", "editor.formatOnSave", "editor.minimap.enabled", "files.autoSave"},
+	"$.browser":              {"defaultApplication"},
 }
 
 func DecodeWorkspaceProfile(data []byte) (WorkspaceProfile, []ValidationIssue) {
@@ -139,6 +166,11 @@ func DecodeWorkspaceProfile(data []byte) (WorkspaceProfile, []ValidationIssue) {
 	}
 	if profile.VSCode != nil && profile.VSCode.Extensions != nil {
 		slices.Sort(*profile.VSCode.Extensions)
+	}
+	if profile.VSCode != nil && profile.VSCode.Marketplace != nil {
+		slices.SortFunc(*profile.VSCode.Marketplace, func(a, b WorkspaceMarketplaceExtension) int {
+			return strings.Compare(a.ID(), b.ID())
+		})
 	}
 	return profile, nil
 }
@@ -194,7 +226,7 @@ func checkWorkspaceJSON(decoder *json.Decoder, path string, depth int) error {
 			}
 		}
 	case '[':
-		if path != "$.desktop.favorites" && path != "$.vscode.extensions" {
+		if path != "$.desktop.favorites" && path != "$.vscode.extensions" && path != "$.vscode.marketplace" {
 			return errors.New("unexpected array")
 		}
 		for decoder.More() {
@@ -332,6 +364,23 @@ func (p WorkspaceProfile) validateValues() []ValidationIssue {
 	}
 	if v := p.VSCode; v != nil {
 		list("vscode.extensions", v.Extensions, 64, workspaceExtensionID)
+		if v.Marketplace != nil {
+			if len(*v.Marketplace) > WorkspaceMaxMarketplace {
+				add("vscode.marketplace", "too many entries")
+			}
+			seen := make(map[string]bool)
+			for _, entry := range *v.Marketplace {
+				if issue := entry.Issue(); issue != "" {
+					add("vscode.marketplace", issue)
+					break
+				}
+				if seen[entry.ID()] {
+					add("vscode.marketplace", "duplicate Marketplace extension")
+					break
+				}
+				seen[entry.ID()] = true
+			}
+		}
 		if s := v.Settings; s != nil {
 			integer("vscode.settings.editor.fontSize", s.FontSize, 8, 40)
 			integer("vscode.settings.editor.tabSize", s.TabSize, 1, 8)
@@ -343,6 +392,25 @@ func (p WorkspaceProfile) validateValues() []ValidationIssue {
 		add("browser.defaultApplication", "must be a desktop identifier of at most 128 ASCII bytes")
 	}
 	return issues
+}
+
+// Issue describes the first invalid field of a Marketplace pin, or "".
+func (e WorkspaceMarketplaceExtension) Issue() string {
+	switch {
+	case e.Publisher == nil || e.Name == nil || e.Version == nil || e.Hash == nil:
+		return "incomplete Marketplace extension"
+	case len(*e.Publisher) > 128 || !workspaceMarketplaceName.MatchString(*e.Publisher),
+		len(*e.Name) > 128 || !workspaceMarketplaceName.MatchString(*e.Name),
+		len(e.ID()) > 128:
+		return "invalid Marketplace publisher or name"
+	case len(*e.Version) > 128 || !workspaceMarketplaceVersion.MatchString(*e.Version):
+		return "Marketplace version must be a stable release number"
+	case !workspaceMarketplaceHash.MatchString(*e.Hash):
+		return "Marketplace hash must be a sha256 SRI hash"
+	case e.Platform != nil && *e.Platform != "linux-x64":
+		return "Marketplace platform must be linux-x64"
+	}
+	return ""
 }
 
 func (p WorkspaceProfile) Validate() []ValidationIssue {

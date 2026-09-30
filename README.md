@@ -367,7 +367,7 @@ only the declaration, not any current home.
 The administrative TUI offers the same reviewed save under **Maintenance →
 Settings → Student workspace**, with guided desktop, dock, VS Code and
 browser fields, including further reviewed VS Code settings by name and value
-and a search across packaged extensions.
+and extensions from the package set or, pinned by hash, from the Marketplace.
 Catalog changes and unsupported application settings remain
 explicit deployment edits; no whole-home capture is performed.
 For an existing profile, system/package update reviews also compare pinned

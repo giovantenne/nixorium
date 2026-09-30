@@ -39,6 +39,7 @@ type options struct {
 	softwarePreset     string
 	softwareExclude    string
 	softwareQuery      string
+	extension          string
 	softwareScope      string
 	json               bool
 	full               bool
@@ -212,6 +213,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	baseSaveManager := app.NewUpdateSaveManager(baseManager, baseSource, gitReviewManager, configurationSaveManager)
 	softwareManager := app.NewSoftwareManager(local)
 	workspaceManager := app.NewWorkspaceManager(local)
+	workspaceMarketplace := app.NewWorkspaceMarketplace(local)
 	templateResetManager := app.NewTemplateResetManager(adapters.TemplateReset{})
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	softwarePresetSaveManager := app.NewSoftwarePresetSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
@@ -234,6 +236,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanWorkspace: func(requestContext context.Context, candidate domain.WorkspaceProfile) domain.WorkspacePlanReport {
 			data, _ := domain.MarshalWorkspaceProfile(candidate)
 			return workspaceManager.Plan(requestContext, repository, data)
+		},
+		ResolveMarketplace: func(requestContext context.Context, id string) domain.WorkspaceMarketplaceReport {
+			return workspaceMarketplace.Resolve(requestContext, repository, id)
 		},
 		SaveWorkspace: func(plan domain.WorkspacePlanReport) domain.WorkspaceApplyReport {
 			return app.NewWorkspaceSaveManager(local, gitReviewManager).Save(ctx, plan)
@@ -630,6 +635,12 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("--query requires a package-name fragment")
 			}
 			result.softwareQuery = arguments[index]
+		case "--extension":
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, errors.New("--extension requires a Marketplace identifier such as publisher.name")
+			}
+			result.extension = arguments[index]
 		case "--scope":
 			index++
 			if index >= len(arguments) || arguments[index] == "" {
@@ -709,6 +720,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("preset must follow software")
 			}
 			result.subcommand = "preset"
+		case "marketplace":
+			if result.command != "workspace" || result.subcommand != "" {
+				return options{}, errors.New("marketplace must follow workspace")
+			}
+			result.subcommand = "marketplace"
 		case "search":
 			if result.command != "software" || result.subcommand != "" {
 				return options{}, errors.New("search must follow software")
@@ -856,9 +872,15 @@ func parseArguments(arguments []string) (options, error) {
 	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
 		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, or git commit apply")
 	}
-	if result.command == "workspace" {
+	if result.extension != "" && (result.command != "workspace" || result.subcommand != "marketplace") {
+		return options{}, errors.New("--extension is only valid with workspace marketplace")
+	}
+	if result.command == "workspace" && result.subcommand == "marketplace" && result.extension == "" {
+		return options{}, errors.New("workspace marketplace requires --extension")
+	}
+	if result.command == "workspace" && result.subcommand != "marketplace" {
 		if result.subcommand != "plan" && result.subcommand != "apply" {
-			return options{}, errors.New("workspace requires plan or apply")
+			return options{}, errors.New("workspace requires plan, apply or marketplace")
 		}
 		if result.file == "" {
 			return options{}, errors.New("workspace plan/apply requires --file")
@@ -1109,6 +1131,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
+	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
 	fmt.Fprintln(writer, "       host-key apply --host <pcNN> --expect <review-token> [--yes] rotates only the reviewed key")
 	fmt.Fprintln(writer, "       support preview [--json] shows the filtered diagnostic payload without saving")

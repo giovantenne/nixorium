@@ -78,20 +78,23 @@ type DashboardActions struct {
 	LoadWorkspace           func(context.Context) domain.WorkspacePlanReport
 	PlanWorkspace           func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
 	SaveWorkspace           func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
-	PlanSettings            func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
-	SaveSettings            func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
-	ChangePassword          SettingsPasswordAction
-	PreparePXE              func() domain.ActionReport
-	LoadPXEProgress         func() (domain.OperationProgress, error)
-	PlanPXEStart            func(context.Context) domain.PXELifecycleReport
-	StartPXE                func() domain.PXELifecycleReport
-	StopPXE                 func() domain.PXELifecycleReport
-	RecoverPXE              func() domain.PXELifecycleReport
-	PrepareRemoteInstall    func(string) (domain.RemoteInstallResponse, error)
-	ObserveRemoteInstall    func(context.Context, string) (string, error)
-	BootstrapRemoteInstall  func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
-	RemoteInstallRequest    func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
-	LoadRemoteInstall       func(context.Context) (domain.RemoteInstallResponse, error)
+	// ResolveMarketplace downloads one Marketplace version into the store
+	// and proposes a pin; it never writes deployment files.
+	ResolveMarketplace     func(context.Context, string) domain.WorkspaceMarketplaceReport
+	PlanSettings           func(context.Context, domain.LabSettingsFile) domain.ConfigPlanReport
+	SaveSettings           func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport
+	ChangePassword         SettingsPasswordAction
+	PreparePXE             func() domain.ActionReport
+	LoadPXEProgress        func() (domain.OperationProgress, error)
+	PlanPXEStart           func(context.Context) domain.PXELifecycleReport
+	StartPXE               func() domain.PXELifecycleReport
+	StopPXE                func() domain.PXELifecycleReport
+	RecoverPXE             func() domain.PXELifecycleReport
+	PrepareRemoteInstall   func(string) (domain.RemoteInstallResponse, error)
+	ObserveRemoteInstall   func(context.Context, string) (string, error)
+	BootstrapRemoteInstall func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
+	RemoteInstallRequest   func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
+	LoadRemoteInstall      func(context.Context) (domain.RemoteInstallResponse, error)
 }
 
 type dashboardScreen int

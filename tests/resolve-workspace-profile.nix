@@ -117,6 +117,22 @@ let
     clientNames = [];
     hostPackages.pc99 = [ "vscode" "jdk" ];
   };
+  # A Marketplace pin joins the pinned package set without any fetch during
+  # evaluation; publisher capitalization does not change the selected ID.
+  marketplacePin = {
+    publisher = "Arduino";
+    name = "Vscode-Arduino";
+    version = "0.7.2";
+    hash = "sha256-${lib.concatStrings (builtins.genList (_: "A") 43)}=";
+  };
+  resolveMarketplace = extensions: import ../lib/resolve-workspace-profile.nix { inherit lib; pkgs = realPkgs; } {
+    catalog = catalog // { baseline = { schemaVersion = 1; }; extensions = []; };
+    profileJSON = builtins.toJSON { schemaVersion = 1; vscode = { inherit extensions; marketplace = [ marketplacePin ]; }; };
+    controllerName = "pc99";
+    clientNames = [];
+    hostPackages.pc99 = [ "vscode" ];
+  };
+  marketplace = resolveMarketplace [ "arduino.vscode-arduino" ];
 in
 assert import ./workspace-template.nix { inherit lib; pkgs = realPkgs; };
 assert builtins.all (value: value) tests;
@@ -152,5 +168,8 @@ assert rejectsValue (withExtension null);
 assert rejectsValue (withEditor null);
 assert rejectsValue (withEditor (pkgs.vscode // { meta.broken = true; }));
 assert builtins.deepSeq pinned true;
+assert map (entry: { inherit (entry) id version; }) marketplace.extensions
+  == [ { id = "arduino.vscode-arduino"; version = "0.7.2"; } ];
+assert rejectsValue (resolveMarketplace []);
 assert (builtins.head pinned.extensions).version == realPkgs.vscode-extensions.redhat.java.version;
 true

@@ -67,6 +67,13 @@ func TestWorkspaceLimits(t *testing.T) {
 		}
 		return result
 	}
+	pins := func(n int) []map[string]any {
+		result := make([]map[string]any, n)
+		for i := range result {
+			result[i] = map[string]any{"publisher": "publisher", "name": fmt.Sprintf("extension%d", i), "version": "1.0.0", "hash": "sha256-" + strings.Repeat("A", 43) + "="}
+		}
+		return result
+	}
 	settings := func(n int) map[string]any {
 		result := make(map[string]any, n)
 		for i := range n {
@@ -91,6 +98,8 @@ func TestWorkspaceLimits(t *testing.T) {
 		{"extra settings over limit", map[string]any{"vscode": map[string]any{"extraSettings": settings(257)}}, false},
 		{"extra setting name at limit", map[string]any{"vscode": map[string]any{"extraSettings": map[string]any{strings.Repeat("a", 128): true}}}, true},
 		{"extra setting name over limit", map[string]any{"vscode": map[string]any{"extraSettings": map[string]any{strings.Repeat("a", 129): true}}}, false},
+		{"marketplace at limit", map[string]any{"vscode": map[string]any{"marketplace": pins(32)}}, true},
+		{"marketplace over limit", map[string]any{"vscode": map[string]any{"marketplace": pins(33)}}, false},
 		{"extra setting integer at limit", map[string]any{"vscode": map[string]any{"extraSettings": map[string]any{"a": 1 << 53}}}, true},
 	} {
 		t.Run(c.name, func(t *testing.T) {

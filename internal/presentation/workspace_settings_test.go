@@ -245,9 +245,76 @@ func TestWorkspaceExtensionSearchAddsPackagedChoices(t *testing.T) {
 	}
 }
 
-func TestWorkspaceReviewNamesSettingChanges(t *testing.T) {
-	before, _ := domain.DecodeWorkspaceProfile([]byte(`{"schemaVersion":1,"vscode":{"extensions":["a.b"],"extraSettings":{"workbench.colorTheme":"Default Dark+","editor.rulers":[80]}}}`))
-	after, issues := domain.DecodeWorkspaceProfile([]byte(`{"schemaVersion":1,"vscode":{"extensions":["a.b"],"extraSettings":{"workbench.colorTheme":"Default Light+","files.trimTrailingWhitespace":true}}}`))
+func TestWorkspaceMarketplaceAddUpdateAndDeselect(t *testing.T) {
+	m := workspaceFixture()
+	version := "3.3.4"
+	proposals := map[string]string{"platformio.platformio-ide": "3.3.4"}
+	var calls []string
+	m.actions.ResolveMarketplace = func(_ context.Context, id string) domain.WorkspaceMarketplaceReport {
+		calls = append(calls, id)
+		publisher, name := "platformio", "platformio-ide"
+		v, hash, platform := proposals[id], "sha256-"+strings.Repeat("C", 43)+"=", "linux-x64"
+		return domain.WorkspaceMarketplaceReport{State: "ready", ID: id, Candidate: &domain.WorkspaceMarketplaceCandidate{
+			Entry:       domain.WorkspaceMarketplaceExtension{Publisher: &publisher, Name: &name, Version: &v, Hash: &hash, Platform: &platform},
+			DisplayName: "PlatformIO IDE", Engine: "^1.65.0", EditorVersion: "1.119.0",
+			Dependencies: []string{"ms-vscode.cpptools"}, Native: true,
+		}}
+	}
+	m.workspace.group = 2
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = workspaceType(m, "u")
+	if !strings.Contains(m.message, "No Marketplace extensions") {
+		t.Fatalf("update check without pins: %q", m.message)
+	}
+	m = workspaceType(m, "m")
+	m = workspaceType(m, "PlatformIO.platformio-ide")
+	m, cmd := workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = workspaceComplete(t, m, cmd)
+	if m.workspace.pending == nil || strings.Join(calls, ",") != "platformio.platformio-ide" {
+		t.Fatalf("no proposal: %q", m.message)
+	}
+	view := m.workspaceView()
+	for _, text := range []string{"not yet in the draft", "3.3.4", "ms-vscode.cpptools", "not adapted to NixOS", "one computer"} {
+		if !strings.Contains(view, text) {
+			t.Fatalf("proposal view lacks %q:\n%s", text, view)
+		}
+	}
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.workspace.pending != nil || !strings.Contains(m.message, "ms-vscode.cpptools") {
+		t.Fatalf("dependency hint missing: %q", m.message)
+	}
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	vscode := m.workspace.candidate.VSCode
+	if vscode == nil || vscode.Marketplace == nil || len(*vscode.Marketplace) != 1 || *(*vscode.Marketplace)[0].Version != version ||
+		!slices.Contains(*vscode.Extensions, "platformio.platformio-ide") {
+		t.Fatalf("pin not in draft: %+v", vscode)
+	}
+	// A newer compatible version replaces the pin only after the draft is kept.
+	proposals["platformio.platformio-ide"] = "3.4.0"
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, cmd = workspaceKey(m, tea.KeyPressMsg{Code: 'u', Text: "u"})
+	m = workspaceComplete(t, m, cmd)
+	if !strings.Contains(m.message, "3.3.4 → 3.4.0") || *(*m.workspace.candidate.VSCode.Marketplace)[0].Version != "3.3.4" {
+		t.Fatalf("update not proposed: %q", m.message)
+	}
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if *(*m.workspace.candidate.VSCode.Marketplace)[0].Version != "3.4.0" {
+		t.Fatal("kept draft lacks the newer pin")
+	}
+	// Deselecting the extension drops its pin as well.
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.workspace.choice = slices.Index(m.workspace.choices, "platformio.platformio-ide")
+	m = workspaceType(m, " ")
+	m, _ = workspaceKey(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if vscode := m.workspace.candidate.VSCode; vscode != nil && vscode.Marketplace != nil {
+		t.Fatalf("unselected pin kept: %+v", *vscode.Marketplace)
+	}
+}
+
+func TestWorkspaceReviewNamesSettingAndPinChanges(t *testing.T) {
+	before, _ := domain.DecodeWorkspaceProfile([]byte(`{"schemaVersion":1,"vscode":{"extensions":["a.b"],"extraSettings":{"workbench.colorTheme":"Default Dark+","editor.rulers":[80]},"marketplace":[{"publisher":"A","name":"B","version":"1.0.0","hash":"sha256-` + strings.Repeat("A", 43) + `="}]}}`))
+	after, issues := domain.DecodeWorkspaceProfile([]byte(`{"schemaVersion":1,"vscode":{"extensions":["a.b"],"extraSettings":{"workbench.colorTheme":"Default Light+","files.trimTrailingWhitespace":true},"marketplace":[{"publisher":"A","name":"B","version":"1.1.0","hash":"sha256-` + strings.Repeat("B", 43) + `="}]}}`))
 	if len(issues) != 0 {
 		t.Fatal(issues)
 	}
@@ -257,6 +324,7 @@ func TestWorkspaceReviewNamesSettingChanges(t *testing.T) {
 		`VSCode / Other settings / editor.rulers: [80] → removed`,
 		`VSCode / Other settings / files.trimTrailingWhitespace: (none) → true`,
 		`VSCode / Other settings / workbench.colorTheme: "Default Dark+" → "Default Light+"`,
+		`VSCode / Marketplace pins / a.b: 1.0.0 → 1.1.0`,
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("review lacks %q:\n%s", want, output.String())

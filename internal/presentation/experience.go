@@ -255,6 +255,8 @@ func (model dashboardModel) helpView() string {
 			"In a list: Space toggles, i inherits, c clears; Shift arrows reorder favorites.",
 			"Extensions: / searches every packaged extension of the pinned package set, not only the catalog.",
 			"Dependencies of searched extensions are checked when the system is built.",
+			"m downloads one Marketplace extension (publisher.name) into the controller's store and shows it before adding;",
+			"u checks pinned Marketplace extensions for newer versions the pinned VS Code accepts. The controller needs Internet for both.",
 			"Enter keeps a field in the draft; Esc cancels that field edit.",
 			"Other settings: a adds a name and value, e edits, d removes, p takes a pasted settings file.",
 			"Guided fields, update settings and settings that can start programs cannot be added there.",

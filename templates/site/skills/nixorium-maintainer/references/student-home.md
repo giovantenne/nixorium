@@ -85,6 +85,14 @@ Choose Desktop, Dock, VSCode or Browser, then a supported field:
   extensions it depends on, and expect a missing dependency to stop the
   system build. Catalog entries (prerequisites, `writable` for extensions
   that create files in their own folder) remain a deployment change.
+- Extensions that are not packaged can come from the Marketplace: `m` takes
+  an exact `publisher.name`, downloads the newest stable Linux version the
+  pinned VS Code accepts into the controller's Nix store, and shows its
+  requirement, dependencies and native programs before Enter adds it (with
+  its pin) to the draft. `u` checks existing pins for newer compatible
+  versions. Both need Internet on the controller only at that moment. This is
+  third-party code: warn that native programs are not adapted to NixOS and
+  often fail, and qualify loading on one computer before the classroom.
 - VSCode → Other settings holds further editor defaults as name and value:
   `a` adds one, `e` edits, `d` removes, and `p` takes a pasted settings file
   (comments and trailing commas are accepted). Plain text is stored as text;
@@ -159,6 +167,17 @@ A `partial` durability result means the JSON was replaced but durable storage
 could not be confirmed: inspect the profile and Git state before another plan.
 
 ## VS Code extensions and settings
+
+For an agent without the TUI, this prints a Marketplace pin after the same
+download and checks; add it under `vscode.marketplace`, select its ID in
+`vscode.extensions`, and review the candidate with `workspace plan`:
+
+```sh
+nixorium workspace marketplace --repo . --extension platformio.platformio-ide --json
+```
+
+Do not invent or copy hashes from elsewhere, and do not pin a version the
+command did not report as compatible.
 
 For existing prepared profiles, framework and package-base update reviews show
 current/proposed pinned package and extension versions, prerequisites and

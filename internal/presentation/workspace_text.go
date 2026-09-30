@@ -51,6 +51,29 @@ func WorkspacePlanText(writer io.Writer, report domain.WorkspacePlanReport) {
 	}
 }
 
+// WorkspaceMarketplaceText prints the proposed pin as profile JSON to add
+// under vscode.marketplace, together with the checks an operator must see.
+func WorkspaceMarketplaceText(writer io.Writer, report domain.WorkspaceMarketplaceReport) {
+	fmt.Fprintf(writer, "Marketplace extension: %s (%s)\n", safeWorkspaceText(report.ID), strings.ToUpper(report.State))
+	if c := report.Candidate; c != nil {
+		fmt.Fprintf(writer, "%s: %s\n", safeWorkspaceText(c.DisplayName), safeWorkspaceText(c.Description))
+		fmt.Fprintf(writer, "Editor requirement: %s (pinned VS Code %s)\n", safeWorkspaceText(c.Engine), safeWorkspaceText(c.EditorVersion))
+		if len(c.Dependencies) != 0 {
+			fmt.Fprintf(writer, "Also select: %s\n", safeWorkspaceText(strings.Join(c.Dependencies, ", ")))
+		}
+		if c.Native {
+			fmt.Fprintln(writer, "WARNING: contains native programs not adapted to NixOS; they often fail to start.")
+		}
+		fmt.Fprintln(writer, "Third-party code pinned by hash; test it on one computer before the classroom.")
+		pin, _ := json.MarshalIndent(c.Entry, "", "  ")
+		fmt.Fprintf(writer, "Add to vscode.marketplace and select %s in vscode.extensions:\n%s\n", c.Entry.ID(), pin)
+	}
+	fmt.Fprintln(writer, safeWorkspaceText(report.Message))
+	for _, issue := range report.Issues {
+		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", safeWorkspaceText(issue.Field), safeWorkspaceText(issue.Message))
+	}
+}
+
 func WorkspaceApplyText(writer io.Writer, report domain.WorkspaceApplyReport) {
 	fmt.Fprintf(writer, "Student workspace save: %s\n", strings.ToUpper(report.State))
 	fmt.Fprintln(writer, safeWorkspaceText(report.Message))
@@ -95,14 +118,14 @@ func workspaceChangesText(writer io.Writer, inspection domain.WorkspaceInspectio
 	}
 	fmt.Fprintln(writer, "Preference changes:")
 	changes := 0
-	for _, field := range workspaceFields {
+	for _, field := range append(append([]workspaceField{}, workspaceFields...), workspaceMarketplaceField) {
 		before := workspaceValue(base, field)
 		after := workspaceValue(inspection.Resolution.Declared, field)
 		if reflect.DeepEqual(before, after) {
 			continue
 		}
-		if field.kind == "settings" {
-			// Name each changed setting rather than a count.
+		if field.kind == "settings" || field.kind == "marketplace" {
+			// Name each changed setting or pin rather than a count.
 			for _, line := range workspaceEntryChanges(field, before, after) {
 				changes++
 				fmt.Fprintf(writer, "  %s / %s / %s\n", field.group, field.label, safeWorkspaceText(line))
@@ -122,7 +145,8 @@ func workspaceChangesText(writer io.Writer, inspection domain.WorkspaceInspectio
 	}
 }
 
-// workspaceEntryChanges compares extra settings by name.
+// workspaceEntryChanges compares named entries: extra settings by name, or
+// Marketplace pins by extension ID with their versions.
 func workspaceEntryChanges(field workspaceField, before, after any) []string {
 	entries := func(value any) map[string]string {
 		result := map[string]string{}
@@ -130,6 +154,14 @@ func workspaceEntryChanges(field workspaceField, before, after any) []string {
 		case map[string]any:
 			for name, item := range items {
 				result[name] = workspaceShortValue(item)
+			}
+		case []any:
+			for _, item := range items {
+				pin, _ := item.(map[string]any)
+				publisher, _ := pin["publisher"].(string)
+				name, _ := pin["name"].(string)
+				version, _ := pin["version"].(string)
+				result[strings.ToLower(publisher+"."+name)] = version
 			}
 		}
 		return result

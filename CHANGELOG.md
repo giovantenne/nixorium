@@ -57,6 +57,15 @@ The project follows [Semantic Versioning](https://semver.org/).
   files in its own folder (the Python and Java debuggers) is copied into the
   reset home instead of linked; the reset helper accepts either form.
 
+- Student workspace profiles accept `vscode.marketplace` pins for extensions
+  that the package set lacks: publisher, name, stable version and package
+  hash (optionally `linux-x64`). The controller fetches the pinned bytes when
+  it builds; clients stay offline. `nixorium workspace marketplace --extension
+  <publisher.name>` and the TUI (`m` to add, `u` to check for updates) pick the
+  newest stable Linux version the pinned VS Code accepts, download it into the
+  Nix store and report dependencies and native programs before anything is
+  added to the draft.
+
 - The student workspace editor names its editor section VSCode and adds
   **Other settings**: add, edit or remove further editor defaults by name and
   value, or take them from a pasted settings file. Refused names are reported
