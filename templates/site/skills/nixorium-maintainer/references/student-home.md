@@ -240,7 +240,7 @@ dconf database or overwriting unrelated desktop settings.
 The supplied workstation module installs Desktop Icons NG, Dash to Dock and
 Tiling Assistant independently of the application profile. Keep their enablement
 additive so unrelated extensions survive. The compact bottom dock with intelligent hiding,
-MoreWaita icons, native Adwaita decoration and blue accent are deployment-owned
+Yaru-yellow icons, native Adwaita decoration and blue accent are deployment-owned
 defaults. Persistent staff accounts use the static vector background. Reset
 student homes choose randomly from `assets.backgrounds` at boot, and the login
 migration must preserve that choice. Tiling Assistant provides snap assist

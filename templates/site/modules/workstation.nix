@@ -42,7 +42,7 @@ let
     "org.gnome.desktop.interface" = {
       color-scheme = "'prefer-dark'";
       gtk-theme = "'Adwaita-dark'";
-      icon-theme = "'MoreWaita'";
+      icon-theme = "'Yaru-yellow'";
       accent-color = "'blue'";
       enable-animations = "true";
     } // lib.optionalAttrs (has "liberation_ttf") {
@@ -166,7 +166,7 @@ in
     dashToDock
     desktopIcons
     tilingAssistant
-    pkgs.morewaita-icon-theme
+    pkgs.yaru-theme
   ];
 
   fonts.packages = lib.optionals (has "nerd-fonts.jetbrains-mono") [ pkgs.nerd-fonts.jetbrains-mono ]
@@ -257,6 +257,11 @@ in
       apply_session_defaults() {
         local APPEARANCE_ROLE="$1"
         local FAVORITES="$2"
+        # MoreWaita is no longer installed: move accounts still using it to
+        # the Yaru icons, without touching any other choice.
+        if [ "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'MoreWaita'" ]; then
+          gsettings set org.gnome.desktop.interface icon-theme "'Yaru-yellow'"
+        fi
         if [[ "$APPEARANCE_ROLE" == managed-student ]]; then
           return 0
         fi

@@ -556,7 +556,7 @@ failure or timeout must block publication.
   Keep application entries conditional on effective software scope, not in core
   desktop policy. The site template's Desktop Icons NG, the compact intelligently hiding Dash
   to Dock and Tiling Assistant are baseline workstation behavior, independent
-  of the selected profile. Keep MoreWaita/Adwaita appearance deployment-owned,
+  of the selected profile. Keep Yaru-yellow icon/Adwaita appearance deployment-owned,
   validate extension metadata and GSettings, and preserve the targeted one-time
   migration rather than resetting unrelated user preferences.
 

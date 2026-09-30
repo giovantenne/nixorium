@@ -125,7 +125,7 @@ behind.
 Desktop Icons NG, Dash to Dock and Tiling Assistant are baseline workstation
 components rather than application-profile choices. The template enables all
 three for every role, keeps a compact bottom dock visible when its area is clear,
-hides it behind overlapping windows, and preserves unrelated enabled extensions. MoreWaita icons complement
+hides it behind overlapping windows, and preserves unrelated enabled extensions. Yaru-yellow icons complement
 native Adwaita decorations and a static blue vector wallpaper for persistent
 staff accounts. Reset student homes choose randomly from the deployment-owned
 backgrounds at boot. A one-time

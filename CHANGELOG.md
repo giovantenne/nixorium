@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The desktop uses the Yaru-yellow icons of Nixorium 1.0.0 again instead of
+  MoreWaita. Accounts still set to MoreWaita switch at their next login; any
+  other icon choice is kept.
+
 - Classroom controls open faster for the teacher: the dashboard appears at
   once and loads inside, the classroom worker no longer evaluates deployment
   readiness it does not show, and it reuses the laboratory identities for an

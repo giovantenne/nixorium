@@ -27,7 +27,8 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   export XDG_CONFIG_HOME="$TMPDIR/config"
   mkdir -p "$XDG_CONFIG_HOME"
   export GSETTINGS_SCHEMA_DIR=${schemas}/share/gsettings-schemas/nixos-gsettings-overrides/glib-2.0/schemas
-  test "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'MoreWaita'"
+  test "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'Yaru-yellow'"
+  test -e ${pkgs.yaru-theme}/share/icons/Yaru-yellow/index.theme
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'BOTTOM'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-fixed)" = false
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = true
@@ -49,7 +50,9 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   gsettings set org.gnome.desktop.interface color-scheme "'prefer-light'"
   gsettings set org.gnome.shell.extensions.dash-to-dock dock-position "'LEFT'"
   gsettings set org.gnome.shell.extensions.dash-to-dock autohide false
+  gsettings set org.gnome.desktop.interface icon-theme "'MoreWaita'"
   apply_session_defaults managed-student "[]"
+  test "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'Yaru-yellow'"
   test "$(gsettings get org.gnome.shell favorite-apps)" = "['code.desktop']"
   test "$(gsettings get org.gnome.desktop.interface color-scheme)" = "'prefer-light'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'LEFT'"

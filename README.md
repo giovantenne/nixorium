@@ -401,5 +401,5 @@ every client in the inventory.
 Released under the [MIT License](LICENSE).
 
 The site template includes a minimal GNOME desktop profile: native Adwaita,
-MoreWaita icons, a compact visible dock, Desktop Icons NG and Tiling Assistant.
+Yaru-yellow icons, a compact visible dock, Desktop Icons NG and Tiling Assistant.
 Appearance stays deployment-owned; see [desktop defaults](docs/system-reference.md).

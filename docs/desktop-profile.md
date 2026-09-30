@@ -2,8 +2,10 @@
 
 The deployment-owned workstation module supplies a restrained GNOME 50 profile:
 
-- Native dark Adwaita decorations with blue accents, plus MoreWaita application
-  and MIME icons. GTK 4 applications retain their supported native styling.
+- Native dark Adwaita decorations with blue accents, plus the Yaru-yellow icon
+  theme used by Nixorium 1.0.0. GTK 4 applications retain their supported
+  native styling. Accounts still set to the removed MoreWaita theme move to
+  Yaru-yellow at their next login; other icon choices are kept.
 - A static blue vector background for administrator and teacher accounts;
   reset student homes select one deployment-owned background at random on each
   boot, without animation or blur.
@@ -20,12 +22,10 @@ login. Appearance remains site policy, not an upstream GNOME mechanism.
 
 ## Research and tradeoffs
 
-Reviewed on 2026-09-26. User feedback favors coherent icon coverage, while
-reports about extension interactions favor keeping the stack small. For
-example, the [MoreWaita release discussion](https://www.reddit.com/r/gnome/comments/1g6cdn1/)
-praises desktop consistency; that is subjective feedback, not a benchmark.
-The [maintainer's description](https://github.com/somepaulo/MoreWaita) explains
-that MoreWaita complements Adwaita and preserves native GNOME/Circle icons.
+Reviewed on 2026-09-26. Reports about extension interactions favor keeping
+the stack small. MoreWaita icons were used briefly after 1.0.0; on 2026-09-30
+the owner restored the Yaru-yellow icons of 1.0.0, which cover applications,
+folders and MIME types from one locked Nixpkgs package (`yaru-theme`).
 
 [Tiling Assistant](https://github.com/ubuntu/Tiling-Assistant) adds practical
 snap assist. Its [changelog](https://github.com/ubuntu/Tiling-Assistant/blob/main/CHANGELOG.md)
