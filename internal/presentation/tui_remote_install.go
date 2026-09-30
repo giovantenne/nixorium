@@ -79,9 +79,15 @@ func (model dashboardModel) remoteInstallView() string {
 		if len(hosts) == 0 {
 			lines = append(lines, tuiStatus("No configured client identities are available", tuiStatusFailure, model.isDark))
 		} else {
-			for index, host := range hosts {
+			// Each identity takes two rows; keep the focused one visible.
+			start, end := listWindow(len(hosts), remote.hostCursor, max(2, (model.height-16)/2))
+			for index := start; index < end; index++ {
+				host := hosts[index]
 				detail := fmt.Sprintf("%s · %s", host.IP, host.Interface)
 				lines = append(lines, tuiSelection(host.Name, index == remote.hostCursor, model.isDark), tuiMuted("    "+detail, model.isDark))
+			}
+			if start > 0 || end < len(hosts) {
+				lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d identities", start+1, end, len(hosts)), model.isDark))
 			}
 		}
 		actions = []tuiAction{{key: "↑/↓", label: "Select identity"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
@@ -138,7 +144,7 @@ func (model dashboardModel) remoteInstallView() string {
 			if !disk.Eligible {
 				state = "excluded: " + strings.Join(disk.ExclusionReasons, ", ")
 			}
-			detail := fmt.Sprintf("%s · %d bytes · %s · %s", state, disk.SizeBytes, disk.Model, disk.Serial)
+			detail := fmt.Sprintf("%s · %s · %s · %s", state, humanBytes(disk.SizeBytes), disk.Model, disk.Serial)
 			lines = append(lines, tuiSelection(disk.Path, index == remote.diskCursor, model.isDark), tuiMuted("    "+detail, model.isDark))
 		}
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The selected disk will be completely erased", detail: "Selection is checked again immediately before Disko; no excluded disk can be reviewed."})
@@ -155,7 +161,7 @@ func (model dashboardModel) remoteInstallView() string {
 			fmt.Sprintf("Logical identity:    %s", plan.Host.Name),
 			fmt.Sprintf("Physical session:   %s · %s", plan.Host.LiveIP, remoteInstallPlanFingerprint(remote.response)),
 			fmt.Sprintf("Installed address:  %s on %s", plan.Host.StaticIP, plan.Host.Interface),
-			fmt.Sprintf("Disk to erase:      %s · %d bytes", plan.Disk.Path, plan.Disk.SizeBytes),
+			fmt.Sprintf("Disk to erase:      %s · %s (%d bytes)", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes), plan.Disk.SizeBytes),
 			fmt.Sprintf("Disk serial / WWN:  %s / %s", plan.Disk.Serial, plan.Disk.WWN),
 			fmt.Sprintf("Revision:           %s", plan.Revision),
 			fmt.Sprintf("System closure:     %s", plan.SystemPath),
@@ -241,16 +247,29 @@ func (model dashboardModel) remoteInstallProgressLines() []string {
 		stage remoteInstallationStage
 		label string
 	}{{remoteInstallPreparing, "Build pinned artifacts"}, {remoteInstallFingerprint, "Read live Ed25519 host key"}, {remoteInstallBootstrap, "Verify live ISO and replace password"}, {remoteInstallSelectDisk, "Transfer signed bundle and probe disks"}, {remoteInstallApplying, "Dispatch independent installer job"}} {
-		kind := tuiStatusAttention
-		if remote.stage > item.stage {
-			kind = tuiStatusSuccess
+		switch {
+		case remote.stage > item.stage:
+			lines = append(lines, tuiStatus(item.label, tuiStatusSuccess, model.isDark))
+		case remote.stage == item.stage:
+			lines = append(lines, tuiStatus(item.label+" · in progress", tuiStatusNeutral, model.isDark))
+		default:
+			// Future steps are waiting, not warnings.
+			lines = append(lines, tuiMuted("  "+item.label+" · waiting", model.isDark))
 		}
-		lines = append(lines, tuiStatus(item.label, kind, model.isDark))
 	}
 	return lines
 }
 
 func (model dashboardModel) remoteInstallResultLines() []string {
+	outcome, next := model.remoteInstallOutcome()
+	lines := []string{outcome, "", "Next: " + next}
+	if !model.installation.remote.details {
+		return append(lines, "", tuiMuted("Technical details are hidden; press d to show them.", model.isDark))
+	}
+	return append(append(lines, "", tuiSection("Technical details", model.isDark)), model.remoteInstallDetailLines()...)
+}
+
+func (model dashboardModel) remoteInstallDetailLines() []string {
 	response := model.installation.remote.response
 	lines := []string{
 		fmt.Sprintf("State:               %s", response.State),
@@ -295,7 +314,11 @@ func (model dashboardModel) remoteInstallResultLines() []string {
 func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 	response := model.installation.remote.response
 	state := response.State
-	actions := []tuiAction{{key: "r", label: "Refresh status"}}
+	details := "Details"
+	if model.installation.remote.details {
+		details = "Hide details"
+	}
+	actions := []tuiAction{{key: "r", label: "Refresh status"}, {key: "d", label: details}}
 	if remoteInstallCanConnect(response) {
 		actions = append(actions, tuiAction{key: "a", label: "Connect live client"})
 	}
@@ -520,6 +543,9 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 		case "r":
 			model.busy = "Refreshing the independent remote installation job"
 			return model.remoteInstallCommand("status", domain.RemoteInstallRequest{Operation: domain.RemoteInstallStatusOperation, OperationID: remote.operationID})
+		case "d":
+			remote.details = !remote.details
+			return model, nil
 		case "v":
 			model.busy = "Verifying the installed static identity, system closure and revision"
 			return model.remoteInstallCommand("verify", domain.RemoteInstallRequest{Operation: domain.RemoteInstallVerifyOperation, OperationID: remote.operationID})

@@ -849,7 +849,10 @@ that key before attempting password authentication, installs an
 operation-specific ephemeral key, probes hardware, and shows only eligible
 non-boot disks. Enter the exact disk path and the content-bound confirmation
 shown by the review. Do not remove the USB, reboot, or reuse the address while
-the install is running.
+the install is running. While the installer job runs, the screen refreshes its
+state by itself (a read-only status request) and names the current step and
+elapsed time; the result then says in one sentence what happened and what to
+do next, with the raw fields behind `d`.
 
 The declared client interface must carry the reviewed live address. Wi-Fi
 profiles and credentials are not copied from the ISO into the installed system:

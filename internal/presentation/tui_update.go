@@ -80,7 +80,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardRemoteFingerprintMsg:
 		return model.handleRemoteFingerprintMessage(message)
 	case dashboardRemoteInstallMsg:
-		return model.handleRemoteInstallMessage(message)
+		next, cmd := model.handleRemoteInstallMessage(message)
+		return model.withRemoteInstallWatch(next, cmd)
+	case remoteInstallTickMsg:
+		return model.handleRemoteInstallTick(message)
 	case dashboardInitialMsg:
 		model.jobs.items, model.jobs.err, model.jobs.id = message.jobs, message.jobsErr, message.jobsID
 		poll := model.scheduleManagedJobsTick()

@@ -136,7 +136,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range usb.Frames {
 		usbText += frame.Text
 	}
-	for _, expected := range []string{"USB over SSH", "official NixOS Minimal 26.05 ISO", "SHA256:AAAAAAAA", "/dev/sda", "boot-media", "/dev/nvme0n1", "ERASE /dev/nvme0n1 FOR pc01", "Remove or deprioritize the USB medium", "Boot verified:       true"} {
+	for _, expected := range []string{"USB over SSH", "official NixOS Minimal 26.05 ISO", "SHA256:AAAAAAAA", "/dev/sda", "boot-media", "/dev/nvme0n1", "ERASE /dev/nvme0n1 FOR pc01", "Remove or deprioritize the USB medium", "is installed and verified"} {
 		if !strings.Contains(usbText, expected) {
 			t.Fatalf("USB installation demo omits %q", expected)
 		}

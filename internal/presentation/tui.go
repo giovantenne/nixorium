@@ -285,6 +285,10 @@ type remoteInstallationModel struct {
 	bootstrapError     string
 	response           domain.RemoteInstallResponse
 	plan               domain.RemoteInstallPlanReport
+	// details shows the raw result fields; watch paces automatic refresh.
+	details      bool
+	watch        uint64
+	watchStarted time.Time
 }
 
 // computersModel owns inventory, filtering, detail and restore navigation.

@@ -218,6 +218,7 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "r  Reattach the recorded USB operation when available")
 	case dashboardUSBInstall:
 		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.", "Use r for status, n for reconciliation, b for reviewed reboot, c to close without reboot, and v for post-boot verification when visible.")
+		lines = append(lines, "While the installer job runs the view refreshes by itself with read-only status requests. d shows the raw result fields.")
 		lines = append(lines, "Artifacts-ready means the live session is not verified. Use a to connect with fresh physical key confirmation, or x to cancel safely, when visible.", "A failed connection's original error remains visible across status refreshes in this TUI session.")
 	case dashboardAdministration:
 		lines = append(lines, taskHelp(administrationTasks)...)

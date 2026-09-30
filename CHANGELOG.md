@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- USB-over-SSH installation shows progress and plain outcomes: while the
+  installer job runs the view refreshes itself with read-only status requests
+  and names the current step and elapsed time; results say in one sentence
+  what happened, whether the disk may have changed and the next step, with the
+  raw fields behind `d`. Pending checklist steps appear as waiting, disk sizes
+  are human-readable and the identity list keeps the selection visible.
+
 - Computer lists show each computer's last known state with the time of the
   check: the update list says which computers need the update, power controls
   which are on, and Internet access whether each is on or blocked. `r` checks

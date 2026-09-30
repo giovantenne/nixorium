@@ -388,7 +388,7 @@ Install one computer from USB over SSH
 Logical identity:    pc01
 Physical session:   192.168.1.141 · SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 Installed address:  10.42.0.11 on enp1s0
-Disk to erase:      /dev/nvme0n1 · 137438953472 bytes
+Disk to erase:      /dev/nvme0n1 · 137.4 GB (137438953472 bytes)
 Disk serial / WWN:  NVME-DEMO / demo-wwn
 Revision:           0123456789abcdef0123456789abcdef01234567
 System closure:     /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo
@@ -412,20 +412,16 @@ Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
 Nixorium  /  Installation  /  USB over SSH
 
 Install one computer from USB over SSH
-State:               verified
-Operation ID:        0123456789abcdef0123456789abcdef
-Phase:               post-boot-verify
-Disk may be changed: true
-Installed:           true
-Reboot requested:    true
-Boot verified:       true
-Dispatch uncertain:  false
-Cleanup unconfirmed: false
+pc01 is installed and verified.
+
+Next: It now appears among the configured computers.
+
+Technical details are hidden; press d to show them.
 
 NOTICE
 ✓ verified pc01 at 10.42.0.11 with the reviewed revision and system closure
 
-r Refresh status  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
+r Refresh status  ·  d Details  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
 ```
 
 ## Shutdown with active sessions
