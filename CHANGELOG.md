@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Overview distinguishes incomplete configuration, uncommitted managed files,
+  controller application and installation-file preparation, without adding
+  startup evaluation or treating stale artifacts as an unconfigured lab.
+
 - Fixed empty-field handling in shell metadata, including controller-only labs;
   legacy home reset now discovers common image formats and skips empty folders.
   Setup cancellation names the correct workflow, background quit describes its

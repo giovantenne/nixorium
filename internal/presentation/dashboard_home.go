@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type dashboardTask struct {
@@ -168,12 +169,8 @@ func (model dashboardModel) homeView() string {
 			detail: "Open Installation to continue or restore normal controller networking.",
 		})
 	}
-	if model.setup.State != "ready" && model.setup.State != "unchecked" {
-		notices = append(notices, tuiNotice{
-			kind:   tuiStatusAttention,
-			title:  "Computer installation is not configured yet",
-			detail: "Choose Installation when you are ready to configure the laboratory.",
-		})
+	if notice, present := setupOverviewNotice(model.setup); present {
+		notices = append(notices, notice)
 	}
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
@@ -188,6 +185,30 @@ func (model dashboardModel) homeView() string {
 		notices: notices,
 		actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}},
 	})
+}
+
+func setupOverviewNotice(setup domain.SetupReport) (tuiNotice, bool) {
+	if setup.State == "ready" || setup.State == "unchecked" {
+		return tuiNotice{}, false
+	}
+	notice := tuiNotice{kind: tuiStatusAttention}
+	switch setup.CurrentStage {
+	case domain.SetupStageNetwork, domain.SetupStageIdentity, domain.SetupStageCredentials, domain.SetupStageKeys, domain.SetupStageValidate:
+		notice.title = "Computer installation is not configured yet"
+		notice.detail = "Choose Installation to complete the laboratory configuration."
+	case domain.SetupStageReview:
+		notice.title = "Managed configuration has uncommitted changes"
+		notice.detail = "Open Maintenance > Review Git changes to review and save them."
+	case domain.SetupStageApply:
+		notice.title = "Saved configuration needs applying to this controller"
+		notice.detail = "Open Maintenance > Rebuild controller for a fresh review."
+	case domain.SetupStageArtifacts:
+		notice.title = "Installation files need preparing"
+		notice.detail = "Open Installation > Network boot (PXE) before installing computers."
+	default:
+		return tuiNotice{}, false
+	}
+	return notice, true
 }
 
 func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
