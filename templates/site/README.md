@@ -690,6 +690,11 @@ automatically; import of existing private keys is available only from
 `hostIfaceNames` can override a configured host. Precedence is host, role, then
 fallback. This permits different predictable interface names on controller and
 client hardware without changing existing deployments.
+The installation form asks for the client computers' interface and shows the
+controller interface separately. On each PXE client, the installer checks the
+selected host's effective interface before the erase review. If it is absent,
+correct the client or host override on the controller, save, and prepare fresh
+installation files; the installer never changes the configuration itself.
 
 `setup install-secrets` starts a fixed sandboxed action that installs only
 verified key material to fixed destinations. After reviewed settings and public

@@ -60,6 +60,22 @@ func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
 	}
 }
 
+func TestInstallationInterfaceFieldEditsClientOverride(t *testing.T) {
+	settings := wizardSettings()
+	settings.Lab.ControllerInterfaceName = "enp8s0"
+	model := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
+	view := model.View().Content
+	if !strings.Contains(view, "Client computers' network interface") || !strings.Contains(view, "Controller network interface: enp8s0") {
+		t.Fatalf("interface roles are unclear: %s", view)
+	}
+	model.drafts[0] = "enp2s0"
+	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(settingsWizardModel)
+	if model.settings.Lab.ClientInterfaceName != "enp2s0" || model.settings.Lab.ControllerInterfaceName != "enp8s0" || model.settings.Lab.InterfaceName != "eth0" {
+		t.Fatalf("client question changed another interface: %+v", model.settings.Lab)
+	}
+}
+
 func TestFirstRunOmitsGitIdentityAndGroupsEssentialFields(t *testing.T) {
 	groups := map[string]bool{}
 	for _, field := range settingsFields {

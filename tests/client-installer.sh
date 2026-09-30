@@ -9,6 +9,7 @@ new_fixture() {
   printf '%s\n' '#!/usr/bin/env bash' > "${FIXTURE_DIR}/disko-install"
   chmod +x "${FIXTURE_DIR}/disko-install"
   ACTION_LOG="${FIXTURE_DIR}/actions"
+  mkdir -p "${FIXTURE_DIR}/interfaces/eth0"
 }
 
 load_test_installer() {
@@ -16,12 +17,14 @@ load_test_installer() {
   source "${REPO_ROOT}/setup.sh"
   PUBLIC_KEY_FILE="${FIXTURE_DIR}/public-key"
   DISKO_INSTALL_SCRIPT="${FIXTURE_DIR}/disko-install"
+  NETWORK_INTERFACES_DIR="${FIXTURE_DIR}/interfaces"
 
   load_lab_meta() {
     LAB_META_SCHEMA_VERSION=2
     LAB_CONTROLLER_DHCP_IP=192.0.2.10
     LAB_CACHE_PORT=5000
     LAB_STUDENT_USER=student
+    LAB_IFACE_NAME=eth0
     LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1"},{"name":"pc02","ip":"10.0.0.2"}]'
     export LAB_META_SCHEMA_VERSION LAB_CONTROLLER_DHCP_IP LAB_CACHE_PORT
     export LAB_STUDENT_USER LAB_CLIENT_HOSTS_JSON
@@ -66,6 +69,36 @@ load_test_installer() {
   verify_installation() { echo "verify" >> "$ACTION_LOG"; }
   reboot_system() { echo "reboot" >> "$ACTION_LOG"; }
 }
+
+test_client_interface_mismatch_stops_before_erase() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  load_lab_meta
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","ifaceName":"enp9s0"}]'
+  load_lab_meta() { return 0; }
+  if OUTPUT=$(main pc01 /dev/vda 2>&1); then
+    echo "installer accepted a missing configured interface" >&2
+    exit 1
+  fi
+  grep -F "requires network interface 'enp9s0'" <<< "$OUTPUT" >/dev/null
+  grep -F 'eth0' <<< "$OUTPUT" >/dev/null
+  grep -F 'Settings > Network' <<< "$OUTPUT" >/dev/null
+  ! grep -F 'DESTRUCTIVE REVIEW' <<< "$OUTPUT"
+  test ! -e "$ACTION_LOG"
+)
+
+test_client_interface_uses_host_override() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  load_lab_meta
+  mkdir -p "${NETWORK_INTERFACES_DIR}/enp2s0"
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","ifaceName":"enp2s0"}]'
+  SELECTED_HOST=pc01
+  OUTPUT=$(require_client_interface)
+  grep -F 'enp2s0 (present)' <<< "$OUTPUT" >/dev/null
+)
 
 test_guided_success_and_reboot() (
   new_fixture
@@ -275,6 +308,8 @@ test_precompiled_disko_receives_validated_basename() (
 
 test_guided_success_and_reboot
 test_reachable_identity_is_refused
+test_client_interface_mismatch_stops_before_erase
+test_client_interface_uses_host_override
 test_inexact_confirmation_changes_nothing
 test_disk_identity_change_is_refused
 test_failure_reports_modified_disk

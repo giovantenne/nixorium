@@ -8,6 +8,7 @@ MUTATION_STARTED=0
 CURRENT_STEP="preflight"
 MINIMUM_DISK_BYTES=8589934592
 INSTALL_HEADROOM_BYTES=2147483648
+NETWORK_INTERFACES_DIR="/sys/class/net"
 
 # shellcheck source=/home/admin/nixorium/scripts/lib/lab-meta.sh
 source "${REPO_ROOT}/scripts/lib/lab-meta.sh"
@@ -225,6 +226,31 @@ check_duplicate_identity() {
   esac
 }
 
+require_client_interface() {
+  local CONFIGURED_INTERFACE INTERFACE
+  CONFIGURED_INTERFACE=$(jq -er --arg name "$SELECTED_HOST" --arg fallback "$LAB_IFACE_NAME" '
+    [.[] | select(.name == $name)]
+    | if length == 1 then (.[0].ifaceName // $fallback) else empty end
+    | select(type == "string" and test("^[A-Za-z0-9_.:-]{1,64}$"))
+  ' <<< "$LAB_CLIENT_HOSTS_JSON") || {
+    echo "Error: installer metadata has no valid network interface for ${SELECTED_HOST}." >&2
+    return 1
+  }
+  if [[ -e "${NETWORK_INTERFACES_DIR}/${CONFIGURED_INTERFACE}" ]]; then
+    echo "Configured client network interface: ${CONFIGURED_INTERFACE} (present)"
+    return 0
+  fi
+  echo "Error: ${SELECTED_HOST} requires network interface '${CONFIGURED_INTERFACE}', which is absent on this computer." >&2
+  echo "Detected wired interfaces:" >&2
+  for INTERFACE in "${NETWORK_INTERFACES_DIR}"/*; do
+    [[ -e "$INTERFACE" && "${INTERFACE##*/}" != lo && ! -d "$INTERFACE/wireless" ]] || continue
+    echo "  ${INTERFACE##*/}" >&2
+  done
+  echo "On the controller, correct this client's interface in Settings > Network (or its hostIfaceNames override), save and prepare installation files again." >&2
+  echo "Installation stopped before erase confirmation; no disk operation was started." >&2
+  return 1
+}
+
 select_disk() {
   local REQUESTED_DISK="$1"
   local CHOICE INDEX CANDIDATE
@@ -401,6 +427,7 @@ main() {
 
   select_host "$REQUESTED_HOST" || return 1
   echo "Selected identity: ${SELECTED_HOST} (${SELECTED_HOST_IP})"
+  require_client_interface || return 1
   check_duplicate_identity || return 1
   resolve_system || return 1
   echo "Prepared system closure: $(format_bytes "$SYSTEM_CLOSURE_BYTES")"

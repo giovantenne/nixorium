@@ -59,7 +59,7 @@ var keyboardChoices = []settingsChoice{
 }
 
 var settingsFields = []settingsField{
-	{id: "lab.ifaceName", group: "Network", label: "Laboratory network interface"},
+	{id: "lab.clientIfaceName", group: "Network", label: "Client computers' network interface (optional override)"},
 	{id: "lab.masterDhcpIp", group: "Network", label: "Current controller DHCP address"},
 	{id: "lab.networkBase", group: "Network", label: "Static laboratory network address"},
 	{id: "lab.networkPrefixLength", group: "Network", label: "Network prefix length"},
@@ -371,6 +371,12 @@ func (model settingsWizardModel) View() tea.View {
 		"",
 		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(model.fields), field.group),
 		field.label,
+	}
+	if field.group == "Network" {
+		lines = append(lines, "Controller network interface: "+model.settings.Lab.ControllerInterface())
+		if field.id == "lab.clientIfaceName" {
+			lines = append(lines, "Use the interface name found on the client computers, for example enp1s0.", "Leave empty to use the shared fallback: "+model.settings.Lab.InterfaceName)
+		}
 	}
 	if strings.Contains(model.title, "First setup") || strings.Contains(model.title, "first-run") {
 		lines = append(lines, "All settings are collected first; passwords and one complete validation follow.")
