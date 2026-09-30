@@ -119,6 +119,17 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = "Status refresh failed. Check the laboratory again."
 		}
 		return model, nil
+	case overviewRefreshMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = "Local refresh failed; previous observations retained."
+			return model, nil
+		}
+		message.report.PXEPreparation = model.report.PXEPreparation
+		message.report.Meta = model.report.Meta
+		model.report, model.setup = message.report, message.setup
+		model.message = "Local observations refreshed; clients were not checked."
+		return model, nil
 	case dashboardDoctorMsg:
 		model.busy = ""
 		model.doctor = message.report
@@ -609,6 +620,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardUpdate
 		if !message.report.HasErrors() && message.report.Updated {
+			model.pendingRevision = message.report.Revision
 			return model.startUpdateControllerApply()
 		}
 		return model, nil
@@ -753,6 +765,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settings.applying = false
 		model.settings.result = message.report
 		if !message.report.HasErrors() && message.report.State == "saved" {
+			model.pendingRevision = message.report.Revision
 			model.settings.current = model.settings.candidate
 			model.message = message.report.Message
 		} else if message.report.State == "unchanged" {
@@ -829,6 +842,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		return model, nil
 	case dashboardSoftwareApplyMsg:
+		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
+			model.pendingRevision = message.report.Revision
+		}
 		model.busy = ""
 		software, result := model.software.finishApply(message.report)
 		model.software = software
@@ -850,6 +866,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.message = result.message
 		return model, nil
 	case dashboardSoftwarePresetApplyMsg:
+		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
+			model.pendingRevision = message.report.Revision
+		}
 		model.busy = ""
 		software, result := model.software.finishProfileApply(message.report)
 		model.software = software

@@ -167,6 +167,8 @@ type PortUse struct {
 }
 
 type StatusReport struct {
+	StoreFreeBytes *uint64             `json:"storeFreeBytes,omitempty"`
+	StoreSpaceLow  bool                `json:"storeSpaceLow,omitempty"`
 	SchemaVersion  int                 `json:"schemaVersion"`
 	Operation      string              `json:"operation"`
 	GeneratedAt    time.Time           `json:"generatedAt"`

@@ -162,10 +162,21 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			return model, nil
 		}
-		model.ensureHomeMenu()
+		model.syncHomeTasks()
+		if key.String() == "r" {
+			return model.refreshOverview()
+		}
 		action := key.String()
+		for _, task := range model.pendingTasks() {
+			if action == task.shortcut {
+				return model.openPendingTask(task.id)
+			}
+		}
 		if action == "enter" {
 			if selected, ok := model.homeMenu.selected(); ok {
+				if strings.HasPrefix(selected.id, "pending-") {
+					return model.openPendingTask(selected.id)
+				}
 				action = selected.shortcut
 			}
 		}

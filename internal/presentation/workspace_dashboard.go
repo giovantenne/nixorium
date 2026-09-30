@@ -93,6 +93,9 @@ func (model dashboardModel) finishWorkspaceSave(message dashboardWorkspaceSaveMs
 	model.busy = ""
 	model.workspace.saving = false
 	model.workspace.result = message.report
+	if !message.report.HasErrors() && message.report.Recorded {
+		model.pendingRevision = message.report.Revision
+	}
 	model.workspace.stage = workspaceResult
 	model.message = ""
 	return model, nil

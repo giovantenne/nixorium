@@ -145,6 +145,10 @@ func (i *Inspector) status(ctx context.Context, repository string, full, evaluat
 	} else if !deployment.Ready {
 		report.State = "action-required"
 	}
+	if free, freeErr := i.source.FreeBytes("/nix/store"); freeErr == nil {
+		report.StoreFreeBytes = &free
+		report.StoreSpaceLow = free < minimumFreeBytes
+	}
 	if gitState.Dirty {
 		report.Warnings = append(report.Warnings, "deployment repository has uncommitted changes")
 	}

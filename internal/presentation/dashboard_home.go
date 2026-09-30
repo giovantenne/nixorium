@@ -127,6 +127,7 @@ func (menu dashboardTaskMenu) update(message tea.Msg) (dashboardTaskMenu, tea.Cm
 }
 
 func (model dashboardModel) homeView() string {
+	model.syncHomeTasks()
 	menu := model.homeMenu
 	if len(menu.list.Items()) == 0 {
 		menu = newDashboardTaskMenu(model.isDark, model.width, model.height)
@@ -159,31 +160,20 @@ func (model dashboardModel) homeView() string {
 		tuiMuted("Choose an area. Observed state is loaded only when the selected task needs it.", model.isDark),
 		"",
 	}
-	notices := model.managedJobNotices()
-	if model.report.PXE.Mode == "recovery-required" {
-		notices = append(notices, tuiNotice{
-			kind:   tuiStatusAttention,
-			title:  "Controller network recovery required",
-			detail: "Open Installation to reconcile the previous session before trusting normal networking.",
-		})
-	} else if model.report.PXE.Mode == "active" {
-		notices = append(notices, tuiNotice{
-			kind:   tuiStatusAttention,
-			title:  "Network installation is active",
-			detail: "Open Installation to continue or restore normal controller networking.",
-		})
-	}
-	if notice, present := setupOverviewNotice(model.setup); present {
-		notices = append(notices, notice)
+	notices := []tuiNotice{}
+	if len(model.pendingTasks()) == 0 {
+		lines = append(lines, "No pending work observed locally; clients have not been checked.", "")
+	} else {
+		lines = append(lines, "Pending work / last observations — select a numbered row", "")
 	}
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
 	}
-	lines = append(lines, model.taskMenu(dashboardTasks, menu.list.Index()))
+	lines = append(lines, model.taskMenu(model.overviewTasks(), menu.list.Index()))
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}}
+	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "r", label: "Refresh local state"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}}
 	if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
 		actions = append([]tuiAction{{key: "v", label: "View progress"}}, actions...)
 	}

@@ -90,6 +90,8 @@ Nixorium  /  Overview
 Laboratory overview
 Choose an area. Observed state is loaded only when the selected task needs it.
 
+No pending work observed locally; clients have not been checked.
+
 › [c] Computers
   [n] Installation
   [w] Software
@@ -97,7 +99,7 @@ Choose an area. Observed state is loaded only when the selected task needs it.
 
 Inventory, system deployment, Internet access and shutdown
 
-↑/↓ Select  ·  Enter Open  ·  F1 Help  ·  q Quit
+↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```
 
 ## Pinned package search
@@ -808,6 +810,9 @@ Nixorium  /  Overview
 Laboratory overview
 Choose an area. Observed state is loaded only when the selected task needs it.
 
+Pending work / last observations — select a numbered row
+
+  [1] Controller configuration — running
 › [c] Computers
   [n] Installation
   [w] Software
@@ -815,11 +820,7 @@ Choose an area. Observed state is loaded only when the selected task needs it.
 
 Inventory, system deployment, Internet access and shutdown
 
-NOTICE
-! Controller configuration — running
-  Press v to view progress and the journal unit. No job will be started.
-
-v View progress  ·  ↑/↓ Select  ·  Enter Open  ·  F1 Help  ·  q Quit
+v View progress  ·  ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```
 
 ## Read-only attachment to existing progress

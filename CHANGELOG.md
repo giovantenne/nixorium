@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Overview now lists selectable pending local work and timestamped client
+  observations, including low Nix-store space. Local refresh never probes
+  clients or evaluates Nix; every follow-up retains its normal review.
+
 - Save results now separate configuration, controller and client status and
   offer the next independently reviewed action. Settings, template reset and
   workspace do not apply systems automatically. The ordinary workspace editor

@@ -1,5 +1,14 @@
 # Lab operations
 
+## Overview observations
+
+On supporting pins, numbered Overview rows open pending work: background jobs,
+installation recovery, uncommitted configuration, controller application and
+low store space. Opening a row does not perform the operation. Client summaries
+show the time of the last session observation, not live state. Refresh local
+state updates only saved configuration and local observations; open inventory
+to check clients. An empty list is not evidence that the fleet is current.
+
 ## After saving configuration
 
 On supporting pins, result screens separate local configuration, this

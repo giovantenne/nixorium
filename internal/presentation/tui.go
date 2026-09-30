@@ -297,6 +297,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	pendingRevision        string
 	jobs                   managedJobsModel
 	read                   readActivity
 	busyStarted            time.Time

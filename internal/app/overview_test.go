@@ -95,3 +95,12 @@ func TestStartupAvoidsAllNixEvaluationAndPreservesNetworkWarnings(t *testing.T) 
 		t.Fatalf("startup lost interrupted PXE warning: %+v err=%v", report, err)
 	}
 }
+
+func TestStartupObservesLowStoreSpaceWithoutEvaluation(t *testing.T) {
+	source := startupGuard{overviewGuard{readyFake()}}
+	source.free = 1 << 30
+	report, err := NewInspector(source).Startup(t.Context(), ".")
+	if err != nil || report.StoreFreeBytes == nil || *report.StoreFreeBytes != source.free || !report.StoreSpaceLow || source.sshCalls != 0 || source.currentCalls != 0 {
+		t.Fatalf("local space observation: %+v %v", report, err)
+	}
+}
