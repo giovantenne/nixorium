@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -148,6 +149,16 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 }
 
 func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.screen == dashboardShutdown {
+		switch key.String() {
+		case "r":
+			return model.checkComputersThen()
+		case "n":
+			chosen, message := model.selectComputers(model.shutdown.chosen, hostIsOn, "No client was on at the last check.")
+			model.shutdown.chosen, model.message = chosen, message
+			return model, nil
+		}
+	}
 	shutdown, intent := model.shutdown.update(model.screen, key, model.report.Meta.Clients.Hosts)
 	model.shutdown = shutdown
 	if intent.message != "" {
@@ -211,11 +222,19 @@ func (model dashboardModel) shutdownView() string {
 		busy:             model.busy,
 		busyView:         model.busyView(),
 		historyAvailable: model.actions.LoadLogs != nil,
+		observedAt:       model.computers.hosts.GeneratedAt,
+		stateLabel: func(name string) string {
+			observed, found := model.observedHost(name)
+			return powerStateLabel(observed, found)
+		},
 	}
 	return model.renderShell(model.shutdown.view(model.screen, model.report.Meta.Clients.Hosts, context))
 }
 
 type shutdownViewContext struct {
+	// stateLabel and observedAt describe the last computer observation.
+	stateLabel       func(string) string
+	observedAt       time.Time
 	height           int
 	dark             bool
 	message          string
@@ -256,7 +275,7 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 		shell.actions = append(shell.actions, tuiAction{key: "Enter", label: "Computers"}, tuiAction{key: "F1", label: "Help"})
 	default:
 		shell.body = strings.Join(model.selectionView(hosts, context), "\n")
-		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Tab", label: "Shut down / restart"}, {key: "Enter", label: "Check"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those that are on"}, {key: "r", label: "Check computers"}, {key: "Tab", label: "Shut down / restart"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	}
 	if context.message != "" && context.message != model.plan.Message {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: context.message})
@@ -275,7 +294,7 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 	if model.action == domain.ClientRestart {
 		actionLabel = "Restart"
 	}
-	lines := []string{tuiSection("Which client computers should receive the request?", context.dark), tuiMuted("Computers are checked only after you continue. The controller is never included.", context.dark), "", "Action  " + actionLabel, fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
+	lines := []string{tuiSection("Which client computers should receive the request?", context.dark), tuiMuted("Access and sessions are checked again when you continue. The controller is never included.", context.dark), tuiMuted(observationHeading(context.observedAt), context.dark), "", "Action  " + actionLabel, fmt.Sprintf("%d of %d clients selected", selected, len(hosts)), ""}
 	start, end := listWindow(len(hosts), model.cursor, max(3, context.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
@@ -283,7 +302,11 @@ func (model shutdownModel) selectionView(hosts []domain.HostMeta, context shutdo
 		if model.chosen[host.Name] {
 			checked = "x"
 		}
-		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s", checked, host.Name, host.IP), index == model.cursor, context.dark))
+		state := ""
+		if context.stateLabel != nil {
+			state = " · " + context.stateLabel(host.Name)
+		}
+		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s%s", checked, host.Name, host.IP, state), index == model.cursor, context.dark))
 	}
 	if len(hosts) > end || start > 0 {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d", start+1, end, len(hosts)), context.dark))

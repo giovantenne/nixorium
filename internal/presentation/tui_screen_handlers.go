@@ -642,6 +642,11 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "t":
 			model.computers.hostTechnical = !model.computers.hostTechnical
 			model.computers.hostDetail = true
+		case "u":
+			if model.actions.ClassroomMode || model.computers.hostDetail {
+				return model, nil
+			}
+			return model.updateComputersThatNeedIt()
 		case "d":
 			if model.actions.ClassroomMode {
 				return model, nil

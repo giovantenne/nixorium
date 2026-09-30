@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -14,7 +15,11 @@ import (
 func InternetPlanText(w io.Writer, p domain.InternetPlan) {
 	fmt.Fprintf(w, "Internet: %s (%s)\n%s\n", p.Action, p.State, p.Message)
 	for _, t := range p.Targets {
-		fmt.Fprintf(w, "  %s  %s  current=%s  available=%t\n", t.Name, t.IP, t.Observed.State, t.Eligible)
+		outcome := "not reachable; not sent"
+		if t.Eligible {
+			outcome = "now " + internetStateWords(t.Observed.State) + "; will be " + internetStateWords(p.Action.DesiredState())
+		}
+		fmt.Fprintf(w, "  %s  %s  %s\n", t.Name, t.IP, outcome)
 	}
 	if p.ReviewToken != "" {
 		fmt.Fprintf(w, "Review token: %s\n", p.ReviewToken)
@@ -23,7 +28,7 @@ func InternetPlanText(w io.Writer, p domain.InternetPlan) {
 func InternetReportText(w io.Writer, r domain.InternetReport) {
 	fmt.Fprintln(w, r.Message)
 	for _, t := range r.Targets {
-		fmt.Fprintf(w, "  %s  %s  %s\n", t.Name, t.State, t.Detail)
+		fmt.Fprintf(w, "  %s  %s  %s\n", t.Name, internetStateWords(t.State), t.Detail)
 	}
 }
 func ConfirmInternet(input io.Reader, output io.Writer, p domain.InternetPlan) (bool, error) {
@@ -43,6 +48,9 @@ type internetModel struct {
 	plan          domain.InternetPlan
 	result        domain.InternetReport
 	applying      bool
+	// observed is the last read-only Internet check of this session.
+	observed   map[string]string
+	observedAt time.Time
 }
 type internetPlanMsg struct{ plan domain.InternetPlan }
 type internetApplyMsg struct{ report domain.InternetReport }
@@ -79,6 +87,30 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 		return model, nil
 	}
 	switch key.String() {
+	case "r":
+		return model.checkInternetState()
+	case "n":
+		if m.observedAt.IsZero() {
+			model.message = "No observation yet: press r to check Internet access first."
+			return model, nil
+		}
+		// Select the computers the current action would change.
+		wanted := "enabled"
+		if m.action == domain.InternetUnblock {
+			wanted = "blocked"
+		}
+		chosen := map[string]bool{}
+		for _, h := range hosts {
+			if m.observed[h.Name] == wanted {
+				chosen[h.Name] = true
+			}
+		}
+		if len(chosen) == 0 {
+			model.message = "No client would change: none had " + internetStateWords(wanted) + " at the last check."
+			return model, nil
+		}
+		m.chosen = chosen
+		model.message = ""
 	case "up", "k":
 		m.cursor = max(0, m.cursor-1)
 	case "down", "j":
@@ -139,9 +171,9 @@ func (model dashboardModel) internetView() string {
 	case 1:
 		lines = append(lines, "Review: "+string(m.action)+" Internet", m.plan.Message, "")
 		for _, t := range m.plan.Targets {
-			outcome := "not sent"
+			outcome := "not reachable · not sent"
 			if t.Eligible {
-				outcome = t.Observed.State + " → " + m.action.DesiredState()
+				outcome = internetStateWords(t.Observed.State) + " → " + internetStateWords(m.action.DesiredState())
 			}
 			lines = append(lines, fmt.Sprintf("%s  %s  %s", t.Name, t.IP, outcome))
 		}
@@ -152,11 +184,11 @@ func (model dashboardModel) internetView() string {
 	case 2:
 		lines = append(lines, m.result.Message, "")
 		for _, t := range m.result.Targets {
-			lines = append(lines, t.Name+"  "+t.State, t.Detail)
+			lines = append(lines, t.Name+"  "+internetStateWords(t.State), t.Detail)
 		}
 		shell.actions = []tuiAction{{key: "r", label: "New review"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
 	default:
-		lines = append(lines, "Action: "+string(m.action)+" Internet", "")
+		lines = append(lines, "Action: "+string(m.action)+" Internet", tuiMuted(observationHeading(m.observedAt), model.isDark), "")
 		hosts := model.report.Meta.Clients.Hosts
 		count := max(1, model.height-17)
 		start, end := listWindow(len(hosts), m.cursor, count)
@@ -166,7 +198,7 @@ func (model dashboardModel) internetView() string {
 			if m.chosen[h.Name] {
 				mark = "[x]"
 			}
-			lines = append(lines, tuiSelection(fmt.Sprintf("%s %-10s %s", mark, h.Name, h.IP), i == m.cursor, model.isDark))
+			lines = append(lines, tuiSelection(fmt.Sprintf("%s %-10s %-15s %s", mark, h.Name, h.IP, m.stateLabel(h.Name)), i == m.cursor, model.isDark))
 		}
 		if len(hosts) == 0 {
 			lines = append(lines, "No client computers configured.")
@@ -174,7 +206,7 @@ func (model dashboardModel) internetView() string {
 		if start > 0 || end < len(hosts) {
 			lines = append(lines, fmt.Sprintf("Showing %d–%d of %d", start+1, end, len(hosts)))
 		}
-		shell.actions = []tuiAction{{key: "↑/↓", label: "Move"}, {key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Tab", label: "Block / unblock"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "↑/↓", label: "Move"}, {key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those to change"}, {key: "r", label: "Check state"}, {key: "Tab", label: "Block / unblock"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	}
 	shell.body = strings.Join(lines, "\n")
 	if model.message != "" {

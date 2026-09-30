@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Computer lists show each computer's last known state with the time of the
+  check: the update list says which computers need the update, power controls
+  which are on, and Internet access whether each is on or blocked. `r` checks
+  again (Internet access with a read-only check) and `n` selects the relevant
+  computers; reviews still probe again before anything is sent. Internet
+  reviews and results use plain words, and Inventory offers `u` to review
+  updating every computer that needed it.
+
 - Power reviews distinguish a computer someone is using from an untouched
   login. The client session helper now reports `unused` when every user
   session is a local graphical session without keyboard or mouse input for ten

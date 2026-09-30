@@ -160,20 +160,22 @@ Distribute the prepared system
 Select → Review → Deploy → Verify
 
 Choose where to apply the saved configuration.
+Not checked in this session · r checks the computers now
 
 5 of 5 computers selected
 
-› [x] pc01       10.42.0.11 · Not checked; review to probe
-  [x] pc02       10.42.0.12 · Not checked; review to probe
-  [x] pc03       10.42.0.13 · Not checked; review to probe
-  [x] pc04       10.42.0.14 · Not checked; review to probe
-  [x] pc05       10.42.0.15 · Not checked; review to probe
+› [x] pc01       10.42.0.11 · Not checked
+  [x] pc02       10.42.0.12 · Not checked
+  [x] pc03       10.42.0.13 · Not checked
+  [x] pc04       10.42.0.14 · Not checked
+  [x] pc05       10.42.0.15 · Not checked
 
 NOTICE
 ○ Opened from a saved software change. Review deploys the complete current configuration.
 ! Software selection saved locally.
 
-Space Select  ·  a All  ·  Enter Review  ·  Esc Computers  ·  F1 Help
+Space Select  ·  a All  ·  n Those needing update  ·  r Check computers  ·  Enter Review  ·  Esc Computers
+F1 Help
 ```
 
 ## Client deployment review

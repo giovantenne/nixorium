@@ -121,6 +121,16 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 	if model.deployment.usbRecovery != nil {
 		return model.updateDeploymentUSBRecovery(key)
 	}
+	if model.screen == dashboardDeploy && model.deployment.result.Operation == "" && !model.deployment.applying {
+		switch key.String() {
+		case "r":
+			return model.checkComputersThen()
+		case "n":
+			chosen, message := model.selectComputers(model.deployment.chosen, hostNeedsUpdate, "No computer needed an update at the last check.")
+			model.deployment.chosen, model.message = chosen, message
+			return model, nil
+		}
+	}
 	deployment, intent := model.deployment.update(model.screen, key, model.report.Meta.Clients.Hosts)
 	model.deployment = deployment
 	if intent.message != "" {
@@ -198,4 +208,15 @@ func deploymentAvailabilityLabel(plan domain.DeploymentPlanReport, name, ip stri
 		}
 	}
 	return "Not checked; review to probe"
+}
+
+// deploymentSelectionLabel prefers the availability probed by the last review
+// and otherwise shows the last computer observation of this session.
+func deploymentSelectionLabel(plan domain.DeploymentPlanReport, host domain.HostMeta, observed domain.HostStatus, found bool) string {
+	for _, availability := range plan.Availability {
+		if availability.Name == host.Name && availability.IP == host.IP {
+			return deploymentAvailabilityLabel(plan, host.Name, host.IP)
+		}
+	}
+	return deploymentStateLabel(observed, found)
 }

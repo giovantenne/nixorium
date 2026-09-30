@@ -84,7 +84,9 @@ substantial storage/time; it does not activate a system or authorize deployment.
 ## Temporary Internet access
 
 Use **Computers → Internet access** to select clients, choose block/unblock,
-review authenticated state and apply. The controller and clients must first
+review authenticated state and apply. `r` checks every client's current state
+read-only and `n` selects those the chosen action would change; the review
+checks them again. The controller and clients must first
 run a version supporting the client helper. Internet returns on client reboot;
 offline clients are never queued. The configured laboratory IPv4 subnet stays
 reachable, including SSH and Veyon. Other destinations and established Internet

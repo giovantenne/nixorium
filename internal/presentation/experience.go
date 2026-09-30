@@ -155,6 +155,9 @@ func (model dashboardModel) computersView() string {
 		}
 		lines = append(lines, body, "", tuiMuted(fmt.Sprintf("%d–%d of %d computers", displayedLineStart(start, len(hosts)), end, len(hosts)), model.isDark))
 		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Details"}, {key: "/", label: "Search"}, {key: "r", label: "Refresh"}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}
+		if !model.actions.ClassroomMode && model.computers.hosts.Deployment.Outdated > 0 {
+			actions = append([]tuiAction{{key: "u", label: "Update those that need it"}}, actions...)
+		}
 	}
 	notices := []tuiNotice{}
 	if configurationView && model.computers.configurationState.HasErrors() {
@@ -221,7 +224,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardHosts:
 		lines = append(lines, "r refresh computers   / search names, addresses or status", "Enter open details   t technical detail", "Search owns all text keys until Enter or Esc.")
 		if !model.actions.ClassroomMode {
-			lines = append(lines, "d review a deployment for the focused computer")
+			lines = append(lines, "d review a deployment for the focused computer", "u review updating every computer that needed it at the last check")
 			lines = append(lines, "h review changed SSH trust in a computer's details, after verifying its physical fingerprint")
 		}
 	case dashboardDeploy:
@@ -233,13 +236,13 @@ func (model dashboardModel) helpView() string {
 				"Esc keeps your selection. Successful recovery creates a fresh review requiring DEPLOY again.")
 			break
 		}
-		lines = append(lines, "Space select   a select/deselect all   Enter review", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   r new review when no recovery is required   Enter Computers")
+		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   r new review when no recovery is required   Enter Computers")
 	case dashboardInternet:
-		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
+		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "r checks Internet access on all clients (read-only); n selects those the chosen action would change.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
 	case dashboardDeployReview:
 		lines = append(lines, "The brief availability check is not authentication or proof of power state.", "F2, when offered, creates a new review for only the reachable computers with an open SSH port.", "The new review requires a fresh DEPLOY confirmation; it never starts automatically.", "Esc during replanning keeps the original review and clears its confirmation.")
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
-		lines = append(lines, "Space select   a select/deselect all   Tab shutdown/restart   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state or a completed restart.")
+		lines = append(lines, "Space select   a select/deselect all   n select those on at the last check   r check computers   Tab shutdown/restart   Enter check/review", "u acknowledge unknown sessions in review   Esc cancel", "An accepted request does not prove physical power state or a completed restart.")
 	case dashboardSetup:
 		lines = append(lines, "Enter continue the observed stage   t full checklist")
 	case dashboardSettings:

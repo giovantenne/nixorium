@@ -550,6 +550,9 @@ nix run .#nixorium -- deploy apply --on @lab --expect REVISION_FROM_PLAN
 
 Planning is read-only. It requires a ready deployment and clean Git revision,
 expands only configured clients, and prints the revision-bound apply command.
+In the dashboard the selection lists each computer's state at the last check
+(`r` checks again, `n` selects those needing the update), and Inventory's `u`
+opens the same review for every computer that needed it.
 Apply repeats the preflight, requires the one-word `DEPLOY` confirmation, builds before
 activation, and streams output to a mode-0600 log. In the dashboard, the same
 foreground operation shows elapsed time, named stages and authenticated-computer

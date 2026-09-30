@@ -298,6 +298,8 @@ type computersModel struct {
 	hostTechnical      bool
 	configurationState domain.ConfigurationStateReport
 	hosts              domain.HostsReport
+	// refreshReturn is the selection list that asked for a computer check.
+	refreshReturn dashboardScreen
 }
 
 type dashboardModel struct {
@@ -2319,7 +2321,7 @@ func (model dashboardModel) deployView() string {
 			selected++
 		}
 	}
-	lines = append(lines, "Choose where to apply the saved configuration.", "", fmt.Sprintf("%d of %d computers selected", selected, len(hosts)), "")
+	lines = append(lines, "Choose where to apply the saved configuration.", tuiMuted(observationHeading(model.computers.hosts.GeneratedAt), model.isDark), "", fmt.Sprintf("%d of %d computers selected", selected, len(hosts)), "")
 	start, end := listWindow(len(hosts), model.deployment.cursor, max(3, model.height-20))
 	for index := start; index < end; index++ {
 		host := hosts[index]
@@ -2327,7 +2329,8 @@ func (model dashboardModel) deployView() string {
 		if model.deployment.chosen[host.Name] {
 			checked = "x"
 		}
-		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s · %s", checked, host.Name, host.IP, deploymentAvailabilityLabel(model.deployment.plan, host.Name, host.IP)), index == model.deployment.cursor, model.isDark))
+		observed, found := model.observedHost(host.Name)
+		lines = append(lines, tuiSelection(fmt.Sprintf("[%s] %-10s %s · %s", checked, host.Name, host.IP, deploymentSelectionLabel(model.deployment.plan, host, observed, found)), index == model.deployment.cursor, model.isDark))
 	}
 	if len(hosts) > end || start > 0 {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d", start+1, end, len(hosts)), model.isDark))
@@ -2339,7 +2342,7 @@ func (model dashboardModel) deployView() string {
 		shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
 	shell.body = strings.Join(lines, "\n")
-	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
+	shell.actions = []tuiAction{{key: "Space", label: "Select"}, {key: "a", label: "All"}, {key: "n", label: "Those needing update"}, {key: "r", label: "Check computers"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	return model.renderShell(shell)
 }
 

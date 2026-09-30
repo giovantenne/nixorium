@@ -44,7 +44,7 @@ func TestInternetRenderGallery(t *testing.T) {
 				case "partial":
 					model.internet.stage = 2
 					model.internet.result = domain.InternetReport{State: "partial", Message: "Verified on 1 of 2 selected clients.", Targets: []domain.InternetOutcome{{Name: "pc02", State: "unconfirmed", Detail: "Refresh and review before retrying."}}}
-					required = append(required, "unconfirmed", "New review", "Computers")
+					required = append(required, "sent, not confirmed", "New review", "Computers")
 				}
 				view := model.View().Content
 				if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

@@ -347,11 +347,18 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = "Computer status refresh failed: " + message.err.Error()
 		} else {
 			model.computers.hosts = message.report
-			model.computers.hostCursor = 0
 			model.message = ""
 		}
+		if model.computers.refreshReturn != 0 {
+			model.screen = model.computers.refreshReturn
+			model.computers.refreshReturn = 0
+			return model, nil
+		}
+		model.computers.hostCursor = 0
 		model.screen = dashboardHosts
 		return model, nil
+	case internetObserveMsg:
+		return model.finishInternetObservation(message)
 	case dashboardConfigurationStateMsg:
 		model.busy = ""
 		model.computers.configurationState = message.report
