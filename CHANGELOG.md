@@ -11,6 +11,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   nothing. `lab-settings.json` (or a legacy `lab-config.nix`) that still
   contains it is now rejected with a message naming the key. Delete the key
   and commit before updating to this release.
+- Made shell validation independent of the developer's boot firmware and the
+  location of host executables, using an injectable UEFI probe and distinct
+  PXE store fixtures built from the locked inputs.
+
 - Reduced repeated Nix evaluation in controller preflight and grouped the complete
   update build set into one invocation. Inventory and package discovery no longer
   evaluate every workspace host; readiness and build guards remain enforced.

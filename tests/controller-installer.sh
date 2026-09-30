@@ -16,6 +16,8 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$MOCK_BIN" "$TARGET_ROOT" "$DEPLOYMENT"
+export NIXORIUM_INSTALLER_EFI_DIRECTORY="${TEST_ROOT}/efi"
+mkdir -p "$NIXORIUM_INSTALLER_EFI_DIRECTORY"
 printf '%s\n' '{ device, studentUser }: {}' > "$LAYOUT"
 printf '%s\n' 'YES' > "$CONFIRM"
 
@@ -75,6 +77,20 @@ EOF
 chmod +x "${MOCK_BIN}/lsblk" "${MOCK_BIN}/nix" \
   "${MOCK_BIN}/nixos-install" "${MOCK_BIN}/sudo" \
   "${MOCK_BIN}/btrfs" "${MOCK_BIN}/swapon" "${MOCK_BIN}/swapoff"
+
+# A missing UEFI directory must fail before any disk mutation, independently
+# of the firmware used to boot the developer or CI machine.
+if PATH="${MOCK_BIN}:$PATH" \
+  CONTROLLER_INSTALLER_LOG="$ACTION_LOG" \
+  DISKO_LAYOUT_FILE="$LAYOUT" \
+  NIXORIUM_INSTALLER_EFI_DIRECTORY="${TEST_ROOT}/missing-efi" \
+  bash "${REPO_ROOT}/scripts/install-controller.sh" /dev/vda \
+  > "${TEST_ROOT}/legacy-output" 2>&1; then
+  echo "controller installer accepted BIOS/Legacy boot" >&2
+  exit 1
+fi
+grep -F 'BIOS/Legacy boot is not supported' "${TEST_ROOT}/legacy-output" >/dev/null
+test ! -e "$ACTION_LOG"
 
 PATH="${MOCK_BIN}:$PATH" \
 CONTROLLER_INSTALLER_LOG="$ACTION_LOG" \

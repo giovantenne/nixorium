@@ -40,6 +40,11 @@ let
   };
 in
 {
+  shell-regression-fixtures = pkgs.runCommand "nixorium-shell-regression-fixtures" {
+    outputs = [ "out" "second" ];
+  } ''
+    mkdir "$out" "$second"
+  '';
   config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
     touch "$out"
   '';

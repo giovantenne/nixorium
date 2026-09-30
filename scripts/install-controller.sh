@@ -100,7 +100,7 @@ else
 fi
 
 # Detect UEFI
-if [ -d /sys/firmware/efi ]; then
+if [ -d "${NIXORIUM_INSTALLER_EFI_DIRECTORY:-/sys/firmware/efi}" ]; then
   echo "Detected UEFI boot"
 else
   echo "Error: BIOS/Legacy boot is not supported. Enable UEFI in firmware settings." >&2

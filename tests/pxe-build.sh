@@ -7,22 +7,14 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 STATE_DIRECTORY="$TEMP_DIR/state"
 mkdir -p "$STATE_DIRECTORY" "$TEMP_DIR/bin"
 ORIGINAL_PATH="$PATH"
-TEST_NIX_EXECUTABLE="$(readlink -f "$(command -v nix)")"
-export NIXORIUM_TEST_STORE_PATH="${TEST_NIX_EXECUTABLE%/bin/nix}"
-BASH_PATH="$(readlink -f "$BASH")"
-SECOND_STORE_PATH="${BASH_PATH%/bin/bash}"
-# Hosted CI may run this script with /usr/bin/bash instead of a store Bash.
-if [[ ! "$SECOND_STORE_PATH" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ \
-    || "$SECOND_STORE_PATH" == "$NIXORIUM_TEST_STORE_PATH" ]]; then
-  for STORE_CANDIDATE in /nix/store/*; do
-    if [[ "$STORE_CANDIDATE" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ \
-        && -d "$STORE_CANDIDATE" && "$STORE_CANDIDATE" != "$NIXORIUM_TEST_STORE_PATH" ]]; then
-      SECOND_STORE_PATH="$STORE_CANDIDATE"
-      break
-    fi
-  done
-fi
-export NIXORIUM_TEST_SECOND_STORE_PATH="$SECOND_STORE_PATH"
+# Real, distinct store outputs from the locked inputs, independent of the
+# location of host executables or unrelated store contents.
+FIXTURE_OUTPUTS="$(nix --extra-experimental-features 'nix-command flakes' build \
+  --file "$REPO_ROOT/tests/source-checks.nix" 'shell-regression-fixtures^*' \
+  --no-link --json)"
+NIXORIUM_TEST_STORE_PATH="$(jq -er '.[0].outputs.out' <<<"$FIXTURE_OUTPUTS")"
+NIXORIUM_TEST_SECOND_STORE_PATH="$(jq -er '.[0].outputs.second' <<<"$FIXTURE_OUTPUTS")"
+export NIXORIUM_TEST_STORE_PATH NIXORIUM_TEST_SECOND_STORE_PATH
 export NIXORIUM_TEST_LOG="$TEMP_DIR/calls"
 
 cat >"$TEMP_DIR/bin/nix" <<'NIX'
