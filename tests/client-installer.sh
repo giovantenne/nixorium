@@ -124,6 +124,46 @@ EOF
   test "$(printf '%s\n' partition:/dev/vdb install:pc02 verify reboot)" = "$(cat "$ACTION_LOG")"
 )
 
+test_mistyped_answers_are_asked_again() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+
+  OUTPUT=$(main <<'EOF' 2>&1
+2
+9
+/dev/nothing
+2
+erase
+ERASE
+
+EOF
+  )
+
+  grep -q "Disk number '9' is not in the list; choose again" <<< "$OUTPUT"
+  grep -q "'/dev/nothing' is not an available writable disk; choose again" <<< "$OUTPUT"
+  grep -q 'That was not ERASE' <<< "$OUTPUT"
+  grep -q 'SUCCESS: pc02 is installed on /dev/vdb' <<< "$OUTPUT"
+)
+
+test_empty_confirmation_cancels() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+
+  set +e
+  OUTPUT=$(main pc01 /dev/vda <<'EOF' 2>&1
+
+EOF
+  )
+  STATUS=$?
+  set -e
+
+  test "$STATUS" -eq 1
+  grep -q 'Installation cancelled; no disk operation was started' <<< "$OUTPUT"
+  test ! -e "$ACTION_LOG"
+)
+
 test_reachable_identity_is_refused() (
   new_fixture
   trap 'rm -rf "$FIXTURE_DIR"' EXIT
@@ -311,6 +351,8 @@ test_reachable_identity_is_refused
 test_client_interface_mismatch_stops_before_erase
 test_client_interface_uses_host_override
 test_inexact_confirmation_changes_nothing
+test_mistyped_answers_are_asked_again
+test_empty_confirmation_cancels
 test_disk_identity_change_is_refused
 test_failure_reports_modified_disk
 test_too_small_disk_is_refused_before_mutation

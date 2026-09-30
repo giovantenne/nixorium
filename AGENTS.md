@@ -316,6 +316,10 @@ failure or timeout must block publication.
   exact selected identities, and always returns to fresh planning and explicit
   deployment confirmation. Never clear reservations or infer verified identity
   from a completion label in presentation code.
+- The netboot image starts the guided client installer once on tty1 through
+  the autologin shell; it remains interactive (identity, `ERASE`, reboot) and
+  is never unattended. Both installers use `ERASE` and ask again after a
+  mistyped answer; an empty confirmation cancels.
 - Client enrollment is local and guided; consume only the immutable versioned installer inventory, treat reachability as a best-effort duplicate warning rather than a reservation, and keep unattended installation disabled without explicit private policy and a documented token model.
 - Client deployment expands only evaluated inventory targets, binds execution to the reviewed clean Git revision, builds before apply, runs unprivileged with fixed Colmena argument arrays, and preserves streamed mode-0600 logs plus honest partial-failure/retry reporting. Bound subprocess groups and inherited output pipes, retain SSH liveness checks, and persist fleet-wide pending evidence before apply. An unsuccessful dispatched apply keeps that evidence across exit/reboot, blocks new operations and requires reviewed recovery; an active revision alone never clears it. Authenticated observations still run after local cancellation, but uncertain activation must not enter successful history. Keep the bounded terminal-safe live tail separate from support exports and safe operation summaries.
 - Deployment availability is advisory: probe only selected identities with the

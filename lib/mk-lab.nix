@@ -782,6 +782,21 @@ builtins.mapAttrs (name: value:
             install -d -m 0755 /installer
             cp -a ${effectiveInstallerSource}/. /installer/
           '';
+          # Start the guided installer once on the first console. It still
+          # asks for the identity and the typed erase confirmation; nothing
+          # runs unattended. Leaving it returns to an ordinary shell.
+          programs.bash.loginShellInit = ''
+            if [ "$(tty)" = /dev/tty1 ] && [ -x /installer/setup.sh ] && [ ! -e /tmp/nixorium-installer-offered ]; then
+              : > /tmp/nixorium-installer-offered
+              sudo /installer/setup.sh || true
+              echo "To start the guided installer again, run: sudo /installer/setup.sh"
+            fi
+          '';
+          services.getty.helpLine = lib.mkAfter ''
+
+            The Nixorium guided installer starts on the first console.
+            To run it again: sudo /installer/setup.sh
+          '';
         })
       ] ++ netbootModules;
     };

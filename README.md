@@ -170,9 +170,10 @@ It retains the controller's time zone and keyboard settings.
 ### 3. Choose how to install the first client
 
 For PXE, continue in the guided flow, review the temporary controller network
-change, boot the client with UEFI network boot, and run `/installer/setup.sh`.
-The client console owns identity, disk selection, `ERASE` confirmation, and the
-separate reboot confirmation.
+change and boot the client with UEFI network boot. The guided installer starts
+by itself on the client's first console (`sudo /installer/setup.sh` starts it
+again). The client console owns identity, disk selection, `ERASE` confirmation,
+and the separate reboot confirmation; a mistyped answer is asked again.
 
 For USB/SSH, boot that client from the official **NixOS 26.05 Minimal ISO** in
 UEFI mode with Ethernet or Wi-Fi connectivity to the controller. For Wi-Fi,
@@ -215,8 +216,8 @@ deployment repository private.
 
 ### 4. Check the installed client
 
-For PXE, boot the test client over the network and run this in the downloaded
-installer environment:
+For PXE, boot the test client over the network. The guided installer starts on
+its first console; to start it again in the downloaded installer environment:
 
 ```sh
 /installer/setup.sh

@@ -269,15 +269,23 @@ select_disk() {
     CHOICE="${AVAILABLE_DISKS[0]}"
     echo "Only one writable disk detected; selected ${CHOICE}."
   else
-    prompt_input "Choose disk number or path: " CHOICE || return 1
-    if [[ "$CHOICE" =~ ^[0-9]+$ ]]; then
-      INDEX=$((10#$CHOICE - 1))
-      if (( INDEX < 0 || INDEX >= ${#AVAILABLE_DISKS[@]} )); then
-        echo "Error: disk number '${CHOICE}' is out of range." >&2
-        return 1
+    # A mistyped choice is asked again; only end of input stops here.
+    while true; do
+      prompt_input "Choose disk number or path: " CHOICE || return 1
+      if [[ "$CHOICE" =~ ^[0-9]+$ ]]; then
+        INDEX=$((10#$CHOICE - 1))
+        if (( INDEX < 0 || INDEX >= ${#AVAILABLE_DISKS[@]} )); then
+          echo "Disk number '${CHOICE}' is not in the list; choose again." >&2
+          continue
+        fi
+        CHOICE="${AVAILABLE_DISKS[$INDEX]}"
       fi
-      CHOICE="${AVAILABLE_DISKS[$INDEX]}"
-    fi
+      CANDIDATE=$(canonicalize_disk "$CHOICE")
+      if [[ "$CANDIDATE" =~ ^/dev/[[:alnum:]_.+-]+$ ]] && is_available_disk "$CANDIDATE"; then
+        break
+      fi
+      echo "'${CHOICE}' is not an available writable disk; choose again." >&2
+    done
   fi
 
   CANDIDATE=$(canonicalize_disk "$CHOICE")
@@ -442,11 +450,15 @@ main() {
   echo "  All data on this disk will be permanently destroyed."
   echo "  No host reservation has been made on the controller."
   EXPECTED_CONFIRMATION="ERASE"
-  prompt_input "Type ERASE to continue: " CONFIRMATION || return 1
-  if [[ "$CONFIRMATION" != "$EXPECTED_CONFIRMATION" ]]; then
-    echo "Installation cancelled; no disk operation was started."
-    return 1
-  fi
+  # A mistyped word is asked again; an empty answer or end of input cancels.
+  while true; do
+    if ! prompt_input "Type ERASE to continue, or press Enter to cancel: " CONFIRMATION || [[ -z "$CONFIRMATION" ]]; then
+      echo "Installation cancelled; no disk operation was started."
+      return 1
+    fi
+    [[ "$CONFIRMATION" == "$EXPECTED_CONFIRMATION" ]] && break
+    echo "That was not ERASE (capital letters). Type it again, or press Enter to cancel." >&2
+  done
 
   revalidate_disk || return 1
   trap cleanup EXIT

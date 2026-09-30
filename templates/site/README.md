@@ -809,10 +809,11 @@ the configured interface and roles. Institutional DHCP remains authoritative.
 
 #### Enroll a client
 
-On the PXE-booted client:
+On the PXE-booted client the guided installer starts by itself on the first
+console. To start it again:
 
 ```sh
-/installer/setup.sh
+sudo /installer/setup.sh
 ```
 
 The installer displays hardware and writable disks, offers only configured
@@ -822,7 +823,9 @@ closure offline and requires its size plus 2 GiB of headroom before offering a
 disk.
 
 Disko starts only after the one-word `ERASE` confirmation on a review that
-shows the exact client identity and disk. The installer reports partition, installation, and verification stages,
+shows the exact client identity and disk; the controller installer uses the
+same word. A mistyped disk choice or confirmation is asked again, and an empty
+confirmation cancels without touching the disk. The installer reports partition, installation, and verification stages,
 then offers a separately confirmed reboot. There is no unattended mode and no
 client-side fallback fetch.
 

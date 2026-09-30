@@ -187,11 +187,13 @@ network observations; do not repair addresses manually before observing boot.
 
 ## Scenario 4: guided client disk installation
 
-On one blank client, run `/installer/setup.sh`, choose a configured unused host,
-and select the disposable target disk. Exercise one incorrect confirmation
-before entering the exact `ERASE <disk> INSTALL <host>` phrase.
+On one blank client, let the guided installer start on the first console,
+choose a configured unused host, and select the disposable target disk.
+Exercise one incorrect confirmation, which is asked again, before entering the
+exact `ERASE` word.
 
-Pass when the wrong phrase causes no disk mutation, closure/capacity checks run
+Pass when the installer starts without typing a command, the wrong word causes
+no disk mutation, closure/capacity checks run
 without client Internet access, installation completes from prepared content,
 and the client reboots from disk with the chosen hostname and mounted root.
 

@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The PXE installer starts by itself once on the client's first console,
+  still asking for the identity and the typed erase confirmation (nothing runs
+  unattended; `sudo /installer/setup.sh` starts it again). Both installers ask
+  again after a mistyped disk choice or confirmation, and an empty answer
+  cancels. The controller installer now asks for `ERASE` like the client.
+
 - USB-over-SSH installation shows progress and plain outcomes: while the
   installer job runs the view refreshes itself with read-only status requests
   and names the current step and elapsed time; results say in one sentence

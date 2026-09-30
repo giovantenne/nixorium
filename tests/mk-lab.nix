@@ -251,6 +251,10 @@ assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces ? 
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
 assert keyboardLab.nixosConfigurations.pc99.config.console.keyMap == "it2";
 assert keyboardLab.nixosConfigurations.netboot.config.console.keyMap == "it2";
+# The netboot console starts the guided installer once; it stays interactive.
+assert lib.hasInfix "sudo /installer/setup.sh" keyboardLab.nixosConfigurations.netboot.config.programs.bash.loginShellInit;
+assert lib.hasInfix "/dev/tty1" keyboardLab.nixosConfigurations.netboot.config.programs.bash.loginShellInit;
+assert keyboardLab.nixosConfigurations.netboot.config.services.getty.autologinUser == "nixos";
 assert builtins.elem "network.target"
   roleInterfaceLab.nixosConfigurations.pc99.config.systemd.services."network-addresses-eno1".wantedBy;
 assert !(builtins.elem "network.target"

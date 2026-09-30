@@ -132,16 +132,18 @@ elif [[ ${#AVAILABLE_DISKS[@]} -eq 1 ]]; then
 else
   echo "Available disks:"
   list_disks
-  prompt_input "Choose install disk: " CHOSEN_DISK
-  INSTALL_DISK=$(canonicalize_disk "$CHOSEN_DISK")
-  if [[ -z "$INSTALL_DISK" ]]; then
-    echo "Error: no disk selected." >&2
-    exit 1
-  fi
-  if ! is_available_disk "$INSTALL_DISK"; then
-    echo "Error: disk '$INSTALL_DISK' is not available on this machine." >&2
-    exit 1
-  fi
+  # A mistyped choice is asked again; only end of input stops here.
+  while true; do
+    if ! prompt_input "Choose install disk: " CHOSEN_DISK; then
+      echo "Error: no disk selected." >&2
+      exit 1
+    fi
+    INSTALL_DISK=$(canonicalize_disk "$CHOSEN_DISK")
+    if [[ -n "$INSTALL_DISK" ]] && is_available_disk "$INSTALL_DISK"; then
+      break
+    fi
+    echo "'${CHOSEN_DISK}' is not an available disk; choose again." >&2
+  done
 fi
 
 # Generate a standalone Disko config with concrete arguments for the selected
@@ -161,11 +163,16 @@ if [[ -z "$UPSTREAM_REF" || -z "$DEPLOYMENT_PATH" || ! -d "$DEPLOYMENT_PATH" ]];
 fi
 
 echo "Selected disk: $INSTALL_DISK"
-prompt_input "This will erase all data on $INSTALL_DISK. Type YES to continue: " CONFIRMATION
-if [[ "$CONFIRMATION" != "YES" ]]; then
-  echo "Installation cancelled; the disk was not changed."
-  exit 1
-fi
+# The same word as the client installer. A mistyped word is asked again; an
+# empty answer or end of input cancels.
+while true; do
+  if ! prompt_input "This will erase all data on $INSTALL_DISK. Type ERASE to continue, or press Enter to cancel: " CONFIRMATION || [[ -z "$CONFIRMATION" ]]; then
+    echo "Installation cancelled; the disk was not changed."
+    exit 1
+  fi
+  [[ "$CONFIRMATION" == "ERASE" ]] && break
+  echo "That was not ERASE (capital letters). Type it again, or press Enter to cancel." >&2
+done
 
 echo "Downloading the pinned partitioning tool. The disk remains unchanged until it is ready..."
 echo "Partitioning disk with the Disko revision pinned by the deployment..."

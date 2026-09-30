@@ -19,7 +19,7 @@ mkdir -p "$MOCK_BIN" "$TARGET_ROOT" "$DEPLOYMENT"
 export NIXORIUM_INSTALLER_EFI_DIRECTORY="${TEST_ROOT}/efi"
 mkdir -p "$NIXORIUM_INSTALLER_EFI_DIRECTORY"
 printf '%s\n' '{ device, studentUser }: {}' > "$LAYOUT"
-printf '%s\n' 'YES' > "$CONFIRM"
+printf '%s\n' 'ERASE' > "$CONFIRM"
 
 cat > "${MOCK_BIN}/lsblk" <<'EOF'
 #!/usr/bin/env bash
@@ -125,7 +125,8 @@ grep -F "|${TARGET_ROOT}/var/cache/nixorium-bootstrap|--root ${TARGET_ROOT} --fl
 test -f "$DEPLOYMENT/flake.lock"
 grep -F 'downloaded into the installed disk, not the live ISO memory' "${TEST_ROOT}/output" >/dev/null
 
-printf '%s\n' 'NO' > "$CONFIRM"
+# An empty answer cancels; a mistyped word would be asked again on a terminal.
+printf '\n' > "$CONFIRM"
 : > "$ACTION_LOG"
 if PATH="${MOCK_BIN}:$PATH" \
   CONTROLLER_INSTALLER_LOG="$ACTION_LOG" \
