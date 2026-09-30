@@ -302,7 +302,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "review":
 						w.plan = demoWorkspacePlan()
 						w.stage = workspaceReview
-						want = append(want, "Type SAVE:", "Save JSON", "no apply, runtime opt-in or reset")
+						want = append(want, "Type SAVE:", "Save JSON", "no system apply or reset")
 					case "loading":
 						m.busy = "Loading workspace metadata"
 						m.beginRead(dashboardReadTimeout)
@@ -318,7 +318,7 @@ func TestWorkspaceRenderingFitsAndKeepsActionsVisible(t *testing.T) {
 					case "saved":
 						w.stage = workspaceResult
 						w.result = domain.WorkspaceApplyReport{State: "saved", Message: "Only the declaration was saved."}
-						want = append(want, "SAVED", "Runtime opt-in")
+						want = append(want, "SAVED", "Preferences take effect")
 					case "partial":
 						w.stage = workspaceResult
 						w.result = domain.WorkspaceApplyReport{State: "partial", RecoveryRequired: true, Message: "Replacement completed but durability is uncertain. Inspect the file before another change."}

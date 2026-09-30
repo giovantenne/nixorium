@@ -414,13 +414,13 @@ failure or timeout must block publication.
   `mkLab` checks prerequisites against each generated host's actual declarative
   system packages, including downstream overrides. Serialize both inputs into
   the offline installer. `state = "prepared"` is not activation.
-  `workspaceRuntimeEnabled` is a separate default-off opt-in requiring the
-  profile; serialize it offline and expose the seed path without claiming it
-  is built, deployed, or active. Absent input preserves legacy home content.
-  The template must still work with older pins when no workspace file exists.
-  Its deployment-owned catalog can prepare the first candidate on supporting
-  pins; `workspace-profile.example.json` is inactive and must never become an
-  implicit fallback. Keep that example compatible with Essential without VS Code.
+  A supplied profile always configures the managed boot reset; there is no
+  public runtime opt-in argument. Internal module selection is derived from
+  profile presence. The template ships an active `workspace-profile.json`
+  matching Essential without VS Code; leave it unchanged for default behavior.
+  Never silently replace a missing/invalid profile with the example. Expose the
+  seed path without claiming it is built, deployed or active. Preserve offline
+  profile/catalog equivalence and the profile-free standalone composition.
   `nixoriumResolveWorkspaceCandidate` returns the same metadata for raw candidate
   JSON without writing it. Review consumers must also compose the deployment's
   `nixoriumValidateWorkspaceCandidate` hook and bind/recheck source, pin and base
@@ -451,14 +451,14 @@ failure or timeout must block publication.
   to the reviewed HEAD and exact candidate blob, preserve unrelated index paths,
   and use the existing no-hooks/no-signing/no-remote commit boundary. A partial
   write/record requires inspection, never token replay or inferred completion.
-  Do not activate or opt into runtime from the save callback.
-  The initial editor load reads the current declaration (absence stays legacy),
+  Do not apply systems or reset homes from the save callback.
+  The initial editor load reads the current declaration,
   resolves it, and rejects concurrent changes. Never load the example implicitly.
   Git review classifies the profile as managed; a separately authorized exact-path
   commit validates its schema without implying Nix validation or activation.
   Update planning compares existing workspace metadata on current/candidate
   pins and preserves local validation hooks. Bind the complete comparison to
-  the update token; do not silently change reset opt-in, identity or targets.
+  the update token; do not silently change reset behavior, identity or targets.
   Legacy absence stays outside this comparison. Extension versions come from
   the package base, not independent home downloads or vendor-latest promises.
 - Save results distinguish local configuration, controller verification at the
@@ -487,11 +487,11 @@ failure or timeout must block publication.
   the `home-reset` unit name, never restarts on switch, and gates both the
   display manager and normal user sessions. Preserve manual-start refusal,
   no automatic retry, and `X-OnlyManualStart` so first-time installation during
-  a rebuild also waits for boot. Only the explicit runtime opt-in selects the
-  module. The legacy service also avoids rebuild-time restart and must refuse
+  a rebuild also waits for boot. A supplied workspace profile selects the
+  module. The profile-free service also avoids rebuild-time restart and must refuse
   managed pending evidence, so disabling the profile cannot bypass recovery.
   Keep student ownership repair/template writes and login preference migration
-  out of the opted-in path, while retaining staff and legacy content behavior.
+  out of the managed path, while retaining staff and profile-free content behavior.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.

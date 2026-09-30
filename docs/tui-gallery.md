@@ -47,8 +47,9 @@ for the operation boundaries.
 
 Settings also offers **Student workspace** on supporting pins. Its desktop,
 dock, editor/extensions and browser fields are a draft until a complete review
-and explicit save. This workflow writes only the profile JSON; Git commit,
-runtime opt-in, system deployment and boot reset are separate. It is not a home
+and explicit save. This workflow saves and records only the profile JSON;
+system application, client deployment and boot reset are separate. No additional
+personalization switch is required. It is not a home
 capture tool and is unavailable in the restricted teacher dashboard.
 
 Arrows or `j`/`k` move, `Enter` invokes the visible action, `Esc` returns or
@@ -518,21 +519,21 @@ Nixorium  /  Settings  /  Student workspace
 
 Student workspace
 Student workspace review: READY
+Preference changes:
+  Desktop / Favorite applications (ordered): Inherit → code.desktop
+Preferences take effect at the next computer start after system application.
+Saving does not apply systems or reset a home.
 Repository: /demo/lab
 File: workspace-profile.json
 Revision: 0123456789abcdef0123456789abcdef01234567
 Student: student
-Runtime opt-in: false (not changed by saving)
 Destinations:
   controller (controller)
   pc01 (client)
   pc02 (client)
-Current declaration: absent (legacy mode)
-Proposed declaration:
-{
-Review lines 1–13 of 32
+Review lines 1–13 of 38
 
-Save and record only the profile JSON; no apply, runtime opt-in or reset.
+Save and record only the profile JSON; no system apply or reset.
 Type SAVE: _
 
 ↑/↓ Scroll  ·  Enter Save JSON  ·  Esc Cancel  ·  F1 Help
@@ -552,8 +553,7 @@ Profile saved and recorded locally. No computer or student home changed.
 ○ Client computers — Not updated here; unknown until checked
 
 Apply to this controller, then review the computers to update.
-Runtime opt-in is not changed here; when enabled, preferences take effect at the next computer start after system
-application.
+Preferences take effect at the next computer start after system application.
 
 Enter Apply to this controller  ·  Esc Settings  ·  F1 Help
 ```
@@ -592,7 +592,7 @@ Builds do not certify plugin loading or the latest vendor release.
 Extension example.extension: 1.0 -> 2.0
 Package nodejs: not selected -> 24.0
 Package vscode: 1.0 -> 2.0
-Current pin: student student, runtime opt-in false
+Current pin: student student, boot preferences configured: true
   controller (controller)
   pc01 (client)
   pc02 (client)

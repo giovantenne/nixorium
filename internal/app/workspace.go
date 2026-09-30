@@ -27,7 +27,7 @@ func NewWorkspaceManager(source WorkspaceSource) WorkspaceManager {
 }
 
 // Load reviews the actual current profile, or an explicit empty proposal for
-// legacy mode. It never imports the example or enables managed runtime.
+// a new draft. It never imports the example or applies a system.
 func (m WorkspaceManager) Load(ctx context.Context, repository string) domain.WorkspacePlanReport {
 	data, err := m.source.ReadWorkspace(repository)
 	exists := !errors.Is(err, fs.ErrNotExist)

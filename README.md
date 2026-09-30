@@ -353,18 +353,17 @@ deployment. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then read
 [`nixorium-developer` skill](skills/nixorium-developer/SKILL.md) before changing
 the API, modules, installers, or template.
 
-The optional [workspace preparation API](docs/system-reference.md#workspace-preparation)
-validates initial student preferences and pinned prerequisites. A separate,
-default-off runtime switch enables the managed student home at the next normal
-boot on the controller and clients. Preparation alone preserves legacy homes;
-the TUI does not enable that switch. The template includes an inactive
-Essential example and a [migration review](skills/nixorium-maintainer/references/student-home.md#review-a-migration);
-neither changes existing homes or selects VS Code implicitly.
+The [workspace preparation API](docs/system-reference.md#workspace-preparation)
+validates initial student preferences and pinned prerequisites. The template
+includes an active Essential profile: leave it unchanged for the defaults or
+customize it in the editor. There is no separate personalization switch.
+After system application, the next normal boot restores these preferences for
+the student on the controller and clients. Staff preferences remain unchanged.
 The candidate-resolution hook can preview effective settings and destinations
 without saving a profile; it does not build or activate them.
 On supporting pins, [`workspace plan` and `workspace apply`](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
 review and save a candidate JSON with source/pin conflict checks. Saving changes
-only the declaration, not the runtime switch or any current home.
+only the declaration, not any current home.
 The administrative TUI offers the same reviewed save under **Maintenance →
 Settings → Student workspace**, with guided desktop, dock, editor/extension and
 browser fields. Catalog changes and unsupported application settings remain

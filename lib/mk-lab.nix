@@ -15,7 +15,6 @@ args@{
   softwarePresets ? null,
   workspaceProfileJSON ? null,
   workspaceCatalog ? null,
-  workspaceRuntimeEnabled ? false,
   clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
@@ -457,6 +456,9 @@ let
       clientNames = validClientNames;
       hostPackages = lib.genAttrs validHostNames workspaceHostPackages;
     };
+  # A supplied profile always participates in the boot-time home reset.
+  # This is derived composition state, not a separate customization switch.
+  workspaceRuntimeEnabled = workspaceProfileJSON != null;
   workspaceSeed = if !workspaceRuntimeEnabled then null else
     import ./build-workspace-home.nix { inherit lib; pkgs = softwarePkgs; } {
       resolution = workspaceResolution;
@@ -601,7 +603,6 @@ let
           ${lib.optionalString (workspaceProfileJSON != null) ''
             workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
             workspaceCatalog = builtins.fromJSON (builtins.readFile ./workspace-catalog.json);
-            workspaceRuntimeEnabled = ${lib.boolToString workspaceRuntimeEnabled};
           ''}
           homeResetEphemeralPaths = builtins.fromJSON (builtins.readFile ./home-reset-ephemeral-paths.json);
           clientGroups = builtins.fromJSON (builtins.readFile ./client-groups.json);
@@ -742,10 +743,6 @@ assert unknownHostModuleNames == []
   || throw "hostModules contains unknown hosts: ${builtins.concatStringsSep ", " unknownHostModuleNames}";
 assert workspaceProfileJSON == null || workspaceCatalog != null
   || throw "workspaceProfileJSON requires a deployment-owned workspaceCatalog";
-assert builtins.isBool workspaceRuntimeEnabled
-  || throw "workspaceRuntimeEnabled must be a boolean";
-assert !workspaceRuntimeEnabled || workspaceProfileJSON != null
-  || throw "workspaceRuntimeEnabled requires an explicit workspace profile";
 assert !workspaceRuntimeEnabled || validRuntimeEphemeralPaths
   || throw "workspace runtime requires bounded, canonical, non-overlapping ephemeral paths";
 assert !workspaceRuntimeEnabled || builtins.length labAssets.backgrounds <= 128
@@ -826,8 +823,7 @@ builtins.mapAttrs (name: value:
         # would pull the entire build-time source closure into this check.
         value = builtins.unsafeDiscardStringContext nixosConfigurations.${name}.config.system.build.toplevel.drvPath;
       }) nixoriumUpdateTargets);
-      # Preparation does not alter a system yet: drvPath equality alone cannot
-      # detect workspace inputs accidentally omitted from the installer.
+      # Check the complete preference metadata as well as system equivalence.
       workspace = nixoriumWorkspace;
     };
     passAsFile = [ "expected" ];
@@ -859,8 +855,8 @@ builtins.mapAttrs (name: value:
 
   nixoriumSoftwarePresets = softwarePresetsConfig;
 
-  # Preparation metadata is deliberately not an active-home receipt. Runtime
-  # seeding and management workflows are not enabled by these arguments alone.
+  # Configured preferences are not an active-home receipt. Build and distribute
+  # the systems, then boot them normally to restore the student home.
   nixoriumWorkspace = if workspaceResolution == null then null else workspaceResolution // {
     state = "prepared";
     runtimeEnabled = workspaceRuntimeEnabled;

@@ -29,7 +29,7 @@ their existing automatic controller follow-up when applicable; client-only
 software still skips the controller. Fix partial saves before system actions.
 Workspace TUI save includes a confined local commit; CLI workspace apply does
 not. Student-home/template/keyboard changes may need the next computer start
-after system application; runtime opt-in is never enabled by workspace save.
+after system application; there is no separate workspace personalization switch.
 
 ## Validation
 

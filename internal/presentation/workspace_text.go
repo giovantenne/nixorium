@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -11,17 +12,21 @@ import (
 
 func WorkspacePlanText(writer io.Writer, report domain.WorkspacePlanReport) {
 	fmt.Fprintf(writer, "Student workspace review: %s\n", strings.ToUpper(report.State))
+	if report.Inspection != nil {
+		workspaceChangesText(writer, *report.Inspection)
+		fmt.Fprintln(writer, workspaceApplicationText(report.Inspection.Resolution.RuntimeEnabled))
+		fmt.Fprintln(writer, "Saving does not apply systems or reset a home.")
+	}
 	fmt.Fprintf(writer, "Repository: %s\nFile: %s\n", safeWorkspaceText(report.Repository), report.ManagedFile)
 	if report.Inspection != nil {
 		inspection := report.Inspection
 		fmt.Fprintf(writer, "Revision: %s\nStudent: %s\n", inspection.Snapshot.Revision, safeWorkspaceText(inspection.Resolution.StudentUser))
-		fmt.Fprintf(writer, "Runtime opt-in: %t (not changed by saving)\n", inspection.Resolution.RuntimeEnabled)
 		fmt.Fprintln(writer, "Destinations:")
 		for _, target := range inspection.Resolution.Targets {
 			fmt.Fprintf(writer, "  %s (%s)\n", safeWorkspaceText(target.Name), safeWorkspaceText(target.Role))
 		}
 		if inspection.Base == nil {
-			fmt.Fprintln(writer, "Current declaration: absent (legacy mode)")
+			fmt.Fprintln(writer, "Current declaration: no saved profile")
 		} else {
 			workspaceProfileText(writer, "Current declaration", *inspection.Base)
 		}
@@ -72,6 +77,39 @@ func workspaceProfileText(writer io.Writer, label string, profile domain.Workspa
 	}
 	fmt.Fprintln(writer, label+":")
 	fmt.Fprint(writer, string(data))
+}
+
+func workspaceApplicationText(enabled bool) string {
+	if !enabled {
+		return "These preferences are not configured to apply to student homes."
+	}
+	return "Preferences take effect at the next computer start after system application."
+}
+
+func workspaceChangesText(writer io.Writer, inspection domain.WorkspaceInspection) {
+	base := domain.WorkspaceProfile{SchemaVersion: 1}
+	if inspection.Base != nil {
+		base = *inspection.Base
+	}
+	fmt.Fprintln(writer, "Preference changes:")
+	changes := 0
+	for _, field := range workspaceFields {
+		before := workspaceValue(base, field)
+		after := workspaceValue(inspection.Resolution.Declared, field)
+		if reflect.DeepEqual(before, after) {
+			continue
+		}
+		changes++
+		fmt.Fprintf(writer, "  %s / %s: %s → %s\n", field.group, field.label,
+			safeWorkspaceText(workspaceValueText(before)), safeWorkspaceText(workspaceValueText(after)))
+	}
+	if changes == 0 {
+		if reflect.DeepEqual(workspaceObject(base), workspaceObject(inspection.Resolution.Declared)) {
+			fmt.Fprintln(writer, "  No preference overrides changed.")
+		} else {
+			fmt.Fprintln(writer, "  Additional profile settings changed; see the declarations below.")
+		}
+	}
 }
 
 func safeWorkspaceText(value string) string {

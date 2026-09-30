@@ -43,30 +43,30 @@ configuration, software, home customization, diagnostics, and operations.
   Git, Node/npm, Pi and OpenCode are common to all supplied profiles. Per-user
   npm overrides persist for staff but are reset for students; keep student
   agent credentials and state out of both the template and rotating snapshots.
-- Optional workspace JSON/catalog files are preparation-only unless the
-  separately reviewed `workspaceRuntimeEnabled` switch is enabled with a
-  supporting pin and compatible local modules. `nixoriumWorkspace.state =
-  "prepared"` is never evidence of deployment or reset. Managed preferences
+- The template ships an active `workspace-profile.json` with the Essential
+  defaults and its deployment-owned catalog. No personalization switch or
+  migration is needed. A supplied profile always configures the boot reset;
+  `nixoriumWorkspace.state = "prepared"` is not evidence of deployment or reset.
+  Managed preferences
   apply to the student on the controller and clients at normal boot, remain
   editable in session, and must not be reapplied at login. Keep staff behavior
   unchanged. On supporting pins, use `workspace plan`/`apply` for a separately
   prepared candidate and source-bound JSON save; this does not authorize
-  migration or deployment. The administrative TUI can edit supported fields
+  deployment or a home reset. The administrative TUI can edit supported fields
   under Maintenance → Settings → Student workspace using the same review/save
   boundary. On supporting pins its confirmed save also records just the profile
   locally, preserving unrelated changes. CLI apply remains file-only. Partial
   save/record results require Git inspection, not blind retry. A successful TUI
   save offers controller review and later client selection; neither is implicit.
-  Catalog changes and migration remain explicit deployment edits.
+  Catalog changes remain explicit deployment edits.
   Existing profiles appear in input-update review with current/proposed pinned
   versions and dependencies. Use package-base updates for packaged extensions;
   qualify loading on a selected client before broader distribution.
   Check the actual CLI/hook capabilities and use the
   student-home reference. Never discard pending reset evidence or
   disable the profile to bypass failed-reset recovery.
-  `workspace-profile.example.json` is an inactive Essential starting proposal,
-  not a migration result. Review unsupported legacy settings and private module
-  conflicts explicitly; the supplied catalog does not install applications.
+  `workspace-profile.example.json` is a reset proposal, never a fallback for a
+  missing saved profile. The supplied catalog does not install applications.
   On supporting pins, `nixoriumResolveWorkspaceCandidate` can preview effective
   values and destinations without writing a profile. Keep any local validation
   hook in the review path; preview success is not permission to save or deploy.

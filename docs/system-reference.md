@@ -383,7 +383,6 @@ installer so client installation needs no second checkout.
 | `softwarePresets` | Optional versioned deployment-owned software-profile catalog; each profile has an ID, label, description, and package IDs |
 | `workspaceProfileJSON` | Optional raw JSON text for preparation of student preferences; `null` preserves legacy behavior |
 | `workspaceCatalog` | Deployment-owned baseline/application/extension catalog required with workspace JSON; no implicit package installation |
-| `workspaceRuntimeEnabled` | Explicit default-off switch for restoring a validated workspace at normal boot; requires workspace JSON |
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
@@ -480,31 +479,28 @@ The candidate hook does not qualify extension loading or mutate sessions.
 Pins exposing `lib.workspaceCandidateVersion` also provide
 `nixoriumResolveWorkspaceCandidate`, with the same raw JSON argument and core
 validation. It returns the candidate's complete preparation metadata, including
-declared/effective preferences, catalog, resolved versions, targets and runtime
-choice, without saving the candidate or changing current metadata. Consumers
+declared/effective preferences, catalog, resolved versions, targets and boot
+behavior, without saving the candidate or changing current metadata. Consumers
 must still invoke `nixoriumValidateWorkspaceCandidate` to preserve any additional
 validation supplied by the deployment. Resolved metadata alone is not a review
 token or proof that the deployment stayed unchanged while evaluating; a save
 workflow must bind and recheck its source, pin, base file and exact candidate.
 Both profile text and catalog data travel through the offline installer. The
-template passes its catalog to supporting pins even before the first profile,
-so that hook can validate a candidate without creating an active file. It reads
-only `workspace-profile.json`, never `workspace-profile.example.json`, as the
-declaration, and rejects a profile if the pin lacks this capability. Older pins
-without a profile receive no new arguments. Do not remove operational home
-modules on the assumption that preparation replaces them. The
-[migration review](../skills/nixorium-maintainer/references/student-home.md#review-a-migration)
-distinguishes representable preferences from retained policy and unsupported
-legacy content.
+template includes an active Essential `workspace-profile.json` and its catalog.
+It reads that saved file, never `workspace-profile.example.json` as a fallback.
+Leave the profile unchanged for the defaults; customizations use the same boot
+path without a separate enablement or migration step.
 
-#### Explicit managed-home runtime
+#### Managed-home runtime
 
-`workspaceRuntimeEnabled = true` requires a profile and a pin exposing
-`lib.workspaceRuntimeVersion`. It applies to the configured student on every
-client and the controller, including controller-only mode; it does not change
-controller autologin or staff preferences. Both the flag and seed metadata are
-preserved by offline reconstruction. Merely updating a preparation-only
-deployment never enables it.
+A supplied `workspaceProfileJSON` always configures the managed student home.
+There is no public `workspaceRuntimeEnabled` argument. Runtime capability
+version 2 identifies this contract. Internal module selection and the
+`nixoriumWorkspace.runtimeEnabled` observation are derived from profile presence,
+not user switches. The profile applies to the student on every client and the
+controller, including controller-only mode, without changing controller autologin
+or staff preferences. Profile/catalog and seed metadata survive offline
+reconstruction. Evaluation and saving do not activate a system or reset a home.
 
 The immutable seed combines supported preferences with a neutral shell/Git/XDG
 scaffold. XDG folders use stable English names. It does not copy a live home,
@@ -514,10 +510,9 @@ disabled as editable session defaults. This is not proof that every plugin
 loads correctly or works offline; qualify each supported plugin separately.
 Wallpapers are composed with the profile dconf source before restoration.
 
-Review existing local `home-profile.nix` and `workstation.nix` before opting in:
-older private copies do not update with the upstream pin. The current template
-skips student template writes, ownership repair, and supported login migrations
-in managed mode, while retaining staff behavior and desktop extension enablement.
+The template skips student template writes, ownership repair, and supported
+login migrations in the managed path, while retaining staff behavior and
+desktop extension enablement.
 Keep desired preferences explicit in the profile/baseline. Missing settings use
 system/application defaults, not an inferred translation of old Nix modules.
 

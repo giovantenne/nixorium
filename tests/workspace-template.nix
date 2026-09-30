@@ -1,7 +1,7 @@
 { lib, pkgs }:
 let
   catalog = import ../templates/site/workspace-catalog.nix;
-  profileJSON = builtins.readFile ../templates/site/workspace-profile.example.json;
+  profileJSON = builtins.readFile ../templates/site/workspace-profile.json;
   resolve = import ../lib/resolve-workspace-profile.nix { inherit lib pkgs; };
   core = [ "gnome-shell" "gnomeExtensions.dash-to-dock" "nautilus" "gnome-text-editor" ];
   presets = (builtins.fromJSON (builtins.readFile ../templates/site/software-presets.json)).presets;
@@ -16,7 +16,7 @@ let
   initialPackages = map (entry: entry.package) initial.packages;
   example = resolveFor initialPackages [ "pc01" ] profileJSON;
   rejects = value: !(builtins.tryEval (builtins.deepSeq value true)).success;
-  templateArguments = capability:
+  templateArguments =
     ((import ../templates/site/flake.nix).outputs {
       self = {};
       nixpkgs = {};
@@ -24,11 +24,8 @@ let
         packageBase = {};
         evalLabSettings = settings: settings.lab;
         mkLab = args: { capturedArguments = args; };
-      } // capability;
+      };
     }).capturedArguments;
-  legacyArguments = templateArguments {};
-  preparedArguments = templateArguments { workspaceProfileSchemaVersion = 1; };
-  runtimeArguments = templateArguments { workspaceProfileSchemaVersion = 1; workspaceRuntimeVersion = 1; };
   # Workspace validation can inspect system packages, whose modules need flake
   # revision metadata. Output names must exist before that guarded value runs.
   recursiveOutputs = (import ../templates/site/flake.nix).outputs {
@@ -60,15 +57,13 @@ let
     lib.hasInfix "/home/admin/" line || lib.hasInfix "/home/instructor/" line
   ) (lib.splitString "\n" script);
 in
-assert !(builtins.pathExists ../templates/site/workspace-profile.json);
+assert builtins.pathExists ../templates/site/workspace-profile.json;
+assert profileJSON == builtins.readFile ../templates/site/workspace-profile.example.json;
 assert recursiveOutputs.guarded;
 assert rejects recursiveOutputs.validationStillRuns;
-assert !(legacyArguments ? workspaceCatalog) && !(legacyArguments ? workspaceProfileJSON)
-  && !(legacyArguments ? workspaceRuntimeEnabled);
-assert preparedArguments.workspaceCatalog == catalog;
-assert !(preparedArguments ? workspaceProfileJSON) && !(preparedArguments ? workspaceRuntimeEnabled);
-assert runtimeArguments.workspaceCatalog == catalog;
-assert !(runtimeArguments ? workspaceProfileJSON) && !(runtimeArguments.workspaceRuntimeEnabled or false);
+assert templateArguments.workspaceCatalog == catalog;
+assert templateArguments.workspaceProfileJSON == profileJSON;
+assert !(templateArguments ? workspaceRuntimeEnabled);
 assert catalog.baseline == { schemaVersion = 1; };
 assert builtins.all (preset: builtins.all (clients:
   let result = resolveFor preset.packages clients profileJSON;

@@ -22,17 +22,6 @@ let
       { package = "jdk"; scope.kind = "shared"; }
     ];
   };
-  legacyTemplate = (import ../templates/site/flake.nix).outputs {
-    self = {};
-    nixpkgs = {};
-    nixorium.lib = {
-      packageBase = {};
-      evalLabSettings = settings: settings.lab;
-      mkLab = args:
-        assert !(args ? workspaceProfileJSON) && !(args ? workspaceCatalog) && !(args ? workspaceRuntimeEnabled);
-        { legacyCompatible = true; };
-    };
-  };
   templateArgs = {
     workspaceProfileJSON = null;
     workspaceCatalog = import ../templates/site/workspace-catalog.nix;
@@ -40,10 +29,9 @@ let
     sharedModules = [ ../templates/site/modules/shared.nix ];
   };
   templateLab = mkWorkspaceLab templateArgs;
-  templateProfile = builtins.readFile ../templates/site/workspace-profile.example.json;
+  templateProfile = builtins.readFile ../templates/site/workspace-profile.json;
   templateManagedLab = mkWorkspaceLab (templateArgs // {
     workspaceProfileJSON = templateProfile;
-    workspaceRuntimeEnabled = true;
   });
   templateController = mkWorkspaceLab (templateArgs // {
     labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
@@ -51,13 +39,12 @@ let
 in
 {
   template =
-    assert legacyTemplate.legacyCompatible;
     assert templateLab.nixoriumWorkspace == null;
     assert templateLab.nixoriumValidateWorkspaceCandidate templateProfile;
     assert templateController.nixoriumValidateWorkspaceCandidate templateProfile;
     assert (templateLab.nixoriumResolveWorkspaceCandidate templateProfile).declared
       == builtins.fromJSON templateProfile;
-    assert !(templateLab.nixoriumResolveWorkspaceCandidate templateProfile).runtimeEnabled;
+    assert (templateLab.nixoriumResolveWorkspaceCandidate templateProfile).runtimeEnabled;
     assert templateManagedLab.nixoriumWorkspace.runtimeEnabled;
     assert !(templateManagedLab.nixoriumWorkspace.effective ? vscode);
     assert builtins.all (name:
@@ -90,18 +77,18 @@ in
   preparation =
     assert absent.nixoriumWorkspace == null;
     assert workspaceLab.nixoriumWorkspace.state == "prepared";
-    assert workspaceLab.nixoriumWorkspace.runtimeEnabled == false;
-    assert workspaceLab.nixoriumWorkspace.seed == null;
+    assert workspaceLab.nixoriumWorkspace.runtimeEnabled;
+    assert builtins.isString workspaceLab.nixoriumWorkspace.seed;
     assert workspaceLab.nixoriumWorkspace.studentUser == labConfig.studentUser;
     assert map (target: target.name) workspaceLab.nixoriumWorkspace.targets == [ "pc99" "pc01" "pc02" ];
     assert workspaceLab.nixoriumWorkspace.effective.desktop.enableAnimations == false;
     assert workspaceLab.nixoriumWorkspace.effective.desktop.favorites == [ "org.gnome.TextEditor.desktop" "code.desktop" ];
     assert controller.nixoriumWorkspace.targets == [ { name = "pc99"; role = "controller"; } ];
     assert !controller.nixosConfigurations.pc99.config.services.displayManager.autoLogin.enable;
-    # Preparation is not activation: every representative system stays identical.
+    # A profile changes the configured system without a second opt-in.
     assert builtins.all (name:
       absent.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
-      == workspaceLab.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
+      != workspaceLab.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
     ) [ "pc99" "pc01" ];
     true;
 
@@ -118,7 +105,7 @@ in
     assert cleared.targets == workspaceLab.nixoriumWorkspace.targets;
     assert cleared.catalog == workspaceLab.nixoriumWorkspace.catalog;
     assert cleared.studentUser == labConfig.studentUser;
-    assert cleared.state == "prepared" && !cleared.runtimeEnabled && cleared.seed == null;
+    assert cleared.state == "prepared" && cleared.runtimeEnabled && builtins.isString cleared.seed;
     assert cleared.extensions == [] && !(builtins.elem "vscode" cleared.requiredPackages);
     assert workspaceLab.nixoriumWorkspace.effective.desktop.favorites == [ "org.gnome.TextEditor.desktop" "code.desktop" ];
     assert managedCandidate.state == "prepared" && managedCandidate.runtimeEnabled;
@@ -152,9 +139,10 @@ in
     assert !(builtins.tryEval (candidate ''{"schemaVersion":1,"schemaVersion":1}'')).success;
     assert !(builtins.tryEval (candidate null)).success;
     assert rejected { workspaceCatalog = null; };
-    assert rejected { workspaceRuntimeEnabled = "yes"; };
-    assert rejected { workspaceRuntimeEnabled = true; workspaceProfileJSON = null; workspaceCatalog = null; };
-    assert builtins.all (paths: rejected { workspaceRuntimeEnabled = true; homeResetEphemeralPaths = paths; }) [
+    assert !(builtins.functionArgs (import ../lib/mk-lab.nix {
+      upstreamSelf = {}; nixpkgs = {}; disko = {}; veyon = {};
+    }) ? workspaceRuntimeEnabled);
+    assert builtins.all (paths: rejected { homeResetEphemeralPaths = paths; }) [
       [ "." ] [ "a//b" ] [ "a/./b" ] [ "a/" ] [ "a\\b" ] [ "a\nb" ]
       [ ".cache" ".cache" ] [ ".cache" ".cache/tool" ] [ ".cache/tool" ".cache" ]
     ];

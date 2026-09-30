@@ -185,7 +185,7 @@ func ValidateWorkspaceResolution(resolved WorkspaceResolution) error {
 }
 
 // WorkspaceReviewToken binds all resolved metadata, including baseline,
-// catalog, versions, dependencies, runtime opt-in and controller destinations.
+// catalog, versions, dependencies, boot behavior and controller destinations.
 func WorkspaceReviewToken(repository string, candidate WorkspaceProfile, inspection WorkspaceInspection) (string, error) {
 	if err := ValidateWorkspaceInspection(inspection, candidate); err != nil {
 		return "", err

@@ -65,9 +65,8 @@
         labConfig = import ./lab-config.nix;
       };
       workspaceLab = mkWorkspaceLab {};
-      workspaceRuntimeLab = mkWorkspaceLab { workspaceRuntimeEnabled = true; };
+      workspaceRuntimeLab = mkWorkspaceLab {};
       workspaceRuntimeControllerLab = mkWorkspaceLab {
-        workspaceRuntimeEnabled = true;
         labConfig = (import ./lab-config.nix) // { deploymentMode = "controller"; pcCount = 0; };
         publicKeys = { cache = null; ssh = null; veyon = null; };
       };
@@ -136,7 +135,7 @@
         softwarePresetSchemaVersion = 1;
         workspaceProfileSchemaVersion = 1;
         workspaceCandidateVersion = 1;
-        workspaceRuntimeVersion = 1;
+        workspaceRuntimeVersion = 2;
         packageBase = {
           schemaVersion = 2;
           source = "github:NixOS/nixpkgs";

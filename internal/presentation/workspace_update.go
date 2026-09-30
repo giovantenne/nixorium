@@ -63,7 +63,7 @@ func workspaceUpdateText(writer io.Writer, impact *domain.WorkspaceUpdateImpact)
 			continue
 		}
 		w := side.value
-		fmt.Fprintf(writer, "%s: student %s, runtime opt-in %t\n", side.label, safeWorkspaceText(w.StudentUser), w.RuntimeEnabled)
+		fmt.Fprintf(writer, "%s: student %s, boot preferences configured: %t\n", side.label, safeWorkspaceText(w.StudentUser), w.RuntimeEnabled)
 		for _, host := range w.Targets {
 			fmt.Fprintf(writer, "  %s (%s)\n", safeWorkspaceText(host.Name), safeWorkspaceText(host.Role))
 		}

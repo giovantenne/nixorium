@@ -73,7 +73,7 @@ func inspectWorkspaceUpdate(ctx context.Context, flake string, common []string) 
 	// student/destinations. Such changes require a separate migration review.
 	if proposed == nil || current.RuntimeEnabled != proposed.RuntimeEnabled ||
 		current.StudentUser != proposed.StudentUser || !reflect.DeepEqual(current.Targets, proposed.Targets) {
-		return nil, errors.New("workspace capability, runtime opt-in or destinations changed; review a separate migration before updating")
+		return nil, errors.New("workspace capability, boot behavior or destinations changed; review the configuration separately before updating")
 	}
 	return &domain.WorkspaceUpdateImpact{Current: current, Proposed: proposed}, nil
 }

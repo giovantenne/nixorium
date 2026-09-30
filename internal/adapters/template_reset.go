@@ -268,7 +268,7 @@ func lockedResetTemplate(ctx context.Context, repository string) (map[string]dom
 		Revision, Source string
 		Runtime, Schema  int
 	}
-	if json.Unmarshal(data, &source) != nil || source.Revision != snapshot.CurrentRev || !domain.ValidStorePath(source.Source) || source.Runtime != 1 || source.Schema != 1 {
+	if json.Unmarshal(data, &source) != nil || source.Revision != snapshot.CurrentRev || !domain.ValidStorePath(source.Source) || source.Runtime != 2 || source.Schema != 1 {
 		return nil, snapshot, errors.New("the locked upstream must provide the supported guided-home template; update Nixorium separately if needed")
 	}
 	files, err := readResetTemplate(filepath.Join(source.Source, "templates/site"))
@@ -399,8 +399,8 @@ func prepareResetFiles(original, template map[string]domain.TemplateFile, snapsh
 	flake := files["flake.nix"]
 	baseMatch := managedPackageBaseInput.FindAllSubmatch(snapshot.FlakeContent, -1)
 	if len(baseMatch) != 1 || len(managedPackageBaseInput.FindAllSubmatch(flake.Data, -1)) != 1 ||
-		len(managedNixoriumInput.FindAllSubmatch(flake.Data, -1)) != 1 || bytes.Count(flake.Data, []byte("workspaceRuntimeEnabled = false;")) != 1 {
-		return nil, selected, errors.New("pinned template input/runtime declarations need an explicit compatibility review")
+		len(managedNixoriumInput.FindAllSubmatch(flake.Data, -1)) != 1 {
+		return nil, selected, errors.New("pinned template input declarations need an explicit compatibility review")
 	}
 	replaceInput := func(content []byte, indices []int, url string) []byte {
 		out := append([]byte{}, content[:indices[4]]...)
@@ -409,7 +409,6 @@ func prepareResetFiles(original, template map[string]domain.TemplateFile, snapsh
 	}
 	flake.Data = replaceInput(flake.Data, managedNixoriumInput.FindSubmatchIndex(flake.Data), snapshot.SourceURL)
 	flake.Data = replaceInput(flake.Data, managedPackageBaseInput.FindSubmatchIndex(flake.Data), string(baseMatch[0][2]))
-	flake.Data = bytes.Replace(flake.Data, []byte("workspaceRuntimeEnabled = false;"), []byte("workspaceRuntimeEnabled = true;"), 1)
 	// Older workspace-capable templates force mkLab before flake self exists.
 	// Discover names with a profile-free shape, then lazily forward each real
 	// output. This keeps the exact pinned API, validation and revision metadata.

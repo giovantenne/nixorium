@@ -220,20 +220,16 @@ files and input pins, with a recoverable local backup and explicit loss review.
 No activation, client deployment, reboot or push is included. See
 [template reset and recovery](DEPLOYMENT-RESET.md) before using it.
 
-The template supplies `workspace-catalog.nix` and an inactive
-`workspace-profile.example.json` matching Essential without requiring VS Code.
-It never reads the example as an active profile. With a supporting pin, the
-catalog can validate a first candidate before `workspace-profile.json` exists;
-older pins receive no new arguments. This interface validates
-preferences and prerequisites for the configured student on the controller
-and every client, and carries them into offline evaluation. Preparation alone
-does **not** apply preferences to homes. The separate `workspaceRuntimeEnabled`
-binding in `flake.nix` defaults to `false`; enable it only with a supporting pin
-and after reviewing local home/desktop modules for migration. The supplied
-modules then stop writing the legacy student template and stop reapplying
-managed student preferences at login. Staff behavior remains unchanged.
+The template supplies `workspace-catalog.nix` and an active
+`workspace-profile.json` matching Essential without requiring VS Code.
+Leave it unchanged for the defaults, or customize it under **Maintenance →
+Settings → Student workspace**. There is no separate personalization switch.
+The example file is only a reset proposal, never a fallback for a missing or
+invalid saved profile. Validation checks preferences and prerequisites for
+the student on the controller and every client, including offline evaluation.
+Staff behavior remains unchanged.
 
-With runtime enabled, a reviewed system deployment prepares an immutable seed;
+A reviewed system deployment prepares an immutable seed;
 the next normal boot restores it for the student, including controller-only
 mode. Rebuilding does not reset an active session. Initial preferences remain
 editable until the next reset. The seed has shell/Git defaults, standard XDG
@@ -254,14 +250,15 @@ saves only `workspace-profile.json` after confirmation (or explicit `--yes`).
 Both support `--json`. Review includes the current/effective preferences, student
 account, controller/client destinations and pinned dependencies. Changed source,
 catalog, pin or profile requires a new review. Saving does not stage, commit,
-enable runtime, build, deploy or reset. See the
+build, deploy or reset. See the
 [save procedure](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
 for requirements and conflict/durability handling. The administrative TUI exposes
 the same save boundary at **Maintenance → Settings → Student workspace**.
 Choose desktop, dock, editor/extensions or browser, keep each change in the
 draft, then review the complete proposal and confirm the save. “Inherit” uses
-the deployment baseline; “Clear” is an explicit empty list. Saving offers a
-separate Git review, not automatic commit or deployment. Catalog additions and
+the deployment baseline; “Clear” is an explicit empty list. Saving includes
+an automatic local commit of just the profile, then a separate controller
+review and client selection; it never deploys automatically. Catalog additions and
 unsupported fields remain manual deployment edits. Older pins/commands may not
 provide this workflow; the inactive example is never loaded automatically.
 Existing profiles are also compared during input-update review: current versus
@@ -274,10 +271,9 @@ defaults, and saving the same profile does not refresh its pinned extensions.
 Supporting pins expose `nixoriumResolveWorkspaceCandidate` to preview a raw JSON
 proposal's effective values, versions and destinations without saving it. This
 complements, rather than replaces, the deployment's validation hook.
-Follow the [migration review](skills/nixorium-maintainer/references/student-home.md#review-a-migration)
-to identify supported settings, retained system policy and legacy behavior that
-the new seed cannot represent. Do not enable runtime while essential differences
-or conflicting private student-home writers remain unresolved.
+See [student preferences](skills/nixorium-maintainer/references/student-home.md#student-preferences)
+for supported settings, retained system policy and boot-time behavior. Keep
+private modules from overwriting managed student preferences at login.
 
 Run the task-oriented dashboard from the repository root:
 

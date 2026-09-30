@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Breaking: remove the public `mkLab.workspaceRuntimeEnabled` argument. A
+  supplied workspace profile always configures student preferences at normal
+  boot after system application. The site template ships active Essential
+  defaults without a personalization switch or migration step. Remove the old
+  argument from hand-written callers; no deployment migration is provided.
+  Workspace review leads with readable preference changes, not JSON, and
+  clearly separates saving from system application and boot-time restoration.
+
 - Settings fields now explain their purpose and show examples and draft network
   addresses. Reviews use readable labels. Both validators reject a controller
   DHCP address inside the static lab prefix; existing overlapping deployments

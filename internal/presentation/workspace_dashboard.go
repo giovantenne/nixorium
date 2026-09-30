@@ -252,9 +252,9 @@ func (model dashboardModel) workspaceView() string {
 		switch w.stage {
 		case workspaceOverview:
 			fixed = "Pinned extensions update through Maintenance → Update system and packages."
-			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), fmt.Sprintf("Runtime opt-in: %t · Not changed here", resolved.RuntimeEnabled), "")
+			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), workspaceApplicationText(resolved.RuntimeEnabled), "")
 			if w.loaded.Inspection.Base == nil {
-				lines = append(lines, "No saved profile (legacy mode); this is a new draft.")
+				lines = append(lines, "No saved profile; this is a new draft.")
 			}
 			for index, group := range workspaceGroups {
 				lines = append(lines, tuiSelection(group, index == w.group, model.isDark))
@@ -315,14 +315,14 @@ func (model dashboardModel) workspaceView() string {
 			var review bytes.Buffer
 			displayed := w.plan
 			if displayed.State == "ready" {
-				displayed.Message = "Save and record only workspace-profile.json locally. No runtime opt-in, system application, deployment or home reset is included."
+				displayed.Message = "Save and record only workspace-profile.json locally. No system application, deployment or home reset is included."
 			}
 			WorkspacePlanText(&review, displayed)
 			wrapped := strings.Split(lipgloss.NewStyle().Width(width).Render(strings.TrimSpace(review.String())), "\n")
 			start := min(w.scroll, max(0, len(wrapped)-capacity))
 			lines = append(lines, wrapped[start:min(len(wrapped), start+capacity)]...)
 			lines = append(lines, fmt.Sprintf("Review lines %d–%d of %d", start+1, min(len(wrapped), start+capacity), len(wrapped)))
-			fixed = "Save and record only the profile JSON; no apply, runtime opt-in or reset.\nType SAVE: " + w.confirmation + "_"
+			fixed = "Save and record only the profile JSON; no system apply or reset.\nType SAVE: " + w.confirmation + "_"
 			label := "Save JSON"
 			if w.plan.State == "unchanged" {
 				fixed = "Declaration unchanged; live home state is not inferred."
@@ -341,7 +341,7 @@ func (model dashboardModel) workspaceView() string {
 				lines = append(lines, safeWorkspaceText(issue.Message))
 			}
 			if w.result.State == "saved" {
-				lines = append(lines, "", "Apply to this controller, then review the computers to update.", "Runtime opt-in is not changed here; when enabled, preferences take effect at the next computer start after system application.")
+				lines = append(lines, "", "Apply to this controller, then review the computers to update.", workspaceApplicationText(resolved.RuntimeEnabled))
 			} else if !w.result.RecoveryRequired {
 				actions = append([]tuiAction{{key: "r", label: "Reload"}}, actions...)
 			}

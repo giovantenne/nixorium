@@ -122,8 +122,8 @@ vendor's latest release. Equal version strings can still hide rebuilt
 dependencies; review the pin diff too.
 
 The comparison and both validation hooks are bound to the update review. A
-candidate that removes existing workspace metadata, changes runtime opt-in,
-the student identity or destinations is blocked pending a separate migration.
+candidate that removes existing workspace metadata, changes boot behavior,
+the student identity or destinations is blocked pending separate configuration review.
 Legacy deployments with no prepared workspace retain their ordinary workflow;
 updating does not create a profile or migrate local home customizations.
 

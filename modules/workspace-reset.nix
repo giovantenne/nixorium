@@ -1,8 +1,8 @@
 { pkgs, labSettings, homeResetEphemeralPaths, workspaceSeed, workspaceWallpapers, nixoriumPackage, ... }:
 
 {
-  # This module is internal. Importing it requires an explicit runtime opt-in;
-  # workspace preparation alone must never select it.
+  # mkLab selects this internal module whenever a workspace profile is supplied.
+  # Activation must not reset a live home: restoration waits for normal boot.
   environment.etc."nixorium-workspace-reset.json".text = builtins.toJSON {
     user = labSettings.studentUser;
     seed = workspaceSeed;

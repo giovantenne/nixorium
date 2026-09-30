@@ -22,26 +22,12 @@
       clientGroups = {
         # graphics = [ "pc01" "pc02" ];
       };
-      # Preparation and runtime activation are separate choices. Keep false
-      # until the local home/profile modules have been reviewed for migration.
-      workspaceRuntimeEnabled = false;
-      # The catalog prepares the candidate hook even before the first profile
-      # exists. The example is never read as the active declaration.
-      # Older pins receive no new mkLab arguments; absent JSON keeps legacy homes.
-      workspaceArguments =
-        if !(builtins.pathExists ./workspace-profile.json) then
-          assert !workspaceRuntimeEnabled || throw "Workspace runtime requires workspace-profile.json";
-          if nixorium.lib ? workspaceProfileSchemaVersion then {
-            workspaceCatalog = import ./workspace-catalog.nix;
-          } else {}
-        else if !(nixorium.lib ? workspaceProfileSchemaVersion) then
-          throw "The pinned Nixorium version does not support workspace profile preparation"
-        else if workspaceRuntimeEnabled && !(nixorium.lib ? workspaceRuntimeVersion) then
-          throw "The pinned Nixorium version does not support workspace runtime activation"
-        else {
-          workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
-          workspaceCatalog = import ./workspace-catalog.nix;
-        } // (if nixorium.lib ? workspaceRuntimeVersion then { inherit workspaceRuntimeEnabled; } else {});
+      # The saved profile is always used at normal boot after system deployment.
+      # Leave it unchanged to keep the supplied defaults; no opt-in is required.
+      workspaceArguments = {
+        workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
+        workspaceCatalog = import ./workspace-catalog.nix;
+      };
       mkDeployment = candidateLabConfig: candidateLabSoftware:
         nixorium.lib.mkLab ({
           deploymentSelf = self;

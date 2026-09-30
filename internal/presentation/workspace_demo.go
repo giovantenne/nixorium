@@ -17,9 +17,10 @@ func demoWorkspacePlan() domain.WorkspacePlanReport {
 		Candidate: &candidate, ReviewToken: "sha256:synthetic-workspace", Confirmation: "SAVE",
 		Message: "Only the profile declaration will be saved. No commit, deployment or reset is included.",
 		Inspection: &domain.WorkspaceInspection{
+			Base:     &candidate,
 			Snapshot: domain.WorkspaceSnapshot{BaseFingerprint: "sha256:synthetic-absent"},
 			Resolution: domain.WorkspaceResolution{
-				SchemaVersion: 1, State: "prepared", StudentUser: "student", Declared: candidate, Effective: baseline,
+				SchemaVersion: 1, State: "prepared", RuntimeEnabled: true, StudentUser: "student", Declared: candidate, Effective: baseline,
 				Targets: []domain.WorkspaceTarget{{Name: "controller", Role: "controller"}, {Name: "pc01", Role: "client"}, {Name: "pc02", Role: "client"}},
 				Catalog: domain.WorkspaceCatalog{
 					SchemaVersion: 1, Baseline: baseline,
@@ -100,7 +101,7 @@ func renderWorkspaceDemo(revision string, width, height int) DemoScenario {
 	r.capture("Compare workspace versions during a system update", 2500)
 	return DemoScenario{
 		ID: "student-workspace", Title: "Customize the initial student workspace",
-		Description: "Edit ordered favorites, review and save one laboratory-wide profile with its local commit. Controller application is offered separately; runtime opt-in, client deployment and boot reset remain separate.",
+		Description: "Edit ordered favorites, review and save one laboratory-wide profile with its local commit. Controller application and client deployment are offered separately; preferences take effect at the next normal boot.",
 		Frames:      r.frames,
 	}
 }

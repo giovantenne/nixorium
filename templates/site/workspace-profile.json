@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "desktop": {
+    "favorites": [
+      "com.mitchellh.ghostty.desktop",
+      "chromium-browser.desktop",
+      "org.gnome.Nautilus.desktop",
+      "org.gnome.TextEditor.desktop"
+    ],
+    "colorScheme": "dark",
+    "enableAnimations": true,
+    "dock": {
+      "position": "bottom",
+      "iconSize": 40,
+      "autoHide": true,
+      "extendHeight": false,
+      "showTrash": false,
+      "showMounts": false
+    }
+  },
+  "browser": {
+    "defaultApplication": "chromium-browser.desktop"
+  }
+}

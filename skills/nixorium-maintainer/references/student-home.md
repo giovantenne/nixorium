@@ -7,10 +7,9 @@ The current template uses `modules/home-profile.nix` for student template
 content, `modules/workstation.nix` for desktop/application policy, and assets
 for editor settings/backgrounds. Existing labs may have different local layouts.
 
-In legacy mode upstream recreates the clean home template during activation; the local home
-profile runs afterward. Student home is reset from that template at boot.
-Changing a student's live home is not a persistent customization. Changing the
-template does not mean an already logged-in student's home changed immediately.
+The saved workspace profile supplies the student preferences restored at boot.
+Changing a student's live home is not a persistent customization. Saving a
+profile does not change an already logged-in student's home.
 
 Do not edit `/var/lib/home-template` directly as a durable solution, reset a
 live home, or reboot without authorization. Explain when students will see the
@@ -22,119 +21,51 @@ There is no supported “capture this student's home” command in this contract
 If asked for snapshots as a new template feature, distinguish that upstream
 design request from the currently available declarative customization.
 
-## Optional workspace preparation and runtime
+## Student preferences
 
-Some upstream pins expose `nixoriumWorkspace` and
-`nixoriumValidateWorkspaceCandidate`. They validate optional workspace JSON,
-catalog/baseline preferences and prerequisites across the controller and all
-clients. Their `prepared` state is not an active-home receipt.
-Preparation-only pins do not seed homes. Recent management commands expose
-`workspace plan`/`apply`; check CLI help and the deployment's candidate hooks
-before using them. Supporting commands also expose the administrative TUI editor
-under Maintenance → Settings → Student workspace.
-Where available, `nixoriumResolveWorkspaceCandidate` previews a raw candidate's
-effective settings, versions and destinations without writing it. Still run the
-deployment's validation hook, which may include additional local policy; a
-preview is neither a save token nor evidence that the source remained unchanged.
-Do not migrate a working deployment merely because these outputs exist. Check
-the actual pinned capabilities and keep configuration, preparation and live
-activation distinct. Workspace data and catalog contents can enter the public
-Nix store; never include credentials or personal session data.
+The template includes an active `workspace-profile.json` with Essential
+defaults: Ghostty, Chromium, Files, Text Editor, dark appearance and a compact
+bottom dock. Leave it unchanged to keep those defaults. Customize it through
+Maintenance → Settings → Student workspace; no separate activation switch or
+migration workflow is needed.
 
-Pins exposing `lib.workspaceRuntimeVersion` additionally accept the separate
-default-off `workspaceRuntimeEnabled` switch. Check that value in the deployment
-and `nixoriumWorkspace.runtimeEnabled`; a prepared profile alone is not opt-in.
-When enabled, edit supported preferences/extensions in the workspace JSON and
-deployment catalog, not the ignored legacy template. Keep prerequisite software
-available on all targets, including a controller with zero clients.
+The deployment-owned catalog supplies a baseline and available choices, not
+additional software. Keep prerequisite packages present on every destination,
+including the controller in controller-only mode. The example JSON is a reset
+proposal, never an implicit replacement for a missing or invalid saved profile.
 
-Before an explicitly requested migration, compare local home/desktop modules
-with the pinned capability: older private copies do not update automatically.
-Remove conflicting student writes only, preserving staff behavior. Retain the
-desired supported values in the catalog baseline/profile; omitted settings use
-system/application defaults, not an inferred copy of the old Nix policy.
-The managed seed includes neutral shell/Git defaults and standard XDG folders
-with stable English names. It does not import arbitrary legacy assets or settings.
+`nixoriumWorkspace` and its candidate hooks describe configured preferences,
+destinations and pinned prerequisites. Their `prepared` state and seed path
+are not proof of deployment or a successful home reset. Candidate resolution
+must still compose the deployment's validation hook and bind the source, pin,
+base file and exact proposal before saving. Workspace data enters the Nix store:
+never include credentials or private session data.
 
-Configuration, system build/deploy and the next normal boot are separate steps.
-The managed reset serves the configured student on clients and controller,
-without changing controller autologin. Rebuilds do not reset the current home,
-and supported preferences are not reapplied at login. Students can edit them
-until the next boot reset. A seed path or reset receipt is not fleet-wide proof.
+A supplied profile always configures the managed reset. Saving the declaration,
+building/applying systems, and the next normal boot are separate steps. The
+student on the controller and clients receives the profile at boot; controller
+autologin and staff preferences do not change. Rebuilds do not reset a current
+home, and login does not reapply supported preferences. Students can change
+them during the session until the next boot reset.
 
-If reset fails, inspect the `home-reset.service` journal read-only and preserve
-`/var/lib/home-snapshots/.workspace-reset` as private recovery evidence.
-`pending.json` blocks retries and normal login across reboot; a previous success
-receipt does not clear it, and switching to legacy is not a recovery method.
-Do not remove the marker or invoke the helper to try again. Escalate the exact
-failure and request a separately authorized recovery based on the actual
-snapshot/home state. Managed snapshots are read-only, sanitized copies under
-`/var/lib/home-snapshots/workspace`; they remain distinct from external backups.
+The seed includes supported preferences, neutral shell/Git defaults and standard
+XDG folders with stable English names. It never captures a live home or imports
+arbitrary application assets. Omitted values inherit the deployment baseline
+or system/application defaults. Desktop themes, shortcuts and other policy
+outside the profile schema remain in deployment modules.
 
-## Review a migration
-
-New templates include a deployment-owned `workspace-catalog.nix` and an inactive
-`workspace-profile.example.json`. Neither enables managed homes. The example
-matches the Essential software selection: Ghostty, Chromium, Files, Text Editor,
-dark appearance and a compact bottom dock. It does not select VS Code. Treat it
-as a starting proposal, not an import of the laboratory's current preferences.
-The catalog baseline is empty; its application and extension entries are choices,
-not additional software declarations. Live Server is an initial pinned extension
-choice, not a certificate of loading on every editor version.
-
-For an authorized migration, present an explicit comparison of existing policy
-and the proposed profile before changing the runtime switch:
-
-| Existing source or behavior | Managed student outcome |
-|---|---|
-| Favorites and the supported appearance/dock fields in `modules/workstation.nix` | Declare desired values in the profile; the managed student login no longer overwrites them |
-| GTK/icon themes, fonts, shortcuts, GNOME extensions and Chromium homepage policy | Remain deployment/system policy, outside the JSON schema; review their existing scope separately |
-| `assets/mimeapps.list` | The profile can select the HTTP/HTTPS/HTML browser; other MIME associations are not imported |
-| `assets/vscode-settings.json` | Only the seven supported editor settings can be declared; themes, terminal profiles, telemetry, chat and extension-specific preferences are not imported |
-| Legacy editor/extension auto-update preferences | Managed VS Code settings disable editor and extension update checks; this does not transfer the rest of the legacy asset |
-| Java extension pack, other extensions and locally edited extension manifests | No automatic transfer; resolve each desired component, dependencies and pin, and test loading before use |
-| `.vscode/argv.json`, including the legacy password-store option | Not part of the managed seed; review the behavioral difference instead of silently copying it |
-| Student shell/Git/XDG scaffold | Recreated from declared identity and neutral defaults; standard folders have stable English names |
-| Student files, browser sessions, credentials, caches and personal application state | Never imported into the seed; pending work and external backups need separate handling |
-| Teacher/admin home setup | Preserved by the supplied modules; older private copies require a local comparison |
-
-Use the actual files and settings in that deployment for the comparison. Do not
-claim automatic parity, execute arbitrary legacy policy to infer a profile, or
-capture a live home. If an unsupported setting is essential, keep legacy mode
-until its handling is explicitly resolved. Do not silently drop it.
-
-Keep preparation and runtime adoption as separate reviewed changes:
-
-1. Confirm the pin supports the workspace schema. Keep
-   `workspaceRuntimeEnabled = false`. Adapt the inactive example to the actual
-   software on every destination, including the controller; validate the raw
-   candidate through `nixoriumValidateWorkspaceCandidate` before saving the
-   optional `workspace-profile.json`. Keep catalog additions explicit and
-   preserve an existing profile rather than overwriting it with the example.
-2. Inspect `nixoriumWorkspace`: check the declared/effective values, targets,
-   prerequisites and versions. Preparation does not modify homes, and copying
-   the example alone is not migration or authorization to deploy.
-3. Before enabling runtime, separately review the pin's runtime capability,
-   private module changes and unresolved differences. The supplied modules
-   guard student writes with `workspaceRuntimeEnabled`; old local copies do not
-   gain these guards from an upstream update. Remove conflicting student
-   template writes, login overrides and ownership repairs without broad changes
-   to staff policy. If custom writers cannot be excluded, keep runtime disabled.
-4. Build and test the reviewed seed/system in an authorized disposable target,
-   including actual extension loading when selected. Deployment, next normal
-   boot/reset and live verification each remain separately authorized steps.
-
-There is no automated migration command. Returning to
-legacy is also a reviewed system change, not recovery of erased files. Preserve
-managed snapshots and pending evidence; do not remove them to make a downgrade
-proceed. Nix generations, profile declarations and student-data backups serve
-different purposes.
+If reset fails, inspect `home-reset.service` read-only and preserve private
+`/var/lib/home-snapshots/.workspace-reset` recovery evidence. Its pending marker
+blocks retries and normal login across reboot. Do not remove it, disable the
+profile, or invoke the helper as a retry. Request separately authorized recovery
+based on the actual snapshot/home state. Sanitized, read-only managed snapshots
+under `/var/lib/home-snapshots/workspace` are not external backups.
 
 ## Review and save a profile
 
 In the administrative TUI, open **Maintenance → Settings → Student workspace**.
-It loads the actual declaration, not the inactive example. With no saved file,
-it starts an explicitly labelled new draft and leaves legacy mode unchanged.
+It loads the saved declaration, never the example. The supplied template already
+has a profile; preserve its defaults and any existing customization.
 Choose Desktop, Dock, Editor or Browser, then a supported field:
 
 - Use “Inherit” (or an empty numeric field) to omit an override. “Clear” on a
@@ -148,8 +79,8 @@ Choose Desktop, Dock, Editor or Browser, then a supported field:
 - On supporting pins, confirmed `SAVE` writes and records only the reviewed
   profile locally. Pre-existing profile edits are refused; unrelated staged
   files remain untouched. The result offers a separate controller review,
-  then fresh client selection after verified application. No save enables
-  runtime, applies a system, deploys clients or resets a home.
+then fresh client selection after verified application. No save applies a
+  system, deploys clients or resets a home.
 - If writing or recording is unconfirmed, inspect the file and Git state
   through the result's Git review action. Do not replay the old save token or
   apply systems before recovery. Older pins may leave recording separate.
@@ -159,7 +90,7 @@ must finish before quitting. If the original profile changed during editing,
 leave and reload it before preparing another proposal. Do not automatically
 retry a stale review or an uncertain-durability result. The editor supports only
 the versioned fields: other application settings, whole-home imports and
-runtime migration remain outside it. The teacher dashboard has no editor.
+system application remain outside it. The teacher dashboard has no editor.
 
 Where supported, prepare the candidate in a separate regular JSON file rather
 than overwriting `workspace-profile.json` before review. Preserve existing
@@ -181,7 +112,7 @@ It re-evaluates the candidate and rejects stale source, pin, catalog or file
 identity; do not automatically renew a failed token and retry the write.
 
 The CLI operation writes only `workspace-profile.json`, mode `0600`. It does not
-stage or commit it, edit the catalog/lock/modules, enable runtime, build systems,
+stage or commit it, edit the catalog/lock/modules, build systems,
 deploy or reset any home. `saved` and `unchanged` are declaration states, not
 evidence of live preferences. Review/commit and activation/distribution remain
 separate authorized workflows; do not assume this save token authorizes them.
@@ -192,7 +123,7 @@ workspace save token is not a Git commit token.
 The profile is classified as managed and its schema is checked before a managed
 commit. This check is not a substitute for the source-bound workspace review,
 system validation or deployment. Missing/invalid profiles block this commit
-path; opting out of managed homes is a separately reviewed migration.
+path; removing a profile is not a way to bypass reset recovery.
 
 ```sh
 nixorium git commit plan --repo . --paths workspace-profile.json --json
@@ -214,9 +145,8 @@ current/proposed pinned package and extension versions, prerequisites and
 effective preferences. Compare these before authorizing the input change;
 they do not describe live home state or the latest vendor release. The full
 comparison is token-bound; source changes still require a fresh review.
-Changed runtime opt-in, student identity or destinations require a separately
-reviewed migration. Deployments without a prepared profile keep their legacy
-update flow; there is no automatic profile import.
+Changed boot behavior, student identity or destinations require separate
+configuration review; an input update must not silently alter them.
 
 Use Maintenance → Update system and packages (or `package-base plan`/`apply`)
 for packaged extensions. Explain that the same pin can change the editor,

@@ -503,12 +503,14 @@ plan/save contract for `workspace-profile.json`, exposed through `workspace
 plan`/`apply` and composed by the administrative TUI's student workspace editor. Review binds the normalized
 candidate and full resolved preparation
 metadata to the repository, Git revision/source, lock and original file identity.
-Absence of the file remains legacy mode, not an empty managed profile. Apply
+Absence of the file is not an implicit import of template defaults. Apply
 regenerates the review before checking its token, including unchanged proposals,
 and requires a locked snapshot recheck from its writer. Only the profile may be
 replaced. A successful result says `saved`, never active; an unconfirmed durable
-write is a recovery-required partial result. No commit, runtime opt-in, build,
-deployment or reset is implicit.
+write is a recovery-required partial result. CLI apply does not commit; the
+ordinary TUI save composes a confined local commit. No build, deployment or
+reset is implicit. A saved profile always configures boot preferences without
+a separate runtime switch.
 
 The workspace adapter now implements that boundary using the deployment-root
 advisory lock and descriptor-relative, no-follow filesystem operations. The
