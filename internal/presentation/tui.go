@@ -78,6 +78,7 @@ type DashboardActions struct {
 	LoadPackageBase         func(context.Context) domain.PackageBaseStatus
 	PlanPackageBase         func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
 	SavePackageBase         func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	SettingsRepairIssues    func() []domain.ValidationIssue
 	LoadSettings            func(context.Context) (domain.LabSettingsFile, error)
 	LoadWorkspace           func(context.Context) domain.WorkspacePlanReport
 	PlanWorkspace           func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
@@ -211,6 +212,8 @@ type settingsModel struct {
 	applying         bool
 	returnScreen     dashboardScreen
 	collectPasswords bool
+	// repair lists problems of saved settings that no longer validate.
+	repair []domain.ValidationIssue
 }
 
 // updateModel owns both upstream and package-base update state because both
@@ -577,6 +580,7 @@ type dashboardUpdateControllerMsg struct {
 
 type dashboardSettingsMsg struct {
 	settings domain.LabSettingsFile
+	repair   []domain.ValidationIssue
 	err      error
 }
 
@@ -718,7 +722,7 @@ func (model dashboardModel) openSetupSettings() (tea.Model, tea.Cmd) {
 	model.message = ""
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		settings, err := model.actions.LoadSettings(ctx)
-		return dashboardSettingsMsg{settings: settings, err: err}
+		return dashboardSettingsMsg{settings: settings, err: err, repair: model.settingsRepairIssues()}
 	})
 }
 
@@ -774,7 +778,7 @@ func (model dashboardModel) beginComputerInstallation(method domain.RemoteInstal
 	model.message = ""
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		settings, err := model.actions.LoadSettings(ctx)
-		return dashboardSettingsMsg{settings: settings, err: err}
+		return dashboardSettingsMsg{settings: settings, err: err, repair: model.settingsRepairIssues()}
 	})
 }
 

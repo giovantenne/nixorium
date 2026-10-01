@@ -27,6 +27,47 @@ func (m SettingsManager) Current(repository string) (domain.LabSettingsFile, err
 	return settings, nil
 }
 
+// CurrentForEditing returns the saved settings for the editor. When they no
+// longer validate, it returns a repaired copy and the problems to fix, so the
+// operator can correct them instead of editing JSON by hand.
+func (m SettingsManager) CurrentForEditing(repository string) (domain.LabSettingsFile, []domain.ValidationIssue, error) {
+	data, err := m.source.ReadSettings(repository)
+	if err != nil {
+		return domain.LabSettingsFile{}, nil, err
+	}
+	settings, issues := domain.DecodeLabSettings(data)
+	if len(issues) == 0 {
+		return settings, nil, nil
+	}
+	repaired, removed, err := domain.RepairLabSettings(data)
+	if err != nil {
+		return domain.LabSettingsFile{}, nil, err
+	}
+	return repaired, domain.SettingsRepairIssues(repaired, removed), nil
+}
+
+// decodeBase reads the saved settings that a candidate replaces. Settings that
+// no longer validate are accepted in repaired form, so saving a valid
+// candidate repairs them; the raw content still binds the review.
+func decodeBase(baseData []byte) (domain.LabSettingsFile, []string, bool) {
+	base, issues := domain.DecodeLabSettings(baseData)
+	if len(issues) == 0 {
+		return base, nil, true
+	}
+	repaired, removed, err := domain.RepairLabSettings(baseData)
+	if err != nil {
+		return domain.LabSettingsFile{}, nil, false
+	}
+	return repaired, removed, true
+}
+
+func withRemovedFields(changes []domain.SettingChange, removed []string) []domain.SettingChange {
+	for _, field := range removed {
+		changes = append(changes, domain.SettingChange{Field: field, Before: "obsolete field", After: "removed"})
+	}
+	return changes
+}
+
 func (m SettingsManager) PlanSettings(ctx context.Context, repository string, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
 	data, err := domain.MarshalLabSettings(candidate)
 	if err != nil {
@@ -79,8 +120,8 @@ func (m SettingsManager) ApplyReviewedSettings(repository string, candidate doma
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$", Message: err.Error()})
 		return report
 	}
-	base, issues := domain.DecodeLabSettings(baseData)
-	if len(issues) > 0 {
+	base, removed, ok := decodeBase(baseData)
+	if !ok {
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$base", Message: "managed settings are invalid; repair them before applying a candidate"})
 		return report
 	}
@@ -94,8 +135,8 @@ func (m SettingsManager) ApplyReviewedSettings(repository string, candidate doma
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$fingerprint", Message: "the managed settings changed after review; create a new plan"})
 		return report
 	}
-	report.Changes = domain.DiffLabSettings(base, candidate)
-	if len(report.Changes) == 0 {
+	report.Changes = withRemovedFields(domain.DiffLabSettings(base, candidate), removed)
+	if len(report.Changes) == 0 && len(base.Validate()) == 0 {
 		report.State = "unchanged"
 		return report
 	}
@@ -188,8 +229,8 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$", Message: err.Error()})
 		return report, nil, domain.LabSettingsFile{}
 	}
-	base, baseIssues := domain.DecodeLabSettings(baseData)
-	if len(baseIssues) > 0 {
+	base, removed, ok := decodeBase(baseData)
+	if !ok {
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$base", Message: "managed settings are invalid; repair them before applying a candidate"})
 		return report, baseData, domain.LabSettingsFile{}
 	}
@@ -207,8 +248,8 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 		})
 		return report, baseData, candidate
 	}
-	report.Changes = domain.DiffLabSettings(base, candidate)
-	if len(report.Changes) == 0 {
+	report.Changes = withRemovedFields(domain.DiffLabSettings(base, candidate), removed)
+	if len(report.Changes) == 0 && len(base.Validate()) == 0 {
 		report.State = "unchanged"
 	} else {
 		report.State = "valid"

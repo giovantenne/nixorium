@@ -327,6 +327,9 @@ func (model dashboardModel) settingsView() string {
 		"",
 		model.settings.menu.list.View(),
 	)
+	if len(model.settings.repair) > 0 {
+		notices = append(notices, settingsRepairNotice(model.settings.repair))
+	}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
@@ -404,4 +407,28 @@ func settingsIssueMessage(issues []domain.ValidationIssue) string {
 		return "settings operation failed"
 	}
 	return issues[0].Field + ": " + issues[0].Message
+}
+
+// settingsRepairNotice explains settings that no longer validate and how
+// saving repairs them.
+func settingsRepairNotice(issues []domain.ValidationIssue) tuiNotice {
+	details := []string{}
+	for _, issue := range issues[:min(len(issues), 4)] {
+		details = append(details, issue.Field+": "+issue.Message)
+	}
+	if len(issues) > 4 {
+		details = append(details, fmt.Sprintf("… and %d more", len(issues)-4))
+	}
+	return tuiNotice{
+		kind:   tuiStatusAttention,
+		title:  "The saved settings need repair. Fix the fields below, then review and save; obsolete fields are removed.",
+		detail: strings.Join(details, "\n  "),
+	}
+}
+
+func (model dashboardModel) settingsRepairIssues() []domain.ValidationIssue {
+	if model.actions.SettingsRepairIssues == nil {
+		return nil
+	}
+	return model.actions.SettingsRepairIssues()
 }

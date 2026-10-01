@@ -702,6 +702,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			return model, nil
 		}
 		model.settings.current = message.settings
+		model.settings.repair = message.repair
 		model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
 		if model.installation.startingLabSetup {
 			model.installation.startingLabSetup = false

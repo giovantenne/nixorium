@@ -111,3 +111,47 @@ func stringsContainHash(change domain.SettingChange) bool {
 	after, _ := change.After.(string)
 	return bytes.Contains([]byte(before), []byte("$6$")) || bytes.Contains([]byte(after), []byte("$6$"))
 }
+
+func TestSettingsThatNoLongerValidateAreRepairedBySaving(t *testing.T) {
+	template, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An obsolete field from an older release and an address rule added later.
+	baseData := bytes.Replace(template, []byte(`"lab": {`), []byte(`"lab": {"veyonNativeHosts": ["pc01"],`), 1)
+	baseData = bytes.Replace(baseData, []byte(`"MASTER_DHCP_IP"`), []byte(`"10.0.0.50"`), 1)
+	if _, issues := domain.DecodeLabSettings(baseData); len(issues) == 0 {
+		t.Fatal("fixture is unexpectedly valid")
+	}
+	written := domain.LabSettingsFile{}
+	manager := NewSettingsManager(fakeSettingsSource{data: baseData, written: &written})
+	if _, err := manager.Current("/repo"); err == nil {
+		t.Fatal("strict loading accepted invalid settings")
+	}
+	editing, problems, err := manager.CurrentForEditing("/repo")
+	if err != nil || len(problems) < 2 {
+		t.Fatalf("repair view = %+v %+v %v", editing, problems, err)
+	}
+	if problems[0].Field != "lab.veyonNativeHosts" {
+		t.Fatalf("obsolete field not listed first: %+v", problems)
+	}
+	editing.Lab.MasterDHCPIP = "192.0.2.10"
+	plan := manager.PlanSettings(context.Background(), "/repo", editing)
+	if plan.HasErrors() || plan.State != "valid" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	removed := false
+	for _, change := range plan.Changes {
+		removed = removed || (change.Field == "lab.veyonNativeHosts" && change.After == "removed")
+	}
+	if !removed {
+		t.Fatalf("removed field not reviewed: %+v", plan.Changes)
+	}
+	applied := manager.ApplySettings(context.Background(), "/repo", editing, plan.BaseFingerprint)
+	if applied.State != "applied" || written.Lab.MasterDHCPIP != "192.0.2.10" {
+		t.Fatalf("applied = %+v", applied)
+	}
+	if _, _, err := NewSettingsManager(fakeSettingsSource{data: []byte("not json")}).CurrentForEditing("/repo"); err == nil {
+		t.Fatal("unparseable JSON was repaired")
+	}
+}

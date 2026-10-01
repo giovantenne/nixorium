@@ -37,6 +37,9 @@ func (model dashboardModel) recoveryFlow(condition domain.BlockingCondition) (te
 	case domain.RecoveryUSBReserved:
 		next, command := model.openUSBInstallation()
 		return next, command, true
+	case domain.RecoverySettingsInvalid:
+		next, command := model.openMaintenanceTask("e")
+		return next, command, true
 	case domain.RecoveryBackupDue:
 		next, command := model.openBackup()
 		return next, command, true

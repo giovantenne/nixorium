@@ -481,8 +481,12 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
+		SettingsRepairIssues: func() []domain.ValidationIssue {
+			_, issues, _ := settingsManager.CurrentForEditing(repository)
+			return issues
+		},
 		LoadSettings: func(ctx context.Context) (domain.LabSettingsFile, error) {
-			settings, err := settingsManager.Current(repository)
+			settings, _, err := settingsManager.CurrentForEditing(repository)
 			if err != nil {
 				return domain.LabSettingsFile{}, err
 			}

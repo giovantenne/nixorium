@@ -503,6 +503,13 @@ commit. Untracked files, new files and private keys are never touched. Never add
 
 ## Configuration is invalid
 
+When `lab-settings.json` no longer validates, for example after an update
+removed a field or added a rule, **Maintenance → Change settings** still opens:
+it lists each problem, drops obsolete fields and lets you correct the values.
+The normal review shows the removed fields and the corrected values, and saving
+writes valid settings. Only a file that is not valid JSON must be restored from
+Git (`nixorium git discard plan --paths lab-settings.json`) or a backup.
+
 `CONFIG-EVAL` and `NETWORK-SUBNET` normally record successful typed evaluation;
 when evaluation itself fails, the support report's status/doctor sections can
 be unavailable instead of carrying a failure finding. `DEPLOYMENT-READY` also

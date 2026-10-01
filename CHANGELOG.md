@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Settings that no longer validate (an obsolete field, or a value a newer rule
+  rejects) open in **Change settings** with each problem listed instead of
+  blocking the editor; the review shows removed fields and saving writes
+  valid settings.
+
 - Undo a mistaken uncommitted change: **Review Git changes → Discard
   changes** and `nixorium git discard plan|apply` restore the selected files
   to the last commit after the `DISCARD` confirmation, first keeping their

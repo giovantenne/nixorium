@@ -119,7 +119,7 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		model.message = ""
 		return model.startRead(func(ctx context.Context) tea.Msg {
 			settings, err := model.actions.LoadSettings(ctx)
-			return dashboardSettingsMsg{settings: settings, err: err}
+			return dashboardSettingsMsg{settings: settings, err: err, repair: model.settingsRepairIssues()}
 		})
 	}
 	return model, nil

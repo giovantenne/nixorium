@@ -156,7 +156,9 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		return model.openRecovery()
 	case "pending-backup":
 		return model.openBackup()
-	case "pending-busy", "pending-settings":
+	case "pending-settings":
+		return model.openMaintenanceTask("e")
+	case "pending-busy":
 		return model.openRecovery()
 	case "pending-git":
 		if model.actions.LoadGitReview != nil {
