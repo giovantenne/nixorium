@@ -434,7 +434,8 @@ dependency of the controller management workflows. The screensaver therefore
 remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and
 Tiling Assistant are installed as workstation basics in every profile. The
 compact bottom dock hides when a window overlaps it and reappears at the bottom
-edge. It stays visible on a clear desktop. Desktop files appear on the desktop, and
+edge. It stays visible on a clear desktop. On the controller, the administrator
+and teacher docks start with the Nixorium launcher. Desktop files appear on the desktop, and
 dragging a window to an edge offers an adjacent window with small 8 px gaps.
 Yaru-yellow icons, as in Nixorium 1.0.0, complement native Adwaita decorations. Administrator and
 teacher accounts start with blue accents and a static vector wallpaper; every

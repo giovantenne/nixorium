@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The **Nixorium** launcher on the controller uses the Nixorium mark from
+  nixorium.org, and the site template pins it first in the dock of the
+  administrator and the teacher on the controller. Existing deployments get
+  the dock entry after a deployment template reset or by adding
+  `nixorium.desktop` to the staff favorites in `modules/workstation.nix`.
+
 - The Overview no longer asks for a controller backup before the laboratory
   keys exist, and low disk space is shown in Maintenance beside **Free disk
   space** instead of among the Overview's pending work.

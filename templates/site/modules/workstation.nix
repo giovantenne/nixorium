@@ -1,6 +1,7 @@
 args@{ pkgs, lib, labSettings, hostSoftwarePackages, ... }:
 let
   workspaceRuntimeEnabled = args.workspaceRuntimeEnabled or false;
+  isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);
   has = package: builtins.elem package hostSoftwarePackages;
   hasGhostty = has "ghostty";
   hasChromium = has "chromium";
@@ -91,7 +92,9 @@ let
     ++ lib.optionals hasChromium [ "chromium-browser.desktop" ]
     ++ lib.optionals hasCode [ "code.desktop" ]
     ++ [ "org.gnome.Nautilus.desktop" "org.gnome.TextEditor.desktop" ];
-  staffFavorites = studentFavorites ++ [ "io.veyon.desktop" ];
+  # The Nixorium launcher exists only on the controller; staff find it first.
+  staffFavorites = lib.optionals isController [ "nixorium.desktop" ]
+    ++ studentFavorites ++ [ "io.veyon.desktop" ];
   enabledExtensions = [
     "ding@rastersoft.com"
     "dash-to-dock@micxgx.gmail.com"

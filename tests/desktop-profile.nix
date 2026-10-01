@@ -12,6 +12,12 @@ let
   };
   profile = import ../templates/site/modules/workstation.nix profileArgs;
   managedProfile = import ../templates/site/modules/workstation.nix (profileArgs // { workspaceRuntimeEnabled = true; });
+  roleProfile = hostName: import ../templates/site/modules/workstation.nix (profileArgs // {
+    inherit hostName;
+    labSettings = profileArgs.labSettings // { masterHostName = "pc99"; };
+  });
+  controllerScript = (roleProfile "pc99").environment.etc."lab/gnome-user-setup.sh".text;
+  clientScript = (roleProfile "pc01").environment.etc."lab/gnome-user-setup.sh".text;
   cfg = profile.services.desktopManager.gnome;
   schemas = pkgs.gnome.nixos-gsettings-overrides.override {
     inherit (cfg) extraGSettingsOverrides extraGSettingsOverridePackages;
@@ -20,6 +26,9 @@ let
   managedScript = pkgs.writeText "managed-desktop-login.sh" managedProfile.environment.etc."lab/gnome-user-setup.sh".text;
 in
 assert pkgs.lib.hasInfix "APPEARANCE_ROLE=managed-student" managedProfile.environment.etc."lab/gnome-user-setup.sh".text;
+# Staff find the Nixorium launcher first in the controller's dock only.
+assert pkgs.lib.hasInfix "FAVORITES='['\\''nixorium.desktop'" controllerScript;
+assert !(pkgs.lib.hasInfix "nixorium.desktop" clientScript);
 pkgs.runCommand "nixorium-desktop-profile-check" {
   nativeBuildInputs = [ pkgs.glib pkgs.jq pkgs.bash ];
 } ''

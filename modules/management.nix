@@ -694,7 +694,8 @@ let
     desktopName = "Nixorium";
     comment = "Manage the laboratory and the classroom computers";
     exec = "${nixoriumOpen}/bin/nixorium-open";
-    icon = "applications-system";
+    # The mark used on nixorium.org, so the dock shows the product.
+    icon = "${../assets/nixorium-icon.svg}";
     categories = [ "System" "Settings" ];
   };
 
