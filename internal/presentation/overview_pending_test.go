@@ -14,8 +14,8 @@ import (
 func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
 	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "unchecked"}, DashboardActions{}, false)
 	m.screen = dashboardHome
-	if len(m.pendingTasks()) != 0 || !strings.Contains(m.View().Content, "No pending work observed locally") {
-		t.Fatal("empty state claims live readiness")
+	if view := m.View().Content; len(m.pendingTasks()) != 0 || strings.Contains(view, "No pending work") || strings.Contains(view, "Needs attention") {
+		t.Fatal("empty overview shows a pending-work line")
 	}
 	m.jobs.items = []domain.ManagedJob{{Operation: "controller-apply", State: "running"}}
 	m.report.PXE.Mode = "recovery-required"
@@ -28,14 +28,13 @@ func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
 	for _, task := range m.pendingTasks() {
 		seen[task.id] = true
 	}
-	for _, id := range []string{"pending-jobs", "pending-pxe", "pending-git", "pending-controller", "pending-clients"} {
+	for _, id := range []string{"pending-jobs", "pending-pxe", "pending-git", "pending-controller"} {
 		if !seen[id] {
 			t.Fatalf("missing %s", id)
 		}
 	}
-	last := m.pendingTasks()[len(m.pendingTasks())-1]
-	if !strings.Contains(last.description, "2026-09-30") || !strings.Contains(last.description, "Not live state") {
-		t.Fatal(last)
+	if seen["pending-clients"] {
+		t.Fatal("the last client check is listed as pending work")
 	}
 	next, cmd := m.updatePrimaryScreenKey(tea.KeyPressMsg{Code: '1', Text: "1"})
 	if cmd != nil || next.(dashboardModel).screen != dashboardManagedJobs {
@@ -70,11 +69,11 @@ func TestOverviewRefreshIsLocalAndPreservesClientObservation(t *testing.T) {
 		t.Fatal("lost dated client evidence or navigated")
 	}
 	m.pendingRevision = strings.Repeat("a", 40)
-	if len(m.pendingTasks()) != 2 {
-		t.Fatal("save not visible alongside client observation")
+	if len(m.pendingTasks()) != 1 {
+		t.Fatal("unapplied save not visible")
 	}
 	m.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", Revision: m.pendingRevision, Applied: true, Verified: true}
-	if len(m.pendingTasks()) != 1 {
+	if len(m.pendingTasks()) != 0 {
 		t.Fatal("verified saved revision remains pending")
 	}
 }

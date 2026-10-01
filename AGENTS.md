@@ -297,9 +297,11 @@ failure or timeout must block publication.
   inventory before client selection; cancelled or failed reads must not resume
   actions or admit stale identities. Keep full operation validation unchanged.
 - Overview pending work uses local Git/service observations and
-  previously computed session evidence only. Keep client observations dated,
-  local refresh free of Nix/client probes, and selectable follow-ups read-only
-  until their ordinary review and confirmation. Low store space is shown in
+  previously computed session evidence only. It lists only items that need
+  action (no empty-state line, no last-client-check reminder; Computer
+  inventory shows dated observations). Keep local refresh free of Nix/client
+  probes, and selectable follow-ups read-only until their ordinary review and
+  confirmation. Low store space is shown in
   Maintenance beside Free disk space, not on the Overview. The backup reminder
   starts only once laboratory private keys exist.
 - Inventory/package discovery must remain independent of host module evaluation.

@@ -91,8 +91,6 @@ Nixorium  /  Overview
 Laboratory overview
 Choose an area. Observed state is loaded only when the selected task needs it.
 
-No pending work observed locally; clients have not been checked.
-
 › [c] Computers
   [n] Installation
   [w] Software
@@ -833,7 +831,7 @@ Nixorium  /  Overview
 Laboratory overview
 Choose an area. Observed state is loaded only when the selected task needs it.
 
-Pending work / last observations — select a numbered row
+Needs attention — press the number to open it
 
   [1] Controller configuration — running
 › [c] Computers

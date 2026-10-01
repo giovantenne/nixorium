@@ -154,10 +154,9 @@ func (model dashboardModel) homeView() string {
 		"",
 	}
 	notices := []tuiNotice{}
-	if len(model.pendingTasks()) == 0 {
-		lines = append(lines, "No pending work observed locally; clients have not been checked.", "")
-	} else {
-		lines = append(lines, "Pending work / last observations — select a numbered row", "")
+	// Rows appear only when something needs action; an empty list says nothing.
+	if len(model.pendingTasks()) > 0 {
+		lines = append(lines, "Needs attention — press the number to open it", "")
 	}
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")

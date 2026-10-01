@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The Overview shows rows above the menu only when something needs action,
+  under "Needs attention". The "No pending work observed" line and the
+  "Clients last checked" reminder are gone; Computer inventory still shows
+  when each computer was last checked.
+
 - When the laboratory is set up for the first time, the installation form
   proposes the controller's network card for the client computers, which are
   often the same model. Laboratories with configured clients keep their saved

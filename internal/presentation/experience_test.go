@@ -62,7 +62,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 	m := experienceFixture(2)
 	m.report.PXE.Mode = "recovery-required"
 	view := m.View().Content
-	if !strings.Contains(view, "Pending work") || !strings.Contains(view, "Controller network recovery required") || !strings.Contains(view, "Enter") {
+	if !strings.Contains(view, "Needs attention") || !strings.Contains(view, "Controller network recovery required") || !strings.Contains(view, "Enter") {
 		t.Fatalf("overview pending action is not separated from its action bar:\n%s", view)
 	}
 }

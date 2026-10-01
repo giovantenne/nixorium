@@ -79,10 +79,7 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 	if model.report.PXEPreparation.Present && !model.report.PXEPreparation.Ready {
 		add("pending-pxe", "Installation files need preparing", "Previously checked installation files are stale or invalid; review them again.")
 	}
-	hosts := model.computers.hosts
-	if !hosts.GeneratedAt.IsZero() {
-		add("pending-clients", fmt.Sprintf("Clients last checked %s", hosts.GeneratedAt.Local().Format("15:04:05")), fmt.Sprintf("Observation from %s: %d current, %d need updates, %d unknown. Not live state; open inventory to check again.", hosts.GeneratedAt.Format("2006-01-02 15:04:05 MST"), hosts.Deployment.Current, hosts.Deployment.Outdated, hosts.Deployment.Unknown))
-	}
+	// The last client check is a reminder, not work: Computer inventory shows it.
 	return tasks
 }
 
@@ -165,10 +162,6 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 	case "pending-controller":
 		if model.actions.PlanController != nil {
 			return model.openControllerReview()
-		}
-	case "pending-clients":
-		if model.actions.LoadHosts != nil {
-			return model.openComputerTask("h")
 		}
 	case "pending-setup":
 		return model.startComputerInstallation()
