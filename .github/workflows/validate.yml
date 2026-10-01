@@ -39,9 +39,14 @@ jobs:
           bash scripts/sync-canonical-copies.sh --check
 
   validate:
-    name: Evaluate source and deployment template
+    # Independent evaluation shards run on separate runners in parallel.
+    name: Evaluate source and deployment template (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [lab, workspace-a, workspace-b, template]
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -53,3 +58,5 @@ jobs:
 
       - name: Run evaluation checks
         run: ./scripts/validate.sh --ci
+        env:
+          NIXORIUM_CI_SHARD: ${{ matrix.shard }}

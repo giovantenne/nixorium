@@ -176,11 +176,39 @@ case "$MODE" in
     ;;
 esac
 
+# CI may split --ci into parallel shards with NIXORIUM_CI_SHARD. Unlisted
+# groups fall into "lab", so a new group is never skipped.
+CI_SHARD="${NIXORIUM_CI_SHARD:-}"
+case "$CI_SHARD" in
+  "" | lab | workspace-a | workspace-b | template) ;;
+  *)
+    echo "Error: unknown NIXORIUM_CI_SHARD '${CI_SHARD}' (lab, workspace-a, workspace-b, template)." >&2
+    exit 1
+    ;;
+esac
+ci_shard_of() {
+  case "$1" in
+    checks-workspace-candidate | checks-workspace-preparation) echo workspace-a ;;
+    checks-workspace-rejection | checks-workspace-runtime | checks-workspace-systems) echo workspace-b ;;
+    checks-workspace-template | systems | template) echo template ;;
+    *) echo lab ;;
+  esac
+}
+in_ci_shard() {
+  [[ -z "$CI_SHARD" || "$(ci_shard_of "$1")" == "$CI_SHARD" ]]
+}
+
 VALIDATION_GROUPS=$(eval_ci_group "$REPO_ROOT" checkGroups)
 if [[ "${MODE}" == "--ci" ]]; then
   while IFS= read -r GROUP; do
-    eval_ci_group "$REPO_ROOT" "$GROUP" >/dev/null
+    if in_ci_shard "$GROUP"; then
+      eval_ci_group "$REPO_ROOT" "$GROUP" >/dev/null
+    fi
   done < <(jq -r 'keys[]' <<<"$VALIDATION_GROUPS")
+  if ! in_ci_shard template; then
+    echo "CI shard ${CI_SHARD} completed successfully."
+    exit 0
+  fi
 else
   bash scripts/check-agent-guidance.sh
   nix build --file "${REPO_ROOT}/tests/source-checks.nix" documentation-check --no-write-lock-file --no-link
@@ -229,7 +257,7 @@ if [[ "$(nix eval "path:${SITE_DIR}#deploymentStatus.ready" --json --no-write-lo
 fi
 
 profile_state() {
-  NIXORIUM_PROFILE_SITE="$SITE_DIR" nix eval --impure --json --expr '
+  NIXORIUM_PROFILE_SITE="${1:-$SITE_DIR}" nix eval --impure --json --expr '
     let
       deployment = builtins.getFlake ("path:" + builtins.getEnv "NIXORIUM_PROFILE_SITE");
       config = deployment.nixosConfigurations.pc01.config;
@@ -270,37 +298,28 @@ profile_state() {
   '
 }
 
+
 profile_check_failed() {
   echo "Error: template profile check failed ($1): $PROFILE_STATE" >&2
   exit 1
 }
+PROFILE_STATE=""
 
-PROFILE_STATE=$(profile_state)
-jq -e '
-  .chromiumPolicy and .screensaver and .desktopExtensions and
-  .desktopExtensionDefaults and .desktopExtensionRepair and
-  ((.docker or .vscodeHome or .vscodeHomeOwnership) | not) and
-  .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "default software"
-cp "$SITE_DIR/lab-software.json" "$TEMP_DIR/lab-software-profile.json"
+# The three software scenarios are independent evaluations of copies of the
+# template; run them in parallel and check each result.
+DEV_SITE="${TEMP_DIR}/site-dev"
+MINIMAL_SITE="${TEMP_DIR}/site-minimal"
+cp -a "$SITE_DIR" "$DEV_SITE"
+cp -a "$SITE_DIR" "$MINIMAL_SITE"
 jq '.packages += [
   {"package": "docker", "scope": {"kind": "shared"}},
   {"package": "vscode", "scope": {"kind": "shared"}}
 ] | .packages |= sort_by(.package)' \
-  "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
-PROFILE_STATE=$(profile_state)
-# The template's active student workspace profile owns the student's VS Code
-# extensions, so adding the package prepares only staff homes.
-jq -e '
-  .chromiumPolicy and .docker and .screensaver and .desktopExtensions and
-  .desktopExtensionDefaults and .desktopExtensionRepair and (.vscodeHome | not) and
-  .vscodeHomeOwnership and .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "Docker and VS Code added"
+  "$SITE_DIR/lab-software.json" > "$DEV_SITE/lab-software.json"
 # Removing the browser and terminal also requires a student workspace profile
 # that no longer names them; the saved template profile does.
-cp "$SITE_DIR/workspace-profile.json" "$TEMP_DIR/workspace-profile.json"
 jq 'del(.browser) | .desktop.favorites |= map(select(. != "com.mitchellh.ghostty.desktop" and . != "chromium-browser.desktop"))' \
-  "$TEMP_DIR/workspace-profile.json" > "$SITE_DIR/workspace-profile.json"
+  "$SITE_DIR/workspace-profile.json" > "$MINIMAL_SITE/workspace-profile.json"
 jq '.packages |= map(select(.package as $package | [
   "chromium",
   "docker",
@@ -308,15 +327,35 @@ jq '.packages |= map(select(.package as $package | [
   "nodejs",
   "python3Packages.terminaltexteffects",
   "vscode"
-] | index($package) | not))' "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
-PROFILE_STATE=$(profile_state)
+] | index($package) | not))' "$SITE_DIR/lab-software.json" > "$MINIMAL_SITE/lab-software.json"
+profile_state "$SITE_DIR" > "$TEMP_DIR/profile-default.json" & DEFAULT_PID=$!
+profile_state "$DEV_SITE" > "$TEMP_DIR/profile-dev.json" & DEV_PID=$!
+profile_state "$MINIMAL_SITE" > "$TEMP_DIR/profile-minimal.json" & MINIMAL_PID=$!
+wait "$DEFAULT_PID" || profile_check_failed "default software evaluation"
+wait "$DEV_PID" || profile_check_failed "Docker and VS Code evaluation"
+wait "$MINIMAL_PID" || profile_check_failed "minimal software evaluation"
+
+PROFILE_STATE=$(cat "$TEMP_DIR/profile-default.json")
+jq -e '
+  .chromiumPolicy and .screensaver and .desktopExtensions and
+  .desktopExtensionDefaults and .desktopExtensionRepair and
+  ((.docker or .vscodeHome or .vscodeHomeOwnership) | not) and
+  .homeOwnershipOrdering
+' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "default software"
+# The template's active student workspace profile owns the student's VS Code
+# extensions, so adding the package prepares only staff homes.
+PROFILE_STATE=$(cat "$TEMP_DIR/profile-dev.json")
+jq -e '
+  .chromiumPolicy and .docker and .screensaver and .desktopExtensions and
+  .desktopExtensionDefaults and .desktopExtensionRepair and (.vscodeHome | not) and
+  .vscodeHomeOwnership and .homeOwnershipOrdering
+' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "Docker and VS Code added"
+PROFILE_STATE=$(cat "$TEMP_DIR/profile-minimal.json")
 jq -e '
   .desktopExtensions and .desktopExtensionDefaults and .desktopExtensionRepair and
   ((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and
   .homeOwnershipOrdering
 ' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "minimal software"
-cp "$TEMP_DIR/lab-software-profile.json" "$SITE_DIR/lab-software.json"
-cp "$TEMP_DIR/workspace-profile.json" "$SITE_DIR/workspace-profile.json"
 
 if [[ "${MODE}" == "--ci" ]]; then
   eval_ci_group "$SITE_DIR" template >/dev/null
