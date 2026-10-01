@@ -75,20 +75,25 @@ func (r GitCommitPlanReport) HasErrors() bool {
 }
 
 type GitCommitReport struct {
-	SchemaVersion    int               `json:"schemaVersion"`
-	Operation        string            `json:"operation"`
-	State            string            `json:"state"`
-	Repository       string            `json:"repository"`
-	PreviousRevision string            `json:"previousRevision,omitempty"`
-	Revision         string            `json:"revision,omitempty"`
-	Paths            []string          `json:"paths"`
-	CommitMessage    string            `json:"commitMessage,omitempty"`
-	Committed        bool              `json:"committed"`
-	RetrySafe        bool              `json:"retrySafe"`
-	Message          string            `json:"message,omitempty"`
-	Issues           []ValidationIssue `json:"issues"`
+	SchemaVersion    int      `json:"schemaVersion"`
+	Operation        string   `json:"operation"`
+	State            string   `json:"state"`
+	Repository       string   `json:"repository"`
+	PreviousRevision string   `json:"previousRevision,omitempty"`
+	Revision         string   `json:"revision,omitempty"`
+	Paths            []string `json:"paths"`
+	CommitMessage    string   `json:"commitMessage,omitempty"`
+	Committed        bool     `json:"committed"`
+	// BackupRef keeps the content removed by a reviewed discard.
+	BackupRef string            `json:"backupRef,omitempty"`
+	RetrySafe bool              `json:"retrySafe"`
+	Message   string            `json:"message,omitempty"`
+	Issues    []ValidationIssue `json:"issues"`
 }
 
 func (r GitCommitReport) HasErrors() bool {
 	return r.State == "blocked" || r.State == "failed" || r.State == "partial" || len(r.Issues) > 0
 }
+
+// GitDiscardConfirmation restores selected files to the last saved version.
+const GitDiscardConfirmation = "DISCARD"

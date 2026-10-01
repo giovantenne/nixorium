@@ -96,3 +96,38 @@ func runTemplateResetRecoveryCommand(ctx context.Context, repository string, opt
 	}
 	return 0
 }
+
+func runGitDiscardApply(ctx context.Context, manager *app.GitDiscardManager, repository string, options options, stdout, stderr io.Writer) int {
+	plan := manager.Plan(ctx, repository, options.paths)
+	if plan.HasErrors() {
+		presentation.GitCommitPlanText(stderr, plan)
+		return 1
+	}
+	if plan.ReviewToken != options.expect {
+		fmt.Fprintln(stderr, "The selected files changed after review; create a fresh discard plan.")
+		return 1
+	}
+	if !options.yes {
+		if !presentation.IsInteractive(os.Stdin) {
+			fmt.Fprintln(stderr, "git discard apply requires an interactive terminal or --yes.")
+			return 2
+		}
+		presentation.GitCommitPlanText(stderr, plan)
+		approved, err := presentation.ConfirmWord(os.Stdin, stderr, plan.Confirmation)
+		if err != nil || !approved {
+			fmt.Fprintln(stderr, "Confirmation did not match; nothing was discarded.")
+			return 1
+		}
+	}
+	report := manager.Apply(ctx, repository, options.paths, options.expect)
+	report.Message = operationRecordMessage(report.Message, report)
+	if options.json {
+		_ = presentation.JSON(stdout, report)
+	} else {
+		presentation.GitCommitText(stdout, report)
+	}
+	if report.HasErrors() {
+		return 1
+	}
+	return 0
+}

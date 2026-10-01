@@ -123,6 +123,18 @@ func runGitCommand(ctx context.Context, repository string, options options, stdo
 		if report.HasErrors() {
 			return 1
 		}
+	case "discard-plan":
+		report := app.NewGitDiscardManager(local).Plan(ctx, repository, options.paths)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.GitCommitPlanText(stdout, report)
+		}
+		if report.HasErrors() {
+			return 1
+		}
+	case "discard-apply":
+		return runGitDiscardApply(ctx, app.NewGitDiscardManager(local), repository, options, stdout, stderr)
 	default:
 		return runGitCommitApply(ctx, app.NewGitCommitManager(local), repository, stdout, stderr, options.paths, options.expect, options.yes, options.json)
 	}

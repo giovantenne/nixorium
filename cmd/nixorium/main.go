@@ -451,6 +451,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadGitReview: func(ctx context.Context) domain.GitReviewReport {
 			return gitReviewManager.Review(ctx, repository)
 		},
+		PlanGitDiscard: func(ctx context.Context, paths string) domain.GitCommitPlanReport {
+			return app.NewGitDiscardManager(local).Plan(ctx, repository, paths)
+		},
+		ApplyGitDiscard: func(plan domain.GitCommitPlanReport) domain.GitCommitReport {
+			report := app.NewGitDiscardManager(local).Apply(ctx, repository, strings.Join(plan.Paths, ","), plan.ReviewToken)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
 		PlanGitCommit: func(ctx context.Context, paths string) domain.GitCommitPlanReport {
 			return gitCommitManager.Plan(ctx, repository, paths)
 		},
@@ -820,6 +828,10 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "search"
 		case "plan":
+			if result.command == "git" && result.subcommand == "discard" {
+				result.subcommand = "discard-plan"
+				continue
+			}
 			if result.command == "git" && result.subcommand == "commit" {
 				result.subcommand = "commit-plan"
 				continue
@@ -852,6 +864,10 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "install-secrets"
 		case "apply":
+			if result.command == "git" && result.subcommand == "discard" {
+				result.subcommand = "discard-apply"
+				continue
+			}
 			if result.command == "git" && result.subcommand == "commit" {
 				result.subcommand = "commit-apply"
 				continue
@@ -891,11 +907,11 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("review must follow git")
 			}
 			result.subcommand = "review"
-		case "commit":
+		case "commit", "discard":
 			if result.command != "git" || result.subcommand != "" {
-				return options{}, errors.New("commit must follow git")
+				return options{}, fmt.Errorf("%s must follow git", arguments[index])
 			}
-			result.subcommand = "commit"
+			result.subcommand = arguments[index]
 		case "cache":
 			if result.command != "services" || result.subcommand != "restart" || result.service != "" {
 				return options{}, fmt.Errorf("unexpected argument %q", arguments[index])
@@ -971,7 +987,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply") || result.subcommand == "recover-apply") {
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && (result.subcommand == "commit-apply" || result.subcommand == "discard-apply")) || result.subcommand == "recover-apply") {
 		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
@@ -986,7 +1002,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply") || result.subcommand == "recover-apply") {
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && (result.subcommand == "commit-apply" || result.subcommand == "discard-apply")) || result.subcommand == "recover-apply") {
 		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, or git commit apply")
 	}
 	if result.extension != "" && (result.command != "workspace" || result.subcommand != "marketplace") {
@@ -1159,13 +1175,14 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "logs" && result.subcommand == "show" && result.logID == "" {
 		return options{}, errors.New("logs show requires an operation log ID")
 	}
-	if result.paths != "" && (result.command != "git" || (result.subcommand != "commit-plan" && result.subcommand != "commit-apply")) {
-		return options{}, errors.New("--paths is only valid with git commit plan or git commit apply")
+	gitPaths := result.subcommand == "commit-plan" || result.subcommand == "commit-apply" || result.subcommand == "discard-plan" || result.subcommand == "discard-apply"
+	if result.paths != "" && (result.command != "git" || !gitPaths) {
+		return options{}, errors.New("--paths is only valid with git commit or git discard plan/apply")
 	}
-	if result.command == "git" && result.subcommand != "review" && result.subcommand != "commit-plan" && result.subcommand != "commit-apply" {
-		return options{}, errors.New("git requires review, commit plan, or commit apply")
+	if result.command == "git" && result.subcommand != "review" && !gitPaths {
+		return options{}, errors.New("git requires review, commit plan/apply, or discard plan/apply")
 	}
-	if result.command == "git" && (result.subcommand == "commit-plan" || result.subcommand == "commit-apply") && result.paths == "" {
+	if result.command == "git" && gitPaths && result.paths == "" {
 		return options{}, fmt.Errorf("git %s requires --paths", strings.ReplaceAll(result.subcommand, "-", " "))
 	}
 	if result.command == "deploy" && !recovering && result.on == "" {
@@ -1180,7 +1197,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "controller" && result.subcommand == "apply" && result.expect == "" {
 		return options{}, errors.New("controller apply requires --expect from controller plan")
 	}
-	if result.command == "git" && result.subcommand == "commit-apply" && result.expect == "" {
+	if result.command == "git" && (result.subcommand == "commit-apply" || result.subcommand == "discard-apply") && result.expect == "" {
 		return options{}, errors.New("git commit apply requires --expect from git commit plan")
 	}
 	if result.command == "update" && result.subcommand == "apply" && result.expect == "" {
@@ -1295,7 +1312,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
@@ -1339,6 +1356,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       git review shows bounded staged and unstaged changes without mutating Git")
 	fmt.Fprintln(writer, "       git commit plan --paths <path[,path...]> creates an isolated proposal")
 	fmt.Fprintln(writer, "       git commit apply --paths <paths> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       git discard plan --paths <paths> restores files to the last commit after review")
+	fmt.Fprintln(writer, "       git discard apply --paths <paths> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       update check explicitly queries the configured public upstream")
 	fmt.Fprintln(writer, "       update plan --target <vMAJOR.MINOR.PATCH[-PRERELEASE]>")
 	fmt.Fprintln(writer, "       update apply --target <release> --expect <review-token> [--yes]")

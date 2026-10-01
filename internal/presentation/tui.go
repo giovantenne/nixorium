@@ -68,6 +68,8 @@ type DashboardActions struct {
 	LoadLog                 func(context.Context, string) domain.OperationLogReport
 	LoadGitReview           func(context.Context) domain.GitReviewReport
 	PlanGitCommit           func(context.Context, string) domain.GitCommitPlanReport
+	PlanGitDiscard          func(context.Context, string) domain.GitCommitPlanReport
+	ApplyGitDiscard         func(domain.GitCommitPlanReport) domain.GitCommitReport
 	ApplyGitCommit          func(domain.GitCommitPlanReport) domain.GitCommitReport
 	CheckUpdate             func(context.Context) domain.UpdateCheckReport
 	PlanUpdate              func(context.Context, string, bool, bool) domain.UpdatePlanReport
@@ -236,16 +238,18 @@ type updateModel struct {
 // maintenanceModel owns the read-only service/log/repository views and the
 // optional reviewed local commit state.
 type maintenanceModel struct {
-	services         domain.ServicesReport
-	serviceResult    domain.ServiceActionReport
-	logs             domain.OperationLogsReport
-	logDetail        domain.OperationLogReport
-	logCursor        int
-	logScroll        int
-	gitReview        domain.GitReviewReport
-	gitScroll        int
-	gitCommitCursor  int
-	gitCommitChosen  map[string]bool
+	services        domain.ServicesReport
+	serviceResult   domain.ServiceActionReport
+	logs            domain.OperationLogsReport
+	logDetail       domain.OperationLogReport
+	logCursor       int
+	logScroll       int
+	gitReview       domain.GitReviewReport
+	gitScroll       int
+	gitCommitCursor int
+	gitCommitChosen map[string]bool
+	// gitDiscard switches path selection and review to a reviewed discard.
+	gitDiscard       bool
 	gitCommitPlan    domain.GitCommitPlanReport
 	gitCommitResult  domain.GitCommitReport
 	gitFromWorkspace bool
@@ -1418,6 +1422,13 @@ func (model dashboardModel) gitReviewView() string {
 		if success {
 			title = "Git changes committed locally"
 		}
+		if model.maintenance.gitCommitResult.Operation == "git-discard" {
+			success = !model.maintenance.gitCommitResult.HasErrors()
+			title = "Discard needs attention"
+			if success {
+				title = "Changes discarded; the files match the last saved version"
+			}
+		}
 		returnLabel := backLabel
 		if model.setupMode {
 			returnLabel = "Setup"
@@ -1458,6 +1469,9 @@ func (model dashboardModel) gitReviewView() string {
 	actions := []tuiAction{{key: "↑/↓/Pg", label: "Scroll"}}
 	if len(model.maintenance.gitReview.Changes) > 0 && !model.maintenance.gitReview.HasErrors() {
 		actions = append(actions, tuiAction{key: "c", label: "Select commit paths"})
+		if model.actions.PlanGitDiscard != nil {
+			actions = append(actions, tuiAction{key: "x", label: "Discard changes"})
+		}
 	}
 	actions = append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: backLabel}, tuiAction{key: "F1", label: "Help"})
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
@@ -1465,7 +1479,11 @@ func (model dashboardModel) gitReviewView() string {
 
 func (model dashboardModel) gitCommitSelectView() string {
 	path := []string{"Maintenance", "Changes", "Select paths"}
-	lines := []string{tuiTitle("Select paths for the local commit", model.isDark), ""}
+	title := "Select paths for the local commit"
+	if model.maintenance.gitDiscard {
+		title = "Select files to restore to the last saved version"
+	}
+	lines := []string{tuiTitle(title, model.isDark), ""}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
@@ -1493,6 +1511,10 @@ func (model dashboardModel) gitCommitSelectView() string {
 func (model dashboardModel) gitCommitReviewView() string {
 	path := []string{"Maintenance", "Changes", "Commit review"}
 	lines := []string{tuiTitle("Review local commit", model.isDark), ""}
+	if model.maintenance.gitDiscard {
+		path = []string{"Maintenance", "Changes", "Discard review"}
+		lines = []string{tuiTitle("Review the changes that will be discarded", model.isDark), tuiMuted("They are kept under a private Git reference, shown in the result.", model.isDark), ""}
+	}
 	if model.busy != "" {
 		lines = append(lines, model.busyView())
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "F1", label: "Help"}}})
@@ -1524,7 +1546,7 @@ func (model dashboardModel) gitCommitReviewView() string {
 		body:      strings.Join(lines, "\n"),
 		fixedBody: tuiSection("Type "+model.maintenance.gitCommitPlan.Confirmation+" to continue:", model.isDark) + "\n> " + model.confirmation + "_",
 		notices:   notices,
-		actions:   []tuiAction{{key: "↑/↓/Pg", label: "Scroll diff"}, {key: "Enter", label: "Create commit"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}},
+		actions:   gitReviewActions(model.maintenance.gitDiscard),
 	})
 }
 
@@ -2848,4 +2870,12 @@ func deploymentPlanIssues(report domain.DeploymentPlanReport) string {
 		issues = append(issues, issue.Field+": "+issue.Message)
 	}
 	return strings.Join(issues, "; ")
+}
+
+func gitReviewActions(discard bool) []tuiAction {
+	primary := "Create commit"
+	if discard {
+		primary = "Discard"
+	}
+	return []tuiAction{{key: "↑/↓/Pg", label: "Scroll diff"}, {key: "Enter", label: primary}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 }

@@ -1006,6 +1006,17 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 			model.maintenance.gitCommitChosen = map[string]bool{}
 			model.maintenance.gitCommitCursor = 0
+			model.maintenance.gitDiscard = false
+			model.message = ""
+			model.screen = dashboardGitCommitSelect
+		case "x":
+			if model.actions.PlanGitDiscard == nil || len(model.maintenance.gitReview.Changes) == 0 || model.maintenance.gitReview.HasErrors() {
+				model.message = "A clean, unblocked change review is required before discarding changes."
+				return model, nil
+			}
+			model.maintenance.gitCommitChosen = map[string]bool{}
+			model.maintenance.gitCommitCursor = 0
+			model.maintenance.gitDiscard = true
 			model.message = ""
 			model.screen = dashboardGitCommitSelect
 		}
@@ -1038,8 +1049,13 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			}
 			model.busy = "Building an isolated commit proposal from HEAD"
 			model.message = ""
+			plan := model.actions.PlanGitCommit
+			if model.maintenance.gitDiscard {
+				model.busy = "Reviewing what would be discarded"
+				plan = model.actions.PlanGitDiscard
+			}
 			return model.startRead(func(ctx context.Context) tea.Msg {
-				return dashboardGitCommitPlanMsg{report: model.actions.PlanGitCommit(ctx, paths)}
+				return dashboardGitCommitPlanMsg{report: plan(ctx, paths)}
 			})
 		}
 	case dashboardGitCommitReview:
@@ -1077,15 +1093,20 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 		case "enter":
 			if model.confirmation != model.maintenance.gitCommitPlan.Confirmation {
 				model.confirmation = ""
-				model.message = "Confirmation did not match; no Git commit was created."
+				model.message = "Confirmation did not match; nothing was changed."
 				return model, nil
 			}
 			model.busy = "Revalidating and creating the reviewed local commit"
 			model.confirmation = ""
 			model.message = ""
 			plan := model.maintenance.gitCommitPlan
+			apply := model.actions.ApplyGitCommit
+			if model.maintenance.gitDiscard {
+				model.busy = "Saving the current content and restoring the selected files"
+				apply = model.actions.ApplyGitDiscard
+			}
 			return model, func() tea.Msg {
-				result := model.actions.ApplyGitCommit(plan)
+				result := apply(plan)
 				ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
 				defer cancel()
 				return dashboardGitCommitResultMsg{report: result, review: model.actions.LoadGitReview(ctx)}

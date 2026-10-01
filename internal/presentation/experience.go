@@ -298,7 +298,7 @@ func (model dashboardModel) helpView() string {
 	case dashboardLogs, dashboardLogDetail:
 		lines = append(lines, "Enter open log   r refresh list   ↑/↓/pg scroll detail")
 	case dashboardGitReview, dashboardGitCommitSelect, dashboardGitCommitReview:
-		lines = append(lines, "c select commit paths   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "Exact confirmation creates a local commit; nothing is pushed.")
+		lines = append(lines, "c select commit paths   x discard changes   Space select   a all safe paths", "r refresh review   ↑/↓/pg scroll patch", "COMMIT creates a local commit; DISCARD restores files after saving their content. Nothing is pushed.")
 	case dashboardUpdate, dashboardUpdateReview:
 		lines = append(lines, "During validation: l expands or collapses current check details in place.")
 		if model.updates.packageBase {

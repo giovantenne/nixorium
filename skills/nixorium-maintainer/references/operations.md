@@ -22,7 +22,10 @@ a mixed checkout); never edit or delete their records by hand (ADR 0023).
 `backup create --to DIR` (TUI: Maintenance → Back up the controller) writes an
 age-encrypted file with the repository and its history, the private keys and
 the trusted host keys; `backup verify` checks it and `backup restore --to
-EMPTY-DIR` extracts it for the controller replacement steps (ADR 0024). Never
+EMPTY-DIR` extracts it for the controller replacement steps (ADR 0024).
+A mistaken uncommitted change is undone with `git discard plan|apply --paths`
+(`DISCARD`); the discarded content is kept under
+`refs/nixorium/discard-backups/`. Never
 put the passphrase or an unencrypted key copy in Git or chat.
 
 A refused operation names the running one when the lock holder can be

@@ -493,8 +493,12 @@ git status --short
 
 Inspect every staged, unstaged, and untracked path. Nixorium never discards or
 stashes changes automatically. Commit an intentional safe allowlist with
-`nixorium git commit plan --paths ...` and its reviewed apply command, or resolve
-the worktree manually. Never add `secret-key`, `admin-ssh`,
+`nixorium git commit plan --paths ...` and its reviewed apply command. To undo
+a mistaken change instead, use **Review Git changes → x Discard changes** or
+`nixorium git discard plan --paths ...` and its reviewed apply (`DISCARD`):
+the current content is first saved under
+`refs/nixorium/discard-backups/…`, then the selected files return to the last
+commit. Untracked files, new files and private keys are never touched. Never add `secret-key`, `admin-ssh`,
 `veyon-private-key.pem`, or plaintext credentials.
 
 ## Configuration is invalid

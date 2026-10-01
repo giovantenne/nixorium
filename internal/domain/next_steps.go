@@ -38,7 +38,7 @@ var nextSteps = map[string]NextStep{
 		TUI: "Overview → Interrupted template reset", Command: "nixorium template-reset recover plan",
 	},
 	"GIT-DIRTY": {
-		Code: "GIT-DIRTY", Action: "Save or inspect the uncommitted configuration changes.",
+		Code: "GIT-DIRTY", Action: "Save, inspect or discard the uncommitted configuration changes.",
 		TUI: "Maintenance → Review Git changes", Command: "nixorium git review",
 	},
 	"REVIEW-EXPIRED": {

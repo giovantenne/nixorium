@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -256,4 +257,46 @@ func gitIndexEnvironment(indexPath string) []string {
 
 func runBoundedGitEnvironment(ctx context.Context, repository string, environment []string, limit int, arguments ...string) (string, bool, error) {
 	return runBoundedGitWithEnvironment(ctx, repository, environment, limit, arguments...)
+}
+
+// DiscardGitPaths saves the current content of the selected paths as a
+// commit under refs/nixorium/discard-backups/, then restores them from HEAD
+// in the index and the worktree. HEAD and the reviewed content must not have
+// changed.
+func (local Local) DiscardGitPaths(ctx context.Context, repository string, paths []string, expectedRevision, expectedTree string) (string, error) {
+	revision, err := local.GitRevision(ctx, repository)
+	if err != nil {
+		return "", err
+	}
+	if revision != expectedRevision {
+		return "", errors.New("HEAD changed after review")
+	}
+	proposal, err := local.GitCommitProposal(ctx, repository, paths)
+	if err != nil {
+		return "", fmt.Errorf("revalidate discard proposal: %w", err)
+	}
+	if proposal.TreeID != expectedTree {
+		return "", errors.New("selected path content changed after review")
+	}
+	commit, truncated, err := runBoundedGitInput(ctx, repository, []byte("Changes discarded by Nixorium\n"), 256, "commit-tree", expectedTree, "-p", expectedRevision)
+	if err != nil {
+		return "", fmt.Errorf("save the discarded content: %w", err)
+	}
+	commit = strings.TrimSpace(commit)
+	if truncated || !fullGitObjectIDPattern.MatchString(commit) {
+		return "", errors.New("saved discard commit ID is invalid")
+	}
+	backup := "refs/nixorium/discard-backups/" + time.Now().UTC().Format("20060102T150405.000000000Z")
+	if _, _, err := runBoundedGit(ctx, repository, 16*1024, "update-ref", backup, commit, strings.Repeat("0", 40)); err != nil {
+		return "", fmt.Errorf("record the discard backup: %w", err)
+	}
+	checkout := append([]string{"checkout", expectedRevision, "--"}, paths...)
+	if _, _, err := runBoundedGit(ctx, repository, 16*1024, checkout...); err != nil {
+		return backup, fmt.Errorf("restore the selected paths: %w", err)
+	}
+	verify := append([]string{"diff", "--quiet", "--no-ext-diff", "--no-textconv", expectedRevision, "--"}, paths...)
+	if _, _, err := runBoundedGit(ctx, repository, 16*1024, verify...); err != nil {
+		return backup, errors.New("the selected paths still differ from the last saved version")
+	}
+	return backup, nil
 }

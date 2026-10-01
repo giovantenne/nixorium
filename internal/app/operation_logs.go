@@ -122,6 +122,9 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 		record.State = report.State
 		record.Subject = fmt.Sprintf("%d path(s)", len(report.Paths))
 		record.Summary = fmt.Sprintf("reviewed local commit finished; committed=%t", report.Committed)
+		if report.Operation == "git-discard" {
+			record.Summary = "reviewed discard of uncommitted changes finished; backup " + report.BackupRef
+		}
 	case domain.UpdateApplyReport:
 		record.Operation = report.Operation
 		record.State = report.State

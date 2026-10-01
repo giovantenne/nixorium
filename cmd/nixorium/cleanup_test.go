@@ -46,3 +46,22 @@ func TestRecoveryArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestGitDiscardArguments(t *testing.T) {
+	for _, args := range [][]string{
+		{"git", "discard", "plan", "--paths", "lab-settings.json"},
+		{"git", "discard", "apply", "--paths", "lab-settings.json", "--expect", "sha256:x", "--yes"},
+	} {
+		if _, err := parseArguments(args); err != nil {
+			t.Fatal(args, err)
+		}
+	}
+	for _, args := range [][]string{
+		{"git", "discard"}, {"git", "discard", "plan"},
+		{"git", "discard", "apply", "--paths", "x"},
+	} {
+		if _, err := parseArguments(args); err == nil {
+			t.Fatal("accepted", args)
+		}
+	}
+}

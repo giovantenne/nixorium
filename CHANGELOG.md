@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Undo a mistaken uncommitted change: **Review Git changes → Discard
+  changes** and `nixorium git discard plan|apply` restore the selected files
+  to the last commit after the `DISCARD` confirmation, first keeping their
+  content under `refs/nixorium/discard-backups/`. Untracked files, new files
+  and private keys are never touched.
+
 - Encrypted controller backups (ADR 0024): `nixorium backup create|verify|
   restore` and **Maintenance → Back up the controller** write one
   passphrase-encrypted file with the configuration and its history, the
