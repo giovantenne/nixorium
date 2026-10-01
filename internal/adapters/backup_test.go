@@ -12,13 +12,16 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	repository := workspaceRepository(t)
 	writeGitReviewFile(t, repository, "lab-settings.json", "{\"lab\":{}}\n")
+	local := Local{}
+	if _, due := local.BackupDue(repository); due {
+		t.Fatal("a backup is due before any laboratory key exists")
+	}
 	if err := os.WriteFile(filepath.Join(repository, "secret-key"), []byte("private cache key"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("/nix/store/0000-result", filepath.Join(repository, "result")); err != nil {
 		t.Fatal(err)
 	}
-	local := Local{}
 	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No backup") {
 		t.Fatalf("due = %q %v", reason, due)
 	}

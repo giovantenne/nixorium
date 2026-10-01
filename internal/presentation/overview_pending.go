@@ -72,9 +72,7 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 	if model.report.Git.Dirty {
 		add("pending-git", "Configuration has uncommitted changes", "Last local Git observation; inspect paths before recording anything.")
 	}
-	if model.report.StoreSpaceLow && model.report.StoreFreeBytes != nil {
-		add("pending-disk", "Low Nix store disk space", fmt.Sprintf("%.1f GiB available at the last local check. Open Free disk space to remove old system versions after review.", float64(*model.report.StoreFreeBytes)/(1<<30)))
-	}
+	// Low disk space is shown in Maintenance, next to Free disk space.
 	if (model.pendingRevision != "" && !controllerVerifiedForSave(model.pendingRevision, model.controller.result)) || (model.controller.plan.Operation != "" && !model.controller.plan.HasErrors() && !model.controller.plan.Current && !controllerVerifiedForSave(model.controller.plan.Revision, model.controller.result)) {
 		add("pending-controller", "Saved configuration needs applying to this controller", "Observed in this session. Open a fresh controller review.")
 	}
@@ -168,8 +166,6 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		if model.actions.PlanController != nil {
 			return model.openControllerReview()
 		}
-	case "pending-disk":
-		return model.openCleanup()
 	case "pending-clients":
 		if model.actions.LoadHosts != nil {
 			return model.openComputerTask("h")

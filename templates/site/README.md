@@ -738,7 +738,8 @@ is due. To replace a failed controller, follow
 ### Free disk space
 
 Every application to the controller and every client update adds a system
-version; nothing removes old ones automatically. When a disk fills up, open
+version; nothing removes old ones automatically. Maintenance warns when the
+controller's disk is low. When a disk fills up, open
 **Maintenance → Advanced → Free disk space**, select the computers and review:
 
 ```sh

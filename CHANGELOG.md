@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The Overview no longer asks for a controller backup before the laboratory
+  keys exist, and low disk space is shown in Maintenance beside **Free disk
+  space** instead of among the Overview's pending work.
+
 - The Pi and OpenCode coding agents are now part of the Programming software
   profile only. The other six profiles, including the default Essential, no
   longer install them, and new deployments start without them. Existing

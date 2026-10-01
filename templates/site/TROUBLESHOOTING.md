@@ -603,9 +603,9 @@ key files and the trusted computer keys (`~/.ssh/nixorium-known-hosts`). Build
 results linked into the Nix store are not included. Keep the file and its
 passphrase away from the controller and from each other: without the
 passphrase the backup cannot be read, and anyone with both can manage the
-laboratory. The Overview and `nixorium doctor` remind you when no backup is
-recorded, the last one is older than 30 days, or the private keys or
-laboratory settings changed since it. `--passphrase-file` reads the passphrase
+laboratory. Once the laboratory keys exist, the Overview and `nixorium doctor`
+remind you when no backup is recorded, the last one is older than 30 days, or
+the private keys or laboratory settings changed since it. `--passphrase-file` reads the passphrase
 from a private file for unattended use.
 
 To replace a failed controller: install the new controller from the NixOS

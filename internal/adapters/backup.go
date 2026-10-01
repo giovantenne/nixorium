@@ -434,6 +434,15 @@ func backupPrivateKeys(files []domain.BackupFile) []string {
 	return keys
 }
 
+func hasPrivateDeploymentKeys(repository string) bool {
+	for _, name := range privateDeploymentPaths {
+		if info, err := os.Lstat(filepath.Join(repository, name)); err == nil && info.Mode().IsRegular() {
+			return true
+		}
+	}
+	return false
+}
+
 func backupKeysDigest(repository string) string {
 	digest := sha256.New()
 	for _, name := range privateDeploymentPaths {
@@ -494,6 +503,11 @@ func (Local) LastBackup() (domain.BackupRecord, bool) {
 
 // BackupDue explains why a new backup is advisable, if it is.
 func (local Local) BackupDue(repository string) (string, bool) {
+	// Before the laboratory keys exist there is nothing a replacement
+	// controller would miss: the next step is configuring the lab.
+	if !hasPrivateDeploymentKeys(repository) {
+		return "", false
+	}
 	record, found := local.LastBackup()
 	switch {
 	case !found:

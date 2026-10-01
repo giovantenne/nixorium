@@ -24,14 +24,17 @@ func TestOverviewShowsUnfinishedUSBInstallation(t *testing.T) {
 	}
 }
 
-func TestLowDiskOpensFreeDiskSpace(t *testing.T) {
+func TestLowDiskIsShownInMaintenance(t *testing.T) {
 	free := uint64(1 << 30)
 	model := dashboardModel{report: testDashboardReport("ready"), width: 120, height: 30}
 	model.report.StoreSpaceLow, model.report.StoreFreeBytes = true, &free
 	model.report.Meta.Controller.Name = "pc99"
-	updated, _ := model.openPendingTask("pending-disk")
-	if updated.(dashboardModel).screen != dashboardCleanup {
-		t.Fatalf("low disk opened screen %d", updated.(dashboardModel).screen)
+	if strings.Contains(model.homeView(), "disk space") {
+		t.Fatal("low disk space is listed on the Overview")
+	}
+	model.screen = dashboardAdministration
+	if view := model.administrationView(); !strings.Contains(view, "Low disk space") || !strings.Contains(view, "Free disk space") {
+		t.Fatalf("maintenance view:\n%s", view)
 	}
 }
 

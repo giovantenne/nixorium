@@ -296,10 +296,12 @@ failure or timeout must block publication.
   local setup/Git/service state only, without claiming readiness. Load evaluated
   inventory before client selection; cancelled or failed reads must not resume
   actions or admit stale identities. Keep full operation validation unchanged.
-- Overview pending work uses local Git/service/store-space observations and
+- Overview pending work uses local Git/service observations and
   previously computed session evidence only. Keep client observations dated,
   local refresh free of Nix/client probes, and selectable follow-ups read-only
-  until their ordinary review and confirmation.
+  until their ordinary review and confirmation. Low store space is shown in
+  Maintenance beside Free disk space, not on the Overview. The backup reminder
+  starts only once laboratory private keys exist.
 - Inventory/package discovery must remain independent of host module evaluation.
   Keep workspace prerequisite guards on readiness, validators, configurations,
   Colmena and individual app/package entries; Nix probes package namespaces even

@@ -191,6 +191,9 @@ func (model dashboardModel) administrationView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
+	if model.report.StoreSpaceLow && model.report.StoreFreeBytes != nil {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: fmt.Sprintf("Low disk space: %.1f GiB free at the last check.", float64(*model.report.StoreFreeBytes)/(1<<30)), detail: "Open Free disk space (f) to remove old system versions after review."})
+	}
 	return model.renderShell(tuiShell{
 		path:    []string{"Maintenance"},
 		body:    strings.Join(lines, "\n"),

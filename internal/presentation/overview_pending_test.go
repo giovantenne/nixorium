@@ -28,7 +28,7 @@ func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
 	for _, task := range m.pendingTasks() {
 		seen[task.id] = true
 	}
-	for _, id := range []string{"pending-jobs", "pending-pxe", "pending-git", "pending-disk", "pending-controller", "pending-clients"} {
+	for _, id := range []string{"pending-jobs", "pending-pxe", "pending-git", "pending-controller", "pending-clients"} {
 		if !seen[id] {
 			t.Fatalf("missing %s", id)
 		}
