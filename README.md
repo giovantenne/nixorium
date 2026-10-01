@@ -1,391 +1,194 @@
 # Nixorium
 
-Nixorium installs and manages reproducible NixOS computer labs from a central
-controller.
+Nixorium manages a room of Linux PCs like one machine.
 
-One controller builds system configurations and installs and updates multiple
-client computers over the LAN. Clients run locally and do not need direct
-Internet access for installation or system deployment.
+One PC in the room, the controller, keeps a single description of the lab:
+computers, accounts, software and the student desktop. It installs and updates
+every student PC over the local network, without direct Internet access on the
+students' side. Each PC then starts from its own disk, runs its applications
+locally and returns to a clean desktop at every boot.
 
-[Website](https://nixorium.org/) ·
+[![Nixorium in one minute: the teacher's PC becomes the lab controller and every PC is ready for the next lesson](docs/images/nixorium-explainer.webp)](https://nixorium.org/)
+
+[Website and one-minute video](https://nixorium.org/) ·
 [Documentation](#documentation) ·
 [Contributing](CONTRIBUTING.md) ·
 [Sponsor](https://github.com/sponsors/giovantenne) ·
 [Releases](https://github.com/giovantenne/nixorium/releases)
 
-> [VERSION](VERSION) identifies this checkout. Published versions and their
-> release status are listed on [Releases](https://github.com/giovantenne/nixorium/releases).
-> `master` may contain unreleased changes: consult documentation at your
-> selected release tag.
+> [VERSION](VERSION) identifies this checkout. Published versions are listed on
+> [Releases](https://github.com/giovantenne/nixorium/releases); `master` may
+> contain unreleased changes, so use the documentation of your release tag.
+> Upgrading to 2.1? Read the [2.1.0 notes](CHANGELOG.md#210---2026-10-01) first.
 
-For 2.1 upgrade notes, including network validation and deprecated settings,
-see the [changelog](CHANGELOG.md#210---2026-10-01).
+## Project status
 
-Learn what Nixorium is designed for and how it is used in a lab:
-[nixorium.org](https://nixorium.org/).
+Nixorium has run the Italian school lab where it began, 30 student PCs and a
+controller, for two years, and other labs use it too. The
+[original classroom account](https://nixorium.org/case-study/original-classroom/)
+tells that story. It is open source under the MIT license and maintained by a
+teacher; support happens in
+[GitHub Discussions](https://github.com/giovantenne/nixorium/discussions).
+Each release is validated on virtual machines; physical hardware differs, so
+start with one controller and one client of your own.
 
-## Why this exists
+## What it does
 
-The project began in one Italian school lab with 30 student workstations and
-one controller (31 machines total). Clients had no Internet access until a
-user authenticated to the school network, complicating installation, updates,
-and recovery. Read the [maintainer’s original classroom account](https://nixorium.org/case-study/original-classroom/),
-adapted from his public post
-and replies. It documents the project’s origin, not hardware certification or
-a benchmark of the current software.
+**For teachers**
 
-NixOS provides declarative, reproducible system configurations. Nixorium adds
-the controller-based installation and management workflow needed to use them
-across a lab, including environments where clients cannot reach the Internet
-or only gain access after a user signs in. One private deployment repository
-describes the site; the controller supplies the systems over the local network.
+- Every student PC starts with the same clean desktop and applications at every
+  boot. The last five sessions stay on that PC as snapshots, so a lost file can
+  be recovered from **Snapshots** in the Files sidebar.
+- Veyon is ready with every PC of the room: watch screens, help one student,
+  lock screens or show your own screen.
+- A classroom dashboard on the controller shows which PCs are on, pauses or
+  restores Internet on selected PCs, and shuts them down or restarts them.
+  It cannot change the lab.
 
-## Features
+**For technicians**
 
-- Centralized configuration and deployment to one, selected, or all clients
-  from pinned Nix inputs.
-- Guided installation and reinstallation through PXE or an official NixOS
-  Minimal ISO over reviewed USB/SSH. Both paths bind a configured computer to
-  an eligible disk and require an explicit destructive confirmation.
-- Controller-prepared installation artifacts and a signed local binary cache,
-  so clients can install and receive system updates without Internet access.
-- ProxyDHCP network boot alongside an existing DHCP server, which remains
-  responsible for address leases.
-- A terminal interface and CLI for installation, software selection, settings,
-  controller updates, client deployment and shutdown, diagnostics, and logs.
-- GNOME workstations with Veyon integration; student sessions cannot change
-  NetworkManager state, and their homes reset from a clean template at boot
-  while retaining up to five local home snapshots. Desktop files remain visible
-  and the application dock remains available outside the GNOME overview.
-- Private, deployment-owned software profiles, suggestions, assets, and
-  extension modules, separate from the reusable public framework. Optional
-  profiles can be added as one reviewed declaration batch and then customized
-  through the ordinary software workflow.
-- Independent, reviewed framework and NixOS/package-base updates, including
-  explicitly acknowledged channel migrations. See [the update guide](docs/updates.md)
-  for validation, deployment adoption and recovery.
-- Reviewed operations with progress and failure reporting, plus recorded PXE
-  network state for explicit recovery and recovery at boot.
+- Add software or change the student desktop once, then update one PC, a group
+  or the whole room. Every change is reviewed before it runs.
+- Install PCs from the network, beside the school's existing DHCP server, or
+  from a USB stick. A disk is erased only after an explicit confirmation.
+- Only the controller needs Internet: it serves systems and updates to the PCs
+  from a local, signed cache.
+- Update Nixorium and the system separately, when you choose, and go back to a
+  previous system version if an update causes trouble.
+- When something is interrupted, Nixorium lists it and says what to do next. An
+  encrypted controller backup lets a new controller take over without
+  reinstalling the PCs.
+- Software choices, desktop defaults and local policy live in your own private
+  repository, separate from this framework.
 
-## Before you try it
+Under the hood: NixOS builds every PC from the same description, Colmena
+deploys it, Harmonia serves the cache and Disko lays out the disks.
 
-- **Hardware:** the supported target is `x86_64-linux`. Controller and clients
-  require UEFI. PXE needs working UEFI network boot; USB/SSH needs USB boot and
-  network connectivity over Ethernet or Wi-Fi. Start with a disposable controller
-  and one client, using VMs or dedicated test hardware.
-- **Controller:** bootstrap from the official [NixOS Minimal
-  ISO](https://nixos.org/download/#nixos-iso) in UEFI mode with Internet access.
-  It provides the predictable Linux text console required while choosing the
-  keyboard and entering passwords. Allow storage for the deployment, build
-  outputs, and prepared client systems; requirements depend on the software
-  selected.
-- **Network:** allow controller-to-client SSH and client-to-controller cache
-  traffic over the configured lab network; USB/SSH does not require Ethernet.
-  PXE additionally needs an existing DHCP server and permission to run
-  ProxyDHCP services. Choose a static lab address range that does not conflict
-  with the existing network. Validators reject a controller DHCP address inside
-  the static lab prefix; the TUI previews the planned host addresses.
-  Wi-Fi may not be compatible with PXE: support depends on hardware, firmware,
-  and network configuration. Use USB/SSH when network boot is unavailable.
-- **Internet:** the controller fetches inputs and packages during preparation
-  and updates. Prepared client installations and system deployments use the
-  LAN only; applications and user sessions may have their own Internet needs.
-- **Console access:** keep access to the controller console. Starting PXE
-  temporarily removes its static lab address, and controller activation can
-  restart networking and services.
+## What you need
 
-> **Disk installation is destructive on both controller and clients.** Back up
-> existing data before selecting a target disk; disconnect unrelated disks
-> where practical. Student-home snapshots and NixOS generations are local
-> recovery mechanisms, not backups. Keep an encrypted, separate backup of the
-> private deployment and its private keys; see [backup and restoration
-> guidance](docs/troubleshooting.md#backups-and-restoration).
+Two 64-bit PCs with UEFI that you can erase (or two virtual machines), a USB
+stick with the official [NixOS Minimal ISO](https://nixos.org/download/#nixos-iso),
+Internet on the controller, and a network where the two PCs reach each other.
+Installation erases the disk you confirm on each PC: back up anything you need
+first.
+
+Network installation also needs UEFI network boot on the clients and permission
+to run ProxyDHCP beside the existing DHCP server; Wi-Fi may not support it,
+and USB over SSH works without it. The
+[administrator guide](templates/site/README.md#first-setup) lists the network,
+storage and console requirements in full.
 
 ## Quick start
 
-Check the requirements above before proceeding. For an initial evaluation,
-configure **one client** and verify it before expanding the lab. This is a
-testing recommendation, not a separate mandatory stage in the interface.
+Verify **one client** before preparing the rest of the room. For a disposable
+trial on virtual machines, follow the
+[evaluation environment](docs/evaluation-environment.md).
 
-For a disposable evaluation, use one controller VM and one client VM on an
-isolated segment with DHCP. The installation still erases the selected virtual
-disks. See the [evaluation environment](docs/evaluation-environment.md) for the
-concrete VirtualBox recipe, expected results, and explicit verification status.
+1. **Install the controller.** Boot the NixOS Minimal ISO in UEFI mode with
+   Internet access and run, in its text console:
 
-### 1. Bootstrap the controller from USB
+   ```sh
+   curl -fsSL https://nixorium.org/install.sh | bash
+   ```
 
-Boot the official **NixOS Minimal ISO** in UEFI mode with Internet access. It
-starts in the Linux text console expected by the bootstrap. Then run:
+   The [bootstrap script](install.sh) asks for the keyboard layout first, then
+   the time zone, accounts, passwords, an initial software profile and the
+   disk, which it erases only after you type `ERASE`. Use the Minimal ISO
+   console, not a terminal inside a graphical ISO.
 
-```sh
-curl -fsSL https://nixorium.org/install.sh | bash
-```
+2. **Configure the lab.** Reboot, sign in as `admin` and open **Nixorium** from
+   the dock (or run `nixorium`). In **Installation**, choose **Network boot
+   (PXE)** or **USB over SSH**; the first time, the guided flow asks for the
+   laboratory settings, creates the keys, activates the controller and
+   prepares the clients.
 
-The command downloads and executes the public [bootstrap script](install.sh);
-inspect it first if required by your local policy. Select a published release
-rather than the moving `master` branch. Follow
-the prompts for regional settings, accounts, passwords, the initial software
-profile, and the controller disk. The software choice is reviewed after the
-account settings and before any disk change. Bootstrap installs the complete
-selected profile; individual applications can be changed later from Nixorium.
-Confirm disk erasure only after checking the selected device.
-Keyboard layout is the first controller-setting prompt. The bootstrap applies
-its console keymap immediately, asks for the time zone next, and stops if the
-keymap cannot be activated. This ensures all remaining input, especially
-passwords, uses the same layout that will be active after reboot. Do not run
-the command from a terminal inside the Graphical ISO:
-its compositor layout cannot be verified portably. Switching that image to a
-real Linux TTY may work, but the Minimal ISO is the supported bootstrap path.
+3. **Install the first client.** With network boot, start the client from the
+   network; the installer opens on its screen, asks which configured computer
+   it is and erases the disk after you type `ERASE`. With USB over SSH, boot
+   the client from the Minimal ISO and follow the controller, which checks the
+   client's fingerprint before using any password. Both procedures are in the
+   administrator guide: [network boot](templates/site/README.md#install-computers-with-pxe)
+   and [USB over SSH](templates/site/README.md#install-one-computer-from-usb-over-ssh).
 
-### 2. Configure the laboratory
+4. **Check it, then expand.** Start the client from its disk, try the student
+   session, a reboot and an update from **Computers → Update computers**. Make
+   the first backup from **Maintenance → Back up the controller** and keep it
+   away from the controller. Then install the other PCs.
 
-For an existing deployment whose copied files are obsolete, supporting versions
-offer **Maintenance → Reset deployment template**: a reviewed replacement from
-the already locked upstream, with preset selection, guided home and a local
-backup. It preserves settings, keys and input pins; it does not apply or deploy.
-Read the [reset and recovery guide](docs/deployment-template-reset.md) first.
+## Using Nixorium
 
-Long-running deployments expose private output details with `l` and a reviewed
-**Stop waiting** action. Stopping local supervision does not cancel remote
-activation: uncertain applies retain pending evidence and block conflicting
-operations until [reviewed recovery](docs/troubleshooting.md#interrupted-client-deployment).
-Controller builds also expose managed progress through `l`, including update
-and software-change follow-ups.
+The administrator menu has four areas:
 
-Controller preflight shares one fresh Nix evaluation, and update validation
-builds its required outputs together. PXE preparation evaluates all configured
-clients and shared artifacts once, then builds their resolved derivations together.
-Inventory/package discovery stays light;
-readiness checks and verification still run before and after relevant changes.
-
-After installation, remove the USB, reboot, and sign in as `admin` using the
-password you chose. Open the management interface:
-
-```sh
-nixorium
-```
-
-Choose **Installation → Install computers** and complete **Laboratory
-settings**. The flow validates and saves the settings, generates missing keys,
-activates the controller configuration, and prepares all configured clients.
-It retains the controller's time zone and keyboard settings.
-
-### 3. Choose how to install the first client
-
-For PXE, continue in the guided flow, review the temporary controller network
-change and boot the client with UEFI network boot. The guided installer starts
-by itself on the client's first console (`sudo /installer/setup.sh` starts it
-again). The client console owns identity, disk selection, `ERASE` confirmation,
-and the separate reboot confirmation; a mistyped answer is asked again.
-
-For USB/SSH, boot that client from the official **NixOS 26.05 Minimal ISO** in
-UEFI mode with Ethernet or Wi-Fi connectivity to the controller. For Wi-Fi,
-connect from the live console with `nmtui` before continuing. At that console run:
-
-```sh
-passwd
-systemctl is-active sshd
-ip -4 -br address
-ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-```
-
-Keep the console visible. On the controller choose **USB over SSH**, select the
-configured computer, and enter only the live IPv4 address. Nixorium reads the
-Ed25519 host key without sending credentials and shows its `SHA256:`
-fingerprint; compare the complete value with the physical console and type
-`MATCH`. Only then enter the temporary live-ISO password. Review the reported
-hardware and eligible disks, type the exact confirmation shown, and wait for
-the independent operation to finish. Remove the USB only when the result says
-the install is ready, request the separately confirmed reboot, and verify the
-installed revision after the client starts from disk.
-
-The password is read only from the controlling terminal and is never a root
-password for the installed system. A fingerprint mismatch is rejected before
-password authentication. Legacy BIOS boot, graphical ISOs, arbitrary
-live environments, and unattended USB installation are outside this supported
-path. Installation creates or replaces a machine; later configuration changes
-use the separate reviewed deployment workflow.
-
-The configured client interface must match the live interface carrying its
-reviewed address. Wi-Fi profiles and credentials are not copied from the ISO
-into the installed system: arrange persistent system connectivity separately,
-or reconnect locally as the administrator after boot before verification.
-Keep wireless secrets out of Git and the Nix store. Wireless isolation must
-not block SSH or the controller's signed cache.
-
-On the PXE path, review the network transition when prompted and confirm start;
-existing DHCP continues assigning leases. On either path, keep the generated
-deployment repository private.
-
-### 4. Check the installed client
-
-For PXE, boot the test client over the network. The guided installer starts on
-its first console; to start it again in the downloaded installer environment:
-
-```sh
-/installer/setup.sh
-```
-
-Select that computer's configured identity and target disk. The installer
-console uses the controller's configured keyboard layout and requires explicit
-destructive confirmation before proceeding. For USB/SSH, follow the reviewed
-operation to its verified result. After either installation, boot the client
-from its local disk.
-
-If used, stop PXE from **Installation → PXE mode and network recovery** to
-restore the controller's normal static address. Check login, desktop behavior,
-home reset, and a client deployment before adding more computers.
-
-Continue with the [administrator guide](templates/site/README.md) for normal
-operation and customization. The [hardware validation plan](docs/hardware-validation.md)
-provides deeper firmware, network, and recovery checks beyond this first trial.
-
-## Repository structure
-
-| Area | Responsibility |
+| Area | What it is for |
 |---|---|
-| `flake.nix`, `lib/`, `modules/`, `pkgs/` | Public `lib.mkLab` API, settings validation, generated hosts, NixOS modules, and packaging |
-| `cmd/nixorium/`, `internal/` | Go CLI/TUI, application workflows, domain rules, and system adapters |
-| `install.sh`, `setup.sh`, `scripts/` | Controller bootstrap, client installation, operational helpers, and validation entry points |
-| `templates/site/` | Private deployment template: settings, software catalog and optional profiles, assets, and local policy modules |
-| `docs/` | Architecture decisions, system reference, troubleshooting, and validation guides |
-| `tests/`, `.github/workflows/` | Schema, shell, and VM tests; CI and release automation |
-| `AGENTS.md`, `skills/` | Contributor instructions and separate upstream-development and lab-maintenance agent workflows |
+| **Computers** | Inventory, updating computers, temporary Internet access and power controls |
+| **Installation** | Laboratory settings, network boot and USB over SSH |
+| **Software** | Packages and where they apply (every PC, the controller, all clients, a group or single PCs), search, suggestions and profiles |
+| **Maintenance** | Settings and the student workspace, diagnostics, updates, logs, the controller backup and advanced tools |
 
-## Architecture and security
+Teachers sign in to the controller with their own account and open the
+restricted classroom dashboard from the same **Nixorium** icon.
 
-Nix describes desired system state; the Go application coordinates reviewed
-workflows. Colmena handles client deployment, Harmonia serves the signed local
-cache, and Disko defines disk layouts. The cache remains available during
-normal lab operation; PXE services run on demand.
+## Security
 
-Privileged operations use fixed systemd units and constrained polkit rules,
-not arbitrary root commands from the interface. Firewall openings are scoped
-to the configured lab interface and machine role. Client installation requires
-an exact reviewed confirmation; unattended installation is disabled.
-
-> [!NOTE]
-> Veyon uses native PipeWire/Wayland capture on every laboratory host.
-> The external VNC bridge, shared password and port 5900 have been removed.
-> Clients admit SSH (22) and Veyon (11100) only from the controller's static
-> IPv4 address on the laboratory interface; IPv6 cannot bypass this policy.
-> GNOME requires initial local approval of sharing, including on the
-> controller when broadcasting its screen.
-
-**Computers → Internet access** lets administrators and the teacher temporarily block or restore
-Internet on selected clients. Laboratory access stays available, and reboot
-restores Internet. Offline computers receive no delayed command.
-
-On the controller, running `nixorium` as the configured teacher opens a
-restricted classroom dashboard with computer inventory, temporary Internet
-control, and reviewed shutdown/restart actions. It cannot open the private
-deployment, change configuration, deploy systems, install clients, or maintain
-the controller. Student accounts cannot access this worker or dashboard.
-
-Site settings, password hashes, public keys, and policy belong in the private
-deployment repository. Private SSH, cache-signing, and Veyon keys must stay out
-of Git and the Nix store. Public keys may be committed to the deployment.
-
-See the [management architecture](docs/management-architecture.md) and
-[architecture decisions](docs/adr/) for the trust boundaries, operation state,
-and failure-handling contracts.
+Privileged operations run through fixed system services, never as arbitrary
+commands from the interface. Clients accept SSH and Veyon only from the
+controller's address on the lab network. Installation always needs an explicit
+confirmation; unattended installation is disabled. Private keys stay out of Git
+and the Nix store. See the [management architecture](docs/management-architecture.md)
+and the [security policy](SECURITY.md).
 
 ## Documentation
 
-The website is the product-facing entry point. Repository documents provide
-the versioned operational and contributor references.
+**Run a lab**
 
-| I want to… | Read |
-|---|---|
-| Understand the product and lab use cases | [Website](https://nixorium.org/) |
-| Evaluate one controller, one client, and one change | [Isolated VM recipe](docs/evaluation-environment.md), then [quick start](#quick-start) |
-| Set up and manage a lab | [Administrator guide](templates/site/README.md) |
-| Understand the management interface | [TUI guide and generated renderer gallery](docs/tui-gallery.md) |
-| Diagnose a failure or restore a backup | [Troubleshooting](docs/troubleshooting.md) |
-| Review a client's changed SSH key after deliberate reinstall | [Physical-fingerprint trust recovery](docs/troubleshooting.md#a-client-was-deliberately-reinstalled-and-its-ssh-key-changed) |
-| Preview and export a minimized local diagnostic report | [Support reports](docs/support-report.md) |
-| Customize systems or use `lib.mkLab` | [System and extension reference](docs/system-reference.md) |
-| Measure software-profile closure sizes | [Profile measurement](docs/system-reference.md#measuring-profile-size) |
-| Update the core, NixOS or packages; adopt older deployments | [Update and recovery guide](docs/updates.md) |
-| Understand architecture and security | [Management architecture](docs/management-architecture.md), [ADRs](docs/adr/) |
-| Report a suspected vulnerability | [Security policy](SECURITY.md) |
-| Review operator responsibilities and limitations | [Operational disclaimer](DISCLAIMER.md) |
-| Evaluate firmware and physical hardware | [Hardware validation plan](docs/hardware-validation.md) |
-| Develop and validate changes | [Contributor guide](CONTRIBUTING.md), [agent instructions](AGENTS.md), [development validation](docs/development-validation.md) |
-| Work with a coding agent | [Agent skills](#agent-skills) |
-| Review release changes | [Changelog](CHANGELOG.md), [Releases](https://github.com/giovantenne/nixorium/releases) |
+- [Administrator guide](templates/site/README.md): setup, daily operation and customization
+- [Troubleshooting](docs/troubleshooting.md): failures, recovery and [backups](docs/troubleshooting.md#backups-and-restoration)
+- [Update guide](docs/updates.md): Nixorium, NixOS and package updates
+- [Management interface](docs/tui-gallery.md) and [support reports](docs/support-report.md)
+- [Template reset](docs/deployment-template-reset.md) for an outdated deployment
+- [Operational disclaimer](DISCLAIMER.md) and [hardware validation plan](docs/hardware-validation.md)
+
+**Customize and extend**
+
+- [System and extension reference](docs/system-reference.md): `lib.mkLab`, software profiles and the [student workspace](docs/system-reference.md#workspace-preparation)
+- [Desktop profile](docs/desktop-profile.md)
+- [Management architecture](docs/management-architecture.md) and [decision records](docs/adr/)
+
+**Contribute**
+
+- [Contributor guide](CONTRIBUTING.md), [agent instructions](AGENTS.md) and [development validation](docs/development-validation.md)
+- [Changelog](CHANGELOG.md) and [security policy](SECURITY.md)
 
 ## Agent skills
 
-Nixorium includes skills: task-specific instructions that help coding agents
-work with the project's configuration, validation, and safety rules.
-
-- **Core development:** use
-  [`nixorium-developer`](skills/nixorium-developer/SKILL.md) in this public
-  repository for changes to the NixOS modules, CLI/TUI, installers, API, or
-  tests.
-- **Lab administration:** use
-  [`nixorium-maintainer`](skills/nixorium-maintainer/SKILL.md) in the lab's
-  private deployment repository for settings, software, local modules,
-  troubleshooting, and reviewed installation or update operations. This skill
-  is included in the deployment template; the developer skill is not.
-
-Open your coding agent in the appropriate repository and ask it to use the
-named skill. Discovery links are included for Codex, OpenCode, Claude Code,
-and Pi. For example, an administrator can ask: “Use nixorium-maintainer to add
-Firefox for all computers and validate the configuration without deploying.”
-A contributor can ask: “Use nixorium-developer to improve the installation
-screen and add regression tests.”
-
-Skills guide the agent; they do not replace review or grant permission to
-install, deploy, change live services, commit, or push. Review the proposed
-changes and explicitly authorize the operations you want performed.
-
-## Support the project
-
-If Nixorium helps your school, laboratory, or organization, you can support its
-continued development through [GitHub Sponsors](https://github.com/sponsors/giovantenne).
-Sponsorship helps cover project infrastructure, test hardware, documentation,
-and maintainer time. It does not change the MIT license or grant privileged
-access to security reports, releases, or project decisions.
+Nixorium ships instructions that help coding agents follow its configuration,
+validation and safety rules:
+[`nixorium-maintainer`](skills/nixorium-maintainer/SKILL.md) for a lab's private
+repository (it is also included in the deployment template) and
+[`nixorium-developer`](skills/nixorium-developer/SKILL.md) for this one.
+Discovery links are included for Codex, OpenCode, Claude Code and Pi; for
+example, ask: “Use nixorium-maintainer to add Firefox for all computers and
+validate the configuration without deploying.” Skills guide an agent; they do
+not replace your review or authorize installing, deploying, committing or
+pushing.
 
 ## Development
 
-Work on the public framework here; keep site-specific changes in a private
-deployment. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then read
-[AGENTS.md](AGENTS.md) and the
-[`nixorium-developer` skill](skills/nixorium-developer/SKILL.md) before changing
-the API, modules, installers, or template.
+Work on the public framework here and keep site-specific changes in a private
+repository. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md)
+first.
 
-The [workspace preparation API](docs/system-reference.md#workspace-preparation)
-validates initial student preferences and pinned prerequisites. The template
-includes an active Essential profile: leave it unchanged for the defaults or
-customize it in the editor. There is no separate personalization switch.
-After system application, the next normal boot restores these preferences for
-the student on the controller and clients. Staff preferences remain unchanged.
-The candidate-resolution hook can preview effective settings and destinations
-without saving a profile; it does not build or activate them.
-On supporting pins, [`workspace plan` and `workspace apply`](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
-review and save a candidate JSON with source/pin conflict checks. Saving changes
-only the declaration, not any current home.
-The administrative TUI offers the same reviewed save under **Maintenance →
-Settings → Student workspace**, with guided desktop, dock, VS Code and
-browser fields, including further reviewed VS Code settings by name and value
-and extensions from the package set or, pinned by hash, from the Marketplace.
-Catalog changes and unsupported application settings remain
-explicit deployment edits; no whole-home capture is performed.
-For an existing profile, system/package update reviews also compare pinned
-editor/extension versions and preferences. This does not certify plugin loading
-or mean that only extensions change; see the [update guide](docs/updates.md).
+| Area | Responsibility |
+|---|---|
+| `flake.nix`, `lib/`, `modules/`, `pkgs/` | Public `lib.mkLab` API, settings validation, generated hosts, NixOS modules and packaging |
+| `cmd/`, `internal/` | Go CLI/TUI, workers, application workflows, domain rules and system adapters |
+| `install.sh`, `setup.sh`, `scripts/` | Controller bootstrap, client installation and validation entry points |
+| `templates/site/` | Template for a lab's private repository |
+| `docs/`, `tests/`, `.github/` | References, tests, CI and release automation |
 
-From a checkout with Nix available, run the normal fast validation gate:
-
-```sh
-./scripts/validate.sh --quick
-```
-
-For repeated Go edits, enter the pinned development shell once and reuse its
-incremental test cache:
+Run the fast validation gate with `./scripts/validate.sh --quick`, and add
+`--eval` for Nix API or host-composition changes. For repeated Go edits:
 
 ```sh
 nix --extra-experimental-features 'nix-command flakes' \
@@ -393,16 +196,16 @@ nix --extra-experimental-features 'nix-command flakes' \
 go test ./...
 ```
 
-Use `./scripts/validate.sh --eval` for Nix API or host-composition changes.
-The [validation guide](docs/development-validation.md) defines when targeted
-VM tests or the full release gate are needed. Routine validation builds one
-representative client and the controller when system builds are required, not
-every client in the inventory.
+The [validation guide](docs/development-validation.md) says when VM tests or
+the full release gate are needed.
+
+## Support the project
+
+If Nixorium helps your school or organization, you can support it through
+[GitHub Sponsors](https://github.com/sponsors/giovantenne). Sponsorship covers
+infrastructure, test hardware, documentation and maintainer time; it does not
+change the license or grant privileged access to releases or decisions.
 
 ## License
 
 Released under the [MIT License](LICENSE).
-
-The site template includes a minimal GNOME desktop profile: native Adwaita,
-Yaru-yellow icons, a compact visible dock, Desktop Icons NG and Tiling Assistant.
-Appearance stays deployment-owned; see [desktop defaults](docs/system-reference.md).
