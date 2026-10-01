@@ -89,10 +89,23 @@ jobs:
           free -h
           df -h /nix/store
 
+      # A runner that runs out of resources is shut down without a log; this
+      # record shows memory and the largest processes until the end.
+      - name: Start resource sampler
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The loop expands its own expressions on every sample.
+          # shellcheck disable=SC2016
+          nohup bash -c 'while sleep 20; do
+            echo "== $(date -u +%T)"
+            free -m | sed -n 2,3p
+            ps -eo pid,user,rss,etime,args --sort=-rss | head -8 | cut -c1-220
+          done' > "$RUNNER_TEMP/resources.log" 2>&1 &
+
       - name: Run validation shard
         shell: bash
         env:
-          NIX_CONFIG: print-build-logs = true
           NIXORIUM_FULL_SHARD: ${{ matrix.shard }}
         run: |
           set -euo pipefail
@@ -103,6 +116,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: full-validation-${{ matrix.shard }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/full-validation.log
+          path: |
+            ${{ runner.temp }}/full-validation.log
+            ${{ runner.temp }}/resources.log
           if-no-files-found: ignore
           retention-days: 14

@@ -425,7 +425,8 @@ build_evaluated() {
   local DRV
   DRV=$(nix eval "$1.drvPath" --raw --no-write-lock-file)
   shift
-  nix build "${DRV}^out" "$@"
+  # CI keeps the complete build log, which explains a stalled or killed build.
+  nix build "${DRV}^out" ${CI:+--print-build-logs} "$@"
 }
 
 SITE_NIXORIUM_STORE=$(build_evaluated "path:${SITE_DIR}#nixorium" \
