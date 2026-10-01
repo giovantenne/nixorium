@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The settings review (TUI and `config plan`) says what happens next: apply
+  to the controller, update the computers, prepare network installation again,
+  password changes, and warnings when the change renumbers the laboratory,
+  removes computers or renames accounts.
+
 - Settings that no longer validate (an obsolete field, or a value a newer rule
   rejects) open in **Change settings** with each problem listed instead of
   blocking the editor; the review shows removed fields and saving writes

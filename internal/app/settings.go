@@ -249,6 +249,7 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 		return report, baseData, candidate
 	}
 	report.Changes = withRemovedFields(domain.DiffLabSettings(base, candidate), removed)
+	report.Impacts = domain.SettingsImpacts(base, candidate, report.Changes)
 	if len(report.Changes) == 0 && len(base.Validate()) == 0 {
 		report.State = "unchanged"
 	} else {

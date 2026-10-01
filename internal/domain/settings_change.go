@@ -25,6 +25,7 @@ type ConfigPlanReport struct {
 	BaseFingerprint      string            `json:"baseFingerprint,omitempty"`
 	CandidateFingerprint string            `json:"candidateFingerprint,omitempty"`
 	Changes              []SettingChange   `json:"changes"`
+	Impacts              []SettingImpact   `json:"impacts,omitempty"`
 	Issues               []ValidationIssue `json:"issues"`
 }
 

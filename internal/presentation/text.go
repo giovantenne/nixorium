@@ -740,6 +740,16 @@ func ConfigPlanText(writer io.Writer, report domain.ConfigPlanReport) {
 		fmt.Fprintf(writer, "Base fingerprint:   %s\n", report.BaseFingerprint)
 	}
 	configChangesText(writer, report.Changes, report.Issues)
+	if len(report.Impacts) > 0 {
+		fmt.Fprintln(writer, "What happens next:")
+		for _, impact := range report.Impacts {
+			prefix := "  - "
+			if impact.Warning {
+				prefix = "  ! "
+			}
+			fmt.Fprintln(writer, prefix+impact.Detail)
+		}
+	}
 }
 
 func ConfigApplyText(writer io.Writer, report domain.ConfigApplyReport) {

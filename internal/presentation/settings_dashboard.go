@@ -383,6 +383,16 @@ func (model dashboardModel) settingsReviewView() string {
 		}
 		lines = append(lines, fmt.Sprintf("  %s: %v → %v", settingLabel(change.Field), before, after))
 	}
+	if len(model.settings.plan.Impacts) > 0 {
+		lines = append(lines, "", tuiSection("What happens next", model.isDark))
+		for _, impact := range model.settings.plan.Impacts {
+			if impact.Warning {
+				lines = append(lines, "  "+tuiStatus("Attention: "+impact.Detail, tuiStatusAttention, model.isDark))
+			} else {
+				lines = append(lines, "  • "+impact.Detail)
+			}
+		}
+	}
 	lines = append(lines,
 		"",
 		"Only lab-settings.json will be replaced atomically.",
