@@ -30,6 +30,9 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			add("pending-jobs", managedJobTitle(job.Operation)+" — "+job.State, "View observed progress and its journal. No job will be started.")
 		}
 	}
+	if model.usbReserved {
+		add("pending-usb", "A USB installation is unfinished", "Open it to resume, verify or close it. Other computer operations wait until then.")
+	}
 	switch model.report.PXE.Mode {
 	case "active":
 		add("pending-pxe", "Network installation is active", "Review the installation session before restoring normal networking.")
@@ -54,7 +57,7 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 		add("pending-git", "Configuration has uncommitted changes", "Last local Git observation; inspect paths before recording anything.")
 	}
 	if model.report.StoreSpaceLow && model.report.StoreFreeBytes != nil {
-		add("pending-disk", "Low Nix store disk space", fmt.Sprintf("%.1f GiB available at the last local check. Open diagnostics; nothing is deleted automatically.", float64(*model.report.StoreFreeBytes)/(1<<30)))
+		add("pending-disk", "Low Nix store disk space", fmt.Sprintf("%.1f GiB available at the last local check. Open Free disk space to remove old system versions after review.", float64(*model.report.StoreFreeBytes)/(1<<30)))
 	}
 	if (model.pendingRevision != "" && !controllerVerifiedForSave(model.pendingRevision, model.controller.result)) || (model.controller.plan.Operation != "" && !model.controller.plan.HasErrors() && !model.controller.plan.Current && !controllerVerifiedForSave(model.controller.plan.Revision, model.controller.result)) {
 		add("pending-controller", "Saved configuration needs applying to this controller", "Observed in this session. Open a fresh controller review.")
@@ -69,12 +72,17 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 	return tasks
 }
 
+func (model dashboardModel) usbReservationPresent() bool {
+	return !model.actions.ClassroomMode && model.actions.RemoteReservationPresent != nil && model.actions.RemoteReservationPresent()
+}
+
 func (model dashboardModel) overviewTasks() []dashboardTask {
 	return append(model.pendingTasks(), dashboardTasks...)
 }
 
 type overviewRefreshMsg struct {
-	report domain.StatusReport
+	usbReserved bool
+	report      domain.StatusReport
 	setup  domain.SetupReport
 	err    error
 }
@@ -87,7 +95,7 @@ func (model dashboardModel) refreshOverview() (tea.Model, tea.Cmd) {
 	model.busy = "Refreshing local configuration and service observations"
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		report, setup, err := model.actions.LoadInitial(ctx)
-		return overviewRefreshMsg{report: report, setup: setup, err: err}
+		return overviewRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent()}
 	})
 }
 
@@ -117,6 +125,8 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		model.screen = dashboardManagedJobs
 	case "pending-pxe":
 		return model.openNetworkInstallation()
+	case "pending-usb":
+		return model.openUSBInstallation()
 	case "pending-git":
 		if model.actions.LoadGitReview != nil {
 			return model.openMaintenanceTask("g")
@@ -126,7 +136,7 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 			return model.openControllerReview()
 		}
 	case "pending-disk":
-		return model.startDiagnostics()
+		return model.openCleanup()
 	case "pending-clients":
 		if model.actions.LoadHosts != nil {
 			return model.openComputerTask("h")

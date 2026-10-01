@@ -291,7 +291,7 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 	if err != nil {
 		report = deploymentIssue(report, "git", fmt.Sprintf("inspect worktree: %v", err))
 	} else if gitState.Dirty {
-		report = deploymentIssue(report, "git", fmt.Sprintf("deployment worktree has %d changed path(s)", gitState.Changes))
+		report = deploymentIssue(report, "git", fmt.Sprintf("deployment worktree has %d changed path(s); save or inspect them in Maintenance → Review Git changes (`nixorium git review`)", gitState.Changes))
 	}
 	if revision, revisionErr := m.source.GitRevision(ctx, root); revisionErr != nil {
 		report = deploymentIssue(report, "git", fmt.Sprintf("resolve revision: %v", revisionErr))

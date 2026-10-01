@@ -86,6 +86,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.handleRemoteInstallTick(message)
 	case dashboardInitialMsg:
 		model.jobs.items, model.jobs.err, model.jobs.id = message.jobs, message.jobsErr, message.jobsID
+		model.usbReserved = message.usbReserved
 		poll := model.scheduleManagedJobsTick()
 		model.busy = ""
 		model.initializing = false
@@ -135,6 +136,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		message.report.PXEPreparation = model.report.PXEPreparation
 		message.report.Meta = model.report.Meta
 		model.report, model.setup = message.report, message.setup
+		model.usbReserved = message.usbReserved
 		model.message = "Local observations refreshed; clients were not checked."
 		return model, nil
 	case dashboardDoctorMsg:

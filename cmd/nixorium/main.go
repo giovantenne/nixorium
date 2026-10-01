@@ -78,6 +78,10 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 			if handled, code := tryRunClassroomDashboard(ctx, stderr); handled {
 				return code
 			}
+			if message, teacher := classroomUnavailable(); teacher {
+				fmt.Fprintln(stderr, message)
+				return 1
+			}
 		}
 		if commandRequiresRepository(options) {
 			fmt.Fprintln(stderr, "Error:", resolveErr)
@@ -501,6 +505,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		RemoteInstallRequest: func(request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
 			return dashboardRemoteInstallRequest(ctx, repository, request, nil)
 		},
+		RemoteReservationPresent: local.RemoteReservationPresent,
 		LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation}, nil)
 		},
@@ -1068,8 +1073,9 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("--host must be a canonical pcNN inventory name")
 		}
 		needsID := result.subcommand != "usb-prepare" && result.subcommand != "usb-start"
-		if needsID != (result.operationID != "") {
-			return options{}, errors.New("install usb status/reconcile/reboot/verify/cancel/close require --id; prepare/start do not accept it")
+		// status without --id shows the unfinished operation, if any.
+		if needsID != (result.operationID != "") && !(result.subcommand == "usb-status" && result.operationID == "") {
+			return options{}, errors.New("install usb reconcile/reboot/verify/cancel/close require --id; prepare/start do not accept it")
 		}
 		if result.operationID != "" && !remoteInstallOperationIDPattern.MatchString(result.operationID) {
 			return options{}, errors.New("--id must contain exactly 32 lowercase hexadecimal characters")
@@ -1158,7 +1164,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       workspace apply --file <candidate.json> --expect <review-token> [--yes] saves only the profile JSON")
 	fmt.Fprintln(writer, "       install usb prepare --host <pcNN> builds only pinned target-independent artifacts")
 	fmt.Fprintln(writer, "       install usb start --host <pcNN> interactively verifies the live ISO, disk, and destructive review")
-	fmt.Fprintln(writer, "       install usb {status|reconcile|reboot|verify|cancel|close} --id <operation-id>")
+	fmt.Fprintln(writer, "       install usb status [--id <operation-id>] shows the given or the unfinished operation")
+	fmt.Fprintln(writer, "       install usb {reconcile|reboot|verify|cancel|close} --id <operation-id>")
 	fmt.Fprintln(writer, "       software catalog")
 	fmt.Fprintln(writer, "       software search --query <package-name>")
 	fmt.Fprintln(writer, "       software presets")

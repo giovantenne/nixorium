@@ -91,6 +91,7 @@ func OpenDeploymentOperation() (*DeploymentOperation, error) {
 	if err != nil {
 		return nil, err
 	}
+	gate.describe("Update computers")
 	return openDeploymentOperationWithGate(stateRoot, time.Now(), gate)
 }
 

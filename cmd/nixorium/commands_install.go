@@ -46,6 +46,9 @@ func runInstallCommand(ctx context.Context, repository string, options options, 
 			"usb-status": domain.RemoteInstallStatusOperation, "usb-reconcile": domain.RemoteInstallReconcileOperation,
 			"usb-verify": domain.RemoteInstallVerifyOperation, "usb-cancel": domain.RemoteInstallCancelOperation,
 		}[options.subcommand]
+		if options.subcommand == "usb-status" && options.operationID == "" {
+			operation = domain.RemoteInstallWorkerProbeOperation
+		}
 		response, err := remoteInstallRequest(ctx, domain.RemoteInstallRequest{Operation: operation, OperationID: options.operationID})
 		return renderRemoteInstallResponse(response, err, options.json, stdout, stderr)
 	}

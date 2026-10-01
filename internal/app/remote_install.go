@@ -130,11 +130,8 @@ func (m *RemoteInstallManager) plan(ctx context.Context, preparation domain.Remo
 	}
 	if !alreadyReserved {
 		active, err := m.source.ClientOperationActive()
-		if err != nil {
-			return remotePlanIssue(report, "operation", "inspect controller operation gate: "+err.Error())
-		}
-		if active {
-			return remotePlanIssue(report, "operation", "another controller or client operation is active or reserved")
+		if message, refused := operationRefusal(active, err, "another controller or client operation is active or reserved", "inspect controller operation gate: "); refused {
+			return remotePlanIssue(report, "operation", message)
 		}
 	}
 	if conflict := remotePXEConflict(m.source, ctx); conflict != "" {

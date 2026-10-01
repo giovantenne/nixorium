@@ -116,6 +116,17 @@ compatibility, not a new Nixorium release. Actual evaluation/build failures
 still block. See [UPDATES.md](UPDATES.md) for the complete TUI/CLI journey,
 one-time adoption for older deployments, independent packages and recovery.
 
+## Opening Nixorium
+
+On the controller, the administrator and the teacher open **Nixorium** from
+the application grid, or type `nixorium` in a terminal. The window stays open
+after an error so the message can be read. The administrator's console and SSH
+logins also say whether something waits, such as an interrupted client update
+or an unfinished USB installation. The teacher sees only classroom controls;
+when something blocks them, the screen says whether to try again later or to
+ask the administrator, with a short code explained in the
+[troubleshooting guide](TROUBLESHOOTING.md#codes-shown-to-the-teacher).
+
 ## Native classroom control
 
 Veyon uses PipeWire/Wayland directly on every laboratory computer. Approve the

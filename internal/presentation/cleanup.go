@@ -168,6 +168,10 @@ func (model dashboardModel) updateCleanup(key tea.KeyPressMsg) (tea.Model, tea.C
 		return model, nil
 	case 2:
 		switch key.String() {
+		case "h":
+			if m.result.Unconfirmed > 0 {
+				return model.openComputerTask("h")
+			}
 		case "n":
 			m.stage, m.plan, m.result = 0, domain.CleanupPlanReport{}, domain.CleanupApplyReport{}
 		case "enter", "esc":
@@ -259,7 +263,11 @@ func (model dashboardModel) cleanupView() string {
 		for _, t := range m.result.Targets {
 			lines = append(lines, t.Name+"  "+cleanupOutcomeSummary(t))
 		}
-		shell.actions = []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "n", label: "New review"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "n", label: "New review"}}
+		if m.result.Unconfirmed > 0 {
+			shell.actions = append(shell.actions, tuiAction{key: "h", label: "Check computers"})
+		}
+		shell.actions = append(shell.actions, tuiAction{key: "F1", label: "Help"})
 	default:
 		rows := model.cleanupRows()
 		count := max(1, model.height-17)

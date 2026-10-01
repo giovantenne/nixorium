@@ -23,6 +23,17 @@ func (Local) AcquireClientOperation() (io.Closer, error) {
 	return acquireManagedOperationGate()
 }
 
+// AcquireClientOperationFor takes the shared gate and names the operation for
+// anyone who is refused while it runs.
+func (Local) AcquireClientOperationFor(label string) (io.Closer, error) {
+	gate, err := acquireManagedOperationGate()
+	if err != nil {
+		return nil, err
+	}
+	gate.describe(label)
+	return gate, nil
+}
+
 func (Local) ShutdownObservations(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.ShutdownObservation {
 	tcp := probeSSHStatuses(ctx, hosts, timeout, probeHostSSH)
 	type result struct {

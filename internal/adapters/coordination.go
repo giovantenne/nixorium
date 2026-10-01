@@ -39,10 +39,18 @@ func (gate *operationGate) Close() error {
 		_ = gate.legacy.Close()
 		gate.legacy = nil
 	}
+	clearOperationOwner(gate.file)
 	_ = syscall.Flock(int(gate.file.Fd()), syscall.LOCK_UN)
 	err := gate.file.Close()
 	gate.file = nil
 	return err
+}
+
+// describe names the operation holding the gate for anyone refused by it.
+func (gate *operationGate) describe(label string) {
+	if gate != nil {
+		recordOperationOwner(gate.file, label)
+	}
 }
 
 func acquireManagedOperationGate() (*operationGate, error) {
@@ -133,8 +141,9 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 		return nil, err
 	}
 	if err := syscall.Flock(descriptor, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		busy := operationBusy(lock)
 		lock.Close()
-		return nil, errors.New("another Nixorium controller or client operation is already running")
+		return nil, busy
 	}
 	if err := checkDeploymentPendingAt(directory); err != nil {
 		lock.Close()
@@ -148,6 +157,7 @@ func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate,
 		}
 		return nil, errors.New("a USB installation remains reserved; reconcile or close that operation first")
 	}
+	recordOperationOwner(lock, defaultOperationLabel())
 	return &operationGate{file: lock}, nil
 }
 
@@ -177,7 +187,7 @@ func operationActiveAt(directoryPath string, managed bool) (bool, error) {
 	}
 	if err := syscall.Flock(descriptor, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
-			return true, nil
+			return true, operationBusy(lock)
 		}
 		return false, fmt.Errorf("inspect managed operation lock: %w", err)
 	}
@@ -300,6 +310,19 @@ type remoteReservationRecord struct {
 	TokenDigest   string `json:"tokenDigest"`
 }
 
+// RemoteReservationPresent reports whether an unfinished USB installation
+// still holds the controller reservation. It reads only the coordination
+// directory and never contacts the worker.
+func (Local) RemoteReservationPresent() bool {
+	directory, err := openCoordinationDirectory(managedCoordinationDirectory, true)
+	if err != nil {
+		return false
+	}
+	defer directory.Close()
+	present, _ := inspectReservationAt(directory)
+	return present
+}
+
 func (Local) ReserveRemoteInstall(_ context.Context, plan domain.RemoteInstallPlan, reviewToken string) (domain.RemoteInstallReservation, error) {
 	return reserveRemoteInstallAt(managedCoordinationDirectory, true, plan, reviewToken)
 }
@@ -370,9 +393,11 @@ func acquireRecoveryGateAt(directoryPath string, managed bool) (*operationGate, 
 		return nil, err
 	}
 	if err := syscall.Flock(descriptor, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		busy := operationBusy(lock)
 		lock.Close()
-		return nil, errors.New("another Nixorium controller or client operation is already running")
+		return nil, busy
 	}
+	recordOperationOwner(lock, defaultOperationLabel())
 	gate := &operationGate{file: lock}
 	if err := checkDeploymentPendingAt(directory); err != nil {
 		gate.Close()
@@ -447,6 +472,7 @@ func createRemoteReservationAt(directoryPath string, managed bool, operationID, 
 	if err != nil {
 		return nil, err
 	}
+	gate.describe("USB installation")
 	directory, err := openCoordinationDirectory(directoryPath, managed)
 	if err != nil {
 		gate.Close()

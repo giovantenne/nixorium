@@ -29,6 +29,17 @@ func (Local) LabMeta(ctx context.Context, repository string) (domain.LabMeta, er
 	return meta, err
 }
 
+// LabMetaAtRevision evaluates the identities of one committed revision, so
+// uncommitted edits in the worktree cannot change or break the result.
+func (Local) LabMetaAtRevision(ctx context.Context, repository, revision string) (domain.LabMeta, error) {
+	var meta domain.LabMeta
+	if !validGitRevision(revision) {
+		return meta, errors.New("deployment revision is not a full Git object ID")
+	}
+	err := nixJSONAt(ctx, repository, revision, "labMeta", &meta)
+	return meta, err
+}
+
 func (Local) DeploymentStatus(ctx context.Context, repository string) (domain.DeploymentStatus, error) {
 	var status domain.DeploymentStatus
 	err := nixJSON(ctx, repository, "deploymentStatus", &status)
@@ -496,12 +507,20 @@ func (Local) ControllerBuild(ctx context.Context, repository, controllerName str
 }
 
 func nixJSON(ctx context.Context, repository, attribute string, destination any) error {
+	return nixJSONAt(ctx, repository, "", attribute, destination)
+}
+
+// nixJSONAt evaluates the worktree, or the given committed revision.
+func nixJSONAt(ctx context.Context, repository, revision, attribute string, destination any) error {
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return err
 	}
 	flake, err := deploymentFlakeReference(repository)
 	if err != nil {
 		return err
+	}
+	if revision != "" {
+		flake += "?rev=" + revision
 	}
 	reference := flake + "#" + attribute
 	output, err := runOutput(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", reference, "--json", "--no-write-lock-file")

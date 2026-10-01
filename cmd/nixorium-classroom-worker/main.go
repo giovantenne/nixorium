@@ -77,6 +77,7 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		response.Hosts = &report
 	case domain.ClassroomPowerPlanOperation:
 		plan := worker.power.PlanAction(ctx, worker.repository, request.Requested, request.SessionPolicy, request.PowerAction)
+		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
 		response.PowerPlan = &plan
 	case domain.ClassroomPowerApplyOperation:
 		if request.PowerPlan == nil || request.PowerPlan.Repository != worker.repository {
@@ -86,9 +87,11 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		if err := app.RecordOperationOutcome(worker.records, report); err != nil {
 			report.Message += " The operation finished, but its history record could not be saved."
 		}
+		report.Message, report.Issues = teacherMessage(report.Message), teacherIssues(report.Issues)
 		response.PowerReport = &report
 	case domain.ClassroomInternetPlanOperation:
 		plan := worker.internet.Plan(ctx, worker.repository, request.Requested, request.InternetAction)
+		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
 		response.InternetPlan = &plan
 	case domain.ClassroomInternetApplyOperation:
 		if request.InternetPlan == nil || request.InternetPlan.Repository != worker.repository {
@@ -98,6 +101,7 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		if err := app.RecordOperationOutcome(worker.records, report); err != nil {
 			report.Message += " The operation finished, but its history record could not be saved."
 		}
+		report.Message = teacherMessage(report.Message)
 		response.InternetReport = &report
 	default:
 		return classroomFailure(errors.New("unsupported classroom operation"))
@@ -114,10 +118,6 @@ func classroomStatus(report domain.StatusReport) domain.StatusReport {
 		Meta:          report.Meta,
 		PXE:           report.PXE,
 	}
-}
-
-func classroomFailure(err error) domain.ClassroomResponse {
-	return domain.ClassroomResponse{State: "failed", Message: err.Error()}
 }
 
 func readDeploymentPath(path string) (string, error) {

@@ -34,6 +34,7 @@ func (TemplateReset) ApplyTemplateReset(ctx context.Context, plan domain.Templat
 		return fail(err)
 	}
 	defer gate.Close()
+	gate.describe("Reset deployment template")
 	// These units can continue serving an installation after its initiating TUI
 	// has closed. A template reset must not invalidate that preparation in flight.
 	for _, unit := range []string{"nixorium-pxe.service", "nixorium-pxe-network.service"} {

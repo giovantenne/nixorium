@@ -10,15 +10,13 @@ import (
 
 // metaSource is the part of the local adapter the cache needs.
 type metaSource interface {
-	LabMeta(context.Context, string) (domain.LabMeta, error)
-	GitState(context.Context, string) (domain.GitState, error)
+	LabMetaAtRevision(context.Context, string, string) (domain.LabMeta, error)
 	GitRevision(context.Context, string) (string, error)
 }
 
-// cachedLocal evaluates labMeta once per committed revision. A clean worktree
-// at the same HEAD evaluates to the same identities, so classroom requests
-// reuse the result instead of starting a new Nix evaluation each time. A
-// dirty worktree is always evaluated again.
+// cachedLocal evaluates labMeta of the committed revision (HEAD) once per
+// revision. Uncommitted edits by the administrator therefore never change or
+// break the classroom controls, and repeated requests skip Nix evaluation.
 type cachedLocal struct {
 	adapters.Local
 	meta *metaCache
@@ -43,31 +41,17 @@ func (local cachedLocal) LabMeta(ctx context.Context, repository string) (domain
 func (cache *metaCache) load(ctx context.Context, repository string) (domain.LabMeta, error) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
-	revision := cache.cleanRevision(ctx, repository)
-	if revision != "" && revision == cache.revision {
+	revision, err := cache.source.GitRevision(ctx, repository)
+	if err != nil {
+		return domain.LabMeta{}, err
+	}
+	if revision == cache.revision {
 		return cache.value, nil
 	}
-	meta, err := cache.source.LabMeta(ctx, repository)
+	meta, err := cache.source.LabMetaAtRevision(ctx, repository, revision)
 	if err != nil {
 		return meta, err
 	}
-	// Remember only a revision that was clean before and after evaluation.
-	if revision != "" && cache.cleanRevision(ctx, repository) == revision {
-		cache.revision, cache.value = revision, meta
-	} else {
-		cache.revision = ""
-	}
+	cache.revision, cache.value = revision, meta
 	return meta, nil
-}
-
-func (cache *metaCache) cleanRevision(ctx context.Context, repository string) string {
-	state, err := cache.source.GitState(ctx, repository)
-	if err != nil || !state.Available || state.Dirty {
-		return ""
-	}
-	revision, err := cache.source.GitRevision(ctx, repository)
-	if err != nil {
-		return ""
-	}
-	return revision
 }

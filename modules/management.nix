@@ -42,6 +42,12 @@ let
     exec 9<>"$COORDINATION_LOCK"
     flock -n 9 \
       || fail "another Nixorium controller or client operation is already running"
+    # Describe the holder for refused operations; the flock stays the lock.
+    read -r -a OPERATION_OWNER_STAT < "/proc/$$/stat" || OPERATION_OWNER_STAT=()
+    if [[ ''${#OPERATION_OWNER_STAT[@]} -ge 22 ]]; then
+      TZ=UTC printf '{"operation":"%s","user":"%s","pid":%d,"pidStart":"%s","startedAt":"%(%Y-%m-%dT%H:%M:%SZ)T"}\n' \
+        "''${0##*/}" "''${USER:-root}" "$$" "''${OPERATION_OWNER_STAT[21]}" -1 > "$COORDINATION_LOCK" || true
+    fi
     check_usb_reservation
     LEGACY_LOCK=/home/admin/.local/state/nixorium/operations/deploy.lock
     if [[ -e "$LEGACY_LOCK" || -L "$LEGACY_LOCK" ]]; then
@@ -653,6 +659,45 @@ let
     '';
   };
 
+  # Opened from the desktop: runs Nixorium in a terminal and keeps the window
+  # open after an error so the message can be read.
+  nixoriumSession = pkgs.writeShellApplication {
+    name = "nixorium-session";
+    runtimeInputs = [ pkgs.coreutils nixoriumPackage ];
+    text = ''
+      GROUPS_OF_USER=" $(id -nG) "
+      if [[ "$GROUPS_OF_USER" != *" nixorium-operations "* && "$GROUPS_OF_USER" != *" nixorium-classroom "* ]]; then
+        echo "Nixorium is for the laboratory administrator and the teacher."
+        read -r -p "Press Enter to close. " _ || true
+        exit 0
+      fi
+      if ! nixorium "$@"; then
+        echo
+        read -r -p "Nixorium stopped with an error. Press Enter to close. " _ || true
+      fi
+    '';
+  };
+  nixoriumOpen = pkgs.writeShellApplication {
+    name = "nixorium-open";
+    text = ''
+      SESSION=${nixoriumSession}/bin/nixorium-session
+      if command -v ghostty >/dev/null; then exec ghostty -e "$SESSION"; fi
+      if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi
+      if command -v gnome-terminal >/dev/null; then exec gnome-terminal -- "$SESSION"; fi
+      if command -v xterm >/dev/null; then exec xterm -e "$SESSION"; fi
+      echo "No terminal application is installed; open a terminal and run: nixorium" >&2
+      exit 1
+    '';
+  };
+  nixoriumLauncher = pkgs.makeDesktopItem {
+    name = "nixorium";
+    desktopName = "Nixorium";
+    comment = "Manage the laboratory and the classroom computers";
+    exec = "${nixoriumOpen}/bin/nixorium-open";
+    icon = "applications-system";
+    categories = [ "System" "Settings" ];
+  };
+
   # Remove this controller's old system generations reviewed under the
   # digest in the unit instance; the helper refuses when the set changed.
   cleanControllerGenerations = pkgs.writeShellApplication {
@@ -698,9 +743,25 @@ in
 
     environment.systemPackages = [
       nixoriumPackage
+      nixoriumLauncher
       pkgs.colmena
       pkgs.git
     ];
+
+    # Console and SSH logins of the administrator say how to start and what
+    # waits. Only file presence is checked: no evaluation, no network.
+    programs.bash.loginShellInit = ''
+      if [[ $- == *i* && "''${USER:-}" == admin && -t 1 ]]; then
+        echo "Nixorium: manage the laboratory with 'nixorium' (or the Nixorium icon)."
+        [[ -e /var/lib/nixorium/coordination/deployment-pending.json ]] \
+          && echo "  Attention: an interrupted client update blocks other operations. Open nixorium."
+        [[ -e /var/lib/nixorium/coordination/usb-reservation.json ]] \
+          && echo "  Attention: a USB installation is unfinished. Open nixorium → Installation."
+        [[ -e ${lib.escapeShellArg cfg.deploymentPath}/.git/nixorium-template-reset.json ]] \
+          && echo "  Attention: a deployment template reset was interrupted. See the troubleshooting guide."
+        true
+      fi
+    '';
 
     security.polkit.enable = true;
     security.polkit.extraConfig = ''

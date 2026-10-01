@@ -149,6 +149,10 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 }
 
 func (model dashboardModel) updateShutdown(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// An unconfirmed request is followed by a fresh look at the computers.
+	if model.screen == dashboardShutdownResult && key.String() == "h" && model.shutdown.result.Unconfirmed > 0 {
+		return model.openComputerTask("h")
+	}
 	if model.screen == dashboardShutdown {
 		switch key.String() {
 		case "r":
@@ -266,6 +270,9 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 	case dashboardShutdownResult:
 		shell.body = strings.Join(model.resultView(context), "\n")
 		shell.actions = []tuiAction{{key: "n", label: "New review"}}
+		if model.result.Unconfirmed > 0 {
+			shell.actions = append(shell.actions, tuiAction{key: "h", label: "Check computers"})
+		}
 		if context.historyAvailable {
 			shell.actions = append(shell.actions, tuiAction{key: "l", label: "History"})
 		}

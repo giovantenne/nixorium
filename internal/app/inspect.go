@@ -312,11 +312,11 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 
 	for _, service := range status.Services {
 		if !service.Loaded {
-			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is not installed", Remediation: "Install the managed-service controller module when it becomes available."})
+			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is not installed", Remediation: "Apply the saved configuration to this controller (Maintenance → Apply to controller, or `nixorium controller apply`)."})
 		} else if service.Name == PXEListenerUnit || service.Name == PXENetworkUnit {
 			continue
 		} else if !service.Active {
-			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is inactive", Evidence: service.State})
+			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is inactive", Evidence: service.State, Remediation: "Open Maintenance → Controller services (`nixorium services`); restart the binary cache there, or read `journalctl -u " + service.Name + "` for the cause."})
 		} else {
 			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelOK, Summary: service.Name + " is active"})
 		}
@@ -338,7 +338,7 @@ func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusRe
 
 	if free, freeErr := i.source.FreeBytes(status.Repository); freeErr == nil {
 		if free < minimumFreeBytes {
-			add(domain.Finding{ID: "DISK-FREE", Level: domain.LevelWarning, Summary: "Available disk space may be too low for Nix builds", Evidence: formatGiB(free), Remediation: "Free Nix store or filesystem space before building all clients."})
+			add(domain.Finding{ID: "DISK-FREE", Level: domain.LevelWarning, Summary: "Available disk space may be too low for Nix builds", Evidence: formatGiB(free), Remediation: "Remove old system versions with Maintenance → Free disk space (`nixorium cleanup plan --on controller`) before building all clients."})
 		} else {
 			add(domain.Finding{ID: "DISK-FREE", Level: domain.LevelOK, Summary: "Disk has at least 10 GiB available", Evidence: formatGiB(free)})
 		}

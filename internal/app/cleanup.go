@@ -68,11 +68,8 @@ func (m *CleanupManager) Plan(ctx context.Context, repository, requested string)
 		return report
 	}
 	active, err := m.source.ClientOperationActive()
-	if err != nil {
-		return cleanupPlanIssue(report, "operation", "inspect active operations: "+err.Error())
-	}
-	if active {
-		return cleanupPlanIssue(report, "operation", "another Nixorium operation is running; wait for it to finish")
+	if message, refused := operationRefusal(active, err, "another Nixorium operation is running; wait for it to finish", "inspect active operations: "); refused {
+		return cleanupPlanIssue(report, "operation", message)
 	}
 	if conflict := cleanupPXEConflict(m.source, ctx); conflict != "" {
 		return cleanupPlanIssue(report, "installation", conflict)
@@ -164,7 +161,7 @@ func (m *CleanupManager) Apply(ctx context.Context, plan domain.CleanupPlanRepor
 		}
 	}
 	if len(clients) > 0 {
-		lease, err := m.source.AcquireClientOperation()
+		lease, err := acquireOperation(m.source, "Free disk space")
 		if err != nil {
 			for _, host := range clients {
 				outcomes[host.Name] = domain.CleanupTargetOutcome{Name: host.Name, State: "not-sent", Detail: "another Nixorium operation is running", TechnicalDetail: err.Error()}

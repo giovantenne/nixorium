@@ -83,7 +83,7 @@ func (m *ControllerManager) Plan(ctx context.Context, repository string) domain.
 	if err != nil {
 		report = controllerIssue(report, "git", fmt.Sprintf("inspect worktree: %v", err))
 	} else if gitState.Dirty {
-		report = controllerIssue(report, "git", fmt.Sprintf("deployment worktree has %d changed path(s)", gitState.Changes))
+		report = controllerIssue(report, "git", fmt.Sprintf("deployment worktree has %d changed path(s); save or inspect them in Maintenance → Review Git changes (`nixorium git review`)", gitState.Changes))
 	}
 	if revision, revisionErr := m.source.GitRevision(ctx, root); revisionErr != nil {
 		report = controllerIssue(report, "git", fmt.Sprintf("resolve revision: %v", revisionErr))

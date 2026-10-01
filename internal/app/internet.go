@@ -55,10 +55,10 @@ func (m *InternetManager) Plan(ctx context.Context, repository, requested string
 	}
 	p.Requested = normalized
 	active, err := m.source.ClientOperationActive()
-	if err != nil {
-		return fail(err.Error())
+	if message, refused := operationRefusal(active, err, "Another client operation or network installation is active; finish it first.", ""); refused {
+		return fail(message)
 	}
-	if active || m.conflict(ctx) {
+	if m.conflict(ctx) {
 		return fail("Another client operation or network installation is active; finish it first.")
 	}
 	eligible := 0
@@ -88,7 +88,7 @@ func (m *InternetManager) Apply(ctx context.Context, p domain.InternetPlan, toke
 	if p.HasErrors() || !p.Action.Valid() || token == "" || token != p.ReviewToken || token != domain.InternetReviewToken(p) || !m.now().Before(p.ExpiresAt) {
 		return fail("Review expired or changed; create a fresh plan.")
 	}
-	lease, err := m.source.AcquireClientOperation()
+	lease, err := acquireOperation(m.source, "Internet access")
 	if err != nil {
 		return fail(err.Error())
 	}

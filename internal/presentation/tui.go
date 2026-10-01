@@ -97,6 +97,9 @@ type DashboardActions struct {
 	BootstrapRemoteInstall func(string, string, string, []byte) (domain.RemoteInstallResponse, error)
 	RemoteInstallRequest   func(domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error)
 	LoadRemoteInstall      func(context.Context) (domain.RemoteInstallResponse, error)
+	// RemoteReservationPresent reports, without starting the worker, whether
+	// a USB installation still holds the controller reservation.
+	RemoteReservationPresent func() bool
 }
 
 type dashboardScreen int
@@ -364,6 +367,9 @@ type dashboardModel struct {
 	inventory    inventoryLoad
 	initializing bool
 	initialError bool
+	// usbReserved is the last local observation of an unfinished USB
+	// installation; the worker is consulted only when it is opened.
+	usbReserved bool
 }
 
 type dashboardStatusMsg struct {
@@ -372,7 +378,8 @@ type dashboardStatusMsg struct {
 }
 
 type dashboardInitialMsg struct {
-	jobs    []domain.ManagedJob
+	usbReserved bool
+	jobs        []domain.ManagedJob
 	jobsErr error
 	jobsID  uint64
 	report  domain.StatusReport
@@ -987,7 +994,7 @@ func (model dashboardModel) loadInitial() (tea.Model, tea.Cmd) {
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		jobs, jobsErr := model.observeManagedJobs(ctx)
 		report, setup, err := model.actions.LoadInitial(ctx)
-		return dashboardInitialMsg{report: report, setup: setup, err: err, jobs: jobs, jobsErr: jobsErr, jobsID: model.jobs.id}
+		return dashboardInitialMsg{report: report, setup: setup, err: err, jobs: jobs, jobsErr: jobsErr, jobsID: model.jobs.id, usbReserved: model.usbReservationPresent()}
 	})
 }
 

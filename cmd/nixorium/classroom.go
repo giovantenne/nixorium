@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -106,7 +107,40 @@ func classroomRequest(ctx context.Context, operation domain.ClassroomOperation, 
 	if configure != nil {
 		configure(&request)
 	}
-	return adapters.ClassroomIPCRequest(ctx, adapters.ClassroomSocketPath, request)
+	response, err := adapters.ClassroomIPCRequest(ctx, adapters.ClassroomSocketPath, request)
+	if err != nil && response.State != "failed" {
+		// The worker already words its own failures for the teacher.
+		return response, errClassroomService
+	}
+	return response, err
+}
+
+var errClassroomService = errors.New("the classroom service is not answering. Ask the administrator to check nixorium-classroom.service. Code: CLASSROOM-SERVICE")
+
+// classroomUnavailable explains a missing classroom service to a teacher
+// instead of an administrator's repository error.
+func classroomUnavailable() (string, bool) {
+	current, err := user.Current()
+	if err != nil {
+		return "", false
+	}
+	groups, err := current.GroupIds()
+	if err != nil {
+		return "", false
+	}
+	classroom, operations := false, false
+	for _, id := range groups {
+		group, lookupErr := user.LookupGroupId(id)
+		if lookupErr != nil {
+			continue
+		}
+		classroom = classroom || group.Name == "nixorium-classroom"
+		operations = operations || group.Name == "nixorium-operations"
+	}
+	if !classroom || operations {
+		return "", false
+	}
+	return "Classroom controls are not available right now: the classroom service is not running. Ask the administrator to check nixorium-classroom.service. Code: CLASSROOM-SERVICE", true
 }
 
 func classroomSetupReport() domain.SetupReport {

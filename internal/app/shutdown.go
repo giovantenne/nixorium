@@ -74,11 +74,8 @@ func (m *ShutdownManager) PlanAction(ctx context.Context, repository, requested 
 		return report
 	}
 	active, err := m.source.ClientOperationActive()
-	if err != nil {
-		return shutdownPlanIssue(report, "operation", "inspect active client operations: "+err.Error())
-	}
-	if active {
-		return shutdownPlanIssue(report, "operation", "another client deployment or shutdown is already running")
+	if message, refused := operationRefusal(active, err, "another client deployment or shutdown is already running", "inspect active client operations: "); refused {
+		return shutdownPlanIssue(report, "operation", message)
 	}
 	if conflict := shutdownPXEConflict(m.source, ctx); conflict != "" {
 		return shutdownPlanIssue(report, "installation", conflict)
@@ -118,7 +115,11 @@ func (m *ShutdownManager) ApplyPlan(ctx context.Context, plan domain.ShutdownPla
 		report.Message = "Shutdown was not started because computer and session observations are stale."
 		return report
 	}
-	lease, err := m.source.AcquireClientOperation()
+	label := "Shut down computers"
+	if plan.Action == domain.ClientRestart {
+		label = "Restart computers"
+	}
+	lease, err := acquireOperation(m.source, label)
 	if err != nil {
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "operation", Message: err.Error()})
 		report.Message = "Shutdown was not started because another client operation is running."

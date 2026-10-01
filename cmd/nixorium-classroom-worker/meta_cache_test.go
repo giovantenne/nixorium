@@ -9,31 +9,26 @@ import (
 )
 
 type fakeMetaSource struct {
-	evaluations int
+	evaluations []string
 	revision    string
-	dirty       bool
 	fail        bool
 }
 
-func (source *fakeMetaSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
-	source.evaluations++
+func (source *fakeMetaSource) LabMetaAtRevision(_ context.Context, _ string, revision string) (domain.LabMeta, error) {
+	source.evaluations = append(source.evaluations, revision)
 	if source.fail {
 		return domain.LabMeta{}, errors.New("evaluation failed")
 	}
 	meta := domain.LabMeta{}
-	meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01-" + source.revision}}
+	meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01-" + revision}}
 	return meta, nil
-}
-
-func (source *fakeMetaSource) GitState(context.Context, string) (domain.GitState, error) {
-	return domain.GitState{Available: true, Dirty: source.dirty}, nil
 }
 
 func (source *fakeMetaSource) GitRevision(context.Context, string) (string, error) {
 	return source.revision, nil
 }
 
-func TestMetaCacheReusesOnlyACleanUnchangedRevision(t *testing.T) {
+func TestMetaCacheEvaluatesEachCommittedRevisionOnce(t *testing.T) {
 	source := &fakeMetaSource{revision: "a"}
 	cache := &metaCache{source: source}
 	load := func() string {
@@ -44,21 +39,19 @@ func TestMetaCacheReusesOnlyACleanUnchangedRevision(t *testing.T) {
 		return meta.Clients.Hosts[0].Name
 	}
 	load()
-	if load() != "pc01-a" || source.evaluations != 1 {
-		t.Fatalf("clean revision evaluated %d times", source.evaluations)
+	if load() != "pc01-a" || len(source.evaluations) != 1 {
+		t.Fatalf("revision evaluated %v", source.evaluations)
 	}
 	source.revision = "b"
-	if load() != "pc01-b" || source.evaluations != 2 {
-		t.Fatalf("new revision not evaluated: %d", source.evaluations)
+	if load() != "pc01-b" || len(source.evaluations) != 2 || source.evaluations[1] != "b" {
+		t.Fatalf("new revision not evaluated at HEAD: %v", source.evaluations)
 	}
-	source.dirty = true
-	load()
-	load()
-	if source.evaluations != 4 {
-		t.Fatalf("dirty worktree reused a cached evaluation: %d", source.evaluations)
-	}
-	source.dirty, source.fail = false, true
+	source.revision, source.fail = "c", true
 	if _, err := cache.load(context.Background(), "/srv/lab"); err == nil {
 		t.Fatal("failed evaluation was hidden by the cache")
+	}
+	source.fail = false
+	if load() != "pc01-c" {
+		t.Fatal("a failed evaluation was cached")
 	}
 }

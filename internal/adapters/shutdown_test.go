@@ -21,7 +21,8 @@ func TestClientOperationLockConflictsWithDeploymentLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if active, err := operationActiveAt(coordinationDirectory, false); err != nil || !active {
+	// A busy gate explains its holder through the returned error.
+	if active, err := operationActiveAt(coordinationDirectory, false); !active || err == nil || !strings.HasPrefix(err.Error(), OperationBusyMessage) {
 		t.Fatalf("active=%t error=%v", active, err)
 	}
 	if _, err := openDeploymentOperation(stateRoot, time.Now()); err == nil {

@@ -215,9 +215,13 @@ broader target lookup reported the live ISO root filesystem.
 
 ## A USB installation was interrupted
 
-First inspect the exact operation without starting another install:
+The Overview lists an unfinished USB installation when the dashboard opens;
+open that row or **Installation → USB over SSH** to continue. From the CLI,
+`nixorium install usb status` without `--id` shows the unfinished operation and
+its ID. Then inspect the exact operation without starting another install:
 
 ```sh
+nixorium install usb status
 nixorium install usb status --id 0123456789abcdef0123456789abcdef --json
 nixorium install usb reconcile --id 0123456789abcdef0123456789abcdef
 ```
@@ -288,6 +292,33 @@ Current controller activation preserves the standard `~/.ssh/known_hosts`
 path as a link into the dedicated `~/.ssh/nixorium-known-hosts` directory.
 Migration refuses conflicting files, and a retry never overwrites a differing
 known-hosts backup; retain those files for investigation.
+
+## Another operation is already running
+
+A refused operation names the running one when it can be confirmed, for
+example `another Nixorium controller or client operation is already running:
+Update computers, started by admin at 10:02`. Wait for it, or open its
+progress from the Overview. The description is read from the lock file and
+checked against the live process; it is never a reason to remove the lock.
+Without a confirmed holder the message says so; do not delete
+`/var/lib/nixorium/coordination/operation.lock`.
+
+## Codes shown to the teacher
+
+Classroom controls replace administrative detail with a short code. The
+technical cause stays in `journalctl -u nixorium-classroom.service`.
+
+| Code | Meaning | What the administrator does |
+|---|---|---|
+| `OP-BUSY` | Another Nixorium operation is running | Let it finish; see [Another operation is already running](#another-operation-is-already-running) |
+| `DEPLOY-PENDING` | An interrupted client update blocks operations | Follow [Interrupted client deployment](#interrupted-client-deployment) |
+| `USB-RESERVED` | A USB installation is unfinished | Finish, verify or close it ([A USB installation was interrupted](#a-usb-installation-was-interrupted)) |
+| `PXE-ACTIVE` | Network installation is running or needs recovery | Finish installation or run `nixorium pxe recover` |
+| `CLASSROOM-LOAD` | The classroom service could not read the committed configuration | Read the service journal; fix and commit the configuration |
+| `CLASSROOM-SERVICE` | The classroom service is not running or not answering | `systemctl status nixorium-classroom.service`; apply the controller configuration if it is missing |
+
+Classroom controls read the last **committed** configuration, so uncommitted
+edits in the deployment repository do not affect them until they are saved.
 
 ## One client is offline or unknown
 

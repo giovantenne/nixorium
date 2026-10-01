@@ -370,7 +370,7 @@ func TestParseArgumentsRejectsUnsafeUSBInstallShortcuts(t *testing.T) {
 		{"install", "usb", "prepare", "--host", "../../pc01"},
 		{"install", "usb", "start", "--host", "pc01", "--json"},
 		{"install", "usb", "start", "--host", "pc01", "--yes"},
-		{"install", "usb", "status"},
+		{"install", "usb", "reconcile"},
 		{"install", "usb", "status", "--id", "../state"},
 		{"install", "usb", "reboot", "--id", id, "--json"},
 		{"install", "usb", "close", "--id", id, "--json"},
@@ -380,6 +380,13 @@ func TestParseArgumentsRejectsUnsafeUSBInstallShortcuts(t *testing.T) {
 		if _, err := parseArguments(arguments); err == nil {
 			t.Fatalf("unsafe or incomplete USB installation arguments were accepted: %v", arguments)
 		}
+	}
+}
+
+func TestInstallUSBStatusFindsTheUnfinishedOperation(t *testing.T) {
+	options, err := parseArguments([]string{"install", "usb", "status"})
+	if err != nil || options.subcommand != "usb-status" || options.operationID != "" {
+		t.Fatalf("status without --id = %+v, %v", options, err)
 	}
 }
 

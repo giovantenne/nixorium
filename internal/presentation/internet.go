@@ -68,6 +68,9 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 		return model, nil
 	}
 	if m.stage == 2 {
+		if key.String() == "h" && internetUnconfirmed(m.result) {
+			return model.openComputerTask("h")
+		}
 		if key.String() == "n" {
 			m.stage = 0
 			m.plan = domain.InternetPlan{}
@@ -158,6 +161,15 @@ func (model dashboardModel) updateInternet(key tea.KeyPressMsg) (tea.Model, tea.
 	}
 	return model, nil
 }
+func internetUnconfirmed(report domain.InternetReport) bool {
+	for _, target := range report.Targets {
+		if target.State == "unconfirmed" {
+			return true
+		}
+	}
+	return false
+}
+
 func (model dashboardModel) internetView() string {
 	m := model.internet
 	shell := tuiShell{path: []string{"Computers", "Internet access"}}
@@ -186,7 +198,11 @@ func (model dashboardModel) internetView() string {
 		for _, t := range m.result.Targets {
 			lines = append(lines, t.Name+"  "+internetStateWords(t.State), t.Detail)
 		}
-		shell.actions = []tuiAction{{key: "n", label: "New review"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
+		shell.actions = []tuiAction{{key: "n", label: "New review"}}
+		if internetUnconfirmed(m.result) {
+			shell.actions = append(shell.actions, tuiAction{key: "h", label: "Check computers"})
+		}
+		shell.actions = append(shell.actions, tuiAction{key: "Enter", label: "Computers"}, tuiAction{key: "F1", label: "Help"})
 	default:
 		lines = append(lines, "Action: "+string(m.action)+" Internet", tuiMuted(observationHeading(m.observedAt), model.isDark), "")
 		hosts := model.report.Meta.Clients.Hosts

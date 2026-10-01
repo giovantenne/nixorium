@@ -149,7 +149,7 @@ func (m HostTrustManager) Apply(ctx context.Context, plan domain.HostTrustPlan, 
 		r.Message = "Host-key review is invalid or expired; create a fresh plan."
 		return r
 	}
-	gate, err := m.source.AcquireClientOperation()
+	gate, err := acquireOperation(m.source, "Host key review")
 	if err != nil {
 		r.Message = err.Error()
 		return r

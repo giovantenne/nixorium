@@ -6,6 +6,29 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- A refused operation says what is running, who started it and when, for
+  example "Update computers, started by admin at 10:02". The holder records
+  itself in the operation lock; an unconfirmed record is ignored.
+
+- Teachers no longer see administrative errors: classroom controls say whether
+  to try again later or to ask the administrator, with a short code explained
+  in the troubleshooting guide. When the classroom service is down, `nixorium`
+  says so instead of reporting a missing deployment repository. Classroom
+  controls read the last committed configuration, so uncommitted edits cannot
+  break them.
+
+- The Overview lists an unfinished USB installation when the dashboard opens,
+  and `nixorium install usb status` without `--id` shows it.
+
+- A **Nixorium** launcher on the controller opens the dashboard for the
+  administrator and the teacher and keeps the window open after an error. The
+  administrator's console and SSH logins mention waiting recovery work.
+
+- Low disk space on the Overview opens **Free disk space**; doctor remedies
+  name the screen and command to use; a dirty Git tree points to **Review Git
+  changes**; unconfirmed power, Internet and cleanup results offer **Check
+  computers**.
+
 - Free disk space after review: Maintenance → Advanced → **Free disk space**
   (`nixorium cleanup plan|apply`) removes old system versions on the controller
   and selected clients. Each computer keeps its newest 10 versions plus the

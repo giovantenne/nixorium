@@ -9,6 +9,14 @@ show the time of the last session observation, not live state. Refresh local
 state updates only saved configuration and local observations; open inventory
 to check clients. An empty list is not evidence that the fleet is current.
 
+A refused operation names the running one when the lock holder can be
+confirmed ("Update computers, started by admin at 10:02"); never remove the
+lock. The Overview lists an unfinished USB installation; `nixorium install usb
+status` without `--id` shows it. Classroom controls read the last committed
+configuration and show teachers short codes (`OP-BUSY`, `DEPLOY-PENDING`,
+`USB-RESERVED`, `PXE-ACTIVE`, `CLASSROOM-LOAD`, `CLASSROOM-SERVICE`) explained
+in the troubleshooting guide; details stay in the classroom service journal.
+
 In the TUI, `r` refreshes observed state on every screen that has a refresh;
 it never removes, retries a save or starts a review. After a result, `n` starts
 a new review; `s` completes an interrupted local save; PXE recovery is `n`
