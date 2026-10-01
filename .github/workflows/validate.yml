@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [lab, workspace-a, workspace-b, template]
+        shard: [lab, workspace-a, workspace-b, template, template-dev, template-minimal]
     steps:
       - name: Check out source
         uses: actions/checkout@v5

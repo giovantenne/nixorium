@@ -180,9 +180,9 @@ esac
 # groups fall into "lab", so a new group is never skipped.
 CI_SHARD="${NIXORIUM_CI_SHARD:-}"
 case "$CI_SHARD" in
-  "" | lab | workspace-a | workspace-b | template) ;;
+  "" | lab | workspace-a | workspace-b | template | template-dev | template-minimal) ;;
   *)
-    echo "Error: unknown NIXORIUM_CI_SHARD '${CI_SHARD}' (lab, workspace-a, workspace-b, template)." >&2
+    echo "Error: unknown NIXORIUM_CI_SHARD '${CI_SHARD}' (lab, workspace-a, workspace-b, template, template-dev, template-minimal)." >&2
     exit 1
     ;;
 esac
@@ -190,7 +190,9 @@ ci_shard_of() {
   case "$1" in
     checks-workspace-candidate | checks-workspace-preparation) echo workspace-a ;;
     checks-workspace-rejection | checks-workspace-runtime | checks-workspace-systems) echo workspace-b ;;
-    checks-workspace-template | systems | template) echo template ;;
+    checks-workspace-template | systems | template | profile-default) echo template ;;
+    profile-dev) echo template-dev ;;
+    profile-minimal) echo template-minimal ;;
     *) echo lab ;;
   esac
 }
@@ -205,7 +207,7 @@ if [[ "${MODE}" == "--ci" ]]; then
       eval_ci_group "$REPO_ROOT" "$GROUP" >/dev/null
     fi
   done < <(jq -r 'keys[]' <<<"$VALIDATION_GROUPS")
-  if ! in_ci_shard template; then
+  if ! in_ci_shard template && ! in_ci_shard profile-dev && ! in_ci_shard profile-minimal; then
     echo "CI shard ${CI_SHARD} completed successfully."
     exit 0
   fi
@@ -216,7 +218,9 @@ else
 fi
 
 if [[ "${MODE}" == "--ci" ]]; then
-  eval_ci_group "$REPO_ROOT" systems >/dev/null
+  if in_ci_shard systems; then
+    eval_ci_group "$REPO_ROOT" systems >/dev/null
+  fi
 else
   LAB_META=$(nix eval "path:${REPO_ROOT}#labMeta" --json --no-write-lock-file)
   CONTROLLER_NAME=$(jq -r .controller.name <<<"$LAB_META")
@@ -328,37 +332,61 @@ jq '.packages |= map(select(.package as $package | [
   "python3Packages.terminaltexteffects",
   "vscode"
 ] | index($package) | not))' "$SITE_DIR/lab-software.json" > "$MINIMAL_SITE/lab-software.json"
-profile_state "$SITE_DIR" > "$TEMP_DIR/profile-default.json" & DEFAULT_PID=$!
-profile_state "$DEV_SITE" > "$TEMP_DIR/profile-dev.json" & DEV_PID=$!
-profile_state "$MINIMAL_SITE" > "$TEMP_DIR/profile-minimal.json" & MINIMAL_PID=$!
-wait "$DEFAULT_PID" || profile_check_failed "default software evaluation"
-wait "$DEV_PID" || profile_check_failed "Docker and VS Code evaluation"
-wait "$MINIMAL_PID" || profile_check_failed "minimal software evaluation"
+# Each scenario is a full NixOS evaluation. Locally they run in parallel; a
+# CI shard runs only its own, keeping each runner within its memory.
+PROFILE_PIDS=()
+for SCENARIO in default dev minimal; do
+  if ! in_ci_shard "profile-${SCENARIO}"; then
+    continue
+  fi
+  case "$SCENARIO" in
+    default) SCENARIO_SITE="$SITE_DIR" ;;
+    dev) SCENARIO_SITE="$DEV_SITE" ;;
+    minimal) SCENARIO_SITE="$MINIMAL_SITE" ;;
+  esac
+  if [[ -n "$CI_SHARD" ]]; then
+    profile_state "$SCENARIO_SITE" > "$TEMP_DIR/profile-${SCENARIO}.json" || profile_check_failed "${SCENARIO} software evaluation"
+  else
+    profile_state "$SCENARIO_SITE" > "$TEMP_DIR/profile-${SCENARIO}.json" &
+    PROFILE_PIDS+=("$!")
+  fi
+done
+for PID in "${PROFILE_PIDS[@]}"; do
+  wait "$PID" || profile_check_failed "software scenario evaluation"
+done
 
-PROFILE_STATE=$(cat "$TEMP_DIR/profile-default.json")
-jq -e '
-  .chromiumPolicy and .screensaver and .desktopExtensions and
-  .desktopExtensionDefaults and .desktopExtensionRepair and
-  ((.docker or .vscodeHome or .vscodeHomeOwnership) | not) and
-  .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "default software"
+if in_ci_shard profile-default; then
+  PROFILE_STATE=$(cat "$TEMP_DIR/profile-default.json")
+  jq -e '
+    .chromiumPolicy and .screensaver and .desktopExtensions and
+    .desktopExtensionDefaults and .desktopExtensionRepair and
+    ((.docker or .vscodeHome or .vscodeHomeOwnership) | not) and
+    .homeOwnershipOrdering
+  ' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "default software"
+fi
 # The template's active student workspace profile owns the student's VS Code
 # extensions, so adding the package prepares only staff homes.
-PROFILE_STATE=$(cat "$TEMP_DIR/profile-dev.json")
-jq -e '
-  .chromiumPolicy and .docker and .screensaver and .desktopExtensions and
-  .desktopExtensionDefaults and .desktopExtensionRepair and (.vscodeHome | not) and
-  .vscodeHomeOwnership and .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "Docker and VS Code added"
-PROFILE_STATE=$(cat "$TEMP_DIR/profile-minimal.json")
-jq -e '
-  .desktopExtensions and .desktopExtensionDefaults and .desktopExtensionRepair and
-  ((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and
-  .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "minimal software"
+if in_ci_shard profile-dev; then
+  PROFILE_STATE=$(cat "$TEMP_DIR/profile-dev.json")
+  jq -e '
+    .chromiumPolicy and .docker and .screensaver and .desktopExtensions and
+    .desktopExtensionDefaults and .desktopExtensionRepair and (.vscodeHome | not) and
+    .vscodeHomeOwnership and .homeOwnershipOrdering
+  ' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "Docker and VS Code added"
+fi
+if in_ci_shard profile-minimal; then
+  PROFILE_STATE=$(cat "$TEMP_DIR/profile-minimal.json")
+  jq -e '
+    .desktopExtensions and .desktopExtensionDefaults and .desktopExtensionRepair and
+    ((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and
+    .homeOwnershipOrdering
+  ' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "minimal software"
+fi
 
 if [[ "${MODE}" == "--ci" ]]; then
-  eval_ci_group "$SITE_DIR" template >/dev/null
+  if in_ci_shard template; then
+    eval_ci_group "$SITE_DIR" template >/dev/null
+  fi
   echo "CI evaluation completed successfully."
   exit 0
 fi

@@ -44,7 +44,7 @@ host-specific modules. A successful evaluation does not prove that packages
 or affected system roles build. Simulated VM tests do not replace official-ISO
 or physical-hardware evidence.
 
-Pull-request and `master` CI run Go packaging/tests plus `./scripts/validate.sh --ci`. CI splits `--ci` into parallel shards with `NIXORIUM_CI_SHARD` (`lab`, `workspace-a`, `workspace-b`, `template`); an unassigned check group falls into `lab`, so a new group is never skipped. Without the variable, `--ci` evaluates everything.
+Pull-request and `master` CI run Go packaging/tests plus `./scripts/validate.sh --ci`. CI splits `--ci` into parallel shards with `NIXORIUM_CI_SHARD` (`lab`, `workspace-a`, `workspace-b`, `template`, `template-dev`, `template-minimal`; each template software scenario is a full NixOS evaluation, so CI runs one per runner); an unassigned check group falls into `lab`, so a new group is never skipped. Without the variable, `--ci` evaluates everything.
 The latter evaluates all checks and grouped representative source/template
 outputs with import-from-derivation disabled. The separate release-tag workflow
 runs `--full` with KVM before publication, with a 360-minute hosted-job limit.
