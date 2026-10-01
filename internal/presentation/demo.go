@@ -406,11 +406,9 @@ func renderSoftwareDeploymentDemo(revision string, width, height int) DemoScenar
 	return DemoScenario{ID: "software-all-clients", Title: "Add one package to every client", Description: "Search the pinned package set for Inkscape, save it for every current and future client, then explicitly deploy and verify all five configured PCs.", Frames: r.frames}
 }
 
-func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario {
-	actions := demoActions()
-	catalog := demoSoftwareCatalog()
-	catalog.Controller = "pc99"
-	profiles := domain.SoftwarePresetCatalog{
+// demoSoftwareProfiles mirrors the template's software profiles for demos.
+func demoSoftwareProfiles() domain.SoftwarePresetCatalog {
+	return domain.SoftwarePresetCatalog{
 		SchemaVersion: domain.SoftwarePresetSchemaVersion,
 		DefaultPreset: "essential",
 		Presets: []domain.SoftwarePreset{
@@ -423,6 +421,13 @@ func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario 
 			{ID: "stem", Label: "STEM and scientific computing", Description: "Numerical, plotting and symbolic mathematics tools", Packages: []string{"gnuplot", "maxima", "nodejs", "octave"}},
 		},
 	}
+}
+
+func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario {
+	actions := demoActions()
+	catalog := demoSoftwareCatalog()
+	catalog.Controller = "pc99"
+	profiles := demoSoftwareProfiles()
 	actions.LoadSoftware = func(ctx context.Context) domain.SoftwareCatalogReport { return catalog }
 	actions.LoadSoftwarePresets = func(ctx context.Context) domain.SoftwarePresetCatalogReport {
 		return domain.SoftwarePresetCatalogReport{SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-presets", State: "ready", Repository: "/demo/lab", Catalog: &profiles, Fingerprint: "sha256:demo-profiles", Issues: []domain.ValidationIssue{}}

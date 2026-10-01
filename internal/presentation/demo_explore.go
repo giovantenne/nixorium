@@ -123,6 +123,85 @@ func demoExploreHosts(revision string) domain.HostsReport {
 	return hosts
 }
 
+// demoExploreCatalog is a lab that already uses every software scope: shared
+// tools, a general-education set on all clients, graphics for one group, a
+// 3D tool on a single PC and a recorder on the controller. Suggestions come
+// from the template catalog.
+func demoExploreCatalog() domain.SoftwareCatalogReport {
+	suggestions := []domain.SoftwareCatalogItem{}
+	for _, item := range [][3]string{
+		{"vlc", "VLC", "Play video and audio files"},
+		{"gimp", "GIMP", "Edit raster images"},
+		{"inkscape", "Inkscape", "Create and edit vector graphics"},
+		{"krita", "Krita", "Digital painting and illustration"},
+		{"blender", "Blender", "3D modelling, animation and rendering"},
+		{"freecad", "FreeCAD", "Parametric 3D CAD"},
+		{"audacity", "Audacity", "Record and edit audio"},
+		{"obs-studio", "OBS Studio", "Record and stream the desktop"},
+		{"filezilla", "FileZilla", "Transfer files with FTP and SFTP"},
+		{"thunderbird", "Thunderbird", "Email and calendar client"},
+		{"wireshark", "Wireshark", "Inspect network traffic"},
+	} {
+		suggestions = append(suggestions, domain.SoftwareCatalogItem{ID: item[0], Label: item[1], Summary: item[2], Availability: "available"})
+	}
+	shared := domain.SoftwareScope{Kind: domain.SoftwareScopeShared}
+	allClients := domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}
+	graphics := domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: "graphics"}
+	declare := func(scope domain.SoftwareScope, packages ...string) []domain.SoftwareDeclaration {
+		declarations := []domain.SoftwareDeclaration{}
+		for _, name := range packages {
+			declarations = append(declarations, domain.SoftwareDeclaration{Package: name, Scope: scope, Origin: "managed"})
+		}
+		return declarations
+	}
+	packages := declare(shared, "chromium", "ghostty", "git", "liberation_ttf")
+	packages = append(packages, declare(allClients, "libreoffice-qt", "vlc", "hunspellDicts.en_US", "hunspellDicts.it_IT")...)
+	packages = append(packages, declare(graphics, "gimp", "inkscape", "krita")...)
+	packages = append(packages, declare(domain.SoftwareScope{Kind: domain.SoftwareScopeClients, Clients: []string{"pc01"}}, "blender")...)
+	packages = append(packages, declare(domain.SoftwareScope{Kind: domain.SoftwareScopeController}, "obs-studio")...)
+	return domain.SoftwareCatalogReport{
+		Controller: "pc99", SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-catalog", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
+		Clients: demoExploreClientNames(), Groups: map[string][]string{"graphics": {"pc01", "pc02"}},
+		Catalog: suggestions, Packages: packages, Issues: []domain.ValidationIssue{},
+	}
+}
+
+// demoExplorePresetPlan reviews adding a profile: packages already declared
+// are listed as existing, the rest as additions.
+func demoExplorePresetPlan(catalog domain.SoftwareCatalogReport, profiles domain.SoftwarePresetCatalog, request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+	preset := profiles.Presets[0]
+	for _, candidate := range profiles.Presets {
+		if candidate.ID == request.Preset {
+			preset = candidate
+		}
+	}
+	declared := map[string]domain.SoftwareDeclaration{}
+	for _, declaration := range catalog.Packages {
+		declared[declaration.Package] = declaration
+	}
+	excluded := map[string]bool{}
+	for _, name := range request.Exclude {
+		excluded[name] = true
+	}
+	plan := domain.SoftwarePresetPlanReport{
+		SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-preset-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json",
+		Request: request, Preset: preset, SelectedPackages: []domain.SoftwareCatalogItem{}, Existing: []domain.SoftwareDeclaration{}, Additions: []domain.SoftwareDeclaration{},
+		AffectedController: "pc99", AffectedClients: catalog.Clients, ReviewToken: "sha256:demo-profile-review", Confirmation: "ADD PROFILE", Issues: []domain.ValidationIssue{},
+	}
+	for _, name := range preset.Packages {
+		if excluded[name] {
+			continue
+		}
+		plan.SelectedPackages = append(plan.SelectedPackages, domain.SoftwareCatalogItem{ID: name, Label: name, Summary: "Pinned package", Availability: "available"})
+		if existing, ok := declared[name]; ok {
+			plan.Existing = append(plan.Existing, existing)
+		} else {
+			plan.Additions = append(plan.Additions, domain.SoftwareDeclaration{Package: name, Scope: request.Scope})
+		}
+	}
+	return plan
+}
+
 func demoExploreStatus(revision string) domain.StatusReport {
 	status := demoStatus("ready", revision)
 	status.Meta.Clients.Count = demoExploreClients
@@ -161,9 +240,8 @@ func demoExploreModel(revision string, width, height int, classroom bool) dashbo
 // for a real installation that lacks them.
 func demoExploreActions(revision string) DashboardActions {
 	hosts := demoExploreHosts(revision)
-	catalog := demoSoftwareCatalog()
-	catalog.Clients = demoExploreClientNames()
-	catalog.Groups = map[string][]string{"graphics": {"pc01", "pc02"}}
+	catalog := demoExploreCatalog()
+	profiles := demoSoftwareProfiles()
 	status := demoExploreStatus(revision)
 	sessions := map[string]domain.ShutdownSessionState{"pc01": domain.ShutdownSessionIdle, "pc02": domain.ShutdownSessionActive, "pc03": domain.ShutdownSessionIdle}
 	actions := DashboardActions{
@@ -209,7 +287,19 @@ func demoExploreActions(revision string) DashboardActions {
 		},
 		LoadSoftware: func(context.Context) domain.SoftwareCatalogReport { return catalog },
 		SearchSoftware: func(_ context.Context, query string) domain.SoftwareSearchReport {
-			return domain.SoftwareSearchReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-search", State: "ready", Repository: "/demo/lab", Query: query, Results: catalog.Catalog, Issues: []domain.ValidationIssue{}}
+			results := []domain.SoftwareCatalogItem{}
+			for _, item := range catalog.Catalog {
+				if query == "" || strings.Contains(strings.ToLower(item.ID+" "+item.Label+" "+item.Summary), strings.ToLower(query)) {
+					results = append(results, item)
+				}
+			}
+			return domain.SoftwareSearchReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-search", State: "ready", Repository: "/demo/lab", Query: query, Results: results, Issues: []domain.ValidationIssue{}}
+		},
+		LoadSoftwarePresets: func(context.Context) domain.SoftwarePresetCatalogReport {
+			return domain.SoftwarePresetCatalogReport{SchemaVersion: domain.SoftwarePresetSchemaVersion, Operation: "software-presets", State: "ready", Repository: "/demo/lab", Catalog: &profiles, Fingerprint: "sha256:demo-profiles", Issues: []domain.ValidationIssue{}}
+		},
+		PlanSoftwarePreset: func(_ context.Context, request domain.SoftwarePresetRequest) domain.SoftwarePresetPlanReport {
+			return demoExplorePresetPlan(catalog, profiles, request)
 		},
 		PlanSoftware: func(_ context.Context, request domain.SoftwareChangeRequest) domain.SoftwareChangePlanReport {
 			confirmation := "SAVE"
