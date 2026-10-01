@@ -21,18 +21,21 @@ Before release:
 7. Run `./scripts/release.sh <version>` only with explicit authorization.
 8. Verify the GitHub workflow and published release.
 
-The release workflow first checks metadata, then runs
-`./scripts/validate.sh --full` on the exact tagged commit, including VM tests,
-representative system builds and offline equivalence. A separate publication
+The release workflow first checks metadata, then calls the full-validation
+workflow, which runs `./scripts/validate.sh --full` on the exact tagged commit
+as parallel shards, including VM tests, representative system builds and
+offline equivalence. A separate publication
 job depends on successful full validation and consumes its validated release
 notes. Failure, cancellation or timeout must never publish a GitHub Release.
 The tag already exists while validation runs; it is not proof of qualification.
 
-Full CI runs only for release tags, including prereleases, never on ordinary
-pushes to `master`. The hosted runner enables KVM, runs one Nix build at a time,
-and retains the validation log as an artifact. Its 360-minute job limit is
-GitHub's maximum, not an unlimited execution guarantee. Nix has no additional
-build/silence timeout; individual test deadlines remain intact.
+Full CI runs for release tags, including prereleases, nightly on `master` and
+on demand, never on ordinary pushes. Before tagging, check that the latest
+nightly or a manual run passed on the commit to release. Each hosted shard
+enables KVM, runs one Nix build at a time, and retains its validation log as an
+artifact. Its 240-minute job limit is not an unlimited execution guarantee. Nix
+has no additional build/silence timeout; individual test deadlines remain
+intact.
 Use only the annotated tag created by `scripts/release.sh`; never create, move,
 replace, or push tags as an implicit part of implementation work. If publishing
 fails after the tag is pushed, inspect the tag and workflow before retrying.

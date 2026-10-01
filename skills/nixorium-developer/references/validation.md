@@ -46,8 +46,10 @@ or physical-hardware evidence.
 
 Pull-request and `master` CI run Go packaging/tests plus `./scripts/validate.sh --ci`. CI splits `--ci` into parallel shards with `NIXORIUM_CI_SHARD` (`lab`, `workspace-a`, `workspace-b`, `template`, `template-dev`, `template-minimal`; each template software scenario is a full NixOS evaluation, so CI runs one per runner); an unassigned check group falls into `lab`, so a new group is never skipped. Without the variable, `--ci` evaluates everything.
 The latter evaluates all checks and grouped representative source/template
-outputs with import-from-derivation disabled. The separate release-tag workflow
-runs `--full` with KVM before publication, with a 360-minute hosted-job limit.
+outputs with import-from-derivation disabled. The release-tag workflow
+calls `full-validation.yml`, which runs `--full` with KVM as parallel
+`NIXORIUM_FULL_SHARD` jobs (each check group plus `systems`, 240 minutes each)
+before publication; it also runs nightly on `master` and on demand.
 Full local preflight is optional for releases; successful full CI on the tagged
 commit is mandatory. Report local and remote evidence separately.
 

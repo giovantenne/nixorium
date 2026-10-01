@@ -30,7 +30,8 @@ not public documentation and must not be copied into this repository.
 ```
 .github/workflows/validate.yml # Go build/tests plus evaluation-only source/template CI
 .github/workflows/security.yml # CodeQL plus pinned Go vulnerability/static analysis
-.github/workflows/release.yml # Full tag validation gates GitHub Release publication
+.github/workflows/full-validation.yml # Parallel full gate: release, nightly and manual
+.github/workflows/release.yml # Metadata check; full validation gates GitHub Release publication
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
 flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
@@ -166,10 +167,13 @@ Releases follow Semantic Versioning. `VERSION`, the release tag (`v<version>`),
 and the dated `CHANGELOG.md` section must agree. After the release commit has
 been pushed to `master`, run `./scripts/release.sh <version>` to create and push
 the annotated tag. The GitHub Actions release workflow validates metadata and
-runs `--full` on that exact commit before a dependent job publishes the GitHub
-Release from the matching changelog section. Full CI is release-tag-only, not
-part of pushes to `master`. Hosted validation has GitHub's six-hour job limit;
-failure or timeout must block publication.
+calls the full-validation workflow, which runs `--full` on that exact commit as
+parallel `NIXORIUM_FULL_SHARD` jobs (every group of
+`tests/validation-groups.nix` plus `systems`), before a dependent job publishes
+the GitHub Release from the matching changelog section. The same workflow runs
+nightly on `master` and on demand, so failures surface before a tag; ordinary
+pushes do not run it. Each job has a 240-minute limit; failure or timeout of
+any shard must block publication.
 
 ## Architecture Notes
 

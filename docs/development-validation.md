@@ -176,20 +176,29 @@ remains disabled. Profile variants are still evaluated independently because
 they change the temporary deployment's declarations.
 
 Pull requests and pushes to `master` run Go packaging/tests and `--ci`, retaining
-the 15-minute limit per job. Full validation runs only in the release workflow
-for `v*.*.*` tags, including prereleases. It validates metadata before expensive
-work and checks out the event's exact commit in both validation and publication
-jobs. Publication depends on successful `--full`; failed, cancelled or timed-out
-validation leaves the tag without a GitHub Release.
+the 15-minute limit per job. Full validation lives in the reusable
+`full-validation.yml` workflow. The release workflow for `v*.*.*` tags,
+including prereleases, validates metadata first and then calls it; it also runs
+nightly on `master` and on demand from the Actions tab, so failures surface
+before a tag. Every job checks out the event's exact commit. Publication depends
+on every full-validation job; a failed, cancelled or timed-out shard leaves the
+tag without a GitHub Release.
 
-The disposable Ubuntu release runner reclaims unused preinstalled SDK space,
-enables and checks KVM, and limits Nix to one build at a time with two cores.
-Nix build and silence timeouts are disabled, while test-specific deadlines are
-preserved. The job uses the [maximum hosted duration of six hours](https://docs.github.com/en/actions/reference/limits).
-Removing `timeout-minutes` would not remove that platform limit. The validation
-log is retained for 14 days when artifact upload can run; GitHub's job log also
-remains available. Release notes and logs live outside the checkout so they do
-not change the Flake source being qualified.
+`--full` splits with `NIXORIUM_FULL_SHARD`: one group of
+`tests/validation-groups.nix` builds only that group, and `systems` runs the
+representative system builds, template profiles (one after another) and offline
+equivalence. A planning job lists the groups from that file, so a new group
+always gets its own job; an unknown shard name is rejected. Without the
+variable, `--full` still runs everything, as it does locally.
+
+Each disposable Ubuntu runner reclaims unused preinstalled SDK space, enables
+and checks KVM, and runs one Nix build at a time with four cores. Nix build and
+silence timeouts are disabled, while test-specific deadlines are preserved.
+Each job has a 240-minute limit within GitHub's
+[maximum hosted duration of six hours](https://docs.github.com/en/actions/reference/limits).
+Each shard's log is retained for 14 days when artifact upload can run; GitHub's
+job log also remains available. Release notes and logs live outside the
+checkout so they do not change the Flake source being qualified.
 
 Full local release preflight is optional; successful full CI on the tagged
 commit is mandatory. If the full matrix exceeds hosted disk, memory or runtime

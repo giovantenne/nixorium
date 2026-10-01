@@ -120,5 +120,6 @@ Before opening a pull request:
 Changes that affect releases also follow [the release process](scripts/release.sh)
 and are versioned only after review. The release-tag workflow requires `--full`
 on the tagged commit before publication; local full preflight is optional.
-Ordinary pushes to `master` do not trigger full CI. Report suspected vulnerabilities through
+Ordinary pushes to `master` do not trigger full CI; it runs nightly on
+`master` and can be started from the Actions tab before tagging. Report suspected vulnerabilities through
 [SECURITY.md](SECURITY.md), not a public issue.

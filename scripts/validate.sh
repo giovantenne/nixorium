@@ -13,6 +13,7 @@ Modes:
   --remote-client-installer-vm
                          Quick checks plus the remote installer VM test
   --full                 Complete release and milestone validation
+                         (NIXORIUM_FULL_SHARD selects one CI shard)
   --ci                   Evaluation-only CI validation
 EOF
 }
@@ -34,6 +35,15 @@ case "$MODE" in
     exit 1
     ;;
 esac
+
+# Release CI may split --full into parallel jobs with NIXORIUM_FULL_SHARD: one
+# group of tests/validation-groups.nix, or "systems" for the system builds,
+# template profiles and offline equivalence. Unset, --full runs everything.
+FULL_SHARD="${NIXORIUM_FULL_SHARD:-}"
+if [[ -n "$FULL_SHARD" && "$MODE" != "--full" ]]; then
+  echo "Error: NIXORIUM_FULL_SHARD applies only to --full." >&2
+  exit 1
+fi
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEMP_DIR=$(mktemp -d)
@@ -124,10 +134,15 @@ eval_ci_group() {
     '
 }
 
+# With a group name, build only that group; otherwise build every group.
 run_full_checks() {
+  local ONLY="${1:-}"
   local GROUP CHECK
   local -a CHECKS OUTPUTS
   while IFS= read -r GROUP; do
+    if [[ -n "$ONLY" && "$GROUP" != "$ONLY" ]]; then
+      continue
+    fi
     mapfile -t CHECKS < <(jq -r --arg group "$GROUP" '.[$group][]' <<<"$VALIDATION_GROUPS")
     OUTPUTS=()
     for CHECK in "${CHECKS[@]}"; do
@@ -212,9 +227,20 @@ if [[ "${MODE}" == "--ci" ]]; then
     exit 0
   fi
 else
+  if [[ -n "$FULL_SHARD" && "$FULL_SHARD" != systems ]]; then
+    if ! jq -e --arg group "$FULL_SHARD" 'has($group)' <<<"$VALIDATION_GROUPS" >/dev/null; then
+      echo "Error: unknown NIXORIUM_FULL_SHARD '${FULL_SHARD}' (systems or a group of tests/validation-groups.nix)." >&2
+      exit 1
+    fi
+    run_full_checks "$FULL_SHARD"
+    echo "Full validation shard ${FULL_SHARD} completed successfully."
+    exit 0
+  fi
   bash scripts/check-agent-guidance.sh
   nix build --file "${REPO_ROOT}/tests/source-checks.nix" documentation-check --no-write-lock-file --no-link
-  run_full_checks
+  if [[ -z "$FULL_SHARD" ]]; then
+    run_full_checks
+  fi
 fi
 
 if [[ "${MODE}" == "--ci" ]]; then
@@ -333,7 +359,8 @@ jq '.packages |= map(select(.package as $package | [
   "vscode"
 ] | index($package) | not))' "$SITE_DIR/lab-software.json" > "$MINIMAL_SITE/lab-software.json"
 # Each scenario is a full NixOS evaluation. Locally they run in parallel; a
-# CI shard runs only its own, keeping each runner within its memory.
+# CI shard runs only its own, and a full-validation shard runs them one after
+# another, keeping each runner within its memory.
 PROFILE_PIDS=()
 for SCENARIO in default dev minimal; do
   if ! in_ci_shard "profile-${SCENARIO}"; then
@@ -344,7 +371,7 @@ for SCENARIO in default dev minimal; do
     dev) SCENARIO_SITE="$DEV_SITE" ;;
     minimal) SCENARIO_SITE="$MINIMAL_SITE" ;;
   esac
-  if [[ -n "$CI_SHARD" ]]; then
+  if [[ -n "$CI_SHARD" || -n "$FULL_SHARD" ]]; then
     profile_state "$SCENARIO_SITE" > "$TEMP_DIR/profile-${SCENARIO}.json" || profile_check_failed "${SCENARIO} software evaluation"
   else
     profile_state "$SCENARIO_SITE" > "$TEMP_DIR/profile-${SCENARIO}.json" &

@@ -1,0 +1,108 @@
+name: Full validation
+
+# The complete gate, split into parallel jobs: one per group of
+# tests/validation-groups.nix plus "systems" for system builds, template
+# profiles and offline equivalence. Releases call it on the tagged commit; it
+# also runs nightly on master and on demand, so problems surface before a tag.
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan validation shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      shards: ${{ steps.shards.outputs.shards }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Every group becomes a job, so a new group can never be skipped.
+      - name: List shards
+        id: shards
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHARDS="$(nix eval --file tests/validation-groups.nix --json \
+            --apply 'groups: builtins.attrNames groups ++ [ "systems" ]')"
+          echo "Shards: ${SHARDS}"
+          echo "shards=${SHARDS}" >> "$GITHUB_OUTPUT"
+
+  validate:
+    name: Validate (${{ matrix.shard }})
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Reclaim unused hosted-runner SDK space
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h /
+
+      - name: Install Nix with KVM support
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          enable_kvm: true
+          extra_nix_config: |
+            system-features = nixos-test benchmark big-parallel kvm
+            max-jobs = 1
+            cores = 4
+            timeout = 0
+            max-silent-time = 0
+
+      - name: Check VM prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -c /dev/kvm
+          test -r /dev/kvm
+          test -w /dev/kvm
+          free -h
+          df -h /nix/store
+
+      - name: Run validation shard
+        shell: bash
+        env:
+          NIX_CONFIG: print-build-logs = true
+          NIXORIUM_FULL_SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          ./scripts/validate.sh --full 2>&1 | tee "$RUNNER_TEMP/full-validation.log"
+
+      - name: Preserve validation log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-validation-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/full-validation.log
+          if-no-files-found: ignore
+          retention-days: 14
