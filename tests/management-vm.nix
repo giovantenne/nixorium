@@ -144,6 +144,11 @@ in
         "systemctl poweroff --no-block")
           printf 'accepted\n' >> /tmp/nixorium-test-shutdown-dispatch.log
           ;;
+        "nixorium-host-state 2>/dev/null; echo '--- jobs';"*)
+          readlink -f /run/current-system
+          cat /tmp/nixorium-test-recover-revision 2>/dev/null || echo unknown
+          printf -- '--- jobs\n--- activation\n0\n'
+          ;;
         "nixorium-clean-generations --plan")
           printf 'format 1\nkeep 9 newest\nremove 1\nfree 1000\nexpect aaaaaaaaaaaaaaaa\n'
           ;;
@@ -668,6 +673,17 @@ in
     # digest that does not match the controller's current plan.
     controller.fail("su - admin -c 'systemctl start nixorium-clean-generations@zz.service'")
     controller.fail("su - admin -c 'systemctl start nixorium-clean-generations@0000000000000000.service'")
+    # An interrupted client update: visible, guided, archived only after review.
+    controller.succeed("rev=$(git -C /tmp/deployment rev-parse HEAD); ip=$(jq -r '.targets[0].ip' /tmp/shutdown-plan.json); printf '%s\\n' \"$rev\" > /tmp/nixorium-test-recover-revision; printf '{\"schemaVersion\":1,\"repository\":\"/tmp/deployment\",\"revision\":\"%s\",\"targets\":[{\"name\":\"pc01\",\"ip\":\"%s\"}],\"startedAt\":\"2026-10-01T10:00:00Z\",\"controllerPid\":1}\\n' \"$rev\" \"$ip\" > /var/lib/nixorium/coordination/deployment-pending.json; chmod 0600 /var/lib/nixorium/coordination/deployment-pending.json")
+    controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'any(.conditions[]; .kind == \"deployment-pending\" and .next.code == \"DEPLOY-PENDING\")'")
+    controller.succeed("nixorium deploy recover plan --repo /tmp/deployment --json > /tmp/recover-plan.json || { cat /tmp/recover-plan.json; false; }; jq -e '.state == \"ready\" and .targets[0].state == \"finished-reviewed\" and .confirmation == \"RECOVERED\"' /tmp/recover-plan.json")
+    controller.succeed("token=$(jq -r .reviewToken /tmp/recover-plan.json); nixorium deploy recover apply --repo /tmp/deployment --expect \"$token\" --yes --json | jq -e '.state == \"completed\"'; test ! -e /var/lib/nixorium/coordination/deployment-pending.json; ls /var/lib/nixorium/coordination/recovered/deployment-*.json")
+    controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'all(.conditions[]; .kind != \"deployment-pending\")'")
+    # Encrypted backup: due, created, verified, restored into an empty directory.
+    controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'any(.conditions[]; .kind == \"backup-due\")'")
+    controller.succeed("install -d -m 0700 /tmp/backups; printf 'correct horse battery\\n' > /tmp/backup-pass; chmod 0600 /tmp/backup-pass; nixorium backup create --repo /tmp/deployment --to /tmp/backups --passphrase-file /tmp/backup-pass --json > /tmp/backup.json || { cat /tmp/backup.json; false; }; jq -e '.state == \"completed\" and .files > 0' /tmp/backup.json")
+    controller.succeed("file=$(jq -r .path /tmp/backup.json); nixorium backup verify \"$file\" --passphrase-file /tmp/backup-pass --json | jq -e '.state == \"completed\"'; nixorium backup restore \"$file\" --to /tmp/restored --passphrase-file /tmp/backup-pass --json | jq -e '.state == \"completed\"'; test -f /tmp/restored/deployment/lab-settings.json; test \"$(git -C /tmp/restored/deployment rev-parse HEAD)\" = \"$(git -C /tmp/deployment rev-parse HEAD)\"")
+    controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'all(.conditions[]; .kind != \"backup-due\")'")
     controller.succeed("journalctl -u nixorium-clean-generations@0000000000000000.service --no-pager | grep -F changed; systemctl reset-failed 'nixorium-clean-generations@0000000000000000.service'")
     controller.succeed("cp /tmp/deployment/lab-settings.json /tmp/candidate.json")
     controller.succeed("nixorium config plan --repo /tmp/deployment --file /tmp/candidate.json --json | jq -e '.operation == \"config-plan\" and .state == \"unchanged\" and (.changes | length) == 0'")

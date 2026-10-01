@@ -136,6 +136,16 @@ func operationRecordFor(outcome any) (domain.OperationRecord, bool) {
 			action = "restart"
 		}
 		record.Summary = fmt.Sprintf("%s requests: accepted=%d; not-sent=%d; unconfirmed=%d", action, report.Accepted, report.NotSent, report.Unconfirmed)
+	case domain.DeploymentRecoveryResult:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = fmt.Sprintf("%d recorded computer(s)", len(report.Targets))
+		record.Summary = "interrupted client update reviewed and its record archived"
+	case domain.TemplateResetRecoveryResult:
+		record.Operation = report.Operation
+		record.State = report.State
+		record.Subject = "case " + report.Case
+		record.Summary = "interrupted deployment template reset resolved"
 	case domain.CleanupApplyReport:
 		record.Operation = report.Operation
 		record.State = report.State

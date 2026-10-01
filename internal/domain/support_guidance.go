@@ -43,6 +43,7 @@ var supportGuides = map[string]string{
 	"RECOVERY-OPERATION-BUSY":         "another-operation-is-already-running",
 	"RECOVERY-SETTINGS-INVALID":       "configuration-is-invalid",
 	"RECOVERY-CONTROLLER-NOT-APPLIED": "controller-apply-failed",
+	"RECOVERY-BACKUP-DUE":             "backups-and-restoration",
 }
 
 // SupportFindingIDs is an exact allowlist, never a prefix match for dynamic

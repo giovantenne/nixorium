@@ -717,6 +717,23 @@ The controller runs Harmonia as `nixorium-harmonia.service`; systemd loads its
 private signing key as an isolated credential outside Git and the Nix store.
 Detailed Harmonia output uses `journalctl -u harmonia.service`.
 
+### Back up the controller
+
+The installed computers trust this controller's private keys, which are never
+committed. Without a copy, a failed controller disk means reinstalling every
+computer. Open **Maintenance → Back up the controller**, choose a USB drive or
+network share and a passphrase of at least 12 characters, or run:
+
+```sh
+nix run .#nixorium -- backup create --to /run/media/admin/USB-DRIVE
+```
+
+The file is encrypted and contains the configuration with its history, the
+private keys and the trusted computer keys. Keep it, and separately its
+passphrase, away from the controller. The Overview reminds you when a backup
+is due. To replace a failed controller, follow
+[Backups and restoration](TROUBLESHOOTING.md#backups-and-restoration).
+
 ### Free disk space
 
 Every application to the controller and every client update adds a system

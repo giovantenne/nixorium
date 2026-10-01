@@ -1,0 +1,82 @@
+package adapters
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	repository := workspaceRepository(t)
+	writeGitReviewFile(t, repository, "lab-settings.json", "{\"lab\":{}}\n")
+	if err := os.WriteFile(filepath.Join(repository, "secret-key"), []byte("private cache key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/nix/store/0000-result", filepath.Join(repository, "result")); err != nil {
+		t.Fatal(err)
+	}
+	local := Local{}
+	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No backup") {
+		t.Fatalf("due = %q %v", reason, due)
+	}
+	destination := t.TempDir()
+	passphrase := []byte("correct horse battery")
+	if report := local.CreateBackup(t.Context(), repository, destination, []byte("short"), "test"); report.State == "completed" {
+		t.Fatal("a short passphrase was accepted")
+	}
+	report := local.CreateBackup(t.Context(), repository, destination, passphrase, "test")
+	if report.State != "completed" || report.Path == "" || len(report.PrivateKeys) != 1 || report.PrivateKeys[0] != "secret-key" {
+		t.Fatalf("create = %+v", report)
+	}
+	entries, _ := os.ReadDir(destination)
+	if len(entries) != 1 || strings.HasPrefix(entries[0].Name(), ".") {
+		t.Fatalf("destination = %v", entries)
+	}
+	if _, due := local.BackupDue(repository); due {
+		t.Fatal("a fresh backup is still reported as due")
+	}
+	if verify := local.VerifyBackup(report.Path, []byte("wrong passphrase!!")); verify.State == "completed" {
+		t.Fatal("a wrong passphrase was accepted")
+	}
+	if verify := local.VerifyBackup(report.Path, passphrase); verify.State != "completed" || verify.Revision != report.Revision {
+		t.Fatalf("verify = %+v", verify)
+	}
+	target := filepath.Join(t.TempDir(), "restored")
+	restored := local.RestoreBackup(report.Path, passphrase, target)
+	if restored.State != "completed" {
+		t.Fatalf("restore = %+v", restored)
+	}
+	key, err := os.ReadFile(filepath.Join(target, "deployment", "secret-key"))
+	if err != nil || string(key) != "private cache key" {
+		t.Fatalf("private key = %q %v", key, err)
+	}
+	if info, _ := os.Stat(filepath.Join(target, "deployment", "secret-key")); info.Mode().Perm() != 0o600 {
+		t.Fatalf("private key mode = %v", info.Mode())
+	}
+	if _, err := os.Lstat(filepath.Join(target, "deployment", "result")); !os.IsNotExist(err) {
+		t.Fatal("a Nix store result link was backed up")
+	}
+	if head := strings.TrimSpace(workspaceTestGit(t, filepath.Join(target, "deployment"), "rev-parse", "HEAD")); head != report.Revision {
+		t.Fatalf("restored HEAD = %s, want %s", head, report.Revision)
+	}
+	if again := local.RestoreBackup(report.Path, passphrase, target); again.State == "completed" {
+		t.Fatal("restore wrote into a non-empty directory")
+	}
+	if err := os.WriteFile(filepath.Join(repository, "secret-key"), []byte("rotated"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "private keys") {
+		t.Fatalf("key change not noticed: %q %v", reason, due)
+	}
+}
+
+func TestBackupRefusesADestinationInsideTheRepository(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	repository := workspaceRepository(t)
+	if report := (Local{}).CreateBackup(t.Context(), repository, repository, []byte("correct horse battery"), "test"); report.State == "completed" {
+		t.Fatal("backup written inside the repository")
+	}
+}

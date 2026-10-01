@@ -14,7 +14,16 @@ laboratory cannot be read) lists persistent blockers — interrupted client
 update, unfinished USB installation, interrupted template reset, controller
 network recovery, held lock, invalid settings, controller not running its
 last applied configuration — each with its next step, from local state only.
-Refusals carry stable codes (`Next (CODE): …`, JSON `next`).
+Refusals carry stable codes (`Next (CODE): …`, JSON `next`). An interrupted
+client update is recovered with `deploy recover plan|apply` (word `RECOVERED`,
+unreachable computers acknowledged explicitly) and an interrupted template
+reset with `template-reset recover plan|apply` (`RECOVERED`, or `RESTORE` for
+a mixed checkout); never edit or delete their records by hand (ADR 0023).
+`backup create --to DIR` (TUI: Maintenance → Back up the controller) writes an
+age-encrypted file with the repository and its history, the private keys and
+the trusted host keys; `backup verify` checks it and `backup restore --to
+EMPTY-DIR` extracts it for the controller replacement steps (ADR 0024). Never
+put the passphrase or an unencrypted key copy in Git or chat.
 
 A refused operation names the running one when the lock holder can be
 confirmed ("Update computers, started by admin at 10:02"); never remove the

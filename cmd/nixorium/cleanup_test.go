@@ -22,3 +22,27 @@ func TestCleanupArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestRecoveryArguments(t *testing.T) {
+	for _, args := range [][]string{
+		{"recovery", "status"}, {"recovery", "status", "--json"},
+		{"deploy", "recover", "plan"}, {"deploy", "recover", "plan", "--acknowledge-unreachable"},
+		{"deploy", "recover", "apply", "--expect", "sha256:x", "--yes"},
+		{"template-reset", "recover", "plan", "--json"},
+		{"template-reset", "recover", "apply", "--expect", "sha256:x"},
+	} {
+		if _, err := parseArguments(args); err != nil {
+			t.Fatal(args, err)
+		}
+	}
+	for _, args := range [][]string{
+		{"recovery", "apply"}, {"deploy", "recover"}, {"deploy", "recover", "apply"},
+		{"deploy", "recover", "plan", "--on", "pc01"}, {"template-reset"},
+		{"template-reset", "recover", "plan", "--acknowledge-unreachable"},
+		{"deploy", "plan", "--on", "pc01", "--acknowledge-unreachable"},
+	} {
+		if _, err := parseArguments(args); err == nil {
+			t.Fatal("accepted", args)
+		}
+	}
+}

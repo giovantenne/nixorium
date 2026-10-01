@@ -70,6 +70,7 @@ same code. The codes are stable:
 | `CLIENT-UNCONFIRMED` | A request to a computer could not be confirmed | Check the computer in Computer inventory before retrying |
 | `DISK-LOW` | The Nix store is low on space | Maintenance → Free disk space |
 | `CONTROLLER-NOT-APPLIED` | The controller does not run the saved configuration | [Controller apply failed](#controller-apply-failed) |
+| `BACKUP-DUE` | No recent backup, or keys or settings changed since it | [Backups and restoration](#backups-and-restoration) |
 | `EVAL-FAILED` | The configuration does not evaluate | Run `nixorium doctor`; fix the first reported error; do not retry other operations |
 
 ## The controller DHCP lease changed
@@ -435,7 +436,27 @@ New managed deployments, controller applies, installation starts and fleet
 mutations are refused. Inventory and logs remain readable. Malformed or unsafe
 pending evidence also blocks operations rather than being silently removed.
 
-Recovery is deliberately manual; there is no automatic retry or force-unlock:
+Recovery is reviewed, never automatic: there is no automatic retry or
+force-unlock. Use the guided recovery (ADR 0023): the Overview row
+**An interrupted client update blocks other operations**, or
+
+```sh
+nixorium deploy recover plan
+nixorium deploy recover apply --expect REVIEW_TOKEN
+```
+
+The review confirms that the Nixorium process that started the update has
+exited, checks every recorded computer over authenticated SSH (running
+revision, queued systemd jobs, running activation) and refuses while any of
+them is still applying. Computers that cannot be checked must be inspected at
+their console and acknowledged explicitly (`u` in the TUI,
+`--acknowledge-unreachable` in the CLI). Typing `RECOVERED` archives the exact
+reviewed record under `/var/lib/nixorium/coordination/recovered/`, holding the
+operation lock and never overwriting an earlier archive. It does not declare
+the old update successful: create a fresh deployment review afterwards.
+
+The manual procedure below remains the fallback when the guided review cannot
+run:
 
 1. Read the private operation log and pending record locally. Do not post either
    without reviewing sensitive values. Do not overwrite or delete the evidence.
@@ -558,10 +579,46 @@ Update never commits, pushes, activates, starts PXE, or deploys clients.
 
 ## Backups and restoration
 
-Back up the private deployment repository including its `.git` history and the
-three ignored private key files. Store that backup encrypted and separately
-from the controller. A Git remote is recommended for the private tracked
-configuration, but private keys must never be pushed or committed.
+Create backups with **Maintenance → Back up the controller** or:
+
+```sh
+nixorium backup create --to /run/media/admin/USB-DRIVE
+nixorium backup verify /run/media/admin/USB-DRIVE/nixorium-backup-20261001-180000.age
+```
+
+A backup is one file encrypted with a passphrase (age, scrypt). It contains
+the deployment repository with its `.git` history, the three ignored private
+key files and the trusted computer keys (`~/.ssh/nixorium-known-hosts`). Build
+results linked into the Nix store are not included. Keep the file and its
+passphrase away from the controller and from each other: without the
+passphrase the backup cannot be read, and anyone with both can manage the
+laboratory. The Overview and `nixorium doctor` remind you when no backup is
+recorded, the last one is older than 30 days, or the private keys or
+laboratory settings changed since it. `--passphrase-file` reads the passphrase
+from a private file for unattended use.
+
+To replace a failed controller: install the new controller from the NixOS
+Minimal ISO with the same controller number and laboratory network, sign in as
+`admin`, then
+
+```sh
+nixorium backup restore BACKUP-FILE --to ~/restored
+mv ~/nixorium-deployment ~/nixorium-deployment.new-install
+mv ~/restored/deployment ~/nixorium-deployment
+cp -a ~/restored/ssh/nixorium-known-hosts/. ~/.ssh/nixorium-known-hosts/
+cd ~/nixorium-deployment
+nixorium setup keys --verify-only
+nixorium setup install-secrets
+nixorium controller plan
+```
+
+Apply the reviewed controller plan, then prepare network installation again.
+The installed computers keep trusting the restored keys, so they are managed
+again without reinstallation. Restore refuses a non-empty target and checks
+every file against the backup manifest first.
+
+A Git remote is still useful for the private tracked configuration, but
+private keys must never be pushed or committed.
 
 Operation logs and authenticated deployment history under the administrator's
 private XDG state are useful audit evidence but are not configuration authority.

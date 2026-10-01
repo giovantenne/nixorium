@@ -42,6 +42,8 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			add("pending-settings", condition.Title, condition.Detail)
 		case domain.RecoveryControllerChanged:
 			add("pending-controller", condition.Title, condition.Detail)
+		case domain.RecoveryBackupDue:
+			add("pending-backup", condition.Title, condition.Detail)
 		}
 	}
 	if model.usbReserved {
@@ -142,7 +144,19 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		return model.openNetworkInstallation()
 	case "pending-usb":
 		return model.openUSBInstallation()
-	case "pending-deploy-recovery", "pending-reset-recovery", "pending-busy", "pending-settings":
+	case "pending-deploy-recovery":
+		if model.actions.PlanDeploymentRecovery != nil {
+			return model.openDeploymentRecovery()
+		}
+		return model.openRecovery()
+	case "pending-reset-recovery":
+		if model.actions.PlanResetRecovery != nil {
+			return model.openResetRecovery()
+		}
+		return model.openRecovery()
+	case "pending-backup":
+		return model.openBackup()
+	case "pending-busy", "pending-settings":
 		return model.openRecovery()
 	case "pending-git":
 		if model.actions.LoadGitReview != nil {

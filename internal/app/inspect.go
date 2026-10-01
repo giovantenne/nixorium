@@ -323,7 +323,7 @@ func (i *Inspector) addLocalFindings(ctx context.Context, repository string, rep
 	if recovery, ok := i.source.(RecoverySource); ok {
 		for _, condition := range NewRecoveryInspector(recovery).Observe(ctx, repository).Conditions {
 			level := domain.LevelError
-			if condition.Kind == domain.RecoveryOperationBusy || condition.Kind == domain.RecoveryControllerChanged {
+			if condition.Kind == domain.RecoveryOperationBusy || condition.Kind == domain.RecoveryControllerChanged || condition.Kind == domain.RecoveryBackupDue {
 				level = domain.LevelWarning
 			}
 			remediation := condition.Next.Action

@@ -178,7 +178,7 @@ func NewSupportSnapshot(input SupportInput) (SupportSnapshot, error) {
 		for _, record := range source[:min(len(source), SupportMaxOperations)] {
 			operation := supportEnum(record.Operation, "config-apply", "setup-keys", "setup-install-secrets", "setup-apply",
 				"pxe-prepare", "pxe-start", "pxe-stop", "pxe-recover", "deploy-apply", "controller-apply",
-				"service-restart", "git-commit", "update-apply", "package-base-apply", "shutdown-apply", "restart-apply", "internet-apply", "cleanup-apply")
+				"service-restart", "git-commit", "update-apply", "package-base-apply", "shutdown-apply", "restart-apply", "internet-apply", "cleanup-apply", "deploy-recover", "template-reset-recover")
 			state := supportEnum(record.State, "completed", "failed", "partial", "blocked", "unchanged", "saved", "ready", "running", "reconciliation-required",
 				"applied", "invalid", "conflict", "action-required", "unchecked", "cancelled")
 			if operation == "unknown" || state == "unknown" {

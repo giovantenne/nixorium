@@ -22,6 +22,10 @@ type RecoverySource interface {
 	ServiceState(context.Context, string) domain.ServiceState
 }
 
+type backupDueSource interface {
+	BackupDue(string) (string, bool)
+}
+
 type RecoveryInspector struct {
 	source RecoverySource
 	now    func() time.Time
@@ -86,6 +90,11 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	}
 	if drift := inspector.source.ControllerActivationDrift(); drift != "" {
 		add(domain.RecoveryControllerChanged, "CONTROLLER-NOT-APPLIED", "This controller is not running its last applied configuration", "This happens after starting an older version from the boot menu or after an interrupted activation; "+drift+".", "", nil, nil)
+	}
+	if backups, ok := inspector.source.(backupDueSource); ok {
+		if reason, due := backups.BackupDue(root); due {
+			add(domain.RecoveryBackupDue, "BACKUP-DUE", "A backup of this controller is due", reason, "", nil, nil)
+		}
 	}
 	if len(report.Conditions) > 0 {
 		report.State = "attention"

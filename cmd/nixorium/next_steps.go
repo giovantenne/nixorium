@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -61,4 +62,16 @@ func (recorder *nextStepRecorder) report(writer io.Writer) {
 	for _, code := range codes {
 		_, _ = io.WriteString(writer, steps[code].Line()+"\n")
 	}
+}
+
+// recordedWriter keeps the original terminal reachable for commands that must
+// check that their output is interactive.
+type recordedWriter struct {
+	io.Writer
+	file *os.File
+}
+
+func recordWriter(writer io.Writer, recorder *nextStepRecorder) io.Writer {
+	file, _ := writer.(*os.File)
+	return recordedWriter{Writer: io.MultiWriter(writer, recorder), file: file}
 }

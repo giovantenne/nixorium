@@ -95,6 +95,24 @@ the previous tracked configuration as a new commit. Inspect conflicts and newer
 edits first; do not force an overwrite. Applying/rebooting that reverted system
 is again a separate decision, not a student-data restore.
 
+**Guided recovery.** The dashboard opens in safe mode with **A deployment
+template reset was interrupted**; open it, or run:
+
+```sh
+nixorium template-reset recover plan
+nixorium template-reset recover apply --expect REVIEW_TOKEN
+```
+
+The review decides from Git state only: when the reset already completed or
+every file already matches it, typing `RECOVERED` finishes it (moving the
+branch with a compare-and-swap when needed); when no file was replaced, it
+keeps the original configuration. When the files are a mix of both, typing
+`RESTORE` saves the current tracked files under a new
+`refs/nixorium/template-backups/…-recovery` reference and restores the
+configuration from before the reset as a new commit. Untracked and ignored
+files are kept; an untracked file that the restore would overwrite stops the
+review. The marker is archived under `.git/nixorium-recovered/`.
+
 A multi-file checkout cannot be atomic. An interruption retains
 `.git/nixorium-template-reset.json`, recording the original/candidate revisions,
 branch, review token and backup ref. Normal apply/deploy preflight refuses this

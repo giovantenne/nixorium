@@ -37,12 +37,25 @@ func (model dashboardModel) recoveryFlow(condition domain.BlockingCondition) (te
 	case domain.RecoveryUSBReserved:
 		next, command := model.openUSBInstallation()
 		return next, command, true
+	case domain.RecoveryBackupDue:
+		next, command := model.openBackup()
+		return next, command, true
 	case domain.RecoveryPXE:
 		next, command := model.openNetworkInstallation()
 		return next, command, true
 	case domain.RecoveryControllerChanged:
 		if model.actions.PlanController != nil {
 			next, command := model.openControllerReview()
+			return next, command, true
+		}
+	case domain.RecoveryDeploymentPending:
+		if model.actions.PlanDeploymentRecovery != nil {
+			next, command := model.openDeploymentRecovery()
+			return next, command, true
+		}
+	case domain.RecoveryResetPending:
+		if model.actions.PlanResetRecovery != nil {
+			next, command := model.openResetRecovery()
 			return next, command, true
 		}
 	}

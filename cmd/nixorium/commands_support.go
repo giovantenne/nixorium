@@ -36,6 +36,9 @@ func runSupportCommand(ctx context.Context, repository string, options options, 
 }
 
 func interactiveWriter(writer io.Writer) bool {
+	if recorded, ok := writer.(recordedWriter); ok {
+		writer = recorded.file
+	}
 	file, ok := writer.(*os.File)
 	return ok && presentation.IsInteractive(file)
 }

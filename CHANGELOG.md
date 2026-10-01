@@ -6,6 +6,25 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Encrypted controller backups (ADR 0024): `nixorium backup create|verify|
+  restore` and **Maintenance → Back up the controller** write one
+  passphrase-encrypted file with the configuration and its history, the
+  private keys and the trusted computer keys. The Overview and the doctor
+  remind you when no backup exists, it is older than 30 days, or keys or
+  settings changed since it. The troubleshooting guide describes replacing a
+  failed controller without reinstalling the computers.
+
+- Guided recovery of interrupted operations (ADR 0023). `nixorium deploy
+  recover plan|apply` (TUI: the Overview row) checks every computer of an
+  interrupted client update, refuses while any is still applying, requires an
+  explicit acknowledgement for computers that cannot be checked, and after
+  `RECOVERED` archives the record so operations are unblocked.
+  `nixorium template-reset recover plan|apply` finishes an interrupted
+  template reset or, for a mixed checkout, restores the configuration from
+  before it after `RESTORE`, keeping the current files under a recovery
+  reference. Neither is automatic and neither declares the old operation
+  successful.
+
 - `nixorium recovery status` and the Overview list what blocks operations —
   interrupted client update, unfinished USB installation, interrupted
   template reset, controller network recovery, held lock, invalid settings,

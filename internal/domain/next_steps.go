@@ -69,6 +69,10 @@ var nextSteps = map[string]NextStep{
 		Code: "CONTROLLER-NOT-APPLIED", Action: "Apply the saved configuration to this controller.",
 		TUI: "Maintenance → Apply to controller", Command: "nixorium controller plan",
 	},
+	"BACKUP-DUE": {
+		Code: "BACKUP-DUE", Action: "Create an encrypted backup of this controller and keep it, and its passphrase, away from it.",
+		TUI: "Maintenance → Back up the controller", Command: "nixorium backup create --to DIRECTORY",
+	},
 	"EVAL-FAILED": {
 		Code: "EVAL-FAILED", Action: "The configuration does not evaluate; run diagnostics and fix the first reported error. Do not retry other operations.",
 		TUI: "Maintenance → Diagnostics", Command: "nixorium doctor", Stop: true,

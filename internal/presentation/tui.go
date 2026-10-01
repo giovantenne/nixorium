@@ -102,6 +102,13 @@ type DashboardActions struct {
 	RemoteReservationPresent func() bool
 	// LoadRecovery observes persistent blockers without Nix evaluation.
 	LoadRecovery func(context.Context) domain.RecoveryReport
+	// Reviewed recoveries of interrupted operations.
+	PlanDeploymentRecovery  func(context.Context, bool) domain.DeploymentRecoveryPlan
+	ApplyDeploymentRecovery func(domain.DeploymentRecoveryPlan) domain.DeploymentRecoveryResult
+	PlanResetRecovery       func(context.Context) domain.TemplateResetRecoveryPlan
+	CreateBackup            func(string, []byte) domain.BackupReport
+	BackupDestination       func() string
+	ApplyResetRecovery      func(domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult
 }
 
 type dashboardScreen int
@@ -140,6 +147,8 @@ const (
 	dashboardInternet
 	dashboardCleanup
 	dashboardRecovery
+	dashboardRecoveryReview
+	dashboardBackup
 	dashboardShutdown
 	dashboardShutdownReview
 	dashboardShutdownResult
@@ -376,6 +385,8 @@ type dashboardModel struct {
 	// recovery is the last observation of persistent blockers.
 	recovery       domain.RecoveryReport
 	recoveryCursor int
+	recoveryReview recoveryReview
+	backup         backupModel
 }
 
 type dashboardStatusMsg struct {
@@ -1080,6 +1091,10 @@ func (model dashboardModel) View() tea.View {
 		content = model.cleanupView()
 	case dashboardRecovery:
 		content = model.recoveryView()
+	case dashboardRecoveryReview:
+		content = model.recoveryReviewView()
+	case dashboardBackup:
+		content = model.backupView()
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		content = model.shutdownView()
 	case dashboardDeploy, dashboardDeployReview:

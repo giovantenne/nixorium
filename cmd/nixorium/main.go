@@ -51,7 +51,13 @@ type options struct {
 	allowDowngrade     bool
 	allowUnverified    bool
 	acknowledgeUnknown bool
-	remove             bool
+	// acknowledgeUnreachable confirms that computers that could not be
+	// checked during a recovery review were inspected at their console.
+	acknowledgeUnreachable bool
+	backupTarget           string
+	backupFile             string
+	passphraseFile         string
+	remove                 bool
 }
 
 func main() {
@@ -62,13 +68,13 @@ func main() {
 // blocker. JSON output carries the same steps in its issues instead.
 func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int {
 	recorder := &nextStepRecorder{}
-	commandStdout := io.MultiWriter(stdout, recorder)
+	commandStdout := recordWriter(stdout, recorder)
 	for _, argument := range arguments {
 		if argument == "--json" {
 			commandStdout = stdout
 		}
 	}
-	code := runCommand(ctx, arguments, commandStdout, io.MultiWriter(stderr, recorder))
+	code := runCommand(ctx, arguments, commandStdout, recordWriter(stderr, recorder))
 	if code != 0 {
 		recorder.report(stderr)
 	}
@@ -155,7 +161,14 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 	case "host-key":
 		return runHostTrustCommand(ctx, repository, options, stdout, stderr)
 	case "deploy":
+		if strings.HasPrefix(options.subcommand, "recover") {
+			return runDeploymentRecoveryCommand(ctx, repository, options, stdout, stderr)
+		}
 		return runDeploymentCommand(ctx, repository, options, stdout, stderr)
+	case "template-reset":
+		return runTemplateResetRecoveryCommand(ctx, repository, options, stdout, stderr)
+	case "backup":
+		return runBackupCommand(ctx, repository, options, stdout, stderr)
 	case "controller":
 		return runControllerCommand(ctx, repository, options, stdout, stderr)
 	case "services":
@@ -533,6 +546,26 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadRecovery: func(ctx context.Context) domain.RecoveryReport {
 			return app.NewRecoveryInspector(local).Observe(ctx, repository)
 		},
+		PlanDeploymentRecovery: func(ctx context.Context, acknowledge bool) domain.DeploymentRecoveryPlan {
+			return app.NewDeploymentRecoveryManager(local).Plan(ctx, repository, acknowledge)
+		},
+		ApplyDeploymentRecovery: func(plan domain.DeploymentRecoveryPlan) domain.DeploymentRecoveryResult {
+			result := app.NewDeploymentRecoveryManager(local).Apply(ctx, plan, plan.ReviewToken)
+			result.Message = operationRecordMessage(result.Message, result)
+			return result
+		},
+		PlanResetRecovery: func(ctx context.Context) domain.TemplateResetRecoveryPlan {
+			return adapters.TemplateReset{}.PlanTemplateResetRecovery(ctx, repository)
+		},
+		CreateBackup: func(destination string, passphrase []byte) domain.BackupReport {
+			return local.CreateBackup(ctx, repository, destination, passphrase, nixoriumVersion)
+		},
+		BackupDestination: defaultBackupDestination,
+		ApplyResetRecovery: func(plan domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult {
+			result := adapters.TemplateReset{}.ApplyTemplateResetRecovery(ctx, plan)
+			result.Message = operationRecordMessage(result.Message, result)
+			return result
+		},
 		LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation}, nil)
 		},
@@ -590,7 +623,7 @@ func runWithManagedProgress[T any](action func() T, load func() (domain.Operatio
 }
 
 func commandRequiresRepository(options options) bool {
-	return options.command != "logs" && (options.command != "pxe" || (options.subcommand != "stop" && options.subcommand != "recover"))
+	return options.command != "logs" && (options.command != "backup" || options.subcommand == "create") && (options.command != "pxe" || (options.subcommand != "stop" && options.subcommand != "recover"))
 }
 
 func parseArguments(arguments []string) (options, error) {
@@ -600,6 +633,17 @@ func parseArguments(arguments []string) (options, error) {
 	result := options{}
 	for index := 0; index < len(arguments); index++ {
 		switch arguments[index] {
+		case "--to", "--passphrase-file":
+			flag := arguments[index]
+			index++
+			if index >= len(arguments) || arguments[index] == "" {
+				return options{}, fmt.Errorf("%s requires a path", flag)
+			}
+			if flag == "--to" {
+				result.backupTarget = arguments[index]
+			} else {
+				result.passphraseFile = arguments[index]
+			}
 		case "--repo":
 			index++
 			if index >= len(arguments) || arguments[index] == "" {
@@ -700,6 +744,8 @@ func parseArguments(arguments []string) (options, error) {
 			result.allowUnverified = true
 		case "--acknowledge-unknown-sessions":
 			result.acknowledgeUnknown = true
+		case "--acknowledge-unreachable":
+			result.acknowledgeUnreachable = true
 		case "--json":
 			result.json = true
 		case "--full":
@@ -723,7 +769,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "install", "support", "cleanup", "recovery":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "install", "support", "cleanup", "recovery", "template-reset", "backup":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -782,6 +828,10 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "preset-plan"
 				continue
 			}
+			if (result.command == "deploy" || result.command == "template-reset") && result.subcommand == "recover" {
+				result.subcommand = "recover-plan"
+				continue
+			}
 			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "workspace" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "cleanup") || result.subcommand != "" {
 				return options{}, errors.New("plan must follow config, deploy, controller, update, software, workspace, shutdown, restart, Internet, or git commit")
 			}
@@ -808,6 +858,10 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			if result.command == "software" && result.subcommand == "preset" {
 				result.subcommand = "preset-apply"
+				continue
+			}
+			if (result.command == "deploy" || result.command == "template-reset") && result.subcommand == "recover" {
+				result.subcommand = "recover-apply"
 				continue
 			}
 			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "" {
@@ -866,11 +920,27 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "start"
 		case "stop", "recover":
+			if arguments[index] == "recover" && (result.command == "deploy" || result.command == "template-reset") && result.subcommand == "" {
+				result.subcommand = "recover"
+				continue
+			}
 			if result.command != "pxe" || result.subcommand != "" {
 				return options{}, fmt.Errorf("%s must follow pxe", arguments[index])
 			}
 			result.subcommand = arguments[index]
-		case "reconcile", "reboot", "verify", "cancel", "close":
+		case "create", "verify", "restore":
+			if result.command == "backup" && result.subcommand == "" {
+				result.subcommand = arguments[index]
+				continue
+			}
+			if arguments[index] != "verify" {
+				return options{}, fmt.Errorf("%s must follow backup", arguments[index])
+			}
+			if result.command != "install" || result.subcommand != "usb" {
+				return options{}, errors.New("verify must follow install usb or backup")
+			}
+			result.subcommand = "usb-verify"
+		case "reconcile", "reboot", "cancel", "close":
 			if result.command != "install" || result.subcommand != "usb" {
 				return options{}, fmt.Errorf("%s must follow install usb", arguments[index])
 			}
@@ -878,6 +948,10 @@ func parseArguments(arguments []string) (options, error) {
 		default:
 			if result.command == "logs" && result.subcommand == "show" && result.logID == "" {
 				result.logID = arguments[index]
+				continue
+			}
+			if result.command == "backup" && (result.subcommand == "verify" || result.subcommand == "restore") && result.backupFile == "" {
+				result.backupFile = arguments[index]
 				continue
 			}
 			return options{}, fmt.Errorf("unknown argument %q", arguments[index])
@@ -897,7 +971,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply") || result.subcommand == "recover-apply") {
 		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
@@ -912,7 +986,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply") || result.subcommand == "recover-apply") {
 		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, or git commit apply")
 	}
 	if result.extension != "" && (result.command != "workspace" || result.subcommand != "marketplace") {
@@ -943,7 +1017,26 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("cleanup apply requires --expect from cleanup plan")
 		}
 	}
-	if result.command == "deploy" && result.subcommand != "plan" && result.subcommand != "apply" {
+	if (result.command == "deploy" || result.command == "template-reset") && strings.HasPrefix(result.subcommand, "recover") {
+		if result.subcommand != "recover-plan" && result.subcommand != "recover-apply" {
+			return options{}, fmt.Errorf("%s recover requires plan or apply", result.command)
+		}
+		if result.on != "" {
+			return options{}, errors.New("--on is not used by recovery; the interrupted record names its computers")
+		}
+		if result.subcommand == "recover-apply" && result.expect == "" {
+			return options{}, fmt.Errorf("%s recover apply requires --expect from %s recover plan", result.command, result.command)
+		}
+		if result.acknowledgeUnreachable && result.command != "deploy" {
+			return options{}, errors.New("--acknowledge-unreachable is only valid with deploy recover")
+		}
+	} else if result.command == "template-reset" {
+		return options{}, errors.New("template-reset accepts only recover plan or recover apply")
+	} else if result.acknowledgeUnreachable {
+		return options{}, errors.New("--acknowledge-unreachable is only valid with deploy recover")
+	}
+	recovering := strings.HasPrefix(result.subcommand, "recover-")
+	if result.command == "deploy" && !recovering && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("deploy requires the plan or apply subcommand")
 	}
 	if result.command == "controller" && result.subcommand != "plan" && result.subcommand != "apply" {
@@ -1039,6 +1132,24 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "services" && result.subcommand == "restart" && result.service == "" {
 		return options{}, errors.New("services restart requires cache")
 	}
+	if result.command == "backup" {
+		switch {
+		case result.subcommand != "create" && result.subcommand != "verify" && result.subcommand != "restore":
+			return options{}, errors.New("backup requires create, verify or restore")
+		case result.subcommand == "create" && result.backupTarget == "":
+			return options{}, errors.New("backup create requires --to <directory>")
+		case result.subcommand == "create" && result.backupFile != "":
+			return options{}, errors.New("backup create does not take a file")
+		case result.subcommand != "create" && result.backupFile == "":
+			return options{}, fmt.Errorf("backup %s requires the backup file", result.subcommand)
+		case result.subcommand == "verify" && result.backupTarget != "":
+			return options{}, errors.New("--to is only valid with backup create or restore")
+		case result.subcommand == "restore" && result.backupTarget == "":
+			return options{}, errors.New("backup restore requires --to <empty directory>")
+		}
+	} else if result.backupTarget != "" || result.passphraseFile != "" {
+		return options{}, errors.New("--to and --passphrase-file are only valid with backup")
+	}
 	if result.command == "recovery" && result.subcommand != "status" {
 		return options{}, errors.New("recovery accepts only the status subcommand")
 	}
@@ -1057,7 +1168,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "git" && (result.subcommand == "commit-plan" || result.subcommand == "commit-apply") && result.paths == "" {
 		return options{}, fmt.Errorf("git %s requires --paths", strings.ReplaceAll(result.subcommand, "-", " "))
 	}
-	if result.command == "deploy" && result.on == "" {
+	if result.command == "deploy" && !recovering && result.on == "" {
 		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
 	}
 	if result.command == "config" && result.subcommand == "apply" && result.expect == "" {
@@ -1184,7 +1295,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|cleanup plan|cleanup apply|recovery status|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
@@ -1206,6 +1317,13 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       internet plan --on <clients|@lab> --action <block|unblock>")
 	fmt.Fprintln(writer, "       internet apply --on <clients|@lab> --action <block|unblock> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
+	fmt.Fprintln(writer, "       backup create --to <directory> [--passphrase-file <file>]")
+	fmt.Fprintln(writer, "       backup verify <file> [--passphrase-file <file>]")
+	fmt.Fprintln(writer, "       backup restore <file> --to <empty-directory> [--passphrase-file <file>]")
+	fmt.Fprintln(writer, "       deploy recover plan [--acknowledge-unreachable]")
+	fmt.Fprintln(writer, "       deploy recover apply --expect <review-token> [--acknowledge-unreachable] [--yes]")
+	fmt.Fprintln(writer, "       template-reset recover plan")
+	fmt.Fprintln(writer, "       template-reset recover apply --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       cleanup plan --on <controller,pcNN,...|@lab>")
 	fmt.Fprintln(writer, "       cleanup apply --on <targets> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")

@@ -238,6 +238,10 @@ func (model dashboardModel) helpView() string {
 			break
 		}
 		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers")
+	case dashboardBackup:
+		lines = append(lines, "Tab next field   Enter write the backup   Esc cancel",
+			"The file is encrypted with the passphrase; keep both away from this controller.",
+			"Restore: nixorium backup restore FILE --to EMPTY-DIRECTORY, then follow the controller replacement steps in the troubleshooting guide.")
 	case dashboardCleanup:
 		lines = append(lines, "Space select   a select all   Enter review   Esc Maintenance",
 			fmt.Sprintf("Each computer keeps its newest %d system versions plus the running and booted ones; the review lists what goes.", domain.CleanupKeepGenerations),

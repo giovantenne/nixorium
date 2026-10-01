@@ -128,6 +128,23 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = "Status refresh failed. Check the laboratory again."
 		}
 		return model, nil
+	case recoveryPlanMsg:
+		model.busy = ""
+		if model.recoveryReview.kind == "deploy" {
+			model.recoveryReview.deployPlan = message.deploy
+		} else {
+			model.recoveryReview.resetPlan = message.reset
+		}
+		return model, nil
+	case backupResultMsg:
+		model.busy = ""
+		model.backup.result, model.backup.done = message.report, true
+		return model, nil
+	case recoveryResultMsg:
+		model.busy = ""
+		model.recoveryReview.done = true
+		model.recoveryReview.deployResult, model.recoveryReview.resetResult = message.deploy, message.reset
+		return model, nil
 	case recoveryMsg:
 		model.busy = ""
 		model.recovery = message.report
