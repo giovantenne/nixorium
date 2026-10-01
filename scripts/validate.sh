@@ -418,9 +418,18 @@ if [[ "${MODE}" == "--ci" ]]; then
   exit 0
 fi
 
-SITE_NIXORIUM_STORE=$(nix build "path:${SITE_DIR}#nixorium" \
+# Evaluating a deployment output passes through its whole host configuration
+# (several GiB). A separate evaluation releases that memory before the build,
+# which a single "nix build" would otherwise hold while compiling and testing.
+build_evaluated() {
+  local DRV
+  DRV=$(nix eval "$1.drvPath" --raw --no-write-lock-file)
+  shift
+  nix build "${DRV}^out" "$@"
+}
+
+SITE_NIXORIUM_STORE=$(build_evaluated "path:${SITE_DIR}#nixorium" \
   --print-out-paths \
-  --no-write-lock-file \
   --no-link)
 SITE_NIXORIUM="${SITE_NIXORIUM_STORE}/bin/nixorium"
 
@@ -463,8 +472,7 @@ DIRECT_CLIENT_DRV=$(
     --no-write-lock-file
 )
 
-nix build "path:${SITE_DIR}#installerBundle" \
-  --no-write-lock-file \
+build_evaluated "path:${SITE_DIR}#installerBundle" \
   --out-link "${TEMP_DIR}/installer-result"
 
 INSTALLER_STORE_PATH=$(readlink -f "${TEMP_DIR}/installer-result")

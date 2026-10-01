@@ -191,6 +191,12 @@ equivalence. A planning job lists the groups from that file, so a new group
 always gets its own job; an unknown shard name is rejected. Without the
 variable, `--full` still runs everything, as it does locally.
 
+Evaluating a generated deployment's outputs passes through its complete host
+configuration and needs several GiB. The template profiles therefore run one
+at a time in a shard, and site packages are built from a separately evaluated
+derivation, so a builder never competes with an evaluator still holding that
+memory. A 16 GB hosted runner otherwise runs out of memory and is shut down.
+
 Each disposable Ubuntu runner reclaims unused preinstalled SDK space, enables
 and checks KVM, and runs one Nix build at a time with four cores. Nix build and
 silence timeouts are disabled, while test-specific deadlines are preserved.
