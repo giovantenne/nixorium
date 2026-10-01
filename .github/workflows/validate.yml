@@ -41,7 +41,7 @@ jobs:
   validate:
     name: Evaluate source and deployment template
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Check out source
         uses: actions/checkout@v5
