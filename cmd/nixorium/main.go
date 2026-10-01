@@ -58,7 +58,24 @@ func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr))
 }
 
+// run adds the next step after a failed command whose output named a known
+// blocker. JSON output carries the same steps in its issues instead.
 func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int {
+	recorder := &nextStepRecorder{}
+	commandStdout := io.MultiWriter(stdout, recorder)
+	for _, argument := range arguments {
+		if argument == "--json" {
+			commandStdout = stdout
+		}
+	}
+	code := runCommand(ctx, arguments, commandStdout, io.MultiWriter(stderr, recorder))
+	if code != 0 {
+		recorder.report(stderr)
+	}
+	return code
+}
+
+func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Writer) int {
 	options, err := parseArguments(arguments)
 	if err != nil {
 		fmt.Fprintln(stderr, "Error:", err)

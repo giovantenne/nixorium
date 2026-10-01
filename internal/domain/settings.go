@@ -87,6 +87,8 @@ func ControllerStaticAddress(lab LabSettings) (string, error) {
 type ValidationIssue struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
+	// Next is attached at output boundaries for recognized blockers.
+	Next *NextStep `json:"next,omitempty"`
 }
 
 type ConfigValidationReport struct {

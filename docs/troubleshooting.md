@@ -40,6 +40,29 @@ intentionally slower. Use `nixorium logs show OPERATION_LOG_ID` for the bounded
 tail of a listed deployment log. Privileged systemd actions keep their full
 output in journald, so use the exact unit named by the failed report.
 
+## Error codes and next steps
+
+When an operation is refused or its result is uncertain, Nixorium names the
+next step: the TUI adds a `Next:` line to the notice, a failed CLI command
+ends with `Next (CODE): …`, and JSON issues carry a `next` object with the
+same code. The codes are stable:
+
+| Code | Situation | Next step |
+|---|---|---|
+| `OP-BUSY` | Another operation holds the lock | Wait or open its progress; see [Another operation is already running](#another-operation-is-already-running) |
+| `DEPLOY-PENDING` | An interrupted client update blocks operations | [Interrupted client deployment](#interrupted-client-deployment) |
+| `USB-RESERVED` | A USB installation is unfinished | [A USB installation was interrupted](#a-usb-installation-was-interrupted) |
+| `RESET-PENDING` | A deployment template reset was interrupted | [Deployment template reset recovery](https://github.com/giovantenne/nixorium/blob/master/docs/deployment-template-reset.md#backup-and-recovery) |
+| `GIT-DIRTY` | The configuration has uncommitted changes | [The Git tree is dirty](#the-git-tree-is-dirty) |
+| `REVIEW-EXPIRED` | The review is too old | Create a new review and confirm again |
+| `REVIEW-CHANGED` | Computers or files changed after the review | Create a new review and confirm again |
+| `PXE-ACTIVE` | Network installation is active or needs recovery | [The controller network is inconsistent](#the-controller-network-is-inconsistent) |
+| `SETTINGS-INVALID` | The laboratory settings no longer validate | [Configuration is invalid](#configuration-is-invalid) |
+| `CLIENT-UNCONFIRMED` | A request to a computer could not be confirmed | Check the computer in Computer inventory before retrying |
+| `DISK-LOW` | The Nix store is low on space | Maintenance → Free disk space |
+| `CONTROLLER-NOT-APPLIED` | The controller does not run the saved configuration | [Controller apply failed](#controller-apply-failed) |
+| `EVAL-FAILED` | The configuration does not evaluate | Run `nixorium doctor`; fix the first reported error; do not retry other operations |
+
 ## The controller DHCP lease changed
 
 Normal administration and Colmena deployment use the static laboratory address.

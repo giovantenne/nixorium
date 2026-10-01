@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Refusals and uncertain results name the next step with a stable code: the
+  TUI adds a `Next:` line to the notice, a failed CLI command ends with
+  `Next (CODE): …`, and JSON issues carry a `next` object. The codes are
+  explained in the troubleshooting guide.
+
 - A refused operation says what is running, who started it and when, for
   example "Update computers, started by admin at 10:02". The holder records
   itself in the operation lock; an unconfirmed record is ignored.

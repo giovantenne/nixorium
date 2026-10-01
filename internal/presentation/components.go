@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"github.com/giovantenne/nixorium/internal/domain"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -185,6 +186,9 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 			if notice.detail != "" {
 				lines = append(lines, "  "+notice.detail)
 			}
+			if line := noticeNextStep(notice); line != "" {
+				lines = append(lines, "  "+line)
+			}
 		}
 		regions.notices = strings.Join(lines, "\n")
 	}
@@ -273,4 +277,25 @@ func tuiHelpBinding(keys []string, label, description string) key.Binding {
 		key.WithKeys(keys...),
 		key.WithHelp(label, description),
 	)
+}
+
+// noticeNextStep names the way forward for a recognized blocker, unless the
+// notice already gives one.
+func noticeNextStep(notice tuiNotice) string {
+	if notice.kind == tuiStatusSuccess {
+		return ""
+	}
+	text := notice.title + " " + notice.detail
+	if strings.Contains(text, "Next:") {
+		return ""
+	}
+	step, found := domain.NextStepFor(text)
+	if !found {
+		return ""
+	}
+	line := "Next: " + step.Action
+	if step.TUI != "" {
+		line += " (" + step.TUI + ")"
+	}
+	return line
 }
