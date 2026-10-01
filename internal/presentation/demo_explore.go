@@ -366,9 +366,11 @@ func demoUpdate(model *dashboardModel, message tea.Msg) tea.Cmd {
 	return command
 }
 
-// demoSettle runs follow-up commands to completion. Timer and spinner ticks
-// are skipped: they only animate or poll, and waiting for them would make the
-// result depend on the clock.
+// demoSettle runs follow-up commands to completion. Timer, spinner and
+// cursor-blink ticks are skipped: they only animate or poll, and waiting for
+// them would make the result depend on the clock. Paths are replayed from the
+// start, so one waited blink would be paid again on every replay through a
+// text field.
 func demoSettle(model dashboardModel, command tea.Cmd) (dashboardModel, bool) {
 	pending := []tea.Cmd{command}
 	for steps := 0; len(pending) > 0 && steps < 64; steps++ {
@@ -415,7 +417,7 @@ func demoTimerCommand(command tea.Cmd) bool {
 		return false
 	}
 	name := function.Name()
-	return strings.Contains(name, "bubbletea/v2.Tick.") || strings.Contains(name, "bubbletea/v2.Every.") || strings.Contains(name, "bubbles/v2/spinner.")
+	return strings.Contains(name, "bubbletea/v2.Tick.") || strings.Contains(name, "bubbletea/v2.Every.") || strings.Contains(name, "bubbles/v2/spinner.") || strings.Contains(name, "bubbles/v2/cursor.")
 }
 
 // demoRunCommand runs one command, recovering a panic in a callback. The
