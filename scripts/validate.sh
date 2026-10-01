@@ -270,13 +270,18 @@ profile_state() {
   '
 }
 
+profile_check_failed() {
+  echo "Error: template profile check failed ($1): $PROFILE_STATE" >&2
+  exit 1
+}
+
 PROFILE_STATE=$(profile_state)
 jq -e '
   .chromiumPolicy and .screensaver and .desktopExtensions and
   .desktopExtensionDefaults and .desktopExtensionRepair and
   ((.docker or .vscodeHome or .vscodeHomeOwnership) | not) and
   .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null
+' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "default software"
 cp "$SITE_DIR/lab-software.json" "$TEMP_DIR/lab-software-profile.json"
 jq '.packages += [
   {"package": "docker", "scope": {"kind": "shared"}},
@@ -284,11 +289,18 @@ jq '.packages += [
 ] | .packages |= sort_by(.package)' \
   "$TEMP_DIR/lab-software-profile.json" > "$SITE_DIR/lab-software.json"
 PROFILE_STATE=$(profile_state)
+# The template's active student workspace profile owns the student's VS Code
+# extensions, so adding the package prepares only staff homes.
 jq -e '
   .chromiumPolicy and .docker and .screensaver and .desktopExtensions and
-  .desktopExtensionDefaults and .desktopExtensionRepair and .vscodeHome and
+  .desktopExtensionDefaults and .desktopExtensionRepair and (.vscodeHome | not) and
   .vscodeHomeOwnership and .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null
+' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "Docker and VS Code added"
+# Removing the browser and terminal also requires a student workspace profile
+# that no longer names them; the saved template profile does.
+cp "$SITE_DIR/workspace-profile.json" "$TEMP_DIR/workspace-profile.json"
+jq 'del(.browser) | .desktop.favorites |= map(select(. != "com.mitchellh.ghostty.desktop" and . != "chromium-browser.desktop"))' \
+  "$TEMP_DIR/workspace-profile.json" > "$SITE_DIR/workspace-profile.json"
 jq '.packages |= map(select(.package as $package | [
   "chromium",
   "docker",
@@ -302,8 +314,9 @@ jq -e '
   .desktopExtensions and .desktopExtensionDefaults and .desktopExtensionRepair and
   ((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and
   .homeOwnershipOrdering
-' <<<"$PROFILE_STATE" >/dev/null
+' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "minimal software"
 cp "$TEMP_DIR/lab-software-profile.json" "$SITE_DIR/lab-software.json"
+cp "$TEMP_DIR/workspace-profile.json" "$SITE_DIR/workspace-profile.json"
 
 if [[ "${MODE}" == "--ci" ]]; then
   eval_ci_group "$SITE_DIR" template >/dev/null
