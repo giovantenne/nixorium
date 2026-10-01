@@ -312,6 +312,10 @@ failure or timeout must block publication.
   resolution within that evaluator only; always parse/validate candidate JSON
   and retain downstream hooks and fresh evaluation after source or pin changes.
 - TUI screens receive typed application callbacks from `cmd/nixorium`; keep command execution, privilege checks, state reconciliation, and other operational logic out of `internal/presentation`.
+- Never leave the administrator or teacher stuck: every refusal names the next
+  step, persistent blockers appear on the Overview, and recovery is a reviewed
+  command, not a manual file edit. See the "Never leave the operator stuck"
+  rules in `skills/nixorium-developer/references/tui-design.md`.
 - Deployment recovery composes the existing USB worker callbacks, preserves
   exact selected identities, and always returns to fresh planning and explicit
   deployment confirmation. Never clear reservations or infer verified identity

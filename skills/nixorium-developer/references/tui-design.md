@@ -84,6 +84,39 @@ state, and the action that will happen now. Keep the existing token binding,
 rechecks, privilege boundaries, and typed callbacks; visual simplification must
 not weaken operational safety.
 
+## Never leave the operator stuck
+
+An administrator who is not a Nix or Git expert must always know the next
+step. Apply these rules to every operation, refusal and recovery state:
+
+1. Every `blocked`, `failed`, `partial` or `unconfirmed` result says what
+   happened in plain words, what changed and what did not, and the next action
+   as a TUI path and a CLI command, or that the operator should stop and
+   collect a support report.
+2. The dashboard always opens. When the laboratory cannot be read, offer
+   local diagnostics, recovery guidance, Git review and the support report
+   instead of only retrying.
+3. Every blocking condition that survives a restart (pending deployment, USB
+   reservation, interrupted template reset, PXE recovery, held operation lock)
+   is visible on the Overview when the dashboard opens, not only when an
+   operation is refused.
+4. No supported recovery requires editing, moving or deleting coordination
+   files, markers or JSON by hand. Add a reviewed command; keep the manual
+   procedure only as a documented fallback.
+5. A refused operation that is busy names the running operation, who started
+   it and when.
+6. Teachers never see administrative detail: they learn whether to try again
+   later or to ask the administrator, with a short code.
+7. Every loss of access (password, keys, controller disk) has a recovery
+   procedure exercised at least in a VM.
+8. Recovery adds a review; it never removes review tokens, rechecks,
+   privilege boundaries or typed confirmations.
+
+Before finishing a change, answer: what does the operator see if this stops
+halfway; does the residual state block other work and appear on the
+Overview; which command leads out of it; what does the teacher read; and
+which troubleshooting section explains it?
+
 ## Keep presentation modular
 
 The root Bubble Tea model should coordinate global window state, navigation,
