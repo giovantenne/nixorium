@@ -77,6 +77,7 @@ test_client_interface_mismatch_stops_before_erase() (
   load_lab_meta
   LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","ifaceName":"enp9s0"}]'
   load_lab_meta() { return 0; }
+  connected_interface() { echo eth0; }
   if OUTPUT=$(main pc01 /dev/vda 2>&1); then
     echo "installer accepted a missing configured interface" >&2
     exit 1
@@ -84,6 +85,7 @@ test_client_interface_mismatch_stops_before_erase() (
   grep -F "requires network interface 'enp9s0'" <<< "$OUTPUT" >/dev/null
   grep -F 'eth0' <<< "$OUTPUT" >/dev/null
   grep -F 'Settings > Network' <<< "$OUTPUT" >/dev/null
+  grep -F "started from the network through 'eth0'" <<< "$OUTPUT" >/dev/null
   ! grep -F 'DESTRUCTIVE REVIEW' <<< "$OUTPUT"
   test ! -e "$ACTION_LOG"
 )

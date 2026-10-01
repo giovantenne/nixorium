@@ -79,6 +79,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.finishWorkspaceMarketplace(message)
 	case dashboardRemoteFingerprintMsg:
 		return model.handleRemoteFingerprintMessage(message)
+	case dashboardRemoteInterfaceSavedMsg:
+		return model.handleRemoteInterfaceSaved(message)
 	case dashboardRemoteInstallMsg:
 		next, cmd := model.handleRemoteInstallMessage(message)
 		return model.withRemoteInstallWatch(next, cmd)

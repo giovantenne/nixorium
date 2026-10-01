@@ -167,3 +167,33 @@ func TestConfigReviewNeverRendersPasswordHash(t *testing.T) {
 		t.Fatalf("unsafe or incomplete review:\n%s", view.Content)
 	}
 }
+
+func TestClientInterfaceProposesTheControllerCardOnlyBeforeClientsExist(t *testing.T) {
+	draft := func(settings domain.LabSettingsFile) string {
+		model := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
+		for index, field := range model.fields {
+			if field.id == "lab.clientIfaceName" {
+				return model.drafts[index]
+			}
+		}
+		t.Fatal("installation form has no client interface field")
+		return ""
+	}
+	settings := domain.LabSettingsFile{}
+	settings.Lab.DeploymentMode = "controller"
+	settings.Lab.InterfaceName = "enp1s0"
+	settings.Lab.ControllerInterfaceName = "eno1"
+	if got := draft(settings); got != "eno1" {
+		t.Fatalf("first laboratory setup proposed %q, want the controller card eno1", got)
+	}
+	settings.Lab.DeploymentMode = "laboratory"
+	settings.Lab.PCCount = 5
+	if got := draft(settings); got != "" {
+		t.Fatalf("installed laboratory changed its client fallback to %q", got)
+	}
+	settings.Lab.ClientInterfaceName = "enp3s0"
+	settings.Lab.DeploymentMode = "controller"
+	if got := draft(settings); got != "enp3s0" {
+		t.Fatalf("saved client card replaced by %q", got)
+	}
+}

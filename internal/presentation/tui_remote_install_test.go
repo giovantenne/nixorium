@@ -499,7 +499,7 @@ func TestUSBInstallReviewFitsSupportedLayoutsAndSanitizesControlText(t *testing.
 			if _, err := writer.Write([]byte(view)); err != nil {
 				t.Fatal(err)
 			}
-			for _, expected := range []string{"Logical identity", "/dev/nvme0n1", "Type exactly", "Cancel safely"} {
+			for _, expected := range []string{"Step 6 of 6 · Check before erasing", "Disk to erase", "/dev/nvme0n1", "Type exactly", "Cancel safely"} {
 				if !strings.Contains(output.String(), expected) {
 					t.Fatalf("USB review lost %q with profile %v", expected, profile)
 				}
@@ -508,5 +508,88 @@ func TestUSBInstallReviewFitsSupportedLayoutsAndSanitizesControlText(t *testing.
 	}
 	if sanitized := sanitizeRemoteInstallText("failure\x1b[31m\x00detail"); strings.ContainsRune(sanitized, '\x1b') || strings.ContainsRune(sanitized, '\x00') {
 		t.Fatalf("remote control text was not sanitized: %q", sanitized)
+	}
+}
+
+func TestUSBInstallOffersTheLiveNetworkCardAndPreparesAgain(t *testing.T) {
+	response := remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{
+		{Name: "wlan0"},
+		{Name: "eno1", Addresses: []string{"192.0.2.20"}},
+	}
+	model := dashboardModel{
+		width: 120, height: 30, screen: dashboardUSBInstall,
+		installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallBootstrap, host: "pc01", operationID: remoteTUITestOperationID, address: "192.0.2.20"}},
+	}
+	var saved domain.LabSettingsFile
+	cancelled, prepared := 0, 0
+	model.actions = DashboardActions{
+		RemoteInstallRequest: func(request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+			if request.Operation != domain.RemoteInstallCancelOperation || request.OperationID != remoteTUITestOperationID {
+				t.Fatalf("unexpected request %+v", request)
+			}
+			cancelled++
+			return domain.RemoteInstallResponse{State: "cancelled", OperationID: remoteTUITestOperationID}, nil
+		},
+		LoadSettings: func(context.Context) (domain.LabSettingsFile, error) {
+			settings := domain.LabSettingsFile{}
+			settings.Lab.HostInterfaceNames = map[string]string{"pc02": "eno2"}
+			return settings, nil
+		},
+		PlanSettings: func(_ context.Context, candidate domain.LabSettingsFile) domain.ConfigPlanReport {
+			return domain.ConfigPlanReport{State: "valid"}
+		},
+		SaveSettings: func(candidate domain.LabSettingsFile, _ domain.ConfigPlanReport) domain.ConfigurationSaveReport {
+			saved = candidate
+			return domain.ConfigurationSaveReport{State: "saved"}
+		},
+		PrepareRemoteInstall: func(host string) (domain.RemoteInstallResponse, error) {
+			prepared++
+			return domain.RemoteInstallResponse{State: "artifacts-ready", OperationID: "next-operation"}, nil
+		},
+	}
+
+	next, _ := model.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "finalize", response: response})
+	model = next.(dashboardModel)
+	if model.installation.remote.stage != remoteInstallInterfaceMismatch || model.installation.remote.liveInterface != "eno1" {
+		t.Fatalf("stage=%d live=%q", model.installation.remote.stage, model.installation.remote.liveInterface)
+	}
+	view := model.View().Content
+	for _, expected := range []string{"set to use the network card enp1s0", "connected", "through eno1", "Use eno1 for pc01", "No disk has been touched"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("mismatch view omits %q:\n%s", expected, view)
+		}
+	}
+
+	next, command := model.updateRemoteInstallKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = next.(dashboardModel)
+	if command == nil {
+		t.Fatal("saving the network card started no command")
+	}
+	next, command = model.handleRemoteInterfaceSaved(command().(dashboardRemoteInterfaceSavedMsg))
+	model = next.(dashboardModel)
+	if cancelled != 1 || saved.Lab.HostInterfaceNames["pc01"] != "eno1" || saved.Lab.HostInterfaceNames["pc02"] != "eno2" {
+		t.Fatalf("cancelled=%d saved=%v", cancelled, saved.Lab.HostInterfaceNames)
+	}
+	if command == nil {
+		t.Fatal("the computer was not prepared again")
+	}
+	next, _ = model.handleRemoteInstallMessage(command().(dashboardRemoteInstallMsg))
+	model = next.(dashboardModel)
+	if prepared != 1 || model.installation.remote.stage != remoteInstallConsole || model.installation.remote.address != "192.0.2.20" {
+		t.Fatalf("prepared=%d stage=%d address=%q", prepared, model.installation.remote.stage, model.installation.remote.address)
+	}
+	if view := model.View().Content; !strings.Contains(view, "Type passwd again on the PC") {
+		t.Fatalf("console does not ask for a new password:\n%s", view)
+	}
+}
+
+func TestUSBInstallKeepsTheConfiguredNetworkCardWhenItMatches(t *testing.T) {
+	response := remoteTUITestPreparedResponse("prepared")
+	response.Session.Preparation.Facts.Interfaces = []domain.RemoteNetworkInterface{{Name: "enp1s0", Addresses: []string{"192.0.2.20"}}}
+	model := dashboardModel{width: 120, height: 30, screen: dashboardUSBInstall, installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallBootstrap, host: "pc01"}}}
+	next, _ := model.handleRemoteInstallMessage(dashboardRemoteInstallMsg{action: "finalize", response: response})
+	if stage := next.(dashboardModel).installation.remote.stage; stage != remoteInstallSelectDisk {
+		t.Fatalf("matching card left disk selection: stage %d", stage)
 	}
 }

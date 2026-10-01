@@ -90,7 +90,7 @@ func TestUSBInstallFailureStatesDiskEffectPlainly(t *testing.T) {
 func TestUSBInstallChecklistWaitsAndSizesAndIdentitiesAreReadable(t *testing.T) {
 	model := dashboardModel{screen: dashboardUSBInstall, height: 24, width: 100, busy: "Working", installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallFingerprint}}}
 	view := model.View().Content
-	if !strings.Contains(view, "Build pinned artifacts") || !strings.Contains(view, "Read live Ed25519 host key · in progress") || !strings.Contains(view, "Dispatch independent installer job · waiting") || strings.Contains(view, "! Dispatch") {
+	if !strings.Contains(view, "Prepare the system for this computer") || !strings.Contains(view, "Read the PC's fingerprint · in progress") || !strings.Contains(view, "Start the installation · waiting") || strings.Contains(view, "! Start") {
 		t.Fatalf("checklist shows pending steps as warnings:\n%s", view)
 	}
 	for size, want := range map[uint64]string{512: "512 B", 512110190592: "512.1 GB", 2000398934016: "2.0 TB"} {
@@ -105,7 +105,7 @@ func TestUSBInstallChecklistWaitsAndSizesAndIdentitiesAreReadable(t *testing.T) 
 	model = dashboardModel{screen: dashboardUSBInstall, height: 24, width: 100, installation: installationModel{remote: remoteInstallationModel{stage: remoteInstallSelectHost, hostCursor: 27}}}
 	model.report.Meta.Clients.Hosts = hosts
 	view = model.View().Content
-	if !strings.Contains(view, "pc28") || strings.Contains(view, "pc01 ") || !strings.Contains(view, "of 30 identities") {
+	if !strings.Contains(view, "pc28") || strings.Contains(view, "pc01 ") || !strings.Contains(view, "of 30 computers") {
 		t.Fatalf("identity list is not windowed around the selection:\n%s", view)
 	}
 }

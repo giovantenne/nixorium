@@ -204,7 +204,9 @@ or enable persistent root password access.
 
 If the address cannot be reached, check routing and wireless client isolation,
 and confirm that it is not the controller or a configured static client address.
-The declared client interface must carry that live address. USB/SSH does not
+The declared client interface must carry that live address; when it does not,
+the TUI offers to save the observed card for that computer and prepares it
+again. USB/SSH does not
 need PXE, ProxyDHCP, or a controller address transition, but the controller must
 reach the live client's SSH server and the client must reach the signed Harmonia
 cache. Wi-Fi profiles and credentials are not copied into the installed system:

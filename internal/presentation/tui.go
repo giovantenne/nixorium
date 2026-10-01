@@ -286,6 +286,7 @@ const (
 	remoteInstallPassword
 	remoteInstallBootstrap
 	remoteInstallSelectDisk
+	remoteInstallInterfaceMismatch
 	remoteInstallRotateHostKey
 	remoteInstallReview
 	remoteInstallApplying
@@ -308,8 +309,14 @@ type remoteInstallationModel struct {
 	confirmation       string
 	recovery           bool
 	bootstrapError     string
-	response           domain.RemoteInstallResponse
-	plan               domain.RemoteInstallPlanReport
+	// liveInterface is the network card that carries the live address when
+	// it differs from the one configured for the chosen computer.
+	liveInterface string
+	// passwordAgain asks for a new passwd after a restarted preparation:
+	// the previous connection locked the temporary password.
+	passwordAgain bool
+	response      domain.RemoteInstallResponse
+	plan          domain.RemoteInstallPlanReport
 	// details shows the raw result fields; watch paces automatic refresh.
 	details      bool
 	watch        uint64

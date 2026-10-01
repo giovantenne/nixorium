@@ -2,8 +2,11 @@ package presentation
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -59,96 +62,122 @@ func (model dashboardModel) selectedRemoteInstallDisk() (domain.RemoteDisk, bool
 
 func (model dashboardModel) remoteInstallView() string {
 	remote := model.installation.remote
-	lines := []string{tuiTitle("Install one computer from USB over SSH", model.isDark)}
+	lines := []string{tuiTitle("Install one computer from USB", model.isDark)}
+	if step, name := remoteInstallStep(remote.stage); step > 0 && model.busy == "" {
+		lines = append(lines, tuiMuted(fmt.Sprintf("Step %d of 6 · %s", step, name), model.isDark))
+	}
 	notices := []tuiNotice{}
 	actions := []tuiAction{{key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	fixedBody := ""
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
 		lines = append(lines, model.remoteInstallProgressLines()...)
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Controller work continues if this view closes", detail: "No disk is modified unless the content-bound review is confirmed."})
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "You can close this view; the controller keeps working", detail: "No disk is changed until you type the erase confirmation."})
 		actions = []tuiAction{{key: "q", label: "Detach"}, {key: "F1", label: "Help"}}
 		return model.renderShell(tuiShell{path: []string{"Installation", "USB over SSH"}, body: strings.Join(lines, "\n"), notices: notices, actions: actions})
 	}
 
 	switch remote.stage {
 	case remoteInstallSelectHost:
-		lines = append(lines,
-			"Select the Nixorium identity that will be installed. Reachability alone never reserves an identity.", "")
+		lines = append(lines, "",
+			"Which lab computer will this PC become? It keeps that name and address", "after installation.", "")
 		hosts := model.remoteInstallHosts()
 		if len(hosts) == 0 {
-			lines = append(lines, tuiStatus("No configured client identities are available", tuiStatusFailure, model.isDark))
+			lines = append(lines, tuiStatus("No client computers are configured yet", tuiStatusFailure, model.isDark), "Set the number of computers in Maintenance → Change settings → Computers.")
 		} else {
 			// Each identity takes two rows; keep the focused one visible.
 			start, end := listWindow(len(hosts), remote.hostCursor, max(2, (model.height-16)/2))
 			for index := start; index < end; index++ {
 				host := hosts[index]
-				detail := fmt.Sprintf("%s · %s", host.IP, host.Interface)
+				detail := fmt.Sprintf("address %s · network card %s", host.IP, host.Interface)
 				lines = append(lines, tuiSelection(host.Name, index == remote.hostCursor, model.isDark), tuiMuted("    "+detail, model.isDark))
 			}
 			if start > 0 || end < len(hosts) {
-				lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d identities", start+1, end, len(hosts)), model.isDark))
+				lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d computers", start+1, end, len(hosts)), model.isDark))
 			}
 		}
-		actions = []tuiAction{{key: "↑/↓", label: "Select identity"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
+		actions = []tuiAction{{key: "↑/↓", label: "Select computer"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
 	case remoteInstallConsole:
-		consoleTitle := "Keep the physical console visible"
-		consoleDetail := "The controller reads the Ed25519 host key without sending a password. You will compare its fingerprint on the next screen."
+		consoleTitle := "Keep the PC's screen visible"
+		consoleDetail := "The controller only reads the PC's fingerprint; no password is sent yet. You compare it on the next step."
 		if remote.recovery {
 			consoleTitle = "Restore access only to reconcile the reserved operation"
 			consoleDetail = "Re-enter the original live address. The controller will compare its observed key with the reserved identity before any password is sent."
 		}
-		lines = append(lines,
-			"On the physical client, boot the official NixOS Minimal 26.05 ISO in UEFI mode and use:",
-			"  passwd",
-			"  systemctl is-active sshd",
-			"  ip -4 -br address show scope global",
-			"  ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+		lines = append(lines, "",
+			"On the PC to install, start the official NixOS Minimal 26.05 ISO from USB",
+			"in UEFI mode, connect it to the network, then type these commands:",
 			"",
-			fmt.Sprintf("Identity:           %s", remote.host),
-			remoteInstallField("Live IPv4", remote.address, true, false),
+			"  1. passwd                                           set a temporary password",
+			"  2. systemctl is-active sshd                         should print: active",
+			"  3. ip -4 -br address show scope global              shows its IP address",
+			"  4. ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub shows its fingerprint",
+			"",
+			remoteInstallField("Computer", remote.host, false, false),
+			remoteInstallField("IP address of the PC", remote.address, true, false),
 		)
+		if remote.passwordAgain {
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Network card saved. Type passwd again on the PC", detail: "The previous temporary password was locked; set a new one, then continue."})
+		}
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: consoleTitle, detail: consoleDetail})
-		actions = []tuiAction{{key: "Enter", label: "Read host key"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+		actions = []tuiAction{{key: "Enter", label: "Read fingerprint"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallFingerprint:
-		lines = append(lines,
-			"Compare the complete fingerprint below with the output still visible on the physical client console.",
+		lines = append(lines, "",
+			"Compare this fingerprint with the one shown on the PC's screen (command 4).",
+			"It must be identical, character by character.",
 			"",
-			fmt.Sprintf("Identity:             %s", remote.host),
-			fmt.Sprintf("Live IPv4:            %s", remote.address),
-			fmt.Sprintf("Observed fingerprint: %s", remote.fingerprint),
+			remoteInstallField("Computer", remote.host, false, false),
+			remoteInstallField("IP address of the PC", remote.address, false, false),
+			remoteInstallField("Fingerprint", remote.fingerprint, false, false),
 		)
 		if remote.recovery && remote.response.Session != nil && remote.response.Session.Bootstrap != nil {
-			lines = append(lines, fmt.Sprintf("Reserved fingerprint: %s", remote.response.Session.Bootstrap.HostFingerprint))
+			lines = append(lines, remoteInstallField("Reserved fingerprint", remote.response.Session.Bootstrap.HostFingerprint, false, false))
 		}
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Confirm the physical host identity", detail: "Type MATCH only when the entire SHA256 fingerprint is identical. The temporary password has not been sent."})
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Type MATCH only if the two fingerprints are identical", detail: "This proves the controller is talking to the PC in front of you. The password has not been sent yet."})
 		actions = []tuiAction{{key: "Enter", label: "Confirm match"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallPassword:
-		lines = append(lines,
-			"The physical fingerprint was confirmed. Enter the temporary password created on the live ISO.",
+		lines = append(lines, "",
+			"The fingerprint matches. Type the temporary password you set with passwd.",
 			"",
-			fmt.Sprintf("Identity:             %s", remote.host),
-			fmt.Sprintf("Live IPv4:            %s", remote.address),
-			fmt.Sprintf("Pinned fingerprint:   %s", remote.fingerprint),
+			remoteInstallField("Computer", remote.host, false, false),
+			remoteInstallField("IP address of the PC", remote.address, false, false),
+			remoteInstallField("Fingerprint", remote.fingerprint, false, false),
 			remoteInstallField("Temporary password", remote.password, true, true),
 		)
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "One-time credential transition", detail: "The password is used once in memory, replaced by an operation key, and then cleared."})
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The password is used only once", detail: "It connects the controller, is replaced by a one-time key and is then forgotten."})
 		actions = []tuiAction{{key: "Enter", label: "Connect"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallSelectDisk:
-		lines = append(lines,
-			fmt.Sprintf("Verified live client: %s at %s", remote.host, remote.address),
-			"Select a disk explicitly. The live medium and any disk in use remain visible but excluded.", "")
+		lines = append(lines, "",
+			fmt.Sprintf("Connected to the PC that becomes %s (%s). Choose the disk to install on.", remote.host, remote.address),
+			"Disks that cannot be used, such as the USB stick, are listed but not selectable.", "")
 		preparation := remote.response.Session.Preparation
 		for index, disk := range preparation.Facts.Disks {
-			state := "eligible"
+			detail := fmt.Sprintf("%s · %s · serial %s", humanBytes(disk.SizeBytes), disk.Model, disk.Serial)
 			if !disk.Eligible {
-				state = "excluded: " + strings.Join(disk.ExclusionReasons, ", ")
+				detail = "not selectable: " + remoteDiskExclusions(disk.ExclusionReasons) + " · " + detail
 			}
-			detail := fmt.Sprintf("%s · %s · %s · %s", state, humanBytes(disk.SizeBytes), disk.Model, disk.Serial)
 			lines = append(lines, tuiSelection(disk.Path, index == remote.diskCursor, model.isDark), tuiMuted("    "+detail, model.isDark))
 		}
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The selected disk will be completely erased", detail: "Selection is checked again immediately before Disko; no excluded disk can be reviewed."})
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The chosen disk will be completely erased", detail: "You review it on the next step; it is checked again just before erasing."})
 		actions = []tuiAction{{key: "↑/↓", label: "Select disk"}, {key: "Enter", label: "Review disk"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+	case remoteInstallInterfaceMismatch:
+		configured := ""
+		if remote.response.Session != nil && remote.response.Session.Preparation != nil {
+			configured = remote.response.Session.Preparation.Host.Interface
+		}
+		lines = append(lines, "",
+			fmt.Sprintf("%s is set to use the network card %s, but this PC is connected", remote.host, configured),
+			fmt.Sprintf("through %s. With the wrong name it would start without its lab address.", remote.liveInterface),
+			"",
+			remoteInstallField("Computer", remote.host, false, false),
+			remoteInstallField("Configured card", configured, false, false),
+			remoteInstallField("This PC's card", remote.liveInterface, false, false),
+			"",
+			fmt.Sprintf("Enter saves %s for %s only, prepares its system again and comes back", remote.liveInterface, remote.host),
+			"to step 2. No disk has been touched.",
+		)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "After saving, type passwd again on the PC", detail: "The connection locked the previous temporary password; the IP address is kept."})
+		actions = []tuiAction{{key: "Enter", label: "Use " + remote.liveInterface + " for " + remote.host}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallRotateHostKey:
 		lines = append(lines,
 			"A different host key is already known for the target static address.",
@@ -157,27 +186,31 @@ func (model dashboardModel) remoteInstallView() string {
 		actions = []tuiAction{{key: "Enter", label: "Confirm rotation"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallReview:
 		plan := remote.plan
+		rotation := "no"
+		if plan.HostKeyRotation {
+			rotation = "yes"
+		}
 		lines = append(lines,
-			fmt.Sprintf("Logical identity:    %s", plan.Host.Name),
-			fmt.Sprintf("Physical session:   %s · %s", plan.Host.LiveIP, remoteInstallPlanFingerprint(remote.response)),
-			fmt.Sprintf("Installed address:  %s on %s", plan.Host.StaticIP, plan.Host.Interface),
-			fmt.Sprintf("Disk to erase:      %s · %s (%d bytes)", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes), plan.Disk.SizeBytes),
-			fmt.Sprintf("Disk serial / WWN:  %s / %s", plan.Disk.Serial, plan.Disk.WWN),
-			fmt.Sprintf("Revision:           %s", plan.Revision),
-			fmt.Sprintf("System closure:     %s", plan.SystemPath),
-			fmt.Sprintf("Signed cache:       %s", plan.CacheURL),
-			fmt.Sprintf("Host-key rotation:  %t", plan.HostKeyRotation),
+			remoteInstallField("Disk to erase", fmt.Sprintf("%s · %s (%d bytes)", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes), plan.Disk.SizeBytes), false, false),
+			remoteInstallField("Disk serial / WWN", plan.Disk.Serial+" / "+plan.Disk.WWN, false, false),
+			remoteInstallField("Computer", plan.Host.Name, false, false),
+			remoteInstallField("Address afterwards", plan.Host.StaticIP+" on "+plan.Host.Interface, false, false),
+			remoteInstallField("PC on the USB stick", plan.Host.LiveIP+" · "+remoteInstallPlanFingerprint(remote.response), false, false),
+			tuiMuted(fmt.Sprintf("  %-22s %s", "Revision", plan.Revision), model.isDark),
+			tuiMuted(fmt.Sprintf("  %-22s %s", "System", plan.SystemPath), model.isDark),
+			tuiMuted(fmt.Sprintf("  %-22s %s", "Signed cache", plan.CacheURL), model.isDark),
+			tuiMuted(fmt.Sprintf("  %-22s %s", "Replace known key", rotation), model.isDark),
 		)
-		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "This permanently erases only the reviewed disk", detail: "Type the exact confirmation below. The worker rechecks identity, cache, revision and disk before mutation."})
+		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Everything on this disk will be permanently deleted", detail: "Only this disk is erased. Computer, disk and revision are checked again just before erasing."})
 		actions = []tuiAction{{key: "Enter", label: "Erase and install"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallConfirmReboot, remoteInstallConfirmClose:
 		word := "REBOOT"
 		title := "Reboot the installed computer?"
-		detail := "Remove or deprioritize the USB medium before continuing. The reboot is sent once and then the static identity is verified separately."
+		detail := "Remove the USB stick first (or make the disk boot first). The PC restarts once, then the controller checks that it came back as installed."
 		if remote.stage == remoteInstallConfirmClose {
 			word = "CLOSE"
 			title = "Close without rebooting?"
-			detail = "The live key is revoked and the controller reservation is released. Reboot locally when ready."
+			detail = "The controller stops using the PC and frees its reservation. Restart the PC yourself when ready."
 		}
 		lines = append(lines, tuiTitle(title, model.isDark), detail)
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Type " + word + " to continue"})
@@ -192,7 +225,11 @@ func (model dashboardModel) remoteInstallView() string {
 		} else if remote.response.State == "ready-to-reboot" || remote.response.State == "reboot-requested" {
 			kind = tuiStatusAttention
 		}
-		notices = append(notices, tuiNotice{kind: kind, title: sanitizeRemoteInstallText(remote.response.Message)})
+		title := sanitizeRemoteInstallText(remote.response.Message)
+		if remote.response.State == "ready-to-reboot" {
+			title = "Installation completed. Remove the USB stick before restarting the PC."
+		}
+		notices = append(notices, tuiNotice{kind: kind, title: title})
 		actions = model.remoteInstallResultActions()
 	}
 
@@ -230,7 +267,7 @@ func remoteInstallField(label, value string, focused, secret bool) string {
 	if focused {
 		prefix = "> "
 	}
-	return fmt.Sprintf("%s%-22s %s", prefix, label+":", display)
+	return fmt.Sprintf("%s%-22s %s", prefix, label, display)
 }
 
 func remoteInstallPlanFingerprint(response domain.RemoteInstallResponse) string {
@@ -246,7 +283,7 @@ func (model dashboardModel) remoteInstallProgressLines() []string {
 	for _, item := range []struct {
 		stage remoteInstallationStage
 		label string
-	}{{remoteInstallPreparing, "Build pinned artifacts"}, {remoteInstallFingerprint, "Read live Ed25519 host key"}, {remoteInstallBootstrap, "Verify live ISO and replace password"}, {remoteInstallSelectDisk, "Transfer signed bundle and probe disks"}, {remoteInstallApplying, "Dispatch independent installer job"}} {
+	}{{remoteInstallPreparing, "Prepare the system for this computer"}, {remoteInstallFingerprint, "Read the PC's fingerprint"}, {remoteInstallBootstrap, "Connect and replace the temporary password"}, {remoteInstallSelectDisk, "Send the installer and list the disks"}, {remoteInstallApplying, "Start the installation"}} {
 		switch {
 		case remote.stage > item.stage:
 			lines = append(lines, tuiStatus(item.label, tuiStatusSuccess, model.isDark))
@@ -303,7 +340,7 @@ func (model dashboardModel) remoteInstallDetailLines() []string {
 		lines = append(lines, "Dispatch is uncertain: do not repeat apply; reconcile the same operation ID.")
 	}
 	if response.State == "ready-to-reboot" {
-		lines = append(lines, "", "Remove or deprioritize the USB medium before authorizing reboot.")
+		lines = append(lines, "", "Remove the USB stick (or make the disk boot first) before restarting.")
 	}
 	if response.State == "reconciliation-required" {
 		lines = append(lines, "", "Do not start another installation. Refresh this operation until its remote receipt is known.")
@@ -399,7 +436,7 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			remote.host = hosts[remote.hostCursor].Name
 			remote.stage = remoteInstallPreparing
-			model.busy = "Building the selected client closure and immutable installer bundle"
+			model.busy = "Preparing the system for this computer (can take a few minutes)"
 			host := remote.host
 			return model, func() tea.Msg {
 				response, err := model.actions.PrepareRemoteInstall(host)
@@ -426,7 +463,7 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			remote.fingerprint = ""
 			remote.confirmation = ""
 			remote.stage = remoteInstallFingerprint
-			model.busy = "Reading the live Ed25519 host key without sending a password"
+			model.busy = "Reading the PC's fingerprint (no password is sent)"
 			address := remote.address
 			return model.startRead(func(ctx context.Context) tea.Msg {
 				fingerprint, err := model.actions.ObserveRemoteInstall(ctx, address)
@@ -472,7 +509,7 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			secret := []byte(remote.password)
 			remote.password = ""
 			remote.stage = remoteInstallBootstrap
-			model.busy = "Verifying the pinned host identity and supported live ISO"
+			model.busy = "Connecting to the PC and checking its USB system"
 			host, address, fingerprint := remote.host, remote.address, remote.fingerprint
 			return model, func() tea.Msg {
 				response, err := model.actions.BootstrapRemoteInstall(host, address, fingerprint, secret)
@@ -481,6 +518,14 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 		default:
 			model.remoteInstallAppendInput(key.Text)
 		}
+	case remoteInstallInterfaceMismatch:
+		switch key.String() {
+		case "esc":
+			return model.cancelRemoteInstall()
+		case "enter":
+			return model.saveRemoteLiveInterface()
+		}
+		return model, nil
 	case remoteInstallSelectDisk:
 		disks := remote.response.Session.Preparation.Facts.Disks
 		switch key.String() {
@@ -516,18 +561,18 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 		return model.updateRemoteInstallConfirmation(key, remote.plan.Confirmation, func(model dashboardModel) (tea.Model, tea.Cmd) {
 			remote := &model.installation.remote
 			remote.stage = remoteInstallApplying
-			model.busy = "Revalidating the reviewed identity and dispatching the independent installer job"
+			model.busy = "Checking everything again and starting the installation"
 			request := domain.RemoteInstallRequest{Operation: domain.RemoteInstallApplyOperation, OperationID: remote.operationID, ReviewToken: remote.plan.ReviewToken, Confirmation: remote.plan.Confirmation}
 			return model.remoteInstallCommand("apply", request)
 		})
 	case remoteInstallConfirmReboot:
 		return model.updateRemoteInstallConfirmation(key, "REBOOT", func(model dashboardModel) (tea.Model, tea.Cmd) {
-			model.busy = "Sending the one-time reboot request"
+			model.busy = "Asking the PC to restart"
 			return model.remoteInstallCommand("reboot", domain.RemoteInstallRequest{Operation: domain.RemoteInstallRebootOperation, OperationID: model.installation.remote.operationID})
 		})
 	case remoteInstallConfirmClose:
 		return model.updateRemoteInstallConfirmation(key, "CLOSE", func(model dashboardModel) (tea.Model, tea.Cmd) {
-			model.busy = "Revoking the live key and closing the installed session"
+			model.busy = "Closing the connection to the PC"
 			return model.remoteInstallCommand("close", domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: model.installation.remote.operationID})
 		})
 	case remoteInstallResult:
@@ -541,13 +586,13 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			model.installation.flow = false
 			model.message = "Remote installation remains available by its operation ID."
 		case "r":
-			model.busy = "Refreshing the independent remote installation job"
+			model.busy = "Checking the installation"
 			return model.remoteInstallCommand("status", domain.RemoteInstallRequest{Operation: domain.RemoteInstallStatusOperation, OperationID: remote.operationID})
 		case "d":
 			remote.details = !remote.details
 			return model, nil
 		case "v":
-			model.busy = "Verifying the installed static identity, system closure and revision"
+			model.busy = "Checking that the PC started as installed"
 			return model.remoteInstallCommand("verify", domain.RemoteInstallRequest{Operation: domain.RemoteInstallVerifyOperation, OperationID: remote.operationID})
 		case "n":
 			if remote.response.State == "reconciliation-required" {
@@ -669,7 +714,7 @@ func (model dashboardModel) updateRemoteInstallConfirmation(key tea.KeyPressMsg,
 }
 
 func (model dashboardModel) planRemoteInstall(disk string, rotation bool) (tea.Model, tea.Cmd) {
-	model.busy = "Creating a content-bound review for the exact client and disk"
+	model.busy = "Preparing the review of the chosen disk"
 	return model.remoteInstallCommand("plan", domain.RemoteInstallRequest{Operation: domain.RemoteInstallPlanOperation, OperationID: model.installation.remote.operationID, Disk: disk, HostKeyRotation: rotation})
 }
 
@@ -679,7 +724,7 @@ func (model dashboardModel) cancelRemoteInstall() (tea.Model, tea.Cmd) {
 		model.screen = dashboardInstallationArea
 		return model, nil
 	}
-	model.busy = "Confirming safe cancellation, credential cleanup, and GC-root cleanup"
+	model.busy = "Cancelling and cleaning up"
 	return model.remoteInstallCommand("cancel", domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: model.installation.remote.operationID})
 }
 
@@ -797,7 +842,7 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 			return model.remoteInstallCommand("reconcile", domain.RemoteInstallRequest{Operation: domain.RemoteInstallReconcileOperation, OperationID: remote.operationID})
 		}
 		remote.stage = remoteInstallBootstrap
-		model.busy = "Verifying signed cache access, importing the installer bundle and probing disks"
+		model.busy = "Sending the installer from the signed cache and listing the disks"
 		return model.remoteInstallCommand("finalize", domain.RemoteInstallRequest{Operation: domain.RemoteInstallPrepareOperation, OperationID: remote.operationID, Host: remote.host})
 	case "finalize":
 		if message.response.Session == nil || message.response.Session.Preparation == nil {
@@ -808,6 +853,12 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		}
 		remote.stage = remoteInstallSelectDisk
 		remote.diskCursor = 0
+		remote.passwordAgain = false
+		preparation := message.response.Session.Preparation
+		if live := remoteLiveInterface(preparation.Facts, preparation.Host.LiveIP); live != "" && live != preparation.Host.Interface {
+			remote.liveInterface = live
+			remote.stage = remoteInstallInterfaceMismatch
+		}
 	case "plan":
 		if message.response.Plan == nil {
 			remote.stage = remoteInstallResult
@@ -828,4 +879,147 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 		}
 	}
 	return model, nil
+}
+
+// remoteInstallStep places an interactive stage in the six steps shown to
+// the operator; progress and result screens have no step number.
+func remoteInstallStep(stage remoteInstallationStage) (int, string) {
+	switch stage {
+	case remoteInstallSelectHost:
+		return 1, "Choose the computer"
+	case remoteInstallConsole:
+		return 2, "Start the PC from USB"
+	case remoteInstallFingerprint:
+		return 3, "Check the fingerprint"
+	case remoteInstallPassword:
+		return 4, "Temporary password"
+	case remoteInstallSelectDisk:
+		return 5, "Choose the disk"
+	case remoteInstallInterfaceMismatch:
+		return 5, "Check the network card"
+	case remoteInstallRotateHostKey, remoteInstallReview:
+		return 6, "Check before erasing"
+	}
+	return 0, ""
+}
+
+var remoteDiskExclusionLabels = map[string]string{
+	"boot-media":     "the USB stick you started from",
+	"live-media":     "the USB stick you started from",
+	"mounted":        "in use",
+	"holders-active": "in use",
+	"swap-active":    "used as swap",
+	"read-only":      "read-only",
+	"removable":      "removable drive",
+	"too-small":      "too small",
+	"not-disk":       "not a disk",
+}
+
+func remoteDiskExclusions(reasons []string) string {
+	labels := []string{}
+	for _, reason := range reasons {
+		label, known := remoteDiskExclusionLabels[reason]
+		if !known {
+			label = sanitizeRemoteInstallText(reason)
+		}
+		if !slices.Contains(labels, label) {
+			labels = append(labels, label)
+		}
+	}
+	return strings.Join(labels, ", ")
+}
+
+// remoteLiveInterface names the network card that carries the live address.
+func remoteLiveInterface(facts domain.RemoteMachineFacts, address string) string {
+	for _, networkInterface := range facts.Interfaces {
+		if slices.Contains(networkInterface.Addresses, address) {
+			return networkInterface.Name
+		}
+	}
+	return ""
+}
+
+type dashboardRemoteInterfaceSavedMsg struct {
+	err error
+}
+
+// saveRemoteLiveInterface cancels the prepared session, records the observed
+// network card for this computer only through the ordinary reviewed settings
+// save, and then prepares the computer again. The disk was never touched.
+func (model dashboardModel) saveRemoteLiveInterface() (tea.Model, tea.Cmd) {
+	remote := model.installation.remote
+	if model.actions.RemoteInstallRequest == nil || model.actions.LoadSettings == nil || model.actions.PlanSettings == nil || model.actions.SaveSettings == nil {
+		model.message = "Saving the network card is not available in this session."
+		return model, nil
+	}
+	host, live, operationID := remote.host, remote.liveInterface, remote.operationID
+	actions := model.actions
+	model.busy = "Saving the network card " + live + " for " + host
+	return model, func() tea.Msg {
+		cancelled, err := actions.RemoteInstallRequest(domain.RemoteInstallRequest{Operation: domain.RemoteInstallCancelOperation, OperationID: operationID})
+		if err != nil {
+			return dashboardRemoteInterfaceSavedMsg{err: fmt.Errorf("cancel the prepared session: %w", err)}
+		}
+		if cancelled.State != "cancelled" {
+			return dashboardRemoteInterfaceSavedMsg{err: fmt.Errorf("the prepared session was not cancelled (%s)", sanitizeRemoteInstallText(cancelled.State))}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		settings, err := actions.LoadSettings(ctx)
+		if err != nil {
+			return dashboardRemoteInterfaceSavedMsg{err: fmt.Errorf("read the laboratory settings: %w", err)}
+		}
+		names := map[string]string{}
+		for name, value := range settings.Lab.HostInterfaceNames {
+			names[name] = value
+		}
+		names[host] = live
+		settings.Lab.HostInterfaceNames = names
+		reviewed := actions.PlanSettings(ctx, settings)
+		if reviewed.HasErrors() {
+			return dashboardRemoteInterfaceSavedMsg{err: errors.New(remoteSettingsIssues(reviewed.Issues))}
+		}
+		saved := actions.SaveSettings(settings, reviewed)
+		if saved.State != "saved" && saved.State != "unchanged" {
+			message := saved.Message
+			if len(saved.Issues) > 0 {
+				message = remoteSettingsIssues(saved.Issues)
+			}
+			return dashboardRemoteInterfaceSavedMsg{err: errors.New(message)}
+		}
+		return dashboardRemoteInterfaceSavedMsg{}
+	}
+}
+
+func remoteSettingsIssues(issues []domain.ValidationIssue) string {
+	parts := []string{}
+	for _, issue := range issues {
+		parts = append(parts, issue.Field+": "+issue.Message)
+	}
+	return sanitizeRemoteInstallText(strings.Join(parts, "; "))
+}
+
+func (model dashboardModel) handleRemoteInterfaceSaved(message dashboardRemoteInterfaceSavedMsg) (tea.Model, tea.Cmd) {
+	model.busy = ""
+	remote := &model.installation.remote
+	if message.err != nil {
+		remote.stage = remoteInstallResult
+		remote.response = domain.RemoteInstallResponse{OperationID: remote.operationID, State: "failed", Message: "The network card was not saved: " + sanitizeRemoteInstallText(message.err.Error())}
+		return model, nil
+	}
+	if model.actions.PrepareRemoteInstall == nil {
+		model.message = "Remote installation preparation is not available."
+		return model, nil
+	}
+	remote.operationID, remote.fingerprint, remote.confirmation, remote.liveInterface = "", "", "", ""
+	remote.bootstrapError = ""
+	remote.passwordAgain = true
+	remote.stage = remoteInstallPreparing
+	model.busy = "Preparing the system for this computer again (can take a few minutes)"
+	host := remote.host
+	prepare := model.actions.PrepareRemoteInstall
+	return model, func() tea.Msg {
+		response, err := prepare(host)
+		return dashboardRemoteInstallMsg{action: "prepare", response: response, err: err}
+	}
 }

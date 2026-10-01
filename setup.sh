@@ -226,6 +226,14 @@ check_duplicate_identity() {
   esac
 }
 
+# The interface that carries this boot's IPv4 address, when exactly one does.
+connected_interface() {
+  local NAMES
+  NAMES=$(ip -o -4 address show scope global 2>/dev/null | awk '{ print $2 }' | sort -u)
+  [[ -n "$NAMES" && $(wc -l <<< "$NAMES") -eq 1 ]] || return 1
+  printf '%s\n' "$NAMES"
+}
+
 require_client_interface() {
   local CONFIGURED_INTERFACE INTERFACE
   CONFIGURED_INTERFACE=$(jq -er --arg name "$SELECTED_HOST" --arg fallback "$LAB_IFACE_NAME" '
@@ -246,7 +254,11 @@ require_client_interface() {
     [[ -e "$INTERFACE" && "${INTERFACE##*/}" != lo && ! -d "$INTERFACE/wireless" ]] || continue
     echo "  ${INTERFACE##*/}" >&2
   done
-  echo "On the controller, correct this client's interface in Settings > Network (or its hostIfaceNames override), save and prepare installation files again." >&2
+  CONNECTED_INTERFACE=$(connected_interface || true)
+  if [[ -n "$CONNECTED_INTERFACE" ]]; then
+    echo "This computer started from the network through '${CONNECTED_INTERFACE}': that is the name to use." >&2
+  fi
+  echo "On the controller, correct this client's interface in Settings > Network (Client computers' network interface, or its hostIfaceNames override), save and prepare installation files again." >&2
   echo "Installation stopped before erase confirmation; no disk operation was started." >&2
   return 1
 }

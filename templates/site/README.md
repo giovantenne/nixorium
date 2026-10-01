@@ -796,10 +796,14 @@ validators block overlap; choose a distinct static subnet before saving or
 updating an overlapping deployment. Field help explains each value and the
 editor previews the first/last client and controller addresses from the draft.
 The installation form asks for the client computers' interface and shows the
-controller interface separately. On each PXE client, the installer checks the
+controller interface separately. Before any client exists it proposes the
+controller's interface, since client PCs are often the same model; an
+installed laboratory keeps its saved value. On each PXE client, the installer checks the
 selected host's effective interface before the erase review. If it is absent,
 correct the client or host override on the controller, save, and prepare fresh
-installation files; the installer never changes the configuration itself.
+installation files; the installer never changes the configuration itself. It
+names the interface the PC started from the network through, which is the
+name to use.
 
 `setup install-secrets` starts a fixed sandboxed action that installs only
 verified key material to fixed destinations. After reviewed settings and public
@@ -916,7 +920,13 @@ state by itself (a read-only status request) and names the current step and
 elapsed time; the result then says in one sentence what happened and what to
 do next, with the raw fields behind `d`.
 
-The declared client interface must carry the reviewed live address. Wi-Fi
+The declared client interface must carry the reviewed live address. When the
+PC is connected through a differently named card, the TUI shows both names
+before disk selection and offers to save the observed card for that computer
+only (a `hostIfaceNames` override, through the ordinary reviewed settings save).
+It then cancels the prepared session, prepares the computer again and returns
+to the live console step; set a new temporary password with `passwd`, because
+the previous one was locked. No disk is touched. Wi-Fi
 profiles and credentials are not copied from the ISO into the installed system:
 arrange persistent connectivity separately, or reconnect locally as the
 administrator after boot before verifying the configured static address.

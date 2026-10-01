@@ -383,24 +383,25 @@ Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
 ```text
 Nixorium  /  Installation  /  USB over SSH
 
-Install one computer from USB over SSH
-Logical identity:    pc01
-Physical session:   192.168.1.141 · SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-Installed address:  10.42.0.11 on enp1s0
-Disk to erase:      /dev/nvme0n1 · 137.4 GB (137438953472 bytes)
-Disk serial / WWN:  NVME-DEMO / demo-wwn
-Revision:           0123456789abcdef0123456789abcdef01234567
-System closure:     /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo
-Signed cache:       http://10.42.0.99:5000
-Host-key rotation:  false
+Install one computer from USB
+Step 6 of 6 · Check before erasing
+  Disk to erase          /dev/nvme0n1 · 137.4 GB (137438953472 bytes)
+  Disk serial / WWN      NVME-DEMO / demo-wwn
+  Computer               pc01
+  Address afterwards     10.42.0.11 on enp1s0
+  PC on the USB stick    192.168.1.141 · SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+  Revision               0123456789abcdef0123456789abcdef01234567
+  System                 /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo
+  Signed cache           http://10.42.0.99:5000
+  Replace known key      no
 
 Type exactly
   ERASE /dev/nvme0n1 FOR pc01
 > _
 
 NOTICE
-× This permanently erases only the reviewed disk
-  Type the exact confirmation below. The worker rechecks identity, cache, revision and disk before mutation.
+× Everything on this disk will be permanently deleted
+  Only this disk is erased. Computer, disk and revision are checked again just before erasing.
 
 Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
 ```
@@ -410,7 +411,7 @@ Enter Erase and install  ·  Esc Cancel safely  ·  F1 Help
 ```text
 Nixorium  /  Installation  /  USB over SSH
 
-Install one computer from USB over SSH
+Install one computer from USB
 pc01 is installed and verified.
 
 Next: It now appears among the configured computers.

@@ -448,7 +448,9 @@ fingerprint, and asks for `MATCH` after a complete physical-console comparison.
 Never approve the fingerprint using DNS, a previous boot, or `known_hosts`.
 
 Use the declared client interface and verify that it carries the reviewed live
-address. Wi-Fi is not refused solely for being wireless; routing/firewall/AP
+address. When the live address is on another card, the TUI offers to save that
+card as the computer's `hostIfaceNames` override through the reviewed settings
+save, cancels the session and prepares again; a new `passwd` is needed. Wi-Fi is not refused solely for being wireless; routing/firewall/AP
 policy must allow SSH to the client and signed-cache access to the controller.
 Live Wi-Fi profiles are not copied into the installed system. Arrange persistent
 connectivity separately or reconnect locally as the administrator after boot,

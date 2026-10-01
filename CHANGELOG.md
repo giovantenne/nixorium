@@ -6,6 +6,28 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- When the laboratory is set up for the first time, the installation form
+  proposes the controller's network card for the client computers, which are
+  often the same model. Laboratories with configured clients keep their saved
+  value.
+
+- USB installation no longer stops when the PC is connected through a
+  differently named network card: before disk selection it shows the
+  configured and the observed card and offers to save the observed one for
+  that computer only, through the ordinary reviewed settings save. It then
+  cancels the prepared session, prepares the computer again and returns to
+  the live console step (a new `passwd` is needed). No disk is touched. The
+  PXE installer, which cannot change the configuration, now names the card
+  the PC started from the network through.
+
+- USB installation screens read more easily: each interactive screen shows
+  "Step N of 6", the live-ISO commands are numbered with what each one shows,
+  labels are aligned and in plain words (computer, IP address of the PC,
+  fingerprint), unusable disks say why (for example the USB stick you started
+  from), the erase review leads with the disk and moves revision, system and
+  cache to a muted technical block, and progress and waiting messages avoid
+  internal terms. Confirmation words and safety checks are unchanged.
+
 - The **Nixorium** launcher on the controller uses the Nixorium mark from
   nixorium.org, and the site template pins it first in the dock of the
   administrator and the teacher on the controller. Existing deployments get

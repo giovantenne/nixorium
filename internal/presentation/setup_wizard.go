@@ -122,6 +122,12 @@ func newSettingsEditorModel(settings domain.LabSettingsFile, fields []settingsFi
 	drafts := make([]string, len(fields))
 	for index, field := range fields {
 		drafts[index] = settingFieldValue(settings, field.id)
+		// Before any client exists, client PCs are usually the same model as
+		// the controller: propose its network card. Installed laboratories
+		// keep their saved value, which their clients already use.
+		if field.id == "lab.clientIfaceName" && drafts[index] == "" && (settings.Lab.DeploymentMode == "controller" || settings.Lab.PCCount == 0) {
+			drafts[index] = settings.Lab.ControllerInterface()
+		}
 	}
 	model := settingsWizardModel{settings: settings, fields: fields, title: title, drafts: drafts, replace: true, width: 80, height: 24}
 	model.prepareCurrentField()
@@ -379,7 +385,7 @@ func (model settingsWizardModel) View() tea.View {
 	if field.group == "Network" {
 		lines = append(lines, "Controller network interface: "+model.settings.Lab.ControllerInterface())
 		if field.id == "lab.clientIfaceName" {
-			lines = append(lines, "Use the interface name found on the client computers, for example enp1s0.", "Leave empty to use the shared fallback: "+model.settings.Lab.InterfaceName)
+			lines = append(lines, "Proposed: the controller's card (client PCs are often the same model).", "Empty uses the shared fallback: "+model.settings.Lab.InterfaceName)
 		}
 	}
 	if strings.Contains(model.title, "First setup") || strings.Contains(model.title, "first-run") {
