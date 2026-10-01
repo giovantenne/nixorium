@@ -123,6 +123,13 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 			return 0
 		}
 		return runDashboardProgram(ctx, repository, false, stderr)
+	case "recovery":
+		report := app.NewRecoveryInspector(local).Observe(ctx, repository)
+		if options.json {
+			err = presentation.JSON(stdout, report)
+		} else {
+			presentation.RecoveryText(stdout, report)
+		}
 	case "status":
 		report, inspectErr := inspector.Status(ctx, repository)
 		if inspectErr != nil {
@@ -523,6 +530,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return dashboardRemoteInstallRequest(ctx, repository, request, nil)
 		},
 		RemoteReservationPresent: local.RemoteReservationPresent,
+		LoadRecovery: func(ctx context.Context) domain.RecoveryReport {
+			return app.NewRecoveryInspector(local).Observe(ctx, repository)
+		},
 		LoadRemoteInstall: func(ctx context.Context) (domain.RemoteInstallResponse, error) {
 			return dashboardRemoteInstallRequest(ctx, repository, domain.RemoteInstallRequest{Operation: domain.RemoteInstallWorkerProbeOperation}, nil)
 		},
@@ -705,7 +715,7 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "usb-status"
 				continue
 			}
-			if (result.command == "setup" || result.command == "package-base") && result.subcommand == "" {
+			if (result.command == "setup" || result.command == "package-base" || result.command == "recovery") && result.subcommand == "" {
 				result.subcommand = "status"
 				continue
 			}
@@ -713,7 +723,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "install", "support", "cleanup":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "install", "support", "cleanup", "recovery":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -1029,6 +1039,9 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "services" && result.subcommand == "restart" && result.service == "" {
 		return options{}, errors.New("services restart requires cache")
 	}
+	if result.command == "recovery" && result.subcommand != "status" {
+		return options{}, errors.New("recovery accepts only the status subcommand")
+	}
 	if result.command == "logs" && result.subcommand != "" && result.subcommand != "show" {
 		return options{}, errors.New("logs accepts only the show subcommand")
 	}
@@ -1171,7 +1184,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|cleanup plan|cleanup apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|cleanup plan|cleanup apply|recovery status|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
@@ -1192,6 +1205,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       software apply --package <id> --scope <scope> [--remove] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       internet plan --on <clients|@lab> --action <block|unblock>")
 	fmt.Fprintln(writer, "       internet apply --on <clients|@lab> --action <block|unblock> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
 	fmt.Fprintln(writer, "       cleanup plan --on <controller,pcNN,...|@lab>")
 	fmt.Fprintln(writer, "       cleanup apply --on <targets> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")

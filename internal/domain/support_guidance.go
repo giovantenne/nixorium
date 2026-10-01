@@ -34,6 +34,15 @@ var supportGuides = map[string]string{
 	"COMMAND-COLMENA":        "build-resources-and-controller-tools",
 	"CLIENT-SSH":             "one-client-is-offline-or-unknown",
 	"CONTROLLER-BUILD":       "controller-apply-failed",
+	"TIME-SYNC":              "first-diagnostics",
+
+	"RECOVERY-DEPLOYMENT-PENDING":     "interrupted-client-deployment",
+	"RECOVERY-USB-RESERVED":           "a-usb-installation-was-interrupted",
+	"RECOVERY-TEMPLATE-RESET-PENDING": "error-codes-and-next-steps",
+	"RECOVERY-PXE-RECOVERY":           "the-controller-network-is-inconsistent",
+	"RECOVERY-OPERATION-BUSY":         "another-operation-is-already-running",
+	"RECOVERY-SETTINGS-INVALID":       "configuration-is-invalid",
+	"RECOVERY-CONTROLLER-NOT-APPLIED": "controller-apply-failed",
 }
 
 // SupportFindingIDs is an exact allowlist, never a prefix match for dynamic

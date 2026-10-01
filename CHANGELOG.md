@@ -6,6 +6,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- `nixorium recovery status` and the Overview list what blocks operations —
+  interrupted client update, unfinished USB installation, interrupted
+  template reset, controller network recovery, held lock, invalid settings,
+  controller not running its last applied configuration — each with its next
+  step, read from local state only. When the laboratory cannot be read, the
+  dashboard opens in safe mode with these items, diagnostics, Git review and
+  the support report instead of only retrying, and `nixorium doctor` still
+  reports local checks with the configuration error first. The doctor also
+  reports these blockers and an unsynchronized clock.
+
 - Refusals and uncertain results name the next step with a stable code: the
   TUI adds a `Next:` line to the notice, a failed CLI command ends with
   `Next (CODE): …`, and JSON issues carry a `next` object. The codes are

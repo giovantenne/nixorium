@@ -254,9 +254,95 @@ func (i *Inspector) hosts(ctx context.Context, repository, requested string) (do
 func (i *Inspector) Doctor(ctx context.Context, repository string, options DoctorOptions) (domain.DoctorReport, error) {
 	status, err := i.Status(ctx, repository)
 	if err != nil {
-		return domain.DoctorReport{}, err
+		return i.degradedDoctor(ctx, repository, err), nil
 	}
-	return i.doctorFromStatus(ctx, status, options), nil
+	report := i.doctorFromStatus(ctx, status, options)
+	i.addLocalFindings(ctx, repository, &report)
+	return report, nil
+}
+
+type clockSource interface {
+	ClockSynchronized() (bool, error)
+}
+
+// degradedDoctor still reports every check that needs no evaluated
+// configuration when the laboratory cannot be read.
+func (i *Inspector) degradedDoctor(ctx context.Context, repository string, statusErr error) domain.DoctorReport {
+	root, err := filepath.Abs(repository)
+	if err != nil {
+		root = repository
+	}
+	report := domain.DoctorReport{SchemaVersion: domain.SchemaVersion, Operation: "doctor", GeneratedAt: i.now().UTC(), State: "errors", Repository: root}
+	add := func(finding domain.Finding) {
+		report.Findings = append(report.Findings, finding)
+	}
+	summary := strings.TrimSpace(statusErr.Error())
+	if first, _, found := strings.Cut(summary, "\n"); found {
+		summary = first
+	}
+	add(domain.Finding{ID: "CONFIG-EVAL", Level: domain.LevelError, Summary: "The laboratory configuration could not be read", Evidence: summary, Remediation: "Fix the first reported error; see What blocks (`nixorium recovery status`) for interrupted operations. Do not retry other operations."})
+	for _, unit := range []string{HarmoniaUnit, PXEListenerUnit, PXENetworkUnit} {
+		service := i.source.ServiceState(ctx, unit)
+		if !service.Loaded {
+			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is not installed", Remediation: "Apply the saved configuration to this controller once it can be read."})
+		} else if unit == HarmoniaUnit && !service.Active {
+			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelWarning, Summary: service.Name + " is inactive", Evidence: service.State})
+		} else {
+			add(domain.Finding{ID: serviceFindingID(service.Name), Level: domain.LevelOK, Summary: service.Name + " is installed"})
+		}
+	}
+	i.addCacheKeyFinding(ctx, root, add)
+	if free, freeErr := i.source.FreeBytes(root); freeErr == nil {
+		level, summary := domain.LevelOK, "Disk has at least 10 GiB available"
+		if free < minimumFreeBytes {
+			level, summary = domain.LevelWarning, "Available disk space may be too low for Nix builds"
+		}
+		add(domain.Finding{ID: "DISK-FREE", Level: level, Summary: summary, Evidence: formatGiB(free)})
+	}
+	for _, command := range []string{"nix", "git", "systemctl", "ssh"} {
+		if !i.source.CommandAvailable(command) {
+			add(domain.Finding{ID: "COMMAND-" + strings.ToUpper(command), Level: domain.LevelError, Summary: command + " is unavailable"})
+		}
+	}
+	i.addLocalFindings(ctx, root, &report)
+	report.State = "errors"
+	return report
+}
+
+// addLocalFindings reports persistent blockers and the clock, when the source
+// can observe them.
+func (i *Inspector) addLocalFindings(ctx context.Context, repository string, report *domain.DoctorReport) {
+	add := func(finding domain.Finding) {
+		report.Findings = append(report.Findings, finding)
+		if finding.Level == domain.LevelError {
+			report.State = "errors"
+		} else if finding.Level == domain.LevelWarning && report.State == "healthy" {
+			report.State = "warnings"
+		}
+	}
+	if recovery, ok := i.source.(RecoverySource); ok {
+		for _, condition := range NewRecoveryInspector(recovery).Observe(ctx, repository).Conditions {
+			level := domain.LevelError
+			if condition.Kind == domain.RecoveryOperationBusy || condition.Kind == domain.RecoveryControllerChanged {
+				level = domain.LevelWarning
+			}
+			remediation := condition.Next.Action
+			if condition.Next.TUI != "" {
+				remediation += " (" + condition.Next.TUI + ")"
+			}
+			if condition.Next.Command != "" {
+				remediation += " `" + condition.Next.Command + "`"
+			}
+			add(domain.Finding{ID: "RECOVERY-" + strings.ToUpper(condition.Kind), Level: level, Summary: condition.Title, Evidence: condition.Detail, Remediation: remediation})
+		}
+	}
+	if clock, ok := i.source.(clockSource); ok {
+		if synchronized, err := clock.ClockSynchronized(); err == nil && !synchronized {
+			add(domain.Finding{ID: "TIME-SYNC", Level: domain.LevelWarning, Summary: "The controller clock is not synchronized", Remediation: "Check network time (`timedatectl`); review expiry and update checks depend on a correct clock."})
+		} else if err == nil {
+			add(domain.Finding{ID: "TIME-SYNC", Level: domain.LevelOK, Summary: "The controller clock is synchronized"})
+		}
+	}
 }
 
 func (i *Inspector) doctorFromStatus(ctx context.Context, status domain.StatusReport, options DoctorOptions) domain.DoctorReport {

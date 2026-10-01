@@ -138,20 +138,7 @@ func (model dashboardModel) homeView() string {
 		menu = newDashboardTaskMenu(model.isDark, model.width, model.height)
 	}
 	if model.initialError {
-		notices := append(model.managedJobNotices(), tuiNotice{
-			kind: tuiStatusFailure, title: "The laboratory could not be opened",
-			detail: model.message + " No configuration or computer was changed.",
-		})
-		actions := []tuiAction{{key: "Enter", label: "Try again"}, {key: "q", label: "Quit"}, {key: "F1", label: "Help"}}
-		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
-			actions = append([]tuiAction{{key: "v", label: "View progress"}}, actions...)
-		}
-		return model.renderShell(tuiShell{
-			path:    []string{"Overview"},
-			body:    "The saved laboratory state is not available yet.",
-			notices: notices,
-			actions: actions,
-		})
+		return model.safeModeView()
 	}
 	if model.initializing {
 		return model.renderShell(tuiShell{

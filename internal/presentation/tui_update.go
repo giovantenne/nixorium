@@ -87,6 +87,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardInitialMsg:
 		model.jobs.items, model.jobs.err, model.jobs.id = message.jobs, message.jobsErr, message.jobsID
 		model.usbReserved = message.usbReserved
+		model.recovery = message.recovery
 		poll := model.scheduleManagedJobsTick()
 		model.busy = ""
 		model.initializing = false
@@ -127,6 +128,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.message = "Status refresh failed. Check the laboratory again."
 		}
 		return model, nil
+	case recoveryMsg:
+		model.busy = ""
+		model.recovery = message.report
+		model.recoveryCursor = min(model.recoveryCursor, max(0, len(message.report.Conditions)-1))
+		return model, nil
 	case overviewRefreshMsg:
 		model.busy = ""
 		if message.err != nil {
@@ -137,6 +143,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		message.report.Meta = model.report.Meta
 		model.report, model.setup = message.report, message.setup
 		model.usbReserved = message.usbReserved
+		model.recovery = message.recovery
 		model.message = "Local observations refreshed; clients were not checked."
 		return model, nil
 	case dashboardDoctorMsg:

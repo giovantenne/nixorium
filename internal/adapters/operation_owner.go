@@ -3,6 +3,7 @@ package adapters
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/giovantenne/nixorium/internal/domain"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -32,10 +33,7 @@ type operationOwner struct {
 // OperationBusyError reports a held lock and, when it can be confirmed, its
 // holder.
 type OperationBusyError struct {
-	Operation string
-	User      string
-	StartedAt time.Time
-	Known     bool
+	domain.OperationHolder
 }
 
 func (err *OperationBusyError) Error() string {
@@ -47,16 +45,7 @@ func (err *OperationBusyError) Error() string {
 
 // Holder describes the running operation in a few words.
 func (err *OperationBusyError) Holder() string {
-	if !err.Known {
-		return "an operation whose owner is not recorded"
-	}
-	description := err.Operation
-	if err.User != "" && err.User != "root" {
-		description += ", started by " + err.User
-	} else {
-		description += ", started"
-	}
-	return description + " at " + err.StartedAt.Local().Format("15:04")
+	return err.Description()
 }
 
 // Labels for privileged units that record only their program name.

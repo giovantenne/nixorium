@@ -30,6 +30,20 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			add("pending-jobs", managedJobTitle(job.Operation)+" — "+job.State, "View observed progress and its journal. No job will be started.")
 		}
 	}
+	for _, condition := range model.recovery.Conditions {
+		switch condition.Kind {
+		case domain.RecoveryDeploymentPending:
+			add("pending-deploy-recovery", condition.Title, condition.Detail)
+		case domain.RecoveryResetPending:
+			add("pending-reset-recovery", condition.Title, condition.Detail)
+		case domain.RecoveryOperationBusy:
+			add("pending-busy", condition.Title, condition.Detail)
+		case domain.RecoverySettingsInvalid:
+			add("pending-settings", condition.Title, condition.Detail)
+		case domain.RecoveryControllerChanged:
+			add("pending-controller", condition.Title, condition.Detail)
+		}
+	}
 	if model.usbReserved {
 		add("pending-usb", "A USB installation is unfinished", "Open it to resume, verify or close it. Other computer operations wait until then.")
 	}
@@ -82,9 +96,10 @@ func (model dashboardModel) overviewTasks() []dashboardTask {
 
 type overviewRefreshMsg struct {
 	usbReserved bool
+	recovery    domain.RecoveryReport
 	report      domain.StatusReport
-	setup  domain.SetupReport
-	err    error
+	setup       domain.SetupReport
+	err         error
 }
 
 func (model dashboardModel) refreshOverview() (tea.Model, tea.Cmd) {
@@ -95,7 +110,7 @@ func (model dashboardModel) refreshOverview() (tea.Model, tea.Cmd) {
 	model.busy = "Refreshing local configuration and service observations"
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		report, setup, err := model.actions.LoadInitial(ctx)
-		return overviewRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent()}
+		return overviewRefreshMsg{report: report, setup: setup, err: err, usbReserved: model.usbReservationPresent(), recovery: model.observeRecovery(ctx)}
 	})
 }
 
@@ -127,6 +142,8 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		return model.openNetworkInstallation()
 	case "pending-usb":
 		return model.openUSBInstallation()
+	case "pending-deploy-recovery", "pending-reset-recovery", "pending-busy", "pending-settings":
+		return model.openRecovery()
 	case "pending-git":
 		if model.actions.LoadGitReview != nil {
 			return model.openMaintenanceTask("g")

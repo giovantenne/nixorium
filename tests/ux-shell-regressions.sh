@@ -139,4 +139,11 @@ done
   if (main --apply 'x; rm -rf /' >/dev/null 2>&1); then echo "cleanup accepted an invalid digest" >&2; exit 1; fi
 )
 
+# Every next-step code is explained in the troubleshooting guide.
+while IFS= read -r CODE; do
+  grep -F "\`${CODE}\`" "$REPO_ROOT/docs/troubleshooting.md" >/dev/null \
+    || { echo "next-step code ${CODE} is not explained in docs/troubleshooting.md" >&2; exit 1; }
+done < <(sed -n 's/^\t"\([A-Z-]*\)": {$/\1/p' "$REPO_ROOT/internal/domain/next_steps.go")
+[[ "$(sed -n 's/^\t"\([A-Z-]*\)": {$/\1/p' "$REPO_ROOT/internal/domain/next_steps.go" | wc -l)" -ge 10 ]]
+
 echo 'UX shell regression tests passed.'

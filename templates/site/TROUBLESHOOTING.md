@@ -24,9 +24,18 @@ describes retained metadata and limitations. There is no upload or automatic
 fix. The detailed commands below may display private values and raw errors;
 do not attach their output without a separate review.
 
+Start with what blocks operations. `nixorium recovery status` reads only local
+state (no Nix evaluation, no network) and lists each interrupted or blocking
+item with its next step; the Overview shows the same items when the dashboard
+opens. When the laboratory cannot be read at all, the dashboard opens in
+**safe mode** with these lists, diagnostics, Git review and the support report.
+`nixorium doctor` still reports local checks in that case, with the first
+configuration error as `CONFIG-EVAL`.
+
 Run these read-only commands from the deployment repository:
 
 ```sh
+nixorium recovery status
 nixorium status
 nixorium doctor
 nixorium setup status

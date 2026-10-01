@@ -9,6 +9,13 @@ show the time of the last session observation, not live state. Refresh local
 state updates only saved configuration and local observations; open inventory
 to check clients. An empty list is not evidence that the fleet is current.
 
+`nixorium recovery status` (TUI: Overview rows, or safe mode when the
+laboratory cannot be read) lists persistent blockers — interrupted client
+update, unfinished USB installation, interrupted template reset, controller
+network recovery, held lock, invalid settings, controller not running its
+last applied configuration — each with its next step, from local state only.
+Refusals carry stable codes (`Next (CODE): …`, JSON `next`).
+
 A refused operation names the running one when the lock holder can be
 confirmed ("Update computers, started by admin at 10:02"); never remove the
 lock. The Overview lists an unfinished USB installation; `nixorium install usb

@@ -164,6 +164,24 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				model.busy = "Opening the laboratory and checking setup progress"
 				model.message = ""
 				return model.loadInitial()
+			case "b":
+				if model.actions.LoadRecovery != nil && !model.actions.ClassroomMode {
+					return model.openRecovery()
+				}
+			case "d":
+				if model.actions.LoadDoctor != nil && !model.actions.ClassroomMode {
+					model.diagnosticReturn = dashboardHome
+					model.screen = dashboardDiagnostics
+					return model.startDiagnostics()
+				}
+			case "s":
+				if model.actions.PreviewSupport != nil && !model.actions.ClassroomMode {
+					return model.openSupportPreview()
+				}
+			case "g":
+				if model.actions.LoadGitReview != nil && !model.actions.ClassroomMode {
+					return model.openMaintenanceTask("g")
+				}
 			}
 			return model, nil
 		}
@@ -678,6 +696,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		return model.updateInternet(key)
 	case dashboardCleanup:
 		return model.updateCleanup(key)
+	case dashboardRecovery:
+		return model.updateRecovery(key)
 	case dashboardSoftware:
 		return model.updateSoftware(key)
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:

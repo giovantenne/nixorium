@@ -100,6 +100,8 @@ type DashboardActions struct {
 	// RemoteReservationPresent reports, without starting the worker, whether
 	// a USB installation still holds the controller reservation.
 	RemoteReservationPresent func() bool
+	// LoadRecovery observes persistent blockers without Nix evaluation.
+	LoadRecovery func(context.Context) domain.RecoveryReport
 }
 
 type dashboardScreen int
@@ -137,6 +139,7 @@ const (
 	dashboardSoftware
 	dashboardInternet
 	dashboardCleanup
+	dashboardRecovery
 	dashboardShutdown
 	dashboardShutdownReview
 	dashboardShutdownResult
@@ -370,6 +373,9 @@ type dashboardModel struct {
 	// usbReserved is the last local observation of an unfinished USB
 	// installation; the worker is consulted only when it is opened.
 	usbReserved bool
+	// recovery is the last observation of persistent blockers.
+	recovery       domain.RecoveryReport
+	recoveryCursor int
 }
 
 type dashboardStatusMsg struct {
@@ -379,12 +385,13 @@ type dashboardStatusMsg struct {
 
 type dashboardInitialMsg struct {
 	usbReserved bool
+	recovery    domain.RecoveryReport
 	jobs        []domain.ManagedJob
-	jobsErr error
-	jobsID  uint64
-	report  domain.StatusReport
-	setup   domain.SetupReport
-	err     error
+	jobsErr     error
+	jobsID      uint64
+	report      domain.StatusReport
+	setup       domain.SetupReport
+	err         error
 }
 
 type dashboardBeginInitialMsg struct{}
@@ -994,7 +1001,7 @@ func (model dashboardModel) loadInitial() (tea.Model, tea.Cmd) {
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		jobs, jobsErr := model.observeManagedJobs(ctx)
 		report, setup, err := model.actions.LoadInitial(ctx)
-		return dashboardInitialMsg{report: report, setup: setup, err: err, jobs: jobs, jobsErr: jobsErr, jobsID: model.jobs.id, usbReserved: model.usbReservationPresent()}
+		return dashboardInitialMsg{report: report, setup: setup, err: err, jobs: jobs, jobsErr: jobsErr, jobsID: model.jobs.id, usbReserved: model.usbReservationPresent(), recovery: model.observeRecovery(ctx)}
 	})
 }
 
@@ -1071,6 +1078,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.internetView()
 	case dashboardCleanup:
 		content = model.cleanupView()
+	case dashboardRecovery:
+		content = model.recoveryView()
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		content = model.shutdownView()
 	case dashboardDeploy, dashboardDeployReview:
