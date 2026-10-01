@@ -414,13 +414,13 @@ func renderSoftwareProfileDemo(revision string, width, height int) DemoScenario 
 		SchemaVersion: domain.SoftwarePresetSchemaVersion,
 		DefaultPreset: "essential",
 		Presets: []domain.SoftwarePreset{
-			{ID: "essential", Label: "Essential", Description: "Browser, terminal, fonts, npm, Pi and OpenCode", Packages: []string{"chromium", "ghostty", "liberation_ttf", "nodejs", "opencode", "pi-coding-agent"}},
-			{ID: "general-education", Label: "General education", Description: "Documents, spelling, web access and media playback", Packages: []string{"chromium", "libreoffice-qt", "nodejs", "opencode", "pi-coding-agent", "vlc"}},
+			{ID: "essential", Label: "Essential", Description: "Browser, terminal, fonts, npm and the lab screensaver", Packages: []string{"chromium", "ghostty", "liberation_ttf", "nodejs", "python3Packages.terminaltexteffects"}},
+			{ID: "general-education", Label: "General education", Description: "Documents, spelling, web access and media playback", Packages: []string{"chromium", "libreoffice-qt", "nodejs", "vlc"}},
 			{ID: "programming", Label: "Programming", Description: "Editors and common development toolchains", Packages: []string{"git", "nodejs", "opencode", "pi-coding-agent", "python3", "vscode"}},
-			{ID: "graphics", Label: "Graphics and illustration", Description: "Raster, vector and digital painting tools", Packages: []string{"gimp", "inkscape", "krita", "nodejs", "opencode", "pi-coding-agent"}},
-			{ID: "multimedia", Label: "Audio and video", Description: "Audio editing, screen recording and video production", Packages: []string{"audacity", "nodejs", "obs-studio", "opencode", "pi-coding-agent", "vlc"}},
-			{ID: "cad-3d", Label: "CAD and 3D modelling", Description: "Parametric CAD, modelling and rendering", Packages: []string{"blender", "freecad", "nodejs", "opencode", "pi-coding-agent"}},
-			{ID: "stem", Label: "STEM and scientific computing", Description: "Numerical, plotting and symbolic mathematics tools", Packages: []string{"gnuplot", "maxima", "nodejs", "octave", "opencode", "pi-coding-agent"}},
+			{ID: "graphics", Label: "Graphics and illustration", Description: "Raster, vector and digital painting tools", Packages: []string{"gimp", "inkscape", "krita", "nodejs"}},
+			{ID: "multimedia", Label: "Audio and video", Description: "Audio editing, screen recording and video production", Packages: []string{"audacity", "nodejs", "obs-studio", "vlc"}},
+			{ID: "cad-3d", Label: "CAD and 3D modelling", Description: "Parametric CAD, modelling and rendering", Packages: []string{"blender", "freecad", "nodejs"}},
+			{ID: "stem", Label: "STEM and scientific computing", Description: "Numerical, plotting and symbolic mathematics tools", Packages: []string{"gnuplot", "maxima", "nodejs", "octave"}},
 		},
 	}
 	actions.LoadSoftware = func(ctx context.Context) domain.SoftwareCatalogReport { return catalog }

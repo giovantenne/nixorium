@@ -108,8 +108,6 @@ let
     "git"
     "liberation_ttf"
     "nodejs"
-    "opencode"
-    "pi-coding-agent"
     "python3Packages.terminaltexteffects"
   ];
   siteProfilesEvaluate = builtins.all
@@ -446,6 +444,11 @@ assert builtins.all
   sitePresetCatalog.presets;
 assert builtins.all
   (preset: builtins.elem "vscode" preset.packages == (preset.id == "programming"))
+  sitePresetCatalog.presets;
+assert builtins.all
+  (preset: builtins.all
+    (package: builtins.elem package preset.packages == (preset.id == "programming"))
+    [ "opencode" "pi-coding-agent" ])
   sitePresetCatalog.presets;
 assert builtins.all (item: item != null && item.availability == "available") siteProfileResolved;
 assert siteProfilesEvaluate;

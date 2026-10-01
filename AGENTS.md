@@ -283,8 +283,8 @@ failure or timeout must block publication.
   equal for that default, validate every profile against the locked package
   set in laboratory and controller-only modes, and serialize the optional
   catalog into the offline installer without changing existing deployments.
-  Every template profile includes Git, Node/npm, Pi and OpenCode; VS Code
-  remains a Programming choice. The controller management module and packaged
+  Every template profile includes Git and Node/npm; Pi, OpenCode and VS Code
+  remain Programming choices. The controller management module and packaged
   command must both carry Git so interactive administration and Nixorium
   operations never depend on the selected deployment profile. Keep npm globals
   user-owned under `~/.local/npm`.

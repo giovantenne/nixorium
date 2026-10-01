@@ -428,8 +428,8 @@ rules and folder listings. The server runs as the student account and listens
 on this computer only; the folder is emptied with the rest of the home at every
 boot, and on the controller it serves the student account's folder.
 
-Every profile includes Git, the Ghostty/TTE lab screensaver, Node.js (and npm),
-Pi and OpenCode. Git is available to every user and is also a runtime
+Every profile includes Git, the Ghostty/TTE lab screensaver and Node.js (and
+npm); Programming also includes the Pi and OpenCode coding agents. Git is available to every user and is also a runtime
 dependency of the controller management workflows. The screensaver therefore
 remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and
 Tiling Assistant are installed as workstation basics in every profile. The
@@ -449,7 +449,8 @@ receive the defaults and a fresh random wallpaper after their ordinary home
 reset; the login helper preserves that wallpaper. All assets and
 extensions come from the locked Nix packages and work without login downloads.
 
-Pi and OpenCode have a reproducible system version available to every user. npm
+Where Programming is selected, Pi and OpenCode have a reproducible system
+version available to every user. npm
 global installs use `~/.local/npm` and take precedence in the user's shell, so
 admin or teacher can try a newer upstream CLI without `sudo`:
 

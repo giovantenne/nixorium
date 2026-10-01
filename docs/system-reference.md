@@ -399,12 +399,12 @@ filesystem paths must belong to either the upstream or private deployment
 source tree. `deploymentStatus` reports placeholders, public default password
 hashes, and missing public keys separately from successful Flake evaluation.
 The public template's seven profiles are fully expanded deployment data.
-Essential is the default for new repositories and its eight `shared`
+Essential is the default for new repositories and its six `shared`
 declarations match the initial `lab-software.json`; existing repositories are
 never rewritten when they update Nixorium. Profile metadata is serialized into
 the offline installer source alongside the effective package declarations.
-All seven profiles include `git`, `nodejs`, `pi-coding-agent`, and `opencode`;
-only Programming includes `vscode` and its toolchain-coupled extension payload.
+All seven profiles include `git` and `nodejs`; only Programming includes
+`pi-coding-agent`, `opencode`, `vscode` and its toolchain-coupled extension payload.
 Programming also carries the C/C++ (`gcc`, `gdb`, `gnumake`, `cmake`), Java,
 Python and PHP toolchains, `mysql84` and `mysql-workbench`. Where `mysql84` is
 selected, the site development module runs a teaching MySQL server that

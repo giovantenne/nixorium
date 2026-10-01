@@ -5,15 +5,13 @@
     {
       "id": "essential",
       "label": "Essential",
-      "description": "A browser, terminal, Git, fonts, lab screensaver, npm and system-managed Pi and OpenCode CLIs for a small workstation.",
+      "description": "A browser, terminal, Git, fonts, lab screensaver and npm for a small workstation.",
       "packages": [
         "chromium",
         "ghostty",
         "git",
         "liberation_ttf",
         "nodejs",
-        "opencode",
-        "pi-coding-agent",
         "python3Packages.terminaltexteffects"
       ]
     },
@@ -31,8 +29,6 @@
         "liberation_ttf",
         "libreoffice-qt",
         "nodejs",
-        "opencode",
-        "pi-coding-agent",
         "python3Packages.terminaltexteffects",
         "vlc"
       ]
@@ -40,7 +36,7 @@
     {
       "id": "programming",
       "label": "Programming",
-      "description": "General classroom software plus VS Code, C/C++, Java, Python and web/PHP toolchains, a local Apache web server, a local MySQL server and MySQL Workbench.",
+      "description": "General classroom software plus VS Code, C/C++, Java, Python and web/PHP toolchains, a local Apache web server, a local MySQL server, MySQL Workbench, and the Pi and OpenCode coding agents.",
       "packages": [
         "apacheHttpd",
         "chromium",
@@ -88,8 +84,6 @@
         "liberation_ttf",
         "libreoffice-qt",
         "nodejs",
-        "opencode",
-        "pi-coding-agent",
         "python3Packages.terminaltexteffects",
         "vlc"
       ]
@@ -111,8 +105,6 @@
         "libreoffice-qt",
         "nodejs",
         "obs-studio",
-        "opencode",
-        "pi-coding-agent",
         "python3Packages.terminaltexteffects",
         "vlc"
       ]
@@ -133,8 +125,6 @@
         "liberation_ttf",
         "libreoffice-qt",
         "nodejs",
-        "opencode",
-        "pi-coding-agent",
         "python3Packages.terminaltexteffects",
         "vlc"
       ]
@@ -157,8 +147,6 @@
         "maxima",
         "nodejs",
         "octave",
-        "opencode",
-        "pi-coding-agent",
         "python3Packages.terminaltexteffects",
         "vlc"
       ]

@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The Pi and OpenCode coding agents are now part of the Programming software
+  profile only. The other six profiles, including the default Essential, no
+  longer install them, and new deployments start without them. Existing
+  deployments keep their `lab-software.json` unchanged; remove the two
+  packages in Software if they are not wanted.
+
 - The controller setup command explains itself and reads more easily: an
   introduction lists the five steps and says that nothing changes before
   `ERASE`; steps are numbered; keyboard layouts are named and the time zone

@@ -135,15 +135,14 @@ Add Essential?
 One local change adds every missing declaration shown below.
 
 Destination  this controller and all current or future clients
-Packages     5 add · 0 keep scope · 1 excluded
+Packages     4 add · 0 keep scope · 1 excluded
 Clients      5 affected by new declarations
 
 ✓ Validated together against the pinned package set
 › + chromium · add for this controller and all current or future clients
   + ghostty · add for this controller and all current or future clients
   + nodejs · add for this controller and all current or future clients
-  + opencode · add for this controller and all current or future clients
-  + pi-coding-agent · add for this controller and all current or future clients
+  + python3Packages.terminaltexteffects · add for this controller and all current or future clients
 
 Now          Save one update to lab-software.json
 Later        Apply to the controller and update affected computers through their normal reviews
