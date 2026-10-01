@@ -93,17 +93,11 @@ func backupPassphrase(options options, stderr io.Writer) ([]byte, error) {
 	return passphrase, nil
 }
 
-// defaultBackupDestination suggests the first mounted removable drive of the
-// administrator, so the backup does not stay on the controller.
+// defaultBackupDestination suggests the administrator's home directory: it
+// is always writable, and the screen reminds to copy the file elsewhere.
 func defaultBackupDestination() string {
-	if user := os.Getenv("USER"); user != "" {
-		if entries, err := os.ReadDir(filepath.Join("/run/media", user)); err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					return filepath.Join("/run/media", user, entry.Name())
-				}
-			}
-		}
+	if home, err := os.UserHomeDir(); err == nil {
+		return home
 	}
 	return ""
 }

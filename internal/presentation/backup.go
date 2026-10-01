@@ -133,7 +133,7 @@ func (model dashboardModel) backupView() string {
 	} else {
 		lines = append(lines,
 			tuiMuted("One encrypted file with the configuration and its history, the private keys and the trusted computer keys.", model.isDark),
-			tuiMuted("Store it away from this controller. Without the passphrase nobody, including you, can read it.", model.isDark), "")
+			tuiMuted("Then copy it away from this controller, for example to a USB drive. Without the passphrase nobody, including you, can read it.", model.isDark), "")
 		fields := []struct{ label, value string }{
 			{"Directory", b.destination},
 			{"Passphrase", strings.Repeat("•", len(b.passphrase))},
