@@ -293,10 +293,9 @@ on native hosts, outside home templates and snapshots. Initial rollout uses a
 fresh permission store and can require reapproval of existing portal grants.
 Never clone this state between users or machines or place tokens in Git.
 
-The former `veyonNativeHosts` setting has been removed. A settings file that
-still contains it is rejected with a message naming the key; delete the key
-before updating Nixorium. After deployment, approve GNOME sharing locally, then
-test monitoring, input, lock/unlock, demo, service restart, logout/login and
+The deprecated `veyonNativeHosts` string list remains accepted for 2.x
+compatibility and has no effect. Existing settings need no change. After
+deployment, approve GNOME sharing locally, then test monitoring, input, lock/unlock, demo, service restart, logout/login and
 reboot/home reset. The controller also needs approval for screen broadcasts.
 Veyon still uses RFB internally; removing the bridge does not remove that
 protocol or its local native implementation.

@@ -533,7 +533,7 @@ failure or timeout must block publication.
 - `labOverlay` composes Veyon's official overlay with local PipeWire and RGB32 rendering fixes. It is applied in each host's module list and in `colmena.meta.nixpkgs`.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
-- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. Every lab host uses native PipeWire capture. The former `veyonNativeHosts` setting is removed and rejected with an explicit message by both validators; never reintroduce it, the external bridge or the shared VNC password. The private key is not managed by Nix (see Security).
+- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. Every lab host uses native PipeWire capture. The deprecated `veyonNativeHosts` string list remains accepted and ignored for 2.x compatibility; never use it to select capture behavior or restore the external bridge or shared VNC password. The private key is not managed by Nix (see Security).
 - `modules/firewall.nix` enables the firewall everywhere, disables implicit
   all-interface SSH/Avahi openings, and uses nftables. Client TCP 22/11100
   admits only the static controller IPv4 address on the lab interface, with

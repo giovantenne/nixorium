@@ -153,15 +153,21 @@ func TestSharedLabSettingsValidationCases(t *testing.T) {
 	}
 }
 
-func TestRemovedVeyonNativeHostsKeyIsNamedInTheError(t *testing.T) {
-	data, err := MarshalLabSettings(validSettings())
-	if err != nil {
-		t.Fatal(err)
-	}
-	legacy := strings.Replace(string(data), `"lab": {`, `"lab": {"veyonNativeHosts": [],`, 1)
-	_, issues := DecodeLabSettings([]byte(legacy))
-	if len(issues) != 1 || issues[0].Field != "$" || !strings.Contains(issues[0].Message, "lab.veyonNativeHosts was removed") {
-		t.Fatalf("removed key did not produce the actionable error: %#v", issues)
+func TestDeprecatedVeyonNativeHostsRoundTrip(t *testing.T) {
+	for _, hosts := range [][]string{{}, {"master", "pc01"}, {"retired-host"}} {
+		settings := validSettings()
+		settings.Lab.VeyonNativeHosts = hosts
+		data, err := MarshalLabSettings(settings)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, issues := DecodeLabSettings(data)
+		if len(issues) != 0 {
+			t.Fatalf("deprecated field rejected: %+v", issues)
+		}
+		if strings.Join(decoded.Lab.VeyonNativeHosts, ",") != strings.Join(hosts, ",") {
+			t.Fatalf("deprecated values lost on save: %+v", decoded.Lab.VeyonNativeHosts)
+		}
 	}
 }
 

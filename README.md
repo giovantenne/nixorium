@@ -18,6 +18,9 @@ Internet access for installation or system deployment.
 > `master` may contain unreleased changes: consult documentation at your
 > selected release tag.
 
+For 2.1 upgrade notes, including network validation and deprecated settings,
+see the [changelog](CHANGELOG.md#210---2026-10-01).
+
 Learn what Nixorium is designed for and how it is used in a lab:
 [nixorium.org](https://nixorium.org/).
 

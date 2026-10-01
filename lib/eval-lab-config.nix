@@ -135,6 +135,11 @@ let
             type = lib.types.str;
             description = "XKB keyboard layout";
           };
+          veyonNativeHosts = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [];
+            description = "Deprecated compatibility field; ignored because every host uses native Veyon capture";
+          };
           consoleKeyMap = lib.mkOption {
             type = lib.types.str;
             description = "Linux console keymap";
@@ -169,9 +174,6 @@ let
     (name: !isNonEmpty config.${name})
     requiredNonEmptyFields;
 in
-# Name the removed key before the module system reports an unknown option.
-assert !(builtins.isAttrs rawConfig && rawConfig ? veyonNativeHosts)
-  || throw "veyonNativeHosts was removed because every laboratory host uses native Veyon capture; delete this key from the deployment settings";
 assert (config.deploymentMode == "controller" && config.pcCount == 0)
   || (config.deploymentMode == "laboratory" && config.pcCount > 0)
   || throw "pcCount must be zero in controller mode and positive in laboratory mode";

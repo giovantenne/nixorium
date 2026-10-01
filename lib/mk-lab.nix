@@ -84,6 +84,7 @@ let
   inherit (config) extraLocale;
   inherit (config) keyboardLayout;
   inherit (config) consoleKeyMap;
+  inherit (config) veyonNativeHosts;
 
   networkOctets = map lib.toInt (lib.splitString "." networkBase);
   networkAddress =
@@ -180,6 +181,7 @@ let
     inherit extraLocale;
     inherit keyboardLayout;
     inherit consoleKeyMap;
+    inherit veyonNativeHosts;
     inherit cachePublicKey;
     inherit cachePort;
     inherit pxeHttpPort;

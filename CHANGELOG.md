@@ -6,6 +6,35 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-01
+
+### Upgrade notes
+
+- The deprecated `veyonNativeHosts` string list remains accepted and ignored
+  for compatibility with 2.0 deployments. Every laboratory host continues to
+  use native Veyon capture; removing this field is not required for updating.
+- Controller DHCP addresses inside the static laboratory subnet are now
+  rejected. Existing overlapping configurations must choose a distinct static
+  laboratory subnet before an update can validate.
+- Existing deployments retain their software declarations and template files.
+  The new template's software and student-profile defaults require a new
+  deployment or an explicitly reviewed deployment template reset.
+- For users tracking unreleased `master` revisions: remove the experimental
+  `mkLab.workspaceRuntimeEnabled` argument from hand-written callers. It was
+  introduced and removed after 2.0.0; a supplied workspace profile now selects
+  the managed boot reset without a separate runtime switch.
+
+### Highlights
+
+- Encrypted controller backups, guided recovery of interrupted operations,
+  reviewed Git discard and cleanup of old system generations.
+- Guided student preferences and pinned VS Code extensions, expanded
+  Programming tools, and restricted classroom controls for teachers.
+- Clearer controller and USB installation, actionable diagnostics, and a
+  dashboard that shows only work needing attention.
+
+### Changed
+
 - The Overview shows rows above the menu only when something needs action,
   under "Needs attention". The "No pending work observed" line and the
   "Clients last checked" reminder are gone; Computer inventory still shows
@@ -205,11 +234,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   controller already runs the saved configuration it says so and offers only
   a way back. `controller plan` reports the same `changes`.
 
-- Breaking: remove the public `mkLab.workspaceRuntimeEnabled` argument. A
-  supplied workspace profile always configures student preferences at normal
-  boot after system application. The site template ships active Essential
-  defaults without a personalization switch or migration step. Remove the old
-  argument from hand-written callers; no deployment migration is provided.
+- A supplied workspace profile configures student preferences at normal boot
+  after system application. The site template ships active Essential defaults.
   Workspace review leads with readable preference changes, not JSON, and
   clearly separates saving from system application and boot-time restoration.
 
@@ -331,11 +357,6 @@ The project follows [Semantic Versioning](https://semver.org/).
   whitespace, so setup cannot treat uncommitted managed configuration as saved.
   Git warnings are kept separate from parsed status records.
 
-- **Breaking:** removed the obsolete `veyonNativeHosts` setting. Every
-  laboratory host already uses native Veyon capture, so the key selected
-  nothing. `lab-settings.json` (or a legacy `lab-config.nix`) that still
-  contains it is now rejected with a message naming the key. Delete the key
-  and commit before updating to this release.
 - Made shell validation independent of the developer's boot firmware and the
   location of host executables, using an injectable UEFI probe and distinct
   PXE store fixtures built from the locked inputs.
@@ -387,17 +408,18 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Added an opt-in workspace preparation API with strict preference validation,
   deployment-owned catalog/baseline resolution, pinned extension metadata and
   prerequisite checks on the controller and every client. Preparation metadata
-  is preserved in the offline installer; it does not activate student-home
-  preferences or change legacy deployment behavior.
-- Added a separate default-off managed-home runtime for the configured student
+  is preserved in the offline installer. Reading preparation metadata does
+  not activate preferences; profile-free deployments retain legacy behavior.
+- Added a profile-selected managed-home runtime for the configured student
   on the controller and clients. It builds an immutable shell/Git/XDG and
   preference seed, composes wallpapers, validates pinned extension payloads,
   and restores only at normal boot. Guarded snapshots and durable failure
   evidence block unsafe retries and login after an incomplete reset. Existing
   template content is not imported automatically.
-- Added an inactive Essential workspace example, a deployment-owned starter
-  catalog and an explicit migration review. New templates can validate a first
-  candidate without activating it; older pins and existing homes stay unchanged.
+- Added an active Essential workspace profile, a deployment-owned starter
+  catalog and a Programming profile example. Existing deployments acquire
+  these template files only through an explicitly reviewed template reset;
+  framework updates alone do not replace private template files.
 - Added a read-only workspace candidate-resolution hook for exact preference,
   version and destination previews without temporarily saving a profile.
 - Added the internal workspace review/save application contract with complete
@@ -411,13 +433,14 @@ The project follows [Semantic Versioning](https://semver.org/).
   content remains untouched; committing does not deploy the profile.
 - Added a guided student workspace editor under Maintenance → Settings.
   Desktop/dock, pinned editor extensions/settings and browser choices share the
-  CLI review/save boundary, preserve inheritance and ordered favorites, and
-  offer a separate Git review after saving. The editor never enables runtime,
-  deploys systems, captures a home or changes current student preferences.
+  CLI review/save boundary and preserve inheritance and ordered favorites.
+  The ordinary TUI records the reviewed profile in a local commit and offers
+  a separate controller review; CLI apply only saves the profile. Saving does
+  not deploy systems, capture a home or change current student preferences.
 - Update reviews now compare existing workspace package/extension versions,
   dependencies and preferences across the current and proposed pins, with the
-  comparison bound to the review token. Changed reset opt-in or destinations
-  require separate migration; builds do not certify actual plugin loading.
+  comparison bound to the review token. Saving remains separate from system
+  application and boot-time reset; builds do not certify actual plugin loading.
 - Added a release-checkpoint VM test for the pinned VS Code/Live Server pair:
   real extension activation and local HTTP serving with external traffic
   blocked, editable student preferences, and boot-only profile updates and
@@ -1346,7 +1369,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.5...v2.0.0
 [2.0.0-beta.5]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.4...v2.0.0-beta.5
 [2.0.0-beta.4]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.3...v2.0.0-beta.4

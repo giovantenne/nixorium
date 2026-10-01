@@ -134,9 +134,9 @@ initial GNOME sharing dialog locally; the grant survives student-home resets.
 The controller also needs its own approval when broadcasting the teacher screen.
 The external VNC bridge and shared password have been removed. Clients expose
 only SSH (22) and Veyon (11100) to the controller's static IPv4 address on the
-lab interface; IPv6 cannot bypass this restriction. The former
-`veyonNativeHosts` setting is removed: delete it from `lab-settings.json` if
-it is still present, otherwise validation rejects the file.
+lab interface; IPv6 cannot bypass this restriction. The deprecated
+`veyonNativeHosts` string list remains accepted and ignored for compatibility;
+existing settings need no change.
 
 ## Temporary Internet access
 

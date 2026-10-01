@@ -143,13 +143,9 @@ let
       hostModules.pc00 = [ ../modules/common.nix ];
     })).labMeta
     true)).success;
-  rejectsRemovedVeyonNativeHosts = !(builtins.tryEval (builtins.deepSeq
-    (mkLab (baseArgs // {
-      labConfig = labConfig // {
-        veyonNativeHosts = [];
-      };
-    })).labMeta
-    true)).success;
+  ignoresDeprecatedVeyonNativeHosts = (mkLab (baseArgs // {
+    labConfig = labConfig // { veyonNativeHosts = [ "master" "pc01" "retired-host" ]; };
+  })).labMeta == (mkLab baseArgs).labMeta;
   rejectsInvalidSoftwareCatalog = !(builtins.tryEval (builtins.deepSeq
     (mkLab (baseArgs // {
       softwareCatalog = [
@@ -458,7 +454,7 @@ assert nestedSoftware.availability == "available";
 assert allowedUnfreeSoftware.availability == "available";
 assert bambuStudioSoftware.availability == "available";
 assert rejectsUnknownHost;
-assert rejectsRemovedVeyonNativeHosts;
+assert ignoresDeprecatedVeyonNativeHosts;
 assert rejectsInvalidSoftwareCatalog;
 assert rejectsUnsafeHomeResetPath;
 true

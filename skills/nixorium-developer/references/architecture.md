@@ -17,8 +17,8 @@ paths, and shared/controller/client/host/netboot module lists. Filesystem
 references must remain inside the upstream or deployment source trees.
 
 Generated host names and addresses come from the validated IPv4 network,
-prefix, client count, and host numbers. Reject unknown per-host modules and
-Veyon pilot names so configuration typos cannot be ignored.
+prefix, client count, and host numbers. Reject unknown per-host modules so configuration typos cannot be ignored.
+The deprecated `veyonNativeHosts` string list is accepted but has no effect.
 
 `deploymentStatus` reports whether placeholders, missing public keys, or
 public default passwords remain. Keep the standalone example evaluable even

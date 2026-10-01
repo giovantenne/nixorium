@@ -117,8 +117,8 @@ func TestSettingsThatNoLongerValidateAreRepairedBySaving(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// An obsolete field from an older release and an address rule added later.
-	baseData := bytes.Replace(template, []byte(`"lab": {`), []byte(`"lab": {"veyonNativeHosts": ["pc01"],`), 1)
+	// An unknown legacy field and an address rule added later.
+	baseData := bytes.Replace(template, []byte(`"lab": {`), []byte(`"lab": {"obsoleteSetting": ["pc01"],`), 1)
 	baseData = bytes.Replace(baseData, []byte(`"MASTER_DHCP_IP"`), []byte(`"10.0.0.50"`), 1)
 	if _, issues := domain.DecodeLabSettings(baseData); len(issues) == 0 {
 		t.Fatal("fixture is unexpectedly valid")
@@ -132,7 +132,7 @@ func TestSettingsThatNoLongerValidateAreRepairedBySaving(t *testing.T) {
 	if err != nil || len(problems) < 2 {
 		t.Fatalf("repair view = %+v %+v %v", editing, problems, err)
 	}
-	if problems[0].Field != "lab.veyonNativeHosts" {
+	if problems[0].Field != "lab.obsoleteSetting" {
 		t.Fatalf("obsolete field not listed first: %+v", problems)
 	}
 	editing.Lab.MasterDHCPIP = "192.0.2.10"
@@ -142,7 +142,7 @@ func TestSettingsThatNoLongerValidateAreRepairedBySaving(t *testing.T) {
 	}
 	removed := false
 	for _, change := range plan.Changes {
-		removed = removed || (change.Field == "lab.veyonNativeHosts" && change.After == "removed")
+		removed = removed || (change.Field == "lab.obsoleteSetting" && change.After == "removed")
 	}
 	if !removed {
 		t.Fatalf("removed field not reviewed: %+v", plan.Changes)
