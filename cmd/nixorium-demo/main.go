@@ -18,6 +18,7 @@ var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 func main() {
 	output := flag.String("output", "", "write the generated JSON to this file (stdout when empty)")
+	graphOutput := flag.String("graph-output", "", "also write the navigable demo graphs to this file")
 	commit := flag.String("source-commit", "", "full Nixorium Git commit used by the demo")
 	date := flag.String("source-date", "", "source commit date in YYYY-MM-DD form")
 	flag.Parse()
@@ -29,6 +30,17 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "nixorium-demo:", err)
 		os.Exit(1)
+	}
+	if *graphOutput != "" {
+		// Compact: the website downloads this file when a visitor opens a demo.
+		graphs, err := json.Marshal(presentation.RenderDemoGraphs(*commit, *date))
+		if err == nil {
+			err = os.WriteFile(*graphOutput, append(graphs, '\n'), 0o644)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "nixorium-demo:", err)
+			os.Exit(1)
+		}
 	}
 	data = append(data, '\n')
 	if *output == "" {
