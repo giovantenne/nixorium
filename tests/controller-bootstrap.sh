@@ -119,6 +119,8 @@ export BOOTSTRAP_CALL_LOG="$CALL_LOG"
 export BOOTSTRAP_INSTALLER_LOG="$INSTALLER_LOG"
 export BOOTSTRAP_REVISION="$REVISION"
 export BOOTSTRAP_TEMPLATE="${REPO_ROOT}/templates/site"
+export NIXORIUM_INSTALLER_EFI_DIRECTORY="${TEST_ROOT}/efi"
+mkdir -p "$NIXORIUM_INSTALLER_EFI_DIRECTORY"
 
 printf '%s\n' \
   'it' 'Europe/Rome' '' '' \
@@ -148,7 +150,7 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
 fi
 grep -F "cannot be verified safely from a graphical terminal" \
   "${TEST_ROOT}/graphical.out" >/dev/null
-if grep -F "3 / 4  Passwords" "${TEST_ROOT}/graphical.out" >/dev/null; then
+if grep -F "Step 3 of 5 · Passwords" "${TEST_ROOT}/graphical.out" >/dev/null; then
   echo "bootstrap requested passwords in an unverified graphical layout" >&2
   exit 1
 fi
@@ -163,7 +165,7 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   echo "bootstrap accepted truncated controller setup input" >&2
   exit 1
 fi
-grep -F "input ended before configuration was complete" \
+grep -F "Setup input ended before all questions were answered" \
   "${TEST_ROOT}/truncated.out" >/dev/null
 : > "$CALL_LOG"
 
@@ -176,9 +178,9 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   echo "bootstrap continued after console keymap activation failed" >&2
   exit 1
 fi
-grep -F "could not activate console keymap 'it2'" \
+grep -F "Could not activate console keymap 'it2'" \
   "${TEST_ROOT}/keymap-failure.out" >/dev/null
-if grep -F "3 / 4  Passwords" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
+if grep -F "Step 3 of 5 · Passwords" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
   grep -F "mkpasswd" "$CALL_LOG" >/dev/null; then
   echo "bootstrap requested or hashed a password before keyboard activation" >&2
   exit 1
@@ -200,8 +202,29 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   echo "bootstrap accepted cancelled software profile" >&2
   exit 1
 fi
-grep -F "Software profile review" "${TEST_ROOT}/profile-cancel.out" >/dev/null
-grep -F "disk was not changed" "${TEST_ROOT}/profile-cancel.out" >/dev/null
+grep -F "Check the applications" "${TEST_ROOT}/profile-cancel.out" >/dev/null
+grep -F "Choose again" "${TEST_ROOT}/profile-cancel.out" >/dev/null
+grep -F "Nothing on this computer was changed" "${TEST_ROOT}/profile-cancel.out" >/dev/null
+test ! -e "$INSTALLER_LOG"
+: > "$CALL_LOG"
+
+# Answering no to the review asks the questions again instead of cancelling.
+printf '%s\n' \
+  'it' 'Europe/Rome' '' '' \
+  'admin-secret' 'admin-secret' \
+  'teacher-secret' 'teacher-secret' \
+  'student-secret' 'student-secret' \
+  'n' > "${TEST_ROOT}/review-again-input"
+if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+  NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/review-again-input" \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/review-again.out" 2>&1; then
+  echo "bootstrap continued after the answers were rejected" >&2
+  exit 1
+fi
+grep -F "Let's go through them again" "${TEST_ROOT}/review-again.out" >/dev/null
+test "$(grep -c -F 'Step 1 of 5 · Keyboard and time zone' "${TEST_ROOT}/review-again.out")" -eq 2
 test ! -e "$INSTALLER_LOG"
 : > "$CALL_LOG"
 
@@ -217,7 +240,7 @@ if ! NIXORIUM_TARGET_ROOT="$V1_TARGET_ROOT" \
   cat "${TEST_ROOT}/v1-install.out" >&2
   exit 1
 fi
-if grep -F "Software profile" "${TEST_ROOT}/v1-install.out" >/dev/null; then
+if grep -F "Step 4 of 5" "${TEST_ROOT}/v1-install.out" >/dev/null; then
   echo "bootstrap capability version 1 unexpectedly prompted for software" >&2
   exit 1
 fi
@@ -236,25 +259,28 @@ if ! NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   exit 1
 fi
 
-grep -F "Resolving master to one immutable revision" "${TEST_ROOT}/install.out" >/dev/null
-grep -F "Preparing Nixorium master at ${REVISION}" "${TEST_ROOT}/install.out" >/dev/null
+grep -F "Finding the exact source of Nixorium master" "${TEST_ROOT}/install.out" >/dev/null
+grep -F "Using Nixorium master, revision ${REVISION}" "${TEST_ROOT}/install.out" >/dev/null
+grep -F "Time zone [Europe/Rome]" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "Recommended environment: official NixOS Minimal ISO in UEFI mode." \
   "${TEST_ROOT}/install.out" >/dev/null
 for UI_TEXT in \
-  "NixOS lab controller bootstrap" \
-  "Controller setup" \
-  "1 / 4  Regional settings" \
-  "2 / 4  Accounts" \
-  "3 / 4  Passwords" \
-  "4 / 4  Review" \
-  "Preparing your controller" \
-  "Installing your controller" \
-  "All done"; do
+  "Controller setup for a NixOS computer lab" \
+  "Nothing on this computer changes until you type ERASE." \
+  "Step 1 of 5 · Keyboard and time zone" \
+  "Step 2 of 5 · Account names" \
+  "Step 3 of 5 · Passwords" \
+  "Check your answers" \
+  "Preparing the lab configuration" \
+  "Step 4 of 5 · Applications" \
+  "All done" \
+  "The controller is installed." \
+  "Installation > Network boot (PXE)"; do
   grep -F "$UI_TEXT" "${TEST_ROOT}/install.out" >/dev/null
 done
 grep -F "> Keyboard layout" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "> Time zone" "${TEST_ROOT}/install.out" >/dev/null
-grep -F "[....] Resolving master to one immutable revision" \
+grep -F "[....] Finding the exact source of Nixorium master" \
   "${TEST_ROOT}/install.out" >/dev/null
 if grep -F 'package IDs' "${TEST_ROOT}/install.out" >/dev/null; then
   echo "bootstrap exposed package IDs to the operator" >&2
@@ -279,9 +305,9 @@ if (( LOADKEYS_LINE >= MKPASSWD_LINE )); then
   echo "bootstrap hashed a password before applying the selected keymap" >&2
   exit 1
 fi
-PROFILE_PROMPT_LINE="$(grep -n -m1 -F 'Profile [essential]' "${TEST_ROOT}/install.out" | cut -d: -f1)"
-SETTINGS_REVIEW_LINE="$(grep -n -m1 -F 'Continue with these settings?' "${TEST_ROOT}/install.out" | cut -d: -f1)"
-INSTALL_LINE="$(grep -n -m1 -F 'Installing the controller from the generated private deployment' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+PROFILE_PROMPT_LINE="$(grep -n -m1 -F 'Applications [Essential]' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+SETTINGS_REVIEW_LINE="$(grep -n -m1 -F 'Are these answers correct?' "${TEST_ROOT}/install.out" | cut -d: -f1)"
+INSTALL_LINE="$(grep -n -m1 -F 'Saving the lab configuration on the new disk' "${TEST_ROOT}/install.out" | cut -d: -f1)"
 if (( PROFILE_PROMPT_LINE <= SETTINGS_REVIEW_LINE || PROFILE_PROMPT_LINE >= INSTALL_LINE )); then
   echo "software profile was not selected after settings and before installation" >&2
   exit 1

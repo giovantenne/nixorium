@@ -6,6 +6,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The controller setup command explains itself and reads more easily: an
+  introduction lists the five steps and says that nothing changes before
+  `ERASE`; steps are numbered; keyboard layouts are named and the time zone
+  is suggested from the keyboard; the three accounts are explained; answering
+  no to the review or to the applications asks again instead of cancelling;
+  disks are chosen by number and shown with size and model before `ERASE`;
+  installation reports its three phases, says what to do when it stops
+  midway, and ends with the next steps. Legacy BIOS is refused before the
+  first question, and Git and template output is no longer printed.
+
 - The settings review (TUI and `config plan`) says what happens next: apply
   to the controller, update the computers, prepare network installation again,
   password changes, and warnings when the change renumbers the laboratory,

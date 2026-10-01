@@ -25,8 +25,13 @@ cat > "${MOCK_BIN}/lsblk" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 case "$*" in
-  "-nrpo MOUNTPOINT /dev/vda") ;;
-  "-dn -o PATH,TYPE -P") printf '%s\n' 'PATH="/dev/vda" TYPE="disk"' ;;
+  "-nrpo MOUNTPOINT /dev/vda"|"-nrpo MOUNTPOINT /dev/vdb") ;;
+  "-dn -o PATH,TYPE -P")
+    printf '%s\n' 'PATH="/dev/vda" TYPE="disk"'
+    if [[ -n "${MOCK_SECOND_DISK:-}" ]]; then printf '%s\n' 'PATH="/dev/vdb" TYPE="disk"'; fi
+    ;;
+  "-dn -o SIZE,MODEL /dev/vdb") printf '%s\n' '80G SECOND DISK' ;;
+  "-dn -o SIZE,MODEL /dev/vda") printf '%s\n' '  40G QEMU HARDDISK  ' ;;
   *) echo "unexpected lsblk call: $*" >&2; exit 1 ;;
 esac
 EOF
@@ -65,6 +70,7 @@ cat > "${MOCK_BIN}/nixos-install" <<'EOF'
 set -euo pipefail
 config=${NIX_CONFIG//$'\n'/;}
 printf 'nixos-install|%s|%s|%s\n' "$config" "$XDG_CACHE_HOME" "$*" >> "$CONTROLLER_INSTALLER_LOG"
+if [[ -n "${MOCK_INSTALL_FAILS:-}" ]]; then exit 1; fi
 EOF
 
 cat > "${MOCK_BIN}/sudo" <<'EOF'
@@ -123,7 +129,10 @@ grep -F 'swapoff|' "$ACTION_LOG" >/dev/null
 grep -F 'nixos-install|experimental-features = nix-command flakes;' "$ACTION_LOG" >/dev/null
 grep -F "|${TARGET_ROOT}/var/cache/nixorium-bootstrap|--root ${TARGET_ROOT} --flake path:/deployment#pc99 --no-write-lock-file --no-root-passwd" "$ACTION_LOG" >/dev/null
 test -f "$DEPLOYMENT/flake.lock"
-grep -F 'downloaded into the installed disk, not the live ISO memory' "${TEST_ROOT}/output" >/dev/null
+grep -F 'Files go to the new disk, not into the memory of the USB system' "${TEST_ROOT}/output" >/dev/null
+grep -F '/dev/vda  40G QEMU HARDDISK' "${TEST_ROOT}/output" >/dev/null
+grep -F '[3/3] Downloading and installing the controller system' "${TEST_ROOT}/output" >/dev/null
+grep -F '[ OK ] Controller system installed.' "${TEST_ROOT}/output" >/dev/null
 
 # An empty answer cancels; a mistyped word would be asked again on a terminal.
 printf '\n' > "$CONFIRM"
@@ -145,5 +154,42 @@ if [[ -s "$ACTION_LOG" ]]; then
   echo "cancelled installer performed a destructive action" >&2
   exit 1
 fi
+
+# Disks are chosen by number; a number outside the list is asked again.
+printf '%s\n' 7 2 ERASE > "$CONFIRM"
+: > "$ACTION_LOG"
+PATH="${MOCK_BIN}:$PATH" \
+MOCK_SECOND_DISK=1 \
+CONTROLLER_INSTALLER_LOG="$ACTION_LOG" \
+DISKO_LAYOUT_FILE="$LAYOUT" \
+FLAKE_REF="path:/deployment" \
+NIXORIUM_UPSTREAM_REF="github:giovantenne/nixorium/revision" \
+NIXORIUM_DEPLOYMENT_PATH="$DEPLOYMENT" \
+NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+NIXORIUM_INSTALLER_TTY="$CONFIRM" \
+  bash "${REPO_ROOT}/scripts/install-controller.sh" \
+  > "${TEST_ROOT}/numbered-output" 2>&1
+grep -F '2) /dev/vdb' "${TEST_ROOT}/numbered-output" >/dev/null
+grep -F "'7' is not in the list" "${TEST_ROOT}/numbered-output" >/dev/null
+grep -F '/dev/vdb  80G SECOND DISK' "${TEST_ROOT}/numbered-output" >/dev/null
+
+# A failure after the disk was touched says so and how to start over.
+printf '%s\n' ERASE > "$CONFIRM"
+if PATH="${MOCK_BIN}:$PATH" \
+  MOCK_INSTALL_FAILS=1 \
+  CONTROLLER_INSTALLER_LOG="$ACTION_LOG" \
+  DISKO_LAYOUT_FILE="$LAYOUT" \
+  FLAKE_REF="path:/deployment" \
+  NIXORIUM_UPSTREAM_REF="github:giovantenne/nixorium/revision" \
+  NIXORIUM_DEPLOYMENT_PATH="$DEPLOYMENT" \
+  NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+  NIXORIUM_INSTALLER_TTY="$CONFIRM" \
+    bash "${REPO_ROOT}/scripts/install-controller.sh" /dev/vda \
+    > "${TEST_ROOT}/failed-output" 2>&1; then
+  echo "installer reported success after a failed installation" >&2
+  exit 1
+fi
+grep -F 'Installation stopped while downloading and installing the controller system' "${TEST_ROOT}/failed-output" >/dev/null
+grep -F 'run the setup' "${TEST_ROOT}/failed-output" >/dev/null
 
 echo "Controller installer tests passed."

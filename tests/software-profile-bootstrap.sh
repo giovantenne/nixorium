@@ -22,7 +22,7 @@ printf '\n\n' | bash "$REPO_ROOT/templates/site/scripts/configure-software-profi
 jq -S . "$REPO_ROOT/templates/site/lab-software.json" > "$TEST_ROOT/default-expected.json"
 jq -S . "$SOFTWARE" > "$TEST_ROOT/default-actual.json"
 cmp "$TEST_ROOT/default-expected.json" "$TEST_ROOT/default-actual.json"
-grep -F 'Selected Essential' "$TEST_ROOT/default.out" >/dev/null
+grep -F 'Essential selected.' "$TEST_ROOT/default.out" >/dev/null
 # Essential keeps the common student profile.
 cmp "$REPO_ROOT/templates/site/workspace-profile.json" "$PROFILE"
 
@@ -40,7 +40,7 @@ jq -e '
   any(.packages[]; .package == "vlc") and
   any(.packages[]; .package == "gcc")
 ' "$SOFTWARE" >/dev/null
-grep -F 'Profile:    Programming' "$TEST_ROOT/programming.out" >/dev/null
+grep -F 'Choice:        Programming' "$TEST_ROOT/programming.out" >/dev/null
 # Programming starts from its own student profile, with editor extensions.
 cmp "$REPO_ROOT/templates/site/workspace-profile.programming.example.json" "$PROFILE"
 test "$(stat -c %a "$PROFILE")" = 644
@@ -56,7 +56,7 @@ printf '99\nessential\n\n' | bash \
   "$REPO_ROOT/templates/site/scripts/configure-software-profile.sh" \
   "$CATALOG" "$SOFTWARE" > "$TEST_ROOT/empty.out"
 jq -e '.packages | length > 0' "$SOFTWARE" >/dev/null
-grep -F 'Choose a listed number or profile ID.' "$TEST_ROOT/empty.out" >/dev/null
+grep -F 'Type a number from 1 to 7' "$TEST_ROOT/empty.out" >/dev/null
 
 cp "$REPO_ROOT/templates/site/lab-software.json" "$SOFTWARE"
 BEFORE="$(sha256sum "$SOFTWARE")"
@@ -69,7 +69,9 @@ fi
 AFTER="$(sha256sum "$SOFTWARE")"
 test "$BEFORE" = "$AFTER"
 test -z "$(find "$TEST_ROOT" -maxdepth 1 -name '.lab-software.json.tmp.*' -print -quit)"
-grep -F 'disk was not changed' "$TEST_ROOT/cancel.out" >/dev/null
+# Answering no offers the choice again; nothing is written meanwhile.
+grep -F 'Choose again' "$TEST_ROOT/cancel.out" >/dev/null
+grep -F 'Setup input ended while choosing the applications' "$TEST_ROOT/cancel.out" >/dev/null
 
 jq '.schemaVersion = 99' "$CATALOG" > "$TEST_ROOT/invalid-catalog.json"
 if printf '\n\n' | bash \

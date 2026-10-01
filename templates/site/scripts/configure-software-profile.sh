@@ -13,6 +13,7 @@ configure_site_software_profile() {
   local CHOICE
   local CHOICE_NUMBER
   local CONFIRMATION
+  local DEFAULT_LABEL
   local DEFAULT_PRESET
   local INDEX
   local PRESET_COUNT
@@ -58,69 +59,76 @@ configure_site_software_profile() {
 
   DEFAULT_PRESET="$(jq -r '.defaultPreset' "$CATALOG_FILE")"
   PRESET_COUNT="$(jq -r '.presets | length' "$CATALOG_FILE")"
-  echo "  Choose the initial applications before the controller is built."
-  echo "  You can add or remove applications later from Nixorium."
+  DEFAULT_LABEL="$(jq -r --arg id "$DEFAULT_PRESET" '.presets[] | select(.id == $id) | .label' "$CATALOG_FILE")"
+  echo "  Choose the applications installed on the controller and on every"
+  echo "  student computer. You can add or remove single applications later"
+  echo "  from Nixorium, so this choice is only a starting point."
   echo
-  for ((INDEX = 0; INDEX < PRESET_COUNT; INDEX++)); do
-    PRESET_ID="$(jq -r ".presets[$INDEX].id" "$CATALOG_FILE")"
-    PRESET_LABEL="$(jq -r ".presets[$INDEX].label" "$CATALOG_FILE")"
-    PRESET_DESCRIPTION="$(jq -r ".presets[$INDEX].description" "$CATALOG_FILE")"
-    if [[ "$PRESET_ID" == "$DEFAULT_PRESET" ]]; then
-      printf '  %d) %s [%s, default]\n' "$((INDEX + 1))" "$PRESET_LABEL" "$PRESET_ID"
-    else
-      printf '  %d) %s [%s]\n' "$((INDEX + 1))" "$PRESET_LABEL" "$PRESET_ID"
-    fi
-    printf '     %s\n' "$PRESET_DESCRIPTION"
-    echo
-  done
 
   while true; do
-    printf '  > Profile [%s]: ' "$DEFAULT_PRESET"
-    if ! IFS= read -r -u "$INPUT_FD" CHOICE; then
-      echo >&2
-      echo "Error: controller setup input ended during software profile selection." >&2
-      return 1
-    fi
-    if [[ -z "$CHOICE" ]]; then
-      SELECTED_ID="$DEFAULT_PRESET"
-      break
-    fi
-    if [[ "$CHOICE" =~ ^[0-9]+$ ]]; then
-      CHOICE_NUMBER=$((10#$CHOICE))
-      if (( CHOICE_NUMBER >= 1 && CHOICE_NUMBER <= PRESET_COUNT )); then
-        SELECTED_ID="$(jq -r ".presets[$((CHOICE_NUMBER - 1))].id" "$CATALOG_FILE")"
+    for ((INDEX = 0; INDEX < PRESET_COUNT; INDEX++)); do
+      PRESET_ID="$(jq -r ".presets[$INDEX].id" "$CATALOG_FILE")"
+      PRESET_LABEL="$(jq -r ".presets[$INDEX].label" "$CATALOG_FILE")"
+      PRESET_DESCRIPTION="$(jq -r ".presets[$INDEX].description" "$CATALOG_FILE")"
+      if [[ "$PRESET_ID" == "$DEFAULT_PRESET" ]]; then
+        printf '  %s%d)%s %s%s%s  (default)\n' "${UI_FOCUS:-}" "$((INDEX + 1))" "${UI_RESET:-}" "${UI_BOLD:-}" "$PRESET_LABEL" "${UI_RESET:-}"
+      else
+        printf '  %s%d)%s %s%s%s\n' "${UI_FOCUS:-}" "$((INDEX + 1))" "${UI_RESET:-}" "${UI_BOLD:-}" "$PRESET_LABEL" "${UI_RESET:-}"
+      fi
+      printf '     %s\n' "$PRESET_DESCRIPTION" | fold -s -w 72 | sed 's/[[:space:]]*$//; 2,$s/^/     /'
+      echo
+    done
+
+    while true; do
+      printf '  %s>%s %sApplications%s [%s]: ' "${UI_FOCUS:-}" "${UI_RESET:-}" "${UI_BOLD:-}" "${UI_RESET:-}" "$DEFAULT_LABEL"
+      if ! IFS= read -r -u "$INPUT_FD" CHOICE; then
+        echo >&2
+        echo "  x Setup input ended while choosing the applications." >&2
+        return 1
+      fi
+      if [[ -z "$CHOICE" ]]; then
+        SELECTED_ID="$DEFAULT_PRESET"
         break
       fi
-    elif jq -e --arg id "$CHOICE" 'any(.presets[]; .id == $id)' "$CATALOG_FILE" >/dev/null; then
-      SELECTED_ID="$CHOICE"
-      break
-    fi
-    echo "  ! Choose a listed number or profile ID."
-  done
+      if [[ "$CHOICE" =~ ^[0-9]+$ ]]; then
+        CHOICE_NUMBER=$((10#$CHOICE))
+        if (( CHOICE_NUMBER >= 1 && CHOICE_NUMBER <= PRESET_COUNT )); then
+          SELECTED_ID="$(jq -r ".presets[$((CHOICE_NUMBER - 1))].id" "$CATALOG_FILE")"
+          break
+        fi
+      elif jq -e --arg id "$CHOICE" 'any(.presets[]; .id == $id)' "$CATALOG_FILE" >/dev/null; then
+        SELECTED_ID="$CHOICE"
+        break
+      fi
+      echo "  ${UI_WARNING:-}!${UI_RESET:-} Type a number from 1 to ${PRESET_COUNT}, or press Enter for ${DEFAULT_LABEL}."
+    done
 
-  PRESET_LABEL="$(jq -r --arg id "$SELECTED_ID" '.presets[] | select(.id == $id) | .label' "$CATALOG_FILE")"
-  echo
-  echo "  Software profile review"
-  echo
-  echo "    Profile:    ${PRESET_LABEL}"
-  echo "    Applies to: controller and all current or future clients"
-  echo "    Later:      add or remove individual applications from Nixorium"
-  echo
-  while true; do
-    printf '  > Use this software profile? [Y/n]: '
-    if ! IFS= read -r -u "$INPUT_FD" CONFIRMATION; then
-      echo >&2
-      echo "Error: controller setup input ended before software confirmation." >&2
-      return 1
-    fi
-    case "${CONFIRMATION,,}" in
-      ""|y|yes) break ;;
-      n|no)
-        echo "Controller installation cancelled; the disk was not changed." >&2
+    PRESET_LABEL="$(jq -r --arg id "$SELECTED_ID" '.presets[] | select(.id == $id) | .label' "$CATALOG_FILE")"
+    echo
+    echo "  Check the applications"
+    echo
+    echo "    Choice:        ${PRESET_LABEL}"
+    echo "    Installed on:  the controller and every current or future student computer"
+    echo "    Later:         add or remove single applications from Nixorium"
+    echo
+    while true; do
+      printf '  %s>%s %sUse these applications?%s [Y/n]: ' "${UI_FOCUS:-}" "${UI_RESET:-}" "${UI_BOLD:-}" "${UI_RESET:-}"
+      if ! IFS= read -r -u "$INPUT_FD" CONFIRMATION; then
+        echo >&2
+        echo "  x Setup input ended before the applications were confirmed." >&2
         return 1
-        ;;
-      *) echo "  ! Enter y or n." ;;
-    esac
+      fi
+      case "${CONFIRMATION,,}" in
+        ""|y|yes) break 2 ;;
+        n|no)
+          echo
+          echo "  Choose again:"
+          echo
+          break
+          ;;
+        *) echo "  ${UI_WARNING:-}!${UI_RESET:-} Type y for yes or n to choose again." ;;
+      esac
+    done
   done
 
   SOFTWARE_DIRECTORY="$(dirname "$SOFTWARE_FILE")"
@@ -155,7 +163,7 @@ configure_site_software_profile() {
     mv -- "$TEMPORARY_FILE" "${SOFTWARE_DIRECTORY}/workspace-profile.json"
   fi
   echo
-  echo "  [ OK ] Selected ${PRESET_LABEL}; applications are ready for the first controller build."
+  printf '  %s[ OK ]%s %s selected.\n' "${UI_SUCCESS:-}" "${UI_RESET:-}" "$PRESET_LABEL"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
