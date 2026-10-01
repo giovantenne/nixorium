@@ -194,7 +194,7 @@ let
           lib.optional (cachePublicKeyFile == null) "Missing cache public key"
           ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key"
           ++ lib.optional (veyonPublicKeyFile == null) "Missing Veyon public key");
-        environment.systemPackages = [ hostState hostSessionState ];
+        environment.systemPackages = [ hostState hostSessionState hostCleanGenerations ];
       }
       // lib.optionalAttrs (effectiveDeploymentRevision != null) {
         system.configurationRevision = effectiveDeploymentRevision;
@@ -548,6 +548,14 @@ let
     name = "nixorium-session-state";
     runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.systemd bootstrapPkgs.util-linux bootstrapPkgs.glib ];
     text = builtins.readFile (upstreamRoot + "/scripts/session-state.sh");
+  };
+
+  # Reviewed removal of old system generations (ADR 0022). Its --plan mode is
+  # read-only; --apply runs as root over SSH or in the controller unit.
+  hostCleanGenerations = bootstrapPkgs.writeShellApplication {
+    name = "nixorium-clean-generations";
+    runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.gnused ];
+    text = builtins.readFile (upstreamRoot + "/scripts/clean-generations.sh");
   };
 
   installerFlake = bootstrapPkgs.writeText "nixorium-installer-flake.nix" ''

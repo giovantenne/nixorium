@@ -23,10 +23,10 @@ func (Local) ControlSystemUnit(ctx context.Context, verb, unit string) error {
 		"nixorium-pxe-network.service":      {"stop": true},
 		"nixorium-pxe-recover.service":      {"start": true},
 	}
-	if !allowed[unit][verb] && !(verb == "start" && controllerApplyUnitPattern.MatchString(unit)) {
+	if !allowed[unit][verb] && !(verb == "start" && (controllerApplyUnitPattern.MatchString(unit) || cleanupUnitPattern.MatchString(unit))) {
 		return fmt.Errorf("system unit action %q %q is not an allowed Nixorium action", verb, unit)
 	}
-	if verb == "start" && (managedUnitOperation(unit) != "" || unit == "nixorium-pxe.service") {
+	if verb == "start" && (managedUnitOperation(unit) != "" || unit == "nixorium-pxe.service" || cleanupUnitPattern.MatchString(unit)) {
 		if err := checkManagedJobConflict(ctx); err != nil {
 			return err
 		}

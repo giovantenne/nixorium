@@ -116,6 +116,11 @@ in
         exit 42
       fi
     '';
+    cleanGenerations = pkgs.writeShellApplication {
+      name = "nixorium-clean-generations";
+      runtimeInputs = [ pkgs.coreutils pkgs.gnused ];
+      text = builtins.readFile ../scripts/clean-generations.sh;
+    };
     fakeHostState = pkgs.writeShellScriptBin "nixorium-host-state" ''
       set -eu
       readlink -f /run/current-system
@@ -138,6 +143,13 @@ in
           ;;
         "systemctl poweroff --no-block")
           printf 'accepted\n' >> /tmp/nixorium-test-shutdown-dispatch.log
+          ;;
+        "nixorium-clean-generations --plan")
+          printf 'format 1\nkeep 9 newest\nremove 1\nfree 1000\nexpect aaaaaaaaaaaaaaaa\n'
+          ;;
+        "nixorium-clean-generations --apply aaaaaaaaaaaaaaaa")
+          printf 'cleaned\n' >> /tmp/nixorium-test-clean-dispatch.log
+          printf 'format 1\nremoved 1\nfree-before 1000\nfree-after 2000\nboot-menu ok\n'
           ;;
         "systemctl reboot --no-block")
           printf 'accepted\n' >> /tmp/nixorium-test-restart-dispatch.log
@@ -257,7 +269,7 @@ in
     # sources across reboot rather than losing the writable store's tmpfs.
     virtualisation.writableStoreUseTmpfs = internetOnly;
     virtualisation.memorySize = if internetOnly then 2048 else 1024;
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnused pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnused pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit cleanGenerations ];
     users.groups.veyon-master = {};
     system.activationScripts.createHomeTemplates = "";
     system.activationScripts.siteHomeProfile = {
@@ -647,6 +659,16 @@ in
     controller.succeed("nixorium shutdown apply --repo /tmp/deployment --on @lab --expect sha256:stale --yes --json > /tmp/shutdown-stale.json || test $? = 1; jq -e '.operation == \"shutdown-apply\" and .state == \"blocked\" and .retrySafe and any(.issues[]; .field == \"review\")' /tmp/shutdown-stale.json; test ! -e /tmp/nixorium-test-shutdown-dispatch.log")
     controller.succeed("nixorium shutdown plan --repo /tmp/deployment --on @lab --json > /tmp/shutdown-fresh-plan.json; token=$(jq -r .reviewToken /tmp/shutdown-fresh-plan.json); nixorium shutdown apply --repo /tmp/deployment --on @lab --expect \"$token\" --yes --json > /tmp/shutdown-apply.json; jq -e '.operation == \"shutdown-apply\" and .state == \"completed\" and .accepted == 1 and .notSent == 0 and .unconfirmed == 0 and (.retrySafe | not) and .targets[0].name == \"pc01\" and .targets[0].state == \"accepted\"' /tmp/shutdown-apply.json; test \"$(wc -l < /tmp/nixorium-test-shutdown-dispatch.log)\" = 1; grep -Fx 'nixorium-session-state' /tmp/nixorium-test-shutdown-ssh.log; grep -Fx 'systemctl poweroff --no-block' /tmp/nixorium-test-shutdown-ssh.log")
     ${internetTestScript}
+    # Free disk space: the fake client has one old version, the controller
+    # is only observed (its profile must stay for the controller tests).
+    controller.succeed("nixorium cleanup plan --repo /tmp/deployment --on controller,@lab --json > /tmp/cleanup-plan.json || { cat /tmp/cleanup-plan.json; false; }; jq -e '.operation == \"cleanup-plan\" and .state == \"ready\" and .keepGenerations == 10 and .confirmation == \"CLEAN\" and .targets[0].controller and .targets[1].name == \"pc01\" and .targets[1].eligible and .targets[1].remove == [1]' /tmp/cleanup-plan.json")
+    controller.succeed("nixorium cleanup apply --repo /tmp/deployment --on @lab --expect sha256:stale --yes --json > /tmp/cleanup-stale.json || test $? = 1; test ! -e /tmp/nixorium-test-clean-dispatch.log")
+    controller.succeed("nixorium cleanup plan --repo /tmp/deployment --on @lab --json > /tmp/cleanup-client.json; token=$(jq -r .reviewToken /tmp/cleanup-client.json); nixorium cleanup apply --repo /tmp/deployment --on @lab --expect \"$token\" --yes --json > /tmp/cleanup-apply.json; jq -e '.operation == \"cleanup-apply\" and .state == \"completed\" and .cleaned == 1 and .targets[0].state == \"cleaned\" and .targets[0].freeAfter == 2000' /tmp/cleanup-apply.json; test \"$(cat /tmp/nixorium-test-clean-dispatch.log)\" = cleaned")
+    # Only a reviewed digest instance is allowed, and the helper refuses a
+    # digest that does not match the controller's current plan.
+    controller.fail("su - admin -c 'systemctl start nixorium-clean-generations@zz.service'")
+    controller.fail("su - admin -c 'systemctl start nixorium-clean-generations@0000000000000000.service'")
+    controller.succeed("journalctl -u nixorium-clean-generations@0000000000000000.service --no-pager | grep -F changed; systemctl reset-failed 'nixorium-clean-generations@0000000000000000.service'")
     controller.succeed("cp /tmp/deployment/lab-settings.json /tmp/candidate.json")
     controller.succeed("nixorium config plan --repo /tmp/deployment --file /tmp/candidate.json --json | jq -e '.operation == \"config-plan\" and .state == \"unchanged\" and (.changes | length) == 0'")
     controller.succeed("nixorium setup keys --repo /tmp/deployment --json | jq -e '.operation == \"setup-keys\" and .state == \"ready\" and all(.keys[]; .verified and .matches and .privateMode == 384)'")

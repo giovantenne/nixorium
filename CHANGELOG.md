@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Free disk space after review: Maintenance → Advanced → **Free disk space**
+  (`nixorium cleanup plan|apply`) removes old system versions on the controller
+  and selected clients. Each computer keeps its newest 10 versions plus the
+  running and booted ones, the boot menu lists at most 10, and the review needs
+  `CLEAN`. A computer that changed after review, is off or is busy is skipped;
+  nothing runs during deployments or network installation (ADR 0022).
+
 - The desktop uses the Yaru-yellow icons of Nixorium 1.0.0 again instead of
   MoreWaita. Accounts still set to MoreWaita switch at their next login; any
   other icon choice is kept.

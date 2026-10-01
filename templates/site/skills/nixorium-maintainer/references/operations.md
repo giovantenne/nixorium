@@ -361,6 +361,21 @@ control characters before text/TUI rendering. An unsafe entry is reported as
 unavailable; do not loosen its permissions merely to make the browser accept
 it. The TUI's **View operation logs** task uses the same bounded operations.
 
+## Free disk space
+
+Old NixOS system generations are removed only by the reviewed
+`nixorium cleanup plan --on <controller,pcNN,...|@lab>` /
+`cleanup apply --expect <token>` flow (TUI: Maintenance → Advanced → Free disk
+space; ADR 0022). Each computer keeps its newest 10 generations plus the
+running and booted ones; GRUB lists at most 10. The fixed helper
+`nixorium-clean-generations` answers `--plan` read-only and `--apply <digest>`
+as root; the digest binds the exact generations to remove, so a changed
+computer reports `not-sent`. The controller runs through
+`nixorium-clean-generations@<digest>.service` under the operation lock;
+clients run over root SSH. Results: `cleaned`, `unchanged`, `not-sent`,
+`unconfirmed` — inspect an unconfirmed computer before retrying. Never run
+`nix-collect-garbage -d` or validation GC instead.
+
 ## Binary cache
 
 In laboratory mode, the controller owns Harmonia through systemd after

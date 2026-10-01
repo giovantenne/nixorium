@@ -60,6 +60,8 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 
 func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.Cmd) {
 	switch action {
+	case "f":
+		return model.openCleanup()
 	case "t":
 		return model.openTemplateReset()
 	case "s":
@@ -674,6 +676,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 	switch model.screen {
 	case dashboardInternet:
 		return model.updateInternet(key)
+	case dashboardCleanup:
+		return model.updateCleanup(key)
 	case dashboardSoftware:
 		return model.updateSoftware(key)
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:

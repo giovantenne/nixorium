@@ -170,6 +170,8 @@ let
     builtins.any (package: (package.name or "") == "nixorium-host-state") packages;
   hasSessionState = packages:
     builtins.any (package: (package.name or "") == "nixorium-session-state") packages;
+  hasCleanGenerations = packages:
+    builtins.any (package: (package.name or "") == "nixorium-clean-generations") packages;
   controllerFirewall = subnetLab.nixosConfigurations.pc99.config.networking.firewall;
   clientFirewall = subnetLab.nixosConfigurations.pc01.config.networking.firewall;
   controllerTCP = controllerFirewall.interfaces.enp0s3.allowedTCPPorts;
@@ -278,6 +280,11 @@ assert hasHostState subnetLab.nixosConfigurations.pc99.config.environment.system
 assert hasHostState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
 assert hasSessionState subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
 assert hasSessionState subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
+assert hasCleanGenerations subnetLab.nixosConfigurations.pc99.config.environment.systemPackages;
+assert hasCleanGenerations subnetLab.nixosConfigurations.pc01.config.environment.systemPackages;
+assert subnetLab.nixosConfigurations.pc01.config.boot.loader.grub.configurationLimit == 10;
+assert subnetLab.nixosConfigurations.pc99.config.systemd.services ? "nixorium-clean-generations@";
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.services ? "nixorium-clean-generations@");
 assert !(builtins.elem "networkmanager" clientUsers.${labConfig.studentUser}.extraGroups);
 assert !(builtins.elem "networkmanager"
   subnetLab.nixosConfigurations.pc99.config.users.users.${labConfig.studentUser}.extraGroups);

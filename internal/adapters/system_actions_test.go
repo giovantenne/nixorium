@@ -51,3 +51,22 @@ func TestControllerApplyUnitAllowlistAcceptsOnlyFullRevisionInstance(t *testing.
 		}
 	}
 }
+
+func TestCleanupUnitAllowlistAcceptsOnlyReviewedDigest(t *testing.T) {
+	if !cleanupUnitPattern.MatchString("nixorium-clean-generations@0123456789abcdef.service") {
+		t.Fatal("valid cleanup unit was rejected")
+	}
+	for _, unit := range []string{
+		"nixorium-clean-generations@.service",
+		"nixorium-clean-generations@0123456789ABCDEF.service",
+		"nixorium-clean-generations@0123456789abcdef0.service",
+		"nixorium-clean-generations@0123456789abcde;.service",
+	} {
+		if cleanupUnitPattern.MatchString(unit) {
+			t.Fatalf("unsafe unit %q was accepted", unit)
+		}
+	}
+	if err := (Local{}).CleanControllerGenerations(context.Background(), "../../x"); err == nil {
+		t.Fatal("invalid digest reached systemctl")
+	}
+}

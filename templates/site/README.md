@@ -706,6 +706,26 @@ The controller runs Harmonia as `nixorium-harmonia.service`; systemd loads its
 private signing key as an isolated credential outside Git and the Nix store.
 Detailed Harmonia output uses `journalctl -u harmonia.service`.
 
+### Free disk space
+
+Every application to the controller and every client update adds a system
+version; nothing removes old ones automatically. When a disk fills up, open
+**Maintenance → Advanced → Free disk space**, select the computers and review:
+
+```sh
+nix run .#nixorium -- cleanup plan --on controller,@lab
+nix run .#nixorium -- cleanup apply --on controller,@lab --expect REVIEW_TOKEN
+```
+
+Each computer keeps its newest 10 system versions, the one it is running and
+the one it started with; the boot menu also lists at most 10 versions. The
+review names what goes and what stays and needs the one-word `CLEAN`
+confirmation. Afterwards you can go back only to the kept versions. Computers
+that are off are never queued, a computer that changed after the review is
+skipped, and the space freed is known only afterwards. Homes, settings and the
+network installation files are never touched. It does not run during a
+deployment, PXE preparation or active network installation.
+
 ### Configuration and first-run setup
 
 ```sh

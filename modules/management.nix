@@ -652,6 +652,23 @@ let
       systemctl restart harmonia.service
     '';
   };
+
+  # Remove this controller's old system generations reviewed under the
+  # digest in the unit instance; the helper refuses when the set changed.
+  cleanControllerGenerations = pkgs.writeShellApplication {
+    name = "nixorium-clean-controller-generations";
+    runtimeInputs = [ pkgs.coreutils pkgs.systemd pkgs.util-linux ];
+    text = ''
+      fail() {
+        echo "Error: $*" >&2
+        exit 1
+      }
+
+      [[ $# -eq 1 && "$1" =~ ^[0-9a-f]{16}$ ]] || fail "reviewed removal digest is invalid"
+      ${operationGate false}
+      exec /run/current-system/sw/bin/nixorium-clean-generations --apply "$1"
+    '';
+  };
 in
 {
   options.services.nixorium.deploymentPath = lib.mkOption {
@@ -698,6 +715,7 @@ in
                unit == "nixorium-prepare-pxe.service" ||
                unit == "nixorium-remote-install.service" ||
                unit == "nixorium-restart-cache.service" ||
+               /^nixorium-clean-generations@[0-9a-f]{16}\.service$/.test(unit) ||
                unit == "nixorium-pxe-recover.service")) ||
              (unit == "nixorium-pxe.service" &&
               (verb == "start" || verb == "stop")) ||
@@ -824,6 +842,24 @@ in
         ProtectHome = true;
         ProtectSystem = "strict";
         ReadWritePaths = [ "/var/lib/nixorium/coordination" ];
+      };
+    };
+
+    systemd.services."nixorium-clean-generations@" = {
+      description = "Remove reviewed old system generations of this controller";
+      restartIfChanged = false;
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${cleanControllerGenerations}/bin/nixorium-clean-controller-generations %i";
+        User = "root";
+        Group = "root";
+        UMask = "0022";
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectHome = true;
+        Nice = 10;
+        IOSchedulingClass = "idle";
+        TimeoutStartSec = "1h";
       };
     };
 

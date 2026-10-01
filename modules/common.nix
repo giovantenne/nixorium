@@ -15,6 +15,9 @@
   boot.loader.grub.efiSupport = true;
   boot.loader.grub.device = "nodev";
   boot.loader.grub.useOSProber = true;
+  # Keep the boot menu and /boot bounded; Maintenance → Free disk space keeps
+  # the same number of system generations (ADR 0022).
+  boot.loader.grub.configurationLimit = lib.mkDefault 10;
   boot.loader.timeout = 5;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.efi.efiSysMountPoint = "/boot";

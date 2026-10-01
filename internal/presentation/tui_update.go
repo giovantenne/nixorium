@@ -905,6 +905,19 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.software = software
 		model.message = result.message
 		return model, nil
+	case cleanupPlanMsg:
+		model.busy = ""
+		model.cleanup.plan = message.plan
+		model.cleanup.stage = 1
+		model.cleanup.confirmation = ""
+		model.message = ""
+		return model, nil
+	case cleanupApplyMsg:
+		model.busy = ""
+		model.cleanup.result = message.report
+		model.cleanup.stage = 2
+		model.message = ""
+		return model, nil
 	case internetPlanMsg:
 		model.busy = ""
 		model.internet.plan = message.plan

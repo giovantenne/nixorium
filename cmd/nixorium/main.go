@@ -148,6 +148,8 @@ func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		return runWorkspaceCommand(ctx, repository, options, stdout, stderr)
 	case "internet":
 		return runInternetCommand(ctx, repository, options, stdout, stderr)
+	case "cleanup":
+		return runCleanupCommand(ctx, repository, options, stdout, stderr)
 	case "shutdown", "restart":
 		return runShutdownCommand(ctx, repository, options, stdout, stderr)
 	case "install":
@@ -218,6 +220,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	softwareSaveManager := app.NewSoftwareSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	softwarePresetSaveManager := app.NewSoftwarePresetSaveManager(softwareManager, gitReviewManager, configurationSaveManager)
 	shutdownManager := app.NewShutdownManager(local)
+	cleanupManager := app.NewCleanupManager(local)
 	internetManager := app.NewInternetManager(local)
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
@@ -347,6 +350,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		},
 		ApplyInternet: func(plan domain.InternetPlan) domain.InternetReport {
 			report := internetManager.Apply(ctx, plan, plan.ReviewToken)
+			report.Message = operationRecordMessage(report.Message, report)
+			return report
+		},
+		PlanCleanup: func(ctx context.Context, requested string) domain.CleanupPlanReport {
+			return cleanupManager.Plan(ctx, repository, requested)
+		},
+		ApplyCleanup: func(plan domain.CleanupPlanReport) domain.CleanupApplyReport {
+			report := cleanupManager.Apply(ctx, plan, plan.ReviewToken)
 			report.Message = operationRecordMessage(report.Message, report)
 			return report
 		},
@@ -680,7 +691,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "install", "support":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "install", "support", "cleanup":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -739,7 +750,7 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "preset-plan"
 				continue
 			}
-			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "workspace" && result.command != "shutdown" && result.command != "restart" && result.command != "internet") || result.subcommand != "" {
+			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "workspace" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "cleanup") || result.subcommand != "" {
 				return options{}, errors.New("plan must follow config, deploy, controller, update, software, workspace, shutdown, restart, Internet, or git commit")
 			}
 			result.subcommand = "plan"
@@ -767,7 +778,7 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "preset-apply"
 				continue
 			}
-			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet") && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
@@ -854,8 +865,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, services restart, or git commit apply")
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
@@ -869,8 +880,8 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
-		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, or git commit apply")
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && result.subcommand == "commit-apply")) {
+		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, or git commit apply")
 	}
 	if result.extension != "" && (result.command != "workspace" || result.subcommand != "marketplace") {
 		return options{}, errors.New("--extension is only valid with workspace marketplace")
@@ -889,8 +900,16 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("workspace apply requires --expect from workspace plan")
 		}
 	}
-	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet") || (result.subcommand != "plan" && result.subcommand != "apply")) {
-		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, or Internet plan/apply")
+	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "cleanup") || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, Internet or cleanup plan/apply")
+	}
+	if result.command == "cleanup" {
+		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" {
+			return options{}, errors.New("cleanup requires plan or apply and --on <controller,pcNN,...|@lab>")
+		}
+		if result.subcommand == "apply" && result.expect == "" {
+			return options{}, errors.New("cleanup apply requires --expect from cleanup plan")
+		}
 	}
 	if result.command == "deploy" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("deploy requires the plan or apply subcommand")
@@ -1129,7 +1148,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|cleanup plan|cleanup apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|update check|update plan|update apply|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
@@ -1149,6 +1168,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       software apply --package <id> --scope <scope> [--remove] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       internet plan --on <clients|@lab> --action <block|unblock>")
 	fmt.Fprintln(writer, "       internet apply --on <clients|@lab> --action <block|unblock> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       cleanup plan --on <controller,pcNN,...|@lab>")
+	fmt.Fprintln(writer, "       cleanup apply --on <targets> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       shutdown plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")
 	fmt.Fprintln(writer, "       shutdown apply --on <targets> [--acknowledge-unknown-sessions] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       restart plan --on <pcNN[,pcNN...]|@lab> [--acknowledge-unknown-sessions]")

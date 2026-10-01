@@ -63,6 +63,7 @@ var administrationTasks = []dashboardTask{
 	{id: "package-base", shortcut: "b", title: "Update system and packages", description: "Refresh the NixOS base or review a channel migration"},
 	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},
 	{id: "logs", shortcut: "l", title: "View operation logs", description: "Recent outcomes and bounded deployment log tails"},
+	{id: "cleanup", shortcut: "f", title: "Free disk space", description: "Remove old system versions on the controller and clients, after review", advanced: true},
 	{id: "controller", shortcut: "c", title: "Apply to controller", description: "Make this controller run the saved configuration, after review", advanced: true},
 	{id: "services", shortcut: "s", title: "Controller services", description: "Check software delivery services or restart the signed cache when troubleshooting", advanced: true},
 	{id: "git", shortcut: "g", title: "Review Git changes", description: "Inspect and commit selected safe deployment files", advanced: true},

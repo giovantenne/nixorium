@@ -29,6 +29,8 @@ type DashboardActions struct {
 	ClassroomMode           bool
 	PlanInternet            func(context.Context, string, domain.InternetAction) domain.InternetPlan
 	ApplyInternet           func(domain.InternetPlan) domain.InternetReport
+	PlanCleanup             func(context.Context, string) domain.CleanupPlanReport
+	ApplyCleanup            func(domain.CleanupPlanReport) domain.CleanupApplyReport
 	RunningVersion          string
 	LoadInventory           func(context.Context) (domain.StatusReport, error)
 	LoadInitial             func(context.Context) (domain.StatusReport, domain.SetupReport, error)
@@ -131,6 +133,7 @@ const (
 	dashboardDiagnostics
 	dashboardSoftware
 	dashboardInternet
+	dashboardCleanup
 	dashboardShutdown
 	dashboardShutdownReview
 	dashboardShutdownResult
@@ -351,6 +354,7 @@ type dashboardModel struct {
 	templateReset          templateResetModel
 	software               softwareModel
 	internet               internetModel
+	cleanup                cleanupModel
 	shutdown               shutdownModel
 	width                  int
 	height                 int
@@ -1058,6 +1062,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.workspaceView()
 	case dashboardInternet:
 		content = model.internetView()
+	case dashboardCleanup:
+		content = model.cleanupView()
 	case dashboardShutdown, dashboardShutdownReview, dashboardShutdownResult:
 		content = model.shutdownView()
 	case dashboardDeploy, dashboardDeployReview:
