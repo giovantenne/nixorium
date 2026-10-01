@@ -35,7 +35,7 @@ func TestDemoGraphsNavigateTheRealDashboard(t *testing.T) {
 		}
 		for id, view := range graph.Views {
 			for key, next := range view.Next {
-				if next < 0 || next >= len(graph.Views) || next == id {
+				if next < demoGraphTrimmed || next >= len(graph.Views) || next == id {
 					t.Fatalf("%s view %d key %s points to %d", graph.ID, id, key, next)
 				}
 			}
@@ -53,6 +53,17 @@ func TestDemoGraphsNavigateTheRealDashboard(t *testing.T) {
 		if screen := demoGraphScreen(demoGraphText(teacher, id)); strings.Contains(screen, "Maintenance") || strings.Contains(screen, "Software") {
 			t.Fatalf("teacher graph reached administration: %s", screen)
 		}
+	}
+	trimmed := 0
+	for _, view := range administrator.Views {
+		for _, next := range view.Next {
+			if next == demoGraphTrimmed {
+				trimmed++
+			}
+		}
+	}
+	if trimmed == 0 {
+		t.Fatal("small limits must leave trimmed edges that the website can explain")
 	}
 	software, ok := administrator.Views[administrator.Start].Next["w"]
 	if !ok || !strings.Contains(demoGraphText(administrator, software), "Software") {

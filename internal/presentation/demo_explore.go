@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -28,7 +29,9 @@ type DemoGraphBundle struct {
 }
 
 // DemoGraph stores each distinct ANSI line once; views reference lines by
-// index and map key names to the view they lead to.
+// index and map key names to the view they lead to. An edge to -1 means the
+// key leads somewhere the exploration limits left out, so the website can say
+// that the step is not part of the demo instead of silently ignoring it.
 type DemoGraph struct {
 	ID    string          `json:"id"`
 	Title string          `json:"title"`
@@ -40,7 +43,14 @@ type DemoGraph struct {
 type DemoGraphView struct {
 	Lines []int          `json:"l"`
 	Next  map[string]int `json:"k,omitempty"`
+	// Text marks a focused text field; the demo does not accept typing.
+	Text bool `json:"t,omitempty"`
+	// Unexplored marks a view past the depth limit: its keys were not tried.
+	Unexplored bool `json:"x,omitempty"`
 }
+
+// demoGraphTrimmed is the edge target for a step the limits left out.
+const demoGraphTrimmed = -1
 
 type demoGraphKey struct {
 	name   string
@@ -80,8 +90,8 @@ func RenderDemoGraphs(sourceCommit, sourceDate string) DemoGraphBundle {
 		Terminal:      fmt.Sprintf("%dx%d", width, height),
 		Synthetic:     true,
 		Graphs: []DemoGraph{
-			exploreDemoGraph("teacher", "Teacher dashboard", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, true) }, demoGraphLimits{views: 240, perScreen: 24, depth: 14}),
-			exploreDemoGraph("administrator", "Administrator menu", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, false) }, demoGraphLimits{views: 1400, perScreen: 24, depth: 14}),
+			exploreDemoGraph("teacher", "Teacher dashboard", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, true) }, demoGraphLimits{views: 900, perScreen: 160, depth: 16}),
+			exploreDemoGraph("administrator", "Administrator menu", func() dashboardModel { return demoExploreModel(sourceCommit, width, height, false) }, demoGraphLimits{views: 2400, perScreen: 160, depth: 16}),
 		},
 	}
 }
@@ -90,29 +100,52 @@ func RenderDemoGraphs(sourceCommit, sourceDate string) DemoGraphBundle {
 // machine that regenerates the graphs.
 var demoObservedAt = time.Date(2026, 9, 30, 10, 15, 0, 0, time.Local)
 
-// demoExploreHosts simulates a running lesson: four clients answer, pc02 has
-// an active student session, pc04 is out of date and pc05 is switched off.
+// demoExploreClients keeps the navigable lab small: selection lists grow
+// with every subset of computers, and four clients still show each state.
+const demoExploreClients = 4
+
+// demoExploreHosts simulates a running lesson: three clients answer, pc02 has
+// an active student session, pc03 is out of date and pc04 is switched off.
 func demoExploreHosts(revision string) domain.HostsReport {
 	hosts := domain.HostsReport{SchemaVersion: domain.SchemaVersion, Operation: "hosts", GeneratedAt: demoObservedAt, State: "ready", Repository: "/demo/lab", DesiredRevision: revision}
-	for index := 1; index <= 5; index++ {
+	for index := 1; index <= demoExploreClients; index++ {
 		host := domain.HostStatus{Name: fmt.Sprintf("pc%02d", index), IP: fmt.Sprintf("10.42.0.%d", 10+index), Role: "client", Reachability: domain.ReachabilityReachable, SSH: domain.SSHAvailable, Deployment: domain.DeploymentCurrent, CurrentRevision: revision, DesiredRevision: revision}
 		switch index {
-		case 4:
+		case 3:
 			host.Deployment = domain.DeploymentOutdated
 			host.CurrentRevision = strings.Repeat("0", 40)
-		case 5:
+		case 4:
 			host.Reachability, host.SSH, host.Deployment, host.CurrentRevision = domain.ReachabilityUnreachable, "", domain.DeploymentUnknown, ""
 		}
 		hosts.Hosts = append(hosts.Hosts, host)
 	}
-	hosts.Deployment = domain.HostDeploymentSummary{Current: 3, Outdated: 1}
+	hosts.Deployment = domain.HostDeploymentSummary{Current: 2, Outdated: 1}
 	return hosts
+}
+
+func demoExploreStatus(revision string) domain.StatusReport {
+	status := demoStatus("ready", revision)
+	status.Meta.Clients.Count = demoExploreClients
+	status.Meta.Clients.Hosts = status.Meta.Clients.Hosts[:demoExploreClients]
+	return status
+}
+
+func demoExploreTargets() []domain.DeploymentTarget {
+	return demoDeploymentTargets()[:demoExploreClients]
+}
+
+func demoExploreClientNames() []string {
+	names := make([]string, 0, demoExploreClients)
+	for _, target := range demoExploreTargets() {
+		names = append(names, target.Name)
+	}
+	return names
 }
 
 func demoExploreModel(revision string, width, height int, classroom bool) dashboardModel {
 	actions := demoExploreActions(revision)
 	actions.ClassroomMode = classroom
-	model := newDashboardModel(demoStatus("ready", revision), demoSetupReady(), actions, false)
+	model := newDashboardModel(demoExploreStatus(revision), demoSetupReady(), actions, false)
 	model.width, model.height, model.isDark = width, height, true
 	model.homeMenu = newDashboardTaskMenu(true, model.width, model.height)
 	model.ensureActivitySpinner()
@@ -129,8 +162,10 @@ func demoExploreModel(revision string, width, height int, classroom bool) dashbo
 func demoExploreActions(revision string) DashboardActions {
 	hosts := demoExploreHosts(revision)
 	catalog := demoSoftwareCatalog()
-	status := demoStatus("ready", revision)
-	sessions := map[string]domain.ShutdownSessionState{"pc01": domain.ShutdownSessionIdle, "pc02": domain.ShutdownSessionActive, "pc03": domain.ShutdownSessionIdle, "pc04": domain.ShutdownSessionIdle}
+	catalog.Clients = demoExploreClientNames()
+	catalog.Groups = map[string][]string{"graphics": {"pc01", "pc02"}}
+	status := demoExploreStatus(revision)
+	sessions := map[string]domain.ShutdownSessionState{"pc01": domain.ShutdownSessionIdle, "pc02": domain.ShutdownSessionActive, "pc03": domain.ShutdownSessionIdle}
 	actions := DashboardActions{
 		RunningVersion: "demo",
 		LoadInventory:  func(context.Context) (domain.StatusReport, error) { return status, nil },
@@ -181,13 +216,21 @@ func demoExploreActions(revision string) DashboardActions {
 			if !request.Present {
 				confirmation = "REMOVE"
 			}
-			return domain.SoftwareChangePlanReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json", Request: request, AffectedClients: []string{"pc01", "pc02", "pc03", "pc04", "pc05"}, ReviewToken: "sha256:demo", Confirmation: confirmation, Issues: []domain.ValidationIssue{}}
+			return domain.SoftwareChangePlanReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-plan", State: "ready", Repository: "/demo/lab", ManagedFile: "lab-software.json", Request: request, AffectedClients: demoExploreClientNames(), ReviewToken: "sha256:demo", Confirmation: confirmation, Issues: []domain.ValidationIssue{}}
 		},
 		SaveSoftware: func(plan domain.SoftwareChangePlanReport) domain.SoftwareChangeApplyReport {
 			return domain.SoftwareChangeApplyReport{SchemaVersion: domain.SoftwareSchemaVersion, Operation: "software-change-save", State: "saved", Repository: plan.Repository, ManagedFile: plan.ManagedFile, Request: plan.Request, AffectedClients: plan.AffectedClients, Revision: revision, Message: "Software selection saved locally.", Issues: []domain.ValidationIssue{}}
 		},
 		PlanDeployment: func(_ context.Context, requested string) domain.DeploymentPlanReport {
-			return domain.DeploymentPlanReport{SchemaVersion: domain.SchemaVersion, Operation: "deploy-plan", State: "ready", Repository: "/demo/lab", Requested: requested, Revision: revision, ColmenaSelector: requested, Targets: demoDeploymentTargets(), Availability: demoDeploymentAvailability(), BuildFirst: true, Issues: []domain.ValidationIssue{}}
+			plan := domain.DeploymentPlanReport{SchemaVersion: domain.SchemaVersion, Operation: "deploy-plan", State: "ready", Repository: "/demo/lab", Requested: requested, Revision: revision, ColmenaSelector: requested, BuildFirst: true, Issues: []domain.ValidationIssue{}}
+			for _, host := range hosts.Hosts {
+				if requested != "" && requested != "@lab" && !strings.Contains(","+requested+",", ","+host.Name+",") {
+					continue
+				}
+				plan.Targets = append(plan.Targets, domain.DeploymentTarget{Name: host.Name, IP: host.IP})
+				plan.Availability = append(plan.Availability, domain.DeploymentTargetAvailability{Name: host.Name, IP: host.IP, Reachability: host.Reachability, SSH: host.SSH})
+			}
+			return plan
 		},
 		LoadSettings:  func(context.Context) (domain.LabSettingsFile, error) { return demoSettings(), nil },
 		LoadWorkspace: func(context.Context) domain.WorkspacePlanReport { return demoWorkspacePlan() },
@@ -274,40 +317,91 @@ func exploreDemoGraph(id, title string, start func() dashboardModel, limits demo
 		panic("demo graph root could not be rendered: " + id)
 	}
 	explorer.add(demoGraphView(root), nil)
-	for next := 0; next < len(explorer.paths); next++ {
-		path := explorer.paths[next]
-		if len(path) >= explorer.limits.depth {
-			continue
+	// Views waiting in the queue already know their paths, so a window of them
+	// is explored in parallel; merging in queue order keeps the result equal
+	// to a sequential breadth-first exploration.
+	window := 4 * runtime.GOMAXPROCS(0)
+	for next := 0; next < len(explorer.paths); {
+		end := min(next+window, len(explorer.paths))
+		explored := explorer.exploreWindow(explorer.paths[next:end])
+		for offset, result := range explored {
+			explorer.merge(next+offset, result)
 		}
-		typing := explorer.acceptsText(path)
-		for index, key := range explorer.keys {
-			if key.letter && typing {
-				continue
-			}
-			candidate := append(append([]int{}, path...), index)
-			model, ok := explorer.replay(candidate)
-			if !ok {
-				continue
-			}
-			view := demoGraphView(model)
-			if view == explorer.views[next] {
-				continue
-			}
-			target, seen := explorer.byView[view]
-			if !seen {
-				// Esc must always lead back, or a capped screen becomes a dead end.
-				if len(explorer.views) >= explorer.limits.views || (key.name != "esc" && explorer.byScreen[demoGraphScreen(view)] >= explorer.limits.perScreen) {
-					continue
-				}
-				target = explorer.add(view, candidate)
-			}
-			if explorer.graph.Views[next].Next == nil {
-				explorer.graph.Views[next].Next = map[string]int{}
-			}
-			explorer.graph.Views[next].Next[key.name] = target
-		}
+		next = end
 	}
 	return explorer.graph
+}
+
+type demoGraphCandidate struct {
+	path []int
+	view string
+	ok   bool
+}
+
+type demoGraphExplored struct {
+	unexplored bool
+	typing     bool
+	candidates []demoGraphCandidate
+}
+
+// exploreWindow replays the keys of several queued views in parallel. Each
+// replay starts from a fresh model, so the work shares no dashboard state.
+func (e *demoExplorer) exploreWindow(paths [][]int) []demoGraphExplored {
+	results := make([]demoGraphExplored, len(paths))
+	var wait sync.WaitGroup
+	for index, path := range paths {
+		if len(path) >= e.limits.depth {
+			results[index].unexplored = true
+			continue
+		}
+		wait.Add(1)
+		go func(index int, path []int) {
+			defer wait.Done()
+			typing := e.acceptsText(path)
+			candidates := make([]demoGraphCandidate, len(e.keys))
+			for key, item := range e.keys {
+				if item.letter && typing {
+					continue
+				}
+				candidate := append(append([]int{}, path...), key)
+				if model, ok := e.replay(candidate); ok {
+					candidates[key] = demoGraphCandidate{path: candidate, view: demoGraphView(model), ok: true}
+				}
+			}
+			results[index] = demoGraphExplored{typing: typing, candidates: candidates}
+		}(index, path)
+	}
+	wait.Wait()
+	return results
+}
+
+// merge records one explored view in queue order, adding new views and
+// marking the steps that the limits leave out.
+func (e *demoExplorer) merge(id int, result demoGraphExplored) {
+	if result.unexplored {
+		e.graph.Views[id].Unexplored = true
+		return
+	}
+	e.graph.Views[id].Text = result.typing
+	for index, candidate := range result.candidates {
+		if !candidate.ok || candidate.view == e.views[id] {
+			continue
+		}
+		key := e.keys[index]
+		target, seen := e.byView[candidate.view]
+		if !seen {
+			// Esc must always lead back, or a capped screen becomes a dead end.
+			if len(e.views) >= e.limits.views || (key.name != "esc" && e.byScreen[demoGraphScreen(candidate.view)] >= e.limits.perScreen) {
+				target = demoGraphTrimmed
+			} else {
+				target = e.add(candidate.view, candidate.path)
+			}
+		}
+		if e.graph.Views[id].Next == nil {
+			e.graph.Views[id].Next = map[string]int{}
+		}
+		e.graph.Views[id].Next[key.name] = target
+	}
 }
 
 func (e *demoExplorer) add(view string, path []int) int {
