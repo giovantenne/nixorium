@@ -16,11 +16,6 @@ locally and returns to a clean desktop at every boot.
 [Sponsor](https://github.com/sponsors/giovantenne) ·
 [Releases](https://github.com/giovantenne/nixorium/releases)
 
-> [VERSION](VERSION) identifies this checkout. Published versions are listed on
-> [Releases](https://github.com/giovantenne/nixorium/releases); `master` may
-> contain unreleased changes, so use the documentation of your release tag.
-> Upgrading to 2.1? Read the [2.1.0 notes](CHANGELOG.md#210---2026-10-01) first.
-
 ## Project status
 
 Nixorium has run the Italian school lab where it began, 30 student PCs and a
