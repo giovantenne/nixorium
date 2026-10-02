@@ -145,7 +145,7 @@ baseline failures before any destructive scenario.
 1. Install the controller through the documented release-pinned bootstrap.
 2. Reboot without the installation medium and sign in as `admin`.
 3. Confirm `nixorium` and the private deployment are available.
-4. Open **Installation → Install computers**, complete Laboratory settings,
+4. Open **Installation → Network boot (PXE)**, complete Laboratory settings,
    verify that time zone and keyboard are not requested again, and let the flow
    create missing keys and activate the controller.
 5. Before starting PXE or rebooting, verify that the configured static

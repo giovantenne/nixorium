@@ -342,7 +342,7 @@ spinner and the current plain-language action.
 Every task menu shows its direct shortcut beside the title. `Esc` returns to
 the parent area; `F1` opens contextual help even while typing. Software tabs
 are directly accessible with `F2`, `F3`, and `F4`. Reapplying a system belongs
-to Computers → Distribute; reinstalling belongs to Installation.
+to Computers → Update computers; reinstalling belongs to Installation.
 
 The initial dashboard reads local settings, evaluated inventory and current
 services, without checking system closures, keys or PXE artifacts. These checks
@@ -509,7 +509,7 @@ locally without exposing Git. For
 `shared` and `controller` scopes, the same reviewed action then builds,
 activates, and verifies this controller. It never pushes, starts PXE, or
 distributes clients. After a successful save that affects clients, choose
-**Distribute affected computers** to open the ordinary deployment selector with
+**Update affected computers** to open the ordinary deployment selector with
 exactly the old and new destinations preselected, or choose **Later**. This
 shortcut still creates a fresh deployment plan and review; it applies the whole
 current deployment configuration, not only the package just changed. Removed

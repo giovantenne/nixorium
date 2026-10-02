@@ -167,8 +167,8 @@ controller's Internet path must still use adapter 2.
 
 ## 4. Prepare one client — inside the controller VM
 
-Open **Installation → Install computers** as described by the official guide.
-Use these Laboratory settings, retaining your chosen accounts and regional
+Open **Installation → Network boot (PXE)** as described by the official guide;
+the first time, its guided flow asks for Laboratory settings. Use these values, retaining your chosen accounts and regional
 settings:
 
 | Setting | Value for this fixture |
@@ -218,8 +218,8 @@ Expected: installation completes using controller-provided content. Shut down
 the client when instructed; select its installed disk in the EFI boot manager
 for subsequent starts. **PXE is for installation, not daily boot.**
 
-On the controller, stop PXE through **Installation → PXE mode and network
-recovery**. Expected: PXE listeners stop and `10.77.0.99/24` is restored on adapter
+On the controller, stop PXE through **Installation → Network boot (PXE)**
+with **Stop PXE**. Expected: PXE listeners stop and `10.77.0.99/24` is restored on adapter
 1. Then boot the client from disk and sign in. On the client:
 
 ```sh
@@ -254,8 +254,7 @@ lsblk -o NAME,PATH,SIZE,TYPE,RM,RO,MOUNTPOINTS,MODEL,SERIAL
 ```
 
 Record the live IPv4 address, full Ed25519 fingerprint, ISO device, and blank
-target disk. On the controller choose **Installation → Install computers → USB
-over SSH**, select `pc01`, and enter the address while the client console remains
+target disk. On the controller choose **Installation → USB over SSH**, select `pc01`, and enter the address while the client console remains
 visible. Confirm that no password attempt occurs while Nixorium observes the
 host key, compare the displayed fingerprint with the console, type `MATCH`, and
 then enter the temporary password. The client VM should not

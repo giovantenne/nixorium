@@ -293,7 +293,7 @@ only after proving the old machine is the selected physical client. Approve
 the newly installed host passes verification. Never delete the entire
 `known_hosts` file or accept a changed key merely because the address matches.
 
-If **Computers → Distribute** finds an unfinished USB installation, it opens
+If **Computers → Update computers** finds an unfinished USB installation, it opens
 **Finish installation** before asking you to confirm deployment. For an
 installed computer awaiting its final check, choose **Verify … and resume**.
 Turn on that computer, boot from the installed disk, and check its network

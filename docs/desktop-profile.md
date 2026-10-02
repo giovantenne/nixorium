@@ -12,6 +12,8 @@ The deployment-owned workstation module supplies a restrained GNOME 50 profile:
 - A compact bottom Dash to Dock with 40 px icons, no full-width panel,
   and no duplicate trash or removable-drive entries. It hides when any window
   overlaps its area and reappears at the bottom edge; a clear desktop keeps it visible.
+  On the controller, the administrator and teacher docks start with the
+  **Nixorium** launcher (`nixorium.desktop`).
 - Desktop Icons NG for files saved to the Desktop directory.
 - Tiling Assistant for snap assist and 8 px window gaps, with its panel indicator
   disabled. Existing Super+arrow window controls remain available.

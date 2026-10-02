@@ -17,6 +17,7 @@ an explicit product decision.
 | Home reset, extensions, npm, desktop defaults | `modules/home-reset.nix`, home scripts, template modules/assets | Maintainer student-home guide; system reference |
 | Account roles and NetworkManager authorization | `modules/users.nix`, mkLab tests | Both AGENTS files; maintainer configuration guidance; deployment README; system/architecture docs; changelog |
 | Privilege, keys, PXE or USB/SSH recovery | Management/PXE modules, remote worker/helper, adapters, integration tests | Core invariants; maintainer configuration/operations; troubleshooting |
+| Backups, interrupted-operation recovery, generation cleanup, Git discard | `internal/adapters/backup.go`, `internal/app/recovery.go`, `deployment_recovery.go`, `cleanup.go`, `git_discard.go`, adapters and TUI tests | ADRs 0022–0024; canonical troubleshooting; maintainer operations; administrator guide; architecture |
 | Local support export and diagnostic-code routes | `internal/domain/support.go`, `support_guidance.go`, app/adapter/TUI support tests | Support-report contract; canonical troubleshooting; maintainer operations; administrator guide |
 | Input ownership and updates | Update adapters/tests, Flake/template contract | Maintainer software/framework-update guidance; deployment AGENTS |
 | Deployment template reset and recovery | `template_reset*.go` domain/app/adapters, TUI and real-Git/Nix tests | Reset guide; both READMEs/AGENTS; maintainer operations; canonical copies; TUI gallery |

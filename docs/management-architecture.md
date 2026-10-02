@@ -64,6 +64,15 @@ a completed reboot. The teacher-facing dashboard reaches only inventory,
 Internet and these power operations through a group-private local worker. The
 worker retains the fixed administrator-owned deployment and SSH identity;
 neither the repository nor general management callbacks are delegated.
+Later reviewed workflows follow the same plan/confirm/apply shape: reviewed
+client host-key rotation, the declaration-only student workspace editor, local
+support export ([contract](support-report.md)), deployment template reset
+([guide](deployment-template-reset.md)), removal of old system generations
+([ADR 0022](adr/0022-reviewed-generation-cleanup.md)), recovery of interrupted
+operations ([ADR 0023](adr/0023-reviewed-recovery-of-interrupted-operations.md)),
+encrypted controller backups
+([ADR 0024](adr/0024-encrypted-controller-backups.md)) and discard of mistaken
+uncommitted Git changes.
 See the [administrator guide](../templates/site/README.md) for operator
 procedures and [hardware validation](hardware-validation.md) for manual evidence.
 
@@ -189,9 +198,10 @@ follow-ups use the same inventory boundary. Reviewed operations retain their
 complete validation independently of navigation.
 
 The CLI composition root parses arguments, resolves the deployment and selects
-a command family. Family handlers live in `commands_software.go`,
-`commands_operations.go` and `commands_setup.go`; reviewed apply boundaries
-live in `command_apply.go`. These handlers select application managers and
+a command family. Family handlers live in the `commands_*.go` files (for
+example software, workspace, operations, setup, install, internet, recovery,
+backup, cleanup, host trust and support); reviewed apply boundaries live in
+`command_apply.go`. These handlers select application managers and
 renderers, while adapters retain filesystem, process and privilege effects.
 
 The initial package layout is:
@@ -241,7 +251,22 @@ nixorium pxe                prepare, start, inspect, stop, or recover PXE mode
 nixorium services           inspect services; restart only the signed cache
 nixorium logs               list or inspect bounded private operation logs
 nixorium update             prepare a reviewable upstream release update
+nixorium package-base       review a NixOS base refresh or channel migration
+nixorium software           review guided software declarations and profiles
+nixorium workspace          review and save the student workspace profile
+nixorium internet           review temporary client Internet blocking
+nixorium install usb        run a reviewed USB/SSH client installation
+nixorium host-key           review a client host-key rotation after reinstall
+nixorium git                review, commit, or discard selected deployment files
+nixorium cleanup            review removal of old system generations
+nixorium backup             create, verify, or restore an encrypted backup
+nixorium recovery           list interrupted operations and their next steps
+nixorium template-reset     recover an interrupted deployment template reset
+nixorium support            preview or export a local support report
 ```
+
+The parser in `cmd/nixorium/main.go` and `nixorium --help` list the complete
+subcommands and options. Deployment template reset itself is TUI-only.
 
 Advanced output names and raw tool commands remain documented and usable. The
 management layer wraps rather than replaces Nix and Colmena.
@@ -362,29 +387,22 @@ separate confirmed operation, not a side effect of diagnosis.
 
 ## TUI information architecture
 
-The default screen prioritizes tasks rather than implementation names:
+The default screen prioritizes tasks rather than implementation names. The
+Overview opens four areas; rows above them appear only under **Needs
+attention** when local observations or earlier session evidence require
+action:
 
 ```text
-Nixorium
-
-Laboratory
-  Configuration        ready / action required
-  Controller services  healthy / degraded
-  Computers            reachable / configured
-  Installation mode    stopped / preparing / active / recovery required
-  Deployment            current / changes pending / unknown
-
-Actions
-  Finish laboratory setup
-  Install computers over network
-  View computers
-  Deploy configuration
-  Diagnose a problem
-  Change settings
-  Update Nixorium
-  Update system and packages
-  Advanced services and logs
+Overview
+  [c] Computers     inventory, update computers, Internet access, power
+  [n] Installation  network boot (PXE) or USB over SSH
+  [w] Software      configured choices and pinned package search
+  [a] Maintenance   settings, updates, logs, diagnostics, backup;
+                    advanced: free disk space, controller apply, services,
+                    Git review, deployment template reset
 ```
+
+The [generated TUI gallery](tui-gallery.md) shows the current screens.
 
 Each action has a review screen before mutation. Long operations show the
 current stage, elapsed time, recent events, and a route to detailed logs.
@@ -432,7 +450,8 @@ in the application/adapter layers.
 
 The dashboard Settings area loads typed managed settings through an application
 callback and groups routine edits into Network, Computers, Accounts, Regional,
-Browser, Git, and Veyon. Each category reuses the field editor and regional
+Browser, and Git, plus the separate Student workspace editor described below.
+Each category reuses the field editor and regional
 Bubbles selectors from first-run setup, but validates the complete candidate
 through the same Nix-backed plan before showing a redacted semantic review.
 Apply is bound to the reviewed source fingerprint and atomically replaces only
@@ -547,12 +566,12 @@ Installation is a resumable reconciliation, not a single `configured` flag.
 The ordinary TUI presents it as one continuous operation:
 
 ```text
-inspect environment
+choose PXE or USB over SSH
+  -> inspect environment
   -> collect complete laboratory settings and credentials
   -> validate and save managed configuration
   -> create, verify and install missing key material
   -> apply controller configuration
-  -> choose PXE or USB over SSH
   -> prepare the selected installation boundary
   -> review its network/session and destructive effects
   -> start the selected installation
@@ -572,19 +591,20 @@ through `nixorium setup configure`, and explicit key reconciliation through
 `nixorium setup keys`. The first-run wizard proposes
 the default-route interface and a non-static IPv4 address observed on that
 interface, so an already-active declarative controller address cannot mask the
-live DHCP lease. It groups 12 essential questions into Network, Laboratory,
-Accounts, Regional settings, Preferences, and Classroom stages.
+live DHCP lease. It groups 11 essential questions into Network, Laboratory,
+Accounts, Regional settings, and Preferences stages.
 Only time zone and keyboard layout are user choices in Regional settings; the
 US locale defaults remain internal and the console keymap follows known desktop
 keyboard selections. Both visible choices use offline Bubbles lists with fuzzy
 filtering, curated common values, and a validated custom path. Optional Git author identity retains the deployment
 template defaults instead of extending first run. The wizard retains entries
 across backward navigation, collects default credentials without echo, and
-uses the same candidate-plan/apply backend as automation. The dashboard's
-**Installation → Install computers** action validates and saves the complete
-form without a second review, while omitting time zone and keyboard because the
-installed controller values are retained. It creates missing keys, activates
-the controller, and then asks which installation method to use. Existing valid
+uses the same candidate-plan/apply backend as automation. In the dashboard's
+**Installation** area, choosing **Network boot (PXE)** or **USB over SSH**
+starts one continuous "Install computers" flow for that method. It validates
+and saves the complete form without a second review, while omitting time zone
+and keyboard because the installed controller values are retained. It then
+creates missing keys and activates the controller. Existing valid
 keys are reused; importing an existing private key is available only under
 Maintenance settings. PXE prepares every configured client and stops at its
 exact start confirmation immediately before the controller's static address is
@@ -607,11 +627,10 @@ that describes affected clients and requires confirmation. Controller rebuild
 and artifact preparation are restartable because output paths are content
 addressed; their logs are recorded by systemd or the operation event stream.
 
-First-run discoverability is provided by a controller-only desktop entry and a
-GNOME autostart notification/launcher conditioned on incomplete readiness. It
-runs as the logged-in administrator and does not use shell profile hooks or
-automatic root execution. The exact desktop mechanism is verified in a NixOS
-VM before it becomes the default.
+First-run discoverability is provided by the controller-only **Nixorium**
+desktop entry, which the site template pins first in the staff dock on the
+controller. It runs as the logged-in administrator and does not use shell
+profile hooks, autostart, or automatic root execution.
 
 ## Privilege model
 
@@ -947,8 +966,8 @@ contents are not opened automatically, settings password hashes are redacted,
 terminal controls are neutralized, and the presence of a known private-key
 path stops patch capture and blocks the report. Private paths are independently
 excluded from every diff, and status plus HEAD are rechecked so a concurrent
-change discards the review. CLI/JSON and the TUI render the same typed report
-and cannot stage, discard, commit, or push.
+change discards the review. CLI/JSON and the TUI render the same typed report;
+the review itself cannot stage, discard, commit, or push.
 
 The optional commit workflow takes only clean repository-relative regular-file
 paths that were present in a fresh review. It rejects directories, symbolic
@@ -969,6 +988,14 @@ unstaged, and untracked state. Repository hooks, commit signing, remotes, and
 push do not run. A partial result explicitly reports the rare case where HEAD
 advanced but index reconciliation failed; retry is then unsafe until inspected.
 A commit remains optional, requires exact confirmation, and needs no remote.
+
+The separate discard workflow (`git discard plan`/`apply`, or **Review Git
+changes → Discard changes**) reverses mistaken uncommitted edits to selected
+tracked files. Its review lists the changes that would be lost and is bound to
+their current content. Apply requires the exact `DISCARD` confirmation, first
+stores that content as a commit under `refs/nixorium/discard-backups/`, and
+only then restores the selected paths to HEAD. Untracked files, new files and
+private-key paths are never touched, and nothing is pushed.
 
 ## Guided upstream update
 
@@ -1019,7 +1046,10 @@ write the deployment lock during review.
 
 Before a plan becomes ready, evaluate `labMeta` and `deploymentStatus`, then
 build one configured client, the controller, netboot ramdisk, PXE firmware, and
-offline installer bundle with no result links. This work may download/build on
+offline installer bundle with no result links. An explicit `controller`
+deployment mode instead requires zero clients and controller readiness and
+builds only the candidate controller; unknown modes and inconsistent
+inventories are rejected. This work may download/build on
 the controller and populate the shared Nix store, but it does not deploy or
 introduce client internet access. The report contains current reference and
 revision, target/channel, bounded redacted `flake.nix`/`flake.lock` patch,
@@ -1142,3 +1172,13 @@ The following decisions are recorded separately:
 - [ADR-0012: preparation-bound PXE controller address](adr/0012-preparation-bound-pxe-address.md)
 - [ADR-0013: guided software declarations](adr/0013-guided-software-declarations.md)
 - [ADR-0014: reviewed client shutdown](adr/0014-reviewed-client-shutdown.md)
+- [ADR-0015: controller-first capabilities](adr/0015-controller-first-capabilities.md)
+- [ADR-0016: explicit shared and controller software scopes](adr/0016-shared-software-scopes.md)
+- [ADR-0017: role-aware network interfaces](adr/0017-role-aware-network-interfaces.md)
+- [ADR-0018: revision-bound controller bootstrap](adr/0018-revision-bound-controller-bootstrap.md)
+- [ADR-0019: deployment-owned package-base pin](adr/0019-deployment-owned-package-base.md)
+- [ADR-0020: laboratory-owned system updates](adr/0020-autonomous-package-base-updates.md)
+- [ADR-0021: reviewed USB installation over verified SSH](adr/0021-reviewed-usb-ssh-installation.md)
+- [ADR-0022: reviewed cleanup of old system generations](adr/0022-reviewed-generation-cleanup.md)
+- [ADR-0023: reviewed recovery of interrupted operations](adr/0023-reviewed-recovery-of-interrupted-operations.md)
+- [ADR-0024: encrypted controller backups](adr/0024-encrypted-controller-backups.md)

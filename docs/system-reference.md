@@ -97,7 +97,7 @@ The advertised channel is reference metadata, not a hard compatibility gate.
 manage the direct base independently, preserving every other locked node.
 Channel changes require explicit unverified-compatibility acknowledgement.
 `nixoriumUpdateTargets` covers the controller and distinct client variants
-(scoped software, Veyon mode, interface and explicit host modules); private
+(scoped software, interface and explicit host modules); private
 host-conditional policies declare additional `mkLab.updateValidationHosts`.
 `nixoriumOfflineCheck`
 compares direct and standalone-installer derivations in an isolated offline
@@ -608,7 +608,8 @@ consume `lib.mkLab`. Important generated outputs include:
 - `deploymentStatus` for readiness blockers;
 - `nixoriumSoftware` for the supported pinned catalog, evaluated scopes, and managed declarations;
 - `nixoriumSoftwarePresets` for the normalized optional profile catalog, or `null` when a deployment does not provide one;
-- `nixoriumWorkspace` and `nixoriumValidateWorkspaceCandidate` for optional preparation metadata and prerequisite validation, not activation;
+- `nixoriumSearchSoftwarePackages`, `nixoriumResolveSoftwarePackage` and `nixoriumValidateControllerSoftwareCandidate` for pinned package search, resolution and controller candidate checks;
+- `nixoriumWorkspace`, `nixoriumValidateWorkspaceCandidate` and `nixoriumResolveWorkspaceCandidate` for optional preparation metadata, prerequisite validation and candidate resolution, not activation;
 - `nixoriumUpdateTargets` and `nixoriumOfflineCheck` for base-update validation;
 - `nixorium` and supporting Flake applications;
 - `pxeFirmware`, `installerBundle`, and the target-independent
