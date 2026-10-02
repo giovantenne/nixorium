@@ -428,7 +428,10 @@ any shard must block publication.
 - Optional `mkLab.workspaceProfileJSON` (raw JSON text) and `workspaceCatalog`
   expose `nixoriumWorkspace` preparation metadata and a candidate hook.
   `mkLab` checks prerequisites against each generated host's actual declarative
-  system packages, including downstream overrides. Serialize both inputs into
+  system packages, including downstream overrides, evaluating one representative
+  per class of hosts with the same role, interface and managed software; a host
+  with `hostModules` is its own class. Keep this memory bounded independently of
+  the inventory size. Serialize both inputs into
   the offline installer. `state = "prepared"` is not activation.
   A supplied profile always configures the managed boot reset; there is no
   public runtime opt-in argument. Internal module selection is derived from

@@ -483,6 +483,18 @@ The project follows [Semantic Versioning](https://semver.org/).
   selected during the boot-time home reset. The static blue wallpaper remains
   the default for the persistent administrator and teacher accounts.
 
+### Fixed
+
+- Adding software, saving settings and other reviewed changes no longer need
+  memory proportional to the number of computers. Student-profile checks now
+  evaluate one computer for each group of identical ones (same role, network
+  interface and managed software; a computer with `hostModules` stands alone)
+  instead of every computer: on the 20-computer template, a software review
+  dropped from more than 14 GiB to about 4 GiB and stays there with 40.
+  Per-computer differences must use `hostModules` or software scopes; a shared
+  module that changes packages by host name alone is checked only on the first
+  computer of its group.
+
 ## [2.0.0] - 2026-09-27
 
 ### Added

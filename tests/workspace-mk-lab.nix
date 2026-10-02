@@ -22,6 +22,18 @@ let
       { package = "jdk"; scope.kind = "shared"; }
     ];
   };
+  # The editor reaches clients through one declaration with the given scope.
+  clientEditor = editorScope: {
+    controllerModules = [ ./fixtures/workspace-controller-editor.nix ];
+    clientGroups = { editors = [ "pc01" ]; };
+    labSoftware = {
+      schemaVersion = 1;
+      packages = [
+        { package = "vscode"; scope = editorScope; }
+        { package = "jdk"; scope.kind = "shared"; }
+      ];
+    };
+  };
   templateArgs = {
     workspaceProfileJSON = null;
     workspaceCatalog = import ../templates/site/workspace-catalog.nix;
@@ -149,6 +161,13 @@ in
     assert rejected { labSoftware = scope "all-clients"; };
     assert rejected { labSoftware = scope "controller"; };
     assert rejected { hostModules.pc02 = [ ./fixtures/workspace-remove-editor.nix ]; };
+    # Clients with different managed software are separate classes, so a
+    # client outside the editor's scope is still checked.
+    assert rejected (clientEditor { kind = "clients"; clients = [ "pc01" ]; });
+    assert rejected (clientEditor { kind = "group"; group = "editors"; });
+    assert !rejected (clientEditor { kind = "clients"; clients = [ "pc01" "pc02" ]; });
+    # Identical clients are resolved once, whatever the size of the lab.
+    assert !rejected { sharedModules = [ ./fixtures/workspace-forbid-second-client.nix ]; };
     assert !(builtins.tryEval (workspaceLab.nixoriumValidateControllerSoftwareCandidate (scope "all-clients"))).success;
     true;
 }

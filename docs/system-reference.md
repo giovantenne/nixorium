@@ -499,6 +499,14 @@ require `vscode`, desktop preferences require `gnome-shell`, and dock preference
 require `gnomeExtensions.dash-to-dock`. Broken, insecure, unsupported-platform
 or unresolved required packages fail preparation. No live hosts are contacted.
 
+Hosts that share their role, network interface and managed software, and have
+no `hostModules`, evaluate the same modules; the check evaluates one of them per
+such class and applies the result to the whole class, so its memory does not
+grow with the number of computers. A host with `hostModules` is always checked
+on its own. Express per-computer differences through `hostModules` or software
+scopes: a shared module that changes packages by host name alone is not seen
+for the other members of its class.
+
 `nixoriumValidateWorkspaceCandidate` accepts raw candidate JSON text and checks
 the same schema, catalog and all-host prerequisites without saving or deploying.
 The candidate hook does not qualify extension loading or mutate sessions.

@@ -232,8 +232,7 @@ let
     inherit workspaceRuntimeEnabled;
     inherit workspaceSeed;
     workspaceWallpapers = map (background: "${background}") labAssets.backgrounds;
-    hostSoftwarePackages = map (entry: entry.package)
-      (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages);
+    hostSoftwarePackages = map (entry: entry.package) (hostSoftwareEntries name);
     inherit nixoriumPackage;
     inherit hostIp;
     hostName = name;
@@ -418,6 +417,8 @@ let
     requireAvailable = false;
     allowUnfree = true;
   } labSoftware;
+  hostSoftwareEntries = name:
+    builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages;
   softwareAppliesTo = name: scope:
     scope.kind == "shared"
     || (scope.kind == "controller" && name == masterHostName)
@@ -450,13 +451,29 @@ let
         else { success = false; };
       in package.success && builtins.elem package.value installed
     ) workspacePackagePaths;
+  # Hosts that share their role, network interface and managed software
+  # evaluate the same modules, so their system packages agree; hostModules
+  # make a host its own class. Resolving one representative per class keeps
+  # validation memory independent of the number of computers. A shared module
+  # that changes packages by host name alone is outside this contract and
+  # belongs in hostModules.
+  workspaceHostClass = name:
+    if hostModules ? ${name} then "host ${name}"
+    else builtins.toJSON {
+      controller = name == masterHostName;
+      interface = ifaceForHost name;
+      software = lib.sort builtins.lessThan (map (entry: entry.package) (hostSoftwareEntries name));
+    };
+  # The first host of each class, in inventory order, represents it.
+  workspaceClassPackages = builtins.mapAttrs (_: workspaceHostPackages)
+    (builtins.listToAttrs (map (name: { name = workspaceHostClass name; value = name; }) validHostNames));
   workspaceResolution = if workspaceProfileJSON == null then null else
     import ./resolve-workspace-profile.nix { inherit lib; pkgs = softwarePkgs; } {
       profileJSON = workspaceProfileJSON;
       catalog = workspaceCatalog;
       controllerName = masterHostName;
       clientNames = validClientNames;
-      hostPackages = lib.genAttrs validHostNames workspaceHostPackages;
+      hostPackages = lib.genAttrs validHostNames (name: workspaceClassPackages.${workspaceHostClass name});
     };
   # A supplied profile always participates in the boot-time home reset.
   # This is derived composition state, not a separate customization switch.
