@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `nixorium --help` now lists the `package-base`, `workspace`, `host-key`
+  and `support` commands, which were accepted but missing from the usage text.
+
 ## [2.1.0] - 2026-10-01
 
 ### Upgrade notes
