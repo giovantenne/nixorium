@@ -88,6 +88,68 @@ SCRIPT
   unset NIXORIUM_TESTING NIXORIUM_OPERATION_ROOT NIXORIUM_SYSTEMD_RUN NIXORIUM_REMOTE_PROGRAM NIXORIUM_TEST_SYSTEMD_CALLS NIXORIUM_OPERATION_OWNER
 }
 
+test_reboot_is_acknowledged_before_deferred_dispatch() {
+  local fixture receipt operation_id
+  fixture=$(mktemp -d)
+  trap 'rm -rf -- "$fixture"' RETURN
+  operation_id=0123456789abcdef0123456789abcdef
+  install -d -m 0700 "$fixture/operations/$operation_id"
+  jq -cn --arg id "$operation_id" '{
+    schemaVersion:1,operationId:$id,state:"ready-to-reboot",phase:"ready-to-reboot",
+    sequence:1,mutationStarted:true,diskMayBeModified:true,installed:true,
+    message:"installation completed"
+  }' > "$fixture/operations/$operation_id/receipt.json"
+  chmod 0600 "$fixture/operations/$operation_id/receipt.json"
+  cat > "$fixture/systemd-run" <<SCRIPT
+#!$(command -v bash)
+set -euo pipefail
+printf '%s\n' "\$*" >> "\$NIXORIUM_TEST_SYSTEMD_CALLS"
+SCRIPT
+  chmod 0700 "$fixture/systemd-run"
+  export NIXORIUM_OPERATION_ROOT="$fixture/operations"
+  export NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  export NIXORIUM_SYSTEMD_RUN="$fixture/systemd-run"
+  export NIXORIUM_TEST_SYSTEMD_CALLS="$fixture/systemd-calls"
+  receipt=$("${HELPER_COMMAND[@]}" reboot "$operation_id")
+  jq -e '.state == "reboot-requested" and .phase == "reboot" and .installed == true and .sequence == 2' <<< "$receipt" >/dev/null
+  grep -F -- "--unit=nixorium-remote-reboot-$operation_id" "$fixture/systemd-calls" >/dev/null
+  grep -F -- "--on-active=10s" "$fixture/systemd-calls" >/dev/null
+  grep -F -- "--timer-property=AccuracySec=1s" "$fixture/systemd-calls" >/dev/null
+  grep -F -- "/run/current-system/sw/bin/systemctl reboot --no-block" "$fixture/systemd-calls" >/dev/null
+  unset NIXORIUM_OPERATION_ROOT NIXORIUM_OPERATION_OWNER NIXORIUM_SYSTEMD_RUN NIXORIUM_TEST_SYSTEMD_CALLS
+}
+
+test_failed_reboot_schedule_remains_ready() {
+  local fixture operation_id
+  fixture=$(mktemp -d)
+  trap 'rm -rf -- "$fixture"' RETURN
+  operation_id=abcdefabcdefabcdefabcdefabcdefab
+  install -d -m 0700 "$fixture/operations/$operation_id"
+  jq -cn --arg id "$operation_id" '{
+    schemaVersion:1,operationId:$id,state:"ready-to-reboot",phase:"ready-to-reboot",
+    sequence:1,mutationStarted:true,diskMayBeModified:true,installed:true,
+    message:"installation completed"
+  }' > "$fixture/operations/$operation_id/receipt.json"
+  chmod 0600 "$fixture/operations/$operation_id/receipt.json"
+  cat > "$fixture/systemd-run" <<SCRIPT
+#!$(command -v bash)
+exit 1
+SCRIPT
+  chmod 0700 "$fixture/systemd-run"
+  export NIXORIUM_OPERATION_ROOT="$fixture/operations"
+  export NIXORIUM_OPERATION_OWNER="$(id -u):$(id -g)"
+  export NIXORIUM_SYSTEMD_RUN="$fixture/systemd-run"
+  if "${HELPER_COMMAND[@]}" reboot "$operation_id" >/dev/null 2>&1; then
+    echo "failed reboot scheduling unexpectedly succeeded" >&2
+    return 1
+  fi
+  jq -e '.state == "ready-to-reboot" and .phase == "ready-to-reboot" and
+    .installed == true and .sequence == 2 and
+    (.message | contains("could not be scheduled"))' \
+    "$fixture/operations/$operation_id/receipt.json" >/dev/null
+  unset NIXORIUM_OPERATION_ROOT NIXORIUM_OPERATION_OWNER NIXORIUM_SYSTEMD_RUN
+}
+
 test_valid_plan
 test_unknown_and_trailing_fields_are_rejected
 test_duplicate_fields_are_rejected_by_compiled_validator
@@ -96,5 +158,7 @@ test_cross_field_mismatch_is_rejected
 test_size_limit_precedes_parsing
 test_status_id_is_not_a_path
 test_apply_dispatch_is_idempotent_and_independent
+test_reboot_is_acknowledged_before_deferred_dispatch
+test_failed_reboot_schedule_remains_ready
 
 echo "Remote client installer tests passed."

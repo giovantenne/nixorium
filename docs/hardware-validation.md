@@ -234,7 +234,9 @@ same live boot, report disk risk, and never run Disko a second time. A new boot
 or lease/address mismatch must fail closed. Successful completion requires USB
 removal, a separately confirmed reboot, installed-host revision verification,
 ephemeral-key removal, and any approved static-address host-key rotation only
-after verification.
+after verification. Confirm that the reboot acknowledgement reaches the
+controller before the live SSH session closes, and that the TUI then verifies
+the installed host automatically without issuing a second reboot.
 
 ## Scenario 5: client visibility and single-client deployment
 

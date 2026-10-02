@@ -486,7 +486,10 @@ guided TUI instead re-observes the fingerprint for comparison and asks the
 operator to re-enter only the address and password; it
 can reattach only to the same live boot and then observes status without
 replaying Disko. A new boot or changed identity remains blocked. Remove the USB
-only when ready, then use separately confirmed `reboot` and `verify` actions.
+only when ready, then confirm the separate reboot action. The TUI retries the
+read-only installed-system verification automatically after disk boot; use
+**Verify now** for an immediate retry. The CLI retains separate explicit
+`reboot` and `verify` commands.
 `cancel` is valid before dispatch and after a confirmed remote failure whose
 receipt says disk mutation did not start. Status normally revokes the live key
 and releases that reservation automatically; use **Cancel safely** only when

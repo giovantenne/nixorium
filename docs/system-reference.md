@@ -209,6 +209,12 @@ operator physically reconfirms the same live boot; reboot and known-host
 rotation remain separately confirmed. Ordinary changes to an installed client
 use `deploy`, not this destructive installation API.
 
+The remote helper records and returns the reboot acknowledgement before a
+short delayed transient unit closes the live SSH session. Once the TUI receives
+that acknowledgement, it retries only the read-only installed-host verification
+at the configured static address. It never replays Disko or the reboot request;
+the CLI keeps reboot and verification as separate explicit operations.
+
 ## Student home reset
 
 At boot, the previous student home becomes one of five rotating snapshots and

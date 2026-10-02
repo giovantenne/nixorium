@@ -69,6 +69,72 @@ func TestUSBInstallRefreshesItselfWithStatusOnlyWhileRunning(t *testing.T) {
 	}
 }
 
+func TestUSBInstallVerifiesAutomaticallyAfterReboot(t *testing.T) {
+	var requests []domain.RemoteInstallRequest
+	attempts := 0
+	rebooted := domain.RemoteInstallResponse{
+		State: "reboot-requested", OperationID: remoteTUITestOperationID,
+		Session: &domain.RemoteInstallSession{
+			OperationID: remoteTUITestOperationID, State: "reboot-requested", RebootRequested: true,
+			Preparation: &domain.RemoteInstallPreparation{OperationID: remoteTUITestOperationID},
+		},
+	}
+	model := dashboardModel{
+		screen: dashboardUSBInstall,
+		installation: installationModel{remote: remoteInstallationModel{
+			stage: remoteInstallConfirmReboot, host: "pc01", operationID: remoteTUITestOperationID,
+		}},
+		actions: DashboardActions{RemoteInstallRequest: func(request domain.RemoteInstallRequest) (domain.RemoteInstallResponse, error) {
+			requests = append(requests, request)
+			if request.Operation == domain.RemoteInstallRebootOperation {
+				return rebooted, nil
+			}
+			attempts++
+			if attempts == 1 {
+				waiting := rebooted
+				waiting.Message = "installed SSH is not reachable yet"
+				return waiting, nil
+			}
+			return domain.RemoteInstallResponse{State: "verified", OperationID: remoteTUITestOperationID}, nil
+		}},
+	}
+	for _, character := range "REBOOT" {
+		next, _ := model.Update(tea.KeyPressMsg{Text: string(character)})
+		model = next.(dashboardModel)
+	}
+	next, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = next.(dashboardModel)
+	if command == nil {
+		t.Fatal("confirmed reboot did not dispatch")
+	}
+	next, command = model.Update(command())
+	model = next.(dashboardModel)
+	if command == nil || !strings.Contains(model.View().Content, "checks the installed identity automatically") {
+		t.Fatalf("reboot result did not start automatic verification:\n%s", model.View().Content)
+	}
+	for attempts < 2 {
+		tick := remoteInstallTickMsg{operationID: remoteTUITestOperationID, watch: model.installation.remote.watch}
+		next, command = model.Update(tick)
+		model = next.(dashboardModel)
+		if command == nil {
+			t.Fatal("automatic verification tick did not issue a request")
+		}
+		next, command = model.Update(command())
+		model = next.(dashboardModel)
+	}
+	for index, request := range requests {
+		if index == 0 && request.Operation != domain.RemoteInstallRebootOperation {
+			t.Fatalf("first request was %s, want reboot", request.Operation)
+		}
+		if index > 0 && request.Operation != domain.RemoteInstallVerifyOperation {
+			t.Fatalf("automatic post-reboot request was %s", request.Operation)
+		}
+	}
+	if model.installation.remote.response.State != "verified" || command != nil {
+		t.Fatalf("automatic verification did not finish cleanly: state=%s command=%v", model.installation.remote.response.State, command != nil)
+	}
+}
+
 func TestUSBInstallFailureStatesDiskEffectPlainly(t *testing.T) {
 	model := dashboardModel{screen: dashboardUSBInstall, installation: installationModel{remote: remoteInstallationModel{
 		stage: remoteInstallResult, host: "pc03", operationID: remoteTUITestOperationID,

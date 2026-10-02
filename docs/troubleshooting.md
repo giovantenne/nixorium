@@ -322,6 +322,12 @@ together, preserving operation state and credentials, then repeat verification.
 After an authorized client reboot, verification can also resume if a controller
 reboot cleared the ISO credentials: it authenticates the installed host with
 the administrator key and the original persisted host pin and revision.
+After a reboot requested from the TUI, this same read-only verification is
+retried automatically while the installation result remains open; **Verify
+now** triggers an immediate retry. The remote helper schedules the reboot only
+after preparing a durable acknowledgement, so the expected SSH disconnect is
+not mistaken for an uncertain reboot. CLI operation remains explicit: run
+`reboot` once, then `verify` after the installed system is reachable.
 Do not delete the reservation or relax protection of the entire SSH directory.
 Current controller activation preserves the standard `~/.ssh/known_hosts`
 path as a link into the dedicated `~/.ssh/nixorium-known-hosts` directory.

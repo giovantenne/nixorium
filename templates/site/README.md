@@ -971,7 +971,10 @@ address is shown separately. Authorize `ROTATE HOST KEY` only after checking
 that the selected identity, live fingerprint, and disk are the intended
 machine. The stored key changes only after the installed host boots and passes
 post-install verification. Remove the USB when the operation says it is ready,
-then use the separately confirmed reboot and verification actions.
+then confirm the separate reboot action. The TUI automatically checks the
+preserved host key, hostname, system closure and revision at the configured
+static address after disk boot; use **Verify now** for an immediate retry. The
+CLI keeps `reboot` and `verify` as separate explicit commands.
 
 <details>
 <summary>Complete CLI command reference</summary>

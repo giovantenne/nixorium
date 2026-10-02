@@ -273,8 +273,10 @@ nixorium install usb reconcile --id 0123456789abcdef0123456789abcdef
 ```
 
 When status reports the install ready, detach the ISO before using the
-separately confirmed reboot action. After disk boot, run `verify` and the same
-hostname, mount, address, route, and active-system checks from step 5. Pass only
+separately confirmed reboot action. For CLI qualification, run `verify` after
+disk boot; also confirm that the TUI path retries the same read-only verification
+automatically. Perform the same hostname, mount, address, route, and active-system
+checks from step 5. Pass only
 when the installed revision matches, PXE stayed stopped, the controller static
 address never changed, the operation key was removed, and the client still had
 no Internet route. Exercise a worker restart before apply in one disposable run

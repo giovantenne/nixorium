@@ -8,8 +8,8 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-// remoteInstallWatchInterval paces automatic refresh while the independent
-// installer job runs. Each refresh is the read-only status request.
+// remoteInstallWatchInterval paces automatic status observation while the
+// independent installer runs and read-only verification after its reboot.
 const remoteInstallWatchInterval = 5 * time.Second
 
 type remoteInstallTickMsg struct {
@@ -17,13 +17,21 @@ type remoteInstallTickMsg struct {
 	watch       uint64
 }
 
-// remoteInstallRunning reports a dispatched job that is still working.
+// remoteInstallRunning reports a dispatched disk job that is still working.
 func remoteInstallRunning(response domain.RemoteInstallResponse) bool {
 	switch response.State {
 	case "accepted", "running", "dispatching":
 		return !remoteInstallDispatchUncertain(response)
 	}
 	return false
+}
+
+// remoteInstallAwaitingVerification reports a safely rebooted installation
+// whose installed identity can be checked repeatedly without replaying a
+// mutation. The reboot authorization is already persisted by the worker.
+func remoteInstallAwaitingVerification(response domain.RemoteInstallResponse) bool {
+	return response.State == "reboot-requested" && response.Session != nil &&
+		response.Session.RebootRequested && response.Session.Preparation != nil
 }
 
 func remoteInstallDispatchUncertain(response domain.RemoteInstallResponse) bool {
@@ -39,7 +47,9 @@ func (model dashboardModel) withRemoteInstallWatch(next tea.Model, cmd tea.Cmd) 
 		return next, cmd
 	}
 	remote := &updated.installation.remote
-	if remote.stage != remoteInstallResult || !remoteInstallRunning(remote.response) || remote.operationID == "" {
+	if remote.stage != remoteInstallResult ||
+		(!remoteInstallRunning(remote.response) && !remoteInstallAwaitingVerification(remote.response)) ||
+		remote.operationID == "" {
 		remote.watchStarted = time.Time{}
 		return updated, cmd
 	}
@@ -56,11 +66,19 @@ func (model dashboardModel) withRemoteInstallWatch(next tea.Model, cmd tea.Cmd) 
 func (model dashboardModel) handleRemoteInstallTick(message remoteInstallTickMsg) (tea.Model, tea.Cmd) {
 	remote := model.installation.remote
 	if model.screen != dashboardUSBInstall || model.busy != "" || remote.stage != remoteInstallResult ||
-		remote.operationID != message.operationID || remote.watch != message.watch || !remoteInstallRunning(remote.response) {
+		remote.operationID != message.operationID || remote.watch != message.watch {
 		return model, nil
 	}
-	// Only the read-only status request; never apply, reboot or reconcile.
-	return model.remoteInstallCommand("status", domain.RemoteInstallRequest{Operation: domain.RemoteInstallStatusOperation, OperationID: remote.operationID})
+	if remoteInstallRunning(remote.response) {
+		// Only the read-only status request; never apply, reboot or reconcile.
+		return model.remoteInstallCommand("status", domain.RemoteInstallRequest{Operation: domain.RemoteInstallStatusOperation, OperationID: remote.operationID})
+	}
+	if remoteInstallAwaitingVerification(remote.response) {
+		// Verification is read-only and bound to the preserved host key, static
+		// address, hostname, closure and deployment revision.
+		return model.remoteInstallCommand("verify", domain.RemoteInstallRequest{Operation: domain.RemoteInstallVerifyOperation, OperationID: remote.operationID})
+	}
+	return model, nil
 }
 
 func remoteInstallPhaseWords(phase domain.RemoteInstallPhase) string {
@@ -136,7 +154,7 @@ func (model dashboardModel) remoteInstallOutcome() (string, string) {
 			"Remove the USB stick (or make the disk boot first), then press b to restart it."
 	case response.State == "reboot-requested" || response.State == "reboot-dispatching":
 		return "Restart of " + host + " was requested.",
-			"When it has started from its disk, press v to verify the installed system."
+			"The controller checks the installed identity automatically every few seconds; press v to retry now."
 	case response.State == "verified":
 		return host + " is installed and verified.", "It now appears among the configured computers."
 	case response.State == "cancelled" || response.State == "closed-before-apply":

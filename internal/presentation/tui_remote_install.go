@@ -363,7 +363,11 @@ func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 		actions = append(actions, tuiAction{key: "b", label: "Reboot"}, tuiAction{key: "c", label: "Close without reboot"})
 	}
 	if state == "reboot-requested" || state == "verified" || state == "reconciliation-required" {
-		actions = append(actions, tuiAction{key: "v", label: "Verify installed system"})
+		label := "Verify installed system"
+		if state == "reboot-requested" {
+			label = "Verify now"
+		}
+		actions = append(actions, tuiAction{key: "v", label: label})
 	}
 	if state == "reconciliation-required" {
 		actions = append(actions, tuiAction{key: "n", label: "Reconcile remote receipt"}, tuiAction{key: "a", label: "Restore live recovery access"})

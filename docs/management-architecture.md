@@ -925,6 +925,10 @@ same address, fingerprint, host and live boot ID. Recovery
 then observes status only. A different live boot revokes the recovered key and
 remains blocked. Reboot and host-key rotation are separate reviewed actions;
 the configured static-address key changes only after installed-host verification.
+The live helper returns a durable acknowledgement before a delayed transient
+unit reboots the machine. After that acknowledgement, the TUI automatically
+retries only the read-only installed-host verification at the configured static
+address; it never repeats Disko or the reboot request.
 
 ## Client enrollment
 

@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- USB/SSH installation now returns a durable reboot acknowledgement before the
+  live ISO closes SSH, and the TUI automatically retries read-only installed
+  system verification after the client starts from disk.
 - `nixorium --help` now lists the `package-base`, `workspace`, `host-key`
   and `support` commands, which were accepted but missing from the usage text.
 

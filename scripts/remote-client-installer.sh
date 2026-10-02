@@ -366,7 +366,7 @@ run_plan() {
 }
 
 reboot_operation() {
-  local operation_id=$1 operation_dir receipt
+  local operation_id=$1 operation_dir receipt reboot_unit
   [[ "$operation_id" =~ ^[0-9a-f]{32}$ ]] || { echo "invalid operation id" >&2; return 2; }
   operation_dir="$OPERATION_ROOT/$operation_id"
   receipt="$operation_dir/receipt.json"
@@ -376,9 +376,19 @@ reboot_operation() {
       echo "operation is not ready for an explicit reboot" >&2
       return 1
     }
+  reboot_unit="nixorium-remote-reboot-$operation_id"
+  if ! "$SYSTEMD_RUN" \
+    --unit="$reboot_unit" --collect --quiet --on-active=10s \
+    --timer-property=AccuracySec=1s \
+    --property=Type=oneshot --property=TimeoutStartSec=30s \
+    /run/current-system/sw/bin/systemctl reboot --no-block; then
+    write_receipt "$operation_dir" "$operation_id" ready-to-reboot ready-to-reboot true true \
+      "installation completed but the reboot could not be scheduled"
+    return 1
+  fi
   write_receipt "$operation_dir" "$operation_id" reboot-requested reboot true true \
-    "reboot requested; waiting for post-boot verification at the reviewed static address"
-  /run/current-system/sw/bin/systemctl reboot --no-block
+    "reboot scheduled; waiting for post-boot verification at the reviewed static address"
+  # Return the durable acknowledgement before the delayed reboot closes SSH.
   status "$operation_id"
 }
 
