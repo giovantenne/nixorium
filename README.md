@@ -8,13 +8,17 @@ every student PC over the local network, without direct Internet access on the
 students' side. Each PC then starts from its own disk, runs its applications
 locally and returns to a clean desktop at every boot.
 
-[![Nixorium in one minute: the teacher's PC becomes the lab controller and every PC is ready for the next lesson](docs/images/nixorium-explainer.webp)](https://nixorium.org/)
-
-[Website and one-minute video](https://nixorium.org/) ·
+[Website](https://nixorium.org/) ·
 [Documentation](#documentation) ·
 [Contributing](CONTRIBUTING.md) ·
 [Sponsor](https://github.com/sponsors/giovantenne) ·
 [Releases](https://github.com/giovantenne/nixorium/releases)
+
+
+https://github.com/user-attachments/assets/3dfc054b-4f10-40a4-b26a-1c317d0d7fcf
+
+
+
 
 ## Project status
 
