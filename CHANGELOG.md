@@ -460,6 +460,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Adding software, saving settings and other reviewed changes no longer need
+  memory proportional to the number of computers. Student-profile checks now
+  evaluate one computer for each group of identical ones (same role, network
+  interface and managed software; a computer with `hostModules` stands alone)
+  instead of every computer: on the 20-computer template, a software review
+  dropped from more than 14 GiB to about 4 GiB and stays there with 40.
+  Per-computer differences must use `hostModules` or software scopes; a shared
+  module that changes packages by host name alone is checked only on the first
+  computer of its group.
 - USB/SSH client installation no longer rejects Wi-Fi interfaces. Network
   reachability, reviewed interface/address and boot identity, signed-cache
   verification, and exact disk review remain required. Live Wi-Fi credentials
@@ -477,23 +486,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   are preserved.
 - GitHub Release publication now requires successful full validation of the
   tagged commit, including VM tests, representative system builds and offline
-  equivalence. Release jobs enable KVM and use the maximum hosted duration;
-  pull-request and `master` checks remain lightweight.
+  equivalence. It runs as parallel jobs with KVM, one per check group, and also
+  nightly on `master` and on demand; pull-request and `master` push checks
+  remain lightweight.
 - The student login setup now preserves the random deployment-owned wallpaper
   selected during the boot-time home reset. The static blue wallpaper remains
   the default for the persistent administrator and teacher accounts.
-
-### Fixed
-
-- Adding software, saving settings and other reviewed changes no longer need
-  memory proportional to the number of computers. Student-profile checks now
-  evaluate one computer for each group of identical ones (same role, network
-  interface and managed software; a computer with `hostModules` stands alone)
-  instead of every computer: on the 20-computer template, a software review
-  dropped from more than 14 GiB to about 4 GiB and stays there with 40.
-  Per-computer differences must use `hostModules` or software scopes; a shared
-  module that changes packages by host name alone is checked only on the first
-  computer of its group.
 
 ## [2.0.0] - 2026-09-27
 
