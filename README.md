@@ -139,6 +139,8 @@ trial on virtual machines, follow the
 
 ## Using Nixorium
 
+![The Nixorium administrator menu, with the Computers, Installation, Software and Maintenance areas](docs/images/nixorium-tui.png)
+
 The administrator menu has four areas:
 
 | Area | What it is for |
