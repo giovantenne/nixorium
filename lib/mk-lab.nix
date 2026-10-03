@@ -84,6 +84,7 @@ let
   inherit (config) extraLocale;
   inherit (config) keyboardLayout;
   inherit (config) consoleKeyMap;
+  inherit (config) classroomView;
   inherit (config) veyonNativeHosts;
 
   networkOctets = map lib.toInt (lib.splitString "." networkBase);
@@ -192,6 +193,7 @@ let
     inherit extraLocale;
     inherit keyboardLayout;
     inherit consoleKeyMap;
+    inherit classroomView;
     inherit veyonNativeHosts;
     inherit cachePublicKey;
     inherit cachePort;
@@ -222,6 +224,7 @@ let
     (upstreamRoot + "/modules/filesystems.nix")
     (upstreamRoot + "/modules/home-reset.nix")
     (upstreamRoot + "/modules/veyon.nix")
+    (upstreamRoot + "/modules/classroom-view.nix")
     (upstreamRoot + "/modules/management.nix")
     (upstreamRoot + "/modules/pxe.nix")
   ] ++ lib.optional (nixosVersionMetadata != null) ({ lib, ... }: {

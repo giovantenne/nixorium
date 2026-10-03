@@ -35,6 +35,11 @@ let
     modules = [
       {
         options.lab = {
+          classroomView = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Experimental classroom view agent on client computers";
+          };
           deploymentMode = lib.mkOption {
             type = lib.types.enum [ "laboratory" "controller" ];
             default = "laboratory";

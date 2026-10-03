@@ -306,6 +306,19 @@ reboot/home reset. The controller also needs approval for screen broadcasts.
 Veyon still uses RFB internally; removing the bridge does not remove that
 protocol or its local native implementation.
 
+## Classroom view agent (experimental)
+
+`lab.classroomView` in `lab-settings.json` (default `false`) installs the
+classroom view agent on client computers only. It is a systemd user service
+started with the graphical session; it listens on
+`$XDG_RUNTIME_DIR/nixorium-classroom.sock` (mode 0600) and opens no network
+port. The controller reaches it with its existing SSH access and the fixed
+command `nixorium-classroom-connect`, which runs as root, finds the user of
+the active graphical session on seat0, checks the socket without following
+links and relays standard input and output. The protocol is versioned and
+bounded; this version answers only `hello`. The teacher's classroom view that
+uses it is not available yet.
+
 ## Temporary client Internet access
 
 The administrator and teacher Computers → Internet access action uses authenticated SSH

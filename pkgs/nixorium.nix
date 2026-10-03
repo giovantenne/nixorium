@@ -27,7 +27,7 @@ buildGoModule {
   };
 
   vendorHash = "sha256-c/oJmxRMgLc5I/MID5lGjpTMYhpdcWb7eKauA36vicw=";
-  subPackages = [ "cmd/nixorium" "cmd/nixorium-classroom-worker" "cmd/nixorium-home-reset" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
+  subPackages = [ "cmd/nixorium" "cmd/nixorium-classroom-agent" "cmd/nixorium-classroom-worker" "cmd/nixorium-home-reset" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
 
   nativeBuildInputs = [ makeWrapper ];
   nativeCheckInputs = [ git ];
@@ -46,7 +46,7 @@ buildGoModule {
       --suffix PATH : ${lib.makeBinPath [ git ]}
   '';
 
-  ldflags = [ "-s" "-w" "-X main.nixoriumVersion=${version}" ];
+  ldflags = [ "-s" "-w" "-X main.nixoriumVersion=${version}" "-X main.agentVersion=${version}" ];
 
   meta = {
     description = "Terminal management interface for Nixorium laboratories";

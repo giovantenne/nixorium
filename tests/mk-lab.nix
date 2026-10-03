@@ -26,6 +26,9 @@ let
       networkPrefixLength = 25;
     };
   });
+  classroomViewLab = mkLab (baseArgs // {
+    labConfig = labConfig // { classroomView = true; };
+  });
   roleInterfaceLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       controllerIfaceName = "eno1";
@@ -305,6 +308,13 @@ assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   ''action.id.indexOf("org.freedesktop.NetworkManager.") == 0'' clientPolkit.extraConfig;
 assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   "return polkit.Result.NO;" clientPolkit.extraConfig;
+# The experimental classroom view agent exists only on clients, and only when enabled.
+assert classroomViewLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent;
+assert !(classroomViewLab.nixosConfigurations.pc99.config.systemd.user.services ? nixorium-classroom-agent);
+assert !(subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent);
+# It adds no network port: the controller reaches it through SSH.
+assert lib.hasInfix "tcp dport { 22, 11100 } accept"
+  classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
 # Veyon's GTK file dialogs abort without the GTK GSettings schemas.
 assert lib.hasInfix "gsettings-schemas" subnetLab.nixosConfigurations.pc99.pkgs.veyon.postFixup;
 assert !(hasPackage subnetLab "pc01" "chromium");

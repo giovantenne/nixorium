@@ -31,6 +31,7 @@ type LabSettingsFile struct {
 
 type LabSettings struct {
 	DeploymentMode          string            `json:"deploymentMode,omitempty"`
+	ClassroomView           bool              `json:"classroomView,omitempty"`
 	MasterDHCPIP            string            `json:"masterDhcpIp"`
 	NetworkBase             string            `json:"networkBase"`
 	NetworkPrefix           int               `json:"networkPrefixLength"`

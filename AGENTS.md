@@ -547,6 +547,13 @@ any shard must block publication.
   a guard before connection tracking preventing IPv6/old-connection bypass.
   Controller services stay interface-scoped; only it opens Harmonia/PXE.
   Preserve independently owned runtime tables on firewall reload.
+- The experimental classroom view (`lab.classroomView`, default false) adds
+  only a client user-session agent on a private Unix socket. The controller
+  reaches it solely through its existing SSH access with the fixed
+  `nixorium-classroom-connect` command; never open a network port for it,
+  accept addresses or commands from the protocol, or follow links when
+  locating the session socket. Keep `internal/classroomview` messages
+  versioned, size-bounded and strict about unknown fields.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
   lock. Recheck authenticated boot ID and state before every fixed helper

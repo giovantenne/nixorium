@@ -256,3 +256,25 @@ func TestMarshalIsDeterministicAndEndsWithNewline(t *testing.T) {
 		t.Fatalf("non-deterministic or unterminated output:\n%s", first)
 	}
 }
+
+func TestClassroomViewIsAnOptionalBooleanSetting(t *testing.T) {
+	settings := validSettings()
+	settings.Lab.ClassroomView = true
+	data, err := MarshalLabSettings(settings)
+	if err != nil || !strings.Contains(string(data), `"classroomView": true`) {
+		t.Fatalf("encoded = %s, %v", data, err)
+	}
+	settings.Lab.ClassroomView = false
+	data, _ = MarshalLabSettings(settings)
+	if strings.Contains(string(data), "classroomView") {
+		t.Fatalf("disabled classroom view is written: %s", data)
+	}
+	changes := DiffLabSettings(LabSettingsFile{}, LabSettingsFile{Lab: LabSettings{ClassroomView: true}})
+	found := false
+	for _, change := range changes {
+		found = found || change.Field == "lab.classroomView"
+	}
+	if !found {
+		t.Fatalf("classroom view change is not reviewed: %+v", changes)
+	}
+}
