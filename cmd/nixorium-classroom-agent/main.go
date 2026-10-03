@@ -48,7 +48,11 @@ func main() {
 		}
 		err = connect(os.Stdin, os.Stdout, loginctl, "/run/user")
 	case "probe":
-		err = probe(os.Args[2:], os.Stdout)
+		arguments, thumbnail := os.Args[2:], ""
+		if len(arguments) >= 2 && arguments[0] == "--thumbnail" {
+			thumbnail, arguments = arguments[1], arguments[2:]
+		}
+		err = probe(arguments, thumbnail, os.Stdout)
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -78,12 +82,13 @@ func serve(runtimeDirectory string) error {
 		return err
 	}
 	name := currentUserName()
+	capture := newMutterCapture()
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
 			return err
 		}
-		handle(connection, name)
+		handle(connection, name, capture)
 	}
 }
 
@@ -111,7 +116,7 @@ func currentUserName() string {
 }
 
 // handle answers one connection until the peer closes it or misbehaves.
-func handle(connection net.Conn, userName string) {
+func handle(connection net.Conn, userName string, capture capturer) {
 	defer connection.Close()
 	for {
 		_ = connection.SetReadDeadline(time.Now().Add(10 * time.Minute))
@@ -131,12 +136,30 @@ func handle(connection net.Conn, userName string) {
 			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName}); err != nil {
 				return
 			}
+		case classroomview.TypeThumbnailRequest:
+			if err := classroomview.Write(connection, thumbnailReply(capture, message.Width)); err != nil {
+				return
+			}
 		default:
 			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported}); err != nil {
 				return
 			}
 		}
 	}
+}
+
+func thumbnailReply(capture capturer, width int) classroomview.Message {
+	if width < classroomview.MinThumbnailWidth || width > classroomview.MaxThumbnailWidth {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest, Detail: "thumbnail width is out of range"}
+	}
+	image, height, capturedAt, err := capture.Thumbnail(width)
+	if errors.Is(err, errNotReady) {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNotReady, Detail: err.Error()}
+	}
+	if err != nil {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: err.Error()}
+	}
+	return classroomview.Message{Type: classroomview.TypeThumbnail, Width: width, Height: height, Image: image, CapturedAt: capturedAt.UnixMilli()}
 }
 
 // commandRunner runs loginctl with fixed arguments and returns its output.
@@ -211,7 +234,7 @@ func connect(input io.Reader, output io.Writer, run commandRunner, runtimeBase s
 }
 
 // probe exchanges one hello through a command's standard input and output.
-func probe(command []string, output io.Writer) error {
+func probe(command []string, thumbnail string, output io.Writer) error {
 	if len(command) == 0 {
 		return errors.New("probe needs a command, for example nixorium-classroom-connect")
 	}
@@ -243,5 +266,27 @@ func probe(command []string, output io.Writer) error {
 	if reply.Type != classroomview.TypeHello {
 		return errors.New("the agent did not answer hello")
 	}
-	return nil
+	if thumbnail == "" {
+		return nil
+	}
+	// Frames come only when the screen changes; retry while the first is pending.
+	for attempt := 0; attempt < 10; attempt++ {
+		if err := classroomview.Write(stdin, classroomview.Message{Type: classroomview.TypeThumbnailRequest, Width: 320}); err != nil {
+			return err
+		}
+		reply, err = classroomview.Read(stdout)
+		if err != nil {
+			return err
+		}
+		if reply.Type == classroomview.TypeThumbnail {
+			fmt.Fprintf(output, "thumbnail width=%d height=%d bytes=%d\n", reply.Width, reply.Height, len(reply.Image))
+			return os.WriteFile(thumbnail, reply.Image, 0o644)
+		}
+		fmt.Fprintf(output, "%s code=%s detail=%s\n", reply.Type, reply.Code, reply.Detail)
+		if reply.Code != classroomview.CodeNotReady {
+			return errors.New("the agent did not return a thumbnail")
+		}
+		time.Sleep(time.Second)
+	}
+	return errors.New("no thumbnail after ten attempts")
 }

@@ -128,8 +128,8 @@ func TestAgentSocketRefusesLinksAndOtherFiles(t *testing.T) {
 
 func TestAgentRefusesOtherProtocolVersionsAndUnknownMessages(t *testing.T) {
 	server, client := net.Pipe()
-	go handle(server, "student")
-	_ = classroomview.Write(client, classroomview.Message{Type: "thumbnail.request"})
+	go handle(server, "student", fakeCapture{})
+	_ = classroomview.Write(client, classroomview.Message{Type: "screen.record"})
 	if reply, err := classroomview.Read(client); err != nil || reply.Code != classroomview.CodeUnsupported {
 		t.Fatalf("unknown message reply = %+v, %v", reply, err)
 	}
@@ -139,5 +139,57 @@ func TestAgentRefusesOtherProtocolVersionsAndUnknownMessages(t *testing.T) {
 	}
 	if _, err := classroomview.Read(client); !errors.Is(err, io.EOF) && err == nil {
 		t.Fatal("agent kept an incompatible connection open")
+	}
+}
+
+type fakeCapture struct {
+	image []byte
+	err   error
+}
+
+func (capture fakeCapture) Thumbnail(width int) ([]byte, int, time.Time, error) {
+	if capture.err != nil {
+		return nil, 0, time.Time{}, capture.err
+	}
+	return capture.image, width * 10 / 16, time.UnixMilli(1700000000000), nil
+}
+
+func TestThumbnailReplies(t *testing.T) {
+	reply := thumbnailReply(fakeCapture{image: []byte{0xff, 0xd8, 0xff, 0xd9}}, 320)
+	if reply.Type != classroomview.TypeThumbnail || reply.Width != 320 || reply.Height != 200 || len(reply.Image) != 4 || reply.CapturedAt != 1700000000000 {
+		t.Fatalf("reply = %+v", reply)
+	}
+	for width, code := range map[int]string{8: classroomview.CodeBadRequest, 4000: classroomview.CodeBadRequest} {
+		if reply := thumbnailReply(fakeCapture{}, width); reply.Code != code {
+			t.Fatalf("width %d reply = %+v", width, reply)
+		}
+	}
+	if reply := thumbnailReply(fakeCapture{err: errNotReady}, 320); reply.Code != classroomview.CodeNotReady {
+		t.Fatalf("not ready reply = %+v", reply)
+	}
+	if reply := thumbnailReply(fakeCapture{err: errors.New("no Mutter")}, 320); reply.Code != classroomview.CodeCapture {
+		t.Fatalf("failure reply = %+v", reply)
+	}
+}
+
+func TestReadFramesSplitsMultipartJPEGs(t *testing.T) {
+	stream := "--nixoriumframe\r\nContent-Type: image/jpeg\r\nContent-Length: 3\r\n\r\nabc\r\n" +
+		"--nixoriumframe\r\nContent-Type: image/jpeg\r\nContent-Length: 2\r\n\r\nde\r\n"
+	frames := []string{}
+	err := readFrames(strings.NewReader(stream), func(frame []byte) { frames = append(frames, string(frame)) })
+	if !errors.Is(err, io.EOF) || len(frames) != 2 || frames[0] != "abc" || frames[1] != "de" {
+		t.Fatalf("frames = %q, %v", frames, err)
+	}
+	bad := "--nixoriumframe\r\nContent-Length: 99999999\r\n\r\n"
+	if err := readFrames(strings.NewReader(bad), func([]byte) {}); err == nil || errors.Is(err, io.EOF) {
+		t.Fatalf("oversized frame accepted: %v", err)
+	}
+}
+
+func TestScaledHeightKeepsAspectAndIsEven(t *testing.T) {
+	for _, item := range []struct{ width, screenWidth, screenHeight, want int }{{320, 1280, 800, 200}, {320, 1920, 1080, 180}, {321, 1366, 768, 180}, {100, 1000, 9, 2}} {
+		if got := scaledHeight(item.width, item.screenWidth, item.screenHeight); got != item.want {
+			t.Fatalf("scaledHeight(%v) = %d", item, got)
+		}
 	}
 }

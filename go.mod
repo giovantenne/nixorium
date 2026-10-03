@@ -9,6 +9,7 @@ require (
 	filippo.io/age v1.3.2
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/godbus/dbus/v5 v5.2.2
 	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
 )

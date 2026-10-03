@@ -21,8 +21,16 @@ const MaxMessageBytes = 4 << 20
 
 // Message types.
 const (
-	TypeHello = "hello"
-	TypeError = "error"
+	TypeHello            = "hello"
+	TypeError            = "error"
+	TypeThumbnailRequest = "thumbnail.request"
+	TypeThumbnail        = "thumbnail"
+)
+
+// Thumbnail width limits accepted by the agent.
+const (
+	MinThumbnailWidth = 64
+	MaxThumbnailWidth = 640
 )
 
 // Error codes reported by the agent or the connect helper.
@@ -31,6 +39,8 @@ const (
 	CodeNoAgent     = "no-agent"
 	CodeUnsupported = "unsupported"
 	CodeBadRequest  = "bad-request"
+	CodeCapture     = "capture-failed"
+	CodeNotReady    = "not-ready"
 )
 
 // Message is one protocol message. Unknown fields are refused on decode.
@@ -41,6 +51,13 @@ type Message struct {
 	User    string `json:"user,omitempty"`
 	Code    string `json:"code,omitempty"`
 	Detail  string `json:"detail,omitempty"`
+	// Thumbnail request and reply. Image is a JPEG; CapturedAt is the time of
+	// the last screen change in Unix milliseconds (screens send frames only
+	// when they change).
+	Width      int    `json:"width,omitempty"`
+	Height     int    `json:"height,omitempty"`
+	Image      []byte `json:"image,omitempty"`
+	CapturedAt int64  `json:"capturedAt,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.

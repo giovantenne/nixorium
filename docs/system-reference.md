@@ -316,8 +316,18 @@ port. The controller reaches it with its existing SSH access and the fixed
 command `nixorium-classroom-connect`, which runs as root, finds the user of
 the active graphical session on seat0, checks the socket without following
 links and relays standard input and output. The protocol is versioned and
-bounded; this version answers only `hello`. The teacher's classroom view that
-uses it is not available yet.
+bounded; it answers `hello` and `thumbnail.request` (a JPEG of the screen,
+64–640 pixels wide). The teacher's classroom view that uses it is not
+available yet.
+
+Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
+so no consent dialog appears. It starts only when the controller asks for a
+frame and stops after 30 seconds without requests. While it runs, GNOME shows
+its screen sharing indicator in the top bar; the
+`nixorium-classroom@nixorium.org` Shell extension, enabled in every client
+session, keeps that indicator visible but removes its stop button, so a
+student cannot end the teacher's view. Mutter sends frames only when the
+screen changes; the agent keeps the last one.
 
 ## Temporary client Internet access
 

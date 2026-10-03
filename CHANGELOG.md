@@ -9,8 +9,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Experimental, off by default: `classroomView` in `lab-settings.json` installs
   a classroom view agent on client computers. It runs in the graphical session
   on a private socket, opens no network port, and is reached by the controller
-  only through its existing SSH access. This first step answers a version
-  check; the teacher's view of the computers comes in later releases.
+  only through its existing SSH access. It returns screen thumbnails through
+  Mutter's own screen cast interface, without a consent dialog; GNOME's
+  sharing indicator stays visible while it captures, and a bundled Shell
+  extension removes the indicator's stop button. Capture stops 30 seconds
+  after the last request. The teacher's view of the computers comes in later
+  releases.
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

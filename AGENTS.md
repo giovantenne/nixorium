@@ -553,7 +553,12 @@ any shard must block publication.
   `nixorium-classroom-connect` command; never open a network port for it,
   accept addresses or commands from the protocol, or follow links when
   locating the session socket. Keep `internal/classroomview` messages
-  versioned, size-bounded and strict about unknown fields.
+  versioned, size-bounded and strict about unknown fields. By owner decision
+  the agent captures through Mutter's ScreenCast/RemoteDesktop D-Bus
+  interfaces without a consent dialog; GNOME's sharing indicator must stay
+  visible whenever it captures (the classroom extension only removes the
+  stop action), and capture must stop when nobody requests frames. The
+  "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
   lock. Recheck authenticated boot ID and state before every fixed helper
@@ -565,7 +570,7 @@ any shard must block publication.
   persistent enablement, arbitrary remote commands or student privileges.
 - Native Veyon hosts persist per-user tokens and portal grants under
   `/var/lib/nixorium/veyon-session`; never copy these into templates, snapshots,
-  Git, or other machines. GNOME initial consent stays explicit. The user-only
+  Git, or other machines. GNOME initial consent stays explicit for Veyon. The user-only
   state link is required because Veyon reconstructs server environment from the
   login session; a service-only XDG_STATE_HOME does not propagate.
 - `Veyon.conf` is a build-time derivation: evaluation must never read a derivation output to encode its network objects. GitHub CI disables import-from-derivation to enforce this boundary.
