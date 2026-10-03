@@ -38,8 +38,14 @@ func run() error {
 	// Evaluate the laboratory identities while no teacher is waiting, so the
 	// first classroom dashboard opens from the cache.
 	go func() { _, _ = local.LabMeta(ctx, repository) }()
+	hosts := func(ctx context.Context) ([]domain.HostMeta, error) {
+		meta, err := local.LabMeta(ctx, repository)
+		return meta.Clients.Hosts, err
+	}
 	worker := classroomWorker{
 		repository: repository,
+		view:       newViewServer(app.NewClassroomViewHub(hosts, adapters.ClassroomAgentConnector{})),
+		viewOn:     func() bool { return classroomViewEnabled(adapters.Local{}, repository) },
 		inspector:  app.NewInspector(local),
 		power:      app.NewShutdownManager(local),
 		internet:   app.NewInternetManager(local),
@@ -50,6 +56,8 @@ func run() error {
 
 type classroomWorker struct {
 	repository string
+	view       *viewServer
+	viewOn     func() bool
 	inspector  *app.Inspector
 	power      *app.ShutdownManager
 	internet   *app.InternetManager
@@ -103,6 +111,15 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		}
 		report.Message = teacherMessage(report.Message)
 		response.InternetReport = &report
+	case domain.ClassroomViewOpenOperation:
+		if worker.view == nil || worker.viewOn == nil || !worker.viewOn() {
+			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}
+		}
+		address, err := worker.view.Open()
+		if err != nil {
+			return classroomFailure(err)
+		}
+		response.ViewURL = address
 	default:
 		return classroomFailure(errors.New("unsupported classroom operation"))
 	}
@@ -141,4 +158,15 @@ func readDeploymentPath(path string) (string, error) {
 		return "", errors.New("configured deployment path is not canonical")
 	}
 	return repository, nil
+}
+
+// classroomViewEnabled reads only the classroomView switch; a missing or
+// unreadable settings file means the view stays off.
+func classroomViewEnabled(reader interface{ ReadSettings(string) ([]byte, error) }, repository string) bool {
+	data, err := reader.ReadSettings(repository)
+	if err != nil {
+		return false
+	}
+	settings, _ := domain.DecodeLabSettings(data)
+	return settings.Lab.ClassroomView
 }

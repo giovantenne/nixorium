@@ -25,6 +25,9 @@ func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
 }
 
 func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd) {
+	if action == "v" {
+		return model.openClassroomView()
+	}
 	if model.report.Meta.Controller.Name == "" {
 		return model.loadInventoryThen(func(ready dashboardModel) (tea.Model, tea.Cmd) {
 			return ready.openComputerTask(action)
@@ -257,6 +260,8 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			return model.openComputerTask(action)
 		case "h", "x", "i":
 			model.areaReturn = dashboardComputersArea
+			return model.openComputerTask(action)
+		case "v":
 			return model.openComputerTask(action)
 		}
 	case dashboardInstallationArea:
@@ -1414,4 +1419,26 @@ func (model dashboardModel) updatePXEScreenKey(key tea.KeyPressMsg) (tea.Model, 
 		}
 	}
 	return model, nil
+}
+
+type dashboardClassroomViewMsg struct {
+	text string
+	err  error
+}
+
+// openClassroomView asks the classroom service for the page, which the
+// command layer opens in the browser; the dashboard only shows the outcome.
+func (model dashboardModel) openClassroomView() (tea.Model, tea.Cmd) {
+	if model.actions.OpenClassroomView == nil {
+		return model, nil
+	}
+	model.busy = "Opening the classroom view"
+	model.message = ""
+	open := model.actions.OpenClassroomView
+	return model, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		text, err := open(ctx)
+		return dashboardClassroomViewMsg{text: text, err: err}
+	}
 }

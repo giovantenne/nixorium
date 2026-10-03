@@ -13,8 +13,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   Mutter's own screen cast interface, without a consent dialog; GNOME's
   sharing indicator stays visible while it captures, and a bundled Shell
   extension removes the indicator's stop button. Capture stops 30 seconds
-  after the last request. The teacher's view of the computers comes in later
-  releases.
+  after the last request. On the controller, **Computers → Classroom view**
+  (teacher and administrator) opens a browser page with every student
+  screen, refreshed every 1.5 seconds; clicking a computer shows it larger.
+  The page is served on the controller's loopback only, behind a one-time
+  token. Remote control comes in a later release.
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

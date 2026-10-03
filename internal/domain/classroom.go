@@ -24,13 +24,17 @@ const (
 	ClassroomPowerApplyOperation    ClassroomOperation = "power-apply"
 	ClassroomInternetPlanOperation  ClassroomOperation = "internet-plan"
 	ClassroomInternetApplyOperation ClassroomOperation = "internet-apply"
+	// ClassroomViewOpenOperation returns a one-time address of the
+	// experimental classroom view page.
+	ClassroomViewOpenOperation ClassroomOperation = "view-open"
 )
 
 func (o ClassroomOperation) Valid() bool {
 	switch o {
 	case ClassroomOverviewOperation, ClassroomStatusOperation, ClassroomHostsOperation,
 		ClassroomPowerPlanOperation, ClassroomPowerApplyOperation,
-		ClassroomInternetPlanOperation, ClassroomInternetApplyOperation:
+		ClassroomInternetPlanOperation, ClassroomInternetApplyOperation,
+		ClassroomViewOpenOperation:
 		return true
 	default:
 		return false
@@ -58,6 +62,7 @@ type ClassroomResponse struct {
 	Hosts          *HostsReport         `json:"hosts,omitempty"`
 	PowerPlan      *ShutdownPlanReport  `json:"powerPlan,omitempty"`
 	PowerReport    *ShutdownApplyReport `json:"powerReport,omitempty"`
+	ViewURL        string               `json:"viewUrl,omitempty"`
 	InternetPlan   *InternetPlan        `json:"internetPlan,omitempty"`
 	InternetReport *InternetReport      `json:"internetReport,omitempty"`
 }

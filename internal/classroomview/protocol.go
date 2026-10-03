@@ -100,3 +100,17 @@ func Read(reader io.Reader) (Message, error) {
 	}
 	return message, nil
 }
+
+// Session is one open channel to a client's classroom agent.
+type Session interface {
+	Thumbnail(width int) (Message, error)
+	Close() error
+}
+
+// ErrUnreachable means the client did not answer over SSH.
+var ErrUnreachable = errors.New("the computer did not answer")
+
+// AgentError carries an agent or relay error code.
+type AgentError struct{ Code string }
+
+func (err AgentError) Error() string { return "classroom agent: " + err.Code }

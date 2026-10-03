@@ -116,3 +116,30 @@ func TestInternetReviewCancelAndApply(t *testing.T) {
 		}
 	}
 }
+
+func TestClassroomViewEntryAppearsOnlyWhenAvailable(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready"), width: 120, height: 30, screen: dashboardComputersArea}
+	for _, task := range model.availableComputerTasks() {
+		if task.id == "view" {
+			t.Fatal("classroom view listed without its service")
+		}
+	}
+	opened := 0
+	model.actions.ClassroomMode = true
+	model.actions.OpenClassroomView = func(context.Context) (string, error) {
+		opened++
+		return "The classroom view opened in a browser window.", nil
+	}
+	tasks := model.availableComputerTasks()
+	if tasks[len(tasks)-1].id != "view" || !strings.Contains(model.View().Content, "Classroom view") {
+		t.Fatalf("tasks = %+v\n%s", tasks, model.View().Content)
+	}
+	next, command := model.updatePrimaryScreenKey(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	if command == nil {
+		t.Fatal("classroom view did not start")
+	}
+	next, _ = next.(dashboardModel).Update(command())
+	if opened != 1 || !strings.Contains(next.(dashboardModel).View().Content, "opened in a browser window") {
+		t.Fatalf("opened=%d\n%s", opened, next.(dashboardModel).View().Content)
+	}
+}

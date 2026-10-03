@@ -1,0 +1,37 @@
+:root {
+  color-scheme: light dark;
+  --background: #f6f7f9;
+  --card: #ffffff;
+  --text: #1d2430;
+  --muted: #5d6675;
+  --line: #d9dde4;
+  --accent: #1b6ac9;
+  --warning: #9a5b00;
+  font-family: system-ui, "Cantarell", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --background: #16191e; --card: #20242b; --text: #e8ebf0; --muted: #a2aab6; --line: #333943; --accent: #78aef0; --warning: #f0b45a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--text); }
+header { display: flex; align-items: baseline; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+h1 { margin: 0; font-size: 1.3rem; }
+#summary { margin: 0; color: var(--muted); }
+main { padding: 1.5rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; margin: 0; padding: 0; list-style: none; }
+.computer { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.computer button { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.computer button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.screen { display: grid; place-items: center; aspect-ratio: 16 / 10; background: #000; color: #c8ced8; font-size: 0.9rem; }
+.screen img { width: 100%; height: 100%; object-fit: contain; }
+.label { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.55rem 0.75rem; }
+.name { font-weight: 600; }
+.state { color: var(--muted); font-size: 0.85rem; text-align: right; }
+.state.warning { color: var(--warning); }
+.message { color: var(--warning); }
+dialog { width: min(96vw, 1600px); padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
+dialog::backdrop { background: rgb(0 0 0 / 0.7); }
+.viewer-bar { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0.9rem; }
+.viewer-bar span { flex: 1; color: var(--muted); }
+.viewer-bar button { padding: 0.35rem 0.9rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: inherit; font: inherit; cursor: pointer; }
+#viewer-image { display: block; width: 100%; background: #000; }

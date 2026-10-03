@@ -79,6 +79,14 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.finishWorkspaceMarketplace(message)
 	case dashboardRemoteFingerprintMsg:
 		return model.handleRemoteFingerprintMessage(message)
+	case dashboardClassroomViewMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = message.err.Error()
+		} else {
+			model.message = message.text
+		}
+		return model, nil
 	case dashboardRemoteInterfaceSavedMsg:
 		return model.handleRemoteInterfaceSaved(message)
 	case dashboardRemoteInstallMsg:

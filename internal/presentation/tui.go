@@ -20,13 +20,16 @@ import (
 // stop action, not the read-only Esc path. PreparePXE is systemd-owned;
 // ApplyController waits for a managed job while the foreground UI stays protected.
 type DashboardActions struct {
-	LoadManagedJobs         func(context.Context) ([]domain.ManagedJob, error)
-	PlanHostTrust           func(context.Context, string) domain.HostTrustPlan
-	ApplyHostTrust          func(domain.HostTrustPlan) domain.HostTrustResult
-	LoadTemplateReset       func(context.Context) domain.TemplateResetCatalog
-	PlanTemplateReset       func(context.Context, string, func(string)) domain.TemplateResetPlan
-	ApplyTemplateReset      func(domain.TemplateResetPlan) domain.TemplateResetResult
-	ClassroomMode           bool
+	LoadManagedJobs    func(context.Context) ([]domain.ManagedJob, error)
+	PlanHostTrust      func(context.Context, string) domain.HostTrustPlan
+	ApplyHostTrust     func(domain.HostTrustPlan) domain.HostTrustResult
+	LoadTemplateReset  func(context.Context) domain.TemplateResetCatalog
+	PlanTemplateReset  func(context.Context, string, func(string)) domain.TemplateResetPlan
+	ApplyTemplateReset func(domain.TemplateResetPlan) domain.TemplateResetResult
+	ClassroomMode      bool
+	// OpenClassroomView opens the experimental classroom view page and
+	// returns a sentence for the operator.
+	OpenClassroomView       func(context.Context) (string, error)
 	PlanInternet            func(context.Context, string, domain.InternetAction) domain.InternetPlan
 	ApplyInternet           func(domain.InternetPlan) domain.InternetReport
 	PlanCleanup             func(context.Context, string) domain.CleanupPlanReport

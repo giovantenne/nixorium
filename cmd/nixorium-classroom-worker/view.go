@@ -1,0 +1,183 @@
+package main
+
+import (
+	"context"
+	"crypto/rand"
+	"embed"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"regexp"
+	"sync"
+	"time"
+
+	"github.com/giovantenne/nixorium/internal/app"
+)
+
+//go:embed view/index.html view/app.js view/style.css
+var viewAssets embed.FS
+
+const (
+	viewCookie       = "nixorium_classroom"
+	viewTokenTTL     = time.Minute
+	viewSessionTTL   = 12 * time.Hour
+	viewSecurityRule = "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+)
+
+var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
+
+// viewSource lists computers and their last thumbnails.
+type viewSource interface {
+	Computers(ctx context.Context) ([]app.ClassroomComputer, error)
+	Thumbnail(name string) ([]byte, bool)
+}
+
+// viewServer serves the teacher's classroom view on the controller's
+// loopback only. A one-time token from the classroom socket (teacher and
+// administrator) becomes a browser session; other local users, such as the
+// student account, cannot enter.
+type viewServer struct {
+	source   viewSource
+	mutex    sync.Mutex
+	address  string
+	tokens   map[string]time.Time
+	sessions map[string]time.Time
+	now      func() time.Time
+}
+
+func newViewServer(source viewSource) *viewServer {
+	return &viewServer{source: source, tokens: map[string]time.Time{}, sessions: map[string]time.Time{}, now: time.Now}
+}
+
+// Open starts the page server on first use and returns a one-time address.
+func (server *viewServer) Open() (string, error) {
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	if server.address == "" {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return "", err
+		}
+		server.address = listener.Addr().String()
+		httpServer := &http.Server{Handler: server, ReadHeaderTimeout: 10 * time.Second}
+		go func() { _ = httpServer.Serve(listener) }()
+	}
+	token, err := randomToken()
+	if err != nil {
+		return "", err
+	}
+	server.tokens[token] = server.now().Add(viewTokenTTL)
+	return "http://" + server.address + "/open?token=" + token, nil
+}
+
+func randomToken() (string, error) {
+	value := make([]byte, 32)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(value), nil
+}
+
+func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	header := writer.Header()
+	header.Set("Content-Security-Policy", viewSecurityRule)
+	header.Set("X-Content-Type-Options", "nosniff")
+	header.Set("Referrer-Policy", "no-referrer")
+	header.Set("Cache-Control", "no-store")
+	server.mutex.Lock()
+	address := server.address
+	server.mutex.Unlock()
+	// A page on another site cannot reach this server through DNS tricks.
+	if request.Host != address || request.Method != http.MethodGet {
+		http.Error(writer, "Not available.", http.StatusBadRequest)
+		return
+	}
+	if request.URL.Path == "/open" {
+		server.enter(writer, request)
+		return
+	}
+	if !server.authorized(request) {
+		http.Error(writer, "Open the classroom view again from Nixorium.", http.StatusForbidden)
+		return
+	}
+	switch request.URL.Path {
+	case "/":
+		server.asset(writer, "view/index.html", "text/html; charset=utf-8")
+	case "/app.js":
+		server.asset(writer, "view/app.js", "text/javascript; charset=utf-8")
+	case "/style.css":
+		server.asset(writer, "view/style.css", "text/css; charset=utf-8")
+	case "/api/computers":
+		ctx, cancel := context.WithTimeout(request.Context(), 2*time.Minute)
+		defer cancel()
+		computers, err := server.source.Computers(ctx)
+		if err != nil {
+			http.Error(writer, "The list of computers is not available.", http.StatusServiceUnavailable)
+			return
+		}
+		header.Set("Content-Type", "application/json")
+		_ = json.NewEncoder(writer).Encode(map[string]any{"computers": computers})
+	case "/api/thumbnail":
+		name := request.URL.Query().Get("name")
+		if !computerNamePattern.MatchString(name) {
+			http.Error(writer, "Unknown computer.", http.StatusBadRequest)
+			return
+		}
+		image, found := server.source.Thumbnail(name)
+		if !found {
+			http.Error(writer, "No image yet.", http.StatusNotFound)
+			return
+		}
+		header.Set("Content-Type", "image/jpeg")
+		_, _ = writer.Write(image)
+	default:
+		http.NotFound(writer, request)
+	}
+}
+
+func (server *viewServer) enter(writer http.ResponseWriter, request *http.Request) {
+	token := request.URL.Query().Get("token")
+	server.mutex.Lock()
+	expiry, found := server.tokens[token]
+	delete(server.tokens, token)
+	server.mutex.Unlock()
+	if !found || server.now().After(expiry) {
+		http.Error(writer, "This link has expired. Open the classroom view again from Nixorium.", http.StatusForbidden)
+		return
+	}
+	session, err := randomToken()
+	if err != nil {
+		http.Error(writer, "The classroom view could not start.", http.StatusInternalServerError)
+		return
+	}
+	server.mutex.Lock()
+	server.sessions[session] = server.now().Add(viewSessionTTL)
+	server.mutex.Unlock()
+	http.SetCookie(writer, &http.Cookie{Name: viewCookie, Value: session, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: int(viewSessionTTL.Seconds())})
+	http.Redirect(writer, request, "/", http.StatusSeeOther)
+}
+
+func (server *viewServer) authorized(request *http.Request) bool {
+	cookie, err := request.Cookie(viewCookie)
+	if err != nil {
+		return false
+	}
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+	expiry, found := server.sessions[cookie.Value]
+	return found && server.now().Before(expiry)
+}
+
+func (server *viewServer) asset(writer http.ResponseWriter, name, contentType string) {
+	content, err := viewAssets.ReadFile(name)
+	if err != nil {
+		http.Error(writer, "Missing page.", http.StatusInternalServerError)
+		return
+	}
+	writer.Header().Set("Content-Type", contentType)
+	_, _ = writer.Write(content)
+}
+
+var errViewDisabled = errors.New("The classroom view is not turned on for this laboratory. Ask the administrator. Code: CLASSROOM-VIEW-OFF.")

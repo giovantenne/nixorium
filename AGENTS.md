@@ -558,6 +558,11 @@ any shard must block publication.
   interfaces without a consent dialog; GNOME's sharing indicator must stay
   visible whenever it captures (the classroom extension only removes the
   stop action), and capture must stop when nobody requests frames. The
+  controller side lives in the classroom worker: it serves the page on
+  loopback only behind a one-time token from the classroom socket, refuses
+  foreign Host headers, keeps a strict CSP with no external resources, takes
+  computer names only from the evaluated inventory, and closes agent channels
+  when the page stops polling. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

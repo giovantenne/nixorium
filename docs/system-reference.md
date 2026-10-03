@@ -317,8 +317,17 @@ command `nixorium-classroom-connect`, which runs as root, finds the user of
 the active graphical session on seat0, checks the socket without following
 links and relays standard input and output. The protocol is versioned and
 bounded; it answers `hello` and `thumbnail.request` (a JPEG of the screen,
-64–640 pixels wide). The teacher's classroom view that uses it is not
-available yet.
+64–640 pixels wide).
+
+On the controller, **Computers → Classroom view** (teacher and administrator)
+asks the classroom service for a one-time address and opens it in a browser
+window. The service keeps one SSH channel per client while the page is open,
+refreshes the thumbnails every 1.5 seconds and closes every channel 15
+seconds after the page stops asking. The page is served on the controller's
+loopback address only; the one-time token becomes an HttpOnly, same-site
+session cookie, foreign `Host` headers are refused, and a strict content
+security policy allows only the page's own files. Clicking a computer shows
+its screen larger; remote control is not available yet.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a

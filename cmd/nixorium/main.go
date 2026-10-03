@@ -573,6 +573,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return local.CreateBackup(ctx, repository, destination, passphrase, nixoriumVersion)
 		},
 		BackupDestination: defaultBackupDestination,
+		OpenClassroomView: classroomViewAction(),
 		ApplyResetRecovery: func(plan domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult {
 			result := adapters.TemplateReset{}.ApplyTemplateResetRecovery(ctx, plan)
 			result.Message = operationRecordMessage(result.Message, result)

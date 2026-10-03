@@ -357,6 +357,7 @@ technical cause stays in `journalctl -u nixorium-classroom.service`.
 | `PXE-ACTIVE` | Network installation is running or needs recovery | Finish installation or run `nixorium pxe recover` |
 | `CLASSROOM-LOAD` | The classroom service could not read the committed configuration | Read the service journal; fix and commit the configuration |
 | `CLASSROOM-SERVICE` | The classroom service is not running or not answering | `systemctl status nixorium-classroom.service`; apply the controller configuration if it is missing |
+| `CLASSROOM-VIEW-OFF` | The experimental classroom view is off for this laboratory | Set `"classroomView": true` in `lab-settings.json`, apply the controller and update the client computers |
 
 Classroom controls read the last **committed** configuration, so uncommitted
 edits in the deployment repository do not affect them until they are saved.

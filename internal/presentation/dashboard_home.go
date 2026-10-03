@@ -43,11 +43,17 @@ var classroomComputerTasks = []dashboardTask{
 	computersAreaTasks[3],
 }
 
+var classroomViewTask = dashboardTask{id: "view", shortcut: "v", title: "Classroom view", description: "See every student screen at once (experimental)"}
+
 func (model dashboardModel) availableComputerTasks() []dashboardTask {
+	tasks := computersAreaTasks
 	if model.actions.ClassroomMode {
-		return classroomComputerTasks
+		tasks = classroomComputerTasks
 	}
-	return computersAreaTasks
+	if model.actions.OpenClassroomView != nil {
+		tasks = append(append([]dashboardTask{}, tasks...), classroomViewTask)
+	}
+	return tasks
 }
 
 var installationAreaTasks = []dashboardTask{

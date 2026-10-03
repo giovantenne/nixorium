@@ -774,6 +774,9 @@ in
     controller.succeed("chown -R admin:users /home/admin/nixorium-deployment; chmod 0700 /home/admin/nixorium-deployment")
     classroom_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium-classroom/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"overview"}\\n\'); value=json.loads(s.makefile().readline()); assert value["requestId"] == "0123456789abcdef0123456789abcdef" and value["state"] == "completed" and value["status"]["lab"]["controller"]["name"] == "pc99"'
     controller.succeed("su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_probe)))
+    # The experimental classroom view stays off unless the laboratory turns it on.
+    view_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium-classroom/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdee","operation":"view-open"}\\n\'); value=json.loads(s.makefile().readline()); assert value["state"] == "failed" and "CLASSROOM-VIEW-OFF" in value["message"] and "viewUrl" not in value'
+    controller.succeed("su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(view_probe)))
     controller.fail("su - teacher -c 'test -r /home/admin/nixorium-deployment/flake.nix'")
     controller.succeed("su - admin -c 'cd /home/admin/nixorium-deployment && nixorium install usb status --id 0123456789abcdef0123456789abcdef --json' >/tmp/usb-status.json || test $? = 1; jq -e '.operationId == \"0123456789abcdef0123456789abcdef\" and .state == \"unavailable\"' /tmp/usb-status.json")
     controller.fail("cd /home/admin/nixorium-deployment && nixorium install usb status --id 0123456789abcdef0123456789abcdef --json")

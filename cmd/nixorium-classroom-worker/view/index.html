@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classroom view</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>Classroom view</h1>
+  <p id="summary">Loading the computers…</p>
+</header>
+<main>
+  <ul id="computers" class="grid" aria-live="polite"></ul>
+  <p id="message" class="message" hidden></p>
+</main>
+<dialog id="viewer" aria-label="Computer screen">
+  <div class="viewer-bar">
+    <strong id="viewer-name"></strong>
+    <span id="viewer-detail"></span>
+    <button type="button" id="viewer-close">Close</button>
+  </div>
+  <img id="viewer-image" alt="">
+</dialog>
+</body>
+</html>

@@ -20,8 +20,9 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 	// The overview is requested from inside the dashboard, which shows its
 	// loading screen at once instead of a blank terminal.
 	actions := presentation.DashboardActions{
-		ClassroomMode:  true,
-		RunningVersion: nixoriumVersion,
+		ClassroomMode:     true,
+		OpenClassroomView: openClassroomView,
+		RunningVersion:    nixoriumVersion,
 		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			response, err := classroomRequest(ctx, domain.ClassroomOverviewOperation, nil)
 			if err != nil || response.Status == nil {
