@@ -141,7 +141,8 @@ trial on virtual machines, follow the
 
 ![The Nixorium administrator menu, with the Computers, Installation, Software and Maintenance areas](docs/images/nixorium-tui.png)
 
-The administrator menu has four areas:
+On the controller, sign in as `admin` and open **Nixorium** from the dock, or
+run `nixorium` in a terminal. The administrator menu has four areas:
 
 | Area | What it is for |
 |---|---|
