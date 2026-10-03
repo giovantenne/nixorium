@@ -30,9 +30,16 @@ migrate "$test_root/existing"
 rm "$test_root/existing/known_hosts"
 printf 'different\n' > "$test_root/existing/known_hosts"
 chmod 0600 "$test_root/existing/known_hosts"
-if migrate "$test_root/existing" 2>/dev/null; then exit 1; fi
-test ! -L "$test_root/existing/known_hosts"
+migrate "$test_root/existing" 2>/dev/null
+test -L "$test_root/existing/known_hosts"
 cmp "$test_root/expected" "$test_root/existing/nixorium-known-hosts/known_hosts"
+kept=("$test_root"/existing/nixorium-known-hosts/known_hosts-legacy-*.bak)
+test "${#kept[@]}" = 1
+printf 'different\n' | cmp - "${kept[0]}"
+test "$(stat -c %a "${kept[0]}")" = 600
+migrate "$test_root/existing"
+kept=("$test_root"/existing/nixorium-known-hosts/known_hosts-legacy-*.bak)
+test "${#kept[@]}" = 1
 
 # Never follow an unexpected SSH directory or known_hosts symlink.
 ln -s "$test_root/fresh" "$test_root/linked"

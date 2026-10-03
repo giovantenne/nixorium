@@ -366,7 +366,9 @@ any shard must block publication.
 - The USB worker may write only the dedicated `.ssh/nixorium-known-hosts`
   directory for atomic host-trust updates; the enclosing `.ssh`, keys, and
   configuration remain read-only. Activation preserves existing entries and
-  links the standard `known_hosts` path to that directory. Never replace
+  links the standard `known_hosts` path to that directory; a differing regular
+  `known_hosts` is kept as a private `known_hosts-legacy-*.bak` copy there
+  (never merged) so controller apply cannot get stuck. Never replace
   conflicting migration/backup evidence or remove a reservation to bypass
   failed post-boot verification. Already-private log ancestors need no chmod.
 - A completed USB disk installation may await reboot/verification while the

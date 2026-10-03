@@ -47,14 +47,23 @@ if [[ -L "$legacy" ]]; then
   exit 0
 fi
 if [[ -e "$legacy" ]]; then known_hosts_file "$legacy"; fi
-if [[ -e "$target" || -L "$target" ]]; then
-  known_hosts_file "$target"
-  [[ ! -e "$legacy" ]] || cmp -s "$legacy" "$target" \
-    || fail "legacy and managed files differ; retain both for reconciliation"
-fi
-
 temporary=$(mktemp -d "$ssh_directory/.nixorium-known-hosts-migration.XXXXXX")
 trap 'rm -rf -- "$temporary"' EXIT
+if [[ -e "$target" || -L "$target" ]]; then
+  known_hosts_file "$target"
+  if [[ -e "$legacy" ]] && ! cmp -s "$legacy" "$target"; then
+    # A tool such as ssh-keygen -R replaced the link with a regular file.
+    # The managed file stays authoritative; keep the other copy for review
+    # instead of stopping the controller update. Keys are never merged.
+    kept=$(mktemp "$managed_directory/known_hosts-legacy-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.bak")
+    cat "$legacy" > "$kept"
+    chmod 0600 "$kept"
+    chown "$owner_uid:$owner_gid" "$kept"
+    sync -f "$kept"
+    echo "SSH known_hosts differed from the Nixorium copy; kept it as $kept" >&2
+  fi
+fi
+
 if [[ ! -e "$target" ]]; then
   if [[ -e "$legacy" ]]; then cat "$legacy" > "$temporary/data"; else : > "$temporary/data"; fi
   chmod 0600 "$temporary/data"
