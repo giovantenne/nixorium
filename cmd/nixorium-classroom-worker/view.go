@@ -10,10 +10,13 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/app"
+	"github.com/giovantenne/nixorium/internal/classroomview"
 )
 
 //go:embed view/index.html view/app.js view/style.css
@@ -28,10 +31,12 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
-// viewSource lists computers and their last thumbnails.
+// viewSource lists computers, their images, and forwards input.
 type viewSource interface {
 	Computers(ctx context.Context) ([]app.ClassroomComputer, error)
 	Thumbnail(name string) ([]byte, bool)
+	Frame(name string, since int64) ([]byte, int64, bool)
+	Input(name string, events []classroomview.InputEvent, release bool) error
 }
 
 // viewServer serves the teacher's classroom view on the controller's
@@ -89,8 +94,12 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	server.mutex.Lock()
 	address := server.address
 	server.mutex.Unlock()
-	// A page on another site cannot reach this server through DNS tricks.
-	if request.Host != address || request.Method != http.MethodGet {
+	// A page on another site cannot reach this server through DNS tricks,
+	// and only the input endpoint accepts a POST from this page itself.
+	post := request.Method == http.MethodPost && request.URL.Path == "/api/input" &&
+		request.Header.Get("Origin") == "http://"+address &&
+		strings.HasPrefix(request.Header.Get("Content-Type"), "application/json")
+	if request.Host != address || (request.Method != http.MethodGet && !post) {
 		http.Error(writer, "Not available.", http.StatusBadRequest)
 		return
 	}
@@ -132,6 +141,50 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		}
 		header.Set("Content-Type", "image/jpeg")
 		_, _ = writer.Write(image)
+	case "/api/frame":
+		name := request.URL.Query().Get("name")
+		since, _ := strconv.ParseInt(request.URL.Query().Get("since"), 10, 64)
+		if !computerNamePattern.MatchString(name) {
+			http.Error(writer, "Unknown computer.", http.StatusBadRequest)
+			return
+		}
+		image, frame, found := server.source.Frame(name, since)
+		if !found {
+			http.Error(writer, "Unknown computer.", http.StatusNotFound)
+			return
+		}
+		header.Set("X-Frame", strconv.FormatInt(frame, 10))
+		if image == nil {
+			writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+		header.Set("Content-Type", "image/jpeg")
+		_, _ = writer.Write(image)
+	case "/api/input":
+		if request.Method != http.MethodPost {
+			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)
+			return
+		}
+		name := request.URL.Query().Get("name")
+		if !computerNamePattern.MatchString(name) {
+			http.Error(writer, "Unknown computer.", http.StatusBadRequest)
+			return
+		}
+		var body struct {
+			Events  []classroomview.InputEvent `json:"events"`
+			Release bool                       `json:"release"`
+		}
+		decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 64<<10))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&body); err != nil {
+			http.Error(writer, "Invalid input.", http.StatusBadRequest)
+			return
+		}
+		if err := server.source.Input(name, body.Events, body.Release); err != nil {
+			http.Error(writer, "The computer did not accept the input.", http.StatusConflict)
+			return
+		}
+		writer.WriteHeader(http.StatusNoContent)
 	default:
 		http.NotFound(writer, request)
 	}

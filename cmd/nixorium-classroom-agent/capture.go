@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/godbus/dbus/v5"
 )
 
@@ -25,10 +26,18 @@ const (
 	firstFrameMax = 3 * time.Second
 )
 
-// capturer provides thumbnails of the session's screen.
+// capturer provides frames of the session's screen and injects input.
 type capturer interface {
-	Thumbnail(width int) (image []byte, height int, capturedAt time.Time, err error)
+	// Thumbnail returns the latest frame; image is nil when frame equals since.
+	Thumbnail(width int, since int64) (image []byte, height int, capturedAt time.Time, frame int64, err error)
+	Input(events []classroomview.InputEvent, release bool) error
 }
+
+// widthMemory keeps the largest width asked for recently, so the overview and
+// the enlarged view of the same computer share one pipeline.
+const widthMemory = 5 * time.Second
+
+var buttonCodes = map[string]int32{"left": 0x110, "right": 0x111, "middle": 0x112}
 
 // mutterCapture keeps one Mutter screen cast and one GStreamer pipeline open
 // while frames are requested, and keeps the last JPEG they produced.
@@ -44,23 +53,42 @@ type mutterCapture struct {
 	failure     error
 	stop        func()
 	generation  int
+	frameNumber int64
+	widths      map[int]time.Time
+	remote      dbus.BusObject
+	streamPath  dbus.ObjectPath
+	screenW     float64
+	screenH     float64
+	keysDown    map[uint32]bool
+	buttonsDown map[string]bool
+	keyboardOn  bool
 }
 
 func newMutterCapture() *mutterCapture {
-	capture := &mutterCapture{}
+	capture := &mutterCapture{widths: map[int]time.Time{}, keysDown: map[uint32]bool{}, buttonsDown: map[string]bool{}}
 	capture.changed = sync.NewCond(&capture.mutex)
 	go capture.stopWhenIdle()
 	return capture
 }
 
-func (capture *mutterCapture) Thumbnail(width int) ([]byte, int, time.Time, error) {
+func (capture *mutterCapture) Thumbnail(requested int, since int64) ([]byte, int, time.Time, int64, error) {
 	capture.mutex.Lock()
 	defer capture.mutex.Unlock()
-	capture.lastRequest = time.Now()
+	now := time.Now()
+	capture.lastRequest = now
+	capture.widths[requested] = now
+	width := requested
+	for candidate, at := range capture.widths {
+		if now.Sub(at) > widthMemory {
+			delete(capture.widths, candidate)
+		} else if candidate > width {
+			width = candidate
+		}
+	}
 	if !capture.running || capture.width != width {
 		capture.stopLocked()
 		if err := capture.startLocked(width); err != nil {
-			return nil, 0, time.Time{}, err
+			return nil, 0, time.Time{}, 0, err
 		}
 	}
 	deadline := time.Now().Add(firstFrameMax)
@@ -71,11 +99,83 @@ func (capture *mutterCapture) Thumbnail(width int) ([]byte, int, time.Time, erro
 	}
 	if capture.frame == nil {
 		if capture.failure != nil {
-			return nil, 0, time.Time{}, capture.failure
+			return nil, 0, time.Time{}, 0, capture.failure
 		}
-		return nil, 0, time.Time{}, errNotReady
+		return nil, 0, time.Time{}, 0, errNotReady
 	}
-	return capture.frame, capture.height, capture.frameAt, nil
+	if since == capture.frameNumber {
+		return nil, capture.height, capture.frameAt, capture.frameNumber, nil
+	}
+	return capture.frame, capture.height, capture.frameAt, capture.frameNumber, nil
+}
+
+// Input moves the pointer, clicks, scrolls and types in the session through
+// the same remote desktop session that captures the screen.
+func (capture *mutterCapture) Input(events []classroomview.InputEvent, release bool) error {
+	capture.mutex.Lock()
+	defer capture.mutex.Unlock()
+	if !capture.running || capture.remote == nil {
+		return errNotReady
+	}
+	capture.lastRequest = time.Now()
+	session := remoteDesktopName + ".Session"
+	call := func(method string, arguments ...any) error {
+		return capture.remote.Call(session+"."+method, 0, arguments...).Err
+	}
+	for _, event := range events {
+		var err error
+		switch event.Kind {
+		case classroomview.InputPointerMove:
+			err = call("NotifyPointerMotionAbsolute", string(capture.streamPath), event.X*capture.screenW, event.Y*capture.screenH)
+		case classroomview.InputButton:
+			if err = call("NotifyPointerButton", buttonCodes[event.Button], event.Pressed); err == nil {
+				capture.buttonsDown[event.Button] = event.Pressed
+			}
+		case classroomview.InputScroll:
+			err = call("NotifyPointerAxisDiscrete", uint32(0), int32(event.Steps))
+		case classroomview.InputKey:
+			if !capture.keyboardOn && event.Pressed {
+				// The virtual keyboard appears with the first key; a neutral
+				// Shift creates it so no typed character is lost.
+				_ = call("NotifyKeyboardKeysym", uint32(0xffe1), true)
+				_ = call("NotifyKeyboardKeysym", uint32(0xffe1), false)
+				capture.keyboardOn = true
+				time.Sleep(50 * time.Millisecond)
+			}
+			if event.Pressed || capture.keysDown[event.Keysym] {
+				if err = call("NotifyKeyboardKeysym", event.Keysym, event.Pressed); err == nil {
+					capture.keysDown[event.Keysym] = event.Pressed
+				}
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("input: %w", err)
+		}
+	}
+	if release {
+		capture.releaseLocked()
+	}
+	return nil
+}
+
+// releaseLocked lets go of everything still pressed, so a closed view never
+// leaves a stuck key or button on the student's computer.
+func (capture *mutterCapture) releaseLocked() {
+	if capture.remote == nil {
+		return
+	}
+	session := remoteDesktopName + ".Session"
+	for keysym, down := range capture.keysDown {
+		if down {
+			_ = capture.remote.Call(session+".NotifyKeyboardKeysym", 0, keysym, false).Err
+		}
+	}
+	for button, down := range capture.buttonsDown {
+		if down {
+			_ = capture.remote.Call(session+".NotifyPointerButton", 0, buttonCodes[button], false).Err
+		}
+	}
+	capture.keysDown, capture.buttonsDown = map[uint32]bool{}, map[string]bool{}
 }
 
 var errNotReady = errors.New("no screen frame yet")
@@ -91,10 +191,14 @@ func (capture *mutterCapture) stopWhenIdle() {
 }
 
 func (capture *mutterCapture) stopLocked() {
+	if capture.running {
+		capture.releaseLocked()
+	}
 	if capture.stop != nil {
 		capture.stop()
 	}
 	capture.running, capture.stop, capture.frame, capture.failure = false, nil, nil, nil
+	capture.remote, capture.keyboardOn = nil, false
 }
 
 // startLocked opens the Mutter sessions (no consent dialog: these are the
@@ -142,7 +246,8 @@ func (capture *mutterCapture) startLocked(width int) error {
 	if err != nil {
 		return fail(err)
 	}
-	height := thumbnailHeight(width, connection.Object(screenCastName, streamPath))
+	screenW, screenH := screenSize(connection.Object(screenCastName, streamPath))
+	height := scaledHeight(width, screenW, screenH)
 	pipeline := exec.Command("gst-launch-1.0", "-q",
 		"pipewiresrc", fmt.Sprintf("path=%d", node), "always-copy=true", "!",
 		"videoconvert", "!", "videoscale", "!",
@@ -159,6 +264,8 @@ func (capture *mutterCapture) startLocked(width int) error {
 	capture.generation++
 	generation := capture.generation
 	capture.running, capture.width, capture.height = true, width, height
+	capture.remote, capture.streamPath = remote, streamPath
+	capture.screenW, capture.screenH = float64(screenW), float64(screenH)
 	var once sync.Once
 	capture.stop = func() {
 		once.Do(func() {
@@ -171,6 +278,7 @@ func (capture *mutterCapture) startLocked(width int) error {
 		err := readFrames(output, func(frame []byte) {
 			capture.mutex.Lock()
 			capture.frame, capture.frameAt = frame, time.Now()
+			capture.frameNumber++
 			capture.changed.Broadcast()
 			capture.mutex.Unlock()
 		})
@@ -219,9 +327,9 @@ func waitForNode(signals <-chan *dbus.Signal, streamPath dbus.ObjectPath) (uint3
 	}
 }
 
-// thumbnailHeight keeps the monitor's aspect ratio, falling back to 16:10.
-func thumbnailHeight(width int, stream dbus.BusObject) int {
-	screenWidth, screenHeight := 16, 10
+// screenSize reads the monitor size of the stream, falling back to 1280×800.
+func screenSize(stream dbus.BusObject) (int, int) {
+	screenWidth, screenHeight := 1280, 800
 	if value, err := stream.GetProperty(screenCastName + ".Stream.Parameters"); err == nil {
 		if parameters, ok := value.Value().(map[string]dbus.Variant); ok {
 			if size, ok := parameters["size"].Value().([]any); ok && len(size) == 2 {
@@ -233,7 +341,7 @@ func thumbnailHeight(width int, stream dbus.BusObject) int {
 			}
 		}
 	}
-	return scaledHeight(width, screenWidth, screenHeight)
+	return screenWidth, screenHeight
 }
 
 func scaledHeight(width, screenWidth, screenHeight int) int {

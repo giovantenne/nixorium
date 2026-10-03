@@ -24,8 +24,19 @@ type ClassroomComputer struct {
 	HasImage   bool   `json:"hasImage"`
 	ImageAt    int64  `json:"imageAt,omitempty"`
 	ScreenAt   int64  `json:"screenAt,omitempty"`
+	Frame      int64  `json:"frame,omitempty"`
 	imageBytes []byte
 }
+
+// Enlarged view: a computer opened in full is refreshed often and larger.
+const (
+	classroomFocusWidth    = 1280
+	classroomFocusInterval = 100 * time.Millisecond
+	classroomFocusTimeout  = 3 * time.Second
+)
+
+// ErrClassroomNotViewed means input arrived for a computer nobody is viewing.
+var ErrClassroomNotViewed = errors.New("this computer is not open in the classroom view")
 
 // Computer states shown to the teacher.
 const (
@@ -49,6 +60,8 @@ type ClassroomViewHub struct {
 	mutex      sync.Mutex
 	computers  map[string]*ClassroomComputer
 	running    map[string]bool
+	sessions   map[string]classroomview.Session
+	focus      map[string]time.Time
 	lastViewed time.Time
 	now        func() time.Time
 }
@@ -57,7 +70,8 @@ func NewClassroomViewHub(hosts func(ctx context.Context) ([]domain.HostMeta, err
 	return &ClassroomViewHub{
 		hosts: hosts, connector: connector, width: 320,
 		interval: 1500 * time.Millisecond, idle: 15 * time.Second,
-		computers: map[string]*ClassroomComputer{}, running: map[string]bool{}, now: time.Now,
+		computers: map[string]*ClassroomComputer{}, running: map[string]bool{},
+		sessions: map[string]classroomview.Session{}, focus: map[string]time.Time{}, now: time.Now,
 	}
 }
 
@@ -101,10 +115,67 @@ func (hub *ClassroomViewHub) Thumbnail(name string) ([]byte, bool) {
 	return computer.imageBytes, true
 }
 
+// Frame returns the latest image of a computer opened in full when it is newer
+// than since, and keeps that computer on the fast refresh.
+func (hub *ClassroomViewHub) Frame(name string, since int64) ([]byte, int64, bool) {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	computer, found := hub.computers[name]
+	if !found {
+		return nil, 0, false
+	}
+	hub.focus[name] = hub.now()
+	hub.lastViewed = hub.now()
+	if computer.Frame == since || len(computer.imageBytes) == 0 {
+		return nil, computer.Frame, true
+	}
+	return computer.imageBytes, computer.Frame, true
+}
+
+// Input sends mouse and keyboard events to a computer open in full.
+func (hub *ClassroomViewHub) Input(name string, events []classroomview.InputEvent, release bool) error {
+	if err := classroomview.ValidateInput(events); err != nil {
+		return err
+	}
+	hub.mutex.Lock()
+	session, found := hub.sessions[name]
+	focused := hub.now().Sub(hub.focus[name]) < classroomFocusTimeout
+	hub.mutex.Unlock()
+	if !found || (!focused && !release) {
+		return ErrClassroomNotViewed
+	}
+	return session.Input(events, release)
+}
+
 func (hub *ClassroomViewHub) watched() bool {
 	hub.mutex.Lock()
 	defer hub.mutex.Unlock()
 	return hub.now().Sub(hub.lastViewed) < hub.idle
+}
+
+func (hub *ClassroomViewHub) focused(name string) bool {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	return hub.now().Sub(hub.focus[name]) < classroomFocusTimeout
+}
+
+func (hub *ClassroomViewHub) setSession(name string, session classroomview.Session) {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	if session == nil {
+		delete(hub.sessions, name)
+	} else {
+		hub.sessions[name] = session
+	}
+}
+
+func (hub *ClassroomViewHub) lastFrame(name string) int64 {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	if computer, found := hub.computers[name]; found {
+		return computer.Frame
+	}
+	return 0
 }
 
 func (hub *ClassroomViewHub) update(name string, change func(*ClassroomComputer)) {
@@ -122,11 +193,14 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 		hub.mutex.Unlock()
 	}()
 	var session classroomview.Session
-	defer func() {
+	closeSession := func() {
 		if session != nil {
+			hub.setSession(host.Name, nil)
 			_ = session.Close()
+			session = nil
 		}
-	}()
+	}
+	defer closeSession()
 	for hub.watched() {
 		if session == nil {
 			// The channel lives as long as the overview is watched; each
@@ -139,12 +213,16 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 				continue
 			}
 			session = opened
+			hub.setSession(host.Name, session)
 		}
-		reply, err := session.Thumbnail(hub.width)
+		width, interval := hub.width, hub.interval
+		if hub.focused(host.Name) {
+			width, interval = classroomFocusWidth, classroomFocusInterval
+		}
+		reply, err := session.Thumbnail(width, hub.lastFrame(host.Name))
 		switch {
 		case err != nil:
-			_ = session.Close()
-			session = nil
+			closeSession()
 			hub.update(host.Name, func(computer *ClassroomComputer) {
 				computer.State, computer.Detail = ClassroomUnreachable, "The computer stopped answering."
 			})
@@ -152,20 +230,21 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 			at := hub.now().UnixMilli()
 			hub.update(host.Name, func(computer *ClassroomComputer) {
 				computer.State, computer.Detail = ClassroomViewing, ""
-				computer.imageBytes, computer.HasImage = reply.Image, true
-				computer.ImageAt, computer.ScreenAt = at, reply.CapturedAt
+				if len(reply.Image) > 0 {
+					computer.imageBytes, computer.HasImage = reply.Image, true
+					computer.ImageAt, computer.ScreenAt, computer.Frame = at, reply.CapturedAt, reply.Frame
+				}
 			})
 		case reply.Code == classroomview.CodeNotReady:
 		default:
 			state, detail := classroomFailureState(classroomview.AgentError{Code: reply.Code})
 			hub.update(host.Name, func(computer *ClassroomComputer) { computer.State, computer.Detail = state, detail })
 			if reply.Code == classroomview.CodeNoSession || reply.Code == classroomview.CodeNoAgent {
-				_ = session.Close()
-				session = nil
+				closeSession()
 				hub.sleep(3 * hub.interval)
 			}
 		}
-		hub.sleep(hub.interval)
+		hub.sleep(interval)
 	}
 }
 

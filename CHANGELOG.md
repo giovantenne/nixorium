@@ -17,7 +17,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   (teacher and administrator) opens a browser page with every student
   screen, refreshed every 1.5 seconds; clicking a computer shows it larger.
   The page is served on the controller's loopback only, behind a one-time
-  token. Remote control comes in a later release.
+  token. Clicking a computer opens a large view refreshed about ten times a
+  second; **Take control** sends the teacher's mouse and keyboard to that
+  student's session, and stopping control releases every key and button.
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

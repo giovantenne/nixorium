@@ -147,27 +147,48 @@ type fakeCapture struct {
 	err   error
 }
 
-func (capture fakeCapture) Thumbnail(width int) ([]byte, int, time.Time, error) {
+func (capture fakeCapture) Thumbnail(width int, since int64) ([]byte, int, time.Time, int64, error) {
 	if capture.err != nil {
-		return nil, 0, time.Time{}, capture.err
+		return nil, 0, time.Time{}, 0, capture.err
 	}
-	return capture.image, width * 10 / 16, time.UnixMilli(1700000000000), nil
+	if since == 5 {
+		return nil, width * 10 / 16, time.UnixMilli(1700000000000), 5, nil
+	}
+	return capture.image, width * 10 / 16, time.UnixMilli(1700000000000), 5, nil
+}
+
+func (capture fakeCapture) Input(events []classroomview.InputEvent, release bool) error {
+	return capture.err
 }
 
 func TestThumbnailReplies(t *testing.T) {
-	reply := thumbnailReply(fakeCapture{image: []byte{0xff, 0xd8, 0xff, 0xd9}}, 320)
-	if reply.Type != classroomview.TypeThumbnail || reply.Width != 320 || reply.Height != 200 || len(reply.Image) != 4 || reply.CapturedAt != 1700000000000 {
+	reply := thumbnailReply(fakeCapture{image: []byte{0xff, 0xd8, 0xff, 0xd9}}, 320, 0)
+	if reply.Type != classroomview.TypeThumbnail || reply.Width != 320 || reply.Height != 200 || len(reply.Image) != 4 || reply.CapturedAt != 1700000000000 || reply.Frame != 5 {
 		t.Fatalf("reply = %+v", reply)
 	}
+	if unchanged := thumbnailReply(fakeCapture{image: []byte{1}}, 320, 5); unchanged.Type != classroomview.TypeThumbnail || unchanged.Image != nil || unchanged.Frame != 5 {
+		t.Fatalf("unchanged reply = %+v", unchanged)
+	}
+	if done := inputReply(fakeCapture{}, classroomview.Message{Type: classroomview.TypeInput, Events: []classroomview.InputEvent{{Kind: classroomview.InputPointerMove, X: 0.5, Y: 0.5}}}); done.Type != classroomview.TypeInputDone {
+		t.Fatalf("input reply = %+v", done)
+	}
+	for _, event := range []classroomview.InputEvent{{Kind: classroomview.InputPointerMove, X: 2}, {Kind: classroomview.InputButton, Button: "fourth"}, {Kind: classroomview.InputScroll}, {Kind: classroomview.InputKey}, {Kind: "shell"}} {
+		if refused := inputReply(fakeCapture{}, classroomview.Message{Type: classroomview.TypeInput, Events: []classroomview.InputEvent{event}}); refused.Code != classroomview.CodeBadRequest {
+			t.Fatalf("event %+v reply = %+v", event, refused)
+		}
+	}
+	if notViewed := inputReply(fakeCapture{err: errNotReady}, classroomview.Message{Type: classroomview.TypeInput}); notViewed.Code != classroomview.CodeNotReady {
+		t.Fatalf("not viewed reply = %+v", notViewed)
+	}
 	for width, code := range map[int]string{8: classroomview.CodeBadRequest, 4000: classroomview.CodeBadRequest} {
-		if reply := thumbnailReply(fakeCapture{}, width); reply.Code != code {
+		if reply := thumbnailReply(fakeCapture{}, width, 0); reply.Code != code {
 			t.Fatalf("width %d reply = %+v", width, reply)
 		}
 	}
-	if reply := thumbnailReply(fakeCapture{err: errNotReady}, 320); reply.Code != classroomview.CodeNotReady {
+	if reply := thumbnailReply(fakeCapture{err: errNotReady}, 320, 0); reply.Code != classroomview.CodeNotReady {
 		t.Fatalf("not ready reply = %+v", reply)
 	}
-	if reply := thumbnailReply(fakeCapture{err: errors.New("no Mutter")}, 320); reply.Code != classroomview.CodeCapture {
+	if reply := thumbnailReply(fakeCapture{err: errors.New("no Mutter")}, 320, 0); reply.Code != classroomview.CodeCapture {
 		t.Fatalf("failure reply = %+v", reply)
 	}
 }

@@ -326,8 +326,18 @@ refreshes the thumbnails every 1.5 seconds and closes every channel 15
 seconds after the page stops asking. The page is served on the controller's
 loopback address only; the one-time token becomes an HttpOnly, same-site
 session cookie, foreign `Host` headers are refused, and a strict content
-security policy allows only the page's own files. Clicking a computer shows
-its screen larger; remote control is not available yet.
+security policy allows only the page's own files.
+
+Clicking a computer opens it in a large view, refreshed about ten times a
+second at up to 1280 pixels; the agent sends a frame only when the screen
+changed, and the overview and the large view share one capture. **Take
+control** sends the teacher's mouse (move, buttons, wheel) and keyboard (as
+X keysyms) to the student's session through the same Mutter remote desktop
+session; while controlling, Escape also goes to the student. **Stop control**,
+closing the view, or leaving the browser window releases every key and
+button still pressed. Input is accepted only as JSON from the page itself
+(same Origin, session cookie), at most 128 events per message, and only for
+a computer currently open in the large view.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a

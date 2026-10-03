@@ -25,13 +25,69 @@ const (
 	TypeError            = "error"
 	TypeThumbnailRequest = "thumbnail.request"
 	TypeThumbnail        = "thumbnail"
+	TypeInput            = "input"
+	TypeInputDone        = "input.done"
 )
 
-// Thumbnail width limits accepted by the agent.
+// Frame width limits accepted by the agent: small for the overview, up to
+// full HD for the enlarged view.
 const (
 	MinThumbnailWidth = 64
-	MaxThumbnailWidth = 640
+	MaxThumbnailWidth = 1920
+	// MaxInputEvents bounds one input message.
+	MaxInputEvents = 128
 )
+
+// Input event kinds. Pointer positions are fractions of the screen (0–1);
+// buttons are left, middle or right; keys are X keysyms.
+const (
+	InputPointerMove = "move"
+	InputButton      = "button"
+	InputScroll      = "scroll"
+	InputKey         = "key"
+)
+
+// InputEvent is one mouse or keyboard event for the enlarged view.
+type InputEvent struct {
+	Kind    string  `json:"kind"`
+	X       float64 `json:"x,omitempty"`
+	Y       float64 `json:"y,omitempty"`
+	Button  string  `json:"button,omitempty"`
+	Pressed bool    `json:"pressed,omitempty"`
+	Steps   int     `json:"steps,omitempty"`
+	Keysym  uint32  `json:"keysym,omitempty"`
+}
+
+// ValidateInput refuses malformed or oversized input before it reaches a
+// client.
+func ValidateInput(events []InputEvent) error {
+	if len(events) > MaxInputEvents {
+		return errors.New("too many input events")
+	}
+	for _, event := range events {
+		switch event.Kind {
+		case InputPointerMove:
+			if event.X < 0 || event.X > 1 || event.Y < 0 || event.Y > 1 {
+				return errors.New("pointer position is outside the screen")
+			}
+		case InputButton:
+			if event.Button != "left" && event.Button != "middle" && event.Button != "right" {
+				return errors.New("unknown pointer button")
+			}
+		case InputScroll:
+			if event.Steps < -10 || event.Steps > 10 || event.Steps == 0 {
+				return errors.New("scroll steps are out of range")
+			}
+		case InputKey:
+			if event.Keysym == 0 || event.Keysym > 0x10ffffff {
+				return errors.New("key symbol is out of range")
+			}
+		default:
+			return errors.New("unknown input event")
+		}
+	}
+	return nil
+}
 
 // Error codes reported by the agent or the connect helper.
 const (
@@ -58,6 +114,14 @@ type Message struct {
 	Height     int    `json:"height,omitempty"`
 	Image      []byte `json:"image,omitempty"`
 	CapturedAt int64  `json:"capturedAt,omitempty"`
+	// Frame numbers each screen change; a request with Since equal to the
+	// latest frame gets a reply without an image.
+	Frame int64 `json:"frame,omitempty"`
+	Since int64 `json:"since,omitempty"`
+	// Input carries mouse and keyboard events; Release lets go of every key
+	// and button still pressed.
+	Events  []InputEvent `json:"events,omitempty"`
+	Release bool         `json:"release,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.
@@ -103,7 +167,8 @@ func Read(reader io.Reader) (Message, error) {
 
 // Session is one open channel to a client's classroom agent.
 type Session interface {
-	Thumbnail(width int) (Message, error)
+	Thumbnail(width int, since int64) (Message, error)
+	Input(events []InputEvent, release bool) error
 	Close() error
 }
 

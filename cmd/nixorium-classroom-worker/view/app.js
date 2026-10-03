@@ -9,6 +9,8 @@ const viewer = document.getElementById('viewer');
 const viewerName = document.getElementById('viewer-name');
 const viewerDetail = document.getElementById('viewer-detail');
 const viewerImage = document.getElementById('viewer-image');
+const controlButton = document.getElementById('viewer-control');
+const controllingNotice = document.getElementById('viewer-controlling');
 const cards = new Map();
 let selected = null;
 
@@ -76,24 +78,180 @@ function render(computers) {
     }
     if (computer.state === 'viewing') viewing += 1;
     if (computer.name === selected) {
-      viewerDetail.textContent = computer.state === 'viewing' ? screenAge(computer) : text;
-      if (computer.hasImage) viewerImage.src = entry.image.src;
+      viewerDetail.textContent = computer.state === 'viewing' ? '' : text;
     }
   }
   summary.textContent = viewing + ' of ' + computers.length + ' screens visible. Student computers show a sharing notice while you watch.';
 }
 
+// Enlarged view: frames as fast as the computer sends them (only changes).
+let frameSince = 0;
+let frameURL = null;
+let frameLoopRunning = false;
+
+async function frameLoop() {
+  if (frameLoopRunning) return;
+  frameLoopRunning = true;
+  while (selected) {
+    const name = selected;
+    try {
+      const response = await fetch('/api/frame?name=' + encodeURIComponent(name) + '&since=' + frameSince, { cache: 'no-store' });
+      if (name !== selected) continue;
+      if (response.status === 200) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        viewerImage.src = url;
+        if (frameURL) URL.revokeObjectURL(frameURL);
+        frameURL = url;
+      }
+      frameSince = Number(response.headers.get('X-Frame') || frameSince);
+    } catch (error) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  frameLoopRunning = false;
+}
+
 function open(name) {
   selected = name;
+  frameSince = 0;
   viewerName.textContent = name;
+  viewerDetail.textContent = '';
   const entry = cards.get(name);
   viewerImage.alt = 'Screen of ' + name;
   viewerImage.src = entry && !entry.image.hidden ? entry.image.src : '';
   viewer.showModal();
+  frameLoop();
 }
 
+// Remote control: mouse and keyboard in the enlarged view go to the computer.
+let controlling = false;
+let queue = [];
+const pressedCodes = new Map();
+
+const specialKeys = {
+  Enter: 0xff0d, Backspace: 0xff08, Tab: 0xff09, Escape: 0xff1b, Delete: 0xffff,
+  Insert: 0xff63, Home: 0xff50, End: 0xff57, PageUp: 0xff55, PageDown: 0xff56,
+  ArrowLeft: 0xff51, ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54,
+  Shift: 0xffe1, Control: 0xffe3, Alt: 0xffe9, AltGraph: 0xfe03, Meta: 0xffeb,
+  CapsLock: 0xffe5, ContextMenu: 0xff67, ' ': 0x20,
+};
+
+function keysym(event) {
+  if (event.key in specialKeys) return specialKeys[event.key];
+  const fn = /^F([1-9]|1[0-2])$/.exec(event.key);
+  if (fn) return 0xffbe + Number(fn[1]) - 1;
+  const chars = Array.from(event.key);
+  if (chars.length !== 1) return 0;
+  const point = chars[0].codePointAt(0);
+  return point < 0x100 ? point : 0x01000000 + point;
+}
+
+function send(events, release) {
+  if (!selected) return Promise.resolve();
+  return fetch('/api/input?name=' + encodeURIComponent(selected), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ events, release: Boolean(release) }),
+  }).catch(() => {});
+}
+
+function queueEvent(event) {
+  if (event.kind === 'move' && queue.length && queue[queue.length - 1].kind === 'move') {
+    queue[queue.length - 1] = event;
+  } else {
+    queue.push(event);
+  }
+}
+
+setInterval(() => {
+  if (!controlling || queue.length === 0) return;
+  const events = queue.splice(0, 128);
+  send(events, false);
+}, 40);
+
+// The image is letterboxed (object-fit: contain): measure the drawn screen.
+function position(event) {
+  const box = viewerImage.getBoundingClientRect();
+  const ratio = (viewerImage.naturalWidth || 16) / (viewerImage.naturalHeight || 10);
+  let width = box.width;
+  let height = width / ratio;
+  if (height > box.height) {
+    height = box.height;
+    width = height * ratio;
+  }
+  const left = box.left + (box.width - width) / 2;
+  const top = box.top + (box.height - height) / 2;
+  const x = Math.min(1, Math.max(0, (event.clientX - left) / width));
+  const y = Math.min(1, Math.max(0, (event.clientY - top) / height));
+  return { kind: 'move', x, y };
+}
+
+const buttons = ['left', 'middle', 'right'];
+
+viewerImage.addEventListener('pointermove', (event) => { if (controlling) queueEvent(position(event)); });
+viewerImage.addEventListener('pointerdown', (event) => {
+  if (!controlling || !buttons[event.button]) return;
+  event.preventDefault();
+  viewerImage.focus();
+  queueEvent(position(event));
+  queueEvent({ kind: 'button', button: buttons[event.button], pressed: true });
+});
+viewerImage.addEventListener('pointerup', (event) => {
+  if (!controlling || !buttons[event.button]) return;
+  event.preventDefault();
+  queueEvent({ kind: 'button', button: buttons[event.button], pressed: false });
+});
+viewerImage.addEventListener('contextmenu', (event) => { if (controlling) event.preventDefault(); });
+viewerImage.addEventListener('wheel', (event) => {
+  if (!controlling) return;
+  event.preventDefault();
+  queueEvent({ kind: 'scroll', steps: event.deltaY > 0 ? 1 : -1 });
+}, { passive: false });
+
+window.addEventListener('keydown', (event) => {
+  if (!controlling || event.target === controlButton) return;
+  const symbol = keysym(event);
+  if (!symbol) return;
+  event.preventDefault();
+  pressedCodes.set(event.code, symbol);
+  queueEvent({ kind: 'key', keysym: symbol, pressed: true });
+});
+window.addEventListener('keyup', (event) => {
+  if (!controlling) return;
+  const symbol = pressedCodes.get(event.code) || keysym(event);
+  pressedCodes.delete(event.code);
+  if (!symbol) return;
+  event.preventDefault();
+  queueEvent({ kind: 'key', keysym: symbol, pressed: false });
+});
+
+function setControl(on) {
+  if (controlling === on) return;
+  controlling = on;
+  controlButton.textContent = on ? 'Stop control' : 'Take control';
+  controlButton.classList.toggle('primary', !on);
+  controllingNotice.hidden = !on;
+  viewerImage.classList.toggle('control', on);
+  if (on) {
+    viewerImage.focus();
+  } else {
+    queue = [];
+    pressedCodes.clear();
+    send([], true);
+  }
+}
+
+controlButton.addEventListener('click', () => setControl(!controlling));
+// While controlling, Escape belongs to the student's computer.
+viewer.addEventListener('cancel', (event) => { if (controlling) event.preventDefault(); });
 document.getElementById('viewer-close').addEventListener('click', () => viewer.close());
-viewer.addEventListener('close', () => { selected = null; });
+viewer.addEventListener('close', () => {
+  setControl(false);
+  selected = null;
+});
+window.addEventListener('blur', () => { if (controlling) { pressedCodes.clear(); send([], true); } });
 
 async function refresh() {
   try {

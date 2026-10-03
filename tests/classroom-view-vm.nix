@@ -48,6 +48,14 @@ pkgs.testers.runNixOSTest {
     client.succeed("test \"$(head -c 2 /tmp/thumb.jpg | od -An -tx1 | tr -d ' ')\" = ffd8")
     client.copy_from_machine("/tmp/thumb.jpg")
 
+    # Remote control: input through the agent reaches the session (GNOME's
+    # idle time restarts), with every key released afterwards.
+    idle = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gdbus call --session --dest org.gnome.Mutter.IdleMonitor --object-path /org/gnome/Mutter/IdleMonitor/Core --method org.gnome.Mutter.IdleMonitor.GetIdletime' | sed -n 's/.*uint64 \\([0-9]*\\).*/\\1/p'"
+    client.sleep(6)
+    client.succeed("test $(" + idle + ") -gt 4000")
+    client.succeed("${agent} probe --input --thumbnail /tmp/thumb-input.jpg nixorium-classroom-connect | grep -F 'input.done'")
+    client.succeed("test $(" + idle + ") -lt 3000")
+
     # The indicator stays visible but a student's click no longer stops the view.
     extensions = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gnome-extensions "
     client.wait_until_succeeds(extensions + "info nixorium-classroom@nixorium.org' | grep -E 'State: (ENABLED|ACTIVE)'", timeout=60)

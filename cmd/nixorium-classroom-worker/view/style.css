@@ -29,9 +29,15 @@ main { padding: 1.5rem; }
 .state { color: var(--muted); font-size: 0.85rem; text-align: right; }
 .state.warning { color: var(--warning); }
 .message { color: var(--warning); }
-dialog { width: min(96vw, 1600px); padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
+dialog { width: min(96vw, 1600px); max-height: 96vh; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); overflow: hidden; }
+dialog[open] { display: flex; flex-direction: column; }
 dialog::backdrop { background: rgb(0 0 0 / 0.7); }
 .viewer-bar { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0.9rem; }
 .viewer-bar span { flex: 1; color: var(--muted); }
 .viewer-bar button { padding: 0.35rem 0.9rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: inherit; font: inherit; cursor: pointer; }
-#viewer-image { display: block; width: 100%; background: #000; }
+#viewer-image { display: block; width: 100%; min-height: 0; flex: 1; max-height: calc(96vh - 6rem); object-fit: contain; background: #000; }
+.viewer-bar button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.controlling { margin: 0; padding: 0.45rem 0.9rem; background: var(--warning); color: #000; font-weight: 600; }
+#viewer-image.control { cursor: none; outline: 3px solid var(--warning); outline-offset: -3px; }
+#viewer-image:focus { outline: none; }
+#viewer-image.control:focus { outline: 3px solid var(--warning); }

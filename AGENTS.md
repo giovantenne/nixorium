@@ -562,7 +562,10 @@ any shard must block publication.
   loopback only behind a one-time token from the classroom socket, refuses
   foreign Host headers, keeps a strict CSP with no external resources, takes
   computer names only from the evaluated inventory, and closes agent channels
-  when the page stops polling. The
+  when the page stops polling. Remote input is accepted only as bounded,
+  validated JSON from the page's own Origin for a computer open in the large
+  view, and every path that ends control must release pressed keys and
+  buttons. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

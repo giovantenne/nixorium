@@ -31,7 +31,9 @@ func TestClassroomAgentHelper(t *testing.T) {
 		case classroomview.TypeHello:
 			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, User: "student"})
 		case classroomview.TypeThumbnailRequest:
-			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeThumbnail, Width: request.Width, Height: 200, Image: []byte("jpeg")})
+			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeThumbnail, Width: request.Width, Height: 200, Image: []byte("jpeg"), Frame: 7})
+		case classroomview.TypeInput:
+			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeInputDone})
 		}
 	}
 }
@@ -63,14 +65,17 @@ func TestClassroomAgentConnectorExchangesOverSSH(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	reply, err := session.Thumbnail(320)
-	if err != nil || reply.Type != classroomview.TypeThumbnail || string(reply.Image) != "jpeg" || reply.Width != 320 {
+	reply, err := session.Thumbnail(320, 0)
+	if err != nil || reply.Type != classroomview.TypeThumbnail || string(reply.Image) != "jpeg" || reply.Width != 320 || reply.Frame != 7 {
 		t.Fatalf("reply = %+v, %v", reply, err)
+	}
+	if err := session.Input([]classroomview.InputEvent{{Kind: classroomview.InputKey, Keysym: 'a', Pressed: true}}, true); err != nil {
+		t.Fatal(err)
 	}
 	if err := session.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := session.Thumbnail(320); err == nil {
+	if _, err := session.Thumbnail(320, 0); err == nil {
 		t.Fatal("a closed session answered")
 	}
 }

@@ -13,11 +13,19 @@ import (
 type fakeAgentSession struct {
 	mutex  *sync.Mutex
 	closed *int
+	inputs *int
 	reply  classroomview.Message
 }
 
-func (session fakeAgentSession) Thumbnail(width int) (classroomview.Message, error) {
+func (session fakeAgentSession) Thumbnail(width int, since int64) (classroomview.Message, error) {
 	return session.reply, nil
+}
+
+func (session fakeAgentSession) Input(events []classroomview.InputEvent, release bool) error {
+	session.mutex.Lock()
+	defer session.mutex.Unlock()
+	*session.inputs += len(events)
+	return nil
 }
 
 func (session fakeAgentSession) Close() error {
@@ -30,6 +38,7 @@ func (session fakeAgentSession) Close() error {
 type fakeAgentConnector struct {
 	mutex  sync.Mutex
 	closed int
+	inputs int
 	errors map[string]error
 	codes  map[string]string
 }
@@ -38,11 +47,11 @@ func (connector *fakeAgentConnector) Connect(_ context.Context, host domain.Host
 	if err := connector.errors[host.Name]; err != nil {
 		return nil, err
 	}
-	reply := classroomview.Message{Type: classroomview.TypeThumbnail, Width: 320, Height: 200, Image: []byte(host.Name), CapturedAt: 1}
+	reply := classroomview.Message{Type: classroomview.TypeThumbnail, Width: 320, Height: 200, Image: []byte(host.Name), CapturedAt: 1, Frame: 3}
 	if code := connector.codes[host.Name]; code != "" {
 		reply = classroomview.Message{Type: classroomview.TypeError, Code: code}
 	}
-	return fakeAgentSession{mutex: &connector.mutex, closed: &connector.closed, reply: reply}, nil
+	return fakeAgentSession{mutex: &connector.mutex, closed: &connector.closed, inputs: &connector.inputs, reply: reply}, nil
 }
 
 func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T) {
@@ -78,6 +87,22 @@ func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T)
 	}
 	if _, found := hub.Thumbnail("pc09"); found {
 		t.Fatal("unknown computer returned an image")
+	}
+	// Opened in full: the latest frame, nothing again until it changes, and input.
+	if image, frame, found := hub.Frame("pc01", 0); !found || frame != 3 || string(image) != "pc01" {
+		t.Fatalf("frame = %q %d %v", image, frame, found)
+	}
+	if image, _, _ := hub.Frame("pc01", 3); image != nil {
+		t.Fatal("an unchanged frame was sent again")
+	}
+	if err := hub.Input("pc01", []classroomview.InputEvent{{Kind: classroomview.InputKey, Keysym: 'a', Pressed: true}}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := hub.Input("pc01", []classroomview.InputEvent{{Kind: "exec"}}, false); err == nil {
+		t.Fatal("malformed input was accepted")
+	}
+	if err := hub.Input("pc02", nil, false); err == nil {
+		t.Fatal("input reached a computer that is not open in full")
 	}
 	// Nobody asks any more: every channel closes and polling stops.
 	time.Sleep(500 * time.Millisecond)

@@ -48,11 +48,14 @@ func main() {
 		}
 		err = connect(os.Stdin, os.Stdout, loginctl, "/run/user")
 	case "probe":
-		arguments, thumbnail := os.Args[2:], ""
+		arguments, thumbnail, input := os.Args[2:], "", false
+		if len(arguments) >= 1 && arguments[0] == "--input" {
+			input, arguments = true, arguments[1:]
+		}
 		if len(arguments) >= 2 && arguments[0] == "--thumbnail" {
 			thumbnail, arguments = arguments[1], arguments[2:]
 		}
-		err = probe(arguments, thumbnail, os.Stdout)
+		err = probe(arguments, thumbnail, input, os.Stdout)
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -137,7 +140,11 @@ func handle(connection net.Conn, userName string, capture capturer) {
 				return
 			}
 		case classroomview.TypeThumbnailRequest:
-			if err := classroomview.Write(connection, thumbnailReply(capture, message.Width)); err != nil {
+			if err := classroomview.Write(connection, thumbnailReply(capture, message.Width, message.Since)); err != nil {
+				return
+			}
+		case classroomview.TypeInput:
+			if err := classroomview.Write(connection, inputReply(capture, message)); err != nil {
 				return
 			}
 		default:
@@ -148,18 +155,32 @@ func handle(connection net.Conn, userName string, capture capturer) {
 	}
 }
 
-func thumbnailReply(capture capturer, width int) classroomview.Message {
+func inputReply(capture capturer, message classroomview.Message) classroomview.Message {
+	if err := classroomview.ValidateInput(message.Events); err != nil {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest, Detail: err.Error()}
+	}
+	err := capture.Input(message.Events, message.Release)
+	if errors.Is(err, errNotReady) {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNotReady, Detail: "the screen is not being viewed"}
+	}
+	if err != nil {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: err.Error()}
+	}
+	return classroomview.Message{Type: classroomview.TypeInputDone}
+}
+
+func thumbnailReply(capture capturer, width int, since int64) classroomview.Message {
 	if width < classroomview.MinThumbnailWidth || width > classroomview.MaxThumbnailWidth {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest, Detail: "thumbnail width is out of range"}
 	}
-	image, height, capturedAt, err := capture.Thumbnail(width)
+	image, height, capturedAt, frame, err := capture.Thumbnail(width, since)
 	if errors.Is(err, errNotReady) {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNotReady, Detail: err.Error()}
 	}
 	if err != nil {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: err.Error()}
 	}
-	return classroomview.Message{Type: classroomview.TypeThumbnail, Width: width, Height: height, Image: image, CapturedAt: capturedAt.UnixMilli()}
+	return classroomview.Message{Type: classroomview.TypeThumbnail, Width: width, Height: height, Image: image, CapturedAt: capturedAt.UnixMilli(), Frame: frame}
 }
 
 // commandRunner runs loginctl with fixed arguments and returns its output.
@@ -234,7 +255,7 @@ func connect(input io.Reader, output io.Writer, run commandRunner, runtimeBase s
 }
 
 // probe exchanges one hello through a command's standard input and output.
-func probe(command []string, thumbnail string, output io.Writer) error {
+func probe(command []string, thumbnail string, input bool, output io.Writer) error {
 	if len(command) == 0 {
 		return errors.New("probe needs a command, for example nixorium-classroom-connect")
 	}
@@ -280,7 +301,30 @@ func probe(command []string, thumbnail string, output io.Writer) error {
 		}
 		if reply.Type == classroomview.TypeThumbnail {
 			fmt.Fprintf(output, "thumbnail width=%d height=%d bytes=%d\n", reply.Width, reply.Height, len(reply.Image))
-			return os.WriteFile(thumbnail, reply.Image, 0o644)
+			if err := os.WriteFile(thumbnail, reply.Image, 0o644); err != nil {
+				return err
+			}
+			if !input {
+				return nil
+			}
+			// A pointer move and a Shift tap, then release everything.
+			events := []classroomview.InputEvent{
+				{Kind: classroomview.InputPointerMove, X: 0.5, Y: 0.5},
+				{Kind: classroomview.InputKey, Keysym: 0xffe1, Pressed: true},
+				{Kind: classroomview.InputKey, Keysym: 0xffe1},
+			}
+			if err := classroomview.Write(stdin, classroomview.Message{Type: classroomview.TypeInput, Events: events, Release: true}); err != nil {
+				return err
+			}
+			reply, err = classroomview.Read(stdout)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(output, "%s code=%s detail=%s\n", reply.Type, reply.Code, reply.Detail)
+			if reply.Type != classroomview.TypeInputDone {
+				return errors.New("the agent refused the input")
+			}
+			return nil
 		}
 		fmt.Fprintf(output, "%s code=%s detail=%s\n", reply.Type, reply.Code, reply.Detail)
 		if reply.Code != classroomview.CodeNotReady {

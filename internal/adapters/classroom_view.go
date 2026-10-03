@@ -54,8 +54,19 @@ type sshAgentSession struct {
 	closed  bool
 }
 
-func (session *sshAgentSession) Thumbnail(width int) (classroomview.Message, error) {
-	return session.exchange(classroomview.Message{Type: classroomview.TypeThumbnailRequest, Width: width}, 10*time.Second)
+func (session *sshAgentSession) Thumbnail(width int, since int64) (classroomview.Message, error) {
+	return session.exchange(classroomview.Message{Type: classroomview.TypeThumbnailRequest, Width: width, Since: since}, 10*time.Second)
+}
+
+func (session *sshAgentSession) Input(events []classroomview.InputEvent, release bool) error {
+	reply, err := session.exchange(classroomview.Message{Type: classroomview.TypeInput, Events: events, Release: release}, 5*time.Second)
+	if err != nil {
+		return err
+	}
+	if reply.Type != classroomview.TypeInputDone {
+		return classroomview.AgentError{Code: reply.Code}
+	}
+	return nil
 }
 
 // exchange sends one request and waits for its reply, closing the session
