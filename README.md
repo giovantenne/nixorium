@@ -20,6 +20,61 @@ https://github.com/user-attachments/assets/3dfc054b-4f10-40a4-b26a-1c317d0d7fcf
 
 
 
+## Why this exists
+
+Managing a room of PCs by hand is slow. Machines drift apart over time,
+reinstalling them one by one takes days, and keeping thirty desktops identical
+becomes a job of its own. Configuration tools help, but they cannot guarantee
+that two PCs prepared a week apart end up the same.
+
+NixOS solves this with declarative, reproducible systems, but its usual
+workflows assume that every machine can reach the Internet. In many schools,
+student PCs have no Internet at all, or only after a user signs in to the
+institutional network.
+
+Nixorium bridges that gap with a local-first workflow:
+
+- One controller in the room builds the systems, keeps a signed package cache
+  and starts the PCs from the network.
+- Student PCs are installed and updated entirely over the local network.
+- One private repository describes the whole lab: computers, accounts,
+  software and the student desktop.
+- Everyday tasks run from a guided menu on the controller.
+
+## Features
+
+**For teachers**
+
+- **A clean desktop at every boot.** Every student PC starts with the same
+  GNOME desktop and applications. The last five sessions stay on that PC as
+  snapshots, so a lost file can be recovered from **Snapshots** in the Files
+  sidebar.
+- **Classroom management.** Veyon is ready with every PC of the room: watch
+  screens, help one student, lock screens or show your own screen.
+- **A classroom dashboard.** On the controller, see which PCs are on, pause or
+  restore Internet on selected PCs, and shut them down or restart them. The
+  dashboard cannot change the lab.
+
+**For technicians**
+
+- **One description, every PC.** Add software or change the student desktop
+  once, then update one PC, a group or the whole room. Every change is
+  reviewed before it runs.
+- **No Internet needed on the clients.** Install PCs from the network, beside
+  the school's existing DHCP server, or from a USB stick. Only the controller
+  needs Internet: it serves systems and updates from a local, signed cache. A
+  disk is erased only after an explicit confirmation.
+- **Updates when you choose.** Update Nixorium and the system separately, and
+  go back to a previous system version if an update causes trouble.
+- **Guided recovery.** When something is interrupted, Nixorium lists it and
+  says what to do next. An encrypted controller backup lets a new controller
+  take over without reinstalling the PCs.
+- **Your lab stays yours.** Software choices, desktop defaults and local
+  policy live in your own private repository, separate from this framework.
+
+Under the hood: NixOS builds every PC from the same description, Colmena
+deploys it, Harmonia serves the cache and Disko lays out the disks.
+
 ## Project status
 
 Nixorium has run the Italian school lab where it began, 30 student PCs and a
@@ -30,38 +85,6 @@ teacher; support happens in
 [GitHub Discussions](https://github.com/giovantenne/nixorium/discussions).
 Each release is validated on virtual machines; physical hardware differs, so
 start with one controller and one client of your own.
-
-## What it does
-
-**For teachers**
-
-- Every student PC starts with the same clean desktop and applications at every
-  boot. The last five sessions stay on that PC as snapshots, so a lost file can
-  be recovered from **Snapshots** in the Files sidebar.
-- Veyon is ready with every PC of the room: watch screens, help one student,
-  lock screens or show your own screen.
-- A classroom dashboard on the controller shows which PCs are on, pauses or
-  restores Internet on selected PCs, and shuts them down or restarts them.
-  It cannot change the lab.
-
-**For technicians**
-
-- Add software or change the student desktop once, then update one PC, a group
-  or the whole room. Every change is reviewed before it runs.
-- Install PCs from the network, beside the school's existing DHCP server, or
-  from a USB stick. A disk is erased only after an explicit confirmation.
-- Only the controller needs Internet: it serves systems and updates to the PCs
-  from a local, signed cache.
-- Update Nixorium and the system separately, when you choose, and go back to a
-  previous system version if an update causes trouble.
-- When something is interrupted, Nixorium lists it and says what to do next. An
-  encrypted controller backup lets a new controller take over without
-  reinstalling the PCs.
-- Software choices, desktop defaults and local policy live in your own private
-  repository, separate from this framework.
-
-Under the hood: NixOS builds every PC from the same description, Colmena
-deploys it, Harmonia serves the cache and Disko lays out the disks.
 
 ## What you need
 
