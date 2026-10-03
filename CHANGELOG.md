@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Veyon no longer crashes when it opens a file dialog (distributing files,
+  saving the computer list): Veyon Master and the Configurator now carry the
+  GTK settings schemas that the dialog requires under GNOME.
+
 ### Fixed
 
 - USB/SSH installation now returns a durable reboot acknowledgement before the

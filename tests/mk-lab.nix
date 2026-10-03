@@ -305,6 +305,8 @@ assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   ''action.id.indexOf("org.freedesktop.NetworkManager.") == 0'' clientPolkit.extraConfig;
 assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   "return polkit.Result.NO;" clientPolkit.extraConfig;
+# Veyon's GTK file dialogs abort without the GTK GSettings schemas.
+assert lib.hasInfix "gsettings-schemas" subnetLab.nixosConfigurations.pc99.pkgs.veyon.postFixup;
 assert !(hasPackage subnetLab "pc01" "chromium");
 assert !(hasPackage subnetLab "pc01" "vscode");
 assert !(hasPackage subnetLab "pc01" "opencode");

@@ -120,6 +120,7 @@ let
     # release explicitly so the official flake also sets both CI tag variables.
     veyon = (prev.makeVeyon { version = "4.11.3"; }).overrideAttrs (oldAttrs: {
       buildInputs = (oldAttrs.buildInputs or []) ++ [ final.pipewire ];
+      nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [ final.makeWrapper ];
       patches = (oldAttrs.patches or []) ++ [
         # Upstream 22218d7 (2026-09-25), pending the next Veyon release.
         ../pkgs/patches/veyon-persist-restore-token.patch
@@ -142,6 +143,16 @@ let
           echo "ERROR: Veyon PipeWire VNC plugin was not built" >&2
           exit 1
         fi
+      '';
+      # Under GNOME, Qt opens GTK file dialogs (distributing files, saving
+      # the computer list). GTK aborts without its GSettings schemas, so the
+      # interactive programs carry them instead of relying on the session.
+      postFixup = (oldAttrs.postFixup or "") + ''
+        for program in veyon-master veyon-configurator; do
+          wrapProgram "$out/bin/$program" \
+            --prefix XDG_DATA_DIRS : "${final.gtk3}/share/gsettings-schemas/${final.gtk3.name}" \
+            --prefix XDG_DATA_DIRS : "${final.gsettings-desktop-schemas}/share/gsettings-schemas/${final.gsettings-desktop-schemas.name}"
+        done
       '';
     });
   };
