@@ -339,3 +339,23 @@ func TestSoftwareApplyReportsUncertainDurabilityAsPartial(t *testing.T) {
 		t.Fatalf("durability error = %+v", report)
 	}
 }
+
+func TestSoftwarePlanKeepsBaseSoftware(t *testing.T) {
+	source, manager := softwareManagerFixture(t)
+	source.data = []byte(`{"schemaVersion":1,"packages":[{"package":"chromium","scope":{"kind":"shared"}}]}`)
+	for name, request := range map[string]domain.SoftwareChangeRequest{
+		"removal":    {Package: "chromium", Present: false},
+		"limit":      {Package: "chromium", Present: true, Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
+		"undeclared": {Package: "python3Packages.terminaltexteffects", Present: false},
+	} {
+		report := manager.Plan(context.Background(), "/lab", request)
+		if report.State == "ready" || report.ReviewToken != "" || len(report.Issues) == 0 || !strings.Contains(report.Issues[0].Message, "always installs it") {
+			t.Fatalf("%s = %+v", name, report)
+		}
+	}
+	for _, id := range domain.BaseSoftware() {
+		if !softwareIDValid(id) {
+			t.Fatalf("base software %q is not a valid package attribute", id)
+		}
+	}
+}

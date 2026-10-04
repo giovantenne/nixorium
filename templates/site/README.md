@@ -364,7 +364,7 @@ spinner and the current plain-language action.
 |---|---|
 | **Computers** | Inspect, distribute, control Internet access, or shut down/restart selected clients |
 | **Installation** | Configure the lab, install through PXE or USB/SSH, and recover interrupted installation state |
-| **Software** | Review configured packages, search the pin, choose scope, and save/apply changes |
+| **Software** | Review configured packages, search the pin, choose scope, and save/apply changes; Chromium, Ghostty, Git and the screensaver's effects are always installed and cannot be removed |
 | **Maintenance** | Change settings, update/rebuild the controller, inspect services, Git, logs, and diagnostics |
 
 Every task menu shows its direct shortcut beside the title. `Esc` returns to

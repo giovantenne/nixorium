@@ -623,6 +623,12 @@ any shard must block publication.
 - `modules/common.nix` is only the composition point for core desktop, firewall,
   power, and SSH modules. Packages, shell preferences, development tools,
   screensaver behavior, and application policy belong in the deployment.
+  The one exception, by owner decision, is base software:
+  `internal/domain/base-software.json` (Chromium, Ghostty, Git, the
+  screensaver's terminaltexteffects) is installed on every host by
+  `lib/mk-lab.nix` whatever `lab-software.json` declares, counts as effective
+  software for the template, and the software review refuses to remove or
+  narrow it. Keep that file the single list for Nix and Go.
 - Site desktop favorites and shortcuts live in `templates/site/modules/workstation.nix`;
   student template content lives in `templates/site/modules/home-profile.nix`.
   Keep application entries conditional on effective software scope, not in core

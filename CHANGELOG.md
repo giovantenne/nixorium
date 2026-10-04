@@ -55,6 +55,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   view directly; `nixorium classroom-view` does the same from a terminal.
   The administrator still gets the dashboard.
 
+- Base software: Chromium, Ghostty, Git and terminaltexteffects (the lab
+  screensaver) are now always installed on every computer, whatever
+  `lab-software.json` declares, because Nixorium's own features need them;
+  the software review refuses to remove them or limit them to some
+  computers.
+
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the
   GTK settings schemas that the dialog requires under GNOME.

@@ -431,8 +431,14 @@ let
     requireAvailable = false;
     allowUnfree = true;
   } labSoftware;
+  # Base software is installed on every computer whatever lab-software.json
+  # declares: Nixorium's own features need it. The Go review refuses to
+  # remove it, reading the same list.
+  baseSoftware = builtins.fromJSON (builtins.readFile ../internal/domain/base-software.json);
   hostSoftwareEntries = name:
-    builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages;
+    let declared = builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages;
+    in declared ++ map (package: { inherit package; scope = { kind = "shared"; }; })
+      (builtins.filter (package: !(builtins.any (entry: entry.package == package) declared)) baseSoftware);
   softwareAppliesTo = name: scope:
     scope.kind == "shared"
     || (scope.kind == "controller" && name == masterHostName)
@@ -445,7 +451,7 @@ let
         let package = lib.attrByPath (lib.splitString "." entry.package) null pkgs;
         in if package != null && lib.isDerivation package then package
         else throw "lab-software.json: package ${entry.package} is unavailable in the pinned package set")
-      (builtins.filter (entry: softwareAppliesTo hostName entry.scope) labSoftwareConfig.packages);
+      (hostSoftwareEntries hostName);
   };
   # Resolve against actual declarative system packages, including GNOME core
   # packages and downstream modules, not just managed software declarations.

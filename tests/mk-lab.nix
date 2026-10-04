@@ -317,7 +317,9 @@ assert lib.hasInfix "tcp dport { 22, 11100 } accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
 # Veyon's GTK file dialogs abort without the GTK GSettings schemas.
 assert lib.hasInfix "gsettings-schemas" subnetLab.nixosConfigurations.pc99.pkgs.veyon.postFixup;
-assert !(hasPackage subnetLab "pc01" "chromium");
+# Base software is installed whatever lab-software.json declares.
+assert builtins.all (host: builtins.all (pname: hasPackage subnetLab host pname)
+  [ "chromium" "ghostty" "git" "terminaltexteffects" ]) [ "pc99" "pc01" ];
 assert !(hasPackage subnetLab "pc01" "vscode");
 assert !(hasPackage subnetLab "pc01" "opencode");
 assert !(hasPackage subnetLab "pc01" "pi-coding-agent");

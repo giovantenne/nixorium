@@ -124,6 +124,9 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 		return softwarePlanIssue(report, "file", err.Error())
 	}
 	report.BaseFingerprint = domain.SoftwareFingerprint(baseData)
+	if domain.IsBaseSoftware(request.Package) {
+		return softwarePlanIssue(report, "package", request.Package+" is part of every laboratory computer: Nixorium always installs it, so it cannot be removed or limited to some computers")
+	}
 	request.Scope = normalizeSoftwareScope(request.Scope)
 	existing, exists := softwareDeclaration(base.Packages, request.Package)
 	item := domain.SoftwareCatalogItem{ID: request.Package, Label: request.Package, Summary: "Configured package", Availability: "available"}
