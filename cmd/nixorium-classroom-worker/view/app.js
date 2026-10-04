@@ -35,6 +35,16 @@ const selectAll = document.getElementById('select-all');
 const selectedCount = document.getElementById('selected-count');
 const toolbarButtons = document.querySelectorAll('.toolbar button[data-action]');
 
+// The latest state of every computer, for actions that depend on it.
+const known = new Map();
+
+// Lock and Internet offer the change that applies: when every selected
+// computer is already locked (or blocked) they turn into Unlock (Allow).
+function setToggle(button, opposite, labels) {
+  button.dataset.action = opposite ? labels[1][0] : labels[0][0];
+  button.textContent = opposite ? labels[1][1] : labels[0][1];
+}
+
 function updateSelection() {
   for (const [name, entry] of cards) {
     entry.check.checked = chosen.has(name);
@@ -44,6 +54,11 @@ function updateSelection() {
   selectAll.checked = chosen.size > 0 && chosen.size === cards.size;
   selectAll.indeterminate = chosen.size > 0 && chosen.size < cards.size;
   for (const button of toolbarButtons) button.disabled = chosen.size === 0 && !(button.dataset.action === 'show-screen' && casting);
+  const picked = [...chosen].map((name) => known.get(name)).filter(Boolean);
+  const all = (test) => picked.length > 0 && picked.every(test);
+  setToggle(document.querySelector('.toolbar [data-toggle="lock"]'), all((computer) => computer.locked), [['lock', 'Lock'], ['unlock', 'Unlock']]);
+  setToggle(document.querySelector('.toolbar [data-toggle="internet"]'), all((computer) => computer.internet === 'blocked'), [['internet-block', 'Block Internet'], ['internet-allow', 'Allow Internet']]);
+  document.querySelector('.power-menu').classList.toggle('disabled', chosen.size === 0);
 }
 
 selectAll.addEventListener('change', () => {
@@ -102,6 +117,7 @@ function screenAge(computer) {
 function render(computers) {
   let viewing = 0;
   for (const computer of computers) {
+    known.set(computer.name, computer);
     const entry = card(computer);
     const text = stateText[computer.state] ?? computer.detail;
     // Without an image the screen area already says why; avoid repeating it.
@@ -136,6 +152,11 @@ function render(computers) {
       if (computer.locked && controlling) setControl(false);
       controlButton.disabled = Boolean(computer.locked);
       controlButton.title = computer.locked ? 'Unlock this computer to take control.' : '';
+      // This computer's menu offers only the change that applies.
+      const offer = { lock: !computer.locked, unlock: Boolean(computer.locked), 'internet-block': computer.internet !== 'blocked', 'internet-allow': computer.internet === 'blocked' };
+      for (const button of document.querySelectorAll('.viewer-actions button[data-action]')) {
+        if (button.dataset.action in offer) button.hidden = !offer[button.dataset.action];
+      }
     }
   }
   summary.textContent = viewing + ' of ' + computers.length + ' screens visible. Student computers show a sharing notice while you watch.';
@@ -452,9 +473,12 @@ function startAction(action, computers) {
 }
 
 for (const button of toolbarButtons) {
-  button.addEventListener('click', () => startAction(button.dataset.action, [...chosen].sort()));
+  button.addEventListener('click', () => {
+    button.closest('details')?.removeAttribute('open');
+    startAction(button.dataset.action, [...chosen].sort());
+  });
 }
-for (const button of document.querySelectorAll('.actions-menu button[data-action]')) {
+for (const button of document.querySelectorAll('.viewer-actions button[data-action]')) {
   button.addEventListener('click', () => {
     button.closest('details').open = false;
     if (selected) startAction(button.dataset.action, [selected]);

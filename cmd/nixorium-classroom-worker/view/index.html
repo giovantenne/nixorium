@@ -16,22 +16,17 @@
   <div class="toolbar" role="toolbar" aria-label="Actions on the selected computers">
     <label class="select-all"><input type="checkbox" id="select-all"> Select all</label>
     <span id="selected-count">None selected</span>
-    <span class="group">
-      <button type="button" data-action="internet-block">Block Internet</button>
-      <button type="button" data-action="internet-allow">Allow Internet</button>
-    </span>
-    <span class="group">
-      <button type="button" data-action="lock">Lock</button>
-      <button type="button" data-action="unlock">Unlock</button>
-    </span>
-    <span class="group">
-      <button type="button" data-action="show-screen" title="Show your whole screen on the selected computers, with their keyboard and mouse blocked">Show my screen</button>
-      <button type="button" data-action="send-desktop" title="Copy the files and folders of a folder you choose, such as your desktop, to the students' desktops">Send desktop</button>
-    </span>
-    <span class="group">
-      <button type="button" data-action="restart">Restart</button>
-      <button type="button" data-action="shutdown">Shut down</button>
-    </span>
+    <button type="button" data-action="show-screen" title="Show your whole screen on the selected computers, with their keyboard and mouse blocked">Show my screen</button>
+    <button type="button" data-action="lock" data-toggle="lock" title="Lock the selected screens, or unlock them when they are all locked">Lock</button>
+    <button type="button" data-action="internet-block" data-toggle="internet" title="Block Internet on the selected computers, or allow it when it is blocked on all of them">Block Internet</button>
+    <button type="button" data-action="send-desktop" title="Copy the files and folders of a folder you choose, such as your desktop, to the students' desktops">Send desktop</button>
+    <details class="actions-menu power-menu">
+      <summary>Power</summary>
+      <div class="menu">
+        <button type="button" data-action="restart">Restart</button>
+        <button type="button" data-action="shutdown">Shut down</button>
+      </div>
+    </details>
   </div>
 </header>
 <main>
@@ -43,7 +38,7 @@
     <strong id="viewer-name"></strong>
     <span id="viewer-detail"></span>
     <span id="viewer-controlling" class="controlling" hidden title="Mouse and keyboard go to the student's screen. In full screen, hold Esc to leave it.">Controlling this computer</span>
-    <details class="actions-menu">
+    <details class="actions-menu viewer-actions">
       <summary>Actions</summary>
       <div class="menu">
         <button type="button" data-action="lock">Lock</button>
