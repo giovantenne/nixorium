@@ -27,7 +27,7 @@ type DashboardActions struct {
 	PlanTemplateReset  func(context.Context, string, func(string)) domain.TemplateResetPlan
 	ApplyTemplateReset func(domain.TemplateResetPlan) domain.TemplateResetResult
 	ClassroomMode      bool
-	// OpenClassroomView opens the experimental classroom view page and
+	// OpenClassroomView opens the classroom view page and
 	// returns a sentence for the operator.
 	OpenClassroomView func(context.Context) (string, error)
 	PlanInternet      func(context.Context, string, domain.InternetAction) domain.InternetPlan

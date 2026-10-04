@@ -26,7 +26,7 @@ func classroomViewSetting(reader interface{ ReadSettings(string) ([]byte, error)
 		return false
 	}
 	settings, _ := domain.DecodeLabSettings(data)
-	return settings.Lab.ClassroomView
+	return settings.Lab.ClassroomViewOn()
 }
 
 func runLockCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {

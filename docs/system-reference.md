@@ -308,7 +308,7 @@ protocol or its local native implementation.
 
 ## Classroom view agent (experimental)
 
-`lab.classroomView` in `lab-settings.json` (default `false`) installs the
+`lab.classroomView` in `lab-settings.json` (on unless set to `false`) installs the
 classroom view agent on client computers only. It is a systemd user service
 started with the graphical session; it listens on
 `$XDG_RUNTIME_DIR/nixorium-classroom.sock` (mode 0600) and opens no network

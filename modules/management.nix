@@ -683,7 +683,7 @@ let
     text = ''
       # The teacher goes straight to the classroom view when the laboratory
       # has it; the dashboard opens if the view cannot.
-      ${lib.optionalString (labSettings.classroomView or false) ''
+      ${lib.optionalString (labSettings.classroomView or true) ''
         if [[ "$(id -un)" == ${lib.escapeShellArg labSettings.teacherUser} ]] && ${nixoriumPackage}/bin/nixorium classroom-view; then
           exit 0
         fi

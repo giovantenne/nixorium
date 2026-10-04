@@ -37,7 +37,7 @@ const (
 	ClassroomDesktopWaitOperation  ClassroomOperation = "desktop-wait"
 	ClassroomDesktopReadyOperation ClassroomOperation = "desktop-ready"
 	// ClassroomViewOpenOperation returns a one-time address of the
-	// experimental classroom view page.
+	// classroom view page.
 	ClassroomViewOpenOperation ClassroomOperation = "view-open"
 )
 

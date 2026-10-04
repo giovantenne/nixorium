@@ -47,7 +47,7 @@ var lockScreensTask = dashboardTask{id: "lock", shortcut: "l", title: "Lock scre
 
 var sendDesktopTask = dashboardTask{id: "share", shortcut: "s", title: "Send desktop", description: "Copy the files on your desktop to the desktops of selected students' computers"}
 
-var classroomViewTask = dashboardTask{id: "view", shortcut: "v", title: "Classroom view", description: "See every student screen at once (experimental)"}
+var classroomViewTask = dashboardTask{id: "view", shortcut: "v", title: "Classroom view", description: "See, control and lock the students' screens, show yours, send your desktop"}
 
 func (model dashboardModel) availableComputerTasks() []dashboardTask {
 	tasks := computersAreaTasks

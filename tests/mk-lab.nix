@@ -311,7 +311,9 @@ assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
 # The experimental classroom view agent exists only on clients, and only when enabled.
 assert classroomViewLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent;
 assert !(classroomViewLab.nixosConfigurations.pc99.config.systemd.user.services ? nixorium-classroom-agent);
-assert !(subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent);
+# The classroom view is on unless a laboratory turns it off.
+assert subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent;
+assert !((mkLab (baseArgs // { labConfig = labConfig // { classroomView = false; }; })).nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent);
 # It adds no network port: the controller reaches it through SSH.
 assert lib.hasInfix "tcp dport { 22, 11100 } accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;

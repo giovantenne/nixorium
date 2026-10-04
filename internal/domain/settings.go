@@ -29,9 +29,16 @@ type LabSettingsFile struct {
 	Lab           LabSettings `json:"lab"`
 }
 
+// ClassroomViewOn tells whether the classroom view is on: it is unless the
+// settings turn it off.
+func (settings LabSettings) ClassroomViewOn() bool {
+	return settings.ClassroomView == nil || *settings.ClassroomView
+}
+
 type LabSettings struct {
-	DeploymentMode          string            `json:"deploymentMode,omitempty"`
-	ClassroomView           bool              `json:"classroomView,omitempty"`
+	DeploymentMode string `json:"deploymentMode,omitempty"`
+	// ClassroomView is on unless set to false; see ClassroomViewOn.
+	ClassroomView           *bool             `json:"classroomView,omitempty"`
 	MasterDHCPIP            string            `json:"masterDhcpIp"`
 	NetworkBase             string            `json:"networkBase"`
 	NetworkPrefix           int               `json:"networkPrefixLength"`

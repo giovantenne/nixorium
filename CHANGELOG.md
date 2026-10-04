@@ -6,7 +6,7 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- Experimental, off by default: `classroomView` in `lab-settings.json` installs
+- The classroom view, on unless `"classroomView": false` in `lab-settings.json`, installs
   a classroom view agent on client computers. It runs in the graphical session
   on a private socket, opens no network port, and is reached by the controller
   only through its existing SSH access. It returns screen thumbnails through

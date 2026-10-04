@@ -260,5 +260,5 @@ func classroomViewEnabled(reader interface{ ReadSettings(string) ([]byte, error)
 		return false
 	}
 	settings, _ := domain.DecodeLabSettings(data)
-	return settings.Lab.ClassroomView
+	return settings.Lab.ClassroomViewOn()
 }

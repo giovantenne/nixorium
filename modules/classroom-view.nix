@@ -7,7 +7,7 @@
 # clickable.
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
-  enabled = (labSettings.classroomView or false) && laboratoryEnabled
+  enabled = (labSettings.classroomView or true) && laboratoryEnabled
     && hostName != labSettings.masterHostName;
   extensionUuid = "nixorium-classroom@nixorium.org";
   extension = pkgs.runCommand "gnome-shell-extension-nixorium-classroom" {} ''

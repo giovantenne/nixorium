@@ -257,24 +257,28 @@ func TestMarshalIsDeterministicAndEndsWithNewline(t *testing.T) {
 	}
 }
 
-func TestClassroomViewIsAnOptionalBooleanSetting(t *testing.T) {
+func TestClassroomViewIsOnUnlessTurnedOff(t *testing.T) {
 	settings := validSettings()
-	settings.Lab.ClassroomView = true
+	data, _ := MarshalLabSettings(settings)
+	if strings.Contains(string(data), "classroomView") || !settings.Lab.ClassroomViewOn() {
+		t.Fatalf("an absent setting is not on by default: %s", data)
+	}
+	off := false
+	settings.Lab.ClassroomView = &off
 	data, err := MarshalLabSettings(settings)
-	if err != nil || !strings.Contains(string(data), `"classroomView": true`) {
+	if err != nil || !strings.Contains(string(data), `"classroomView": false`) || settings.Lab.ClassroomViewOn() {
 		t.Fatalf("encoded = %s, %v", data, err)
 	}
-	settings.Lab.ClassroomView = false
-	data, _ = MarshalLabSettings(settings)
-	if strings.Contains(string(data), "classroomView") {
-		t.Fatalf("disabled classroom view is written: %s", data)
+	decoded, issues := DecodeLabSettings(data)
+	if len(issues) > 0 || decoded.Lab.ClassroomViewOn() {
+		t.Fatalf("decoded = %+v, %v", decoded.Lab.ClassroomView, issues)
 	}
-	changes := DiffLabSettings(LabSettingsFile{}, LabSettingsFile{Lab: LabSettings{ClassroomView: true}})
+	changes := DiffLabSettings(LabSettingsFile{}, LabSettingsFile{Lab: LabSettings{ClassroomView: &off}})
 	found := false
 	for _, change := range changes {
-		found = found || change.Field == "lab.classroomView"
+		found = found || (change.Field == "lab.classroomView" && change.Before == true && change.After == false)
 	}
 	if !found {
-		t.Fatalf("classroom view change is not reviewed: %+v", changes)
+		t.Fatalf("turning the classroom view off is not reviewed: %+v", changes)
 	}
 }

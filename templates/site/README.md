@@ -150,7 +150,7 @@ Update the controller and clients before first use.
 
 ## Lock screens
 
-With the experimental classroom view (`"classroomView": true`), open
+With the classroom view (on unless `"classroomView": false`), open
 **Computers → Lock screens** as `admin` or the teacher, select clients, choose
 **lock** or **unlock** with Tab, and review before applying. A locked screen
 shows "Eyes on the teacher" and ignores keyboard and mouse until it is

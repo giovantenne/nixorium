@@ -549,7 +549,7 @@ any shard must block publication.
   a guard before connection tracking preventing IPv6/old-connection bypass.
   Controller services stay interface-scoped; only it opens Harmonia/PXE.
   Preserve independently owned runtime tables on firewall reload.
-- The experimental classroom view (`lab.classroomView`, default false) adds
+- The classroom view (`lab.classroomView`, on unless set to false) adds
   only a client user-session agent on a private Unix socket. The controller
   reaches it solely through its existing SSH access with the fixed
   `nixorium-classroom-connect` command; never open a network port for it,
