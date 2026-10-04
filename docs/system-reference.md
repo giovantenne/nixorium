@@ -346,7 +346,10 @@ Check boxes on the overview select computers for **Block/Allow Internet**,
 same in its **Actions** menu. The page calls the classroom service's own
 review and apply handling, as the classroom dashboard does: the review token
 stays in the service and each review applies once. The review names
-computers whose session is active or unknown; one explicit button (such as
+computers whose session is active or unknown. While the page is open, the
+service reads every computer's real Internet state every 30 seconds with the
+same read-only check as the Internet review, so "Internet off" also follows
+changes made from the TUI or by a restart. One explicit button (such as
 "Restart 3 computers") confirms, and the outcome appears as a brief notice
 that names the computers that did not take the action.
 

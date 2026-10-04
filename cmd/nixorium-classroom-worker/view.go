@@ -59,6 +59,9 @@ type viewServer struct {
 	sessions   map[string]viewGrant
 	// desktops reaches the desktop helper of a page's user, if any.
 	desktops *desktopBroker
+	// internet reads the computers' real Internet state while the page is
+	// open; nil keeps only the page's own changes.
+	internet *internetWatcher
 	now      func() time.Time
 }
 
@@ -154,6 +157,9 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			Internet string `json:"internet,omitempty"`
 			Power    string `json:"power,omitempty"`
 			Showing  bool   `json:"showing,omitempty"`
+		}
+		if server.internet != nil {
+			server.internet.Touch()
 		}
 		showing := map[string]bool{}
 		if server.broadcasts != nil {

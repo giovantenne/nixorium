@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
@@ -60,6 +61,16 @@ func run() error {
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
 	worker.view.desktops = newDesktopBroker()
+	view := worker.view
+	view.internet = &internetWatcher{
+		observe:  local.ObserveInternet,
+		hosts:    hosts,
+		interval: 30 * time.Second,
+		idle:     time.Minute,
+		record: func(name, state string) {
+			view.setLabel(name, func(labels *computerLabels) { labels.internet = state })
+		},
+	}
 	// Showing the teacher's screen starts only from the page.
 	worker.view.broadcasts = &broadcaster{manager: app.NewBroadcastManager(lockSource{local, adapters.ClassroomAgentConnector{}}), repository: repository, viewOn: worker.viewOn}
 	return adapters.NewClassroomIPCServer(adapters.ClassroomSocketPath, worker.handle).Serve(ctx)
