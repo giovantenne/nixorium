@@ -65,7 +65,12 @@ func main() {
 	}
 }
 
-// serve listens on the private socket and answers each connection in turn.
+// maxConnections bounds simultaneous controller channels. The controller
+// keeps one; the spare ones let a new channel work at once while a dead one
+// (a dropped network or a restarted controller) waits for its read timeout.
+const maxConnections = 4
+
+// serve listens on the private socket and answers connections in parallel.
 func serve(runtimeDirectory string) error {
 	if !filepath.IsAbs(runtimeDirectory) {
 		return errors.New("XDG_RUNTIME_DIR must be an absolute path")
@@ -84,14 +89,27 @@ func serve(runtimeDirectory string) error {
 	if err := os.Chmod(path, 0o600); err != nil {
 		return err
 	}
-	name := currentUserName()
-	capture := newMutterCapture()
+	return serveConnections(listener, currentUserName(), newMutterCapture())
+}
+
+func serveConnections(listener net.Listener, userName string, capture capturer) error {
+	slots := make(chan struct{}, maxConnections)
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
 			return err
 		}
-		handle(connection, name, capture)
+		select {
+		case slots <- struct{}{}:
+			go func() {
+				defer func() { <-slots }()
+				handle(connection, userName, capture)
+			}()
+		default:
+			_ = connection.SetWriteDeadline(time.Now().Add(time.Second))
+			_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBusy, Detail: "too many classroom view connections"})
+			_ = connection.Close()
+		}
 	}
 }
 

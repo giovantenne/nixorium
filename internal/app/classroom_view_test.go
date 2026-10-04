@@ -122,6 +122,7 @@ func TestClassroomFailureStates(t *testing.T) {
 		classroomview.CodeNoSession: ClassroomNoSession,
 		classroomview.CodeNoAgent:   ClassroomNoAgent,
 		classroomview.CodeLocked:    ClassroomLocked,
+		classroomview.CodeBusy:      ClassroomConnecting,
 		classroomview.CodeCapture:   ClassroomFailed,
 	} {
 		if state, _ := classroomFailureState(classroomview.AgentError{Code: code}); state != want {

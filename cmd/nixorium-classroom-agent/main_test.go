@@ -217,3 +217,52 @@ func TestScaledHeightKeepsAspectAndIsEven(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentAnswersWhileAnotherConnectionHangs(t *testing.T) {
+	listener, err := net.Listen("unix", filepath.Join(t.TempDir(), SocketName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	go func() { _ = serveConnections(listener, "student", fakeCapture{}) }()
+	hello := func() (classroomview.Message, error) {
+		connection, err := net.Dial("unix", listener.Addr().String())
+		if err != nil {
+			return classroomview.Message{}, err
+		}
+		defer connection.Close()
+		_ = connection.SetDeadline(time.Now().Add(2 * time.Second))
+		if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+			return classroomview.Message{}, err
+		}
+		return classroomview.Read(connection)
+	}
+	// Silent connections, as left by a controller that vanished.
+	for range maxConnections - 1 {
+		silent, err := net.Dial("unix", listener.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer silent.Close()
+	}
+	if reply, err := hello(); err != nil || reply.Type != classroomview.TypeHello {
+		t.Fatalf("hello beside silent connections = %+v, %v", reply, err)
+	}
+	last, err := net.Dial("unix", listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer last.Close()
+	// Every slot is taken now: a further connection is refused at once.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		reply, err := hello()
+		if err == nil && reply.Code == classroomview.CodeBusy {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("over-limit reply = %+v, %v", reply, err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}

@@ -263,6 +263,9 @@ func classroomFailureState(err error) (string, string) {
 			return ClassroomNoAgent, "The classroom view is not running on this computer."
 		case classroomview.CodeLocked:
 			return ClassroomLocked, "The screen is locked."
+		case classroomview.CodeBusy:
+			// Older channels are still closing; the next attempt gets through.
+			return ClassroomConnecting, "Connecting…"
 		default:
 			return ClassroomFailed, "The screen could not be captured."
 		}

@@ -98,6 +98,7 @@ const (
 	CodeCapture     = "capture-failed"
 	CodeNotReady    = "not-ready"
 	CodeLocked      = "screen-locked"
+	CodeBusy        = "busy"
 )
 
 // Message is one protocol message. Unknown fields are refused on decode.
