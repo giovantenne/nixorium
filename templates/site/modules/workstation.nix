@@ -269,6 +269,45 @@ in
         gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
       }
 
+      # A GVariant list of application IDs, such as ['a.desktop', 'b.desktop']
+      # or @as [], one ID per line. IDs contain no quotes or commas.
+      favorites_lines() {
+        local VALUE="$1"
+        VALUE="''${VALUE#@as }"
+        VALUE="''${VALUE#[}"
+        VALUE="''${VALUE%]}"
+        VALUE="''${VALUE//\'/}"
+        tr ',' '\n' <<<"$VALUE" | sed 's/^ *//; s/ *$//; /^$/d'
+      }
+
+      favorites_list() {
+        local LIST="" ITEM
+        while IFS= read -r ITEM; do
+          LIST="''${LIST:+$LIST, }'$ITEM'"
+        done
+        printf '[%s]' "$LIST"
+      }
+
+      # Staff keep their own dock: the laboratory's favorites are set once,
+      # and later only applications the laboratory adds are appended.
+      merge_staff_favorites() {
+        local FAVORITES="$1" STATE CURRENT ITEM
+        STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-favorites-v1"
+        if [ ! -e "$STATE" ]; then
+          gsettings set org.gnome.shell favorite-apps "$FAVORITES"
+        else
+          CURRENT=$(favorites_lines "$(gsettings get org.gnome.shell favorite-apps)")
+          while IFS= read -r ITEM; do
+            if ! grep -qxF "$ITEM" "$STATE" && ! grep -qxF "$ITEM" <<<"$CURRENT"; then
+              CURRENT=$(printf '%s\n%s' "$CURRENT" "$ITEM")
+            fi
+          done < <(favorites_lines "$FAVORITES")
+          gsettings set org.gnome.shell favorite-apps "$(sed '/^$/d' <<<"$CURRENT" | favorites_list)"
+        fi
+        mkdir -p "$(dirname "$STATE")"
+        favorites_lines "$FAVORITES" > "$STATE"
+      }
+
       apply_session_defaults() {
         local APPEARANCE_ROLE="$1"
         local FAVORITES="$2"
@@ -280,7 +319,11 @@ in
         if [[ "$APPEARANCE_ROLE" == managed-student ]]; then
           return 0
         fi
-        gsettings set org.gnome.shell favorite-apps "$FAVORITES"
+        if [[ "$APPEARANCE_ROLE" == staff ]]; then
+          merge_staff_favorites "$FAVORITES"
+        else
+          gsettings set org.gnome.shell favorite-apps "$FAVORITES"
+        fi
         STYLE_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-style-v1"
         if [ ! -e "$STYLE_STATE" ]; then
           if [[ "$APPEARANCE_ROLE" == student ]]; then

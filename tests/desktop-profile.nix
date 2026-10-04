@@ -86,6 +86,19 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   gsettings set org.gnome.shell.extensions.ding show-home true
   apply_session_defaults staff "['org.gnome.TextEditor.desktop']"
   test "$(gsettings get org.gnome.shell.extensions.ding show-home)" = true
+  # Staff keep their own dock: their changes stay, and only applications
+  # the laboratory adds later are appended.
+  gsettings set org.gnome.shell favorite-apps "['mine.desktop']"
+  apply_session_defaults staff "['org.gnome.TextEditor.desktop']"
+  test "$(gsettings get org.gnome.shell favorite-apps)" = "['mine.desktop']"
+  apply_session_defaults staff "['org.gnome.TextEditor.desktop', 'nixorium.desktop']"
+  test "$(gsettings get org.gnome.shell favorite-apps)" = "['mine.desktop', 'nixorium.desktop']"
+  gsettings set org.gnome.shell favorite-apps "@as []"
+  apply_session_defaults staff "['org.gnome.TextEditor.desktop', 'nixorium.desktop']"
+  test "$(gsettings get org.gnome.shell favorite-apps)" = "@as []"
+  # Students still get the laboratory's dock at every login.
+  apply_session_defaults student "['org.gnome.TextEditor.desktop']"
+  test "$(gsettings get org.gnome.shell favorite-apps)" = "['org.gnome.TextEditor.desktop']"
   ${pkgs.lib.concatMapStringsSep "\n" (extension: ''
     jq -e --arg version '${pkgs.lib.versions.major pkgs.gnome-shell.version}' \
       '."shell-version" | index($version) != null' \

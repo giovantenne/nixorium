@@ -47,7 +47,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - New laboratories (site template): the desktops of the administrator and
   the teacher no longer show Home and Trash icons, so they hold only the
   files that Send desktop copies to students; the trash is in the dock.
-  This applies once per account; students are unchanged. Existing
+  This applies once per account; students are unchanged. Staff docks now
+  keep their own changes: the laboratory's favorites are set at the first
+  login, and later only applications the laboratory adds are appended. Existing
   laboratories get it by applying the same change to their
   `modules/workstation.nix`.
 
