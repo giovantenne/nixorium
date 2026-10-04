@@ -69,6 +69,17 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe --thumbnail /tmp/thumb3.jpg nixorium-classroom-connect")
     client.fail("systemd-run --user -M student@ --wait --pipe --collect ${clicker} 1160 16")
 
+    # A new screen size closes Mutter's stream: the next request records the
+    # new screen and input still works (no stale frame, no "Unknown stream").
+    client.succeed("${agent} probe --thumbnail /tmp/thumb4.jpg nixorium-classroom-connect | grep -F 'height=200'")
+    connector = client.succeed("for status in /sys/class/drm/card*-*/status; do grep -qx connected $status && basename $(dirname $status) | cut -d- -f2-; done | head -1").strip()
+    gdctl = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus ${pkgs.mutter}/bin/gdctl "
+    mode = client.succeed(gdctl + "show --modes' | grep -o '1024x768@[0-9.]*' | head -1").strip()
+    client.succeed(gdctl + "set --logical-monitor --primary --monitor " + connector + " --mode " + mode + "'")
+    client.sleep(2)
+    client.succeed("${agent} probe --input --thumbnail /tmp/thumb5.jpg nixorium-classroom-connect | tee /dev/stderr | grep -F 'input.done'")
+    client.succeed("${agent} probe --thumbnail /tmp/thumb6.jpg nixorium-classroom-connect | grep -F 'width=320 height=240'")
+
     # Without a running agent the controller gets a clear error, not a hang.
     client.succeed("systemctl --user -M student@ stop nixorium-classroom-agent")
     client.fail("${agent} probe nixorium-classroom-connect")

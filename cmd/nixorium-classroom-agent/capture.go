@@ -19,6 +19,7 @@ import (
 const (
 	remoteDesktopName = "org.gnome.Mutter.RemoteDesktop"
 	screenCastName    = "org.gnome.Mutter.ScreenCast"
+	displayConfigName = "org.gnome.Mutter.DisplayConfig"
 	frameBoundary     = "nixoriumframe"
 	// captureIdle stops capturing when nobody asked for a frame, so the
 	// sharing indicator disappears when the teacher stops watching.
@@ -149,6 +150,9 @@ func (capture *mutterCapture) Input(events []classroomview.InputEvent, release b
 			}
 		}
 		if err != nil {
+			// The stream may be gone (a resized screen); the next frame
+			// request opens a new capture.
+			capture.stopLocked()
 			return fmt.Errorf("input: %w", err)
 		}
 	}
@@ -234,6 +238,7 @@ func (capture *mutterCapture) startLocked(width int) error {
 	for _, match := range [][]dbus.MatchOption{
 		{dbus.WithMatchObjectPath(streamPath), dbus.WithMatchInterface(screenCastName + ".Stream"), dbus.WithMatchMember("PipeWireStreamAdded")},
 		{dbus.WithMatchObjectPath(remotePath), dbus.WithMatchInterface(remoteDesktopName + ".Session"), dbus.WithMatchMember("Closed")},
+		{dbus.WithMatchInterface(displayConfigName), dbus.WithMatchMember("MonitorsChanged")},
 	} {
 		if err := connection.AddMatchSignal(match...); err != nil {
 			return fail(err)
@@ -291,6 +296,13 @@ func (capture *mutterCapture) startLocked(width int) error {
 				capture.ended(generation, errors.New("the screen cast was closed"))
 				return
 			}
+			// A new screen size or monitor closes Mutter's stream but keeps
+			// the remote desktop session: frames stop and input is refused.
+			// End this capture so the next request records the new screen.
+			if signal.Name == displayConfigName+".MonitorsChanged" {
+				capture.ended(generation, nil)
+				return
+			}
 		}
 	}()
 	return nil
@@ -305,6 +317,7 @@ func (capture *mutterCapture) ended(generation int, err error) {
 	}
 	capture.stop()
 	capture.running, capture.stop, capture.frame = false, nil, nil
+	capture.remote, capture.keyboardOn = nil, false
 	if err != nil && !errors.Is(err, io.EOF) {
 		capture.failure = err
 	}
