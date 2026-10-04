@@ -257,11 +257,29 @@ fullscreenButton.addEventListener('click', () => {
     viewerPanel.requestFullscreen().catch(() => {});
   }
 });
+// Outside full screen the viewer moves by dragging its bar.
+const viewerBar = viewerPanel.querySelector('.viewer-bar');
+let drag = null;
+viewerBar.addEventListener('pointerdown', (event) => {
+  if (document.fullscreenElement || event.button !== 0 || event.target.closest('button')) return;
+  const box = viewer.getBoundingClientRect();
+  drag = { dx: event.clientX - box.left, dy: event.clientY - box.top, width: box.width, height: box.height };
+  viewerBar.setPointerCapture(event.pointerId);
+  event.preventDefault();
+});
+viewerBar.addEventListener('pointermove', (event) => {
+  if (!drag) return;
+  const left = Math.min(Math.max(0, event.clientX - drag.dx), window.innerWidth - drag.width);
+  const top = Math.min(Math.max(0, event.clientY - drag.dy), window.innerHeight - drag.height);
+  Object.assign(viewer.style, { margin: '0', inset: 'auto', left: left + 'px', top: top + 'px' });
+});
+viewerBar.addEventListener('pointerup', () => { drag = null; });
+viewerBar.addEventListener('pointercancel', () => { drag = null; });
+
 // In full screen the bar appears when the pointer reaches the top edge.
 viewerPanel.addEventListener('pointermove', (event) => {
   if (!document.fullscreenElement) return;
-  const bar = viewerPanel.querySelector('.viewer-bar');
-  const reveal = viewerPanel.classList.contains('show-bar') ? bar.offsetHeight + 8 : 4;
+  const reveal = viewerPanel.classList.contains('show-bar') ? viewerBar.offsetHeight + 8 : 4;
   viewerPanel.classList.toggle('show-bar', event.clientY <= reveal);
 });
 document.addEventListener('fullscreenchange', () => {
@@ -280,6 +298,7 @@ viewer.addEventListener('cancel', (event) => { if (controlling) event.preventDef
 document.getElementById('viewer-close').addEventListener('click', () => viewer.close());
 viewer.addEventListener('close', () => {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  viewer.removeAttribute('style');
   setControl(false);
   selected = null;
 });

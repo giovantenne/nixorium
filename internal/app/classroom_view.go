@@ -30,7 +30,7 @@ type ClassroomComputer struct {
 
 // Enlarged view: a computer opened in full is refreshed often and larger.
 const (
-	classroomFocusWidth    = 1280
+	classroomFocusWidth    = classroomview.MaxThumbnailWidth
 	classroomFocusInterval = 100 * time.Millisecond
 	classroomFocusTimeout  = 3 * time.Second
 )

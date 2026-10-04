@@ -252,12 +252,19 @@ func (capture *mutterCapture) startLocked(width int) error {
 		return fail(err)
 	}
 	screenW, screenH := screenSize(connection.Object(screenCastName, streamPath))
-	height := scaledHeight(width, screenW, screenH)
+	// Never enlarge the screen; the enlarged view gets a sharper JPEG than
+	// the small thumbnails.
+	outputWidth := min(width, screenW)
+	height := scaledHeight(outputWidth, screenW, screenH)
+	quality := 60
+	if outputWidth > 640 {
+		quality = 85
+	}
 	pipeline := exec.Command("gst-launch-1.0", "-q",
 		"pipewiresrc", fmt.Sprintf("path=%d", node), "always-copy=true", "!",
 		"videoconvert", "!", "videoscale", "!",
-		fmt.Sprintf("video/x-raw,width=%d,height=%d", width, height), "!",
-		"jpegenc", "quality=60", "!",
+		fmt.Sprintf("video/x-raw,width=%d,height=%d", outputWidth, height), "!",
+		"jpegenc", fmt.Sprintf("quality=%d", quality), "!",
 		"multipartmux", "boundary="+frameBoundary, "!", "fdsink", "fd=1")
 	output, err := pipeline.StdoutPipe()
 	if err != nil {

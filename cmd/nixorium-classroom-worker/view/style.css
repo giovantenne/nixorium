@@ -33,7 +33,7 @@ dialog { width: min(96vw, 1600px); max-height: 96vh; padding: 0; border: 1px sol
 dialog[open], #viewer-panel { display: flex; flex-direction: column; min-height: 0; }
 #viewer-panel { flex: 1; background: var(--card); }
 dialog::backdrop { background: rgb(0 0 0 / 0.7); }
-.viewer-bar { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0.9rem; }
+.viewer-bar { cursor: move; user-select: none; display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0.9rem; }
 .viewer-bar span { flex: 1; color: var(--muted); }
 .viewer-bar button { padding: 0.35rem 0.9rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: inherit; font: inherit; cursor: pointer; }
 #viewer-image { display: block; width: 100%; min-height: 0; flex: 1; max-height: calc(96vh - 6rem); object-fit: contain; background: #000; }
@@ -44,6 +44,6 @@ dialog::backdrop { background: rgb(0 0 0 / 0.7); }
 /* Full screen: only the student's screen; the bar slides in at the top edge. */
 #viewer-panel:fullscreen { position: relative; background: #000; }
 #viewer-panel:fullscreen #viewer-image { max-height: none; height: 100vh; }
-#viewer-panel:fullscreen .viewer-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 1; background: var(--card); box-shadow: 0 2px 12px rgb(0 0 0 / 0.5); transform: translateY(-100%); transition: transform 0.15s ease-out; }
+#viewer-panel:fullscreen .viewer-bar { cursor: default; position: absolute; top: 0; left: 0; right: 0; z-index: 1; background: var(--card); box-shadow: 0 2px 12px rgb(0 0 0 / 0.5); transform: translateY(-100%); transition: transform 0.15s ease-out; }
 #viewer-panel:fullscreen.show-bar .viewer-bar { transform: none; }
 #viewer-image.control:focus { outline: 3px solid var(--warning); }
