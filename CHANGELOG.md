@@ -27,7 +27,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   shutting down a computer that someone is using needs the typed word.
   **Lock** covers the selected screens with "Eyes on the teacher" and takes
   their keyboard and mouse until **Unlock**, logout or restart; a locked
-  computer is still visible but cannot be controlled.
+  computer is still visible but cannot be controlled. The same lock is in
+  **Computers → Lock screens** for the teacher and the administrator, and in
+  `nixorium lock plan|apply --on <clients|@lab> --action lock|unlock`.
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

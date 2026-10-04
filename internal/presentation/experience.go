@@ -249,6 +249,8 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "Space select   a select all   Enter review   Esc Maintenance",
 			fmt.Sprintf("Each computer keeps its newest %d system versions plus the running and booted ones; the review lists what goes.", domain.CleanupKeepGenerations),
 			"Type CLEAN on the review to start. Computers that are off are never queued. After the result: n new review.")
+	case dashboardLock:
+		lines = append(lines, "Space select clients; a select all; Tab choose lock or unlock; Enter review, then Enter applies.", "A locked screen shows \"Eyes on the teacher\" and ignores keyboard and mouse; logging out or restarting unlocks it.", "Computers that are off or have nobody signed in are listed and skipped.")
 	case dashboardInternet:
 		lines = append(lines, "Space select clients; a select all; Tab choose block or unblock; Enter review.", "r checks Internet access on all clients (read-only); n selects those the chosen action would change.", "Enter applies the reviewed change. Reboot restores Internet; offline clients are never queued.")
 	case dashboardDeployReview:

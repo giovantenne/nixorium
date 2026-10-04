@@ -29,9 +29,13 @@ type DashboardActions struct {
 	ClassroomMode      bool
 	// OpenClassroomView opens the experimental classroom view page and
 	// returns a sentence for the operator.
-	OpenClassroomView       func(context.Context) (string, error)
-	PlanInternet            func(context.Context, string, domain.InternetAction) domain.InternetPlan
-	ApplyInternet           func(domain.InternetPlan) domain.InternetReport
+	OpenClassroomView func(context.Context) (string, error)
+	PlanInternet      func(context.Context, string, domain.InternetAction) domain.InternetPlan
+	ApplyInternet     func(domain.InternetPlan) domain.InternetReport
+	// PlanLock and ApplyLock lock or unlock students' screens; nil when the
+	// laboratory has no classroom view.
+	PlanLock                func(context.Context, string, domain.LockAction) domain.LockPlan
+	ApplyLock               func(domain.LockPlan) domain.LockReport
 	PlanCleanup             func(context.Context, string) domain.CleanupPlanReport
 	ApplyCleanup            func(domain.CleanupPlanReport) domain.CleanupApplyReport
 	RunningVersion          string
@@ -151,6 +155,7 @@ const (
 	dashboardDiagnostics
 	dashboardSoftware
 	dashboardInternet
+	dashboardLock
 	dashboardCleanup
 	dashboardRecovery
 	dashboardRecoveryReview
@@ -386,6 +391,7 @@ type dashboardModel struct {
 	templateReset          templateResetModel
 	software               softwareModel
 	internet               internetModel
+	lock                   lockModel
 	cleanup                cleanupModel
 	shutdown               shutdownModel
 	width                  int
@@ -1105,6 +1111,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.workspaceView()
 	case dashboardInternet:
 		content = model.internetView()
+	case dashboardLock:
+		content = model.lockView()
 	case dashboardCleanup:
 		content = model.cleanupView()
 	case dashboardRecovery:

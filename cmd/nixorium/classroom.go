@@ -92,6 +92,37 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			}
 			return *response.InternetReport
 		},
+		PlanLock: func(ctx context.Context, requested string, action domain.LockAction) domain.LockPlan {
+			response, err := classroomRequest(ctx, domain.ClassroomLockPlanOperation, func(request *domain.ClassroomRequest) {
+				request.Requested = requested
+				request.LockAction = action
+			})
+			if err != nil || response.LockPlan == nil {
+				message := "Locking screens is unavailable."
+				if err != nil {
+					message = err.Error()
+				} else if response.Message != "" {
+					message = response.Message
+				}
+				return domain.LockPlan{SchemaVersion: domain.SchemaVersion, Operation: "lock-plan", State: "blocked", Action: action, Message: message, Issues: []domain.ValidationIssue{{Field: "classroom", Message: message}}}
+			}
+			return *response.LockPlan
+		},
+		ApplyLock: func(plan domain.LockPlan) domain.LockReport {
+			response, err := classroomRequest(ctx, domain.ClassroomLockApplyOperation, func(request *domain.ClassroomRequest) {
+				request.LockPlan = &plan
+			})
+			if err != nil || response.LockReport == nil {
+				message := "The reviewed lock change could not be applied."
+				if err != nil {
+					message = err.Error()
+				} else if response.Message != "" {
+					message = response.Message
+				}
+				return domain.LockReport{SchemaVersion: domain.SchemaVersion, Operation: "lock-apply", State: "blocked", Action: plan.Action, Message: message, Targets: []domain.LockOutcome{}}
+			}
+			return *response.LockReport
+		},
 	}
 	if err := presentation.RunLoadingDashboard(actions, false); err != nil {
 		fmt.Fprintln(stderr, "Error:", err)

@@ -148,6 +148,18 @@ SSH and Veyon remain available; other IPv4/IPv6 destinations are blocked.
 Offline or outdated clients are reported and receive no queued command.
 Update the controller and clients before first use.
 
+## Lock screens
+
+With the experimental classroom view (`"classroomView": true`), open
+**Computers → Lock screens** as `admin` or the teacher, select clients, choose
+**lock** or **unlock** with Tab, and review before applying. A locked screen
+shows "Eyes on the teacher" and ignores keyboard and mouse until it is
+unlocked; logging out or restarting always unlocks it. Computers that are
+off or have nobody signed in are listed and skipped. The classroom view page
+offers the same as **Lock** and **Unlock**. From a terminal:
+`nixorium lock plan --on @lab --action lock`, then `nixorium lock apply` with
+the same options and `--expect` set to the review token.
+
 ## Local customization
 
 - `modules/shared.nix`: every machine

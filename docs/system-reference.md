@@ -316,8 +316,8 @@ port. The controller reaches it with its existing SSH access and the fixed
 command `nixorium-classroom-connect`, which runs as root, finds the user of
 the active graphical session on seat0, checks the socket without following
 links and relays standard input and output. The protocol is versioned and
-bounded; it answers `hello` and `thumbnail.request` (a JPEG of the screen,
-64–640 pixels wide).
+bounded; it answers `hello`, `thumbnail.request` (a JPEG of the screen,
+64–1920 pixels wide, never wider than the screen), `input` and `lock.set`.
 
 On the controller, **Computers → Classroom view** (teacher and administrator)
 asks the classroom service for a one-time address and opens it in a browser
@@ -328,9 +328,11 @@ loopback address only; the one-time token becomes an HttpOnly, same-site
 session cookie, foreign `Host` headers are refused, and a strict content
 security policy allows only the page's own files.
 
-Clicking a computer opens it in a large view, refreshed about ten times a
-second at up to 1280 pixels; the agent sends a frame only when the screen
-changed, and the overview and the large view share one capture. **Take
+Clicking a computer opens it in its own browser window, refreshed about ten
+times a second at up to 1920 pixels; the agent sends a frame only when the
+screen changed, and the overview and the large view share one capture. The
+window can be moved, maximized or put on full screen, where its button bar
+slides in at the top edge. **Take
 control** sends the teacher's mouse (move, buttons, wheel) and keyboard (as
 X keysyms) to the student's session through the same Mutter remote desktop
 session; while controlling, Escape also goes to the student. **Stop control**,
@@ -338,6 +340,23 @@ closing the view, or leaving the browser window releases every key and
 button still pressed. Input is accepted only as JSON from the page itself
 (same Origin, session cookie), at most 128 events per message, and only for
 a computer currently open in the large view.
+
+Check boxes on the overview select computers for **Block/Allow Internet**,
+**Lock/Unlock**, **Restart** and **Shut down**; a computer's window offers the
+same in its **Actions** menu. The page calls the classroom service's own
+review and apply handling, as the classroom dashboard does: the review token
+stays in the service, each review applies once, and restarting or shutting
+down a computer whose session is active or unknown needs the typed word.
+
+**Lock** asks the agent to have the bundled Shell extension cover the whole
+screen with "Eyes on the teacher" and take the keyboard and mouse (a modal
+grab); the extension offers this only on the session bus. A locked computer
+stays visible but cannot be controlled. Logout and restart always unlock. The
+lock is a classroom aid, not a security boundary. Locking also works from
+**Computers → Lock screens** (teacher and administrator) and with
+`nixorium lock plan|apply --on <clients|@lab> --action lock|unlock`; it does
+not take the administrative operation lock, since it changes no system
+state.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a
