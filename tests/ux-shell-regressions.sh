@@ -5,17 +5,6 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TEST_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
-source "$REPO_ROOT/scripts/home-reset.sh"
-mkdir -p "$TEST_ROOT/backgrounds"
-mapfile -d '' -t WALLPAPERS < <(nixorium_collect_wallpapers "$TEST_ROOT/backgrounds")
-[[ ${#WALLPAPERS[@]} -eq 0 ]]
-touch "$TEST_ROOT/backgrounds/a.jpeg" "$TEST_ROOT/backgrounds/b.PNG" "$TEST_ROOT/backgrounds/readme.txt"
-mkdir "$TEST_ROOT/backgrounds/directory.jpg"
-mapfile -d '' -t WALLPAPERS < <(nixorium_collect_wallpapers "$TEST_ROOT/backgrounds")
-[[ ${#WALLPAPERS[@]} -eq 2 ]]
-[[ "${WALLPAPERS[0]}" == "$TEST_ROOT/backgrounds/a.jpeg" ]]
-[[ "${WALLPAPERS[1]}" == "$TEST_ROOT/backgrounds/b.PNG" ]]
-
 source "$REPO_ROOT/scripts/lib/lab-meta.sh"
 touch "$TEST_ROOT/flake.nix"
 for COUNT in 0 2; do

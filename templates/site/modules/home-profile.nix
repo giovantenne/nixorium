@@ -1,8 +1,8 @@
-args@{ pkgs, lib, labSettings, labAssets, hostSoftwarePackages, ... }:
+{ pkgs, lib, labSettings, labAssets, hostSoftwarePackages, ... }:
 let
-  legacyStudent = !(args.workspaceRuntimeEnabled or false);
+  # Staff homes persist. The student home is restored at every boot from the
+  # workspace profile (workspace-profile.json), not from this module.
   has = package: builtins.elem package hostSoftwarePackages;
-  studentTemplate = "/var/lib/home-template/${labSettings.studentUser}";
   adminHome = "/home/admin";
   teacherHome = "/home/${labSettings.teacherUser}";
   staffHomes = [
@@ -24,43 +24,12 @@ let
     password-store = "basic";
     enable-crash-reporter = false;
   });
-  # Keep this list equal to workspace-profile.programming.example.json, which
-  # seeds the guided home. Packaged directories keep the publisher's case.
-  # Copied extensions write into their own folder (Live Server's manifest is
-  # edited below; debug adapters create files); the others stay linked.
-  vscodeExtension = copy: pkg: {
-    inherit copy;
-    inherit pkg;
-    dir = pkg.vscodeExtUniqueId;
-    name = lib.toLower pkg.vscodeExtUniqueId;
-  };
-  vscodeExtensions = map (vscodeExtension true) [
-    pkgs.vscode-extensions.ritwickdey.liveserver
-    pkgs.vscode-extensions.ms-python.debugpy
-    pkgs.vscode-extensions.vscjava.vscode-java-debug
-  ] ++ map (vscodeExtension false) [
-    pkgs.vscode-extensions.ecmel.vscode-html-css
-    pkgs.vscode-extensions.esbenp.prettier-vscode
-    pkgs.vscode-extensions.bmewburn.vscode-intelephense-client
-    pkgs.vscode-extensions.xdebug.php-debug
-    pkgs.vscode-extensions.ms-vscode.cpptools
-    pkgs.vscode-extensions.ms-python.python
-    pkgs.vscode-extensions.ms-python.vscode-pylance
-    pkgs.vscode-extensions.vscjava.vscode-java-pack
-    pkgs.vscode-extensions.redhat.java
-    pkgs.vscode-extensions.vscjava.vscode-java-test
-    pkgs.vscode-extensions.vscjava.vscode-maven
-    pkgs.vscode-extensions.vscjava.vscode-java-dependency
-  ];
 in
 {
   system.activationScripts.siteHomeProfile = {
     deps = [ "createHomeTemplates" ];
     text = ''
       ${lib.optionalString (has "chromium") ''
-        ${lib.optionalString legacyStudent ''
-          install -D -m 0644 ${labAssets.mimeApps} "${studentTemplate}/.config/mimeapps.list"
-        ''}
         install -D -o admin -g users -m 0644 ${labAssets.mimeApps} "${adminHome}/.config/mimeapps.list"
       ''}
       ${lib.optionalString (!has "chromium") ''
@@ -70,25 +39,6 @@ in
       ${lib.optionalString (has "vscode") ''
         ${prepareStaffDirectories}
         ${installForStaff ".config/Code/User/settings.json" labAssets.vscodeSettings}
-        ${lib.optionalString legacyStudent ''
-          install -D -m 0644 ${labAssets.vscodeSettings} "${studentTemplate}/.config/Code/User/settings.json"
-          install -d -m 0755 "${studentTemplate}/.vscode/extensions"
-          ${builtins.concatStringsSep "\n          " (map (extension:
-            if extension.copy then
-              ''cp -a "${extension.pkg}/share/vscode/extensions/${extension.dir}" "${studentTemplate}/.vscode/extensions/${extension.name}"''
-            else
-              ''ln -s "${extension.pkg}/share/vscode/extensions/${extension.dir}" "${studentTemplate}/.vscode/extensions/${extension.name}"''
-          ) vscodeExtensions)}
-          ${builtins.concatStringsSep "\n          " (map (extension:
-            ''chmod -R u+w "${studentTemplate}/.vscode/extensions/${extension.name}"''
-          ) (builtins.filter (extension: extension.copy) vscodeExtensions))}
-          ${pkgs.jq}/bin/jq 'del(.announcement)' \
-            "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json" \
-            > "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp"
-          mv "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json.tmp" \
-            "${studentTemplate}/.vscode/extensions/ritwickdey.liveserver/package.json"
-          install -D -m 0644 ${vscodeArgv} "${studentTemplate}/.vscode/argv.json"
-        ''}
         ${installForStaff ".vscode/argv.json" vscodeArgv}
       ''}
       ${lib.optionalString (!has "vscode") ''
@@ -96,16 +46,9 @@ in
         ${removeForStaff ".vscode/argv.json"}
       ''}
       ${lib.optionalString (has "nodejs") ''
-        ${lib.optionalString legacyStudent ''
-          install -d -m 0755 "${studentTemplate}/.local/npm"
-        ''}
         ${builtins.concatStringsSep "\n        " (map (profile:
           ''install -d -o ${profile.user} -g users -m 0755 "${profile.home}/.local/npm"''
         ) staffHomes)}
-      ''}
-
-      ${lib.optionalString legacyStudent ''
-        chown -R ${labSettings.studentUser}:users "${studentTemplate}"
       ''}
     '';
   };

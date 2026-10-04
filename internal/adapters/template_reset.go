@@ -415,12 +415,6 @@ func prepareResetFiles(original, template map[string]domain.TemplateFile, snapsh
 	}
 	flake.Data = replaceInput(flake.Data, managedNixoriumInput.FindSubmatchIndex(flake.Data), snapshot.SourceURL)
 	flake.Data = replaceInput(flake.Data, managedPackageBaseInput.FindSubmatchIndex(flake.Data), string(baseMatch[0][2]))
-	// Older workspace-capable templates force mkLab before flake self exists.
-	// Discover names with a profile-free shape, then lazily forward each real
-	// output. This keeps the exact pinned API, validation and revision metadata.
-	if bytes.Count(flake.Data, []byte("    deployment // {")) == 1 {
-		flake.Data = bytes.Replace(flake.Data, []byte("    deployment // {"), []byte("    builtins.mapAttrs (name: _: deployment.${name})\n      (nixorium.lib.mkLab { deploymentSelf = ./.; inherit labConfig; }) // {"), 1)
-	}
 	files["flake.nix"] = flake
 	return files, selected, nil
 }

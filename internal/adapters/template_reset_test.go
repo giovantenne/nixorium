@@ -184,7 +184,7 @@ func TestTemplateResetCandidatePreservesPinAndEnablesGuidedHome(t *testing.T) {
 		if err != nil || selected.ID != preset.ID {
 			t.Fatalf("%s: %v", preset.ID, err)
 		}
-		if strings.Contains(string(candidate["flake.nix"].Data), "workspaceRuntimeEnabled") || !strings.Contains(string(candidate["flake.nix"].Data), snapshot.SourceURL) {
+		if !strings.Contains(string(candidate["flake.nix"].Data), snapshot.SourceURL) {
 			t.Fatal("pin/runtime not preserved")
 		}
 		profile, issues := domain.DecodeWorkspaceProfile(candidate[domain.WorkspaceFileName].Data)

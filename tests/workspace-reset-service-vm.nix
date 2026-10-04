@@ -18,22 +18,9 @@ let
   nextSeed = makeSeed 19 editorQualification;
   editorCheck = import ./workspace-editor-fixture.nix { inherit pkgs; editor = editorPkgs.vscode; inherit extension; };
   resetModule = ../modules/workspace-reset.nix;
-  legacyService = (import ../modules/home-reset.nix {
-    inherit pkgs;
-    inherit (pkgs) lib;
-    labSettings = {
-      studentUser = "student";
-      teacherUser = "teacher";
-      studentGitName = "Student";
-      studentGitEmail = "student@example.invalid";
-      adminGitName = "Admin";
-      adminGitEmail = "admin@example.invalid";
-    };
-    homeResetEphemeralPaths = [];
-  }).systemd.services.home-reset.content;
   nixoriumPackage = pkgs.callPackage ../pkgs/nixorium.nix {};
-  makeNode = managed: { lib, ... }: {
-    imports = lib.optionals managed [ resetModule ] ++ lib.optional (editorQualification && managed) editorCheck.module;
+  node = { lib, ... }: {
+    imports = [ resetModule ] ++ lib.optional editorQualification editorCheck.module;
     _module.args = {
       labSettings.studentUser = "student";
       homeResetEphemeralPaths = [ ".local/npm" ];
@@ -69,17 +56,6 @@ let
       '';
       restartIfChanged = false;
     };
-    systemd.services.home-reset = lib.mkIf (!managed) (lib.mkDefault {
-      description = "Legacy reset fixture";
-      wantedBy = [ "multi-user.target" ];
-      requiredBy = [ "display-manager.service" ];
-      before = [ "display-manager.service" ];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        ExecStart = "${pkgs.coreutils}/bin/touch /home/student/legacy-session";
-      };
-    });
     # A small login consumer makes ordering and failure propagation observable
     # without claiming to exercise GNOME or a real graphical student session.
     systemd.services.display-manager = {
@@ -93,15 +69,11 @@ let
       restartIfChanged = false;
     };
     specialisation = {
-      updated.configuration = if managed then {
+      updated.configuration = {
         _module.args.workspaceSeed = lib.mkForce nextSeed;
         systemd.services.home-reset.description = lib.mkForce "Updated workspace reset fixture";
-      } else {
-        imports = [ resetModule ];
       };
-    } // lib.optionalAttrs managed {
-      legacy.configuration.systemd.services.home-reset = lib.mkForce legacyService;
-    } // lib.optionalAttrs (managed && editorQualification) {
+    } // lib.optionalAttrs editorQualification {
       without-extension.configuration._module.args.workspaceSeed = lib.mkForce (makeSeed 19 false);
     };
     system.stateVersion = "26.05";
@@ -109,43 +81,36 @@ let
 in
 pkgs.testers.runNixOSTest {
   name = if editorQualification then "nixorium-workspace-editor" else "nixorium-workspace-reset-service";
-  nodes = { managed = makeNode true; } // pkgs.lib.optionalAttrs (!editorQualification) { legacy = makeNode false; };
+  nodes.managed = node;
   testScript = if editorQualification then editorCheck.testScript else ''
     managed.start(allow_reboot=True)
-    legacy.start()
-    for machine in (managed, legacy):
-        machine.wait_for_unit("multi-user.target")
-        machine.wait_for_unit("display-manager.service")
-        machine.succeed("test -f /run/reset-fixture-login-started; test ! -e /run/nologin")
+    managed.wait_for_unit("multi-user.target")
+    managed.wait_for_unit("display-manager.service")
+    managed.succeed("test -f /run/reset-fixture-login-started; test ! -e /run/nologin")
 
     managed.succeed("test -f /home/student/.config/Code/User/settings.json; test -f /var/lib/home-snapshots/.workspace-reset/success.json")
     managed.succeed("grep -q '\"editor.fontSize\":15' /home/student/.config/Code/User/settings.json")
-    for machine in (managed, legacy):
-        machine.succeed("echo session-sentinel > /home/student/session-sentinel")
-        machine.succeed("systemd-run --unit=student-session-fixture --uid=student /run/current-system/sw/bin/sleep infinity")
-        machine.wait_for_unit("student-session-fixture.service")
-        machine.fail("${nixoriumPackage}/bin/nixorium-home-reset --home /home/admin")
-        machine.fail("runuser -u student -- ${nixoriumPackage}/bin/nixorium-home-reset")
-        machine.succeed("/run/current-system/specialisation/updated/bin/switch-to-configuration test", timeout=120)
-        machine.succeed("grep -qx session-sentinel /home/student/session-sentinel")
-        machine.succeed("systemctl is-active student-session-fixture.service display-manager.service systemd-user-sessions.service")
-        machine.succeed("test ! -e /run/nologin; test ! -e /var/lib/home-snapshots/.workspace-reset/pending.json")
-        machine.fail("${nixoriumPackage}/bin/nixorium-home-reset")
-        machine.succeed("grep -qx session-sentinel /home/student/session-sentinel")
-
-    legacy.succeed("test -f /home/student/legacy-session; test ! -e /var/lib/home-snapshots/.workspace-reset/success.json")
+    managed.succeed("echo session-sentinel > /home/student/session-sentinel")
+    managed.succeed("systemd-run --unit=student-session-fixture --uid=student /run/current-system/sw/bin/sleep infinity")
+    managed.wait_for_unit("student-session-fixture.service")
+    managed.fail("${nixoriumPackage}/bin/nixorium-home-reset --home /home/admin")
+    managed.fail("runuser -u student -- ${nixoriumPackage}/bin/nixorium-home-reset")
+    # A new seed takes effect at the next boot, never during a switch.
+    managed.succeed("/run/current-system/specialisation/updated/bin/switch-to-configuration test", timeout=120)
+    managed.succeed("grep -qx session-sentinel /home/student/session-sentinel")
+    managed.succeed("systemctl is-active student-session-fixture.service display-manager.service systemd-user-sessions.service")
+    managed.succeed("test ! -e /run/nologin; test ! -e /var/lib/home-snapshots/.workspace-reset/pending.json")
+    managed.fail("${nixoriumPackage}/bin/nixorium-home-reset")
+    managed.succeed("grep -qx session-sentinel /home/student/session-sentinel")
     managed.succeed("grep -q '\"editor.fontSize\":15' /home/student/.config/Code/User/settings.json")
     managed.succeed("grep -q '${seed}' /var/lib/home-snapshots/.workspace-reset/success.json")
     managed.succeed("grep -q '${nextSeed}' /etc/nixorium-workspace-reset.json")
-    managed.succeed("/run/booted-system/specialisation/legacy/bin/switch-to-configuration test", timeout=120)
-    managed.succeed("grep -qx session-sentinel /home/student/session-sentinel; systemctl is-active student-session-fixture.service display-manager.service")
 
     # The engine VM injects real failures. Here retained evidence must prevent
     # both login consumers on the next boot, without deleting the live sentinel.
     managed.succeed("install -m 0600 /dev/null /var/lib/home-snapshots/.workspace-reset/pending.json; sync")
     managed.succeed("systemctl stop student-session-fixture.service display-manager.service systemd-user-sessions.service home-reset.service")
     managed.fail("systemctl start home-reset.service")
-    managed.succeed("systemctl show home-reset.service --property=ExecStartPre --value | grep -q 'status=1'")
     managed.succeed("grep -qx session-sentinel /home/student/session-sentinel")
     managed.reboot()
     managed.wait_until_succeeds("systemctl is-failed home-reset.service")

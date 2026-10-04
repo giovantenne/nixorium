@@ -16,7 +16,7 @@ func WorkspacePlanText(writer io.Writer, report domain.WorkspacePlanReport) {
 	fmt.Fprintf(writer, "Student workspace review: %s\n", strings.ToUpper(report.State))
 	if report.Inspection != nil {
 		workspaceChangesText(writer, *report.Inspection)
-		fmt.Fprintln(writer, workspaceApplicationText(report.Inspection.Resolution.RuntimeEnabled))
+		fmt.Fprintln(writer, workspaceApplicationText())
 		fmt.Fprintln(writer, "Saving does not apply systems or reset a home.")
 	}
 	fmt.Fprintf(writer, "Repository: %s\nFile: %s\n", safeWorkspaceText(report.Repository), report.ManagedFile)
@@ -104,10 +104,7 @@ func workspaceProfileText(writer io.Writer, label string, profile domain.Workspa
 	fmt.Fprint(writer, string(data))
 }
 
-func workspaceApplicationText(enabled bool) string {
-	if !enabled {
-		return "These preferences are not configured to apply to student homes."
-	}
+func workspaceApplicationText() string {
 	return "Preferences take effect at the next computer start after system application."
 }
 

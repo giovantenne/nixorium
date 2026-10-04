@@ -98,21 +98,20 @@
 
     target.state_dir = installer.state_dir
     os.environ["NIX_EFI_VARS"] = str(installer.state_dir / "installer-efi-vars.fd")
-    target.start()
+    target.start(allow_reboot=True)
     target.wait_for_unit("multi-user.target")
     target.succeed("test \"$(systemctl show virtualbox.service --property=LoadState --value)\" = not-found")
     target.succeed("test \"$(hostname)\" = pc01")
     target.succeed("findmnt -n -o SOURCE / | grep -E '/dev/vda2|/dev/disk/by-label/nixos'")
-    target.succeed("for user in admin teacher student; do home=$(getent passwd $user | cut -d: -f6); test \"$(stat -c %U:%G $home)\" = $user:users; for path in .config .config/Code/User/globalStorage .vscode .vscode/extensions .local .local/npm; do test \"$(stat -c %U:%G $home/$path)\" = $user:users; su -s /bin/sh $user -c \"test -w $home/$path\"; done; test -z \"$(find $home/.config/Code $home/.vscode/extensions $home/.local/npm -xdev ! -user $user -print -quit)\"; done")
+    target.succeed("test \"$(stat -c %U:%G /home/student)\" = student:users; su -s /bin/sh student -c 'test -w /home/student'")
+    target.succeed("for user in admin teacher; do home=$(getent passwd $user | cut -d: -f6); test \"$(stat -c %U:%G $home)\" = $user:users; for path in .config .config/Code/User/globalStorage .vscode .vscode/extensions .local .local/npm; do test \"$(stat -c %U:%G $home/$path)\" = $user:users; su -s /bin/sh $user -c \"test -w $home/$path\"; done; test -z \"$(find $home/.config/Code $home/.vscode/extensions $home/.local/npm -xdev ! -user $user -print -quit)\"; done")
     target.succeed("for user in admin teacher student; do uid=$(id -u $user); systemctl start user-runtime-dir@$uid.service; test \"$(stat -c %U:%G:%a /run/user/$uid)\" = $user:users:700; su -s /bin/sh $user -c \"test -w /run/user/$uid\"; done")
     target.succeed("install -d -o student -g users /home/student/.pi /home/student/.config/opencode /home/student/.local/share/opencode /home/student/.npm; for path in .pi/session.json .config/opencode/credentials.json .local/share/opencode/history.json .npm/cache; do install -o student -g users -m 0600 /dev/null /home/student/$path; done; echo keep > /home/student/lesson.txt; chown student:users /home/student/lesson.txt")
-    # At boot the reset runs before the display manager. Restarting it here
-    # would also restart the autologin session, whose user services write
-    # to ~/.local while the reset clears it; end that session first.
-    target.succeed("systemctl stop display-manager.service; loginctl terminate-user student || true")
-    target.wait_until_fails("loginctl show-user student >/dev/null 2>&1")
-    target.succeed("systemctl restart home-reset.service")
-    target.succeed("test -f /var/lib/home-snapshots/snapshot-1/lesson.txt; for path in .pi .config/opencode .local/share/opencode .local/npm .npm .opencode; do test ! -e /var/lib/home-snapshots/snapshot-1/$path; done")
-    target.succeed("test ! -e /home/student/lesson.txt; test -f /home/student/.local/npm/fixture; test ! -e /home/student/.pi; test ! -e /home/student/.config/opencode; test ! -e /home/student/.local/share/opencode; test ! -e /home/student/.npm; test ! -e /home/student/.opencode")
+    # The student home is restored at every boot; the previous home is kept
+    # as a snapshot without the ephemeral paths.
+    target.reboot()
+    target.wait_for_unit("home-reset.service")
+    target.succeed("test -f /var/lib/home-snapshots/workspace/snapshot-1/lesson.txt; for path in .pi .config/opencode .local/share/opencode .local/npm .npm .opencode; do test ! -e /var/lib/home-snapshots/workspace/snapshot-1/$path; done")
+    target.succeed("test ! -e /home/student/lesson.txt; test ! -e /home/student/.pi; test ! -e /home/student/.config/opencode; test ! -e /home/student/.local/share/opencode; test ! -e /home/student/.npm; test ! -e /home/student/.opencode")
   '';
 }

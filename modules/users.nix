@@ -1,10 +1,9 @@
-args@{ hostName, labSettings, lib, pkgs, ... }:
+{ hostName, labSettings, lib, pkgs, ... }:
 
 let
   # Master controller: no autologin (teacher selects account)
   isMaster = hostName == labSettings.masterHostName;
-  normalUsers = [ "admin" labSettings.teacherUser ]
-    ++ lib.optional (!(args.workspaceRuntimeEnabled or false)) labSettings.studentUser;
+  normalUsers = [ "admin" labSettings.teacherUser ];
   repairUserHome = user: ''
     HOME_DIR="/home/${user}"
     for PATH_NAME in "$HOME_DIR/.config" "$HOME_DIR/.local" "$HOME_DIR/.vscode"; do

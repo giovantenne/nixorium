@@ -20,7 +20,7 @@ func demoWorkspacePlan() domain.WorkspacePlanReport {
 			Base:     &candidate,
 			Snapshot: domain.WorkspaceSnapshot{BaseFingerprint: "sha256:synthetic-absent"},
 			Resolution: domain.WorkspaceResolution{
-				SchemaVersion: 1, State: "prepared", RuntimeEnabled: true, StudentUser: "student", Declared: candidate, Effective: baseline,
+				SchemaVersion: 1, State: "prepared", Seed: "/nix/store/00000000000000000000000000000000-home", StudentUser: "student", Declared: candidate, Effective: baseline,
 				Targets: []domain.WorkspaceTarget{{Name: "controller", Role: "controller"}, {Name: "pc01", Role: "client"}, {Name: "pc02", Role: "client"}},
 				Catalog: domain.WorkspaceCatalog{
 					SchemaVersion: 1, Baseline: baseline,

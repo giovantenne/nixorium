@@ -66,7 +66,7 @@
       };
       workspaceIntegrationTests = import ./tests/workspace-mk-lab.nix {
         inherit mkWorkspaceLab workspaceLab;
-        inherit workspaceRuntimeLab workspaceRuntimeControllerLab;
+        inherit workspaceRuntimeLab workspaceRuntimeControllerLab defaultLab;
         labConfig = import ./lab-config.nix;
       };
       managementVmTest = pkgs.testers.runNixOSTest (import ./tests/management-vm.nix {

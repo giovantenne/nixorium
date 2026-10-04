@@ -100,7 +100,7 @@ func workspaceManagerFixture() (*fakeWorkspaceSource, WorkspaceManager) {
 		},
 		Resolution: domain.WorkspaceResolution{
 			SchemaVersion: 1, State: "prepared", ManagedFile: domain.WorkspaceFileName, StudentUser: "learner",
-			Declared: profile, Effective: profile,
+			Seed: "/nix/store/00000000000000000000000000000000-home", Declared: profile, Effective: profile,
 			Catalog: domain.WorkspaceCatalog{
 				SchemaVersion: 1, Baseline: profile,
 				Applications: []domain.WorkspaceApplication{{ID: "code.desktop", Package: "vscode"}},
@@ -152,9 +152,8 @@ func TestWorkspaceReviewBindsCompleteProposal(t *testing.T) {
 		"controller":      func(f *fakeWorkspaceSource) { f.inspection.Resolution.Targets[0].Name = "other" },
 		"client":          func(f *fakeWorkspaceSource) { f.inspection.Resolution.Targets[1].Name = "pc02" },
 		"inventory":       func(f *fakeWorkspaceSource) { f.inspection.Resolution.Targets = f.inspection.Resolution.Targets[:1] },
-		"runtime opt in": func(f *fakeWorkspaceSource) {
-			seed := "/nix/store/00000000000000000000000000000000-home"
-			f.inspection.Resolution.RuntimeEnabled, f.inspection.Resolution.Seed = true, &seed
+		"seed": func(f *fakeWorkspaceSource) {
+			f.inspection.Resolution.Seed = "/nix/store/11111111111111111111111111111111-home"
 		},
 		"baseline": func(f *fakeWorkspaceSource) {
 			f.inspection.Resolution.Catalog.Baseline.Desktop = &domain.WorkspaceDesktop{}
@@ -290,7 +289,7 @@ func TestWorkspaceInvalidInspectionNeverAuthorizesWrite(t *testing.T) {
 		"missing controller":     func(i *domain.WorkspaceInspection) { i.Resolution.Targets = i.Resolution.Targets[1:] },
 		"duplicate host":         func(i *domain.WorkspaceInspection) { i.Resolution.Targets[1].Name = i.Resolution.Targets[0].Name },
 		"two controllers":        func(i *domain.WorkspaceInspection) { i.Resolution.Targets[1].Role = "controller" },
-		"no seed":                func(i *domain.WorkspaceInspection) { i.Resolution.RuntimeEnabled = true },
+		"no seed":                func(i *domain.WorkspaceInspection) { i.Resolution.Seed = "" },
 		"invalid baseline":       func(i *domain.WorkspaceInspection) { i.Resolution.Catalog.Baseline.SchemaVersion = 2 },
 	} {
 		t.Run(name, func(t *testing.T) {

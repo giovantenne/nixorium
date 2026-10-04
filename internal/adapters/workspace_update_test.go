@@ -16,7 +16,7 @@ func workspaceUpdateFixture(version string) *domain.WorkspaceResolution {
 	p := domain.WorkspaceProfile{SchemaVersion: 1}
 	return &domain.WorkspaceResolution{
 		SchemaVersion: 1, State: "prepared", ManagedFile: domain.WorkspaceFileName,
-		StudentUser: "student", Declared: p, Effective: p,
+		StudentUser: "student", Seed: "/nix/store/00000000000000000000000000000000-home", Declared: p, Effective: p,
 		Catalog:    domain.WorkspaceCatalog{SchemaVersion: 1, Baseline: p},
 		Packages:   []domain.WorkspacePackage{{Package: "vscode", Version: version}},
 		Extensions: []domain.WorkspaceExtension{{ID: "example.extension", Version: version}},
@@ -25,16 +25,12 @@ func workspaceUpdateFixture(version string) *domain.WorkspaceResolution {
 }
 
 func TestWorkspaceUpdateReadsBothPinsAndRejectsMigration(t *testing.T) {
-	for _, mode := range []string{"versions", "legacy", "disabled", "dropped", "student", "targets", "schema", "malformed", "private-error", "validator-false"} {
+	for _, mode := range []string{"versions", "missing", "dropped", "student", "targets", "schema", "malformed", "private-error", "validator-false"} {
 		t.Run(mode, func(t *testing.T) {
 			before, after := workspaceUpdateFixture("1.0"), workspaceUpdateFixture("2.0")
 			switch mode {
-			case "legacy":
+			case "missing":
 				before, after = nil, nil
-			case "disabled":
-				before.RuntimeEnabled = true
-				seed := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-seed"
-				before.Seed = &seed
 			case "dropped":
 				after = nil
 			case "student":
@@ -76,22 +72,19 @@ esac
 			t.Setenv("NIXORIUM_WORKSPACE_TEST_BIN", bin)
 			t.Setenv("NIXORIUM_WORKSPACE_TEST_MODE", mode)
 			impact, err := inspectWorkspaceUpdate(context.Background(), "git+file:///fixture", []string{"--reference-lock-file", "/candidate-lock", "--no-write-lock-file"})
-			valid := mode == "versions" || mode == "legacy"
+			valid := mode == "versions"
 			if (err == nil) != valid {
 				t.Fatalf("impact=%+v err=%v", impact, err)
 			}
 			if err != nil && strings.Contains(err.Error(), "private-sentinel") {
 				t.Fatal("evaluator stderr exposed")
 			}
-			if mode == "legacy" && impact != nil {
-				t.Fatal("legacy deployment gained a profile")
-			}
 			if mode == "versions" && (impact.Current.Extensions[0].Version != "1.0" || impact.Proposed.Extensions[0].Version != "2.0") {
 				t.Fatal("version comparison lost")
 			}
 			calls, _ := os.ReadFile(filepath.Join(bin, "calls"))
 			expected := 3
-			if mode == "legacy" {
+			if mode == "missing" {
 				expected = 1
 			}
 			if mode == "dropped" || mode == "schema" || mode == "malformed" || mode == "private-error" {

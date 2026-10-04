@@ -9,7 +9,7 @@ import (
 
 func TestWorkspaceUpdateMetadataIsDisplayedAndTokenBound(t *testing.T) {
 	for _, base := range []bool{false, true} {
-		for _, mutation := range []string{"version", "dependency", "target", "runtime", "omit-report", "omit-proposal"} {
+		for _, mutation := range []string{"version", "dependency", "target", "seed", "omit-report", "omit-proposal"} {
 			source := updateSaveSource()
 			manager, target := NewUpdateManager(source), "v1.1.0"
 			if base {
@@ -31,8 +31,8 @@ func TestWorkspaceUpdateMetadataIsDisplayedAndTokenBound(t *testing.T) {
 				plan.Workspace.Proposed.Extensions[0].RequiredPackages = []string{"nodejs"}
 			case "target":
 				plan.Workspace.Proposed.Targets = []domain.WorkspaceTarget{{Name: "other", Role: "controller"}}
-			case "runtime":
-				plan.Workspace.Proposed.RuntimeEnabled = true
+			case "seed":
+				plan.Workspace.Proposed.Seed = "/nix/store/11111111111111111111111111111111-home"
 			case "omit-report":
 				plan.Workspace = nil
 			case "omit-proposal":

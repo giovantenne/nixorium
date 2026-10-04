@@ -124,8 +124,7 @@ dependencies; review the pin diff too.
 The comparison and both validation hooks are bound to the update review. A
 candidate that removes existing workspace metadata, changes boot behavior,
 the student identity or destinations is blocked pending separate configuration review.
-Legacy deployments with no prepared workspace retain their ordinary workflow;
-updating does not create a profile or migrate local home customizations.
+Updating does not change the profile or migrate local home customizations.
 
 To update packaged VS Code extensions, use **Update system and packages** (or
 `package-base plan`/`apply`), not repeated profile saves or downloads in student

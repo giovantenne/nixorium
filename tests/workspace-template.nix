@@ -54,11 +54,8 @@ let
     hostSoftwarePackages = [ "chromium" "vscode" "nodejs" ];
   };
   packageSearch = (import ../lib/software-packages.nix { inherit lib pkgs; allowUnfree = true; }).search;
-  occurrences = needle: text: builtins.length (lib.splitString needle text) - 1;
-  home = enabled: import ../templates/site/modules/home-profile.nix
-    (homeArgs // { workspaceRuntimeEnabled = enabled; });
-  legacyHome = (home false).system.activationScripts.siteHomeProfile.text;
-  managedHome = (home true).system.activationScripts.siteHomeProfile.text;
+  homeScript = (import ../templates/site/modules/home-profile.nix homeArgs)
+    .system.activationScripts.siteHomeProfile.text;
   staffLines = script: builtins.filter (line:
     lib.hasInfix "/home/admin/" line || lib.hasInfix "/home/instructor/" line
   ) (lib.splitString "\n" script);
@@ -69,7 +66,6 @@ assert recursiveOutputs.guarded;
 assert rejects recursiveOutputs.validationStillRuns;
 assert templateArguments.workspaceCatalog == catalog;
 assert templateArguments.workspaceProfileJSON == profileJSON;
-assert !(templateArguments ? workspaceRuntimeEnabled);
 assert catalog.baseline == { schemaVersion = 1; };
 assert builtins.all (preset: builtins.all (clients:
   let result = resolveFor preset.packages clients profileJSON;
@@ -81,8 +77,7 @@ assert rejects (resolveFor (lib.remove "chromium" initialPackages) [] profileJSO
 assert rejects (resolveFor initialPackages [] ''{"schemaVersion":1,"vscode":{"extensions":["ritwickdey.liveserver"]}}'');
 assert builtins.deepSeq (resolveFor (initialPackages ++ [ "vscode" ]) [] ''{"schemaVersion":1,"vscode":{"extensions":["ritwickdey.liveserver"]}}'') true;
 # Programming is the only profile tailored with editor extensions. Its
-# toolchains, database client and every extension resolve from the pin, and
-# the legacy home installs the same extension set.
+# toolchains, database client and every extension resolve from the pin.
 assert map (entry: entry.id) programming.extensions == programmingExtensions;
 assert builtins.length programmingExtensions == 15;
 assert builtins.elem "ms-python.vscode-pylance" programmingExtensions;
@@ -91,18 +86,14 @@ assert builtins.all (package: builtins.elem package programming.requiredPackages
   [ "gcc" "gdb" "jdk21" "maven" "php" "python3" "vscode" "mysql-workbench" ];
 assert rejects (resolveFor initialPackages [] programmingJSON);
 assert rejects (resolveFor (lib.remove "gdb" programmingPreset.packages) [] programmingJSON);
-assert builtins.all (id: lib.hasInfix "/.vscode/extensions/${id}\"" legacyHome) programmingExtensions;
-assert occurrences "/share/vscode/extensions/" legacyHome == builtins.length programmingExtensions;
-assert !(lib.hasInfix "/share/vscode/extensions/" managedHome);
+# Staff homes get editor settings only; the student home comes from the seed.
+assert !(lib.hasInfix "/share/vscode/extensions/" homeScript);
 # Extension search spans publishers and lists only selectable identifiers.
 assert builtins.elem "vscode-extensions.ms-python.vscode-pylance"
   (map (item: item.id) (packageSearch { query = "vscode-extensions.pylance"; limit = 40; }));
 assert builtins.all (item: builtins.length (lib.splitString "." item.id) == 3)
   (packageSearch { query = "vscode-extensions.python"; limit = 40; });
 assert builtins.filter (entry: entry.writable) programming.extensions != [];
-assert lib.hasInfix "/var/lib/home-template/learner" legacyHome;
-assert !(lib.hasInfix "/var/lib/home-template/learner" managedHome);
-assert staffLines legacyHome != [] && staffLines legacyHome == staffLines managedHome;
-assert (home false).system.activationScripts.nixoriumUserHomeOwnership.deps
-  == (home true).system.activationScripts.nixoriumUserHomeOwnership.deps;
+assert !(lib.hasInfix "learner" homeScript);
+assert staffLines homeScript != [];
 true

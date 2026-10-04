@@ -75,11 +75,8 @@ modules/
 scripts/
   release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Live USB bootstrap installer for controller with disk selection
-  run-harmonia.sh          # Advanced standalone Harmonia compatibility helper
-  run-pxe-proxy.sh         # ProxyDHCP + TFTP + HTTP netboot server (external DHCP compatible)
   lib/lab-meta.sh          # Shared helper: loads labMeta from the flake for shell scripts
   create-home-template.sh  # Builds clean home directory template
-  home-reset.sh            # Boot-time snapshot rotation + home reset
   validate.sh              # Tiered upstream validation entry point
   security-check.sh        # Pinned staticcheck and govulncheck entry point
 assets/
@@ -426,34 +423,33 @@ any shard must block publication.
   evidence. Preserve explicit dependencies, pinned identity/version checks and
   list-replacement semantics when composing the deployment baseline. It does
   not install software or qualify plugin loading.
-- Optional `mkLab.workspaceProfileJSON` (raw JSON text) and `workspaceCatalog`
-  expose `nixoriumWorkspace` preparation metadata and a candidate hook.
+- `mkLab.workspaceProfileJSON` (raw JSON text) and `workspaceCatalog`
+  default to an empty profile and catalog, and expose `nixoriumWorkspace` preparation metadata and a candidate hook.
   `mkLab` checks prerequisites against each generated host's actual declarative
   system packages, including downstream overrides, evaluating one representative
   per class of hosts with the same role, interface and managed software; a host
   with `hostModules` is its own class. Keep this memory bounded independently of
   the inventory size. Serialize both inputs into
   the offline installer. `state = "prepared"` is not activation.
-  A supplied profile always configures the managed boot reset; there is no
-  public runtime opt-in argument. Internal module selection is derived from
-  profile presence. The template ships an active `workspace-profile.json`
+  The student home is always restored at boot from the workspace seed; there
+  is no other student reset path and no runtime opt-in argument. The template ships an active `workspace-profile.json`
   matching Essential without VS Code; leave it unchanged for default behavior.
   Never silently replace a missing/invalid profile with the example. Expose the
   seed path without claiming it is built, deployed or active. Preserve offline
-  profile/catalog equivalence and the profile-free standalone composition.
+  profile/catalog equivalence.
   Bootstrap and template reset copy `workspace-profile.<preset>.example.json`
   to `workspace-profile.json` when the template ships one for the selected
   software profile; only Programming does. Additive software-profile changes
-  never rewrite a saved workspace profile. Keep its
-  extension list equal to the legacy list in `modules/home-profile.nix`, and
-  every extension prerequisite inside the Programming package list.
+  never rewrite a saved workspace profile. Keep every extension prerequisite
+  inside the Programming package list.
   `vscode.extraSettings` carries reviewed free-form editor defaults; keep its
   refused keys identical in the Go and Nix decoders through the shared corpus.
   Extension IDs stay lowercase while packaged identities compare without case.
   The extension catalog adds prerequisites but is not an allowlist; any
   extension of the pinned set is selectable and linked. Catalog `writable`
   entries are copied into the seed instead: debug adapters create files in
-  their own folder, and a directory of per-file links breaks the editor's
+  their own folder, the Maven and Java Project Manager extensions copy their
+  project templates (a copy from the store keeps read-only modes), and a directory of per-file links breaks the editor's
   attribution of running code to its extension. The reset validator accepts
   exactly one link to the payload or a copy with an identical manifest.
   `vscode.marketplace` pins (publisher, name, stable version, SRI hash,
@@ -500,8 +496,7 @@ any shard must block publication.
   commit validates its schema without implying Nix validation or activation.
   Update planning compares existing workspace metadata on current/candidate
   pins and preserves local validation hooks. Bind the complete comparison to
-  the update token; do not silently change reset behavior, identity or targets.
-  Legacy absence stays outside this comparison. Extension versions come from
+  the update token; do not silently change identity or targets. Extension versions come from
   the package base, not independent home downloads or vendor-latest promises.
 - Save results distinguish local configuration, controller verification at the
   saved revision, and unobserved client state. Settings, workspace and template
@@ -515,13 +510,12 @@ any shard must block publication.
   preferences. Check built extension manifests against resolved identities and
   versions. `build-workspace-home.nix` adds a neutral shell/Git/XDG scaffold,
   never writable template content. A built seed is not home activation or
-  proof of plugin loading; neither builder changes the legacy payload.
+  proof of plugin loading.
 - `internal/homereset` contains a confined removal primitive and an internal
   boot-reset engine. Preserve complete preflight, no-follow traversal,
   mount/subvolume checks, immutable seed validation, account/process checks,
   and a held login barrier. The private recovery snapshot is sanitized before
-  publication; five read-only managed snapshots live separately from legacy
-  snapshots. Durable pending evidence must block retries after failure and
+  publication; five read-only managed snapshots are kept. Durable pending evidence must block retries after failure and
   reboot. Never delete it automatically or treat a previous success receipt as
   completion of a pending attempt. The fixed root-only `nixorium-home-reset`
   helper accepts no target arguments and reads only its store-backed system
@@ -529,15 +523,12 @@ any shard must block publication.
   the `home-reset` unit name, never restarts on switch, and gates both the
   display manager and normal user sessions. Preserve manual-start refusal,
   no automatic retry, and `X-OnlyManualStart` so first-time installation during
-  a rebuild also waits for boot. A supplied workspace profile selects the
-  module. The profile-free service also avoids rebuild-time restart and must refuse
-  managed pending evidence, so disabling the profile cannot bypass recovery.
-  Keep student ownership repair/template writes and login preference migration
-  out of the managed path, while retaining staff and profile-free content behavior.
+  a rebuild also waits for boot. Keep student ownership repair, template writes
+  and login preference changes out of this path; staff homes keep theirs.
 - VirtualBox guest additions are enabled by default via `mkDefault` in `common.nix` (harmless on bare metal).
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
-- Netboot uses the systemd-owned `nixorium-pxe.service` with `dnsmasq` in ProxyDHCP mode so institutional DHCP remains authoritative for leases. `scripts/run-pxe-proxy.sh` remains an advanced foreground compatibility helper. `mkLab` builds a standalone installer source containing the effective downstream configuration and only local Flake inputs for offline evaluation.
+- Netboot uses the systemd-owned `nixorium-pxe.service` with `dnsmasq` in ProxyDHCP mode so institutional DHCP remains authoritative for leases. `mkLab` builds a standalone installer source containing the effective downstream configuration and only local Flake inputs for offline evaluation.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
 - `modules/firewall.nix` enables the firewall everywhere, disables implicit
@@ -693,7 +684,7 @@ Use only the arguments the module actually needs:
 | Scope            | Convention       | Examples                                    |
 |------------------|------------------|---------------------------------------------|
 | Nix variables    | camelCase        | `masterIp`, `mkHost`, `labSettings`         |
-| File names       | kebab-case       | `home-reset.nix`, `run-harmonia.sh`         |
+| File names       | kebab-case       | `home-reset.nix`, `install-controller.sh`   |
 | Shell variables  | UPPER_SNAKE_CASE | `PC_NUMBER`, `TEMPLATE_DIR`                 |
 | NixOS options    | Standard dotted  | `services.openssh.enable`                   |
 | Helper functions | `mk` prefix      | `mkHost`, `mkColmenaHost`                   |

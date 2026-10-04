@@ -13,7 +13,7 @@
   # It is used in two places:
   #   1. Netboot ramdisk -- baked into the netboot image so PXE-booted
   #      clients can reach the binary cache (Harmonia) on the controller.
-  #   2. PXE proxy server (run-pxe-proxy.sh) -- the iPXE boot script
+  #   2. PXE service (nixorium-pxe.service) -- the iPXE boot script
   #      fetches kernel and initrd over HTTP from this address.
   #
   # After all clients are installed, day-to-day Colmena deploys use the

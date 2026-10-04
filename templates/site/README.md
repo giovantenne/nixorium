@@ -274,7 +274,7 @@ the next normal boot restores it for the student, including controller-only
 mode. Rebuilding does not reset an active session. Initial preferences remain
 editable until the next reset. The seed has shell/Git defaults, standard XDG
 folders with stable English names, and the supported profile settings; arbitrary
-legacy assets, editor settings and plugins are not imported automatically.
+assets, editor settings and plugins are not imported automatically.
 Explicitly retain the desired supported values in the profile/catalog baseline;
 omitted values otherwise fall back to system/application defaults.
 

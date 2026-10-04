@@ -26,8 +26,6 @@ in
     remoteInstaller = packages.remoteInstallerBundle.drvPath;
     firmware = packages.pxeFirmware.drvPath;
     command = packages.nixorium.drvPath;
-    harmoniaApp = apps.run-harmonia.program;
-    pxeApp = apps.run-pxe-proxy.program;
     commandApp = apps.nixorium.program;
     colmenaTarget = flake.colmena.pc01.deployment.targetHost;
     status = flake.deploymentStatus;

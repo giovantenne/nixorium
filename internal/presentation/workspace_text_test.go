@@ -13,7 +13,7 @@ func TestWorkspaceTextAndConfirmationKeepSaveSeparate(t *testing.T) {
 	plan := domain.WorkspacePlanReport{
 		State: "ready", Repository: "/deployment", ManagedFile: domain.WorkspaceFileName, Confirmation: "SAVE", ReviewToken: "token",
 		Inspection: &domain.WorkspaceInspection{Resolution: domain.WorkspaceResolution{
-			StudentUser: "learner", RuntimeEnabled: true, Declared: profile, Effective: profile,
+			StudentUser: "learner", Declared: profile, Effective: profile,
 			Targets:    []domain.WorkspaceTarget{{Name: "controller", Role: "controller"}, {Name: "pc01", Role: "client"}},
 			Packages:   []domain.WorkspacePackage{{Package: "vscode", Version: "1.0"}},
 			Extensions: []domain.WorkspaceExtension{{ID: "example.plugin", Version: "2.0", RequiredPackages: []string{"nodejs"}}},
@@ -58,7 +58,7 @@ func TestWorkspaceReviewSummarizesChangesBeforeJSON(t *testing.T) {
 	}
 	var output bytes.Buffer
 	WorkspacePlanText(&output, domain.WorkspacePlanReport{State: "ready", Inspection: &domain.WorkspaceInspection{
-		Base: &base, Resolution: domain.WorkspaceResolution{RuntimeEnabled: true, Declared: proposed},
+		Base: &base, Resolution: domain.WorkspaceResolution{Declared: proposed},
 	}})
 	view := output.String()
 	jsonAt := strings.Index(view, `"schemaVersion"`)
@@ -76,10 +76,7 @@ func TestWorkspaceReviewSummarizesChangesBeforeJSON(t *testing.T) {
 }
 
 func TestWorkspaceApplicationDescriptionDoesNotClaimLiveState(t *testing.T) {
-	if text := workspaceApplicationText(true); !strings.Contains(text, "after system application") || !strings.Contains(text, "next computer start") {
-		t.Fatal(text)
-	}
-	if text := workspaceApplicationText(false); !strings.Contains(text, "not configured to apply") {
+	if text := workspaceApplicationText(); !strings.Contains(text, "after system application") || !strings.Contains(text, "next computer start") {
 		t.Fatal(text)
 	}
 }

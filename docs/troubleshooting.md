@@ -596,6 +596,53 @@ Update never commits, pushes, activates, starts PXE, or deploys clients.
 | Client deployment | May leave mixed generations; inspect logs/hosts and retry a fresh convergent plan. |
 | Upstream update | Plan is read-only; apply rolls back when possible and reports an unsafe partial pair explicitly. |
 
+## A VS Code extension reports permission denied
+
+Typical signs in the student session:
+
+- a command fails with `EACCES: permission denied`, often naming a path under
+  `~/.vscode/extensions/`;
+- a newly created project opens, but its files cannot be edited or new files
+  cannot be added (`ls -l` shows `r--r--r--` files or `r-xr-xr-x` folders).
+
+Most extensions are linked to the read-only Nix store. An extension that
+writes into its own folder, or copies its own files (such as a project
+template) into the student's projects, then fails, or produces read-only
+copies. Such an extension must be marked `writable` in the deployment's
+`workspace-catalog.nix`, so the next home reset gives the student a private
+copy of it:
+
+```nix
+{ id = "vscjava.vscode-maven"; package = "vscode-extensions.vscjava.vscode-maven"; requiredPackages = [ "maven" ]; writable = true; }
+```
+
+The template already marks the known cases: the Python and Java debuggers,
+Maven for Java (“Maven: New Project”) and Project Manager for Java (“Java:
+Create Java Project → No build tools”). For any other extension, add an entry
+with its `id`, `package = "vscode-extensions.<id>"` and `writable = true`;
+keep its `requiredPackages` and `requiredExtensions` if it already has an
+entry. Do not mark every extension writable: copies count against the seed
+limit (256 MB, 8192 entries) and some extensions alone exceed it.
+
+1. Edit `workspace-catalog.nix` in the deployment repository and commit it
+   (`nixorium git commit plan --paths workspace-catalog.nix`).
+2. Review and apply the controller plan, then `deploy plan --on ...` and
+   `deploy apply` for the clients.
+3. The change reaches each student home at its next reset (the next normal
+   boot). Then test the failing command again in a freshly reset home.
+
+Until then, a student can make an already generated project editable and
+remove a half-created one:
+
+```sh
+chmod -R u+w ~/Desktop/demo
+rm -rf ~/Desktop/demo   # only to delete a failed attempt
+```
+
+When adding a new extension, try the features that create something (new
+project, templates, starting the debugger) in a reset student home before
+distributing it to the whole laboratory.
+
 ## Backups and restoration
 
 Create backups with **Maintenance → Back up the controller** or:

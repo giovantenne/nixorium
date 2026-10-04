@@ -16,7 +16,6 @@ const WorkspaceMaxBytes = 64 * 1024
 
 // WorkspaceProfile describes initial student preferences, not account policy.
 // Absent fields inherit the deployment baseline; explicit empty lists clear it.
-// Absence of the entire file is handled separately by callers (legacy mode).
 type WorkspaceProfile struct {
 	SchemaVersion int               `json:"schemaVersion"`
 	Desktop       *WorkspaceDesktop `json:"desktop,omitempty"`

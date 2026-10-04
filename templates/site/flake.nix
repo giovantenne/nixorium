@@ -8,7 +8,7 @@
   outputs = { self, nixpkgs, nixorium }:
     let
       packageBase = nixorium.lib.packageBase;
-      # deploymentMode is optional: existing deployments remain laboratories.
+      # deploymentMode is optional and defaults to a laboratory.
       # Explicit controller mode requires pcCount = 0 (see README).
       labConfig = nixorium.lib.evalLabSettings
         (builtins.fromJSON (builtins.readFile ./lab-settings.json));

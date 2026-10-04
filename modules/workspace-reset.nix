@@ -1,8 +1,7 @@
 { pkgs, labSettings, homeResetEphemeralPaths, workspaceSeed, workspaceWallpapers, nixoriumPackage, ... }:
 
 {
-  # mkLab selects this internal module whenever a workspace profile is supplied.
-  # Activation must not reset a live home: restoration waits for normal boot.
+  # Imported by home-reset.nix. Activation must not reset a live home: restoration waits for normal boot.
   environment.etc."nixorium-workspace-reset.json".text = builtins.toJSON {
     user = labSettings.studentUser;
     seed = workspaceSeed;
@@ -20,7 +19,6 @@
     before = [ "systemd-user-sessions.service" "display-manager.service" ];
     after = [ "local-fs.target" "systemd-tmpfiles-setup.service" ];
     # A new profile takes effect at the next normal boot, not during switch.
-    # The same unit name also preserves an already-active legacy reset unit.
     restartIfChanged = false;
     stopIfChanged = false;
     unitConfig = {

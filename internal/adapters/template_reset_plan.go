@@ -228,7 +228,6 @@ const resetValidationExpression = `let
   names = [ f.labMeta.controller.name ] ++ (if f.labMeta.clients.hosts == [] then [] else [(builtins.head f.labMeta.clients.hosts).name]);
   systems = map (name: f.nixosConfigurations.${name}.config.system.build.toplevel.drvPath) names;
 in assert f.nixoriumValidateWorkspaceCandidate raw == true;
-assert resolved.runtimeEnabled;
 assert f.nixoriumValidateCandidate (builtins.fromJSON (builtins.readFile (f.outPath + "/lab-settings.json"))) == true;
 assert f.nixoriumValidateSoftwareCandidate (builtins.fromJSON (builtins.readFile (f.outPath + "/lab-software.json"))) == true;
 builtins.deepSeq [resolved systems] { meta = f.labMeta; status = f.deploymentStatus; }`

@@ -31,15 +31,6 @@ in
         install -D -o "$user" -g users -m 0644 ${profileFixture} \
           "/home/$user/.local/npm/fixture"
       done
-
-      student_template="/var/lib/home-template/${labSettings.studentUser}"
-      install -D -m 0644 ${profileFixture} \
-        "$student_template/.config/Code/User/globalStorage/fixture"
-      install -D -m 0644 ${profileFixture} \
-        "$student_template/.vscode/extensions/fixture"
-      install -D -m 0644 ${profileFixture} \
-        "$student_template/.local/npm/fixture"
-      chown -R ${labSettings.studentUser}:users "$student_template"
     '';
   };
   system.activationScripts.nixoriumUserHomeOwnership.deps =

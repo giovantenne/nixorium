@@ -1,6 +1,5 @@
 args@{ pkgs, lib, labSettings, hostSoftwarePackages, ... }:
 let
-  workspaceRuntimeEnabled = args.workspaceRuntimeEnabled or false;
   isController = args ? hostName && args.hostName == (labSettings.masterHostName or null);
   has = package: builtins.elem package hostSoftwarePackages;
   hasGhostty = has "ghostty";
@@ -73,15 +72,11 @@ let
       show-layout-panel-indicator = "false";
     };
   };
-  studentAppearanceSettings = builtins.removeAttrs appearanceSettings [
-    "org.gnome.desktop.background"
-  ];
   applySettings = settings: lib.concatStringsSep "\n" (lib.mapAttrsToList (schema: values:
     lib.concatStringsSep "\n" (lib.mapAttrsToList (key: value:
       "gsettings set ${lib.escapeShellArg schema} ${lib.escapeShellArg key} ${lib.escapeShellArg value}"
     ) values)
   ) settings);
-  applyStudentAppearance = applySettings studentAppearanceSettings;
   applyStaffAppearance = applySettings (lib.recursiveUpdate appearanceSettings staffDesktopIcons);
   # Staff desktops hold the files Send desktop copies to students, so they
   # show only those files; the trash moves to the dock.
@@ -230,27 +225,13 @@ in
       #!/usr/bin/env bash
       set -euo pipefail
 
-      apply_student_appearance() {
-        ${applyStudentAppearance}
-      }
-
       apply_staff_appearance() {
         ${applyStaffAppearance}
       }
 
       main() {
-        local APPEARANCE_ROLE
-        local FAVORITES
-
         case "''${USER:-}" in
-          ${labSettings.studentUser})
-            APPEARANCE_ROLE=${if workspaceRuntimeEnabled then "managed-student" else "student"}
-            FAVORITES=${lib.escapeShellArg (gvariantList studentFavorites)}
-            ;;
-          admin|${labSettings.teacherUser})
-            APPEARANCE_ROLE=staff
-            FAVORITES=${lib.escapeShellArg (gvariantList staffFavorites)}
-            ;;
+          ${labSettings.studentUser}|admin|${labSettings.teacherUser}) ;;
           *) exit 0 ;;
         esac
 
@@ -258,9 +239,10 @@ in
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "ding@rastersoft.com"
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "dash-to-dock@micxgx.gmail.com"
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "tiling-assistant@leleat-on-github"
-        # Managed student preferences are seeded only at the normal boot reset.
-        # Extension enablement remains.
-        apply_session_defaults "$APPEARANCE_ROLE" "$FAVORITES"
+        # Student preferences are seeded only at the normal boot reset.
+        if [[ "$USER" != ${labSettings.studentUser} ]]; then
+          apply_staff_defaults ${lib.escapeShellArg (gvariantList staffFavorites)}
+        fi
         gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
       }
 
@@ -303,24 +285,11 @@ in
         favorites_lines "$FAVORITES" > "$STATE"
       }
 
-      apply_session_defaults() {
-        local APPEARANCE_ROLE="$1"
-        local FAVORITES="$2"
-        if [[ "$APPEARANCE_ROLE" == managed-student ]]; then
-          return 0
-        fi
-        if [[ "$APPEARANCE_ROLE" == staff ]]; then
-          merge_staff_favorites "$FAVORITES"
-        else
-          gsettings set org.gnome.shell favorite-apps "$FAVORITES"
-        fi
+      apply_staff_defaults() {
+        merge_staff_favorites "$1"
         STYLE_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-style-v1"
         if [ ! -e "$STYLE_STATE" ]; then
-          if [[ "$APPEARANCE_ROLE" == student ]]; then
-            apply_student_appearance
-          else
-            apply_staff_appearance
-          fi
+          apply_staff_appearance
           mkdir -p "$(dirname "$STYLE_STATE")"
           touch "$STYLE_STATE"
         fi

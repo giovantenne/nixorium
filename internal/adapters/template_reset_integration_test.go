@@ -96,4 +96,4 @@ const resetIntegrationFlake = `{
   };
 }`
 const resetIntegrationHooks = `nixoriumValidateWorkspaceCandidate = raw: true;
-    nixoriumResolveWorkspaceCandidate = raw: { runtimeEnabled = true; declared = builtins.fromJSON raw; };`
+    nixoriumResolveWorkspaceCandidate = raw: { declared = builtins.fromJSON raw; };`

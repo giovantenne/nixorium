@@ -267,7 +267,7 @@ func (model dashboardModel) workspaceView() string {
 		switch w.stage {
 		case workspaceOverview:
 			fixed = "Packaged extensions update with Maintenance → Update system and packages;\nMarketplace pins with u in VSCode → extensions."
-			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), workspaceApplicationText(resolved.RuntimeEnabled), "")
+			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), workspaceApplicationText(), "")
 			if w.loaded.Inspection.Base == nil {
 				lines = append(lines, "No saved profile; this is a new draft.")
 			}
@@ -378,7 +378,7 @@ func (model dashboardModel) workspaceView() string {
 				lines = append(lines, safeWorkspaceText(issue.Message))
 			}
 			if w.result.State == "saved" {
-				lines = append(lines, "", "Apply to this controller, then review the computers to update.", workspaceApplicationText(resolved.RuntimeEnabled))
+				lines = append(lines, "", "Apply to this controller, then review the computers to update.", workspaceApplicationText())
 			} else if !w.result.RecoveryRequired {
 				actions = append([]tuiAction{{key: "r", label: "Reload"}}, actions...)
 			}

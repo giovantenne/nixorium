@@ -66,8 +66,7 @@ type WorkspaceResolution struct {
 	State            string               `json:"state"`
 	ManagedFile      string               `json:"managedFile"`
 	StudentUser      string               `json:"studentUser"`
-	RuntimeEnabled   bool                 `json:"runtimeEnabled"`
-	Seed             *string              `json:"seed"`
+	Seed             string               `json:"seed"`
 	Declared         WorkspaceProfile     `json:"declared"`
 	Effective        WorkspaceProfile     `json:"effective"`
 	Catalog          WorkspaceCatalog     `json:"catalog"`
@@ -162,9 +161,8 @@ func ValidateWorkspaceResolution(resolved WorkspaceResolution) error {
 		resolved.Catalog.SchemaVersion != WorkspaceSchemaVersion {
 		return errors.New("unsupported workspace preparation metadata")
 	}
-	if resolved.RuntimeEnabled != (resolved.Seed != nil) ||
-		(resolved.Seed != nil && !ValidStorePath(*resolved.Seed)) {
-		return errors.New("inconsistent workspace runtime preparation metadata")
+	if !ValidStorePath(resolved.Seed) {
+		return errors.New("invalid workspace seed in preparation metadata")
 	}
 	profiles := []WorkspaceProfile{resolved.Declared, resolved.Effective, resolved.Catalog.Baseline}
 	for _, profile := range profiles {

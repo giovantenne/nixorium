@@ -220,7 +220,8 @@ case " $* " in
   *"#deploymentStatus "*)
     printf '%s\n' '{"ready":true,"issues":[]}'
     ;;
-  *"nixoriumWorkspace"*) printf 'null\n' ;;
+  *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
+  *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -245,12 +246,12 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 5 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 3 || strings.Count(string(log), "--no-write-lock-file") != 4 {
+	if len(lines) != 7 || strings.Count(string(log), " build ") != 1 || strings.Count(string(log), "--no-link") != 1 || strings.Count(string(log), "--reference-lock-file") != 5 || strings.Count(string(log), "--no-write-lock-file") != 6 {
 		t.Fatalf("unexpected Nix invocations (%d):\n%s", len(lines), log)
 	}
 	for _, output := range []string{"nixosConfigurations.pc01.config.system.build.toplevel", "nixosConfigurations.pc99.config.system.build.toplevel", "nixosConfigurations.netboot.config.system.build.netbootRamdisk", "pxeFirmware", "installerBundle"} {
-		if !strings.Contains(lines[4], "#"+output) {
-			t.Fatalf("required output %s missing from grouped build: %s", output, lines[4])
+		if !strings.Contains(lines[6], "#"+output) {
+			t.Fatalf("required output %s missing from grouped build: %s", output, lines[6])
 		}
 	}
 	if strings.Contains(string(log), repository+"/secret-key") {
@@ -293,7 +294,8 @@ case " $* " in
   *"#deploymentStatus "*)
     printf '%s\n' '{"ready":false,"issues":["Client installation is not configured"],"controller":{"ready":true,"issues":[],"requiresKeys":false}}'
     ;;
-  *"nixoriumWorkspace"*) printf 'null\n' ;;
+  *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
+  *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
   *" build "*) exit 0 ;;
   *) exit 3 ;;
 esac
@@ -315,7 +317,7 @@ esac
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
-	if len(lines) != 5 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
+	if len(lines) != 7 || strings.Count(string(log), " build ") != 1 || !strings.Contains(string(log), "#nixosConfigurations.pc99.config.system.build.toplevel") {
 		t.Fatalf("unexpected controller-only Nix invocations (%d):\n%s", len(lines), log)
 	}
 	for _, excluded := range []string{"nixosConfigurations.pc01", "nixosConfigurations.netboot", "#pxeFirmware", "#installerBundle"} {

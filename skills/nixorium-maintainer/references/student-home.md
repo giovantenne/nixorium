@@ -74,7 +74,7 @@ The managed seed supports VS Code through the typed settings, reviewed
 `vscode.extraSettings` (themes, telemetry, chat and extension preferences;
 terminal profile, shell and environment keys are refused), selected extensions
 and fixed `.vscode/argv.json` launch defaults (basic password store, no crash
-reporter). `assets/vscode-settings.json` configures staff and legacy homes
+reporter). `assets/vscode-settings.json` configures staff homes
 only; nothing is imported from it automatically.
 
 ## Review and save a profile
@@ -93,7 +93,8 @@ Choose Desktop, Dock, VSCode or Browser, then a supported field:
   language tools it needs through the software workflow, select the
   extensions it depends on, and expect a missing dependency to stop the
   system build. Catalog entries (prerequisites, `writable` for extensions
-  that create files in their own folder) remain a deployment change.
+  that create files in their own folder or copy their own templates into
+  projects) remain a deployment change.
 - Extensions that are not packaged can come from the Marketplace: `m` takes
   an exact `publisher.name`, downloads the newest stable Linux version the
   pinned VS Code accepts into the controller's Nix store, and shows its
@@ -211,16 +212,25 @@ inside each package rather than assuming Marketplace IDs are Nix attributes.
 Add only the agreed extensions to the local profile, preserving existing
 ones and any settings unrelated to Python. Inspect current activation ordering
 and ownership; keep the profile conditional on the effective VS Code package.
-Legacy settings assets affect admin, teacher, and student in the supplied template:
-do not broaden a student-only request to staff without identifying that effect.
+Settings assets affect admin and teacher only; student requests belong in the
+workspace profile. Do not broaden a student-only request to staff.
 
 Create staff application directories with their final owner instead of relying
 on `install -D -o` for intermediate directories. Core repairs the managed
-`.config/Code`, `.vscode/extensions`, and npm trees for admin, teacher, and
-legacy student during activation; managed student ownership is assigned at reset,
+`.config/Code`, `.vscode/extensions`, and npm trees for admin and teacher
+during activation; student ownership is assigned at reset,
 not repaired during an active session. Do not use world-writable modes.
 `/run/user/<uid>` is created by logind, while activation only reconciles an
 already existing top-level directory whose ownership or mode is wrong.
+
+Linked extensions are read-only. An extension that writes into its own
+folder fails with `EACCES`, and one that copies its own files into a project
+(Maven “New Project”, Java “Create Java Project → No build tools”) leaves
+read-only files and folders there. Mark such extensions `writable` in
+`workspace-catalog.nix` rather than relaxing modes in the home; see
+[the troubleshooting entry](https://github.com/giovantenne/nixorium/blob/master/docs/troubleshooting.md#a-vs-code-extension-reports-permission-denied).
+Do not mark every extension writable: copies count against the seed size and
+entry limits.
 
 Build a representative affected system and check the extension payload/settings.
 Do not rely on a Marketplace download at student login: clients must receive

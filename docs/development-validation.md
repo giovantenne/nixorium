@@ -222,20 +222,7 @@ Nix store garbage collection.
 
 Deployment-template reset has real-Git transaction tests (backup, ignored files,
 stale snapshots and interrupted-checkout recovery), plus unprivileged real-Nix
-and coordination-gate checks in the management VM. The explicit network-enabled
-legacy migration test starts from the public `v2.0.0` template and locks the
-published revision at HEAD of the supplied upstream checkout. Run it before
-advancing HEAD to an unpublished commit, or supply a separate published checkout:
-
-```sh
-NIXORIUM_TEST_PINNED_RESET_REPO="$PWD" ./scripts/test-go.sh \
-  ./internal/adapters -run '^TestTemplateResetPinnedLegacyMigration$' -count=1 -v
-```
-
-This uses disposable repositories and public inputs; it must reproduce the old
-workspace-load failure, preserve the exact lock and private-file sentinel, and
-load the enabled workspace after resetting. It does not build/apply a system
-or qualify live student homes.
+and coordination-gate checks in the management VM.
 
 New regression tests belong at the lowest level that proves the invariant:
 
@@ -293,16 +280,14 @@ Injected failures before deletion and during restoration retain durable
 evidence, prevent blind retries and preserve recovery data across a VM reboot.
 Negative lifecycle cases assert the rejection reason, not just any error.
 These are internal engine tests, not proof of systemd ordering, deployment
-activation, or legacy-path safety. Mount/lifecycle tests are explicitly disabled
+activation. Mount/lifecycle tests are explicitly disabled
 outside that fixture. The VM belongs to the full checkpoint, not the quick loop.
 
 The separate `workspace-reset-service-vm` check imports the internal service
-module in two minimal systems. It verifies successful boot ordering and the
+module in a minimal system. It verifies successful boot ordering and the
 packaged helper's fixed root-only entry point, then performs real NixOS
-configuration switches while a student-owned process runs. Both a seed update
-and transitions to/from an active legacy reset preserve the process and session
-files. The legacy pre-start guard also refuses managed pending evidence.
-Retained failure evidence blocks the display-manager fixture and normal
+configuration switches while a student-owned process runs. A seed update
+preserves the process and session files until the next boot. Retained failure evidence blocks the display-manager fixture and normal
 user sessions on reboot. This check uses a small login consumer, not GNOME;
 the workspace API checks, `workspace-systems`, `workspace-offline` and `desktop-profile` own
 the separate generated-system, offline and template-preference contracts.

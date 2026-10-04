@@ -289,8 +289,9 @@ assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   ''HOME_DIR="/home/admin"'' clientHomeOwnership.text;
 assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   ''HOME_DIR="/home/${labConfig.teacherUser}"'' clientHomeOwnership.text;
-assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
-  ''HOME_DIR="/home/${labConfig.studentUser}"'' clientHomeOwnership.text;
+# The student home is restored from the workspace seed, not repaired here.
+assert !(subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
+  ''HOME_DIR="/home/${labConfig.studentUser}"'' clientHomeOwnership.text);
 assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix
   ''.config/Code'' clientHomeOwnership.text;
 assert subnetLab.nixosConfigurations.pc01.pkgs.lib.hasInfix

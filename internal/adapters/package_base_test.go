@@ -55,7 +55,8 @@ case " $* " in
   *"#labMeta "*) printf '%s\n' '{"schemaVersion":2,"controller":{"name":"pc99"},"clients":{"count":2,"hosts":[{"name":"pc01"},{"name":"pc02"}]}}' ;;
   *"#deploymentStatus "*) printf '%s\n' '{"ready":true,"issues":[]}' ;;
   *"#nixoriumUpdateTargets "*) printf '%s\n' '["pc99","pc01","pc02"]' ;;
-  *"nixoriumWorkspace"*) printf 'null\n' ;;
+  *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;
+  *"nixoriumWorkspace"*) printf '%s\n' '{"schemaVersion":1,"state":"prepared","managedFile":"workspace-profile.json","studentUser":"student","seed":"/nix/store/00000000000000000000000000000000-home","declared":{"schemaVersion":1},"effective":{"schemaVersion":1},"catalog":{"schemaVersion":1,"baseline":{"schemaVersion":1},"applications":[],"extensions":[]},"requiredPackages":[],"packages":[],"extensions":[],"targets":[{"name":"pc99","role":"controller"}]}' ;;
   *" build "*) test "$NIXORIUM_TEST_BASE_MODE" != build-failed ;;
   *) exit 3 ;;
 esac

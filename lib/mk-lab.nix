@@ -13,8 +13,10 @@ args@{
   labSoftware ? { schemaVersion = 1; packages = []; },
   softwareCatalog ? [],
   softwarePresets ? null,
-  workspaceProfileJSON ? null,
-  workspaceCatalog ? null,
+  # Without a deployment profile the student home still resets at every boot,
+  # to the system defaults.
+  workspaceProfileJSON ? builtins.toJSON { schemaVersion = 1; },
+  workspaceCatalog ? { schemaVersion = 1; baseline.schemaVersion = 1; applications = []; extensions = []; },
   clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
@@ -188,7 +190,6 @@ let
     labSettings = labSettings // { ifaceName = ifaceForHost name; };
     inherit labAssets;
     inherit homeResetEphemeralPaths;
-    inherit workspaceRuntimeEnabled;
     inherit workspaceSeed;
     workspaceWallpapers = map (background: "${background}") labAssets.backgrounds;
     hostSoftwarePackages = map (entry: entry.package) (hostSoftwareEntries name);
@@ -259,8 +260,7 @@ let
   labSoftwareJson = builtins.toFile "lab-software.json" (builtins.toJSON labSoftwareConfig);
   softwareCatalogJson = builtins.toFile "software-catalog.json" (builtins.toJSON softwareCatalog);
   softwarePresetsJson = builtins.toFile "software-presets.json" (builtins.toJSON softwarePresetsConfig);
-  workspaceProfileFile = builtins.toFile "workspace-profile.json"
-    (if workspaceProfileJSON == null then "null" else workspaceProfileJSON);
+  workspaceProfileFile = builtins.toFile "workspace-profile.json" workspaceProfileJSON;
   workspaceCatalogFile = builtins.toFile "workspace-catalog.json" (builtins.toJSON workspaceCatalog);
   homeResetEphemeralPathsJson = builtins.toFile "home-reset-ephemeral-paths.json"
     (builtins.toJSON homeResetEphemeralPaths);
@@ -430,7 +430,7 @@ let
   # The first host of each class, in inventory order, represents it.
   workspaceClassPackages = builtins.mapAttrs (_: workspaceHostPackages)
     (builtins.listToAttrs (map (name: { name = workspaceHostClass name; value = name; }) validHostNames));
-  workspaceResolution = if workspaceProfileJSON == null then null else
+  workspaceResolution =
     import ./resolve-workspace-profile.nix { inherit lib; pkgs = softwarePkgs; } {
       profileJSON = workspaceProfileJSON;
       catalog = workspaceCatalog;
@@ -438,10 +438,7 @@ let
       clientNames = validClientNames;
       hostPackages = lib.genAttrs validHostNames (name: workspaceClassPackages.${workspaceHostClass name});
     };
-  # A supplied profile always participates in the boot-time home reset.
-  # This is derived composition state, not a separate customization switch.
-  workspaceRuntimeEnabled = workspaceProfileJSON != null;
-  workspaceSeed = if !workspaceRuntimeEnabled then null else
+  workspaceSeed =
     import ./build-workspace-home.nix { inherit lib; pkgs = softwarePkgs; } {
       resolution = workspaceResolution;
       inherit labSettings;
@@ -566,10 +563,8 @@ let
           labSoftware = builtins.fromJSON (builtins.readFile ./lab-software.json);
           softwareCatalog = builtins.fromJSON (builtins.readFile ./software-catalog.json);
           softwarePresets = builtins.fromJSON (builtins.readFile ./software-presets.json);
-          ${lib.optionalString (workspaceProfileJSON != null) ''
-            workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
-            workspaceCatalog = builtins.fromJSON (builtins.readFile ./workspace-catalog.json);
-          ''}
+          workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
+          workspaceCatalog = builtins.fromJSON (builtins.readFile ./workspace-catalog.json);
           homeResetEphemeralPaths = builtins.fromJSON (builtins.readFile ./home-reset-ephemeral-paths.json);
           clientGroups = builtins.fromJSON (builtins.readFile ./client-groups.json);
           publicKeys = {
@@ -606,10 +601,8 @@ let
     install -m 0644 ${labMetaJson} "$out/lab-meta.json"
     install -m 0644 ${softwareCatalogJson} "$out/software-catalog.json"
     install -m 0644 ${softwarePresetsJson} "$out/software-presets.json"
-    ${lib.optionalString (workspaceProfileJSON != null) ''
-      install -m 0644 ${workspaceProfileFile} "$out/workspace-profile.json"
-      install -m 0644 ${workspaceCatalogFile} "$out/workspace-catalog.json"
-    ''}
+    install -m 0644 ${workspaceProfileFile} "$out/workspace-profile.json"
+    install -m 0644 ${workspaceCatalogFile} "$out/workspace-catalog.json"
     install -m 0644 ${homeResetEphemeralPathsJson} "$out/home-reset-ephemeral-paths.json"
     install -m 0644 ${clientGroupsJson} "$out/client-groups.json"
     install -m 0755 ${upstreamRoot}/setup.sh "$out/setup.sh"
@@ -663,22 +656,6 @@ let
       };
     };
 
-  runHarmonia = bootstrapPkgs.writeShellApplication {
-    name = "nixorium-run-harmonia";
-    text = ''
-      export LAB_REPO_ROOT="$PWD"
-      exec ${upstreamRoot}/scripts/run-harmonia.sh "$@"
-    '';
-  };
-
-  runPxeProxy = bootstrapPkgs.writeShellApplication {
-    name = "nixorium-run-pxe-proxy";
-    text = ''
-      export LAB_REPO_ROOT="$PWD"
-      exec ${upstreamRoot}/scripts/run-pxe-proxy.sh "$@"
-    '';
-  };
-
   runDisko = bootstrapPkgs.writeShellApplication {
     name = "nixorium-disko";
     text = ''
@@ -706,12 +683,10 @@ assert builtins.isList updateValidationHosts && builtins.all
   || throw "updateValidationHosts must contain configured host names";
 assert unknownHostModuleNames == []
   || throw "hostModules contains unknown hosts: ${builtins.concatStringsSep ", " unknownHostModuleNames}";
-assert workspaceProfileJSON == null || workspaceCatalog != null
-  || throw "workspaceProfileJSON requires a deployment-owned workspaceCatalog";
-assert !workspaceRuntimeEnabled || validRuntimeEphemeralPaths
-  || throw "workspace runtime requires bounded, canonical, non-overlapping ephemeral paths";
-assert !workspaceRuntimeEnabled || builtins.length labAssets.backgrounds <= 128
-  || throw "workspace runtime supports at most 128 wallpapers";
+assert validRuntimeEphemeralPaths
+  || throw "homeResetEphemeralPaths must be bounded, canonical and non-overlapping";
+assert builtins.length labAssets.backgrounds <= 128
+  || throw "the student home reset supports at most 128 wallpapers";
 # Discovery does not authorize an operation. Keep inventory and package queries
 # independent of all host module graphs; readiness, validators and every build
 # or deployment output still require the complete workspace prerequisite check.
@@ -837,10 +812,9 @@ builtins.mapAttrs (name: value:
 
   # Configured preferences are not an active-home receipt. Build and distribute
   # the systems, then boot them normally to restore the student home.
-  nixoriumWorkspace = if workspaceResolution == null then null else workspaceResolution // {
+  nixoriumWorkspace = workspaceResolution // {
     state = "prepared";
-    runtimeEnabled = workspaceRuntimeEnabled;
-    seed = if workspaceRuntimeEnabled then toString workspaceSeed else null;
+    seed = toString workspaceSeed;
     managedFile = "workspace-profile.json";
     inherit studentUser;
   };
@@ -857,7 +831,7 @@ builtins.mapAttrs (name: value:
     # Update review validates the current declaration again through this hook.
     # Reuse only this evaluator's fully checked resolution of the same profile;
     # another process or changed source still resolves all prerequisites afresh.
-    if workspaceResolution != null && declared == workspaceResolution.declared then
+    if declared == workspaceResolution.declared then
       nixoriumWorkspace
     else builtins.deepSeq candidate.nixoriumWorkspace candidate.nixoriumWorkspace;
   nixoriumValidateWorkspaceCandidate = rawJSON:
@@ -914,16 +888,6 @@ builtins.mapAttrs (name: value:
       type = "app";
       program = "${nixoriumPackage}/bin/nixorium";
       meta.description = "Manage the Nixorium laboratory";
-    };
-    run-harmonia = {
-      type = "app";
-      program = "${runHarmonia}/bin/nixorium-run-harmonia";
-      meta.description = "Run the laboratory Harmonia binary cache";
-    };
-    run-pxe-proxy = {
-      type = "app";
-      program = "${runPxeProxy}/bin/nixorium-run-pxe-proxy";
-      meta.description = "Run the laboratory ProxyDHCP, TFTP, and HTTP services";
     };
     disko = {
       type = "app";

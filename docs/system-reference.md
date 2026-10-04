@@ -451,8 +451,8 @@ installer so client installation needs no second checkout.
 | `labSoftware` | Strict versioned supported client-package declarations, normally decoded from `lab-software.json` |
 | `softwareCatalog` | Deployment-owned suggested packages shown before free search; each entry has `id`, `label`, and `summary` |
 | `softwarePresets` | Optional versioned deployment-owned software-profile catalog; each profile has an ID, label, description, and package IDs |
-| `workspaceProfileJSON` | Optional raw JSON text for preparation of student preferences; `null` preserves legacy behavior |
-| `workspaceCatalog` | Deployment-owned baseline/application/extension catalog required with workspace JSON; no implicit package installation |
+| `workspaceProfileJSON` | Raw JSON text of the student preferences; defaults to `{"schemaVersion":1}` |
+| `workspaceCatalog` | Deployment-owned baseline/application/extension catalog; defaults to an empty catalog; no implicit package installation |
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
 | `publicKeys` | Harmonia and SSH public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
@@ -506,13 +506,12 @@ defaults and two proposals that are never read as the declaration:
 `workspace-profile.example.json` (the same Essential defaults) and
 `workspace-profile.programming.example.json`, which bootstrap and template
 reset copy to `workspace-profile.json` when the Programming software profile
-is selected. With no `workspaceProfileJSON` (hand-written callers),
-`nixoriumWorkspace` is `null` and the legacy home/template/login behavior
-remains. With a profile, the output reports `state = "prepared"`, the
-configured `studentUser`, all target hosts, declared/effective preferences,
-normalized catalog and pinned package/extension versions. `runtimeEnabled` is
-derived from profile presence and `seed` is the immutable build-output path.
-Neither field reports live installed or active state.
+is selected. Hand-written callers that pass no profile get an empty one, so
+the student home still resets to the system defaults. `nixoriumWorkspace`
+reports `state = "prepared"`, the configured `studentUser`, all target hosts,
+declared/effective preferences, normalized catalog and pinned
+package/extension versions. `seed` is the immutable build-output path; it does
+not report live installed or active state.
 
 `workspaceProfileJSON` must be raw JSON text, limited to 64 KiB, with integer
 `schemaVersion: 1`. Unknown fields, duplicate keys (including escaped aliases),
@@ -598,11 +597,9 @@ path without a separate enablement or migration step.
 
 #### Managed-home runtime
 
-A supplied `workspaceProfileJSON` always configures the managed student home.
-There is no public `workspaceRuntimeEnabled` argument. Runtime capability
-version 2 identifies this contract. Internal module selection and the
-`nixoriumWorkspace.runtimeEnabled` observation are derived from profile presence,
-not user switches. The profile applies to the student on every client and the
+Every deployment uses the managed student home; there is no other student
+reset path and no runtime switch. Runtime capability version 2 identifies this
+contract. The profile applies to the student on every client and the
 controller, including controller-only mode, without changing controller autologin
 or staff preferences. Profile/catalog and seed metadata survive offline
 reconstruction. Evaluation and saving do not activate a system or reset a home.
@@ -624,7 +621,7 @@ their lowercase ID. The TUI uses it for extension search.
 
 The immutable seed combines supported preferences with a neutral shell/Git/XDG
 scaffold. XDG folders use stable English names. It does not copy a live home,
-the writable legacy template, or arbitrary application assets. Extension links
+a writable template, or arbitrary application assets. Extension links
 point to identity-checked pinned store payloads, and editor update checks start
 disabled as editable session defaults. The seed build fails when a selected
 extension declares a dependency that is not selected. With a `vscode` section
@@ -633,16 +630,15 @@ crash reporter. This is not proof that every plugin
 loads correctly or works offline; qualify each supported plugin separately.
 Wallpapers are composed with the profile dconf source before restoration.
 
-The template skips student template writes, ownership repair, and supported
-login migrations in the managed path, while retaining staff behavior and
-desktop extension enablement.
+The template makes no student template writes, ownership repairs or login
+preference changes, while retaining staff behavior and desktop extension
+enablement.
 Keep desired preferences explicit in the profile/baseline. Missing settings use
 system/application defaults, not an inferred translation of old Nix modules.
 
 Build and deploy through the existing reviewed controller/client flows. The
 new home becomes available at the next normal boot, not on save or rebuild.
-Both reset implementations avoid automatic restart during a configuration
-switch, including transitions in either direction. Students may change their
+The reset never restarts during a configuration switch. Students may change their
 initial preferences during the session; the next reset restores the seed.
 
 The managed reset requires the declared Btrfs home/snapshot mounts, exact
@@ -654,15 +650,13 @@ kernel confinement APIs do not fall back to unsafe removal.
 
 Before changing the original home, it creates a private snapshot, removes the
 configured ephemeral data from that copy and makes it read-only. Five managed
-snapshots are published under `/var/lib/home-snapshots/workspace`, separate
-from legacy snapshots. The teacher reads them through the `nixorium-staff` group.
+snapshots are published under `/var/lib/home-snapshots/workspace`. The teacher reads them through the `nixorium-staff` group.
 Reset success records bind the seed, user and boot ID under the root-only
 `/var/lib/home-snapshots/.workspace-reset` directory. They are not fleet status
 and are not currently consumed by the TUI.
 
 An incomplete attempt leaves `pending.json` and recovery data, blocks normal
-login and refuses subsequent attempts, including after reboot or a switch
-back to the legacy path. The root-only helper is not an interactive reset or
+login and refuses subsequent attempts, including after reboot. The root-only helper is not an interactive reset or
 recovery command. Inspect the `home-reset.service` journal and preserve the
 private evidence before administrator-led recovery; never delete the marker
 or rerun the reset just to clear an error. Snapshot recovery, external backups

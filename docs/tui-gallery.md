@@ -593,7 +593,7 @@ Builds do not certify plugin loading or the latest vendor release.
 Extension example.extension: 1.0 -> 2.0
 Package nodejs: not selected -> 24.0
 Package vscode: 1.0 -> 2.0
-Current pin: student student, boot preferences configured: true
+Current pin: student student
   controller (controller)
   pc01 (client)
   pc02 (client)

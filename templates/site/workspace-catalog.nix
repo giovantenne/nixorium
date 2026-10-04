@@ -14,9 +14,11 @@
   # Choices are not installations or loading/compatibility certificates.
   # requiredPackages are the language tools an extension expects on every
   # destination; requiredExtensions mirror its declared extension dependencies.
-  # writable copies an extension that creates files in its own folder into
-  # the home instead of linking it. Other extensions from the pinned package
-  # set can be selected too; they are linked and need no entry here.
+  # writable copies an extension that creates files in its own folder, or
+  # copies its own files into projects, into the home instead of linking it:
+  # store files are read-only and copies made from them stay read-only.
+  # Other extensions from the pinned package set can be selected too; they
+  # are linked and need no entry here.
   extensions = [
     # Web
     { id = "ritwickdey.liveserver"; package = "vscode-extensions.ritwickdey.liveserver"; }
@@ -35,8 +37,8 @@
     { id = "redhat.java"; package = "vscode-extensions.redhat.java"; requiredPackages = [ "jdk21" ]; }
     { id = "vscjava.vscode-java-debug"; package = "vscode-extensions.vscjava.vscode-java-debug"; requiredExtensions = [ "redhat.java" ]; writable = true; }
     { id = "vscjava.vscode-java-test"; package = "vscode-extensions.vscjava.vscode-java-test"; requiredExtensions = [ "redhat.java" "vscjava.vscode-java-debug" ]; }
-    { id = "vscjava.vscode-maven"; package = "vscode-extensions.vscjava.vscode-maven"; requiredPackages = [ "maven" ]; }
-    { id = "vscjava.vscode-java-dependency"; package = "vscode-extensions.vscjava.vscode-java-dependency"; requiredExtensions = [ "redhat.java" ]; }
+    { id = "vscjava.vscode-maven"; package = "vscode-extensions.vscjava.vscode-maven"; requiredPackages = [ "maven" ]; writable = true; }
+    { id = "vscjava.vscode-java-dependency"; package = "vscode-extensions.vscjava.vscode-java-dependency"; requiredExtensions = [ "redhat.java" ]; writable = true; }
     { id = "vscjava.vscode-java-pack"; package = "vscode-extensions.vscjava.vscode-java-pack"; }
   ];
 }

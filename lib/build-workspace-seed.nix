@@ -1,6 +1,6 @@
 { lib, pkgs }:
 # Build only the supported preference payload from an already resolved profile.
-# This does not activate a home or import content from the legacy template.
+# This does not activate a home.
 resolution:
 let
   profile = import ./eval-workspace-profile.nix { inherit lib; }

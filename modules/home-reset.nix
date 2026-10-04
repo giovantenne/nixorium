@@ -1,40 +1,20 @@
-args@{ pkgs, lib, labSettings, homeResetEphemeralPaths, ... }:
+{ pkgs, labSettings, ... }:
 
 let
-  workspaceRuntimeEnabled = args.workspaceRuntimeEnabled or false;
-  # Git configuration
-  gitConfigStudent = {
-    name = labSettings.studentGitName;
-    email = labSettings.studentGitEmail;
-  };
-
   gitConfigAdmin = {
     name = labSettings.adminGitName;
     email = labSettings.adminGitEmail;
   };
 
-  templateDirStudent = "/var/lib/home-template/${labSettings.studentUser}";
   templateDirAdmin = "/var/lib/home-template/admin";
-  snapshotsDir = "/var/lib/home-snapshots";
-  homeDirStudent = "/home/${labSettings.studentUser}";
-  homeDirAdmin = "/home/admin";
-  ephemeralPathsFile = pkgs.writeText "nixorium-home-reset-ephemeral-paths"
-    (builtins.concatStringsSep "\n" homeResetEphemeralPaths + "\n");
-  # External scripts
   createTemplateScript = ../scripts/create-home-template.sh;
-  homeResetScript = ../scripts/home-reset.sh;
 in
 {
-  imports = lib.optional workspaceRuntimeEnabled ./workspace-reset.nix;
+  # The student home is restored from the workspace seed at every boot.
+  imports = [ ./workspace-reset.nix ];
   # Create templates at system activation (rebuild time)
   system.activationScripts.createHomeTemplates = {
     text = ''
-      ${lib.optionalString (!workspaceRuntimeEnabled) ''
-        # Create the legacy student template only when it owns the reset path.
-        ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirStudent}" "${gitConfigStudent.name}" "${gitConfigStudent.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
-        chown -R ${labSettings.studentUser}:users "${templateDirStudent}"
-      ''}
-
       # Create admin template
       ${pkgs.bash}/bin/bash ${createTemplateScript} "${templateDirAdmin}" "${gitConfigAdmin.name}" "${gitConfigAdmin.email}" "${pkgs.xdg-user-dirs}/bin/xdg-user-dirs-update"
       chown -R admin:users "${templateDirAdmin}"
@@ -47,35 +27,6 @@ in
       fi
     '';
     deps = [ "users" ];
-  };
-
-  # Systemd service to reset student home at boot
-  systemd.services.home-reset = lib.mkIf (!workspaceRuntimeEnabled) {
-    description = "Reset ${labSettings.studentUser} home directory from template";
-    wantedBy = [ "multi-user.target" ];
-    requiredBy = [ "systemd-user-sessions.service" "display-manager.service" ];
-    before = [ "systemd-user-sessions.service" "display-manager.service" ];
-    after = [ "local-fs.target" ];
-    # Returning from the managed path must not reset a live session on switch.
-    restartIfChanged = false;
-    stopIfChanged = false;
-    unitConfig = {
-      "X-OnlyManualStart" = true;
-      "X-StopOnRemoval" = false;
-      RequiresMountsFor = [
-        "/home/${labSettings.studentUser}"
-        "/var/lib/home-template"
-        "/var/lib/home-snapshots"
-      ];
-    };
-    path = [ pkgs.btrfs-progs pkgs.dconf pkgs.findutils pkgs.coreutils ];
-    serviceConfig = {
-      Type = "oneshot";
-      # Disabling the new profile is not recovery from an incomplete reset.
-      ExecStartPre = "${pkgs.coreutils}/bin/test ! -e /var/lib/home-snapshots/.workspace-reset/pending.json";
-      ExecStart = "${pkgs.bash}/bin/bash ${homeResetScript} ${snapshotsDir} ${homeDirStudent} ${templateDirStudent} ${labSettings.studentUser}:users ${ephemeralPathsFile}";
-      RemainAfterExit = true;
-    };
   };
 
   # Ensure directories have correct permissions
