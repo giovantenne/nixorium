@@ -13,6 +13,8 @@
   :root { --background: #16191e; --card: #20242b; --text: #e8ebf0; --muted: #a2aab6; --line: #333943; --accent: #78aef0; --warning: #f0b45a; }
 }
 * { box-sizing: border-box; }
+/* Hidden stays hidden even where a rule sets display. */
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--background); color: var(--text); }
 header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
 header .title { display: flex; align-items: baseline; gap: 1rem; }
