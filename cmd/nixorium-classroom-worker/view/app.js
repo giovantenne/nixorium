@@ -396,11 +396,12 @@ async function startCasting(id) {
   const tick = async () => {
     if (!casting || casting.id !== id) return;
     if (video.videoWidth > 0) {
-      const width = Math.min(1280, video.videoWidth);
+      // Sharp enough to read text on the students' screens.
+      const width = Math.min(1920, video.videoWidth);
       canvas.width = width;
       canvas.height = Math.round(video.videoHeight * width / video.videoWidth);
       canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
       if (blob) {
         const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).join(',');
         if (digest !== lastDigest || Date.now() - lastSent > 4000) {

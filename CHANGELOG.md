@@ -37,7 +37,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   student's desktop is kept as "name (2)". **Computers → Send desktop**
   (teacher and administrator) and `nixorium desktop plan|apply --on
   <clients|@lab>` send the desktop of whoever runs Nixorium the same way.
-  **Show my screen** (classroom view page only) asks GNOME to share the
+  **Show my screen** (classroom view page only, up to 1920 pixels) asks GNOME to share the
   teacher's entire screen and, after a review, shows it over the whole
   screen of the selected computers with their keyboard and mouse blocked,
   above any lock, until **Stop showing**, closing the page, or ten seconds

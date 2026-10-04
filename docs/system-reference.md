@@ -378,7 +378,7 @@ and requires the token of the review.
 
 **Show my screen** exists only in the page. The browser asks GNOME which
 screen to share and the page refuses a window or a tab. After the review,
-the page draws the screen at up to 1280 pixels and sends a JPEG at most
+the page draws the screen at up to 1920 pixels (JPEG quality 0.85) and sends a JPEG at most
 five times a second when it changed, and at least every four seconds. The
 classroom service keeps one channel per selected computer and always sends
 it the latest picture (`broadcast.frame`), so a slow computer skips
