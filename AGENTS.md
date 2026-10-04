@@ -599,8 +599,8 @@ any shard must block publication.
   cover above the lock, accepting only those file names. The showing ends
   with `broadcast.stop`, the end of its connection, or 15 seconds without a
   picture, and never ends a lock. Only the page starts a showing (no
-  classroom socket operation): it captures the entire screen with the
-  browser's own consent, posts JPEGs to `/api/broadcast/frame`, and the
+  classroom socket operation): it captures the screen, window or tab the
+  teacher chooses with the browser's own consent (never the page itself), posts JPEGs to `/api/broadcast/frame`, and the
   worker keeps one showing at a time, sending each computer only the latest
   picture and ending after ten silent seconds. The
   "initial consent" rule below applies to Veyon only.

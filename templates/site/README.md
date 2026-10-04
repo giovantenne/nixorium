@@ -172,8 +172,8 @@ view page offers the same as **Send desktop**.
 From a terminal: `nixorium desktop plan --on @lab`, then
 `nixorium desktop apply --on @lab --expect` with the review token.
 
-In the classroom view page, **Show my screen** shows your entire screen
-on the selected computers, over their whole screen and with their keyboard
+In the classroom view page, **Show my screen** shows your screen (or the
+window or tab you choose) on the selected computers, over their whole screen and with their keyboard
 and mouse blocked, until **Stop showing** or until you close the page.
 
 ## Local customization

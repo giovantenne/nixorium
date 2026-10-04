@@ -384,8 +384,9 @@ the XDG desktop folder of whoever runs Nixorium and send it through the
 classroom service the same way; `desktop apply` prepares the files again
 and requires the token of the review.
 
-**Show my screen** exists only in the page. The browser asks GNOME which
-screen to share and the page refuses a window or a tab. After the review,
+**Show my screen** exists only in the page. The browser asks GNOME what to
+share: the entire screen is offered first, and a window or another tab works
+too (never the classroom view page itself). After the review,
 the page draws the screen at up to 1920 pixels (JPEG quality 0.85) and sends a JPEG at most
 five times a second when it changed, and at least every four seconds. The
 classroom service keeps one channel per selected computer and always sends

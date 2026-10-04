@@ -297,9 +297,10 @@ async function sendDesktop(computers) {
   runAction('send-desktop', computers, prepared.transfer);
 }
 
-// Show my screen: GNOME asks which screen to share (the whole screen is
-// required); after the review the page sends a picture whenever it changes,
-// at most five a second, and one every few seconds to keep the showing on.
+// Show my screen: GNOME asks what to share (the whole screen is offered
+// first; a window or a tab works too, but not this page itself); after the
+// review the page sends a picture whenever it changes, at most five a
+// second, and one every few seconds to keep the showing on.
 let pendingStream = null;
 let casting = null;
 
@@ -314,12 +315,6 @@ async function showMyScreen(computers) {
       surfaceSwitching: 'exclude',
     });
   } catch (error) {
-    return;
-  }
-  const surface = stream.getVideoTracks()[0].getSettings().displaySurface;
-  if (surface && surface !== 'monitor') {
-    stream.getTracks().forEach((track) => track.stop());
-    showProgress('Show my screen', 'Choose your entire screen, not a window or a tab.');
     return;
   }
   pendingStream = stream;
