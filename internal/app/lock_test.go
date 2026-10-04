@@ -23,6 +23,8 @@ func (session fakeLockSession) Thumbnail(int, int64) (classroomview.Message, err
 }
 func (session fakeLockSession) Input([]classroomview.InputEvent, bool) error { return nil }
 func (session fakeLockSession) Close() error                                 { return nil }
+func (session fakeLockSession) ShowFrame([]byte) error                       { return nil }
+func (session fakeLockSession) StopBroadcast() error                         { return nil }
 func (session fakeLockSession) SendFiles([]classroomview.FileEntry, func(int) (io.ReadCloser, error)) ([]string, error) {
 	return nil, nil
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -327,4 +328,59 @@ func TestAgentLocksThroughTheExtension(t *testing.T) {
 		t.Fatalf("lock without the extension = %+v", reply)
 	}
 	_ = client.Close()
+}
+
+type fakeShower struct {
+	mutex sync.Mutex
+	shown int
+	stops int
+}
+
+func (shower *fakeShower) Show([]byte) error {
+	shower.mutex.Lock()
+	defer shower.mutex.Unlock()
+	shower.shown++
+	return nil
+}
+
+func (shower *fakeShower) Stop() {
+	shower.mutex.Lock()
+	defer shower.mutex.Unlock()
+	shower.stops++
+}
+
+func TestAgentShowsTheTeachersScreenUntilTheConnectionEnds(t *testing.T) {
+	screen := &fakeShower{}
+	server, client := net.Pipe()
+	go handle(server, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}, screen: screen})
+	exchange := func(message classroomview.Message) classroomview.Message {
+		t.Helper()
+		if err := classroomview.Write(client, message); err != nil {
+			t.Fatal(err)
+		}
+		reply, err := classroomview.Read(client)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeBroadcastFrame}); reply.Code != classroomview.CodeBadRequest {
+		t.Fatalf("empty picture = %+v", reply)
+	}
+	for range 2 {
+		if reply := exchange(classroomview.Message{Type: classroomview.TypeBroadcastFrame, Image: []byte{0xff, 0xd8}}); reply.Type != classroomview.TypeBroadcastShown {
+			t.Fatalf("frame = %+v", reply)
+		}
+	}
+	_ = client.Close()
+	for attempt := 0; attempt < 100; attempt++ {
+		screen.mutex.Lock()
+		shown, stops := screen.shown, screen.stops
+		screen.mutex.Unlock()
+		if shown == 2 && stops == 1 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("the showing did not end with its connection")
 }

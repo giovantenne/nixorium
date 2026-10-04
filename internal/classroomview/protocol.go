@@ -31,6 +31,12 @@ const (
 	// agent answers TypeLockState with the resulting state.
 	TypeLock      = "lock.set"
 	TypeLockState = "lock.state"
+	// TypeBroadcastFrame shows the teacher's screen (Image, a JPEG) over the
+	// whole screen with input blocked; TypeBroadcastStop ends it. The agent
+	// answers TypeBroadcastShown to both.
+	TypeBroadcastFrame = "broadcast.frame"
+	TypeBroadcastStop  = "broadcast.stop"
+	TypeBroadcastShown = "broadcast.shown"
 )
 
 // Frame width limits accepted by the agent: small for the overview, up to
@@ -105,7 +111,12 @@ const (
 	CodeBusy        = "busy"
 	// CodeLockUnavailable: the session has no classroom extension to lock it.
 	CodeLockUnavailable = "lock-unavailable"
+	// CodeBroadcastFailed: the session could not show the teacher's screen.
+	CodeBroadcastFailed = "broadcast-failed"
 )
+
+// MaxBroadcastBytes bounds one picture of the teacher's screen.
+const MaxBroadcastBytes = 2 << 20
 
 // Message is one protocol message. Unknown fields are refused on decode.
 type Message struct {
@@ -189,6 +200,10 @@ type Session interface {
 	SetLocked(locked bool) (bool, error)
 	// Locked is the lock state reported when the session opened.
 	Locked() bool
+	// ShowFrame shows a picture of the teacher's screen; StopBroadcast ends
+	// it.
+	ShowFrame(image []byte) error
+	StopBroadcast() error
 	// SendFiles places files on the session's desktop; content opens the
 	// file at an entry's position. It returns the names given there.
 	SendFiles(entries []FileEntry, content func(int) (io.ReadCloser, error)) ([]string, error)

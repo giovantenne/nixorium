@@ -9,7 +9,13 @@
 // keyboard and the mouse until the teacher unlocks it. The classroom agent,
 // in the same session, asks for it on the session bus. Logging out or
 // restarting always ends the lock.
+//
+// While the teacher shows their screen, a second cover above everything,
+// the lock included, shows the latest picture the agent received, again
+// with keyboard and mouse taken. When it ends, the lock (if any) remains.
 import Clutter from 'gi://Clutter';
+import Cogl from 'gi://Cogl';
+import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -25,6 +31,11 @@ const Interface = `<node>
       <arg type="b" direction="in" name="locked"/>
     </method>
     <property name="Locked" type="b" access="read"/>
+    <method name="ShowFrame">
+      <arg type="s" direction="in" name="path"/>
+    </method>
+    <method name="StopBroadcast"/>
+    <property name="Broadcasting" type="b" access="read"/>
   </interface>
 </node>`;
 
@@ -38,6 +49,7 @@ export default class NixoriumClassroomExtension extends Extension {
     }
 
     disable() {
+        this.StopBroadcast();
         this._setLocked(false);
         if (this._nameId) {
             Gio.bus_unown_name(this._nameId);
@@ -55,6 +67,75 @@ export default class NixoriumClassroomExtension extends Extension {
 
     get Locked() {
         return Boolean(this._cover);
+    }
+
+    get Broadcasting() {
+        return Boolean(this._screen);
+    }
+
+    // D-Bus: shows a JPEG from the agent's private runtime folder.
+    ShowFrame(path) {
+        const runtime = GLib.get_user_runtime_dir();
+        if (GLib.path_get_dirname(path) !== runtime || !GLib.path_get_basename(path).startsWith('nixorium-classroom-frame'))
+            throw new Error('Unexpected picture');
+        const pixbuf = GdkPixbuf.Pixbuf.new_from_file(path);
+        if (!this._screen)
+            this._showScreen();
+        const content = St.ImageContent.new_with_preferred_size(pixbuf.width, pixbuf.height);
+        content.set_bytes(
+            global.stage.context.get_backend().get_cogl_context(),
+            pixbuf.read_pixel_bytes(),
+            pixbuf.get_has_alpha() ? Cogl.PixelFormat.RGBA_8888 : Cogl.PixelFormat.RGB_888,
+            pixbuf.width,
+            pixbuf.height,
+            pixbuf.rowstride);
+        this._picture.set_content(content);
+    }
+
+    StopBroadcast() {
+        if (!this._screen)
+            return;
+        Main.layoutManager.uiGroup.disconnect(this._screenRaiseId);
+        this._screenRaiseId = 0;
+        if (this._screenGrab) {
+            Main.popModal(this._screenGrab);
+            this._screenGrab = null;
+        }
+        this._screen.destroy();
+        this._screen = null;
+        this._picture = null;
+        this._service?.emit_property_changed('Broadcasting', GLib.Variant.new_boolean(false));
+    }
+
+    _showScreen() {
+        Main.overview.hide();
+        Main.panel.menuManager.activeMenu?.close();
+        const screen = new St.Widget({
+            name: 'nixoriumClassroomBroadcast',
+            reactive: true,
+            can_focus: true,
+            style: 'background-color: #000000;',
+            layout_manager: new Clutter.BinLayout(),
+        });
+        screen.add_constraint(new Clutter.BindConstraint({
+            source: global.stage,
+            coordinate: Clutter.BindCoordinate.ALL,
+        }));
+        const picture = new Clutter.Actor({
+            content_gravity: Clutter.ContentGravity.RESIZE_ASPECT,
+            x_expand: true,
+            y_expand: true,
+        });
+        screen.add_child(picture);
+        Main.layoutManager.uiGroup.add_child(screen);
+        Main.layoutManager.uiGroup.set_child_above_sibling(screen, null);
+        this._screenGrab = Main.pushModal(screen, {actionMode: Shell.ActionMode.NONE});
+        screen.grab_key_focus();
+        this._screenRaiseId = Main.layoutManager.uiGroup.connect('child-added', () =>
+            Main.layoutManager.uiGroup.set_child_above_sibling(screen, null));
+        this._screen = screen;
+        this._picture = picture;
+        this._service?.emit_property_changed('Broadcasting', GLib.Variant.new_boolean(true));
     }
 
     _setLocked(locked) {
@@ -95,8 +176,13 @@ export default class NixoriumClassroomExtension extends Extension {
         this._grab = Main.pushModal(cover, {actionMode: Shell.ActionMode.NONE});
         cover.grab_key_focus();
         // Keep the cover above anything shown later, such as notifications.
-        this._raiseId = Main.layoutManager.uiGroup.connect('child-added', () =>
-            Main.layoutManager.uiGroup.set_child_above_sibling(cover, null));
+        this._raiseId = Main.layoutManager.uiGroup.connect('child-added', () => {
+            Main.layoutManager.uiGroup.set_child_above_sibling(cover, null);
+            if (this._screen)
+                Main.layoutManager.uiGroup.set_child_above_sibling(this._screen, null);
+        });
+        if (this._screen)
+            Main.layoutManager.uiGroup.set_child_above_sibling(this._screen, null);
         this._cover = cover;
     }
 

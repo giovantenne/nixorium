@@ -100,6 +100,22 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe --lock off nixorium-classroom-connect | grep -F 'lock.state locked=false'")
     client.succeed(super_key)
 
+    # The teacher's screen covers the student's, above a lock, and takes
+    # the keyboard while it is shown; afterwards the lock remains.
+    classroom_property = "su - student -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus gdbus call --session --dest org.nixorium.Classroom --object-path /org/nixorium/Classroom --method org.freedesktop.DBus.Properties.Get org.nixorium.Classroom "
+    client.succeed("${agent} probe --lock on nixorium-classroom-connect")
+    client.succeed("(${agent} probe --show /tmp/thumb.jpg 12 nixorium-classroom-connect > /tmp/show.log 2>&1 &)")
+    client.wait_until_succeeds("grep -F broadcast.shown /tmp/show.log", timeout=20)
+    client.succeed(classroom_property + "Broadcasting' | grep -F true")
+    client.sleep(1)
+    client.screenshot("classroom-broadcast")
+    client.fail(super_key)
+    client.wait_until_succeeds("test $(grep -c broadcast.shown /tmp/show.log) -ge 2", timeout=40)
+    client.succeed(classroom_property + "Broadcasting' | grep -F false")
+    client.succeed(classroom_property + "Locked' | grep -F true")
+    client.succeed("${agent} probe --lock off nixorium-classroom-connect")
+    client.succeed(super_key)
+
     # Files sent to the desktop belong to the student and are never
     # executable; links are not sent and nothing on the desktop is replaced.
     client.succeed("mkdir -p /tmp/share/Lesson && echo notes > /tmp/share/Lesson/notes.txt && printf 'ls\\n' > /tmp/share/run.sh && chmod 755 /tmp/share/run.sh && ln -s /etc/shadow /tmp/share/secret")

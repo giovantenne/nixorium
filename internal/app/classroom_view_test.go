@@ -26,6 +26,9 @@ func (session fakeAgentSession) SetLocked(locked bool) (bool, error) { return lo
 
 func (session fakeAgentSession) Locked() bool { return false }
 
+func (session fakeAgentSession) ShowFrame([]byte) error { return nil }
+func (session fakeAgentSession) StopBroadcast() error   { return nil }
+
 func (session fakeAgentSession) SendFiles([]classroomview.FileEntry, func(int) (io.ReadCloser, error)) ([]string, error) {
 	return nil, nil
 }

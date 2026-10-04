@@ -7,8 +7,10 @@
 //	         active graphical session on seat0.
 //	probe    runs a command (for example the SSH connection) and exchanges
 //	         one hello through it, optionally a thumbnail and input, or a
-//	         lock request (--lock on|off), or sends a folder's contents to
-//	         the desktop (--send DIR); used by tests and diagnostics.
+//	         lock request (--lock on|off), sends a folder's contents to the
+//	         desktop (--send DIR), or shows a picture as the teacher's
+//	         screen for some seconds (--show JPEG SECONDS); used by tests
+//	         and diagnostics.
 package main
 
 import (
@@ -51,6 +53,15 @@ func main() {
 		err = connect(os.Stdin, os.Stdout, loginctl, "/run/user")
 	case "probe":
 		arguments, thumbnail, input := os.Args[2:], "", false
+		if len(arguments) >= 3 && arguments[0] == "--show" {
+			seconds, convErr := strconv.Atoi(arguments[2])
+			if convErr != nil || seconds < 0 || seconds > 60 {
+				err = errors.New("--show needs a JPEG file and 0–60 seconds")
+				break
+			}
+			err = probeShow(arguments[3:], arguments[1], time.Duration(seconds)*time.Second, os.Stdout)
+			break
+		}
 		if len(arguments) >= 2 && arguments[0] == "--send" {
 			err = probeSend(arguments[2:], arguments[1], os.Stdout)
 			break
@@ -103,7 +114,8 @@ func serve(runtimeDirectory string) error {
 	if err != nil {
 		return err
 	}
-	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: &extensionLocker{}})
+	lock := &extensionLocker{}
+	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: lock, screen: &extensionShower{locker: lock, runtime: runtimeDirectory}})
 }
 
 // agentContext is what every connection of the session's agent shares.
@@ -112,6 +124,7 @@ type agentContext struct {
 	home     string
 	capture  capturer
 	lock     locker
+	screen   screenShower
 }
 
 func serveConnections(listener net.Listener, agent agentContext) error {
@@ -162,11 +175,16 @@ func currentUserName() string {
 func handle(connection net.Conn, agent agentContext) {
 	defer connection.Close()
 	userName, capture, lock := agent.userName, agent.capture, agent.lock
-	// Files of an unfinished sending are removed when the connection ends.
+	// Files of an unfinished sending are removed when the connection ends,
+	// and a showing of the teacher's screen through it ends too.
 	var incoming *receiver
+	showing := false
 	defer func() {
 		if incoming != nil {
 			incoming.abort()
+		}
+		if showing && agent.screen != nil {
+			agent.screen.Stop()
 		}
 	}()
 	for {
@@ -197,6 +215,26 @@ func handle(connection net.Conn, agent agentContext) {
 			}
 		case classroomview.TypeLock:
 			if err := classroomview.Write(connection, lockReply(lock, message.Locked)); err != nil {
+				return
+			}
+		case classroomview.TypeBroadcastFrame, classroomview.TypeBroadcastStop:
+			reply := classroomview.Message{Type: classroomview.TypeBroadcastShown}
+			switch {
+			case agent.screen == nil:
+				reply = classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBroadcastFailed}
+			case message.Type == classroomview.TypeBroadcastStop:
+				agent.screen.Stop()
+				showing = false
+			case len(message.Image) == 0 || len(message.Image) > classroomview.MaxBroadcastBytes:
+				reply = classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBadRequest, Detail: "the picture is empty or too large"}
+			default:
+				if err := agent.screen.Show(message.Image); err != nil {
+					reply = classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeBroadcastFailed, Detail: err.Error()}
+				} else {
+					showing = true
+				}
+			}
+			if err := classroomview.Write(connection, reply); err != nil {
 				return
 			}
 		case classroomview.TypeFilesBegin, classroomview.TypeFilesChunk, classroomview.TypeFilesEnd:
@@ -442,6 +480,57 @@ func probeSend(command []string, folder string, output io.Writer) error {
 	}
 	fmt.Fprintf(output, "files.done %s\n", strings.ReplaceAll(reply.Detail, "\n", ", "))
 	return nil
+}
+
+// probeShow shows a picture over the session's screen, keeps it for a while
+// and ends the showing, as the controller does.
+func probeShow(command []string, picture string, duration time.Duration, output io.Writer) error {
+	if len(command) == 0 {
+		return errors.New("probe needs a command, for example nixorium-classroom-connect")
+	}
+	image, err := os.ReadFile(picture)
+	if err != nil {
+		return err
+	}
+	process := exec.Command(command[0], command[1:]...)
+	stdin, err := process.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := process.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	process.Stderr = os.Stderr
+	if err := process.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = stdin.Close()
+		_ = process.Wait()
+	}()
+	exchange := func(message classroomview.Message) error {
+		if err := classroomview.Write(stdin, message); err != nil {
+			return err
+		}
+		reply, err := classroomview.Read(stdout)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(output, "%s code=%s detail=%s\n", reply.Type, reply.Code, reply.Detail)
+		if reply.Type == classroomview.TypeError {
+			return errors.New("the agent refused the picture")
+		}
+		return nil
+	}
+	if err := exchange(classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}); err != nil {
+		return err
+	}
+	if err := exchange(classroomview.Message{Type: classroomview.TypeBroadcastFrame, Image: image}); err != nil {
+		return err
+	}
+	time.Sleep(duration)
+	return exchange(classroomview.Message{Type: classroomview.TypeBroadcastStop})
 }
 
 // probeLock locks or unlocks through a command, as the controller does.

@@ -586,7 +586,12 @@ any shard must block publication.
   temporary folder under position-based names only, hashes each file, and
   binds the share review to paths, sizes and digests rather than to the
   transfer identifier; the page may upload raw pieces only to its own
-  `/api/share/chunk` endpoint. The
+  `/api/share/chunk` endpoint. Showing the teacher's screen sends JPEG
+  pictures (`broadcast.frame`, at most 2 MB); the agent writes them only to
+  its own runtime folder and the extension shows them in a second modal
+  cover above the lock, accepting only those file names. The showing ends
+  with `broadcast.stop`, the end of its connection, or 15 seconds without a
+  picture, and never ends a lock. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

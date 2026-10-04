@@ -85,6 +85,25 @@ func (session *sshAgentSession) SetLocked(locked bool) (bool, error) {
 	return reply.Locked, nil
 }
 
+func (session *sshAgentSession) ShowFrame(image []byte) error {
+	return session.broadcast(classroomview.Message{Type: classroomview.TypeBroadcastFrame, Image: image})
+}
+
+func (session *sshAgentSession) StopBroadcast() error {
+	return session.broadcast(classroomview.Message{Type: classroomview.TypeBroadcastStop})
+}
+
+func (session *sshAgentSession) broadcast(request classroomview.Message) error {
+	reply, err := session.exchange(request, 10*time.Second)
+	if err != nil {
+		return err
+	}
+	if reply.Type != classroomview.TypeBroadcastShown {
+		return classroomview.AgentError{Code: reply.Code}
+	}
+	return nil
+}
+
 func (session *sshAgentSession) SendFiles(entries []classroomview.FileEntry, content func(int) (io.ReadCloser, error)) ([]string, error) {
 	expect := func(request classroomview.Message, want string, timeout time.Duration) (classroomview.Message, error) {
 		reply, err := session.exchange(request, timeout)
