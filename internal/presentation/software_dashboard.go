@@ -1154,12 +1154,10 @@ func (model softwareModel) selectedScope() (domain.SoftwareScope, string) {
 }
 
 func (model softwareModel) scopeOptions() []softwareScopeOption {
-	result := []softwareScopeOption{{label: "All clients, including future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}}}
-	if model.catalog.Controller != "" {
-		result = append([]softwareScopeOption{
-			{label: "This controller and all current or future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
-			{label: "Only this controller", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeController}},
-		}, result...)
+	result := []softwareScopeOption{
+		{label: "This controller and all current or future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
+		{label: "Only this controller", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeController}},
+		{label: "All clients, including future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
 	}
 	names := make([]string, 0, len(model.catalog.Groups))
 	for name := range model.catalog.Groups {

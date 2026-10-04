@@ -145,11 +145,12 @@ func TestSoftwarePresetApplyRejectsCatalogFileAndTokenDrift(t *testing.T) {
 	}
 }
 
-func TestSoftwarePresetPlanUsesCandidateValidationAndControllerCapability(t *testing.T) {
+func TestSoftwarePresetPlanUsesCandidateValidation(t *testing.T) {
 	source, manager := softwarePresetFixture(t)
 	shared := domain.SoftwarePresetRequest{Preset: "essential", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}
+	source.definition.Controller = ""
 	if plan := manager.PlanPreset(context.Background(), "/deployment", shared); !plan.HasErrors() || source.validations != 0 {
-		t.Fatalf("legacy contract accepted shared preset: %+v", plan)
+		t.Fatalf("contract without a controller was accepted: %+v", plan)
 	}
 
 	source.definition.Controller = "pc99"

@@ -59,7 +59,7 @@ func controllerChanges(ctx context.Context, repository, applied, reviewed string
 	for _, name := range strings.Split(strings.TrimSuffix(names, "\x00"), "\x00") {
 		switch {
 		case name == "":
-		case name == "lab-settings.json" || name == "lab-config.nix":
+		case name == "lab-settings.json":
 			found[controllerChangeSettings] = true
 		case name == "lab-software.json":
 			found[controllerChangeSoftware] = true

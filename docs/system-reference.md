@@ -88,9 +88,7 @@ and `config apply` workflow. Bootstrap starts with `en_US.UTF-8`.
 New deployments own a direct `nixpkgs` pin on the channel advertised by
 `nixorium.lib.packageBase`. Nixorium's transitive consumers follow it, and the
 deployment exposes `nixoriumPackageBase` with its locked revision. Framework
-updates fail if their candidate lock changes that root node. Legacy deployments
-without the direct input remain supported; migration and package-base update
-are separate reviewed operations.
+updates fail if their candidate lock changes that root node.
 
 The advertised channel is reference metadata, not a hard compatibility gate.
 `package-base status/plan/apply` and Maintenance → Update system and packages

@@ -92,6 +92,7 @@ func softwareManagerFixture(t *testing.T) (*fakeSoftwareSource, SoftwareManager)
 	source := &fakeSoftwareSource{data: data, resolved: map[string]domain.SoftwareCatalogItem{}, resolveErr: map[string]error{}, definition: domain.SoftwareDefinition{
 		SchemaVersion: domain.SoftwareSchemaVersion,
 		ManagedFile:   "lab-software.json",
+		Controller:    "pc99",
 		Clients:       []string{"pc01", "pc02"},
 		Groups:        map[string][]string{"graphics": {"pc02"}},
 		Catalog: []domain.SoftwareCatalogItem{
@@ -116,12 +117,13 @@ func TestSoftwarePlanUsesCatalogAndSeparatesConfigurationFromDistribution(t *tes
 	}
 }
 
-func TestSoftwareControllerScopesRequireCapability(t *testing.T) {
+func TestSoftwareControllerScopes(t *testing.T) {
 	for _, kind := range []string{domain.SoftwareScopeShared, domain.SoftwareScopeController} {
 		source, manager := softwareManagerFixture(t)
 		request := domain.SoftwareChangeRequest{Package: "hello", Present: true, Scope: domain.SoftwareScope{Kind: kind}}
+		source.definition.Controller = ""
 		if plan := manager.Plan(context.Background(), "/deployment", request); !plan.HasErrors() || source.validations != 0 {
-			t.Fatalf("legacy contract accepted controller scope: %+v", plan)
+			t.Fatalf("contract without a controller was accepted: %+v", plan)
 		}
 		source.definition.Controller = "pc99"
 		source.definition.Clients = nil

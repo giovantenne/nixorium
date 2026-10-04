@@ -98,9 +98,9 @@ nix eval .#deploymentStatus --json --no-write-lock-file
 ```
 
 In explicit controller-only mode, validate only the controller and use
-`deploymentStatus.controller` when supported. Zero clients is valid: do not
-require a client, lab keys, or netboot artifacts. Legacy metadata uses the
-older readiness contract; never use controller readiness to authorize clients.
+`deploymentStatus.controller`. Zero clients is valid: do not require a
+client, lab keys, or netboot artifacts. Never use controller readiness to
+authorize clients.
 
 Build changed roles before live application, not on every exploratory edit.
 For client-only changes use one actual representative client from `labMeta`;
@@ -586,7 +586,7 @@ then `package-base plan` to advance the current channel. A new stable channel
 requires `--target nixos-YY.MM --allow-unverified` in both plan and apply;
 apply also requires `--expect REVIEW_TOKEN`. These plans preserve every other
 lock node, validate controller/client variants and offline installer equivalence,
-and refuse ambiguous/legacy source layouts. The TUI Maintenance → Update
+and refuse ambiguous source layouts. The TUI Maintenance → Update
 system and packages task exposes the same operation and shared save/controller
 recovery. Build success does not prove reboot, hardware, the classroom view or data migration.
 Verify a canary client before explicit fleet distribution; refresh PXE artifacts

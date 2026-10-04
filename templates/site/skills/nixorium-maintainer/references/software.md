@@ -15,8 +15,8 @@ module-provided package by deleting an unrelated managed declaration.
 On deployments advertising controller software support, `shared` includes
 the controller and present/future clients, and `controller` targets only the
 controller. `all-clients`, `group:NAME`, and `clients:pc01,pc04` never include
-the controller. Inspect the evaluated inventory and capabilities first; do
-not guess host names or use new scopes on legacy releases.
+the controller. Inspect the evaluated inventory first; do not guess host
+names.
 
 ```sh
 nixorium software catalog

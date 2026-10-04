@@ -181,8 +181,7 @@ any shard must block publication.
 - New deployment templates own the direct `nixpkgs` input and make Nixorium's
   input follow it. `lib.packageBase` describes a reference source/channel;
   `Update Nixorium` must preserve the complete deployment-owned lock node.
-  Legacy deployments remain readable and are never migrated implicitly; see
-  ADR 0019 and ADR 0020. `package-base` updates own only root nixpkgs, preserve
+  See ADR 0019 and ADR 0020. `package-base` updates own only root nixpkgs, preserve
   every other lock node, and require explicit unverified-channel acceptance.
   Never bypass actual builds or change `system.stateVersion` automatically.
   Keep docs/updates.md and templates/site/UPDATES.md identical. Runtime/hardware
@@ -256,7 +255,7 @@ any shard must block publication.
   `shared` applies to the controller and present/future clients; `controller`
   applies only to the controller. Existing `all-clients`, groups and explicit
   client scopes never gain controller effects. `nixoriumSoftware.controller`
-  advertises the new capability; absent metadata keeps the legacy UI/scopes.
+  is required; a software contract without it is rejected.
   Review includes both old and new destinations when changing scope, and the
   token binds that impact. Always compose the existing deployment validation
   with the upstream controller-candidate hook when old/new declarations include
@@ -390,7 +389,7 @@ any shard must block publication.
   and validate representative outputs against that exact lock. Explicit
   controller mode requires zero clients, explicit controller readiness, and a
   candidate controller build; it must not require or build client/PXE outputs.
-  Laboratory mode and legacy metadata retain strict fleet readiness plus the
+  Laboratory mode retains strict fleet readiness plus the
   controller/client/netboot/firmware/installer build set. Reject unknown modes
   and inconsistent inventories. The CLI applies only the
   token-bound `flake.nix`/`flake.lock` proposal under the deployment-root lock;
@@ -772,7 +771,6 @@ fallback settings in `lib/mk-lab.nix`; `modules/networking.nix` applies the
 resolved interface.
 
 Managed site settings live in a new deployment's `lab-settings.json`, and
-managed software declarations in `lab-software.json`; legacy `lab-config.nix` deployments remain supported and
-read-only until explicitly migrated.
+managed software declarations in `lab-software.json`.
 Additional behavior belongs in downstream extension modules, never in copies of upstream modules.
 Shell scripts must load operational settings from `labMeta` via `scripts/lib/lab-meta.sh`.

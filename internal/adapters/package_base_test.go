@@ -52,7 +52,7 @@ case " $* " in
       shift
     done
     exit 2 ;;
-  *"#labMeta "*) printf '%s\n' '{"schemaVersion":2,"controller":{"name":"pc99"},"clients":{"count":2,"hosts":[{"name":"pc01"},{"name":"pc02"}]}}' ;;
+  *"#labMeta "*) printf '%s\n' '{"schemaVersion":2,"deploymentMode":"laboratory","controller":{"name":"pc99"},"clients":{"count":2,"hosts":[{"name":"pc01"},{"name":"pc02"}]}}' ;;
   *"#deploymentStatus "*) printf '%s\n' '{"ready":true,"issues":[]}' ;;
   *"#nixoriumUpdateTargets "*) printf '%s\n' '["pc99","pc01","pc02"]' ;;
   *"#nixoriumValidateWorkspaceCandidate "*) printf 'true\n' ;;

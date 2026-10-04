@@ -1074,8 +1074,7 @@ Planning keeps the configured upstream identity, accepts exactly `master` or a
 SemVer release, generates the candidate lock outside the checkout, evaluates
 readiness, and builds outputs for the configured capability. An explicit
 controller-only deployment validates controller readiness and builds only the
-controller candidate. A laboratory deployment, including legacy metadata,
-retains the representative controller/client/netboot/firmware/installer set.
+controller candidate. A laboratory deployment retains the representative controller/client/netboot/firmware/installer set.
 Unknown modes, a client inventory in controller mode, or missing explicit
 controller readiness are rejected.
 Prereleases require `--allow-prerelease`; known downgrades require

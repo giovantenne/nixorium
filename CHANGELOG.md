@@ -6,6 +6,21 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Backward-compatibility paths are removed; there are no older installations
+  to carry. The student home is always restored at boot from the workspace
+  profile (an empty profile when `mkLab` receives none), so the profile-free
+  reset, its student template and `scripts/home-reset.sh` are gone, and
+  `nixoriumWorkspace.runtimeEnabled` is dropped. Deployments must report
+  `deploymentStatus.controller`, `labMeta.deploymentMode` and
+  `nixoriumSoftware.controller`; there is no fallback for metadata without
+  them. The installer refuses releases without bootstrap capability 2. PXE uses
+  only managed preparation, and the standalone `run-harmonia` and
+  `run-pxe-proxy` apps are removed. The old `deploy.lock`, the one-time
+  MoreWaita, dock and desktop-icon migrations, the pre-workspace template-reset
+  patch and the guides for migrating old deployment layouts are removed too.
+  A workspace profile that requires no packages no longer evaluates host
+  systems, which keeps evaluation memory low.
+
 - The classroom view, on unless `"classroomView": false` in `lab-settings.json`, installs
   a classroom view agent on client computers. It runs in the graphical session
   on a private socket, opens no network port, and is reached by the controller

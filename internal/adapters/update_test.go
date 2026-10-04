@@ -215,7 +215,7 @@ case " $* " in
     exit 2
     ;;
   *"#labMeta "*)
-    printf '%s\n' '{"schemaVersion":2,"controller":{"name":"pc99"},"clients":{"count":1,"hosts":[{"name":"pc01","ip":"10.0.0.1"}]}}'
+    printf '%s\n' '{"schemaVersion":2,"deploymentMode":"laboratory","controller":{"name":"pc99"},"clients":{"count":1,"hosts":[{"name":"pc01","ip":"10.0.0.1"}]}}'
     ;;
   *"#deploymentStatus "*)
     printf '%s\n' '{"ready":true,"issues":[]}'
@@ -353,13 +353,17 @@ func TestUpdateCandidateChecksFailClosedAcrossDeploymentModes(t *testing.T) {
 		})
 	}
 
-	legacy := domain.LabMeta{}
-	legacy.Controller.Name = "pc99"
-	legacy.Clients.Count = 1
-	legacy.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}}
-	builds, checks, err := updateCandidateChecks(legacy, domain.DeploymentStatus{Ready: true})
+	laboratory := domain.LabMeta{DeploymentMode: "laboratory"}
+	laboratory.Controller.Name = "pc99"
+	laboratory.Clients.Count = 1
+	laboratory.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}}
+	builds, checks, err := updateCandidateChecks(laboratory, domain.DeploymentStatus{Ready: true})
 	if err != nil || len(builds) != 5 || len(checks) != 2 {
-		t.Fatalf("legacy laboratory builds = %+v, checks = %+v, error = %v", builds, checks, err)
+		t.Fatalf("laboratory builds = %+v, checks = %+v, error = %v", builds, checks, err)
+	}
+	laboratory.DeploymentMode = ""
+	if _, _, err := updateCandidateChecks(laboratory, domain.DeploymentStatus{Ready: true}); err == nil {
+		t.Fatal("labMeta without a deployment mode was accepted")
 	}
 }
 

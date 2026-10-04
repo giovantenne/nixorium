@@ -76,7 +76,7 @@ configuration, software, home customization, diagnostics, and operations.
 - Keep the direct `nixpkgs` input and
   `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs"` together when present.
   Updating Nixorium must preserve that package-base lock node. Do not change
-  its channel or migrate a legacy layout implicitly.
+  its channel implicitly.
 - Use `package-base status/plan/apply` or Maintenance → Update system and
   packages for a separately authorized base refresh; see UPDATES.md. Channel
   changes require explicit unverified-compatibility acceptance, not upstream

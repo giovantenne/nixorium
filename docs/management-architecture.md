@@ -1112,7 +1112,7 @@ Testing is layered:
 - adapter tests use temporary Git repositories and fake executables with
   recorded argument arrays and controlled output;
 - Nix evaluation tests cover package/module exports, strict configuration,
-  public metadata schemas, template generation, and unchanged legacy inputs;
+  public metadata schemas, template generation and inputs;
 - NixOS VM tests cover first-run discovery, systemd ordering, Harmonia health,
   PXE start/stop/recovery, the remote worker's unit/socket/ownership and orphan
   recovery boundaries, mutual PXE/USB exclusion, permission boundaries, CLI

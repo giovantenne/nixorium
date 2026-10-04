@@ -18,9 +18,8 @@ examples. Do not update the framework just to obtain a convenient command.
 
 Distinguish controller-only mode from a configured laboratory. Use
 `labMeta` for actual hosts/interfaces and `deploymentStatus.controller` for
-controller readiness when available; client installation/deployment requires
-`deploymentStatus.ready`. Missing newer capability metadata means use the
-legacy contract, not assume support.
+controller readiness; client installation/deployment requires
+`deploymentStatus.ready`.
 
 Clarify only choices that materially affect the result: which computers/users,
 which tool or version when ambiguous, and whether to apply now. Explain impact

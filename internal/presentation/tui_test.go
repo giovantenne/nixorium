@@ -33,9 +33,6 @@ func testDashboardReport(mode string) domain.StatusReport {
 
 func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 	model := dashboardModel{}
-	if first := model.software.scopeOptions()[0].scope.Kind; first != domain.SoftwareScopeAllClients {
-		t.Fatalf("legacy default changed: %s", first)
-	}
 	model.software.catalog.Controller = "pc99"
 	options := model.software.scopeOptions()
 	if options[0].scope.Kind != domain.SoftwareScopeShared || options[1].scope.Kind != domain.SoftwareScopeController {
@@ -183,6 +180,11 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	model = updated.(dashboardModel)
 	if model.screen != dashboardSoftware || model.software.stage != softwareScope || !strings.Contains(model.View().Content, "This is not the set of computers deployed today") {
 		t.Fatalf("software scope missing:\n%s", model.View().Content)
+	}
+	// Choose "All clients", after the two controller scopes.
+	for range 2 {
+		updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+		model = updated.(dashboardModel)
 	}
 	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)

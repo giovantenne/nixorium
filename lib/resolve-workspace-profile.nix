@@ -111,15 +111,18 @@ let
     builtins.isString value && builtins.match "[a-z0-9][a-z0-9-]{0,62}" value != null;
   targets = [ controllerName ] ++ clientNames;
   expectedNames = lib.sort builtins.lessThan targets;
+  # A profile that requires no package never inspects host systems.
   checkHost = name:
     let
       packages = hostPackages.${name};
       missing = builtins.filter (package: !(builtins.elem package packages)) requiredPackages;
+      role = if name == controllerName then "controller" else "client";
     in
-    if !builtins.isList packages || !(builtins.all packageTools.validPath packages)
+    if requiredPackages == [] then { inherit name role; }
+    else if !builtins.isList packages || !(builtins.all packageTools.validPath packages)
     then fail "invalid host package declaration"
     else if missing != [] then fail "${name} is missing required packages: ${lib.concatStringsSep ", " missing}"
-    else { inherit name; role = if name == controllerName then "controller" else "client"; };
+    else { inherit name role; };
   normalizedCatalog = {
     schemaVersion = 1;
     inherit baseline;

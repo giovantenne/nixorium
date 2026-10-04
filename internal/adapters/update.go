@@ -446,7 +446,7 @@ func updateCandidateChecks(meta domain.LabMeta, status domain.DeploymentStatus) 
 				{ID: "lab-meta", State: "passed", Message: "candidate controller metadata evaluated"},
 				{ID: "deployment-status", State: "passed", Message: "candidate controller is ready"},
 			}, nil
-	case "", "laboratory":
+	case "laboratory":
 		if len(meta.Clients.Hosts) == 0 || meta.Clients.Hosts[0].Name == "" {
 			return nil, nil, errors.New("candidate labMeta does not contain at least one client")
 		}

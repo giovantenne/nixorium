@@ -6,11 +6,6 @@ The private deployment owns the desired laboratory configuration and exact
 input revisions in `flake.lock`. The installed controller is the management
 point, not a remote permission service.
 
-Legacy sites without a direct root nixpkgs pin still inherit their effective
-base from the framework. They need the reviewed pin migration below **before**
-relying on core-only update isolation; a framework update alone does not migrate
-their private flake.
-
 | Operation | Changes | Preserves |
 | --- | --- | --- |
 | Update Nixorium | Framework source, modules, patches, management program and its auxiliary input graph | Direct deployment nixpkgs lock node |
@@ -137,7 +132,7 @@ auto-update checks, and the next ordinary boot reset installs the new seed.
 System/package planning requires a direct stable
 `github:NixOS/nixpkgs/nixos-YY.05` or `nixos-YY.11` input and the explicit
 root follows relationship. Custom URLs, unstable channels, channel downgrades,
-ambiguous expressions and legacy layouts require a manual reviewed operation.
+and ambiguous expressions require a manual reviewed operation.
 
 The system updater compares **every other node** in the candidate lock graph.
 Unexpected changes, including transitive dependencies, fail closed. It checks
@@ -155,39 +150,7 @@ Neither output should be overridden to bypass failures.
 
 Build success remains explicitly runtime/hardware-unverified. No
 `--allow-unverified` flag bypasses input integrity, clean-state checks,
-readiness, builds, offline consistency or a stale review token. The legacy
-framework update path retains its controller/representative-client and
-installation-artifact checks; it is not the new variant-aware base validation.
-
-## Existing deployments: one-time, reviewed adoption
-
-Updating a framework input does not overwrite private template files.
-
-For a deployment already owning root nixpkgs:
-
-1. Adopt a Nixorium revision containing this feature while keeping nixpkgs
-   unchanged. Ensure the installed management executable is that version.
-2. Remove only the old `packageBaseCompatible` channel-comparison binding and
-   its assertion from the private flake. Preserve local policy, modules,
-   assets and validation hooks. Do not remove real module/schema assertions.
-3. Keep `inputs.nixpkgs.url` and
-   `inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";`.
-   Update optional package-base metadata following the new template.
-4. Expose the `mkLab` outputs unchanged (normally `deployment // { ... }`
-   already does this). Validate the effective lock and both update outputs,
-   run offline equivalence and compare systems before/after this adoption.
-5. Review and commit the migration before planning a base update.
-
-For a legacy deployment without root nixpkgs, **first migrate without upgrading
-the effective package base**. Record the current framework nixpkgs source,
-revision and hash by resolving its lock graph (including follows paths).
-Add the direct declaration and follows edge, generate a temporary candidate
-lock pinned to that exact revision, preserve the appropriate channel in the
-original source metadata, and inspect every changed node. Nix may rename nodes;
-do not replace the whole lock blindly. Compare direct/offline derivation paths,
-build the configured systems, review and commit. Only then request a newer
-base. This structural migration is intentionally manual: arbitrary private
-Nix expressions cannot safely be rewritten by a textual updater.
+readiness, builds, offline consistency or a stale review token.
 
 ## Updating one application independently
 

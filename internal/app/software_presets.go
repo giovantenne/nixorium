@@ -92,9 +92,6 @@ func (m SoftwareManager) PlanPreset(ctx context.Context, repository string, requ
 	if err := validateSoftwareRequestScope(request.Scope, software.Clients, software.Groups); err != nil {
 		return softwarePresetPlanIssue(report, "scope", err.Error())
 	}
-	if softwareScopeIncludesController(request.Scope) && software.Controller == "" {
-		return softwarePresetPlanIssue(report, "scope", "this deployment does not support controller software; update Nixorium before using this scope")
-	}
 	presetPackages := map[string]bool{}
 	for _, packageID := range preset.Packages {
 		presetPackages[packageID] = true

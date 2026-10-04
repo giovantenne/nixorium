@@ -152,9 +152,6 @@ func (m SoftwareManager) Plan(ctx context.Context, repository string, request do
 	if err := validateSoftwareRequestScope(request.Scope, catalog.Clients, catalog.Groups); err != nil {
 		return softwarePlanIssue(report, "scope", err.Error())
 	}
-	if softwareScopeIncludesController(request.Scope) && catalog.Controller == "" {
-		return softwarePlanIssue(report, "scope", "this deployment does not support controller software; update Nixorium before using this scope")
-	}
 	report.Request = request
 	report.AffectedClients = softwareScopeClients(request.Scope, catalog.Clients, catalog.Groups)
 	if softwareScopeIncludesController(request.Scope) {
@@ -312,7 +309,7 @@ func validateSoftwarePackageItem(item domain.SoftwareCatalogItem) error {
 }
 
 func validateSoftwareDefinition(definition domain.SoftwareDefinition) error {
-	if definition.SchemaVersion != domain.SoftwareSchemaVersion || definition.ManagedFile != "lab-software.json" {
+	if definition.SchemaVersion != domain.SoftwareSchemaVersion || definition.ManagedFile != "lab-software.json" || definition.Controller == "" {
 		return errors.New("deployment exposes an unsupported software contract")
 	}
 	clients := map[string]bool{}
@@ -351,9 +348,6 @@ func validateSoftwareDefinition(definition domain.SoftwareDefinition) error {
 		}
 		managed[entry.Package] = true
 		entry.Origin = ""
-		if softwareScopeIncludesController(entry.Scope) && definition.Controller == "" {
-			return errors.New("software contract does not advertise controller software support")
-		}
 		if err := domain.ValidateLabSoftware(domain.LabSoftwareFile{SchemaVersion: domain.SoftwareSchemaVersion, Packages: []domain.SoftwareDeclaration{entry}}); err != nil {
 			return errors.New("software contract contains an invalid managed declaration")
 		}

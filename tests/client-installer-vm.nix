@@ -98,7 +98,7 @@
 
     target.state_dir = installer.state_dir
     os.environ["NIX_EFI_VARS"] = str(installer.state_dir / "installer-efi-vars.fd")
-    target.start(allow_reboot=True)
+    target.start()
     target.wait_for_unit("multi-user.target")
     target.succeed("test \"$(systemctl show virtualbox.service --property=LoadState --value)\" = not-found")
     target.succeed("test \"$(hostname)\" = pc01")
@@ -109,7 +109,8 @@
     target.succeed("install -d -o student -g users /home/student/.pi /home/student/.config/opencode /home/student/.local/share/opencode /home/student/.npm; for path in .pi/session.json .config/opencode/credentials.json .local/share/opencode/history.json .npm/cache; do install -o student -g users -m 0600 /dev/null /home/student/$path; done; echo keep > /home/student/lesson.txt; chown student:users /home/student/lesson.txt")
     # The student home is restored at every boot; the previous home is kept
     # as a snapshot without the ephemeral paths.
-    target.reboot()
+    target.shutdown()
+    target.start()
     target.wait_for_unit("home-reset.service")
     target.succeed("test -f /var/lib/home-snapshots/workspace/snapshot-1/lesson.txt; for path in .pi .config/opencode .local/share/opencode .local/npm .npm .opencode; do test ! -e /var/lib/home-snapshots/workspace/snapshot-1/$path; done")
     target.succeed("test ! -e /home/student/lesson.txt; test ! -e /home/student/.pi; test ! -e /home/student/.config/opencode; test ! -e /home/student/.local/share/opencode; test ! -e /home/student/.npm; test ! -e /home/student/.opencode")
