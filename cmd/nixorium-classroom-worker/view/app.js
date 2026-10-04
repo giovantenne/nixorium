@@ -35,16 +35,6 @@ const selectAll = document.getElementById('select-all');
 const selectedCount = document.getElementById('selected-count');
 const toolbarButtons = document.querySelectorAll('.toolbar button[data-action]');
 
-// The latest state of every computer, for actions that depend on it.
-const known = new Map();
-
-// Lock and Internet offer the change that applies: when every selected
-// computer is already locked (or blocked) they turn into Unlock (Allow).
-function setToggle(button, opposite, labels) {
-  button.dataset.action = opposite ? labels[1][0] : labels[0][0];
-  button.textContent = opposite ? labels[1][1] : labels[0][1];
-}
-
 function updateSelection() {
   for (const [name, entry] of cards) {
     entry.check.checked = chosen.has(name);
@@ -54,10 +44,6 @@ function updateSelection() {
   selectAll.checked = chosen.size > 0 && chosen.size === cards.size;
   selectAll.indeterminate = chosen.size > 0 && chosen.size < cards.size;
   for (const button of toolbarButtons) button.disabled = chosen.size === 0 && !(button.dataset.action === 'show-screen' && casting);
-  const picked = [...chosen].map((name) => known.get(name)).filter(Boolean);
-  const all = (test) => picked.length > 0 && picked.every(test);
-  setToggle(document.querySelector('.toolbar [data-toggle="lock"]'), all((computer) => computer.locked), [['lock', 'Lock'], ['unlock', 'Unlock']]);
-  setToggle(document.querySelector('.toolbar [data-toggle="internet"]'), all((computer) => computer.internet === 'blocked'), [['internet-block', 'Block Internet'], ['internet-allow', 'Allow Internet']]);
   document.querySelector('.power-menu').classList.toggle('disabled', chosen.size === 0);
 }
 
@@ -117,7 +103,6 @@ function screenAge(computer) {
 function render(computers) {
   let viewing = 0;
   for (const computer of computers) {
-    known.set(computer.name, computer);
     const entry = card(computer);
     const text = stateText[computer.state] ?? computer.detail;
     // Without an image the screen area already says why; avoid repeating it.

@@ -17,8 +17,14 @@
     <label class="select-all"><input type="checkbox" id="select-all"> Select all</label>
     <span id="selected-count">None selected</span>
     <button type="button" data-action="show-screen" title="Show your whole screen on the selected computers, with their keyboard and mouse blocked">Show my screen</button>
-    <button type="button" data-action="lock" data-toggle="lock" title="Lock the selected screens, or unlock them when they are all locked">Lock</button>
-    <button type="button" data-action="internet-block" data-toggle="internet" title="Block Internet on the selected computers, or allow it when it is blocked on all of them">Block Internet</button>
+    <span class="pair" role="group" aria-label="Screens">
+      <button type="button" data-action="lock">Lock</button>
+      <button type="button" data-action="unlock">Unlock</button>
+    </span>
+    <span class="pair" role="group" aria-label="Internet">
+      <button type="button" data-action="internet-block">Block Internet</button>
+      <button type="button" data-action="internet-allow">Allow Internet</button>
+    </span>
     <button type="button" data-action="send-desktop" title="Copy the files and folders of a folder you choose, such as your desktop, to the students' desktops">Send desktop</button>
     <details class="actions-menu power-menu">
       <summary>Power</summary>
