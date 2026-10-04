@@ -177,6 +177,9 @@ func thumbnailReply(capture capturer, width int, since int64) classroomview.Mess
 	if errors.Is(err, errNotReady) {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNotReady, Detail: err.Error()}
 	}
+	if errors.Is(err, errLocked) {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeLocked, Detail: err.Error()}
+	}
 	if err != nil {
 		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeCapture, Detail: err.Error()}
 	}

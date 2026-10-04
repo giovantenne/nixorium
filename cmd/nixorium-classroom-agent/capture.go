@@ -184,6 +184,8 @@ func (capture *mutterCapture) releaseLocked() {
 
 var errNotReady = errors.New("no screen frame yet")
 
+var errLocked = errors.New("the screen is locked")
+
 func (capture *mutterCapture) stopWhenIdle() {
 	for range time.Tick(5 * time.Second) {
 		capture.mutex.Lock()
@@ -218,6 +220,10 @@ func (capture *mutterCapture) startLocked(width int) error {
 	}
 	var remotePath, castPath, streamPath dbus.ObjectPath
 	if err := connection.Object(remoteDesktopName, "/org/gnome/Mutter/RemoteDesktop").Call(remoteDesktopName+".CreateSession", 0).Store(&remotePath); err != nil {
+		if strings.Contains(err.Error(), "inhibited") {
+			// GNOME refuses screen capture while the screen is locked.
+			return fail(errLocked)
+		}
 		return fail(fmt.Errorf("remote desktop session: %w", err))
 	}
 	remote := connection.Object(remoteDesktopName, remotePath)

@@ -80,6 +80,14 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe --input --thumbnail /tmp/thumb5.jpg nixorium-classroom-connect | tee /dev/stderr | grep -F 'input.done'")
     client.succeed("${agent} probe --thumbnail /tmp/thumb6.jpg nixorium-classroom-connect | grep -F 'width=320 height=240'")
 
+    # A locked screen cannot be captured; the teacher is told why. The
+    # capture stops after 30 idle seconds, then the screen is locked.
+    client.sleep(35)
+    client.succeed("loginctl lock-sessions")
+    client.sleep(3)
+    client.succeed("(${agent} probe --thumbnail /tmp/thumb-locked.jpg nixorium-classroom-connect || true) | grep -F 'code=screen-locked'")
+    client.succeed("loginctl unlock-sessions")
+
     # Without a running agent the controller gets a clear error, not a hang.
     client.succeed("systemctl --user -M student@ stop nixorium-classroom-agent")
     client.fail("${agent} probe nixorium-classroom-connect")

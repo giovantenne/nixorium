@@ -116,3 +116,16 @@ func TestClassroomViewHubShowsEveryComputerAndStopsWhenNobodyLooks(t *testing.T)
 		t.Fatalf("polling still running=%v, closed sessions=%d", running, closed)
 	}
 }
+
+func TestClassroomFailureStates(t *testing.T) {
+	for code, want := range map[string]string{
+		classroomview.CodeNoSession: ClassroomNoSession,
+		classroomview.CodeNoAgent:   ClassroomNoAgent,
+		classroomview.CodeLocked:    ClassroomLocked,
+		classroomview.CodeCapture:   ClassroomFailed,
+	} {
+		if state, _ := classroomFailureState(classroomview.AgentError{Code: code}); state != want {
+			t.Fatalf("code %s state = %s, want %s", code, state, want)
+		}
+	}
+}

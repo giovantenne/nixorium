@@ -45,6 +45,7 @@ const (
 	ClassroomNoSession   = "no-session"
 	ClassroomNoAgent     = "no-agent"
 	ClassroomUnreachable = "unreachable"
+	ClassroomLocked      = "locked"
 	ClassroomFailed      = "failed"
 )
 
@@ -260,6 +261,8 @@ func classroomFailureState(err error) (string, string) {
 			return ClassroomNoSession, "Nobody is signed in."
 		case classroomview.CodeNoAgent:
 			return ClassroomNoAgent, "The classroom view is not running on this computer."
+		case classroomview.CodeLocked:
+			return ClassroomLocked, "The screen is locked."
 		default:
 			return ClassroomFailed, "The screen could not be captured."
 		}

@@ -188,6 +188,9 @@ func TestThumbnailReplies(t *testing.T) {
 	if reply := thumbnailReply(fakeCapture{err: errNotReady}, 320, 0); reply.Code != classroomview.CodeNotReady {
 		t.Fatalf("not ready reply = %+v", reply)
 	}
+	if reply := thumbnailReply(fakeCapture{err: errLocked}, 320, 0); reply.Code != classroomview.CodeLocked {
+		t.Fatalf("locked reply = %+v", reply)
+	}
 	if reply := thumbnailReply(fakeCapture{err: errors.New("no Mutter")}, 320, 0); reply.Code != classroomview.CodeCapture {
 		t.Fatalf("failure reply = %+v", reply)
 	}

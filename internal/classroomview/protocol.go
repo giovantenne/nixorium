@@ -97,6 +97,7 @@ const (
 	CodeBadRequest  = "bad-request"
 	CodeCapture     = "capture-failed"
 	CodeNotReady    = "not-ready"
+	CodeLocked      = "screen-locked"
 )
 
 // Message is one protocol message. Unknown fields are refused on decode.

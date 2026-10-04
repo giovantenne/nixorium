@@ -21,6 +21,7 @@ const stateText = {
   viewing: '',
   'no-session': 'Nobody is signed in',
   'no-agent': 'Classroom view is not running here',
+  locked: 'The screen is locked',
   unreachable: 'Switched off or not reachable',
   failed: 'The screen could not be captured',
 };
