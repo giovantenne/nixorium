@@ -38,8 +38,12 @@ dialog::backdrop { background: rgb(0 0 0 / 0.7); }
 .viewer-bar button { padding: 0.35rem 0.9rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: inherit; font: inherit; cursor: pointer; }
 #viewer-image { display: block; width: 100%; min-height: 0; flex: 1; max-height: calc(96vh - 6rem); object-fit: contain; background: #000; }
 .viewer-bar button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
-.controlling { margin: 0; padding: 0.45rem 0.9rem; background: var(--warning); color: #000; font-weight: 600; }
-#viewer-image.control { cursor: crosshair; outline: 3px solid var(--warning); outline-offset: -3px; }
+.viewer-bar .controlling { flex: none; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--warning); color: #000; font-weight: 600; }
+#viewer-image.control { outline: 3px solid var(--warning); outline-offset: -3px; }
 #viewer-image:focus { outline: none; }
-#viewer-panel:fullscreen #viewer-image { max-height: none; }
+/* Full screen: only the student's screen; the bar slides in at the top edge. */
+#viewer-panel:fullscreen { position: relative; background: #000; }
+#viewer-panel:fullscreen #viewer-image { max-height: none; height: 100vh; }
+#viewer-panel:fullscreen .viewer-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 1; background: var(--card); box-shadow: 0 2px 12px rgb(0 0 0 / 0.5); transform: translateY(-100%); transition: transform 0.15s ease-out; }
+#viewer-panel:fullscreen.show-bar .viewer-bar { transform: none; }
 #viewer-image.control:focus { outline: 3px solid var(--warning); }

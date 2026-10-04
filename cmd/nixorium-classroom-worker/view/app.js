@@ -257,8 +257,16 @@ fullscreenButton.addEventListener('click', () => {
     viewerPanel.requestFullscreen().catch(() => {});
   }
 });
+// In full screen the bar appears when the pointer reaches the top edge.
+viewerPanel.addEventListener('pointermove', (event) => {
+  if (!document.fullscreenElement) return;
+  const bar = viewerPanel.querySelector('.viewer-bar');
+  const reveal = viewerPanel.classList.contains('show-bar') ? bar.offsetHeight + 8 : 4;
+  viewerPanel.classList.toggle('show-bar', event.clientY <= reveal);
+});
 document.addEventListener('fullscreenchange', () => {
   const full = Boolean(document.fullscreenElement);
+  viewerPanel.classList.remove('show-bar');
   fullscreenButton.textContent = full ? 'Leave full screen' : 'Full screen';
   if (full && navigator.keyboard && navigator.keyboard.lock) {
     navigator.keyboard.lock().catch(() => {});
