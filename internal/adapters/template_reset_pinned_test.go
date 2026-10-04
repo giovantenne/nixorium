@@ -1,11 +1,7 @@
 package adapters
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,6 +57,8 @@ func TestTemplateResetPinnedLegacyMigration(t *testing.T) {
 	files["lab-settings.json"] = domain.TemplateFile{Mode: "100644", Data: data}
 	old := files["flake.nix"]
 	old.Data = []byte(strings.Replace(string(old.Data), "github:giovantenne/nixorium/v2.0.0", "github:giovantenne/nixorium/"+revision, 1))
+	// Veyon is gone from the current upstream, together with its key.
+	old.Data = []byte(strings.Replace(string(old.Data), "            veyon = ./keys/veyon-public-key.pem;\n", "", 1))
 	files["flake.nix"] = old
 	for destination, fixture := range map[string]string{"keys/admin-ssh.pub": "remote-vm-admin.pub", "keys/cache-public-key": "remote-vm-cache-public-key"} {
 		content, err := os.ReadFile(filepath.Join(upstream, "tests/fixtures", fixture))
@@ -69,15 +67,6 @@ func TestTemplateResetPinnedLegacyMigration(t *testing.T) {
 		}
 		files[destination] = domain.TemplateFile{Mode: "100644", Data: content}
 	}
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	public, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	files["keys/veyon-public-key.pem"] = domain.TemplateFile{Mode: "100644", Data: pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: public})}
 	repository, err := isolatedResetCandidate(t.Context(), files)
 	if err != nil {
 		t.Fatal(err)

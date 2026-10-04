@@ -200,9 +200,9 @@ func (m SetupManager) status(ctx context.Context, repository string, initial boo
 				keyProblems = append(keyProblems, problem)
 			}
 		}
-		facts.Keys.Complete = len(keyStates) == 3 && len(keyProblems) == 0
+		facts.Keys.Complete = len(keyStates) == 2 && len(keyProblems) == 0
 		if facts.Keys.Complete {
-			facts.Keys.Detail = "cache, SSH, and Veyon pairs have safe private modes and verified correspondence"
+			facts.Keys.Detail = "cache and SSH pairs have safe private modes and verified correspondence"
 		} else {
 			facts.Keys.Detail = "incomplete key pairs: " + strings.Join(keyProblems, ", ")
 		}
@@ -274,10 +274,9 @@ func (m SetupManager) status(ctx context.Context, repository string, initial boo
 
 func pendingManagedSetupPaths(paths []string) []string {
 	managed := map[string]bool{
-		"lab-settings.json":         true,
-		"keys/cache-public-key":     true,
-		"keys/admin-ssh.pub":        true,
-		"keys/veyon-public-key.pem": true,
+		"lab-settings.json":     true,
+		"keys/cache-public-key": true,
+		"keys/admin-ssh.pub":    true,
 	}
 	pending := []string{}
 	for _, path := range paths {

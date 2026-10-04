@@ -17,10 +17,8 @@ func TestKeyMaterialRequiresPrivateModesAndNoSymlinks(t *testing.T) {
 	files := map[string]os.FileMode{
 		"secret-key": 0600,
 		filepath.Join("keys", "cache-public-key"): 0644,
-		"admin-ssh":                                   0644,
-		filepath.Join("keys", "admin-ssh.pub"):        0644,
-		"veyon-private-key.pem":                       0600,
-		filepath.Join("keys", "veyon-public-key.pem"): 0644,
+		"admin-ssh":                            0644,
+		filepath.Join("keys", "admin-ssh.pub"): 0644,
 	}
 	for path, mode := range files {
 		if err := os.WriteFile(filepath.Join(repository, path), []byte("key"), mode); err != nil {
@@ -28,7 +26,7 @@ func TestKeyMaterialRequiresPrivateModesAndNoSymlinks(t *testing.T) {
 		}
 	}
 	states := (Local{}).KeyMaterial(context.Background(), repository)
-	if len(states) != 3 || states[0].Ready() || states[1].Ready() || states[2].Ready() {
+	if len(states) != 2 || states[0].Ready() || states[1].Ready() {
 		t.Fatalf("states = %+v", states)
 	}
 
@@ -58,7 +56,7 @@ func TestReconcileKeyMaterialCreatesVerifiesAndReusesPairs(t *testing.T) {
 		t.Fatal(err)
 	}
 	states := local.KeyMaterial(context.Background(), repository)
-	if len(states) != 3 {
+	if len(states) != 2 {
 		t.Fatalf("states = %+v", states)
 	}
 	for _, state := range states {
@@ -70,7 +68,6 @@ func TestReconcileKeyMaterialCreatesVerifiesAndReusesPairs(t *testing.T) {
 	paths := []string{
 		"secret-key", filepath.Join("keys", "cache-public-key"),
 		"admin-ssh", filepath.Join("keys", "admin-ssh.pub"),
-		"veyon-private-key.pem", filepath.Join("keys", "veyon-public-key.pem"),
 	}
 	original := map[string]string{}
 	for _, path := range paths {
@@ -154,7 +151,6 @@ func TestImportKeyMaterialCopiesVerifiedPrivateKeysWithoutChangingSources(t *tes
 	sources := map[string]string{
 		"cache": "nixorium-cache:PRIVATE\n",
 		"ssh":   "ssh-private\n",
-		"veyon": "-----BEGIN PRIVATE KEY-----\nVEYONPRIVATE\n-----END PRIVATE KEY-----\n",
 	}
 	for name, content := range sources {
 		path := filepath.Join(sourceDirectory, name)
@@ -272,13 +268,6 @@ case "$1" in
     printf 'ssh-ed25519 AAAATEST admin@controller\n' > "$target.pub"
     ;;
   -y) printf 'ssh-ed25519 AAAATEST\n' ;;
-  *) exit 2 ;;
-esac
-`)
-	writeExecutable(t, filepath.Join(directory, "openssl"), `#!/bin/sh
-case "$1" in
-  genrsa) printf '%s\n' '-----BEGIN PRIVATE KEY-----' 'VEYONPRIVATE' '-----END PRIVATE KEY-----' ;;
-  pkey) cat >/dev/null; printf '%s\n' '-----BEGIN PUBLIC KEY-----' 'VEYONPUBLIC' '-----END PUBLIC KEY-----' ;;
   *) exit 2 ;;
 esac
 `)

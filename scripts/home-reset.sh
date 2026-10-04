@@ -94,8 +94,8 @@ if [ -n "$(find "$HOME_DIR" -maxdepth 1 -mindepth 1 -print -quit 2>/dev/null)" ]
   echo "Creating snapshot of current home..."
   btrfs subvolume snapshot "$HOME_DIR" "$SNAPSHOTS_DIR/snapshot-1"
 
-  # Make snapshot accessible to admin/teacher (veyon-master group)
-  chgrp veyon-master "$SNAPSHOTS_DIR/snapshot-1"
+  # Make snapshot accessible to admin/teacher (nixorium-staff group)
+  chgrp nixorium-staff "$SNAPSHOTS_DIR/snapshot-1"
   chmod 750 "$SNAPSHOTS_DIR/snapshot-1"
   chmod -R g+rX "$SNAPSHOTS_DIR/snapshot-1"
 fi

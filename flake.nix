@@ -7,13 +7,9 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    veyon = {
-      url = "git+https://github.com/veyon/veyon.git?ref=refs/tags/v4.11.3&submodules=1";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, disko, veyon }:
+  outputs = { self, nixpkgs, disko }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -23,7 +19,6 @@
         upstreamSelf = self;
         inherit nixpkgs;
         inherit disko;
-        inherit veyon;
       };
       defaultLab = mkLab {
         deploymentSelf = self;
@@ -31,7 +26,6 @@
         publicKeys = {
           cache = ./public-key;
           ssh = ./id_ed25519.pub;
-          veyon = ./veyon-public-key.pem;
         };
       };
       configSchemaTest = import ./tests/eval-lab-config.nix {
@@ -68,7 +62,7 @@
       workspaceRuntimeLab = mkWorkspaceLab {};
       workspaceRuntimeControllerLab = mkWorkspaceLab {
         labConfig = (import ./lab-config.nix) // { deploymentMode = "controller"; pcCount = 0; };
-        publicKeys = { cache = null; ssh = null; veyon = null; };
+        publicKeys = { cache = null; ssh = null; };
       };
       workspaceIntegrationTests = import ./tests/workspace-mk-lab.nix {
         inherit mkWorkspaceLab workspaceLab;
@@ -93,7 +87,6 @@
         publicKeys = {
           cache = ./public-key;
           ssh = ./id_ed25519.pub;
-          veyon = ./veyon-public-key.pem;
         };
         hostModules.pc01 = [ ./tests/client-installer-instrumentation.nix ];
       };

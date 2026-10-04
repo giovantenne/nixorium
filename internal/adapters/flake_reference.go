@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var privateDeploymentPaths = []string{"secret-key", "admin-ssh", "veyon-private-key.pem"}
+var privateDeploymentPaths = []string{"secret-key", "admin-ssh"}
 
 // deploymentFlakeReference deliberately uses the Git fetcher rather than the
 // path fetcher. A private deployment contains ignored secret key files; the

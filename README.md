@@ -49,8 +49,9 @@ Nixorium bridges that gap with a local-first workflow:
   GNOME desktop and applications. The last five sessions stay on that PC as
   snapshots, so a lost file can be recovered from **Snapshots** in the Files
   sidebar.
-- **Classroom management.** Veyon is ready with every PC of the room: watch
-  screens, help one student, lock screens or show your own screen.
+- **Classroom view.** On the controller, see every student screen at once,
+  open one in its own window and take control, lock screens, show your own
+  screen, and send the files on your desktop to the students' desktops.
 - **A classroom dashboard.** On the controller, see which PCs are on, pause or
   restore Internet on selected PCs, and shut them down or restart them. The
   dashboard cannot change the lab.
@@ -157,8 +158,8 @@ restricted classroom dashboard from the same **Nixorium** icon.
 ## Security
 
 Privileged operations run through fixed system services, never as arbitrary
-commands from the interface. Clients accept SSH and Veyon only from the
-controller's address on the lab network. Installation always needs an explicit
+commands from the interface. Clients accept SSH only from the controller's
+address on the lab network. Installation always needs an explicit
 confirmation; unattended installation is disabled. Private keys stay out of Git
 and the Nix store. See the [management architecture](docs/management-architecture.md)
 and the [security policy](SECURITY.md).

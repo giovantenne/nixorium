@@ -43,7 +43,7 @@ let
     };
     virtualisation = { memorySize = if editorQualification then 2048 else 768; emptyDiskImages = [ 512 ]; };
     users.users.student = { isNormalUser = true; uid = 2000; group = "users"; };
-    users.groups.veyon-master = {};
+    users.groups.nixorium-staff = {};
     environment.systemPackages = [ pkgs.btrfs-progs ];
     # Only these disposable VM disks are formatted, and only on the first boot.
     systemd.services.prepare-reset-fixture = {

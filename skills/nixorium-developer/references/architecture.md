@@ -18,7 +18,6 @@ references must remain inside the upstream or deployment source trees.
 
 Generated host names and addresses come from the validated IPv4 network,
 prefix, client count, and host numbers. Reject unknown per-host modules so configuration typos cannot be ignored.
-The deprecated `veyonNativeHosts` string list is accepted but has no effect.
 
 `deploymentStatus` reports whether placeholders, missing public keys, or
 public default passwords remain. Keep the standalone example evaluable even
@@ -45,10 +44,9 @@ packages, power behavior, screensaver, shell configuration, and SSH policy
 belong in separate modules. Site-specific removal or policy should use
 downstream overrides or the smallest new generic extension point.
 
-Keep module evaluation free of import-from-derivation. In particular,
-`Veyon.conf` must encode its generated network objects inside its build-time
-derivation and be installed through `environment.etc.<name>.source`; never read
-that derivation with `builtins.readFile` during evaluation.
+Keep module evaluation free of import-from-derivation: generated files are
+installed through `environment.etc.<name>.source`; never read a derivation
+with `builtins.readFile` during evaluation.
 
 Keep controller orchestration in `management.nix` and privileged PXE address
 state in the focused `pxe.nix` module. The network unit must write its

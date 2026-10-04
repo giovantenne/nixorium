@@ -102,7 +102,6 @@ func (f fakeSetupSource) KeyMaterial(context.Context, string) []domain.KeyMateri
 	return []domain.KeyMaterialState{
 		{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
 		{Name: "ssh", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
-		{Name: "veyon", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
 	}
 }
 
@@ -119,14 +118,14 @@ func TestReconcileKeysReportsVerifiedState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Operation != "setup-keys" || report.State != "ready" || len(report.Keys) != 3 {
+	if report.Operation != "setup-keys" || report.State != "ready" || len(report.Keys) != 2 {
 		t.Fatalf("report = %+v", report)
 	}
 }
 
 func TestVerifyKeysIsReadOnlyAndReportsVerifiedState(t *testing.T) {
 	report := NewSetupManager(fakeSetupSource{}).VerifyKeys(context.Background(), "/repo")
-	if report.Operation != "setup-keys-verify" || report.State != "ready" || len(report.Keys) != 3 {
+	if report.Operation != "setup-keys-verify" || report.State != "ready" || len(report.Keys) != 2 {
 		t.Fatalf("report = %+v", report)
 	}
 }

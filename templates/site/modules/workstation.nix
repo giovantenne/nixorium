@@ -106,7 +106,7 @@ let
     ++ [ "org.gnome.Nautilus.desktop" "org.gnome.TextEditor.desktop" ];
   # The Nixorium launcher exists only on the controller; staff find it first.
   staffFavorites = lib.optionals isController [ "nixorium.desktop" ]
-    ++ studentFavorites ++ [ "io.veyon.desktop" ];
+    ++ studentFavorites;
   enabledExtensions = [
     "ding@rastersoft.com"
     "dash-to-dock@micxgx.gmail.com"

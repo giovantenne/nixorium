@@ -501,7 +501,7 @@ explicit conflicts.
 Plaintext passwords are read without terminal echo, sent to a local hashing
 process over standard input, retained in memory only as long as needed, and
 cleared where practical. Only salted SHA-512 password hashes enter the private
-configuration. Private Harmonia, SSH, and Veyon keys stay outside the Git
+configuration. Private Harmonia and SSH keys stay outside the Git
 worktree in root- or user-owned locations. Their public counterparts remain in
 the deployment and may be committed.
 
@@ -665,8 +665,8 @@ The first implemented privileged action is
 `nixorium-install-secrets.service`, reached only through `nixorium setup
 install-secrets` or the typed continuous installation flow. It reads the
 declaratively fixed,
-administrator-owned deployment, re-verifies all three pairs, and copies them
-only to fixed SSH, Veyon, and Harmonia destinations. Its polkit rule permits
+administrator-owned deployment, re-verifies both pairs, and copies them
+only to fixed SSH and Harmonia destinations. Its polkit rule permits
 wheel members to start that exact unit only. The systemd sandbox makes the
 deployment read-only and exposes write access only to the three pre-created
 destination directories; differing existing keys and symlinks are fatal.

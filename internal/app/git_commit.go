@@ -214,10 +214,10 @@ func generatedGitCommitMessage(paths []string) string {
 	publicKeys := true
 	managed := true
 	for _, path := range paths {
-		if path != "keys/cache-public-key" && path != "keys/admin-ssh.pub" && path != "keys/veyon-public-key.pem" {
+		if path != "keys/cache-public-key" && path != "keys/admin-ssh.pub" {
 			publicKeys = false
 		}
-		if path != "lab-settings.json" && path != "lab-software.json" && path != domain.WorkspaceFileName && path != "keys/cache-public-key" && path != "keys/admin-ssh.pub" && path != "keys/veyon-public-key.pem" {
+		if path != "lab-settings.json" && path != "lab-software.json" && path != domain.WorkspaceFileName && path != "keys/cache-public-key" && path != "keys/admin-ssh.pub" {
 			managed = false
 		}
 	}

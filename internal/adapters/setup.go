@@ -28,7 +28,6 @@ type keyMaterialSpec struct {
 var keyMaterialSpecs = []keyMaterialSpec{
 	{name: "cache", privatePath: "secret-key", publicPath: filepath.Join("keys", "cache-public-key")},
 	{name: "ssh", privatePath: "admin-ssh", publicPath: filepath.Join("keys", "admin-ssh.pub")},
-	{name: "veyon", privatePath: "veyon-private-key.pem", publicPath: filepath.Join("keys", "veyon-public-key.pem")},
 }
 
 func (Local) ImportKeyMaterial(ctx context.Context, repository, name, sourcePath string) (domain.KeyImportEvidence, error) {
@@ -247,8 +246,6 @@ func generatePrivateKey(ctx context.Context, name string) ([]byte, error) {
 		}
 		content, _, err := readRegularFileNoFollowLimit(privatePath, maximumKeyMaterialBytes)
 		return content, err
-	case "veyon":
-		return runKeyCommand(ctx, nil, "openssl", "genrsa", "4096")
 	default:
 		return nil, fmt.Errorf("unsupported key type %q", name)
 	}
@@ -276,8 +273,6 @@ func derivePublicKey(ctx context.Context, name string, privateContent []byte) ([
 			return nil, createErr
 		}
 		content, err = runKeyCommand(ctx, nil, "ssh-keygen", "-y", "-P", "", "-f", privatePath)
-	case "veyon":
-		content, err = runKeyCommand(ctx, privateContent, "openssl", "pkey", "-pubout")
 	default:
 		return nil, fmt.Errorf("unsupported key type %q", name)
 	}
@@ -297,8 +292,6 @@ func publicKeysMatch(name string, expected, actual []byte) bool {
 		expectedFields := strings.Fields(string(expected))
 		actualFields := strings.Fields(string(actual))
 		return len(expectedFields) >= 2 && len(actualFields) >= 2 && expectedFields[0] == actualFields[0] && expectedFields[1] == actualFields[1]
-	case "veyon":
-		return strings.Join(strings.Fields(string(expected)), "") == strings.Join(strings.Fields(string(actual)), "")
 	default:
 		return strings.TrimSpace(string(expected)) == strings.TrimSpace(string(actual))
 	}

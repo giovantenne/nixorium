@@ -5,6 +5,5 @@ these public files in this directory:
 
 - `cache-public-key`
 - `admin-ssh.pub`
-- `veyon-public-key.pem`
 
 Never commit the corresponding private keys.

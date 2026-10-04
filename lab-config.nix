@@ -44,7 +44,7 @@
   # hostIfaceNames.pc05 = "enp3s0";
 
   # ── User accounts ─────────────────────────────────────────────
-  # Teacher account (gets Veyon Master access + no home reset)
+  # Teacher account (classroom view on the controller, no home reset)
   teacherUser = "teacher";
   # Student account (autologin on client PCs, home reset at boot)
   studentUser = "student";

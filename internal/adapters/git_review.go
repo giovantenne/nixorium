@@ -20,12 +20,11 @@ const (
 )
 
 var managedDeploymentPaths = map[string]bool{
-	domain.WorkspaceFileName:    true,
-	"lab-settings.json":         true,
-	"lab-software.json":         true,
-	"keys/cache-public-key":     true,
-	"keys/admin-ssh.pub":        true,
-	"keys/veyon-public-key.pem": true,
+	domain.WorkspaceFileName: true,
+	"lab-settings.json":      true,
+	"lab-software.json":      true,
+	"keys/cache-public-key":  true,
+	"keys/admin-ssh.pub":     true,
 }
 
 var passwordJSONValue = regexp.MustCompile(`("(?:admin|teacher|student)Password"[[:space:]]*:[[:space:]]*)"(?:\\.|[^"\\])*"`)

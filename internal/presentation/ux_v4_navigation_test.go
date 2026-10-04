@@ -509,7 +509,7 @@ func TestSetupPreparesSavesAndInstallsKeysThroughTypedActions(t *testing.T) {
 	model.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageKeys}
 	model.actions.LoadSetupKeys = func(ctx context.Context) domain.KeyReconcileReport {
 		return domain.KeyReconcileReport{Operation: "setup-keys-verify", State: "action-required", Keys: []domain.KeyMaterialState{
-			{Name: "cache", Problem: "missing"}, {Name: "ssh", Problem: "missing"}, {Name: "veyon", Problem: "missing"},
+			{Name: "cache", Problem: "missing"}, {Name: "ssh", Problem: "missing"},
 		}}
 	}
 	model.actions.ReconcileSetupKeys = func() (domain.KeyReconcileReport, error) {
@@ -601,7 +601,6 @@ func TestExistingKeyImportLivesUnderAdvancedSettings(t *testing.T) {
 		return domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
 			{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
 			{Name: "ssh", Problem: "private and public keys are missing"},
-			{Name: "veyon", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
 		}}
 	}
 
@@ -639,7 +638,6 @@ func TestSetupImportsSelectedExistingKeyWithoutExposingMaterial(t *testing.T) {
 	model.setupKeys = domain.KeyReconcileReport{State: "action-required", Keys: []domain.KeyMaterialState{
 		{Name: "cache", PrivatePresent: true, PublicPresent: true, Safe: true, Verified: true, Matches: true},
 		{Name: "ssh", Problem: "private and public keys are missing"},
-		{Name: "veyon", Problem: "private and public keys are missing"},
 	}}
 	model.actions.ImportSetupKey = func(name, path string) (domain.KeyImportReport, error) {
 		importedName, importedPath = name, path

@@ -6,7 +6,7 @@ The deployment passes these values to `nixorium.lib.mkLab`:
 
 - `labConfig`: typed site settings loaded from the machine-owned
   `lab-settings.json`
-- `publicKeys`: cache, SSH, and Veyon public-key paths
+- `publicKeys`: cache and SSH public-key paths
 - `assets`: logo, backgrounds, MIME defaults, and VS Code settings
 - `labSoftware`: package declarations loaded from `lab-software.json`
 - `softwareCatalog`: local suggestions loaded from `software-catalog.nix`
@@ -17,8 +17,8 @@ The deployment passes these values to `nixorium.lib.mkLab`:
 - `hostModules`: modules keyed by a generated host name
 - `netbootModules`: the PXE environment
 
-Unknown settings, asset names, public-key names, host names, and Veyon pilot
-hosts are rejected. Keep every referenced file inside the deployment
+Unknown settings, asset names, public-key names, and host names are
+rejected. Keep every referenced file inside the deployment
 repository.
 
 The generated template owns the workstation profile in its package declaration,
@@ -49,7 +49,7 @@ nix run .#nixorium -- setup
 It proposes detected network values, retains prior entries when navigating
 back, accepts normal passwords without echo, hashes them locally, validates the
 complete candidate through Nix, and presents a redacted review before writing.
-Bare `setup` then reconciles the three key pairs; `setup configure` runs only
+Bare `setup` then reconciles the two key pairs; `setup configure` runs only
 the settings stage.
 
 For a machine-generated complete candidate, use the review/apply protocol:
@@ -135,11 +135,10 @@ Private files stay outside Git:
 
 - `secret-key`
 - `admin-ssh`
-- `veyon-private-key.pem`
 
 Only their public counterparts belong under `keys/`.
 
-Create or reconcile all three pairs with:
+Create or reconcile both pairs with:
 
 ```sh
 nix run .#nixorium -- setup keys

@@ -1,4 +1,4 @@
-{ upstreamSelf, nixpkgs, disko, veyon }:
+{ upstreamSelf, nixpkgs, disko }:
 args@{
   deploymentSelf,
   labConfig,
@@ -44,10 +44,8 @@ let
 
   configuredCachePublicKeyFile = publicKeys.cache or ../public-key;
   configuredAdminSshKeyFile = publicKeys.ssh or ../id_ed25519.pub;
-  configuredVeyonPublicKeyFile = publicKeys.veyon or ../veyon-public-key.pem;
   cachePublicKeyFile = if fileExists configuredCachePublicKeyFile then configuredCachePublicKeyFile else null;
   adminSshKeyFile = if fileExists configuredAdminSshKeyFile then configuredAdminSshKeyFile else null;
-  veyonPublicKeyFile = if fileExists configuredVeyonPublicKeyFile then configuredVeyonPublicKeyFile else null;
   cachePublicKey = readSingleLine cachePublicKeyFile;
   adminSshKey = readSingleLine adminSshKeyFile;
 
@@ -85,7 +83,6 @@ let
   inherit (config) keyboardLayout;
   inherit (config) consoleKeyMap;
   inherit (config) classroomView;
-  inherit (config) veyonNativeHosts;
 
   networkOctets = map lib.toInt (lib.splitString "." networkBase);
   networkAddress =
@@ -115,53 +112,6 @@ let
   pcNumbers = builtins.genList (n: n + 1) pcCount;
   clientNumbers = pcNumbers;
   clientIps = map mkHostIp clientNumbers;
-
-  veyonWaylandOverlay = final: prev: {
-    # The v4.11.3 tag still has VERSION_PATCH 2 in CMake's fallback; pass the
-    # release explicitly so the official flake also sets both CI tag variables.
-    veyon = (prev.makeVeyon { version = "4.11.3"; }).overrideAttrs (oldAttrs: {
-      buildInputs = (oldAttrs.buildInputs or []) ++ [ final.pipewire ];
-      nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [ final.makeWrapper ];
-      patches = (oldAttrs.patches or []) ++ [
-        # Upstream 22218d7 (2026-09-25), pending the next Veyon release.
-        ../pkgs/patches/veyon-persist-restore-token.patch
-        # Local fix for RGB32 padding exposed by Qt Wayland rendering.
-        ../pkgs/patches/veyon-opaque-framebuffer.patch
-      ];
-      postPatch = (oldAttrs.postPatch or "") + ''
-        # Veyon 4.11.1 sanitizes child PATH to FHS locations. Keep its fixed,
-        # trusted-path policy while resolving NixOS setuid helpers and tools.
-        substituteInPlace plugins/platform/linux/LinuxServiceCore.cpp \
-          --replace-fail \
-            'QStringLiteral("/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")' \
-            "QStringLiteral(\"/run/wrappers/bin:$out/bin:/run/current-system/sw/bin\")"
-        substituteInPlace plugins/platform/linux/input-helper/CMakeLists.txt \
-          --replace-fail 'OWNER_READ OWNER_WRITE OWNER_EXECUTE SETUID' \
-                         'OWNER_READ OWNER_WRITE OWNER_EXECUTE'
-      '';
-      postInstall = (oldAttrs.postInstall or "") + ''
-        if [ ! -f "$out/lib/veyon/pipewire-vnc-server.so" ]; then
-          echo "ERROR: Veyon PipeWire VNC plugin was not built" >&2
-          exit 1
-        fi
-      '';
-      # Under GNOME, Qt opens GTK file dialogs (distributing files, saving
-      # the computer list). GTK aborts without its GSettings schemas, so the
-      # interactive programs carry them instead of relying on the session.
-      postFixup = (oldAttrs.postFixup or "") + ''
-        for program in veyon-master veyon-configurator; do
-          wrapProgram "$out/bin/$program" \
-            --prefix XDG_DATA_DIRS : "${final.gtk3}/share/gsettings-schemas/${final.gtk3.name}" \
-            --prefix XDG_DATA_DIRS : "${final.gsettings-desktop-schemas}/share/gsettings-schemas/${final.gsettings-desktop-schemas.name}"
-        done
-      '';
-    });
-  };
-
-  labOverlay = lib.composeManyExtensions [
-    veyon.overlays.default
-    veyonWaylandOverlay
-  ];
 
   labSettings = {
     inherit deploymentMode;
@@ -194,21 +144,17 @@ let
     inherit keyboardLayout;
     inherit consoleKeyMap;
     inherit classroomView;
-    inherit veyonNativeHosts;
     inherit cachePublicKey;
     inherit cachePort;
     inherit pxeHttpPort;
-    inherit veyonPublicKeyFile;
   };
 
   baseHostModules = [
-    { nixpkgs.overlays = [ labOverlay ]; }
     ({ lib, ... }:
       {
         warnings = lib.optionals laboratoryEnabled (
           lib.optional (cachePublicKeyFile == null) "Missing cache public key"
-          ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key"
-          ++ lib.optional (veyonPublicKeyFile == null) "Missing Veyon public key");
+          ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key");
         environment.systemPackages = [ hostState hostSessionState hostCleanGenerations ];
       }
       // lib.optionalAttrs (effectiveDeploymentRevision != null) {
@@ -223,7 +169,6 @@ let
     (upstreamRoot + "/modules/cache.nix")
     (upstreamRoot + "/modules/filesystems.nix")
     (upstreamRoot + "/modules/home-reset.nix")
-    (upstreamRoot + "/modules/veyon.nix")
     (upstreamRoot + "/modules/classroom-view.nix")
     (upstreamRoot + "/modules/management.nix")
     (upstreamRoot + "/modules/pxe.nix")
@@ -326,7 +271,7 @@ let
     ++ netbootModules
     ++ lib.concatLists (lib.attrValues hostModules);
   isModulePath = module: builtins.isPath module || builtins.isString module;
-  unknownPublicKeyNames = builtins.attrNames (builtins.removeAttrs publicKeys [ "cache" "ssh" "veyon" ]);
+  unknownPublicKeyNames = builtins.attrNames (builtins.removeAttrs publicKeys [ "cache" "ssh" ]);
   unknownAssetNames = builtins.attrNames (builtins.removeAttrs assets [ "logo" "backgrounds" "mimeApps" "vscodeSettings" ]);
   validHomeResetEphemeralPath = path:
     builtins.isString path
@@ -361,7 +306,6 @@ let
     ++ lib.optional (masterDhcpIp == "MASTER_DHCP_IP") "masterDhcpIp still uses the template placeholder"
     ++ lib.optional (cachePublicKeyFile == null) "cache public key is missing"
     ++ lib.optional (adminSshKeyFile == null) "admin SSH public key is missing"
-    ++ lib.optional (veyonPublicKeyFile == null) "Veyon public key is missing"
     ++ credentialIssues;
   controllerIssues = if laboratoryEnabled then deploymentIssues else credentialIssues;
   sourceNixosVersionMetadata =
@@ -382,7 +326,6 @@ let
   };
   softwarePkgs = import nixpkgs {
     inherit system;
-    overlays = [ labOverlay ];
     config.allowUnfree = true;
   };
   softwarePackageTools = import ./software-packages.nix {
@@ -605,25 +548,14 @@ let
           url = "path:${deploymentRoot}";
           flake = false;
         };
-        systems.url = "path:${veyon.inputs.flake-utils.inputs.systems.outPath}";
-        flake-utils = {
-          url = "path:${veyon.inputs.flake-utils.outPath}";
-          inputs.systems.follows = "systems";
-        };
         disko = {
           url = "path:${disko.outPath}";
           inputs.nixpkgs.follows = "nixpkgs";
-        };
-        veyon = {
-          url = "path:${veyon.outPath}";
-          inputs.nixpkgs.follows = "nixpkgs";
-          inputs.flake-utils.follows = "flake-utils";
         };
         nixorium = {
           url = "path:${upstreamRoot}";
           inputs.nixpkgs.follows = "nixpkgs";
           inputs.disko.follows = "disko";
-          inputs.veyon.follows = "veyon";
         };
       };
 
@@ -643,7 +575,6 @@ let
           publicKeys = {
             cache = ${renderPath cachePublicKeyFile};
             ssh = ${renderPath adminSshKeyFile};
-            veyon = ${renderPath veyonPublicKeyFile};
           };
           assets = {
             logo = ${renderPath labAssets.logo};
@@ -920,7 +851,7 @@ builtins.mapAttrs (name: value:
     assert builtins.isString rawJSON || throw "workspace candidate must be JSON text";
     let
       declared = (import ./eval-workspace-profile.nix { inherit lib; }) rawJSON;
-      candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko veyon; }
+      candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko; }
         (args // { workspaceProfileJSON = rawJSON; });
     in
     # Update review validates the current declaration again through this hook.
@@ -938,7 +869,7 @@ builtins.mapAttrs (name: value:
   # clients in their software hook. Reuse every downstream extension unchanged.
   nixoriumValidateControllerSoftwareCandidate = rawSoftware:
     let
-      candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko veyon; }
+      candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko; }
         (args // { labSoftware = rawSoftware; });
     in builtins.deepSeq
       candidate.nixosConfigurations.${masterHostName}.config.system.build.toplevel.drvPath

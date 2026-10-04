@@ -45,7 +45,7 @@ func TestRecoveryReportsEveryPersistentBlocker(t *testing.T) {
 		pending:      domain.PendingDeployment{SchemaVersion: 1, Repository: "/srv/lab", Revision: strings.Repeat("a", 40), Targets: []domain.DeploymentTarget{{Name: "pc01"}, {Name: "pc02"}}, StartedAt: started},
 		pendingFound: true, usb: true, reset: true,
 		holder: domain.OperationHolder{Operation: "Update computers", User: "admin", StartedAt: started, Known: true}, busy: true,
-		settings: []domain.ValidationIssue{{Field: "lab.veyonNativeHosts", Message: "unknown field"}},
+		settings: []domain.ValidationIssue{{Field: "lab.retiredOption", Message: "unknown field"}},
 		drift:    "the running system differs from the last applied configuration",
 	}
 	report := NewRecoveryInspector(source).Observe(context.Background(), "/srv/lab")
@@ -85,7 +85,7 @@ func TestRecoveryReportsEveryPersistentBlocker(t *testing.T) {
 type failingMetaSource struct{ *fakeSource }
 
 func (failingMetaSource) LabMeta(context.Context, string) (domain.LabMeta, error) {
-	return domain.LabMeta{}, errors.New("nix: error: attribute 'veyonNativeHosts' unexpected\nlong trace")
+	return domain.LabMeta{}, errors.New("nix: error: attribute 'retiredOption' unexpected\nlong trace")
 }
 
 func TestDoctorStillReportsWhenTheLaboratoryCannotBeRead(t *testing.T) {

@@ -83,8 +83,8 @@ configuration, software, home customization, diagnostics, and operations.
   permission. Preserve every other lock node and `system.stateVersion`.
   A successful build does not certify boot, hardware or application data.
 - Keep referenced modules, public keys, and assets inside the deployment tree
-  for offline installation. Never commit private `secret-key`, `admin-ssh`,
-  or `veyon-private-key.pem`, or expose them to the Nix store or chat.
+  for offline installation. Never commit private `secret-key` or `admin-ssh`,
+  or expose them to the Nix store or chat.
 - Create/verify keys with `nixorium setup keys`; never overwrite mismatched
   pairs. Install verified secrets only through `nixorium setup install-secrets`.
 - Use managed controller, deployment, PXE, and USB/SSH installation operations.

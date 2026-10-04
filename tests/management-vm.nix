@@ -275,7 +275,7 @@ in
     virtualisation.writableStoreUseTmpfs = internetOnly;
     virtualisation.memorySize = if internetOnly then 2048 else 1024;
     environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnused pkgs.jq pkgs.python3 pkgs.util-linux fakeColmena fakeHostState fakeShutdownRemote fakeUpdateNix fakeUpdateGit cleanGenerations ];
-    users.groups.veyon-master = {};
+    users.groups.nixorium-staff = {};
     system.activationScripts.createHomeTemplates = "";
     system.activationScripts.siteHomeProfile = {
       deps = [ "users" ];
@@ -685,15 +685,15 @@ in
     controller.succeed("cp /tmp/deployment/lab-settings.json /tmp/candidate.json")
     controller.succeed("nixorium config plan --repo /tmp/deployment --file /tmp/candidate.json --json | jq -e '.operation == \"config-plan\" and .state == \"unchanged\" and (.changes | length) == 0'")
     controller.succeed("nixorium setup keys --repo /tmp/deployment --json | jq -e '.operation == \"setup-keys\" and .state == \"ready\" and all(.keys[]; .verified and .matches and .privateMode == 384)'")
-    controller.succeed("test $(stat -c '%a' /tmp/deployment/secret-key /tmp/deployment/admin-ssh /tmp/deployment/veyon-private-key.pem | sort -u) = 600")
-    controller.succeed("before=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh /tmp/deployment/veyon-private-key.pem); nixorium setup keys --repo /tmp/deployment --json >/dev/null; after=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh /tmp/deployment/veyon-private-key.pem); test \"$before\" = \"$after\"")
+    controller.succeed("test $(stat -c '%a' /tmp/deployment/secret-key /tmp/deployment/admin-ssh | sort -u) = 600")
+    controller.succeed("before=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh); nixorium setup keys --repo /tmp/deployment --json >/dev/null; after=$(sha256sum /tmp/deployment/secret-key /tmp/deployment/admin-ssh); test \"$before\" = \"$after\"")
     controller.succeed("git -C /tmp/deployment add keys && git -C /tmp/deployment -c user.name=Test -c user.email=test@example.invalid commit -qm keys")
     # Encrypted backup: due, created, verified, restored into an empty directory.
     controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'any(.conditions[]; .kind == \"backup-due\")'")
-    controller.succeed("install -d -m 0700 /tmp/backups; printf 'correct horse battery\\n' > /tmp/backup-pass; chmod 0600 /tmp/backup-pass; nixorium backup create --repo /tmp/deployment --to /tmp/backups --passphrase-file /tmp/backup-pass --json > /tmp/backup.json || { cat /tmp/backup.json; false; }; jq -e '.state == \"completed\" and .files > 0 and (.privateKeys | length) == 3' /tmp/backup.json")
+    controller.succeed("install -d -m 0700 /tmp/backups; printf 'correct horse battery\\n' > /tmp/backup-pass; chmod 0600 /tmp/backup-pass; nixorium backup create --repo /tmp/deployment --to /tmp/backups --passphrase-file /tmp/backup-pass --json > /tmp/backup.json || { cat /tmp/backup.json; false; }; jq -e '.state == \"completed\" and .files > 0 and (.privateKeys | length) == 2' /tmp/backup.json")
     controller.succeed("file=$(jq -r .path /tmp/backup.json); nixorium backup verify \"$file\" --passphrase-file /tmp/backup-pass --json | jq -e '.state == \"completed\"'; nixorium backup restore \"$file\" --to /tmp/restored --passphrase-file /tmp/backup-pass --json | jq -e '.state == \"completed\"'; test -f /tmp/restored/deployment/lab-settings.json; test \"$(git -C /tmp/restored/deployment rev-parse HEAD)\" = \"$(git -C /tmp/deployment rev-parse HEAD)\"")
     controller.succeed("nixorium recovery status --repo /tmp/deployment --json | jq -e 'all(.conditions[]; .kind != \"backup-due\")'")
-    controller.succeed("set -e; for key in secret-key admin-ssh veyon-private-key.pem; do cmp /tmp/deployment/$key /tmp/restored/deployment/$key; test $(stat -c '%a' /tmp/restored/deployment/$key) = 600; done")
+    controller.succeed("set -e; for key in secret-key admin-ssh; do cmp /tmp/deployment/$key /tmp/restored/deployment/$key; test $(stat -c '%a' /tmp/restored/deployment/$key) = 600; done")
     controller.succeed("test -z \"$(git -C /tmp/deployment status --porcelain=v1 --untracked-files=normal)\"")
     controller.succeed("cp /tmp/deployment/admin-ssh /tmp/existing-admin-key; chmod 0600 /tmp/existing-admin-key; sha256sum /tmp/existing-admin-key > /tmp/existing-admin-key.sha256; rm /tmp/deployment/admin-ssh /tmp/deployment/keys/admin-ssh.pub; ((sleep 8; printf a; sleep 1; printf e; sleep 4; printf y; sleep 4; printf j; printf i; sleep 1; printf '/tmp/existing-admin-key\\r'; sleep 6; printf '\\r'; sleep 6) | TERM=xterm timeout 35s script -qefc 'stty rows 40 cols 120; nixorium --repo /tmp/deployment' /tmp/nixorium-key-import-tui.log) || test $? = 124")
     controller.succeed("sha256sum -c /tmp/existing-admin-key.sha256; cmp /tmp/existing-admin-key /tmp/deployment/admin-ssh; test \"$(stat -c '%a' /tmp/deployment/admin-ssh)\" = 600; nixorium setup status --repo /tmp/deployment --json | jq -e '.currentStage == \"apply-controller\"'; ! git -C /tmp/deployment status --porcelain=v1 | grep -F 'keys/admin-ssh.pub'")
@@ -765,7 +765,7 @@ in
       assert actual == base_lock
       assert controller.succeed("cat /tmp/base-deployment/flake.nix") == base_flake
 
-    controller.succeed("source_path=$(nix --extra-experimental-features 'nix-command flakes' flake metadata git+file:///tmp/deployment --json --no-write-lock-file | jq -r .path); test ! -e \"$source_path/secret-key\"; test ! -e \"$source_path/admin-ssh\"; test ! -e \"$source_path/veyon-private-key.pem\"")
+    controller.succeed("source_path=$(nix --extra-experimental-features 'nix-command flakes' flake metadata git+file:///tmp/deployment --json --no-write-lock-file | jq -r .path); test ! -e \"$source_path/secret-key\"; test ! -e \"$source_path/admin-ssh\"")
     controller.succeed("git -C /tmp/deployment add -f secret-key")
     controller.fail("nixorium status --repo /tmp/deployment --json")
     controller.succeed("git -C /tmp/deployment rm --cached -q secret-key")
@@ -774,8 +774,9 @@ in
     controller.succeed("chown -R admin:users /home/admin/nixorium-deployment; chmod 0700 /home/admin/nixorium-deployment")
     classroom_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium-classroom/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdef","operation":"overview"}\\n\'); value=json.loads(s.makefile().readline()); assert value["requestId"] == "0123456789abcdef0123456789abcdef" and value["state"] == "completed" and value["status"]["lab"]["controller"]["name"] == "pc99"'
     controller.succeed("su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(classroom_probe)))
-    # The experimental classroom view stays off unless the laboratory turns it on.
-    view_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium-classroom/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdee","operation":"view-open"}\\n\'); value=json.loads(s.makefile().readline()); assert value["state"] == "failed" and "CLASSROOM-VIEW-OFF" in value["message"] and "viewUrl" not in value'
+    # The classroom view is on unless the laboratory turns it off: the teacher
+    # gets a one-time loopback address.
+    view_probe = 'import json,socket; s=socket.socket(socket.AF_UNIX); s.connect("/run/nixorium-classroom/control.sock"); s.sendall(b\'{"schemaVersion":1,"requestId":"0123456789abcdef0123456789abcdee","operation":"view-open"}\\n\'); value=json.loads(s.makefile().readline()); assert value["state"] == "completed" and value["viewUrl"].startswith("http://127.0.0.1:")'
     controller.succeed("su - teacher -c " + shlex.quote("python3 -c " + shlex.quote(view_probe)))
     controller.fail("su - teacher -c 'test -r /home/admin/nixorium-deployment/flake.nix'")
     controller.succeed("su - admin -c 'cd /home/admin/nixorium-deployment && nixorium install usb status --id 0123456789abcdef0123456789abcdef --json' >/tmp/usb-status.json || test $? = 1; jq -e '.operationId == \"0123456789abcdef0123456789abcdef\" and .state == \"unavailable\"' /tmp/usb-status.json")
@@ -798,7 +799,6 @@ in
     controller.succeed("test $(cat /home/admin/.local/state/nixorium/operations/deploy.lock) = legacy-lock")
     controller.succeed("su - admin -c 'cd ~/nixorium-deployment && nixorium setup install-secrets --json' | jq -e '.operation == \"setup-install-secrets\" and .state == \"completed\"'")
     controller.succeed("cmp /home/admin/nixorium-deployment/admin-ssh /home/admin/.ssh/id_ed25519")
-    controller.succeed("cmp /home/admin/nixorium-deployment/veyon-private-key.pem /etc/veyon/keys/private/teacher/key")
     controller.succeed("cmp /home/admin/nixorium-deployment/secret-key /var/lib/nixorium/keys/harmonia-secret-key")
     controller.succeed("test $(stat -c '%a' /home/admin/.ssh/id_ed25519 /var/lib/nixorium/keys/harmonia-secret-key | sort -u) = 600")
     controller.succeed("printf 'restrict,command=\"/run/current-system/sw/bin/nixorium-test-shutdown-remote\" %s\n' \"$(cat /home/admin/nixorium-deployment/keys/admin-ssh.pub)\" > /root/.ssh/authorized_keys; chmod 0600 /root/.ssh/authorized_keys; systemctl reload sshd.service")
@@ -826,7 +826,6 @@ in
     controller.succeed("journalctl -u nixorium-template-reset-check.service --no-pager | grep -F -- '--- PASS: TestTemplateResetRealNixCandidate'")
     controller.succeed("systemctl start nixorium-support-export-check.service")
     controller.succeed("journalctl -u nixorium-support-export-check.service --no-pager | grep -F -- '--- PASS: TestSupportExportPrivateExactAndNeverOverwrites'")
-    controller.succeed("test $(stat -c '%a' /etc/veyon/keys/private/teacher/key) = 640")
     controller.succeed("systemctl reset-failed harmonia.service harmonia.socket; systemctl restart harmonia.socket nixorium-harmonia.service")
     controller.wait_for_unit("nixorium-harmonia.service")
     controller.wait_until_succeeds("curl --fail --silent http://192.0.2.10:5000/nix-cache-info | grep -F 'StoreDir: /nix/store'")
@@ -970,7 +969,7 @@ in
       controller.succeed("install -d -m 0700 /tmp/controller-only-secrets; mv /home/admin/nixorium-deployment/admin-ssh /tmp/controller-only-secrets/repository-ssh")
       controller.fail("systemctl start nixorium-apply-controller.service")
       controller.succeed("journalctl -u nixorium-apply-controller.service --no-pager | grep -F 'deployment key correspondence verification failed'; systemctl reset-failed nixorium-apply-controller.service")
-      controller.succeed("mv /home/admin/nixorium-deployment/secret-key /tmp/controller-only-secrets/repository-cache; mv /home/admin/nixorium-deployment/veyon-private-key.pem /tmp/controller-only-secrets/repository-veyon; mv /home/admin/.ssh/id_ed25519 /tmp/controller-only-secrets/installed-ssh; mv /var/lib/nixorium/keys/harmonia-secret-key /tmp/controller-only-secrets/installed-cache; mv /etc/veyon/keys/private/teacher/key /tmp/controller-only-secrets/installed-veyon")
+      controller.succeed("mv /home/admin/nixorium-deployment/secret-key /tmp/controller-only-secrets/repository-cache; mv /home/admin/.ssh/id_ed25519 /tmp/controller-only-secrets/installed-ssh; mv /var/lib/nixorium/keys/harmonia-secret-key /tmp/controller-only-secrets/installed-cache")
       controller.succeed("cp /home/admin/nixorium-deployment/flake.nix /home/admin/nixorium-deployment/laboratory-flake.nix; cp /etc/nixorium-test/controller-only.nix /home/admin/nixorium-deployment/flake.nix; jq '.lab.deploymentMode = \"controller\" | .lab.pcCount = 0 | .lab.masterDhcpIp = \"MASTER_DHCP_IP\"' /home/admin/nixorium-deployment/lab-settings.json > /tmp/controller-only-settings.json; cp /tmp/controller-only-settings.json /home/admin/nixorium-deployment/lab-settings.json; chown admin:users /home/admin/nixorium-deployment/laboratory-flake.nix /home/admin/nixorium-deployment/flake.nix /home/admin/nixorium-deployment/lab-settings.json")
       controller.succeed("su - admin -c 'cd ~/nixorium-deployment; cp /etc/nixorium-test/lab-software.json lab-software.json; git add flake.nix laboratory-flake.nix lab-settings.json lab-software.json; git -c user.name=Test -c user.email=test@example.invalid commit -qm controller-only; nixorium config validate --json'")
       controller.succeed("su - admin -c 'nixorium controller plan --repo ~/nixorium-deployment --json' | jq -e '.state == \"ready\" and (.issues | length) == 0'")

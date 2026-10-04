@@ -64,9 +64,14 @@ The project follows [Semantic Versioning](https://semver.org/).
   the software review refuses to remove them or limit them to some
   computers.
 
-- Veyon no longer crashes when it opens a file dialog (distributing files,
-  saving the computer list): Veyon Master and the Configurator now carry the
-  GTK settings schemas that the dialog requires under GNOME.
+- Veyon is removed: the classroom view replaces it. Gone are the Veyon
+  module, package and patches, the `veyon` Flake input, the Veyon key pair
+  (`setup keys` now manages the cache and SSH pairs only), port 11100 and
+  the `veyon-master` group; the administrator and the teacher read student
+  home snapshots through the new `nixorium-staff` group. Clients accept only
+  SSH from the controller. Deployments must drop `publicKeys.veyon`,
+  `keys/veyon-public-key.pem` and any `veyonNativeHosts` setting, which are
+  now rejected. GNOME's remote desktop server stays disabled.
 
 ### Fixed
 

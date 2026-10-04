@@ -48,7 +48,7 @@ do not copy/edit upstream modules or merge upstream Git history. A required
 core change must be reported as an upstream task, not implemented inside a lab.
 
 Keep assets, modules, and public keys inside the deployment source tree for the
-offline installer. Private signing, SSH, and Veyon keys must stay out of Git,
+offline installer. Private signing and SSH keys must stay out of Git,
 the Nix store, logs, and chat. Preserve unrelated work and existing key pairs.
 
 ## Finish with evidence

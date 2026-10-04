@@ -62,6 +62,9 @@ in
   };
 
   services.gnome.gnome-keyring.enable = lib.mkForce false;
+  # No GNOME remote desktop server: the classroom view reaches sessions only
+  # through the controller's SSH access.
+  systemd.user.services.gnome-remote-desktop.enable = false;
   services.desktopManager.gnome.extraGSettingsOverrides = ''
     [org.gnome.desktop.session]
     idle-delay=uint32 0

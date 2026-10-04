@@ -34,7 +34,7 @@ not public documentation and must not be copied into this repository.
 .github/workflows/release.yml # Metadata check; full validation gates GitHub Release publication
 install.sh                  # Public entrypoint for controller bootstrap
 flake.nix                  # Public Flake API plus backward-compatible example deployment
-flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko, Veyon)
+flake.lock                 # Pinned inputs (nixpkgs nixos-26.05, Disko)
 VERSION                    # Canonical Semantic Version
 CHANGELOG.md               # Curated release notes
 LICENSE                    # MIT license
@@ -59,7 +59,7 @@ cmd/nixorium-demo/         # Developer-only deterministic website demo exporter
 internal/                  # Domain, application, adapter, and presentation layers
 modules/
   common.nix               # Composition point and shared system defaults
-  firewall.nix             # Interface-scoped SSH, Veyon, cache, and PXE policy
+  firewall.nix             # Interface-scoped SSH, cache, and PXE policy
   desktop.nix              # Core GNOME session, locale and regional policy
   power.nix                # Idle and controller sleep policy
   ssh.nix                  # SSH client and server policy
@@ -67,11 +67,11 @@ modules/
   networking.nix           # Hostname + static IP with shared iface name
   management.nix           # Controller-only management command installation
   pxe.nix                  # Transactional PXE address state and boot recovery
-  users.nix                # User accounts (admin + teacher + student, veyon-master group)
+  users.nix                # User accounts (admin + teacher + student, nixorium-staff group)
   cache.nix                # Controller Harmonia service + client cache trust
   filesystems.nix          # Btrfs subvolume mount declarations
   home-reset.nix           # Student home directory templating + boot-time reset
-  veyon.nix                # Veyon service, public key, firewall, base config
+  classroom-view.nix       # Classroom view agent and Shell extension on clients
 scripts/
   release.sh               # Validates, tags, and publishes a release
   install-controller.sh    # Live USB bootstrap installer for controller with disk selection
@@ -102,7 +102,6 @@ docs/adr/                   # Product architecture decision records
 Generated locally during setup and committed in the private deployment repo:
 - `keys/cache-public-key`
 - `keys/admin-ssh.pub`
-- `keys/veyon-public-key.pem`
 
 ## Development and validation
 
@@ -539,12 +538,10 @@ any shard must block publication.
 - Hardware detection uses `modules/hardware.nix` with `not-detected.nix` for automatic driver loading. No per-host hardware-configuration.nix files are needed.
 - UEFI boot is required on all machines. Disk partitioning uses an EFI System Partition (`/boot`) plus Btrfs subvolumes.
 - Netboot uses the systemd-owned `nixorium-pxe.service` with `dnsmasq` in ProxyDHCP mode so institutional DHCP remains authoritative for leases. `scripts/run-pxe-proxy.sh` remains an advanced foreground compatibility helper. `mkLab` builds a standalone installer source containing the effective downstream configuration and only local Flake inputs for offline evaluation.
-- `labOverlay` composes Veyon's official overlay with local PipeWire and RGB32 rendering fixes. It is applied in each host's module list and in `colmena.meta.nixpkgs`.
 - Docker is rootless for every normal user. Never add users back to the root-equivalent `docker` group; each account has declarative subordinate UID/GID ranges.
 - Global npm packages use `~/.local/npm` through `NPM_CONFIG_PREFIX`. Do not install npm tools with `sudo` or into the Nix store.
-- Veyon classroom management is configured in `modules/veyon.nix`: runs `veyon-service` in the graphical user session, deploys the public key, generates a `Veyon.conf` with all client PCs pre-mapped, and opens port 11100. Every lab host uses native PipeWire capture. The deprecated `veyonNativeHosts` string list remains accepted and ignored for 2.x compatibility; never use it to select capture behavior or restore the external bridge or shared VNC password. The private key is not managed by Nix (see Security).
 - `modules/firewall.nix` enables the firewall everywhere, disables implicit
-  all-interface SSH/Avahi openings, and uses nftables. Client TCP 22/11100
+  all-interface SSH/Avahi openings, and uses nftables. Client TCP 22
   admits only the static controller IPv4 address on the lab interface, with
   a guard before connection tracking preventing IPv6/old-connection bypass.
   Controller services stay interface-scoped; only it opens Harmonia/PXE.
@@ -602,8 +599,7 @@ any shard must block publication.
   classroom socket operation): it captures the screen, window or tab the
   teacher chooses with the browser's own consent (never the page itself), posts JPEGs to `/api/broadcast/frame`, and the
   worker keeps one showing at a time, sending each computer only the latest
-  picture and ending after ten silent seconds. The
-  "initial consent" rule below applies to Veyon only.
+  picture and ending after ten silent seconds.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
   lock. Recheck authenticated boot ID and state before every fixed helper
@@ -613,13 +609,8 @@ any shard must block publication.
   owned nftables table. Preserve lab IPv4, DHCP, IPv6 neighbor discovery,
   ordinary firewall reloads and reboot-to-enabled semantics. No gateway,
   persistent enablement, arbitrary remote commands or student privileges.
-- Native Veyon hosts persist per-user tokens and portal grants under
-  `/var/lib/nixorium/veyon-session`; never copy these into templates, snapshots,
-  Git, or other machines. GNOME initial consent stays explicit for Veyon. The user-only
-  state link is required because Veyon reconstructs server environment from the
-  login session; a service-only XDG_STATE_HOME does not propagate.
-- `Veyon.conf` is a build-time derivation: evaluation must never read a derivation output to encode its network objects. GitHub CI disables import-from-derivation to enforce this boundary.
-- The `veyon-master` group (declared in `modules/veyon.nix`) controls access to the Veyon private key. Users `admin` and the teacher user are members (configured in `modules/users.nix`).
+- GitHub CI disables import-from-derivation: evaluation must never read a derivation output.
+- The `nixorium-staff` group (declared in `modules/users.nix`) lets `admin` and the teacher read the student's home snapshots.
 - `modules/common.nix` is only the composition point for core desktop, firewall,
   power, and SSH modules. Packages, shell preferences, development tools,
   screensaver behavior, and application policy belong in the deployment.
@@ -731,9 +722,6 @@ set -euo pipefail
 ## Security
 
 - **Never commit** `secret-key` or `admin-ssh` (both in the deployment `.gitignore`)
-- **Never commit** `veyon-private-key.pem` (in `.gitignore`). Install it through
-  `nixorium setup install-secrets`; the fixed destination is
-  `/etc/veyon/keys/private/teacher/key`, mode `0640`, group `veyon-master`.
 - `nixorium git review` must refuse known private-key paths before reading any
   patch content; do not weaken this boundary when adding the optional commit
   workflow
@@ -746,7 +734,7 @@ set -euo pipefail
 - `nixorium update` may use controller internet only when explicitly invoked;
   it must never accept an arbitrary replacement source URL, expose ignored
   private files to Nix, or introduce client-side network requirements
-- `keys/cache-public-key`, `keys/admin-ssh.pub`, and `keys/veyon-public-key.pem` are public and may be committed
+- `keys/cache-public-key` and `keys/admin-ssh.pub` are public and may be committed
 - `nixorium setup keys` uses create-new semantics and refuses public-only or mismatched pairs; never bypass that refusal by overwriting an existing key
 - `nixorium setup install-secrets` may start only `nixorium-install-secrets.service`; its deployment path is declarative and destinations are fixed
 - `nixorium setup apply` requires a clean reviewed Git deployment and may start

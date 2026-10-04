@@ -71,12 +71,6 @@
       "overrides": {
         "consoleKeyMap": ""
       }
-    },
-    {
-      "name": "invalid deprecated Veyon native host list",
-      "overrides": {
-        "veyonNativeHosts": "pc01"
-      }
     }
   ]
 }

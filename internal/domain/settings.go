@@ -64,7 +64,6 @@ type LabSettings struct {
 	KeyboardLayout          string            `json:"keyboardLayout"`
 	ConsoleKeyMap           string            `json:"consoleKeyMap"`
 	// Deprecated: retained for compatibility; every host uses native capture.
-	VeyonNativeHosts []string `json:"veyonNativeHosts,omitempty"`
 }
 
 func (l LabSettings) ControllerInterface() string {

@@ -20,7 +20,7 @@ their private flake.
 
 Keeping nixpkgs fixed does **not** guarantee that every installed binary stays
 identical during a framework update: Nixorium can change its modules, package
-overrides, Veyon input or GNOME patches. Conversely, updating nixpkgs can change
+overrides or GNOME patches. Conversely, updating nixpkgs can change
 kernel, drivers, desktop, services and ordinary applications together. A
 package's displayed upstream version can stay equal while its dependencies
 or build change.
@@ -73,7 +73,7 @@ Open Maintenance:
 
 A successful controller switch proves the managed service completed and the
 active closure matches. It does not prove a subsequent boot, graphical login,
-Veyon screen sharing/control, audio/video, printing or every hardware driver.
+the classroom view, audio/video, printing or every hardware driver.
 Record those practical checks and the tested machines.
 
 ## CLI: advanced reviewed workflow
@@ -143,7 +143,7 @@ ambiguous expressions and legacy layouts require a manual reviewed operation.
 The system updater compares **every other node** in the candidate lock graph.
 Unexpected changes, including transitive dependencies, fail closed. It checks
 deployment readiness, builds the controller and representative client variants
-(`nixoriumUpdateTargets`): distinct managed-software selections, Veyon modes,
+(`nixoriumUpdateTargets`): distinct managed-software selections,
 interfaces and every explicit host module. Private modules branching on host
 identity must declare additional `updateValidationHosts = [ "pc03" ];` in
 their `mkLab` arguments; these hosts also enter offline validation. Identical

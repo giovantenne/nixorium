@@ -27,14 +27,3 @@ func TestSettingsFingerprintIsStableAndContentSensitive(t *testing.T) {
 		t.Fatalf("unexpected fingerprints: %q", first)
 	}
 }
-
-func TestDeprecatedVeyonSettingChangesRemainVisibleInReview(t *testing.T) {
-	before := validSettings()
-	before.Lab.VeyonNativeHosts = []string{"pc01"}
-	after := before
-	after.Lab.VeyonNativeHosts = nil
-	changes := DiffLabSettings(before, after)
-	if len(changes) != 1 || changes[0].Field != "lab.veyonNativeHosts" {
-		t.Fatalf("deprecated field removal was not reviewed: %+v", changes)
-	}
-}

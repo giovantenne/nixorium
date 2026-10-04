@@ -125,7 +125,7 @@ read-only and `n` selects those the chosen action would change; the review
 checks them again. The controller and clients must first
 run a version supporting the client helper. Internet returns on client reboot;
 offline clients are never queued. The configured laboratory IPv4 subnet stays
-reachable, including SSH and Veyon. Other destinations and established Internet
+reachable, including SSH. Other destinations and established Internet
 connections are blocked without changing the gateway.
 
 ```sh
@@ -588,14 +588,14 @@ apply also requires `--expect REVIEW_TOKEN`. These plans preserve every other
 lock node, validate controller/client variants and offline installer equivalence,
 and refuse ambiguous/legacy source layouts. The TUI Maintenance → Update
 system and packages task exposes the same operation and shared save/controller
-recovery. Build success does not prove reboot, hardware, Veyon or data migration.
+recovery. Build success does not prove reboot, hardware, the classroom view or data migration.
 Verify a canary client before explicit fleet distribution; refresh PXE artifacts
 before new installations. Do not change `system.stateVersion` or bypass a
 failed build. Older private templates need a reviewed adoption, never an
 automatic rewrite; see the deployment's UPDATES.md (upstream docs/updates.md).
 A framework update may change its own patches/packages despite fixed nixpkgs.
 Declare `mkLab.updateValidationHosts` for private host-conditional variants;
-explicit host modules, scoped software, interface and Veyon variants are covered.
+explicit host modules, scoped software and interface variants are covered.
 
 For an unsupported computed input, create a temporary upgrade branch, change
 `inputs.nixorium.url` to the chosen released tag, and update only that input:
@@ -629,22 +629,14 @@ a refusal. A failed deployment can be partial; a disconnected host is not proof
 of shutdown or rollback. Ask for direction when recovery requires a new
 destructive action or uncertain target.
 
-## Native Veyon and client access
+## Classroom view and client access
 
-Every laboratory host uses native PipeWire/Wayland capture. The external VNC
-bridge and shared password are removed. The deprecated `veyonNativeHosts`
-string list remains accepted and ignored; existing settings need no change. GNOME
-needs one local approval of screen sharing and input access; token persistence does not bypass initial consent.
-Validate monitoring, control, locking, demo, service restart, logout/login and
-reboot/home reset after deployment. The controller needs its own consent when
-broadcasting its screen. Client SSH/Veyon ports accept only the controller's
-static IPv4 address on the lab interface; other sources and IPv6 are blocked.
-Do not open port 5900 or add a shared VNC password to recover a failed session.
-
-Native hosts keep each user's Veyon token and portal permission database in
-`/var/lib/nixorium/veyon-session/<user>`, outside the reset home and snapshots.
-Portal grants for other applications also persist; normal student files do not.
-First enablement uses a fresh permission store and may ask to reapprove grants.
-Do not print tokens, copy them into templates, or reuse them on another host.
-Revocation or display changes can require fresh approval. Do not delete this
-state to diagnose a connection error.
+The classroom view is on unless `"classroomView": false`. Each client runs an
+agent in the student's session; the controller reaches it only through its
+SSH access with the fixed `nixorium-classroom-connect` command, so no other
+port is opened. Client SSH accepts only the controller's static IPv4 address
+on the lab interface; other sources and IPv6 are blocked. GNOME's sharing
+notice stays visible while the teacher watches. Updates to the classroom
+Shell extension take effect at the student's next login. Validate the
+overview, control, lock, showing the teacher's screen and Send desktop after
+deployment on a real classroom computer.

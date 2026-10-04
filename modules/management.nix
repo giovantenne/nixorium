@@ -105,12 +105,10 @@ let
       }
 
       install -d -m 0700 -o admin -g users /home/admin/.ssh
-      install -d -m 0750 -o root -g veyon-master /etc/veyon/keys/private/teacher
       install -d -m 0700 -o root -g root /var/lib/nixorium/keys
 
       install_checked "$REPOSITORY/admin-ssh" /home/admin/.ssh/id_ed25519 0600 admin users
       install_checked "$REPOSITORY/keys/admin-ssh.pub" /home/admin/.ssh/id_ed25519.pub 0644 admin users
-      install_checked "$REPOSITORY/veyon-private-key.pem" /etc/veyon/keys/private/teacher/key 0640 root veyon-master
       install_checked "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key 0600 root root
     '';
   };
@@ -223,7 +221,7 @@ let
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
         || fail "deployment worktree must be clean before controller apply"
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
-          secret-key admin-ssh veyon-private-key.pem)" ]] \
+          secret-key admin-ssh)" ]] \
         || fail "private key files must not be tracked by Git"
 
       REVISION="$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)"
@@ -257,14 +255,12 @@ let
         || fail "controller readiness must be true before controller apply"
 
       # Only an explicit capability from the pinned configuration can omit lab
-      # keys. Old deployments continue to require all three installed pairs.
+      # keys. Old deployments continue to require both installed pairs.
       if ! jq -e '.requiresKeys == false' <<<"$CONTROLLER_READINESS" >/dev/null; then
         as_admin nixorium setup keys --verify-only --repo "$REPOSITORY" --json \
           || fail "deployment key correspondence verification failed"
         cmp -s "$REPOSITORY/admin-ssh" /home/admin/.ssh/id_ed25519 \
           || fail "installed admin SSH key is absent or differs"
-        cmp -s "$REPOSITORY/veyon-private-key.pem" /etc/veyon/keys/private/teacher/key \
-          || fail "installed Veyon private key is absent or differs"
         cmp -s "$REPOSITORY/secret-key" /var/lib/nixorium/keys/harmonia-secret-key \
           || fail "installed Harmonia signing key is absent or differs"
       fi
@@ -484,7 +480,7 @@ let
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
         || fail "deployment worktree must be clean before PXE preparation"
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
-          secret-key admin-ssh veyon-private-key.pem)" ]] \
+          secret-key admin-ssh)" ]] \
         || fail "private key files must not be tracked by Git"
 
       FLAKE_URL="git+file://$REPOSITORY"
@@ -798,7 +794,6 @@ in
 
     systemd.tmpfiles.rules = [
       "d /home/admin/.ssh 0700 admin users -"
-      "d /etc/veyon/keys/private/teacher 0750 root veyon-master -"
       "d /var/lib/nixorium/keys 0700 root root -"
       "d /var/cache/nixorium/admin 0700 admin users -"
       "d /var/lib/nixorium/coordination 0770 root nixorium-operations -"
@@ -827,7 +822,6 @@ in
         ReadOnlyPaths = [ cfg.deploymentPath ];
         ReadWritePaths = [
           "-/home/admin/.ssh"
-          "-/etc/veyon/keys/private/teacher"
           "-/var/lib/nixorium/keys"
           "-/var/cache/nixorium"
           "/var/lib/nixorium/coordination"

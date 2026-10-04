@@ -24,7 +24,7 @@ The operator is responsible for:
 - obtaining authorization to administer the computers and network, and
   complying with applicable organizational policy and law;
 - protecting private repositories, password hashes, SSH keys, cache-signing
-  keys, Veyon credentials, and other deployment secrets, including prompt
+  keys, and other deployment secrets, including prompt
   rotation after suspected exposure;
 - evaluating hardware, firmware, network, software, privacy, accessibility,
   and security requirements for the actual laboratory; and

@@ -17,7 +17,7 @@ in
     interfaces = lib.mkIf laboratoryEnabled {
       ${labSettings.ifaceName} = {
         allowedTCPPorts = lib.optionals isController [
-          22 11100 labSettings.cachePort labSettings.pxeHttpPort
+          22 labSettings.cachePort labSettings.pxeHttpPort
         ];
         allowedUDPPorts = lib.optionals isController [ 5353 67 69 4011 ];
       };

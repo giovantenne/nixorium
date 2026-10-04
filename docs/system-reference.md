@@ -11,8 +11,8 @@ and privilege boundaries belong in the
 
 | Account | Default role |
 |---|---|
-| `admin` | System administrator, SSH access, sudo, and Veyon Master access |
-| Teacher account | Persistent instructor workspace, Veyon Master, and restricted classroom controls |
+| `admin` | System administrator, SSH access, sudo, and the classroom view |
+| Teacher account | Persistent instructor workspace, the classroom view, and restricted classroom controls |
 | Student account | Client autologin, reset home, and read-only host networking |
 | `root` | Disabled password and key-only SSH access |
 
@@ -267,46 +267,7 @@ npm update -g
 Downloading packages requires Internet access for that user session. Packages
 installed by the reset student account are intentionally ephemeral.
 
-## Veyon classroom management
-
-Nixorium pins Veyon 4.11.3 from its official Flake and supplies the NixOS overlay
-and wrappers required for PipeWire, authentication, and Wayland input. Every
-graphical host runs `veyon-service`; the generated configuration maps all
-configured clients under the `Lab` location.
-
-- Clients receive only the Veyon public key.
-- The controller receives the private key outside Git and the Nix store.
-- The `veyon-master` group grants key access to `admin` and the teacher.
-- Every lab host uses native PipeWire/portal capture; no external VNC server,
-  shared password or port 5900 is enabled.
-- Client TCP ports 22 and 11100 accept only the controller's static IPv4
-  address on the configured lab interface. IPv6 and other sources are denied.
-  Veyon's internal capture and feature ports remain on loopback.
-- Controller SSH, Veyon, discovery, cache and PXE remain interface-scoped.
-
-Native hosts include upstream commit `22218d772dba639819938911b47ab80924c6c87f`
-and enable `PipeWireVnc/PersistRestoreToken`. GNOME still requires initial
-interactive approval of screen sharing and input access. Subsequent starts can
-restore that grant; revocation or a changed monitor can require approval again.
-
-Veyon's token and the PermissionStore service's portal grants live under
-`/var/lib/nixorium/veyon-session/<user>/`, with separate mode-0700 directories
-for each managed desktop user. A user-service startup link exposes only Veyon's
-state in the home. The permission service alone receives a persistent
-`XDG_DATA_HOME`; application data and other student-home content still reset.
-Portal permissions (including grants for other applications) therefore persist
-on native hosts, outside home templates and snapshots. Initial rollout uses a
-fresh permission store and can require reapproval of existing portal grants.
-Never clone this state between users or machines or place tokens in Git.
-
-The deprecated `veyonNativeHosts` string list remains accepted for 2.x
-compatibility and has no effect. Existing settings need no change. After
-deployment, approve GNOME sharing locally, then test monitoring, input, lock/unlock, demo, service restart, logout/login and
-reboot/home reset. The controller also needs approval for screen broadcasts.
-Veyon still uses RFB internally; removing the bridge does not remove that
-protocol or its local native implementation.
-
-## Classroom view agent (experimental)
+## Classroom view
 
 `lab.classroomView` in `lab-settings.json` (on unless set to `false`) installs the
 classroom view agent on client computers only. It is a systemd user service
@@ -493,7 +454,7 @@ installer so client installation needs no second checkout.
 | `workspaceProfileJSON` | Optional raw JSON text for preparation of student preferences; `null` preserves legacy behavior |
 | `workspaceCatalog` | Deployment-owned baseline/application/extension catalog required with workspace JSON; no implicit package installation |
 | `clientGroups` | Named sets of evaluated client identities available to software scopes |
-| `publicKeys` | Harmonia, SSH, and Veyon public-key paths |
+| `publicKeys` | Harmonia and SSH public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
 | `homeResetEphemeralPaths` | Deployment-owned relative cache/tool paths excluded before student snapshots |
 | `sharedModules` | NixOS modules applied to every generated host |
@@ -694,7 +655,7 @@ kernel confinement APIs do not fall back to unsafe removal.
 Before changing the original home, it creates a private snapshot, removes the
 configured ephemeral data from that copy and makes it read-only. Five managed
 snapshots are published under `/var/lib/home-snapshots/workspace`, separate
-from legacy snapshots. Teacher access remains through `veyon-master`.
+from legacy snapshots. The teacher reads them through the `nixorium-staff` group.
 Reset success records bind the seed, user and boot ID under the root-only
 `/var/lib/home-snapshots/.workspace-reset` directory. They are not fleet status
 and are not currently consumed by the TUI.

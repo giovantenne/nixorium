@@ -65,7 +65,7 @@ editorPkgs.testers.runNixOSTest {
     boot.loader.timeout = 1;
     users.users.student = { isNormalUser = true; uid = 2000; group = "users"; };
     users.users.teacher = { isNormalUser = true; uid = 2001; group = "users"; };
-    users.groups.veyon-master = {};
+    users.groups.nixorium-staff = {};
     environment.systemPackages = [ editorPkgs.btrfs-progs editorPkgs.jq editorPkgs.iproute2 editorPkgs.curl ]
       ++ map (package: lib.attrByPath (lib.splitString "." package) null editorPkgs) vmPackages;
     # Editor and extensions must work offline, as on a lab client.

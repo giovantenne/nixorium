@@ -508,7 +508,7 @@ a mistaken change instead, use **Review Git changes → x Discard changes** or
 the current content is first saved under
 `refs/nixorium/discard-backups/…`, then the selected files return to the last
 commit. Untracked files, new files and private keys are never touched. Never add `secret-key`, `admin-ssh`,
-`veyon-private-key.pem`, or plaintext credentials.
+or plaintext credentials.
 
 ## Configuration is invalid
 
@@ -548,8 +548,7 @@ nixorium setup status
 
 Reconciliation creates only missing pairs, enforces mode `0600` on private
 files, and never replaces existing key material. Commit only
-`keys/cache-public-key`, `keys/admin-ssh.pub`, and
-`keys/veyon-public-key.pem`. A missing-private/existing-public or mismatched
+`keys/cache-public-key` and `keys/admin-ssh.pub`. A missing-private/existing-public or mismatched
 pair requires restoring the correct private backup or deliberately rotating the
 pair through a separately reviewed maintenance procedure.
 

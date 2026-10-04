@@ -77,7 +77,6 @@ assert builtins.all (preset: builtins.all (clients:
 ) [ [] [ "pc01" "pc02" ] ]) presets;
 assert !(example.effective ? vscode) && example.extensions == [];
 assert !(builtins.elem "vscode" example.requiredPackages);
-assert !(builtins.elem "io.veyon.desktop" example.effective.desktop.favorites);
 assert rejects (resolveFor (lib.remove "chromium" initialPackages) [] profileJSON);
 assert rejects (resolveFor initialPackages [] ''{"schemaVersion":1,"vscode":{"extensions":["ritwickdey.liveserver"]}}'');
 assert builtins.deepSeq (resolveFor (initialPackages ++ [ "vscode" ]) [] ''{"schemaVersion":1,"vscode":{"extensions":["ritwickdey.liveserver"]}}'') true;

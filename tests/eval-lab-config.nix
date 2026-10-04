@@ -7,8 +7,7 @@ let
   sharedCases = builtins.fromJSON (builtins.readFile ./lab-settings-validation-cases.json);
 in
 assert evaluates valid;
-assert evaluates (valid // { veyonNativeHosts = []; });
-assert evaluates (valid // { veyonNativeHosts = [ "master" "pc01" "retired-host" ]; });
+assert !(evaluates (valid // { veyonNativeHosts = []; }));
 assert evaluates (valid // { masterDhcpIp = "10.0.1.0"; networkBase = "10.0.0.0"; networkPrefixLength = 24; });
 assert evaluates (valid // { masterDhcpIp = "9.255.255.255"; networkBase = "10.0.0.0"; networkPrefixLength = 24; });
 assert (evalLabConfig valid).deploymentMode == "laboratory";

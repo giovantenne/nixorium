@@ -225,7 +225,7 @@ func preflight(config Config) (resetAccount, error) {
 	if err != nil {
 		return account, err
 	}
-	group, err := user.LookupGroup("veyon-master")
+	group, err := user.LookupGroup("nixorium-staff")
 	if err != nil {
 		return account, err
 	}

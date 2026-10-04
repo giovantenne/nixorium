@@ -375,7 +375,7 @@ func (preparer *RemoteInstallPreparer) validateRepository(ctx context.Context) e
 	if err != nil || len(bytes.TrimSpace(status)) != 0 {
 		return errors.New("fixed deployment repository must have a clean worktree")
 	}
-	tracked, err := preparer.run(ctx, "git", "-c", "safe.directory="+preparer.repository, "-C", preparer.repository, "ls-files", "--", "secret-key", "admin-ssh", "veyon-private-key.pem")
+	tracked, err := preparer.run(ctx, "git", "-c", "safe.directory="+preparer.repository, "-C", preparer.repository, "ls-files", "--", "secret-key", "admin-ssh")
 	if err != nil || len(bytes.TrimSpace(tracked)) != 0 {
 		return errors.New("private deployment key files must not be tracked")
 	}

@@ -52,7 +52,7 @@ pkgs.testers.runNixOSTest {
     environment.systemPackages = [ pkgs.btrfs-progs tests ];
     environment.etc."home-reset-test.json".source = config;
     users.users.student = { isNormalUser = true; uid = 2000; group = "users"; };
-    users.groups.veyon-master = {};
+    users.groups.nixorium-staff = {};
     system.stateVersion = "26.05";
   };
   testScript = ''

@@ -67,7 +67,7 @@ def serve(port):
  s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('::',port));s.listen(32)
  while True:
   c,_=s.accept();threading.Thread(target=handle,args=(c,),daemon=True).start()
-for port in (22,11100,5900): threading.Thread(target=serve,args=(port,),daemon=True).start()
+for port in (22,5900): threading.Thread(target=serve,args=(port,),daemon=True).start()
 time.sleep(300)
 '''
 try:
@@ -91,11 +91,11 @@ try:
     spawn(*ns(client, python, '-c', server))
     time.sleep(.3)
     # Prove all listeners and both IP families work before applying policy.
-    for port in (22, 11100, 5900):
+    for port in (22, 5900):
         connect(peer, '10.77.0.1', port, True)
         connect(peer, 'fd77::1', port, True)
     old = spawn(*ns(peer, python, '-u', '-c', '''import socket,sys
-s=socket.create_connection(('10.77.0.1',11100),1)
+s=socket.create_connection(('10.77.0.1',22),1)
 print('connected',flush=True)
 sys.stdin.readline();s.settimeout(.8)
 try:
@@ -108,23 +108,23 @@ assert data!=b'test', 'pre-existing peer connection bypassed the source guard'
     run(*ns(client, nft, '-f', rules))
     old.stdin.write('check\n');old.stdin.flush()
     assert old.wait(timeout=3) == 0
-    for port in (22, 11100):
-        connect(os.getpid(), '10.77.0.1', port, True)
-        connect(peer, '10.77.0.1', port, False)
-        connect(os.getpid(), 'fd77::1', port, False)
-        connect(peer, 'fd77::1', port, False)
-        connect(client, '127.0.0.1', port, True)
+    connect(os.getpid(), '10.77.0.1', 22, True)
+    connect(peer, '10.77.0.1', 22, False)
+    connect(os.getpid(), 'fd77::1', 22, False)
+    connect(peer, 'fd77::1', 22, False)
+    connect(client, '127.0.0.1', 22, True)
+    # Other services are closed to everyone, the controller included.
     connect(os.getpid(), '10.77.0.1', 5900, False)
     connect(peer, '10.77.0.1', 5900, False)
     connect(client, '127.0.0.1', 5900, True)
-    print('PASS: master IPv4 allowed; peer IPv4 and all remote IPv6 denied; old peer connection revoked; loopback retained; external VNC denied')
+    print('PASS: master SSH allowed; peer IPv4 and all remote IPv6 denied; old peer connection revoked; loopback retained; other services closed')
     if internet_rules:
         # Public-address endpoints live only in this isolated test namespace.
         run('ip', 'addr', 'add', '203.0.113.99/32', 'dev', 'br-test')
         run('ip', '-6', 'addr', 'add', '2001:db8::99/128', 'dev', 'br-test', 'nodad')
         run(*ns(client, 'ip', 'route', 'add', 'default', 'via', '10.77.0.99'))
         run(*ns(client, 'ip', '-6', 'route', 'add', 'default', 'via', 'fd77::99'))
-        spawn(python, '-c', server.replace('(22,11100,5900)', '(443,)'))
+        spawn(python, '-c', server.replace('(22,5900)', '(443,)'))
         time.sleep(.3)
         for address in ('203.0.113.99', '2001:db8::99'):
             connect(client, address, 443, True)
@@ -145,19 +145,18 @@ assert data!=b'test', 'existing Internet connection bypassed the block'
         for address in ('203.0.113.99', '2001:db8::99'):
             connect(client, address, 443, False)
         connect(client, '10.77.0.99', 443, True)
-        for port in (22, 11100):
-            connect(os.getpid(), '10.77.0.1', port, True)
+        connect(os.getpid(), '10.77.0.1', 22, True)
         # A normal firewall reload must retain the independently owned block.
         reload_rules = ('delete table inet base_firewall\n'
                         'delete table inet nixorium_client_access\n' + pathlib.Path(rules).read_text())
         run(*ns(client, nft, '-f', '-'), input=reload_rules)
         connect(client, '203.0.113.99', 443, False)
-        connect(os.getpid(), '10.77.0.1', 11100, True)
+        connect(os.getpid(), '10.77.0.1', 22, True)
         run(*ns(client, nft, 'delete', 'table', 'inet', 'nixorium_internet'))
         for address in ('203.0.113.99', '2001:db8::99'):
             connect(client, address, 443, True)
-        connect(peer, '10.77.0.1', 11100, False)
-        print('PASS: Internet IPv4/IPv6 and established traffic blocked; LAN/SSH/Veyon retained; firewall reload retains block; unblock restores Internet only')
+        connect(peer, '10.77.0.1', 22, False)
+        print('PASS: Internet IPv4/IPv6 and established traffic blocked; LAN/SSH retained; firewall reload retains block; unblock restores Internet only')
 finally:
     for p in reversed(children):
         if p.poll() is None:

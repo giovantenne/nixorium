@@ -177,8 +177,6 @@ const resetIdentityExpression = `let
       (builtins.intersectAttrs { admin = null; ${meta.users.student} = null; ${meta.users.teacher} = null; } c.users.users);
     sshKeys = c.users.users.admin.openssh.authorizedKeys.keys;
     cacheKeys = c.nix.settings.trusted-public-keys;
-    veyon = if c.environment.etc ? "veyon/keys/public/teacher/key"
-      then builtins.hashFile "sha256" c.environment.etc."veyon/keys/public/teacher/key".source else null;
   };
 in {
   metadata = builtins.removeAttrs meta [ "version" "clients" ] // {

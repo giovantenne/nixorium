@@ -50,7 +50,6 @@
           publicKeys = {
             cache = ./keys/cache-public-key;
             ssh = ./keys/admin-ssh.pub;
-            veyon = ./keys/veyon-public-key.pem;
           };
 
           assets = {

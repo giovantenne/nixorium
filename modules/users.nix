@@ -41,10 +41,13 @@ in
         [ labSettings.adminSshKey ];
   };
 
+  # The administrator and the teacher read the student's home snapshots.
+  users.groups.nixorium-staff = {};
+
   users.users.${labSettings.teacherUser} = {
     isNormalUser = true;
     description = labSettings.teacherUser;
-    extraGroups = [ "networkmanager" "veyon-master" ];
+    extraGroups = [ "networkmanager" "nixorium-staff" ];
     hashedPassword = labSettings.teacherPassword;
   };
 
@@ -58,7 +61,7 @@ in
   users.users.admin = {
     isNormalUser = true;
     description = "admin";
-    extraGroups = [ "networkmanager" "wheel" "veyon-master" ];
+    extraGroups = [ "networkmanager" "wheel" "nixorium-staff" ];
     hashedPassword = labSettings.adminPassword;
     openssh.authorizedKeys.keys =
       if labSettings.adminSshKey == null then

@@ -91,6 +91,5 @@ func DiffLabSettings(before, after LabSettingsFile) []SettingChange {
 	add("lab.extraLocale", before.Lab.ExtraLocale, after.Lab.ExtraLocale)
 	add("lab.keyboardLayout", before.Lab.KeyboardLayout, after.Lab.KeyboardLayout)
 	add("lab.consoleKeyMap", before.Lab.ConsoleKeyMap, after.Lab.ConsoleKeyMap)
-	add("lab.veyonNativeHosts", before.Lab.VeyonNativeHosts, after.Lab.VeyonNativeHosts)
 	return changes
 }

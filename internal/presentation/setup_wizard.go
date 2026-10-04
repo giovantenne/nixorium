@@ -511,9 +511,8 @@ func (model configReviewModel) View() tea.View {
 
 func classifyExistingChanges(paths []string) (generated, unexpected []string) {
 	known := map[string]bool{
-		"keys/cache-public-key":     true,
-		"keys/admin-ssh.pub":        true,
-		"keys/veyon-public-key.pem": true,
+		"keys/cache-public-key": true,
+		"keys/admin-ssh.pub":    true,
 	}
 	for _, path := range paths {
 		if known[path] {

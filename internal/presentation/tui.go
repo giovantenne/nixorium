@@ -1248,7 +1248,6 @@ func (model dashboardModel) setupKeysView() string {
 	}{
 		{name: "cache", label: "Binary cache signing", purpose: "Lets client computers verify software served by this controller."},
 		{name: "ssh", label: "Administrator SSH", purpose: "Lets the controller manage enrolled computers without a password prompt."},
-		{name: "veyon", label: "Veyon classroom control", purpose: "Authenticates classroom viewing and control from the teacher station."},
 	}
 	states := map[string]domain.KeyMaterialState{}
 	for _, state := range model.setupKeys.Keys {
@@ -1315,7 +1314,7 @@ func (model dashboardModel) selectedSetupKey() (domain.KeyMaterialState, bool) {
 }
 
 func (model dashboardModel) selectedSetupKeyName() string {
-	names := []string{"cache", "ssh", "veyon"}
+	names := []string{"cache", "ssh"}
 	if model.setupKeyCursor < 0 || model.setupKeyCursor >= len(names) {
 		return ""
 	}
@@ -1328,8 +1327,6 @@ func setupKeyShortLabel(name string) string {
 		return "cache-signing"
 	case "ssh":
 		return "administrator SSH"
-	case "veyon":
-		return "Veyon"
 	default:
 		return "controller"
 	}

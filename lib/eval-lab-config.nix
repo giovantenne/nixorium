@@ -140,11 +140,6 @@ let
             type = lib.types.str;
             description = "XKB keyboard layout";
           };
-          veyonNativeHosts = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
-            default = [];
-            description = "Deprecated compatibility field; ignored because every host uses native Veyon capture";
-          };
           consoleKeyMap = lib.mkOption {
             type = lib.types.str;
             description = "Linux console keymap";

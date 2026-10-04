@@ -9,8 +9,7 @@ for lab configuration, validation and upstream-update work.
 
 > [!IMPORTANT]
 > Keep this repository private. It contains password hashes and internal
-> network details. Keep `secret-key`, `admin-ssh`, and
-> `veyon-private-key.pem` outside Git.
+> network details. Keep `secret-key` and `admin-ssh` outside Git.
 
 ## Contents
 
@@ -43,7 +42,7 @@ path.
 Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
 The public Nix evaluator and the management command both reject empty required
-regional/Git values, malformed homepage URLs, and unknown Veyon host names.
+regional/Git values and malformed homepage URLs.
 
 The controller is named `pc99` by default because
 `lab.masterHostNumber` starts at `99`. This setting is not a fixed controller
@@ -107,8 +106,8 @@ commit the initial template first because Flakes include only tracked files.
 Before production, pin the Nixorium input to a released tag. Optional branding
 and NixOS policy can be added later under `assets/` and `modules/`.
 
-This template owns its `nixpkgs` pin directly. Nixorium and its Disko/Veyon
-inputs follow that same package base, so controller and client systems cannot
+This template owns its `nixpkgs` pin directly. Nixorium and its Disko
+input follow that same package base, so controller and client systems cannot
 drift onto a second implicit pin. `Update Nixorium` preserves the package-base
 lock node. `Update system and packages` advances that base separately; changing
 channel requires an explicit target and acknowledgement of unverified runtime
@@ -127,16 +126,13 @@ when something blocks them, the screen says whether to try again later or to
 ask the administrator, with a short code explained in the
 [troubleshooting guide](TROUBLESHOOTING.md#codes-shown-to-the-teacher).
 
-## Native classroom control
+## Classroom view
 
-Veyon uses PipeWire/Wayland directly on every laboratory computer. Approve the
-initial GNOME sharing dialog locally; the grant survives student-home resets.
-The controller also needs its own approval when broadcasting the teacher screen.
-The external VNC bridge and shared password have been removed. Clients expose
-only SSH (22) and Veyon (11100) to the controller's static IPv4 address on the
-lab interface; IPv6 cannot bypass this restriction. The deprecated
-`veyonNativeHosts` string list remains accepted and ignored for compatibility;
-existing settings need no change.
+Clients expose only SSH (22) to the controller's static IPv4 address on the
+lab interface; IPv6 cannot bypass this restriction. The classroom view reaches
+each student's session through that access, and GNOME shows its sharing
+notice while the teacher watches. Changes to the classroom Shell extension
+apply at the student's next login.
 
 ## Temporary Internet access
 
@@ -144,7 +140,7 @@ As `admin` or the configured teacher, open **Computers → Internet access**
 to restrict browsing during a lesson,
 select clients, choose **block** or **unblock** with Tab, and review before
 applying. Internet returns after each client reboots. The lab's IPv4 subnet,
-SSH and Veyon remain available; other IPv4/IPv6 destinations are blocked.
+SSH remains available; other IPv4/IPv6 destinations are blocked.
 Offline or outdated clients are reported and receive no queued command.
 Update the controller and clients before first use.
 
@@ -806,7 +802,7 @@ Git identity is not requested during first run. The wizard supports backward
 navigation, collects passwords without echo, retries recoverable password
 mistakes in the current account without restarting configuration, validates
 the complete candidate, shows a redacted review, writes atomically after
-acceptance, and reconciles all three key pairs. It never overwrites existing
+acceptance, and reconciles both key pairs. It never overwrites existing
 key material. Bare `setup` and `setup status` report the first incomplete stage
 without trusting a hidden completion flag; run `nixorium` and choose
 **Installation → Network boot (PXE)** for the continuous interactive flow. The
@@ -895,7 +891,7 @@ reconciles an interrupted session, and boot recovery performs the same repair
 automatically. These actions are idempotent; a failed start rolls back before
 returning. Quitting the dashboard does not stop active systemd-owned services.
 
-The firewall exposes SSH, mDNS, Veyon, optional VNC, Harmonia, and PXE only on
+The firewall exposes SSH, mDNS, Harmonia, and PXE only on
 the configured interface and roles. Institutional DHCP remains authoritative.
 
 #### Enroll a client

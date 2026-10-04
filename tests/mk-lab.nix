@@ -14,7 +14,7 @@ let
       studentPassword = "$6$test$student";
       adminPassword = "$6$test$admin";
     };
-    publicKeys = { cache = null; ssh = null; veyon = null; };
+    publicKeys = { cache = null; ssh = null; };
   });
   controllerOnly = controllerOnlyLab.nixosConfigurations.pc99.config;
   insecureController = mkLab (baseArgs // {
@@ -36,7 +36,7 @@ let
       hostIfaceNames.pc02 = "enp3s0";
     };
   });
-  nativeVeyonLab = mkLab baseArgs;
+  plainLab = mkLab baseArgs;
   keyboardLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       keyboardLayout = "it";
@@ -96,7 +96,7 @@ let
           studentPassword = "$6$test$student";
           adminPassword = "$6$test$admin";
         };
-        publicKeys = { cache = null; ssh = null; veyon = null; };
+        publicKeys = { cache = null; ssh = null; };
         softwarePresets = sitePresetCatalog;
         labSoftware = softwareForPreset preset;
       });
@@ -146,9 +146,6 @@ let
       hostModules.pc00 = [ ../modules/common.nix ];
     })).labMeta
     true)).success;
-  ignoresDeprecatedVeyonNativeHosts = (mkLab (baseArgs // {
-    labConfig = labConfig // { veyonNativeHosts = [ "master" "pc01" "retired-host" ]; };
-  })).labMeta == (mkLab baseArgs).labMeta;
   rejectsInvalidSoftwareCatalog = !(builtins.tryEval (builtins.deepSeq
     (mkLab (baseArgs // {
       softwareCatalog = [
@@ -174,8 +171,8 @@ let
   controllerTCP = controllerFirewall.interfaces.enp0s3.allowedTCPPorts;
   controllerUDP = controllerFirewall.interfaces.enp0s3.allowedUDPPorts;
   clientTCP = clientFirewall.interfaces.enp0s3.allowedTCPPorts;
-  nativeClient = nativeVeyonLab.nixosConfigurations.pc01.config;
-  nativeClientTCP = nativeVeyonLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
+  nativeClient = plainLab.nixosConfigurations.pc01.config;
+  nativeClientTCP = plainLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
   clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
   clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
   clientHomeOwnership = subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumUserHomeOwnership;
@@ -188,7 +185,7 @@ assert subnetLab.nixosConfigurations.pc99.config.virtualisation.virtualbox.guest
 assert subnetLab.nixosConfigurations.pc01.config.virtualisation.virtualbox.guest.enable;
 assert controllerOnlyLab.nixoriumUpdateTargets == [ "pc99" ];
 assert subnetLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];
-assert nativeVeyonLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];
+assert plainLab.nixoriumUpdateTargets == [ "pc99" "pc01" ];
 assert builtins.elem "pc02" softwareLab.nixoriumUpdateTargets;
 assert (mkLab (baseArgs // { updateValidationHosts = [ "pc03" ]; })).nixoriumUpdateTargets == [ "pc99" "pc01" "pc03" ];
 assert controllerOnlyLab.nixoriumOfflineCheck.drvPath != "";
@@ -207,7 +204,6 @@ assert controllerOnly.networking.networkmanager.enable;
 assert controllerOnly.networking.firewall.enable;
 assert controllerOnly.networking.firewall.interfaces == {};
 assert !controllerOnly.services.harmonia.cache.enable;
-assert !(controllerOnly.systemd.user.services ? veyon-server);
 assert controllerOnly.system.build.toplevel.drvPath != "";
 assert subnetLab.labMeta.controller.staticIp == "10.23.4.227";
 assert subnetLab.labMeta.deploymentMode == "laboratory";
@@ -315,10 +311,8 @@ assert !(classroomViewLab.nixosConfigurations.pc99.config.systemd.user.services 
 assert subnetLab.nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent;
 assert !((mkLab (baseArgs // { labConfig = labConfig // { classroomView = false; }; })).nixosConfigurations.pc01.config.systemd.user.services ? nixorium-classroom-agent);
 # It adds no network port: the controller reaches it through SSH.
-assert lib.hasInfix "tcp dport { 22, 11100 } accept"
+assert lib.hasInfix "tcp dport 22 accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
-# Veyon's GTK file dialogs abort without the GTK GSettings schemas.
-assert lib.hasInfix "gsettings-schemas" subnetLab.nixosConfigurations.pc99.pkgs.veyon.postFixup;
 # Base software is installed whatever lab-software.json declares.
 assert builtins.all (host: builtins.all (pname: hasPackage subnetLab host pname)
   [ "chromium" "ghostty" "git" "terminaltexteffects" ]) [ "pc99" "pc01" ];
@@ -371,8 +365,8 @@ assert subnetLab.nixosConfigurations.pc99.config.users.users.nixorium-pxe-dnsmas
 assert controllerFirewall.enable;
 assert controllerFirewall.allowedTCPPorts == [];
 assert controllerFirewall.allowedUDPPorts == [];
-assert builtins.all (port: builtins.elem port controllerTCP) [ 22 11100 5000 8080 ];
-assert builtins.length controllerTCP == 4;
+assert builtins.all (port: builtins.elem port controllerTCP) [ 22 5000 8080 ];
+assert builtins.length controllerTCP == 3;
 assert builtins.all (port: builtins.elem port controllerUDP) [ 67 69 4011 5353 ];
 assert builtins.length controllerUDP == 4;
 assert !subnetLab.nixosConfigurations.pc01.config.services.harmonia.cache.enable;
@@ -394,21 +388,13 @@ assert subnetLab.nixosConfigurations.pc01.config.systemd.services.nixorium-inter
 assert subnetLab.nixosConfigurations.pc01.config.networking.nftables.enable;
 assert !subnetLab.nixosConfigurations.pc01.config.networking.nftables.flushRuleset;
 assert lib.hasInfix "10.23.4.227" clientFirewall.extraInputRules;
-assert lib.hasInfix "22, 11100" clientFirewall.extraInputRules;
+assert lib.hasInfix "tcp dport 22 accept" clientFirewall.extraInputRules;
+assert !(lib.hasInfix "11100" clientFirewall.extraInputRules);
 assert lib.hasInfix "priority -10" subnetLab.nixosConfigurations.pc01.config.networking.nftables.tables.nixorium-client-access.content;
 assert !(subnetLab.nixosConfigurations.pc99.config.networking.nftables.tables ? nixorium-client-access);
-assert nativeVeyonLab.nixosConfigurations.pc01.pkgs.veyon.version == "4.11.3";
-assert nativeClient.systemd.user.services.xdg-permission-store.overrideStrategy == "asDropin";
-assert nativeClient.systemd.user.services.xdg-permission-store.serviceConfig.Environment == [
-  "XDG_DATA_HOME=/var/lib/nixorium/veyon-session/%u/data"
-];
-assert nativeClient.systemd.user.services.veyon-server.partOf == [ "graphical-session.target" ];
-assert nativeClient.systemd.user.services.veyon-server.preStart != "";
-assert builtins.elem "d /var/lib/nixorium/veyon-session/${labConfig.studentUser}/state/veyon 0700 ${labConfig.studentUser} users - -" nativeClient.systemd.tmpfiles.rules;
-assert subnetLab.nixosConfigurations.pc01.config.systemd.user.services.xdg-permission-store.overrideStrategy == "asDropin";
 assert !subnetLab.nixosConfigurations.pc99.config.systemd.user.services.gnome-remote-desktop.enable;
-assert nativeVeyonLab.nixosConfigurations.pc02.config.systemd.user.services.veyon-server.preStart != "";
 assert !nativeClient.systemd.user.services.gnome-remote-desktop.enable;
+assert nativeClient.users.groups ? nixorium-staff;
 assert builtins.any (package: (package.pname or "") == "vlc")
   softwareLab.nixosConfigurations.pc01.config.environment.systemPackages;
 assert !(builtins.any (package: (package.pname or "") == "vlc")
@@ -470,7 +456,6 @@ assert nestedSoftware.availability == "available";
 assert allowedUnfreeSoftware.availability == "available";
 assert bambuStudioSoftware.availability == "available";
 assert rejectsUnknownHost;
-assert ignoresDeprecatedVeyonNativeHosts;
 assert rejectsInvalidSoftwareCatalog;
 assert rejectsUnsafeHomeResetPath;
 true

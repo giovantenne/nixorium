@@ -153,24 +153,6 @@ func TestSharedLabSettingsValidationCases(t *testing.T) {
 	}
 }
 
-func TestDeprecatedVeyonNativeHostsRoundTrip(t *testing.T) {
-	for _, hosts := range [][]string{{}, {"master", "pc01"}, {"retired-host"}} {
-		settings := validSettings()
-		settings.Lab.VeyonNativeHosts = hosts
-		data, err := MarshalLabSettings(settings)
-		if err != nil {
-			t.Fatal(err)
-		}
-		decoded, issues := DecodeLabSettings(data)
-		if len(issues) != 0 {
-			t.Fatalf("deprecated field rejected: %+v", issues)
-		}
-		if strings.Join(decoded.Lab.VeyonNativeHosts, ",") != strings.Join(hosts, ",") {
-			t.Fatalf("deprecated values lost on save: %+v", decoded.Lab.VeyonNativeHosts)
-		}
-	}
-}
-
 func TestControllerOnlySettingsAreExplicitAndRoundTrip(t *testing.T) {
 	settings := validSettings()
 	settings.Lab.PCCount = 0

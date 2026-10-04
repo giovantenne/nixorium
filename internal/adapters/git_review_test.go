@@ -97,7 +97,7 @@ func TestParseGitPorcelainHandlesRenameConflictAndControlCharacters(t *testing.T
 
 func TestGitReviewDiffArgumentsDisableDriversAndExcludePrivatePaths(t *testing.T) {
 	arguments := strings.Join(gitReviewDiffArguments(true), " ")
-	for _, expected := range []string{"diff --cached", "--no-ext-diff", "--no-textconv", "--no-color", ":(exclude,top)secret-key", ":(exclude,top)admin-ssh", ":(exclude,top)veyon-private-key.pem"} {
+	for _, expected := range []string{"diff --cached", "--no-ext-diff", "--no-textconv", "--no-color", ":(exclude,top)secret-key", ":(exclude,top)admin-ssh"} {
 		if !strings.Contains(arguments, expected) {
 			t.Fatalf("Git diff arguments omit %q: %s", expected, arguments)
 		}
@@ -138,7 +138,7 @@ func newGitReviewRepository(t *testing.T) string {
 	writeGitReviewFile(t, repository, "lab-settings.json", "{\n  \"schemaVersion\": 1,\n  \"lab\": {\n    \"adminPassword\": \"$6$old$admin\",\n    \"teacherPassword\": \"$6$old$teacher\",\n    \"studentPassword\": \"$6$old$student\"\n  }\n}\n")
 	writeGitReviewFile(t, repository, "lab-software.json", "{\n  \"schemaVersion\": 1,\n  \"packages\": []\n}\n")
 	writeGitReviewFile(t, repository, "module.nix", "{ ... }: { services.openssh.enable = true; }\n")
-	writeGitReviewFile(t, repository, ".gitignore", "secret-key\nadmin-ssh\nveyon-private-key.pem\n")
+	writeGitReviewFile(t, repository, ".gitignore", "secret-key\nadmin-ssh\n")
 	if _, err := run(context.Background(), "git", "-C", repository, "add", "."); err != nil {
 		t.Fatal(err)
 	}

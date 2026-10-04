@@ -4,7 +4,7 @@ let
   absent = mkWorkspaceLab { workspaceProfileJSON = null; workspaceCatalog = null; };
   controller = mkWorkspaceLab {
     labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
-    publicKeys = { cache = null; ssh = null; veyon = null; };
+    publicKeys = { cache = null; ssh = null; };
   };
   rejected = extra: !(builtins.tryEval (builtins.deepSeq (mkWorkspaceLab extra).nixoriumWorkspace true)).success;
   discoveryLab = mkWorkspaceLab {
@@ -152,7 +152,7 @@ in
     assert !(builtins.tryEval (candidate null)).success;
     assert rejected { workspaceCatalog = null; };
     assert !(builtins.functionArgs (import ../lib/mk-lab.nix {
-      upstreamSelf = {}; nixpkgs = {}; disko = {}; veyon = {};
+      upstreamSelf = {}; nixpkgs = {}; disko = {};
     }) ? workspaceRuntimeEnabled);
     assert builtins.all (paths: rejected { homeResetEphemeralPaths = paths; }) [
       [ "." ] [ "a//b" ] [ "a/./b" ] [ "a/" ] [ "a\\b" ] [ "a\nb" ]

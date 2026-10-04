@@ -57,5 +57,5 @@ Run the optional `desktop-profile` check from `tests/source-checks.nix` for
 strict GSettings compilation, extension compatibility and login-script syntax.
 Keep that GNOME-dependent check separate from the lightweight Go gate. Build
 one affected controller/client pair using existing cache, then verify login,
-window snapping, icons and native Veyon sharing on the actual target before
+window snapping, icons and the classroom view on the actual target before
 claiming runtime or hardware validation.

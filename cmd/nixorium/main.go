@@ -363,7 +363,6 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 				"lab-settings.json",
 				"keys/cache-public-key",
 				"keys/admin-ssh.pub",
-				"keys/veyon-public-key.pem",
 			})
 		},
 		InstallSetupSecrets: func() domain.ActionReport {
