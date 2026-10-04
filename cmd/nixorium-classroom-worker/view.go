@@ -26,7 +26,7 @@ const (
 	viewCookie       = "nixorium_classroom"
 	viewTokenTTL     = time.Minute
 	viewSessionTTL   = 12 * time.Hour
-	viewSecurityRule = "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	viewSecurityRule = "default-src 'none'; img-src 'self' blob:; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)

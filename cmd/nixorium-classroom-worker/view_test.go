@@ -82,7 +82,9 @@ func TestClassroomViewNeedsTheOneTimeTokenAndTheLoopbackHost(t *testing.T) {
 		t.Fatalf("token reused = %d", again.Code)
 	}
 	page := viewRequest(server, "/", host, cookie.Value)
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "Classroom view") || !strings.Contains(page.Header().Get("Content-Security-Policy"), "default-src 'none'") {
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "Classroom view") || !strings.Contains(page.Header().Get("Content-Security-Policy"), "default-src 'none'") ||
+		// The enlarged view shows each frame through a blob: URL.
+		!strings.Contains(page.Header().Get("Content-Security-Policy"), "img-src 'self' blob:;") {
 		t.Fatalf("page = %d %q", page.Code, page.Header())
 	}
 	if list := viewRequest(server, "/api/computers", host, cookie.Value); list.Code != http.StatusOK || !strings.Contains(list.Body.String(), `"pc01"`) {
