@@ -114,13 +114,13 @@ func TestReceiverRefusesBrokenSendings(t *testing.T) {
 
 func TestDesktopDirectoryStaysInTheHome(t *testing.T) {
 	home := t.TempDir()
-	if got, _ := desktopDirectory(home); got != filepath.Join(home, "Desktop") {
+	if got, _ := classroomview.DesktopDirectory(home); got != filepath.Join(home, "Desktop") {
 		t.Fatalf("default = %s", got)
 	}
 	_ = os.MkdirAll(filepath.Join(home, ".config"), 0o700)
 	for _, line := range []string{`XDG_DESKTOP_DIR="/etc"`, `XDG_DESKTOP_DIR="$HOME/../x"`, `XDG_DESKTOP_DIR="$HOME/"`} {
 		_ = os.WriteFile(filepath.Join(home, ".config", "user-dirs.dirs"), []byte(line+"\n"), 0o600)
-		if got, _ := desktopDirectory(home); got != filepath.Join(home, "Desktop") {
+		if got, _ := classroomview.DesktopDirectory(home); got != filepath.Join(home, "Desktop") {
 			t.Fatalf("%s gave %s", line, got)
 		}
 	}

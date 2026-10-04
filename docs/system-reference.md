@@ -370,7 +370,11 @@ folder of the home with explicit 0755/0644 modes and moves the top-level
 items to the XDG desktop folder only when everything arrived; an existing
 name becomes "name (2)". At most 2000 items and 500 MB are sent at once, and
 at most three prepared sendings exist, each removed after 30 unused minutes
-or once delivered everywhere.
+or once delivered everywhere. **Computers → Send desktop** (teacher and
+administrator) and `nixorium desktop plan|apply --on <clients|@lab>` read
+the XDG desktop folder of whoever runs Nixorium and send it through the
+classroom service the same way; `desktop apply` prepares the files again
+and requires the token of the review.
 
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a

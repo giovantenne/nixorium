@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -369,32 +368,13 @@ func connect(input io.Reader, output io.Writer, run commandRunner, runtimeBase s
 }
 
 // probeSend sends the contents of a folder to the session's desktop through
-// a command, as the controller does. Links and special files are skipped.
+// a command, as the controller does. Hidden names, links and special files
+// are skipped.
 func probeSend(command []string, folder string, output io.Writer) error {
 	if len(command) == 0 {
 		return errors.New("probe needs a command, for example nixorium-classroom-connect")
 	}
-	entries := []classroomview.FileEntry{}
-	err := filepath.WalkDir(folder, func(name string, entry fs.DirEntry, err error) error {
-		if err != nil || name == folder {
-			return err
-		}
-		relative, err := filepath.Rel(folder, name)
-		if err != nil {
-			return err
-		}
-		switch {
-		case entry.IsDir():
-			entries = append(entries, classroomview.FileEntry{Path: filepath.ToSlash(relative), Dir: true})
-		case entry.Type().IsRegular():
-			info, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			entries = append(entries, classroomview.FileEntry{Path: filepath.ToSlash(relative), Size: info.Size()})
-		}
-		return nil
-	})
+	entries, err := classroomview.CollectFolder(folder)
 	if err != nil {
 		return err
 	}

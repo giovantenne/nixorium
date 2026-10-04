@@ -34,7 +34,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   picks (the desktop first) to the desktop of the selected computers, after
   a review: at most 2000 items and 500 MB, hidden files and links left out,
   owned by the student, never executable, and a name already on the
-  student's desktop is kept as "name (2)".
+  student's desktop is kept as "name (2)". **Computers → Send desktop**
+  (teacher and administrator) and `nixorium desktop plan|apply --on
+  <clients|@lab>` send the desktop of whoever runs Nixorium the same way.
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

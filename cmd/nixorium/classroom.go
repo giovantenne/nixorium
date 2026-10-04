@@ -108,6 +108,10 @@ func tryRunClassroomDashboard(ctx context.Context, stderr io.Writer) (bool, int)
 			}
 			return *response.LockPlan
 		},
+		PlanShare: planDesktopShare,
+		ApplyShare: func(plan domain.SharePlan) domain.ShareReport {
+			return applyDesktopShare(ctx, plan)
+		},
 		ApplyLock: func(plan domain.LockPlan) domain.LockReport {
 			response, err := classroomRequest(ctx, domain.ClassroomLockApplyOperation, func(request *domain.ClassroomRequest) {
 				request.LockPlan = &plan

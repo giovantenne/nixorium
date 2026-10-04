@@ -961,6 +961,18 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.internet.stage = 1
 		model.message = ""
 		return model, nil
+	case sharePlanMsg:
+		model.busy = ""
+		model.share.plan = message.plan
+		model.share.stage = 1
+		model.message = ""
+		return model, nil
+	case shareApplyMsg:
+		model.busy = ""
+		model.share.result = message.report
+		model.share.stage = 2
+		model.message = ""
+		return model, nil
 	case lockPlanMsg:
 		model.busy = ""
 		model.lock.plan = message.plan

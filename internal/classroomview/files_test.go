@@ -2,6 +2,8 @@ package classroomview
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -42,5 +44,35 @@ func TestValidateFileEntries(t *testing.T) {
 	}
 	if err := ValidateFileEntries(many); err == nil {
 		t.Fatal("too many entries were accepted")
+	}
+}
+
+func TestCollectFolderSkipsHiddenNamesAndLinks(t *testing.T) {
+	folder := t.TempDir()
+	for name, content := range map[string]string{"b.txt": "bb", "Lesson/a.txt": "a", ".hidden": "x", ".config/c": "x"} {
+		target := filepath.Join(folder, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink("/etc/passwd", filepath.Join(folder, "link")); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := CollectFolder(folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, entry := range entries {
+		got = append(got, fmt.Sprintf("%s:%d:%t", entry.Path, entry.Size, entry.Dir))
+	}
+	if strings.Join(got, ",") != "Lesson:0:true,Lesson/a.txt:1:false,b.txt:2:false" {
+		t.Fatalf("entries = %v", got)
+	}
+	if err := ValidateFileEntries(entries); err != nil {
+		t.Fatal(err)
 	}
 }

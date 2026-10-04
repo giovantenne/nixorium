@@ -45,6 +45,8 @@ var classroomComputerTasks = []dashboardTask{
 
 var lockScreensTask = dashboardTask{id: "lock", shortcut: "l", title: "Lock screens", description: "Lock or unlock the screens of selected students' computers"}
 
+var sendDesktopTask = dashboardTask{id: "share", shortcut: "s", title: "Send desktop", description: "Copy the files on your desktop to the desktops of selected students' computers"}
+
 var classroomViewTask = dashboardTask{id: "view", shortcut: "v", title: "Classroom view", description: "See every student screen at once (experimental)"}
 
 func (model dashboardModel) availableComputerTasks() []dashboardTask {
@@ -54,6 +56,9 @@ func (model dashboardModel) availableComputerTasks() []dashboardTask {
 	}
 	if model.actions.PlanLock != nil {
 		tasks = append(append([]dashboardTask{}, tasks...), lockScreensTask)
+	}
+	if model.actions.PlanShare != nil {
+		tasks = append(append([]dashboardTask{}, tasks...), sendDesktopTask)
 	}
 	if model.actions.OpenClassroomView != nil {
 		tasks = append(append([]dashboardTask{}, tasks...), classroomViewTask)

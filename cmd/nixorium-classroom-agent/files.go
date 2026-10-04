@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -35,7 +34,7 @@ func newReceiver(home string, entries []classroomview.FileEntry) (*receiver, err
 	if err := classroomview.ValidateFileEntries(entries); err != nil {
 		return nil, err
 	}
-	desktop, err := desktopDirectory(home)
+	desktop, err := classroomview.DesktopDirectory(home)
 	if err != nil {
 		return nil, err
 	}
@@ -205,35 +204,4 @@ func (incoming *receiver) abort() {
 		incoming.file = nil
 	}
 	_ = os.RemoveAll(incoming.staging)
-}
-
-// desktopDirectory is the user's desktop folder (XDG_DESKTOP_DIR in
-// user-dirs.dirs, such as ~/Scrivania in Italian), or ~/Desktop.
-func desktopDirectory(home string) (string, error) {
-	if !filepath.IsAbs(home) {
-		return "", errors.New("the home folder is unknown")
-	}
-	desktop := filepath.Join(home, "Desktop")
-	file, err := os.Open(filepath.Join(home, ".config", "user-dirs.dirs"))
-	if err != nil {
-		return desktop, nil
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		value, found := strings.CutPrefix(strings.TrimSpace(scanner.Text()), "XDG_DESKTOP_DIR=")
-		if !found {
-			continue
-		}
-		value = strings.Trim(value, `"`)
-		if rest, found := strings.CutPrefix(value, "$HOME/"); found && rest != "" {
-			candidate := filepath.Join(home, rest)
-			if strings.HasPrefix(candidate, home+string(filepath.Separator)) {
-				return candidate, nil
-			}
-		}
-		// The desktop is never the home itself or outside it.
-		return desktop, nil
-	}
-	return desktop, nil
 }

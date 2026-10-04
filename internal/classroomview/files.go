@@ -1,8 +1,12 @@
 package classroomview
 
 import (
+	"bufio"
 	"errors"
+	"io/fs"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
@@ -99,4 +103,75 @@ func validFilePath(name string) error {
 		}
 	}
 	return nil
+}
+
+// DesktopDirectory is the user's desktop folder (XDG_DESKTOP_DIR in
+// user-dirs.dirs, such as ~/Scrivania in Italian), or ~/Desktop.
+func DesktopDirectory(home string) (string, error) {
+	if !filepath.IsAbs(home) {
+		return "", errors.New("the home folder is unknown")
+	}
+	desktop := filepath.Join(home, "Desktop")
+	file, err := os.Open(filepath.Join(home, ".config", "user-dirs.dirs"))
+	if err != nil {
+		return desktop, nil
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		value, found := strings.CutPrefix(strings.TrimSpace(scanner.Text()), "XDG_DESKTOP_DIR=")
+		if !found {
+			continue
+		}
+		value = strings.Trim(value, `"`)
+		if rest, found := strings.CutPrefix(value, "$HOME/"); found && rest != "" {
+			candidate := filepath.Join(home, rest)
+			if strings.HasPrefix(candidate, home+string(filepath.Separator)) {
+				return candidate, nil
+			}
+		}
+		// The desktop is never the home itself or outside it.
+		return desktop, nil
+	}
+	return desktop, nil
+}
+
+// CollectFolder lists a folder's files and folders for sending, in order,
+// folders before their contents. Hidden names, links and special files are
+// left out.
+func CollectFolder(folder string) ([]FileEntry, error) {
+	entries := []FileEntry{}
+	err := filepath.WalkDir(folder, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if name == folder {
+			return nil
+		}
+		if strings.HasPrefix(entry.Name(), ".") {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		relative, err := filepath.Rel(folder, name)
+		if err != nil {
+			return err
+		}
+		switch {
+		case entry.IsDir():
+			entries = append(entries, FileEntry{Path: filepath.ToSlash(relative), Dir: true})
+		case entry.Type().IsRegular():
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			entries = append(entries, FileEntry{Path: filepath.ToSlash(relative), Size: info.Size()})
+		}
+		if len(entries) > MaxFileEntries {
+			return errors.New("too many files and folders")
+		}
+		return nil
+	})
+	return entries, err
 }

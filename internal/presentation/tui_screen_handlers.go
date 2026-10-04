@@ -45,6 +45,13 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		model.screen = dashboardLock
 		model.lock = lockModel{chosen: map[string]bool{}, action: domain.LockOn}
 		model.message = ""
+	case "s":
+		if model.actions.PlanShare == nil {
+			return model, nil
+		}
+		model.screen = dashboardShare
+		model.share = shareModel{chosen: map[string]bool{}}
+		model.message = ""
 	case "x":
 		model.screen = dashboardShutdown
 		model.shutdown = newShutdownModel()
@@ -265,7 +272,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			model.areaReturn = dashboardComputersArea
 			return model.openComputerTask(action)
-		case "h", "x", "i", "l":
+		case "h", "x", "i", "l", "s":
 			model.areaReturn = dashboardComputersArea
 			return model.openComputerTask(action)
 		case "v":
@@ -710,6 +717,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		return model.updateInternet(key)
 	case dashboardLock:
 		return model.updateLock(key)
+	case dashboardShare:
+		return model.updateShare(key)
 	case dashboardCleanup:
 		return model.updateCleanup(key)
 	case dashboardRecovery:

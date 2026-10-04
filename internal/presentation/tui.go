@@ -34,8 +34,12 @@ type DashboardActions struct {
 	ApplyInternet     func(domain.InternetPlan) domain.InternetReport
 	// PlanLock and ApplyLock lock or unlock students' screens; nil when the
 	// laboratory has no classroom view.
-	PlanLock                func(context.Context, string, domain.LockAction) domain.LockPlan
-	ApplyLock               func(domain.LockPlan) domain.LockReport
+	PlanLock  func(context.Context, string, domain.LockAction) domain.LockPlan
+	ApplyLock func(domain.LockPlan) domain.LockReport
+	// PlanShare prepares the caller's desktop and reviews sending it to the
+	// selected students' desktops; nil without the classroom view.
+	PlanShare               func(context.Context, string) domain.SharePlan
+	ApplyShare              func(domain.SharePlan) domain.ShareReport
 	PlanCleanup             func(context.Context, string) domain.CleanupPlanReport
 	ApplyCleanup            func(domain.CleanupPlanReport) domain.CleanupApplyReport
 	RunningVersion          string
@@ -156,6 +160,7 @@ const (
 	dashboardSoftware
 	dashboardInternet
 	dashboardLock
+	dashboardShare
 	dashboardCleanup
 	dashboardRecovery
 	dashboardRecoveryReview
@@ -392,6 +397,7 @@ type dashboardModel struct {
 	software               softwareModel
 	internet               internetModel
 	lock                   lockModel
+	share                  shareModel
 	cleanup                cleanupModel
 	shutdown               shutdownModel
 	width                  int
@@ -1113,6 +1119,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.internetView()
 	case dashboardLock:
 		content = model.lockView()
+	case dashboardShare:
+		content = model.shareView()
 	case dashboardCleanup:
 		content = model.cleanupView()
 	case dashboardRecovery:

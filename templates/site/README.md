@@ -160,6 +160,18 @@ offers the same as **Lock** and **Unlock**. From a terminal:
 `nixorium lock plan --on @lab --action lock`, then `nixorium lock apply` with
 the same options and `--expect` set to the review token.
 
+## Send desktop
+
+With the classroom view, **Computers → Send desktop** copies the files and
+folders on your own desktop to the desktop of the selected students'
+computers after a review: hidden files and links are left out, at most 2000
+items and 500 MB are sent, the copies belong to the student and are never
+executable, and a name already on a student's desktop is kept as
+"name (2)". A restart empties the student's home, as usual. The classroom
+view page offers the same as **Send desktop**, where you choose the folder.
+From a terminal: `nixorium desktop plan --on @lab`, then
+`nixorium desktop apply --on @lab --expect` with the review token.
+
 ## Local customization
 
 - `modules/shared.nix`: every machine
