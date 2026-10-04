@@ -679,7 +679,15 @@ let
   };
   nixoriumOpen = pkgs.writeShellApplication {
     name = "nixorium-open";
+    runtimeInputs = [ pkgs.coreutils ];
     text = ''
+      # The teacher goes straight to the classroom view when the laboratory
+      # has it; the dashboard opens if the view cannot.
+      ${lib.optionalString (labSettings.classroomView or false) ''
+        if [[ "$(id -un)" == ${lib.escapeShellArg labSettings.teacherUser} ]] && ${nixoriumPackage}/bin/nixorium classroom-view; then
+          exit 0
+        fi
+      ''}
       SESSION=${nixoriumSession}/bin/nixorium-session
       if command -v ghostty >/dev/null; then exec ghostty -e "$SESSION"; fi
       if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi

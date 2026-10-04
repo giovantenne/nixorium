@@ -96,6 +96,17 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		usage(stdout)
 		return 0
 	}
+	// The classroom view needs only the classroom service: the teacher
+	// cannot read the deployment repository.
+	if options.command == "classroom-view" {
+		message, err := openClassroomView(ctx)
+		if err != nil {
+			fmt.Fprintln(stderr, "Error:", err)
+			return 1
+		}
+		fmt.Fprintln(stdout, message)
+		return 0
+	}
 	repository := options.repository
 	resolvedRepository, resolveErr := resolveRepository(options.repository)
 	if resolveErr == nil {
@@ -807,7 +818,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "desktop", "install", "support", "cleanup", "recovery", "template-reset", "backup":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "desktop", "classroom-view", "install", "support", "cleanup", "recovery", "template-reset", "backup":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -1360,7 +1371,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|desktop plan|desktop apply|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|desktop plan|desktop apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
@@ -1385,6 +1396,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       lock apply --on <clients|@lab> --action <lock|unlock> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       desktop plan --on <clients|@lab> reviews copying your desktop to students' desktops (classroom view)")
 	fmt.Fprintln(writer, "       desktop apply --on <clients|@lab> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
 	fmt.Fprintln(writer, "       backup create --to <directory> [--passphrase-file <file>]")
 	fmt.Fprintln(writer, "       backup verify <file> [--passphrase-file <file>]")

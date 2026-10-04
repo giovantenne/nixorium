@@ -44,6 +44,17 @@ The project follows [Semantic Versioning](https://semver.org/).
   above any lock, until **Stop showing**, closing the page, or ten seconds
   without pictures; computers that sign in meanwhile get it too.
 
+- New laboratories (site template): the desktops of the administrator and
+  the teacher no longer show Home and Trash icons, so they hold only the
+  files that Send desktop copies to students; the trash is in the dock.
+  This applies once per account; students are unchanged. Existing
+  laboratories get it by applying the same change to their
+  `modules/workstation.nix`.
+
+- With the classroom view, the teacher's Nixorium icon opens the classroom
+  view directly; `nixorium classroom-view` does the same from a terminal.
+  The administrator still gets the dashboard.
+
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the
   GTK settings schemas that the dialog requires under GNOME.
