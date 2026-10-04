@@ -1,7 +1,7 @@
 {
   "uuid": "nixorium-classroom@nixorium.org",
   "name": "Nixorium classroom",
-  "description": "Keeps the screen sharing indicator visible while the teacher views this computer, without a stop button.",
+  "description": "Keeps the screen sharing indicator visible while the teacher views this computer, without a stop button, and covers the screen while the teacher locks it.",
   "shell-version": ["50"],
   "url": "https://nixorium.org"
 }

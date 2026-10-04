@@ -69,6 +69,17 @@ func (session *sshAgentSession) Input(events []classroomview.InputEvent, release
 	return nil
 }
 
+func (session *sshAgentSession) SetLocked(locked bool) (bool, error) {
+	reply, err := session.exchange(classroomview.Message{Type: classroomview.TypeLock, Locked: locked}, 10*time.Second)
+	if err != nil {
+		return false, err
+	}
+	if reply.Type != classroomview.TypeLockState {
+		return false, classroomview.AgentError{Code: reply.Code}
+	}
+	return reply.Locked, nil
+}
+
 // exchange sends one request and waits for its reply, closing the session
 // when the client does not answer in time.
 func (session *sshAgentSession) exchange(request classroomview.Message, timeout time.Duration) (classroomview.Message, error) {

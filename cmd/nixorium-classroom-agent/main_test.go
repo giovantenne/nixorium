@@ -128,7 +128,7 @@ func TestAgentSocketRefusesLinksAndOtherFiles(t *testing.T) {
 
 func TestAgentRefusesOtherProtocolVersionsAndUnknownMessages(t *testing.T) {
 	server, client := net.Pipe()
-	go handle(server, "student", fakeCapture{})
+	go handle(server, "student", fakeCapture{}, &fakeLocker{})
 	_ = classroomview.Write(client, classroomview.Message{Type: "screen.record"})
 	if reply, err := classroomview.Read(client); err != nil || reply.Code != classroomview.CodeUnsupported {
 		t.Fatalf("unknown message reply = %+v, %v", reply, err)
@@ -224,7 +224,7 @@ func TestAgentAnswersWhileAnotherConnectionHangs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	go func() { _ = serveConnections(listener, "student", fakeCapture{}) }()
+	go func() { _ = serveConnections(listener, "student", fakeCapture{}, &fakeLocker{}) }()
 	hello := func() (classroomview.Message, error) {
 		connection, err := net.Dial("unix", listener.Addr().String())
 		if err != nil {
@@ -272,4 +272,50 @@ func TestAgentAnswersWhileAnotherConnectionHangs(t *testing.T) {
 	if reply, err := hello(); err != nil || reply.Code != classroomview.CodeBusy {
 		t.Fatalf("over-limit reply = %+v, %v", reply, err)
 	}
+}
+
+type fakeLocker struct {
+	locked      bool
+	unavailable bool
+}
+
+func (locker *fakeLocker) SetLocked(locked bool) error {
+	if locker.unavailable {
+		return errLockUnavailable
+	}
+	locker.locked = locked
+	return nil
+}
+
+func (locker *fakeLocker) Locked() bool { return locker.locked }
+
+func TestAgentLocksThroughTheExtension(t *testing.T) {
+	lock := &fakeLocker{}
+	server, client := net.Pipe()
+	go handle(server, "student", fakeCapture{image: []byte{0xff, 0xd8}}, lock)
+	exchange := func(message classroomview.Message) classroomview.Message {
+		t.Helper()
+		if err := classroomview.Write(client, message); err != nil {
+			t.Fatal(err)
+		}
+		reply, err := classroomview.Read(client)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply
+	}
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeLock, Locked: true}); reply.Type != classroomview.TypeLockState || !reply.Locked || !lock.locked {
+		t.Fatalf("lock reply = %+v", reply)
+	}
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeThumbnailRequest, Width: 320}); reply.Type != classroomview.TypeThumbnail || !reply.Locked {
+		t.Fatalf("thumbnail of a locked screen = %+v", reply)
+	}
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeLock}); reply.Type != classroomview.TypeLockState || reply.Locked || lock.locked {
+		t.Fatalf("unlock reply = %+v", reply)
+	}
+	lock.unavailable = true
+	if reply := exchange(classroomview.Message{Type: classroomview.TypeLock, Locked: true}); reply.Code != classroomview.CodeLockUnavailable {
+		t.Fatalf("lock without the extension = %+v", reply)
+	}
+	_ = client.Close()
 }

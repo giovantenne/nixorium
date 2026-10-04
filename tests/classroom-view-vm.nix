@@ -10,6 +10,10 @@ let
     export GI_TYPELIB_PATH="${pkgs.glib.out}/lib/girepository-1.0:${pkgs.gobject-introspection}/lib/girepository-1.0"
     exec ${python}/bin/python3 ${./classroom-view-click.py} "$@"
   '';
+  superKey = pkgs.writeShellScript "classroom-view-key" ''
+    export GI_TYPELIB_PATH="${pkgs.glib.out}/lib/girepository-1.0:${pkgs.gobject-introspection}/lib/girepository-1.0"
+    exec ${python}/bin/python3 ${./classroom-view-key.py}
+  '';
   labSettings = {
     classroomView = true;
     deploymentMode = "laboratory";
@@ -79,6 +83,21 @@ pkgs.testers.runNixOSTest {
     client.sleep(2)
     client.succeed("${agent} probe --input --thumbnail /tmp/thumb5.jpg nixorium-classroom-connect | tee /dev/stderr | grep -F 'input.done'")
     client.succeed("${agent} probe --thumbnail /tmp/thumb6.jpg nixorium-classroom-connect | grep -F 'width=320 height=240'")
+
+    # The teacher's lock covers the screen and takes the keyboard: Super no
+    # longer opens the overview until the computer is unlocked. The screen
+    # stays visible to the teacher.
+    client.succeed(extensions + "enable nixorium-classroom@nixorium.org'")
+    client.wait_until_succeeds(extensions + "info nixorium-classroom@nixorium.org' | grep -E 'State: (ENABLED|ACTIVE)'", timeout=60)
+    super_key = "systemd-run --user -M student@ --wait --pipe --collect ${superKey}"
+    client.wait_until_succeeds(super_key, timeout=30)
+    client.succeed("${agent} probe --lock on nixorium-classroom-connect | grep -F 'lock.state locked=true'")
+    client.fail(super_key)
+    client.succeed("${agent} probe --thumbnail /tmp/thumb-lock.jpg nixorium-classroom-connect")
+    client.sleep(1)
+    client.screenshot("classroom-lock")
+    client.succeed("${agent} probe --lock off nixorium-classroom-connect | grep -F 'lock.state locked=false'")
+    client.succeed(super_key)
 
     # A locked screen cannot be captured; the teacher is told why. The
     # capture stops after 30 idle seconds, then the screen is locked.

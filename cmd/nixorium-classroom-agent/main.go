@@ -6,7 +6,8 @@
 //	         relays standard input and output to the agent of the user of the
 //	         active graphical session on seat0.
 //	probe    runs a command (for example the SSH connection) and exchanges
-//	         one hello through it; used by tests and diagnostics.
+//	         one hello through it, optionally a thumbnail and input, or a
+//	         lock request (--lock on|off); used by tests and diagnostics.
 package main
 
 import (
@@ -49,6 +50,10 @@ func main() {
 		err = connect(os.Stdin, os.Stdout, loginctl, "/run/user")
 	case "probe":
 		arguments, thumbnail, input := os.Args[2:], "", false
+		if len(arguments) >= 2 && arguments[0] == "--lock" && (arguments[1] == "on" || arguments[1] == "off") {
+			err = probeLock(arguments[2:], arguments[1] == "on", os.Stdout)
+			break
+		}
 		if len(arguments) >= 1 && arguments[0] == "--input" {
 			input, arguments = true, arguments[1:]
 		}
@@ -89,10 +94,10 @@ func serve(runtimeDirectory string) error {
 	if err := os.Chmod(path, 0o600); err != nil {
 		return err
 	}
-	return serveConnections(listener, currentUserName(), newMutterCapture())
+	return serveConnections(listener, currentUserName(), newMutterCapture(), &extensionLocker{})
 }
 
-func serveConnections(listener net.Listener, userName string, capture capturer) error {
+func serveConnections(listener net.Listener, userName string, capture capturer, lock locker) error {
 	slots := make(chan struct{}, maxConnections)
 	for {
 		connection, err := listener.Accept()
@@ -103,7 +108,7 @@ func serveConnections(listener net.Listener, userName string, capture capturer) 
 		case slots <- struct{}{}:
 			go func() {
 				defer func() { <-slots }()
-				handle(connection, userName, capture)
+				handle(connection, userName, capture, lock)
 			}()
 		default:
 			_ = connection.SetWriteDeadline(time.Now().Add(time.Second))
@@ -137,7 +142,7 @@ func currentUserName() string {
 }
 
 // handle answers one connection until the peer closes it or misbehaves.
-func handle(connection net.Conn, userName string, capture capturer) {
+func handle(connection net.Conn, userName string, capture capturer, lock locker) {
 	defer connection.Close()
 	for {
 		_ = connection.SetReadDeadline(time.Now().Add(10 * time.Minute))
@@ -158,7 +163,15 @@ func handle(connection net.Conn, userName string, capture capturer) {
 				return
 			}
 		case classroomview.TypeThumbnailRequest:
-			if err := classroomview.Write(connection, thumbnailReply(capture, message.Width, message.Since)); err != nil {
+			reply := thumbnailReply(capture, message.Width, message.Since)
+			if reply.Type == classroomview.TypeThumbnail {
+				reply.Locked = lock.Locked()
+			}
+			if err := classroomview.Write(connection, reply); err != nil {
+				return
+			}
+		case classroomview.TypeLock:
+			if err := classroomview.Write(connection, lockReply(lock, message.Locked)); err != nil {
 				return
 			}
 		case classroomview.TypeInput:
@@ -171,6 +184,13 @@ func handle(connection net.Conn, userName string, capture capturer) {
 			}
 		}
 	}
+}
+
+func lockReply(lock locker, locked bool) classroomview.Message {
+	if err := lock.SetLocked(locked); err != nil {
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeLockUnavailable, Detail: err.Error()}
+	}
+	return classroomview.Message{Type: classroomview.TypeLockState, Locked: lock.Locked()}
 }
 
 func inputReply(capture capturer, message classroomview.Message) classroomview.Message {
@@ -273,6 +293,47 @@ func connect(input io.Reader, output io.Writer, run commandRunner, runtimeBase s
 	}()
 	_, err = io.Copy(output, connection)
 	return err
+}
+
+// probeLock locks or unlocks through a command, as the controller does.
+func probeLock(command []string, locked bool, output io.Writer) error {
+	if len(command) == 0 {
+		return errors.New("probe needs a command, for example nixorium-classroom-connect")
+	}
+	process := exec.Command(command[0], command[1:]...)
+	stdin, err := process.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := process.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	process.Stderr = os.Stderr
+	if err := process.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = stdin.Close()
+		_ = process.Wait()
+	}()
+	for _, message := range []classroomview.Message{
+		{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion},
+		{Type: classroomview.TypeLock, Locked: locked},
+	} {
+		if err := classroomview.Write(stdin, message); err != nil {
+			return err
+		}
+		reply, err := classroomview.Read(stdout)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(output, "%s locked=%t code=%s detail=%s\n", reply.Type, reply.Locked, reply.Code, reply.Detail)
+		if reply.Type == classroomview.TypeError {
+			return errors.New("the agent refused the lock request")
+		}
+	}
+	return nil
 }
 
 // probe exchanges one hello through a command's standard input and output.

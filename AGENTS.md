@@ -571,6 +571,10 @@ any shard must block publication.
   worker's own typed plan/apply handling in process: the review token never
   reaches the page, each review is applied at most once, and restart or
   shutdown with active or unknown sessions requires the typed word. The
+  teacher's lock is the classroom extension's full-screen cover with a modal
+  grab, requested by the agent on the session bus; logout and restart always
+  end it. It is a classroom aid, not a security boundary: the session's own
+  user can reach the agent and the bus. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

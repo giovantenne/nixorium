@@ -27,6 +27,10 @@ const (
 	TypeThumbnail        = "thumbnail"
 	TypeInput            = "input"
 	TypeInputDone        = "input.done"
+	// TypeLock asks the agent to lock (Locked) or unlock the computer; the
+	// agent answers TypeLockState with the resulting state.
+	TypeLock      = "lock.set"
+	TypeLockState = "lock.state"
 )
 
 // Frame width limits accepted by the agent: small for the overview, up to
@@ -99,6 +103,8 @@ const (
 	CodeNotReady    = "not-ready"
 	CodeLocked      = "screen-locked"
 	CodeBusy        = "busy"
+	// CodeLockUnavailable: the session has no classroom extension to lock it.
+	CodeLockUnavailable = "lock-unavailable"
 )
 
 // Message is one protocol message. Unknown fields are refused on decode.
@@ -124,6 +130,9 @@ type Message struct {
 	// and button still pressed.
 	Events  []InputEvent `json:"events,omitempty"`
 	Release bool         `json:"release,omitempty"`
+	// Locked is the requested state in TypeLock and the current state in
+	// TypeLockState and thumbnail replies.
+	Locked bool `json:"locked,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.
@@ -171,6 +180,8 @@ func Read(reader io.Reader) (Message, error) {
 type Session interface {
 	Thumbnail(width int, since int64) (Message, error)
 	Input(events []InputEvent, release bool) error
+	// SetLocked locks or unlocks the computer and returns the new state.
+	SetLocked(locked bool) (bool, error)
 	Close() error
 }
 
