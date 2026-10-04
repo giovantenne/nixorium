@@ -34,6 +34,15 @@ func (fake *fakeActions) handle(_ context.Context, request domain.ClassroomReque
 		return domain.ClassroomResponse{PowerPlan: &domain.ShutdownPlanReport{State: "ready", Action: request.PowerAction, Eligible: 1, ExpiresAt: expires, ReviewToken: "sha256:power", Targets: []domain.ShutdownTargetPlan{
 			{Name: "pc01", Eligible: true, Session: domain.ShutdownSessionActive},
 		}}}
+	case domain.ClassroomLockPlanOperation:
+		return domain.ClassroomResponse{LockPlan: &domain.LockPlan{State: "ready", Action: request.LockAction, ExpiresAt: expires, ReviewToken: "sha256:lock", Targets: []domain.LockTarget{
+			{HostMeta: domain.HostMeta{Name: "pc01"}, Eligible: true, Reachable: true},
+			{HostMeta: domain.HostMeta{Name: "pc02"}, Detail: "Nobody is signed in."},
+		}}}
+	case domain.ClassroomLockApplyOperation:
+		return domain.ClassroomResponse{LockReport: &domain.LockReport{State: "partial", Targets: []domain.LockOutcome{
+			{Name: "pc01", State: "verified", Detail: "Locked."}, {Name: "pc02", State: "not-sent", Detail: "Unavailable in the reviewed plan; nothing was sent."},
+		}}}
 	case domain.ClassroomPowerApplyOperation:
 		return domain.ClassroomResponse{PowerReport: &domain.ShutdownApplyReport{State: "completed", Targets: []domain.ShutdownTargetOutcome{{Name: "pc01", State: "accepted"}}}}
 	}
@@ -155,5 +164,27 @@ func TestPageActionsRefuseForeignOriginsAndBadTargets(t *testing.T) {
 	}
 	if len(fake.requests) != 0 {
 		t.Fatalf("refused requests reached the worker: %+v", fake.requests)
+	}
+}
+
+func TestPageLocksSelectedComputers(t *testing.T) {
+	fake := &fakeActions{}
+	server, host, cookie := openedViewServer(t, fake)
+	origin := "http://" + host
+	plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"lock","computers":["pc01","pc02"]}`)
+	var review actionReview
+	if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready || review.Confirm != "Lock 1 computer" || review.Word != "" || !review.Rows[1].Skip {
+		t.Fatalf("review = %s", plan.Body.String())
+	}
+	if request := fake.requests[0]; request.Operation != domain.ClassroomLockPlanOperation || request.LockAction != domain.LockOn {
+		t.Fatalf("plan request = %+v", request)
+	}
+	apply := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`"}`)
+	var result actionResult
+	if err := json.Unmarshal(apply.Body.Bytes(), &result); err != nil || result.State != "partial" || result.Rows[0].Note != "Locked." || result.Rows[0].Skip || !result.Rows[1].Skip {
+		t.Fatalf("result = %s", apply.Body.String())
+	}
+	if request := fake.requests[1]; request.Operation != domain.ClassroomLockApplyOperation || request.LockPlan == nil || request.LockPlan.ReviewToken != "sha256:lock" {
+		t.Fatalf("apply request = %+v", request)
 	}
 }

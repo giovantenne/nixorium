@@ -43,6 +43,7 @@ func (ClassroomAgentConnector) Connect(ctx context.Context, host domain.HostMeta
 		session.Close()
 		return nil, classroomview.AgentError{Code: reply.Code}
 	}
+	session.locked = reply.Locked
 	return session, nil
 }
 
@@ -52,7 +53,10 @@ type sshAgentSession struct {
 	input   io.WriteCloser
 	output  io.Reader
 	closed  bool
+	locked  bool
 }
+
+func (session *sshAgentSession) Locked() bool { return session.locked }
 
 func (session *sshAgentSession) Thumbnail(width int, since int64) (classroomview.Message, error) {
 	return session.exchange(classroomview.Message{Type: classroomview.TypeThumbnailRequest, Width: width, Since: since}, 10*time.Second)

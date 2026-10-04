@@ -574,7 +574,9 @@ any shard must block publication.
   teacher's lock is the classroom extension's full-screen cover with a modal
   grab, requested by the agent on the session bus; logout and restart always
   end it. It is a classroom aid, not a security boundary: the session's own
-  user can reach the agent and the bus. The
+  user can reach the agent and the bus. Lock plan/apply (`LockManager`) has
+  an expiring content-bound review like Internet control but does not take
+  the administrative operation lock, since it changes no system state. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

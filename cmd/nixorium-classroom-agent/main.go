@@ -159,7 +159,7 @@ func handle(connection net.Conn, userName string, capture capturer, lock locker)
 				_ = classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeUnsupported, Detail: fmt.Sprintf("protocol version %d is not supported", message.Version)})
 				return
 			}
-			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName}); err != nil {
+			if err := classroomview.Write(connection, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, Agent: agentVersion, User: userName, Locked: lock.Locked()}); err != nil {
 				return
 			}
 		case classroomview.TypeThumbnailRequest:

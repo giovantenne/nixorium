@@ -268,8 +268,15 @@ func TestAgentAnswersWhileAnotherConnectionHangs(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	// Every slot is taken now: a further connection is refused at once.
-	if reply, err := hello(); err != nil || reply.Code != classroomview.CodeBusy {
+	// Every slot is taken now: a further connection is refused at once,
+	// before it sends anything.
+	refused, err := net.Dial("unix", listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer refused.Close()
+	_ = refused.SetDeadline(time.Now().Add(2 * time.Second))
+	if reply, err := classroomview.Read(refused); err != nil || reply.Code != classroomview.CodeBusy {
 		t.Fatalf("over-limit reply = %+v, %v", reply, err)
 	}
 }

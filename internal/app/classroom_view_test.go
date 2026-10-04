@@ -23,6 +23,8 @@ func (session fakeAgentSession) Thumbnail(width int, since int64) (classroomview
 
 func (session fakeAgentSession) SetLocked(locked bool) (bool, error) { return locked, nil }
 
+func (session fakeAgentSession) Locked() bool { return false }
+
 func (session fakeAgentSession) Input(events []classroomview.InputEvent, release bool) error {
 	session.mutex.Lock()
 	defer session.mutex.Unlock()

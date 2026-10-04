@@ -48,7 +48,8 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe ssh -T -i /root/.ssh/id -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ClearAllForwardings=yes -o ForwardAgent=no root@127.0.0.1 nixorium-classroom-connect | grep -F 'user=student'")
 
     # A real thumbnail of the student's screen, through the same relay.
-    client.succeed("${agent} probe --thumbnail /tmp/thumb.jpg nixorium-classroom-connect | grep -E '^thumbnail width=320 height=200 bytes=[0-9]{3,}'")
+    # The shell may still be starting its screen cast service: wait for it.
+    client.wait_until_succeeds("${agent} probe --thumbnail /tmp/thumb.jpg nixorium-classroom-connect | grep -E '^thumbnail width=320 height=200 bytes=[0-9]{3,}'", timeout=60)
     client.succeed("test \"$(head -c 2 /tmp/thumb.jpg | od -An -tx1 | tr -d ' ')\" = ffd8")
     client.copy_from_machine("/tmp/thumb.jpg")
 

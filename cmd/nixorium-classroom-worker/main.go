@@ -49,6 +49,7 @@ func run() error {
 		inspector:  app.NewInspector(local),
 		power:      app.NewShutdownManager(local),
 		internet:   app.NewInternetManager(local),
+		lock:       app.NewLockManager(lockSource{local, adapters.ClassroomAgentConnector{}}),
 		records:    local,
 	}
 	// The page's actions go through the same handling as the dashboard.
@@ -63,7 +64,14 @@ type classroomWorker struct {
 	inspector  *app.Inspector
 	power      *app.ShutdownManager
 	internet   *app.InternetManager
+	lock       *app.LockManager
 	records    app.OperationRecordSink
+}
+
+// lockSource reads the laboratory identities and reaches the classroom agents.
+type lockSource struct {
+	cachedLocal
+	adapters.ClassroomAgentConnector
 }
 
 func (worker classroomWorker) handle(ctx context.Context, request domain.ClassroomRequest) domain.ClassroomResponse {
@@ -113,6 +121,20 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		}
 		report.Message = teacherMessage(report.Message)
 		response.InternetReport = &report
+	case domain.ClassroomLockPlanOperation:
+		if worker.viewOn == nil || !worker.viewOn() {
+			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}
+		}
+		plan := worker.lock.Plan(ctx, worker.repository, request.Requested, request.LockAction)
+		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		response.LockPlan = &plan
+	case domain.ClassroomLockApplyOperation:
+		if request.LockPlan == nil || request.LockPlan.Repository != worker.repository {
+			return classroomFailure(errors.New("lock review does not belong to the fixed deployment"))
+		}
+		report := worker.lock.Apply(ctx, *request.LockPlan, request.LockPlan.ReviewToken)
+		report.Message = teacherMessage(report.Message)
+		response.LockReport = &report
 	case domain.ClassroomViewOpenOperation:
 		if worker.view == nil || worker.viewOn == nil || !worker.viewOn() {
 			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}

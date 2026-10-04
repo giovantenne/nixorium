@@ -25,6 +25,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   down**, also available for one computer in its window's **Actions** menu.
   They use the same reviews as the classroom dashboard; restarting or
   shutting down a computer that someone is using needs the typed word.
+  **Lock** covers the selected screens with "Eyes on the teacher" and takes
+  their keyboard and mouse until **Unlock**, logout or restart; a locked
+  computer is still visible but cannot be controlled.
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

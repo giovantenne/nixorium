@@ -21,6 +21,8 @@ const (
 	actionInternetAllow = "internet-allow"
 	actionRestart       = "restart"
 	actionShutdown      = "shutdown"
+	actionLock          = "lock"
+	actionUnlock        = "unlock"
 	maxActionComputers  = 200
 	// powerLabelTime keeps "Restarting…" on a card while the computer is away.
 	powerLabelTime = 3 * time.Minute
@@ -29,6 +31,7 @@ const (
 type classroomHandler func(context.Context, domain.ClassroomRequest) domain.ClassroomResponse
 
 type pendingAction struct {
+	lock     *domain.LockPlan
 	internet *domain.InternetPlan
 	power    *domain.ShutdownPlanReport
 	word     string
@@ -158,6 +161,18 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			break
 		}
 		review, pending = powerReview(*response.PowerPlan)
+	case actionLock, actionUnlock:
+		operation.Operation = domain.ClassroomLockPlanOperation
+		operation.LockAction = domain.LockOff
+		if body.Action == actionLock {
+			operation.LockAction = domain.LockOn
+		}
+		response := server.actions(ctx, operation)
+		if response.LockPlan == nil {
+			review = actionReview{Title: "Lock", Message: response.Message}
+			break
+		}
+		review, pending = lockReview(*response.LockPlan)
 	default:
 		http.Error(writer, "Unknown action.", http.StatusBadRequest)
 		return
@@ -209,6 +224,40 @@ func internetReview(plan domain.InternetPlan) (actionReview, pendingAction) {
 		review.Confirm = verb + plural(eligible, "computer")
 	}
 	return review, pendingAction{internet: &plan, expires: plan.ExpiresAt}
+}
+
+func lockReview(plan domain.LockPlan) (actionReview, pendingAction) {
+	lock := plan.Action.Locked()
+	review := actionReview{Title: "Unlock", Message: plan.Message, Rows: []actionRow{}}
+	if lock {
+		review.Title = "Lock"
+	}
+	eligible := 0
+	for _, target := range plan.Targets {
+		row := actionRow{Name: target.Name, Note: target.Detail}
+		switch {
+		case !target.Eligible:
+			row.Skip = true
+		case target.Locked == lock:
+			row.Note = "Already like this."
+			eligible++
+		default:
+			eligible++
+		}
+		review.Rows = append(review.Rows, row)
+	}
+	for _, issue := range plan.Issues {
+		review.Warnings = append(review.Warnings, issue.Message)
+	}
+	review.Ready = !plan.HasErrors() && eligible > 0
+	if review.Ready {
+		verb := "Unlock "
+		if lock {
+			verb = "Lock "
+		}
+		review.Confirm = verb + plural(eligible, "computer")
+	}
+	return review, pendingAction{lock: &plan, expires: plan.ExpiresAt}
 }
 
 func powerReview(plan domain.ShutdownPlanReport) (actionReview, pendingAction) {
@@ -288,6 +337,19 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 	}
 	result := actionResult{Rows: []actionRow{}}
 	switch {
+	case pending.lock != nil:
+		operation.Operation = domain.ClassroomLockApplyOperation
+		operation.LockPlan = pending.lock
+		response := server.actions(ctx, operation)
+		if response.LockReport == nil {
+			result.State, result.Message = "failed", response.Message
+			break
+		}
+		report := response.LockReport
+		result.State, result.Message = report.State, report.Message
+		for _, target := range report.Targets {
+			result.Rows = append(result.Rows, actionRow{Name: target.Name, Note: outcomeText(target.State, target.Detail), Skip: target.State != "verified"})
+		}
 	case pending.internet != nil:
 		operation.InternetPlan = pending.internet
 		response := server.actions(ctx, operation)

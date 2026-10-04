@@ -182,6 +182,8 @@ type Session interface {
 	Input(events []InputEvent, release bool) error
 	// SetLocked locks or unlocks the computer and returns the new state.
 	SetLocked(locked bool) (bool, error)
+	// Locked is the lock state reported when the session opened.
+	Locked() bool
 	Close() error
 }
 

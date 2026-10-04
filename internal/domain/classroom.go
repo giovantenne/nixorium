@@ -24,6 +24,8 @@ const (
 	ClassroomPowerApplyOperation    ClassroomOperation = "power-apply"
 	ClassroomInternetPlanOperation  ClassroomOperation = "internet-plan"
 	ClassroomInternetApplyOperation ClassroomOperation = "internet-apply"
+	ClassroomLockPlanOperation      ClassroomOperation = "lock-plan"
+	ClassroomLockApplyOperation     ClassroomOperation = "lock-apply"
 	// ClassroomViewOpenOperation returns a one-time address of the
 	// experimental classroom view page.
 	ClassroomViewOpenOperation ClassroomOperation = "view-open"
@@ -34,6 +36,7 @@ func (o ClassroomOperation) Valid() bool {
 	case ClassroomOverviewOperation, ClassroomStatusOperation, ClassroomHostsOperation,
 		ClassroomPowerPlanOperation, ClassroomPowerApplyOperation,
 		ClassroomInternetPlanOperation, ClassroomInternetApplyOperation,
+		ClassroomLockPlanOperation, ClassroomLockApplyOperation,
 		ClassroomViewOpenOperation:
 		return true
 	default:
@@ -51,6 +54,8 @@ type ClassroomRequest struct {
 	InternetAction InternetAction        `json:"internetAction,omitempty"`
 	PowerPlan      *ShutdownPlanReport   `json:"powerPlan,omitempty"`
 	InternetPlan   *InternetPlan         `json:"internetPlan,omitempty"`
+	LockAction     LockAction            `json:"lockAction,omitempty"`
+	LockPlan       *LockPlan             `json:"lockPlan,omitempty"`
 }
 
 type ClassroomResponse struct {
@@ -65,6 +70,8 @@ type ClassroomResponse struct {
 	ViewURL        string               `json:"viewUrl,omitempty"`
 	InternetPlan   *InternetPlan        `json:"internetPlan,omitempty"`
 	InternetReport *InternetReport      `json:"internetReport,omitempty"`
+	LockPlan       *LockPlan            `json:"lockPlan,omitempty"`
+	LockReport     *LockReport          `json:"lockReport,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {

@@ -24,7 +24,7 @@ const stateText = {
   viewing: '',
   'no-session': 'Nobody is signed in',
   'no-agent': 'Classroom view is not running here',
-  locked: 'The screen is locked',
+  locked: "The student's screen lock is on",
   unreachable: 'Switched off or not reachable',
   failed: 'The screen could not be captured',
 };
@@ -116,6 +116,7 @@ function render(computers) {
       entry.placeholder.textContent = text;
     }
     const labels = [];
+    if (computer.locked) labels.push('Locked');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
     if (labels.join('|') !== entry.badgeText) {
@@ -129,7 +130,11 @@ function render(computers) {
     }
     if (computer.state === 'viewing') viewing += 1;
     if (computer.name === selected) {
-      viewerDetail.textContent = computer.state === 'viewing' ? '' : text;
+      viewerDetail.textContent = computer.state === 'viewing' ? (computer.locked ? 'Locked' : '') : text;
+      // A locked computer is seen, not controlled: unlock it first.
+      if (computer.locked && controlling) setControl(false);
+      controlButton.disabled = Boolean(computer.locked);
+      controlButton.title = computer.locked ? 'Unlock this computer to take control.' : '';
     }
   }
   summary.textContent = viewing + ' of ' + computers.length + ' screens visible. Student computers show a sharing notice while you watch.';

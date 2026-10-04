@@ -18,13 +18,15 @@ type ClassroomAgentConnector interface {
 
 // ClassroomComputer is one card of the teacher's overview.
 type ClassroomComputer struct {
-	Name       string `json:"name"`
-	State      string `json:"state"`
-	Detail     string `json:"detail"`
-	HasImage   bool   `json:"hasImage"`
-	ImageAt    int64  `json:"imageAt,omitempty"`
-	ScreenAt   int64  `json:"screenAt,omitempty"`
-	Frame      int64  `json:"frame,omitempty"`
+	Name     string `json:"name"`
+	State    string `json:"state"`
+	Detail   string `json:"detail"`
+	HasImage bool   `json:"hasImage"`
+	ImageAt  int64  `json:"imageAt,omitempty"`
+	ScreenAt int64  `json:"screenAt,omitempty"`
+	Frame    int64  `json:"frame,omitempty"`
+	// Locked: the teacher's lock covers this screen.
+	Locked     bool `json:"locked,omitempty"`
 	imageBytes []byte
 }
 
@@ -230,7 +232,7 @@ func (hub *ClassroomViewHub) poll(host domain.HostMeta) {
 		case reply.Type == classroomview.TypeThumbnail:
 			at := hub.now().UnixMilli()
 			hub.update(host.Name, func(computer *ClassroomComputer) {
-				computer.State, computer.Detail = ClassroomViewing, ""
+				computer.State, computer.Detail, computer.Locked = ClassroomViewing, "", reply.Locked
 				if len(reply.Image) > 0 {
 					computer.imageBytes, computer.HasImage = reply.Image, true
 					computer.ImageAt, computer.ScreenAt, computer.Frame = at, reply.CapturedAt, reply.Frame
@@ -262,7 +264,7 @@ func classroomFailureState(err error) (string, string) {
 		case classroomview.CodeNoAgent:
 			return ClassroomNoAgent, "The classroom view is not running on this computer."
 		case classroomview.CodeLocked:
-			return ClassroomLocked, "The screen is locked."
+			return ClassroomLocked, "The student's screen lock is on."
 		case classroomview.CodeBusy:
 			// Older channels are still closing; the next attempt gets through.
 			return ClassroomConnecting, "Connecting…"
