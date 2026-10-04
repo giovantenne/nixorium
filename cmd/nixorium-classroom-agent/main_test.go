@@ -248,21 +248,28 @@ func TestAgentAnswersWhileAnotherConnectionHangs(t *testing.T) {
 	if reply, err := hello(); err != nil || reply.Type != classroomview.TypeHello {
 		t.Fatalf("hello beside silent connections = %+v, %v", reply, err)
 	}
-	last, err := net.Dial("unix", listener.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer last.Close()
-	// Every slot is taken now: a further connection is refused at once.
+	// The last free slot: it may be refused while the previous hello's slot
+	// is still being released, so retry until it is answered and kept open.
 	deadline := time.Now().Add(2 * time.Second)
 	for {
-		reply, err := hello()
-		if err == nil && reply.Code == classroomview.CodeBusy {
+		last, err := net.Dial("unix", listener.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer last.Close()
+		_ = last.SetDeadline(time.Now().Add(time.Second))
+		_ = classroomview.Write(last, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion})
+		if reply, err := classroomview.Read(last); err == nil && reply.Type == classroomview.TypeHello {
+			_ = last.SetDeadline(time.Time{})
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("over-limit reply = %+v, %v", reply, err)
+			t.Fatal("the last free slot was never answered")
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+	// Every slot is taken now: a further connection is refused at once.
+	if reply, err := hello(); err != nil || reply.Code != classroomview.CodeBusy {
+		t.Fatalf("over-limit reply = %+v, %v", reply, err)
 	}
 }

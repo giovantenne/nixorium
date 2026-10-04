@@ -9,8 +9,22 @@
 </head>
 <body>
 <header>
-  <h1>Classroom view</h1>
-  <p id="summary">Loading the computers…</p>
+  <div class="title">
+    <h1>Classroom view</h1>
+    <p id="summary">Loading the computers…</p>
+  </div>
+  <div class="toolbar" role="toolbar" aria-label="Actions on the selected computers">
+    <label class="select-all"><input type="checkbox" id="select-all"> Select all</label>
+    <span id="selected-count">None selected</span>
+    <span class="group">
+      <button type="button" data-action="internet-block">Block Internet</button>
+      <button type="button" data-action="internet-allow">Allow Internet</button>
+    </span>
+    <span class="group">
+      <button type="button" data-action="restart">Restart</button>
+      <button type="button" data-action="shutdown">Shut down</button>
+    </span>
+  </div>
 </header>
 <main>
   <ul id="computers" class="grid" aria-live="polite"></ul>
@@ -21,11 +35,31 @@
     <strong id="viewer-name"></strong>
     <span id="viewer-detail"></span>
     <span id="viewer-controlling" class="controlling" hidden title="Mouse and keyboard go to the student's screen. In full screen, hold Esc to leave it.">Controlling this computer</span>
+    <details class="actions-menu">
+      <summary>Actions</summary>
+      <div class="menu">
+        <button type="button" data-action="internet-block">Block Internet</button>
+        <button type="button" data-action="internet-allow">Allow Internet</button>
+        <button type="button" data-action="restart">Restart</button>
+        <button type="button" data-action="shutdown">Shut down</button>
+      </div>
+    </details>
     <button type="button" id="viewer-control" class="primary">Take control</button>
     <button type="button" id="viewer-fullscreen">Full screen</button>
     <button type="button" id="viewer-close">Close</button>
   </div>
   <img id="viewer-image" alt="" tabindex="0">
 </section>
+<dialog id="action-dialog" aria-labelledby="action-title">
+  <h2 id="action-title"></h2>
+  <p id="action-message"></p>
+  <ul id="action-rows"></ul>
+  <ul id="action-warnings"></ul>
+  <label id="action-word-label" hidden>Type <strong id="action-word"></strong> to confirm <input id="action-word-input" autocomplete="off" spellcheck="false"></label>
+  <div class="dialog-buttons">
+    <button type="button" id="action-cancel">Cancel</button>
+    <button type="button" id="action-confirm" class="primary" hidden></button>
+  </div>
+</dialog>
 </body>
 </html>

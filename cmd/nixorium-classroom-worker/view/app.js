@@ -29,6 +29,29 @@ const stateText = {
   failed: 'The screen could not be captured',
 };
 
+// Computers chosen with their check boxes for the toolbar actions.
+const chosen = new Set();
+const selectAll = document.getElementById('select-all');
+const selectedCount = document.getElementById('selected-count');
+const toolbarButtons = document.querySelectorAll('.toolbar button[data-action]');
+
+function updateSelection() {
+  for (const [name, entry] of cards) {
+    entry.check.checked = chosen.has(name);
+    entry.item.classList.toggle('chosen', chosen.has(name));
+  }
+  selectedCount.textContent = chosen.size === 0 ? 'None selected' : chosen.size + ' selected';
+  selectAll.checked = chosen.size > 0 && chosen.size === cards.size;
+  selectAll.indeterminate = chosen.size > 0 && chosen.size < cards.size;
+  for (const button of toolbarButtons) button.disabled = chosen.size === 0;
+}
+
+selectAll.addEventListener('change', () => {
+  chosen.clear();
+  if (selectAll.checked) for (const name of cards.keys()) chosen.add(name);
+  updateSelection();
+});
+
 function card(computer) {
   let entry = cards.get(computer.name);
   if (entry) return entry;
@@ -36,6 +59,8 @@ function card(computer) {
   item.className = 'computer';
   const button = document.createElement('button');
   button.type = 'button';
+  button.className = 'open';
+  button.title = 'Open the screen of ' + computer.name;
   const screen = document.createElement('div');
   screen.className = 'screen';
   const image = document.createElement('img');
@@ -43,19 +68,27 @@ function card(computer) {
   image.hidden = true;
   const placeholder = document.createElement('span');
   screen.append(image, placeholder);
+  button.append(screen);
+  button.addEventListener('click', () => openWindow(computer.name));
   const label = document.createElement('div');
   label.className = 'label';
-  const name = document.createElement('span');
+  const name = document.createElement('label');
   name.className = 'name';
-  name.textContent = computer.name;
+  const check = document.createElement('input');
+  check.type = 'checkbox';
+  check.addEventListener('change', () => {
+    if (check.checked) chosen.add(computer.name); else chosen.delete(computer.name);
+    updateSelection();
+  });
+  name.append(check, computer.name);
   const state = document.createElement('span');
   state.className = 'state';
   label.append(name, state);
-  button.append(screen, label);
-  button.addEventListener('click', () => openWindow(computer.name));
-  item.append(button);
+  const badges = document.createElement('div');
+  badges.className = 'badges';
+  item.append(button, label, badges);
   grid.append(item);
-  entry = { image, placeholder, state, imageAt: 0 };
+  entry = { item, check, image, placeholder, state, badges, badgeText: '', imageAt: 0 };
   cards.set(computer.name, entry);
   return entry;
 }
@@ -82,12 +115,141 @@ function render(computers) {
     } else if (!computer.hasImage) {
       entry.placeholder.textContent = text;
     }
+    const labels = [];
+    if (computer.internet === 'blocked') labels.push('Internet off');
+    if (computer.power) labels.push(computer.power);
+    if (labels.join('|') !== entry.badgeText) {
+      entry.badgeText = labels.join('|');
+      entry.badges.replaceChildren(...labels.map((text) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = text;
+        return badge;
+      }));
+    }
     if (computer.state === 'viewing') viewing += 1;
     if (computer.name === selected) {
       viewerDetail.textContent = computer.state === 'viewing' ? '' : text;
     }
   }
   summary.textContent = viewing + ' of ' + computers.length + ' screens visible. Student computers show a sharing notice while you watch.';
+  updateSelection();
+}
+
+// Actions: the controller reviews the computers first; nothing happens until
+// the teacher confirms that review in the dialog.
+const actionDialog = document.getElementById('action-dialog');
+const actionTitle = document.getElementById('action-title');
+const actionMessage = document.getElementById('action-message');
+const actionRows = document.getElementById('action-rows');
+const actionWarnings = document.getElementById('action-warnings');
+const actionWordLabel = document.getElementById('action-word-label');
+const actionWord = document.getElementById('action-word');
+const actionWordInput = document.getElementById('action-word-input');
+const actionCancel = document.getElementById('action-cancel');
+const actionConfirm = document.getElementById('action-confirm');
+let actionID = '';
+
+function showRows(list, rows) {
+  list.replaceChildren(...(rows || []).map((row) => {
+    const item = document.createElement('li');
+    item.classList.toggle('skip', Boolean(row.skip));
+    item.append(row.name);
+    if (row.note) {
+      const note = document.createElement('span');
+      note.className = 'note';
+      note.textContent = ' — ' + row.note;
+      item.append(note);
+    }
+    return item;
+  }));
+}
+
+function showText(list, lines) {
+  list.replaceChildren(...(lines || []).map((line) => {
+    const item = document.createElement('li');
+    item.textContent = line;
+    return item;
+  }));
+}
+
+async function postJSON(path, body) {
+  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+async function runAction(action, computers) {
+  // The dialog takes the keyboard: let go of every key on the student's side.
+  if (controlling) {
+    pressedCodes.clear();
+    send([], true);
+  }
+  actionID = '';
+  actionTitle.textContent = 'Checking the computers…';
+  actionMessage.textContent = '';
+  showRows(actionRows, []);
+  showText(actionWarnings, []);
+  actionWordLabel.hidden = true;
+  actionWordInput.value = '';
+  actionConfirm.hidden = true;
+  actionCancel.textContent = 'Cancel';
+  if (!actionDialog.open) actionDialog.showModal();
+  try {
+    const review = await postJSON('/api/actions/plan', { action, computers });
+    actionTitle.textContent = review.title;
+    actionMessage.textContent = review.ready ? '' : (review.message || 'This action is not possible now.');
+    showRows(actionRows, review.rows);
+    showText(actionWarnings, review.warnings);
+    if (review.ready) {
+      actionID = review.id;
+      actionConfirm.textContent = review.confirm;
+      actionConfirm.hidden = false;
+      actionWordLabel.hidden = !review.word;
+      actionWord.textContent = review.word || '';
+      if (review.word) actionWordInput.focus(); else actionConfirm.focus();
+    }
+  } catch (error) {
+    actionTitle.textContent = 'The action could not start';
+    actionMessage.textContent = 'The controller did not answer. Try again.';
+  }
+}
+
+actionConfirm.addEventListener('click', async () => {
+  if (!actionID) return;
+  const id = actionID;
+  actionID = '';
+  actionConfirm.hidden = true;
+  actionWordLabel.hidden = true;
+  actionMessage.textContent = 'Working…';
+  try {
+    const result = await postJSON('/api/actions/apply', { id, word: actionWordInput.value });
+    actionMessage.textContent = result.message || (result.state === 'completed' ? 'Done.' : '');
+    showRows(actionRows, result.rows);
+    showText(actionWarnings, []);
+    // Computers that did not take the action stay selected for a retry.
+    if (!screenMode && result.rows && result.rows.length) {
+      chosen.clear();
+      for (const row of result.rows) if (row.skip) chosen.add(row.name);
+      updateSelection();
+    }
+  } catch (error) {
+    actionMessage.textContent = 'The controller did not answer; the result is unknown. Check the computers before trying again.';
+  }
+  actionCancel.textContent = 'Close';
+  actionCancel.focus();
+});
+actionCancel.addEventListener('click', () => actionDialog.close());
+actionDialog.addEventListener('close', () => { actionID = ''; });
+
+for (const button of toolbarButtons) {
+  button.addEventListener('click', () => runAction(button.dataset.action, [...chosen].sort()));
+}
+for (const button of document.querySelectorAll('.actions-menu button[data-action]')) {
+  button.addEventListener('click', () => {
+    button.closest('details').open = false;
+    if (selected) runAction(button.dataset.action, [selected]);
+  });
 }
 
 // Enlarged view: frames as fast as the computer sends them (only changes).
@@ -222,7 +384,7 @@ viewerImage.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 window.addEventListener('keydown', (event) => {
-  if (!controlling || event.target === controlButton) return;
+  if (!controlling || event.target === controlButton || actionDialog.open) return;
   const symbol = keysym(event);
   if (!symbol) return;
   event.preventDefault();
@@ -230,7 +392,7 @@ window.addEventListener('keydown', (event) => {
   queueEvent({ kind: 'key', keysym: symbol, pressed: true });
 });
 window.addEventListener('keyup', (event) => {
-  if (!controlling) return;
+  if (!controlling || actionDialog.open) return;
   const symbol = pressedCodes.get(event.code) || keysym(event);
   pressedCodes.delete(event.code);
   if (!symbol) return;

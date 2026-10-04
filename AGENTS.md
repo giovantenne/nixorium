@@ -567,7 +567,10 @@ any shard must block publication.
   when the page stops polling. Remote input is accepted only as bounded,
   validated JSON from the page's own Origin for a computer open in the large
   view, and every path that ends control must release pressed keys and
-  buttons. The
+  buttons. Page actions on selected computers (Internet, power) call the
+  worker's own typed plan/apply handling in process: the review token never
+  reaches the page, each review is applied at most once, and restart or
+  shutdown with active or unknown sessions requires the typed word. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

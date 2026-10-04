@@ -31,6 +31,8 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
+var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true}
+
 // viewSource lists computers, their images, and forwards input.
 type viewSource interface {
 	Computers(ctx context.Context) ([]app.ClassroomComputer, error)
@@ -45,6 +47,9 @@ type viewSource interface {
 // student account, cannot enter.
 type viewServer struct {
 	source   viewSource
+	actions  classroomHandler
+	pending  map[string]pendingAction
+	labels   map[string]computerLabels
 	mutex    sync.Mutex
 	address  string
 	tokens   map[string]time.Time
@@ -53,7 +58,7 @@ type viewServer struct {
 }
 
 func newViewServer(source viewSource) *viewServer {
-	return &viewServer{source: source, tokens: map[string]time.Time{}, sessions: map[string]time.Time{}, now: time.Now}
+	return &viewServer{source: source, pending: map[string]pendingAction{}, labels: map[string]computerLabels{}, tokens: map[string]time.Time{}, sessions: map[string]time.Time{}, now: time.Now}
 }
 
 // Open starts the page server on first use and returns a one-time address.
@@ -95,8 +100,8 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	address := server.address
 	server.mutex.Unlock()
 	// A page on another site cannot reach this server through DNS tricks,
-	// and only the input endpoint accepts a POST from this page itself.
-	post := request.Method == http.MethodPost && request.URL.Path == "/api/input" &&
+	// and only the page's own endpoints accept a POST from this page itself.
+	post := request.Method == http.MethodPost && postPaths[request.URL.Path] &&
 		request.Header.Get("Origin") == "http://"+address &&
 		strings.HasPrefix(request.Header.Get("Content-Type"), "application/json")
 	if request.Host != address || (request.Method != http.MethodGet && !post) {
@@ -126,8 +131,18 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			http.Error(writer, "The list of computers is not available.", http.StatusServiceUnavailable)
 			return
 		}
+		type pageComputer struct {
+			app.ClassroomComputer
+			Internet string `json:"internet,omitempty"`
+			Power    string `json:"power,omitempty"`
+		}
+		list := make([]pageComputer, 0, len(computers))
+		for _, computer := range computers {
+			internet, power := server.labelsFor(computer.Name)
+			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power})
+		}
 		header.Set("Content-Type", "application/json")
-		_ = json.NewEncoder(writer).Encode(map[string]any{"computers": computers})
+		_ = json.NewEncoder(writer).Encode(map[string]any{"computers": list})
 	case "/api/thumbnail":
 		name := request.URL.Query().Get("name")
 		if !computerNamePattern.MatchString(name) {
@@ -160,6 +175,16 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		}
 		header.Set("Content-Type", "image/jpeg")
 		_, _ = writer.Write(image)
+	case "/api/actions/plan", "/api/actions/apply":
+		if request.Method != http.MethodPost || server.actions == nil {
+			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)
+			return
+		}
+		if request.URL.Path == "/api/actions/plan" {
+			server.planAction(writer, request)
+		} else {
+			server.applyAction(writer, request)
+		}
 	case "/api/input":
 		if request.Method != http.MethodPost {
 			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)

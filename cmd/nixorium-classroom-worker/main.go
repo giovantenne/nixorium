@@ -51,6 +51,8 @@ func run() error {
 		internet:   app.NewInternetManager(local),
 		records:    local,
 	}
+	// The page's actions go through the same handling as the dashboard.
+	worker.view.actions = worker.handle
 	return adapters.NewClassroomIPCServer(adapters.ClassroomSocketPath, worker.handle).Serve(ctx)
 }
 
