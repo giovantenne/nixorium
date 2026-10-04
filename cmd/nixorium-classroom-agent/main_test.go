@@ -128,7 +128,7 @@ func TestAgentSocketRefusesLinksAndOtherFiles(t *testing.T) {
 
 func TestAgentRefusesOtherProtocolVersionsAndUnknownMessages(t *testing.T) {
 	server, client := net.Pipe()
-	go handle(server, "student", fakeCapture{}, &fakeLocker{})
+	go handle(server, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}})
 	_ = classroomview.Write(client, classroomview.Message{Type: "screen.record"})
 	if reply, err := classroomview.Read(client); err != nil || reply.Code != classroomview.CodeUnsupported {
 		t.Fatalf("unknown message reply = %+v, %v", reply, err)
@@ -224,7 +224,9 @@ func TestAgentAnswersWhileAnotherConnectionHangs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	go func() { _ = serveConnections(listener, "student", fakeCapture{}, &fakeLocker{}) }()
+	go func() {
+		_ = serveConnections(listener, agentContext{userName: "student", capture: fakeCapture{}, lock: &fakeLocker{}})
+	}()
 	hello := func() (classroomview.Message, error) {
 		connection, err := net.Dial("unix", listener.Addr().String())
 		if err != nil {
@@ -299,7 +301,7 @@ func (locker *fakeLocker) Locked() bool { return locker.locked }
 func TestAgentLocksThroughTheExtension(t *testing.T) {
 	lock := &fakeLocker{}
 	server, client := net.Pipe()
-	go handle(server, "student", fakeCapture{image: []byte{0xff, 0xd8}}, lock)
+	go handle(server, agentContext{userName: "student", capture: fakeCapture{image: []byte{0xff, 0xd8}}, lock: lock})
 	exchange := func(message classroomview.Message) classroomview.Message {
 		t.Helper()
 		if err := classroomview.Write(client, message); err != nil {

@@ -7,13 +7,15 @@
 //	         active graphical session on seat0.
 //	probe    runs a command (for example the SSH connection) and exchanges
 //	         one hello through it, optionally a thumbnail and input, or a
-//	         lock request (--lock on|off); used by tests and diagnostics.
+//	         lock request (--lock on|off), or sends a folder's contents to
+//	         the desktop (--send DIR); used by tests and diagnostics.
 package main
 
 import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -50,6 +52,10 @@ func main() {
 		err = connect(os.Stdin, os.Stdout, loginctl, "/run/user")
 	case "probe":
 		arguments, thumbnail, input := os.Args[2:], "", false
+		if len(arguments) >= 2 && arguments[0] == "--send" {
+			err = probeSend(arguments[2:], arguments[1], os.Stdout)
+			break
+		}
 		if len(arguments) >= 2 && arguments[0] == "--lock" && (arguments[1] == "on" || arguments[1] == "off") {
 			err = probeLock(arguments[2:], arguments[1] == "on", os.Stdout)
 			break
@@ -94,10 +100,22 @@ func serve(runtimeDirectory string) error {
 	if err := os.Chmod(path, 0o600); err != nil {
 		return err
 	}
-	return serveConnections(listener, currentUserName(), newMutterCapture(), &extensionLocker{})
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	return serveConnections(listener, agentContext{userName: currentUserName(), home: home, capture: newMutterCapture(), lock: &extensionLocker{}})
 }
 
-func serveConnections(listener net.Listener, userName string, capture capturer, lock locker) error {
+// agentContext is what every connection of the session's agent shares.
+type agentContext struct {
+	userName string
+	home     string
+	capture  capturer
+	lock     locker
+}
+
+func serveConnections(listener net.Listener, agent agentContext) error {
 	slots := make(chan struct{}, maxConnections)
 	for {
 		connection, err := listener.Accept()
@@ -108,7 +126,7 @@ func serveConnections(listener net.Listener, userName string, capture capturer, 
 		case slots <- struct{}{}:
 			go func() {
 				defer func() { <-slots }()
-				handle(connection, userName, capture, lock)
+				handle(connection, agent)
 			}()
 		default:
 			_ = connection.SetWriteDeadline(time.Now().Add(time.Second))
@@ -142,8 +160,16 @@ func currentUserName() string {
 }
 
 // handle answers one connection until the peer closes it or misbehaves.
-func handle(connection net.Conn, userName string, capture capturer, lock locker) {
+func handle(connection net.Conn, agent agentContext) {
 	defer connection.Close()
+	userName, capture, lock := agent.userName, agent.capture, agent.lock
+	// Files of an unfinished sending are removed when the connection ends.
+	var incoming *receiver
+	defer func() {
+		if incoming != nil {
+			incoming.abort()
+		}
+	}()
 	for {
 		_ = connection.SetReadDeadline(time.Now().Add(10 * time.Minute))
 		message, err := classroomview.Read(connection)
@@ -174,6 +200,11 @@ func handle(connection net.Conn, userName string, capture capturer, lock locker)
 			if err := classroomview.Write(connection, lockReply(lock, message.Locked)); err != nil {
 				return
 			}
+		case classroomview.TypeFilesBegin, classroomview.TypeFilesChunk, classroomview.TypeFilesEnd:
+			reply := filesReply(&incoming, agent.home, message)
+			if err := classroomview.Write(connection, reply); err != nil {
+				return
+			}
 		case classroomview.TypeInput:
 			if err := classroomview.Write(connection, inputReply(capture, message)); err != nil {
 				return
@@ -183,6 +214,48 @@ func handle(connection net.Conn, userName string, capture capturer, lock locker)
 				return
 			}
 		}
+	}
+}
+
+// filesReply advances a sending to the desktop; any refusal ends it.
+func filesReply(incoming **receiver, home string, message classroomview.Message) classroomview.Message {
+	refuse := func(err error) classroomview.Message {
+		if *incoming != nil {
+			(*incoming).abort()
+			*incoming = nil
+		}
+		return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}
+	}
+	switch message.Type {
+	case classroomview.TypeFilesBegin:
+		if *incoming != nil {
+			(*incoming).abort()
+		}
+		started, err := newReceiver(home, message.Entries)
+		if err != nil {
+			*incoming = nil
+			return refuse(err)
+		}
+		*incoming = started
+		return classroomview.Message{Type: classroomview.TypeFilesReady}
+	case classroomview.TypeFilesChunk:
+		if *incoming == nil {
+			return refuse(errors.New("no sending is open"))
+		}
+		if err := (*incoming).chunk(message.Index, message.Data); err != nil {
+			return refuse(err)
+		}
+		return classroomview.Message{Type: classroomview.TypeFilesAck, Index: message.Index}
+	default:
+		if *incoming == nil {
+			return refuse(errors.New("no sending is open"))
+		}
+		placed, err := (*incoming).finish()
+		*incoming = nil
+		if err != nil {
+			return classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeFilesRefused, Detail: err.Error()}
+		}
+		return classroomview.Message{Type: classroomview.TypeFilesDone, Detail: strings.Join(placed, "\n")}
 	}
 }
 
@@ -293,6 +366,102 @@ func connect(input io.Reader, output io.Writer, run commandRunner, runtimeBase s
 	}()
 	_, err = io.Copy(output, connection)
 	return err
+}
+
+// probeSend sends the contents of a folder to the session's desktop through
+// a command, as the controller does. Links and special files are skipped.
+func probeSend(command []string, folder string, output io.Writer) error {
+	if len(command) == 0 {
+		return errors.New("probe needs a command, for example nixorium-classroom-connect")
+	}
+	entries := []classroomview.FileEntry{}
+	err := filepath.WalkDir(folder, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || name == folder {
+			return err
+		}
+		relative, err := filepath.Rel(folder, name)
+		if err != nil {
+			return err
+		}
+		switch {
+		case entry.IsDir():
+			entries = append(entries, classroomview.FileEntry{Path: filepath.ToSlash(relative), Dir: true})
+		case entry.Type().IsRegular():
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			entries = append(entries, classroomview.FileEntry{Path: filepath.ToSlash(relative), Size: info.Size()})
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	process := exec.Command(command[0], command[1:]...)
+	stdin, err := process.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := process.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	process.Stderr = os.Stderr
+	if err := process.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = stdin.Close()
+		_ = process.Wait()
+	}()
+	exchange := func(message classroomview.Message, want string) (classroomview.Message, error) {
+		if err := classroomview.Write(stdin, message); err != nil {
+			return classroomview.Message{}, err
+		}
+		reply, err := classroomview.Read(stdout)
+		if err == nil && reply.Type != want {
+			err = fmt.Errorf("the agent answered %s %s: %s", reply.Type, reply.Code, reply.Detail)
+		}
+		return reply, err
+	}
+	if _, err := exchange(classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion}, classroomview.TypeHello); err != nil {
+		return err
+	}
+	if _, err := exchange(classroomview.Message{Type: classroomview.TypeFilesBegin, Entries: entries}, classroomview.TypeFilesReady); err != nil {
+		return err
+	}
+	buffer := make([]byte, classroomview.MaxChunkBytes)
+	for index, entry := range entries {
+		if entry.Dir || entry.Size == 0 {
+			continue
+		}
+		file, err := os.Open(filepath.Join(folder, filepath.FromSlash(entry.Path)))
+		if err != nil {
+			return err
+		}
+		for sent := int64(0); sent < entry.Size; {
+			count, err := file.Read(buffer[:min(int64(len(buffer)), entry.Size-sent)])
+			if count > 0 {
+				if _, err := exchange(classroomview.Message{Type: classroomview.TypeFilesChunk, Index: index, Data: buffer[:count]}, classroomview.TypeFilesAck); err != nil {
+					_ = file.Close()
+					return err
+				}
+				sent += int64(count)
+			}
+			if err != nil {
+				_ = file.Close()
+				return err
+			}
+		}
+		_ = file.Close()
+	}
+	reply, err := exchange(classroomview.Message{Type: classroomview.TypeFilesEnd}, classroomview.TypeFilesDone)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(output, "files.done %s\n", strings.ReplaceAll(reply.Detail, "\n", ", "))
+	return nil
 }
 
 // probeLock locks or unlocks through a command, as the controller does.

@@ -100,6 +100,15 @@ pkgs.testers.runNixOSTest {
     client.succeed("${agent} probe --lock off nixorium-classroom-connect | grep -F 'lock.state locked=false'")
     client.succeed(super_key)
 
+    # Files sent to the desktop belong to the student and are never
+    # executable; links are not sent and nothing on the desktop is replaced.
+    client.succeed("mkdir -p /tmp/share/Lesson && echo notes > /tmp/share/Lesson/notes.txt && printf 'ls\\n' > /tmp/share/run.sh && chmod 755 /tmp/share/run.sh && ln -s /etc/shadow /tmp/share/secret")
+    client.succeed("${agent} probe --send /tmp/share nixorium-classroom-connect | grep -F 'files.done Lesson, run.sh'")
+    client.succeed("test \"$(stat -c %U:%a /home/student/Desktop/Lesson /home/student/Desktop/Lesson/notes.txt /home/student/Desktop/run.sh | tr '\\n' ' ')\" = 'student:755 student:644 student:644 '")
+    client.succeed("grep -qx notes /home/student/Desktop/Lesson/notes.txt && test ! -e /home/student/Desktop/secret")
+    client.succeed("${agent} probe --send /tmp/share nixorium-classroom-connect | grep -F 'files.done Lesson (2), run (2).sh'")
+    client.succeed("test -z \"$(ls -A /home/student/.local/share/nixorium-classroom)\"")
+
     # A locked screen cannot be captured; the teacher is told why. The
     # capture stops after 30 idle seconds, then the screen is locked.
     client.sleep(35)

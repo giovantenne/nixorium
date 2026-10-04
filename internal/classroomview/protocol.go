@@ -133,6 +133,11 @@ type Message struct {
 	// Locked is the requested state in TypeLock and the current state in
 	// TypeLockState and thumbnail replies.
 	Locked bool `json:"locked,omitempty"`
+	// Entries lists the files of TypeFilesBegin; Index and Data carry one
+	// piece of the file at that position in TypeFilesChunk.
+	Entries []FileEntry `json:"entries,omitempty"`
+	Index   int         `json:"index,omitempty"`
+	Data    []byte      `json:"data,omitempty"`
 }
 
 // Write encodes a message as a big-endian length followed by JSON.

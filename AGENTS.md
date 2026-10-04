@@ -576,7 +576,13 @@ any shard must block publication.
   end it. It is a classroom aid, not a security boundary: the session's own
   user can reach the agent and the bus. Lock plan/apply (`LockManager`) has
   an expiring content-bound review like Internet control but does not take
-  the administrative operation lock, since it changes no system state. The
+  the administrative operation lock, since it changes no system state.
+  Files sent to a desktop (`files.begin/chunk/end`) are validated as a plain
+  relative tree within 2000 entries and 500 MB, written by the agent as the
+  student into a private staging folder with no-follow exclusive creation and
+  explicit 0755/0644 modes, and moved to the XDG desktop folder only when
+  complete, never replacing an existing name; an interrupted sending leaves
+  nothing behind. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet
