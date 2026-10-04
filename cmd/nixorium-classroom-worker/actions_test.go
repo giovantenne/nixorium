@@ -43,6 +43,19 @@ func (fake *fakeActions) handle(_ context.Context, request domain.ClassroomReque
 		return domain.ClassroomResponse{LockReport: &domain.LockReport{State: "partial", Targets: []domain.LockOutcome{
 			{Name: "pc01", State: "verified", Detail: "Locked."}, {Name: "pc02", State: "not-sent", Detail: "Unavailable in the reviewed plan; nothing was sent."},
 		}}}
+	case domain.ClassroomShareBeginOperation:
+		return domain.ClassroomResponse{ShareTransfer: "t1"}
+	case domain.ClassroomShareChunkOperation:
+		if request.ShareTransfer != "t1" {
+			return domain.ClassroomResponse{State: "failed", Message: "unknown transfer"}
+		}
+		return domain.ClassroomResponse{State: "completed"}
+	case domain.ClassroomSharePlanOperation:
+		return domain.ClassroomResponse{SharePlan: &domain.SharePlan{State: "ready", Transfer: request.ShareTransfer, ExpiresAt: expires, ReviewToken: "sha256:share", Message: "1 item (5 bytes) go to the desktop.", Targets: []domain.ShareTarget{
+			{HostMeta: domain.HostMeta{Name: "pc01"}, Eligible: true},
+		}}}
+	case domain.ClassroomShareApplyOperation:
+		return domain.ClassroomResponse{ShareReport: &domain.ShareReport{State: "completed", Targets: []domain.ShareOutcome{{Name: "pc01", State: "delivered", Detail: "On the desktop: notes.txt."}}}}
 	case domain.ClassroomPowerApplyOperation:
 		return domain.ClassroomResponse{PowerReport: &domain.ShutdownApplyReport{State: "completed", Targets: []domain.ShutdownTargetOutcome{{Name: "pc01", State: "accepted"}}}}
 	}
@@ -186,5 +199,53 @@ func TestPageLocksSelectedComputers(t *testing.T) {
 	}
 	if request := fake.requests[1]; request.Operation != domain.ClassroomLockApplyOperation || request.LockPlan == nil || request.LockPlan.ReviewToken != "sha256:lock" {
 		t.Fatalf("apply request = %+v", request)
+	}
+}
+
+func TestPageSendsPreparedFiles(t *testing.T) {
+	fake := &fakeActions{}
+	server, host, cookie := openedViewServer(t, fake)
+	origin := "http://" + host
+	begin := actionPost(server, host, cookie, origin, "/api/share/begin", `{"entries":[{"path":"notes.txt","size":5}]}`)
+	if !strings.Contains(begin.Body.String(), `"transfer":"t1"`) || len(fake.requests[0].ShareFiles) != 1 {
+		t.Fatalf("begin = %s", begin.Body.String())
+	}
+	chunk := func(contentType, query, body string) int {
+		request := httptest.NewRequest(http.MethodPost, "/api/share/chunk?"+query, strings.NewReader(body))
+		request.Host = host
+		request.Header.Set("Origin", origin)
+		request.Header.Set("Content-Type", contentType)
+		request.AddCookie(&http.Cookie{Name: viewCookie, Value: cookie})
+		recorder := httptest.NewRecorder()
+		server.ServeHTTP(recorder, request)
+		return recorder.Code
+	}
+	if code := chunk("application/octet-stream", "transfer=t1&index=0&offset=0", "hello"); code != http.StatusNoContent {
+		t.Fatalf("chunk = %d", code)
+	}
+	if request := fake.requests[1]; request.ShareIndex != 0 || string(request.ShareData) != "hello" {
+		t.Fatalf("chunk request = %+v", request)
+	}
+	for name, code := range map[string]int{
+		"form post":        chunk("application/x-www-form-urlencoded", "transfer=t1&index=0&offset=0", "hello"),
+		"unknown transfer": chunk("application/octet-stream", "transfer=t2&index=0&offset=0", "hello"),
+		"bad index":        chunk("application/octet-stream", "transfer=t1&index=x&offset=0", "hello"),
+		"empty":            chunk("application/octet-stream", "transfer=t1&index=0&offset=5", ""),
+	} {
+		if code == http.StatusNoContent {
+			t.Fatalf("%s was accepted", name)
+		}
+	}
+	if forged := actionPost(server, host, cookie, origin, "/api/share/begin", `{"entries":[{"path":"a","size":1,"sha256":"x"}]}`); forged.Code == http.StatusOK {
+		t.Fatal("a digest from the page was accepted")
+	}
+	plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"send-desktop","computers":["pc01"],"transfer":"t1"}`)
+	var review actionReview
+	if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready || review.Confirm != "Send to 1 computer" {
+		t.Fatalf("review = %s", plan.Body.String())
+	}
+	apply := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`"}`)
+	if !strings.Contains(apply.Body.String(), "On the desktop: notes.txt.") {
+		t.Fatalf("apply = %s", apply.Body.String())
 	}
 }

@@ -26,6 +26,12 @@ const (
 	ClassroomInternetApplyOperation ClassroomOperation = "internet-apply"
 	ClassroomLockPlanOperation      ClassroomOperation = "lock-plan"
 	ClassroomLockApplyOperation     ClassroomOperation = "lock-apply"
+	// Sending files to students' desktops: prepare a transfer, upload each
+	// file in pieces, then review and apply like any classroom action.
+	ClassroomShareBeginOperation ClassroomOperation = "share-begin"
+	ClassroomShareChunkOperation ClassroomOperation = "share-chunk"
+	ClassroomSharePlanOperation  ClassroomOperation = "share-plan"
+	ClassroomShareApplyOperation ClassroomOperation = "share-apply"
 	// ClassroomViewOpenOperation returns a one-time address of the
 	// experimental classroom view page.
 	ClassroomViewOpenOperation ClassroomOperation = "view-open"
@@ -37,6 +43,8 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomPowerPlanOperation, ClassroomPowerApplyOperation,
 		ClassroomInternetPlanOperation, ClassroomInternetApplyOperation,
 		ClassroomLockPlanOperation, ClassroomLockApplyOperation,
+		ClassroomShareBeginOperation, ClassroomShareChunkOperation,
+		ClassroomSharePlanOperation, ClassroomShareApplyOperation,
 		ClassroomViewOpenOperation:
 		return true
 	default:
@@ -56,7 +64,17 @@ type ClassroomRequest struct {
 	InternetPlan   *InternetPlan         `json:"internetPlan,omitempty"`
 	LockAction     LockAction            `json:"lockAction,omitempty"`
 	LockPlan       *LockPlan             `json:"lockPlan,omitempty"`
+	ShareFiles     []ShareFile           `json:"shareFiles,omitempty"`
+	ShareTransfer  string                `json:"shareTransfer,omitempty"`
+	ShareIndex     int                   `json:"shareIndex,omitempty"`
+	ShareOffset    int64                 `json:"shareOffset,omitempty"`
+	ShareData      []byte                `json:"shareData,omitempty"`
+	SharePlan      *SharePlan            `json:"sharePlan,omitempty"`
 }
+
+// ClassroomShareChunkBytes keeps one uploaded piece, encoded, well below the
+// classroom message limit.
+const ClassroomShareChunkBytes = 512 << 10
 
 type ClassroomResponse struct {
 	SchemaVersion  int                  `json:"schemaVersion"`
@@ -72,6 +90,9 @@ type ClassroomResponse struct {
 	InternetReport *InternetReport      `json:"internetReport,omitempty"`
 	LockPlan       *LockPlan            `json:"lockPlan,omitempty"`
 	LockReport     *LockReport          `json:"lockReport,omitempty"`
+	ShareTransfer  string               `json:"shareTransfer,omitempty"`
+	SharePlan      *SharePlan           `json:"sharePlan,omitempty"`
+	ShareReport    *ShareReport         `json:"shareReport,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {

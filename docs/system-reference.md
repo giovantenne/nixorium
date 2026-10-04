@@ -358,6 +358,20 @@ lock is a classroom aid, not a security boundary. Locking also works from
 not take the administrative operation lock, since it changes no system
 state.
 
+**Send desktop** opens the browser's folder picker at the desktop. The page
+reads the chosen folder (hidden files and links are left out), prepares its
+files in the classroom service's private temporary folder in 512 KB pieces,
+then reviews the selected computers. The review binds each file's path,
+size and SHA-256, so the same files prepared again keep the review token.
+The service streams the files to at most four computers at a time with
+`files.begin`, `files.chunk` (1 MB pieces, each acknowledged) and
+`files.end`. The agent writes them as the student into a private staging
+folder of the home with explicit 0755/0644 modes and moves the top-level
+items to the XDG desktop folder only when everything arrived; an existing
+name becomes "name (2)". At most 2000 items and 500 MB are sent at once, and
+at most three prepared sendings exist, each removed after 30 unused minutes
+or once delivered everywhere.
+
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a
 frame and stops after 30 seconds without requests. While it runs, GNOME shows

@@ -582,7 +582,11 @@ any shard must block publication.
   student into a private staging folder with no-follow exclusive creation and
   explicit 0755/0644 modes, and moved to the XDG desktop folder only when
   complete, never replacing an existing name; an interrupted sending leaves
-  nothing behind. The
+  nothing behind. The classroom worker prepares files in its private
+  temporary folder under position-based names only, hashes each file, and
+  binds the share review to paths, sizes and digests rather than to the
+  transfer identifier; the page may upload raw pieces only to its own
+  `/api/share/chunk` endpoint. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

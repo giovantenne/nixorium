@@ -31,7 +31,7 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
-var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true}
+var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/begin": true, "/api/share/chunk": true}
 
 // viewSource lists computers, their images, and forwards input.
 type viewSource interface {
@@ -101,9 +101,13 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	server.mutex.Unlock()
 	// A page on another site cannot reach this server through DNS tricks,
 	// and only the page's own endpoints accept a POST from this page itself.
+	contentType := "application/json"
+	if request.URL.Path == "/api/share/chunk" {
+		contentType = "application/octet-stream"
+	}
 	post := request.Method == http.MethodPost && postPaths[request.URL.Path] &&
 		request.Header.Get("Origin") == "http://"+address &&
-		strings.HasPrefix(request.Header.Get("Content-Type"), "application/json")
+		strings.HasPrefix(request.Header.Get("Content-Type"), contentType)
 	if request.Host != address || (request.Method != http.MethodGet && !post) {
 		http.Error(writer, "Not available.", http.StatusBadRequest)
 		return
@@ -175,15 +179,20 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		}
 		header.Set("Content-Type", "image/jpeg")
 		_, _ = writer.Write(image)
-	case "/api/actions/plan", "/api/actions/apply":
+	case "/api/actions/plan", "/api/actions/apply", "/api/share/begin", "/api/share/chunk":
 		if request.Method != http.MethodPost || server.actions == nil {
 			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)
 			return
 		}
-		if request.URL.Path == "/api/actions/plan" {
+		switch request.URL.Path {
+		case "/api/actions/plan":
 			server.planAction(writer, request)
-		} else {
+		case "/api/actions/apply":
 			server.applyAction(writer, request)
+		case "/api/share/begin":
+			server.beginShare(writer, request)
+		default:
+			server.shareChunk(writer, request)
 		}
 	case "/api/input":
 		if request.Method != http.MethodPost {

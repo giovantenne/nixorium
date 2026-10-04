@@ -30,6 +30,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   computer is still visible but cannot be controlled. The same lock is in
   **Computers → Lock screens** for the teacher and the administrator, and in
   `nixorium lock plan|apply --on <clients|@lab> --action lock|unlock`.
+  **Send desktop** copies the files and folders of a folder the teacher
+  picks (the desktop first) to the desktop of the selected computers, after
+  a review: at most 2000 items and 500 MB, hidden files and links left out,
+  owned by the student, never executable, and a name already on the
+  student's desktop is kept as "name (2)".
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

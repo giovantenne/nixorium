@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/classroomview"
@@ -65,7 +64,7 @@ func (m *LockManager) Plan(ctx context.Context, repository, requested string, ac
 		}
 	}
 	p.Targets = make([]domain.LockTarget, len(hosts))
-	m.each(hosts, func(index int, host domain.HostMeta) {
+	eachHost(hosts, lockParallel, func(index int, host domain.HostMeta) {
 		target := domain.LockTarget{HostMeta: host}
 		session, err := m.source.Connect(ctx, host)
 		if err != nil {
@@ -118,7 +117,7 @@ func (m *LockManager) Apply(ctx context.Context, p domain.LockPlan, token string
 		hosts[index] = target.HostMeta
 	}
 	outcomes := make([]domain.LockOutcome, len(hosts))
-	m.each(hosts, func(index int, host domain.HostMeta) {
+	eachHost(hosts, lockParallel, func(index int, host domain.HostMeta) {
 		outcome := domain.LockOutcome{Name: host.Name, State: "not-sent", Detail: "Unavailable in the reviewed plan; nothing was sent."}
 		if p.Targets[index].Eligible {
 			outcome = m.change(ctx, host, p.Action.Locked())
@@ -167,20 +166,6 @@ func (m *LockManager) change(ctx context.Context, host domain.HostMeta, locked b
 		outcome.Detail = "The computer did not confirm; check it before trying again."
 	}
 	return outcome
-}
-
-func (m *LockManager) each(hosts []domain.HostMeta, work func(int, domain.HostMeta)) {
-	var group sync.WaitGroup
-	slots := make(chan struct{}, lockParallel)
-	for index, host := range hosts {
-		group.Add(1)
-		slots <- struct{}{}
-		go func() {
-			defer func() { <-slots; group.Done() }()
-			work(index, host)
-		}()
-	}
-	group.Wait()
 }
 
 func lockUnavailable(err error) string {

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -22,6 +23,9 @@ func (session fakeLockSession) Thumbnail(int, int64) (classroomview.Message, err
 }
 func (session fakeLockSession) Input([]classroomview.InputEvent, bool) error { return nil }
 func (session fakeLockSession) Close() error                                 { return nil }
+func (session fakeLockSession) SendFiles([]classroomview.FileEntry, func(int) (io.ReadCloser, error)) ([]string, error) {
+	return nil, nil
+}
 func (session fakeLockSession) Locked() bool {
 	session.source.mutex.Lock()
 	defer session.source.mutex.Unlock()

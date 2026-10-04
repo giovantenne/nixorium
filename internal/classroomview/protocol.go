@@ -189,6 +189,9 @@ type Session interface {
 	SetLocked(locked bool) (bool, error)
 	// Locked is the lock state reported when the session opened.
 	Locked() bool
+	// SendFiles places files on the session's desktop; content opens the
+	// file at an entry's position. It returns the names given there.
+	SendFiles(entries []FileEntry, content func(int) (io.ReadCloser, error)) ([]string, error)
 	Close() error
 }
 

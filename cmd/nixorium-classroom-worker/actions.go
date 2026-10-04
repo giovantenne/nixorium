@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ const (
 	actionShutdown      = "shutdown"
 	actionLock          = "lock"
 	actionUnlock        = "unlock"
+	actionSendDesktop   = "send-desktop"
 	maxActionComputers  = 200
 	// powerLabelTime keeps "Restarting…" on a card while the computer is away.
 	powerLabelTime = 3 * time.Minute
@@ -31,6 +33,7 @@ const (
 type classroomHandler func(context.Context, domain.ClassroomRequest) domain.ClassroomResponse
 
 type pendingAction struct {
+	share    *domain.SharePlan
 	lock     *domain.LockPlan
 	internet *domain.InternetPlan
 	power    *domain.ShutdownPlanReport
@@ -41,6 +44,8 @@ type pendingAction struct {
 type actionPlanRequest struct {
 	Action    string   `json:"action"`
 	Computers []string `json:"computers"`
+	// Transfer names files prepared with /api/share for send-desktop.
+	Transfer string `json:"transfer,omitempty"`
 }
 
 type actionApplyRequest struct {
@@ -80,7 +85,11 @@ type computerLabels struct {
 }
 
 func decodePageJSON(writer http.ResponseWriter, request *http.Request, value any) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 64<<10))
+	return decodePageJSONLimit(writer, request, value, 64<<10)
+}
+
+func decodePageJSONLimit(writer http.ResponseWriter, request *http.Request, value any, limit int64) bool {
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, limit))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
 		http.Error(writer, "Invalid request.", http.StatusBadRequest)
@@ -173,6 +182,15 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			break
 		}
 		review, pending = lockReview(*response.LockPlan)
+	case actionSendDesktop:
+		operation.Operation = domain.ClassroomSharePlanOperation
+		operation.ShareTransfer = body.Transfer
+		response := server.actions(ctx, operation)
+		if response.SharePlan == nil {
+			review = actionReview{Title: "Send desktop", Message: response.Message}
+			break
+		}
+		review, pending = shareReview(*response.SharePlan)
 	default:
 		http.Error(writer, "Unknown action.", http.StatusBadRequest)
 		return
@@ -224,6 +242,25 @@ func internetReview(plan domain.InternetPlan) (actionReview, pendingAction) {
 		review.Confirm = verb + plural(eligible, "computer")
 	}
 	return review, pendingAction{internet: &plan, expires: plan.ExpiresAt}
+}
+
+func shareReview(plan domain.SharePlan) (actionReview, pendingAction) {
+	review := actionReview{Title: "Send desktop", Message: plan.Message, Rows: []actionRow{}}
+	eligible := 0
+	for _, target := range plan.Targets {
+		review.Rows = append(review.Rows, actionRow{Name: target.Name, Note: target.Detail, Skip: !target.Eligible})
+		if target.Eligible {
+			eligible++
+		}
+	}
+	for _, issue := range plan.Issues {
+		review.Warnings = append(review.Warnings, issue.Message)
+	}
+	review.Ready = !plan.HasErrors() && eligible > 0
+	if review.Ready {
+		review.Confirm = "Send to " + plural(eligible, "computer")
+	}
+	return review, pendingAction{share: &plan, expires: plan.ExpiresAt}
 }
 
 func lockReview(plan domain.LockPlan) (actionReview, pendingAction) {
@@ -337,6 +374,19 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 	}
 	result := actionResult{Rows: []actionRow{}}
 	switch {
+	case pending.share != nil:
+		operation.Operation = domain.ClassroomShareApplyOperation
+		operation.SharePlan = pending.share
+		response := server.actions(ctx, operation)
+		if response.ShareReport == nil {
+			result.State, result.Message = "failed", response.Message
+			break
+		}
+		report := response.ShareReport
+		result.State, result.Message = report.State, report.Message
+		for _, target := range report.Targets {
+			result.Rows = append(result.Rows, actionRow{Name: target.Name, Note: target.Detail, Skip: target.State != "delivered"})
+		}
 	case pending.lock != nil:
 		operation.Operation = domain.ClassroomLockApplyOperation
 		operation.LockPlan = pending.lock
@@ -430,4 +480,58 @@ func (server *viewServer) labelsFor(name string) (string, string) {
 		power = ""
 	}
 	return labels.internet, power
+}
+
+type shareBeginRequest struct {
+	Entries []domain.ShareFile `json:"entries"`
+}
+
+// beginShare reserves room for the files the teacher chose to send.
+func (server *viewServer) beginShare(writer http.ResponseWriter, request *http.Request) {
+	var body shareBeginRequest
+	// Up to 2000 names: more room than other requests.
+	if !decodePageJSONLimit(writer, request, &body, 1<<20) {
+		return
+	}
+	operation, err := domain.NewClassroomRequest(domain.ClassroomShareBeginOperation)
+	if err != nil {
+		http.Error(writer, "The files could not be prepared.", http.StatusInternalServerError)
+		return
+	}
+	for _, entry := range body.Entries {
+		if entry.SHA256 != "" {
+			http.Error(writer, "Invalid request.", http.StatusBadRequest)
+			return
+		}
+	}
+	operation.ShareFiles = body.Entries
+	response := server.actions(request.Context(), operation)
+	writePageJSON(writer, map[string]string{"transfer": response.ShareTransfer, "message": response.Message})
+}
+
+// shareChunk stores one piece of a file; the body is the raw content.
+func (server *viewServer) shareChunk(writer http.ResponseWriter, request *http.Request) {
+	query := request.URL.Query()
+	index, indexErr := strconv.Atoi(query.Get("index"))
+	offset, offsetErr := strconv.ParseInt(query.Get("offset"), 10, 64)
+	if indexErr != nil || offsetErr != nil {
+		http.Error(writer, "Invalid request.", http.StatusBadRequest)
+		return
+	}
+	data, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, domain.ClassroomShareChunkBytes))
+	if err != nil || len(data) == 0 {
+		http.Error(writer, "Invalid request.", http.StatusBadRequest)
+		return
+	}
+	operation, err := domain.NewClassroomRequest(domain.ClassroomShareChunkOperation)
+	if err != nil {
+		http.Error(writer, "The files could not be prepared.", http.StatusInternalServerError)
+		return
+	}
+	operation.ShareTransfer, operation.ShareIndex, operation.ShareOffset, operation.ShareData = query.Get("transfer"), index, offset, data
+	if response := server.actions(request.Context(), operation); response.State == "failed" {
+		http.Error(writer, response.Message, http.StatusConflict)
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
+	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -42,6 +43,8 @@ func run() error {
 		meta, err := local.LabMeta(ctx, repository)
 		return meta.Clients.Hosts, err
 	}
+	// The service has a private temporary folder for files being sent.
+	shares := newShareStore(os.TempDir())
 	worker := classroomWorker{
 		repository: repository,
 		view:       newViewServer(app.NewClassroomViewHub(hosts, adapters.ClassroomAgentConnector{})),
@@ -50,6 +53,8 @@ func run() error {
 		power:      app.NewShutdownManager(local),
 		internet:   app.NewInternetManager(local),
 		lock:       app.NewLockManager(lockSource{local, adapters.ClassroomAgentConnector{}}),
+		shares:     shares,
+		share:      app.NewShareManager(lockSource{local, adapters.ClassroomAgentConnector{}}, shares),
 		records:    local,
 	}
 	// The page's actions go through the same handling as the dashboard.
@@ -65,6 +70,8 @@ type classroomWorker struct {
 	power      *app.ShutdownManager
 	internet   *app.InternetManager
 	lock       *app.LockManager
+	shares     *shareStore
+	share      *app.ShareManager
 	records    app.OperationRecordSink
 }
 
@@ -135,6 +142,39 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 		report := worker.lock.Apply(ctx, *request.LockPlan, request.LockPlan.ReviewToken)
 		report.Message = teacherMessage(report.Message)
 		response.LockReport = &report
+	case domain.ClassroomShareBeginOperation:
+		if worker.viewOn == nil || !worker.viewOn() {
+			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}
+		}
+		entries := make([]classroomview.FileEntry, len(request.ShareFiles))
+		for index, file := range request.ShareFiles {
+			entries[index] = classroomview.FileEntry{Path: file.Path, Size: file.Size, Dir: file.Dir}
+		}
+		transfer, err := worker.shares.Begin(entries)
+		if err != nil {
+			return domain.ClassroomResponse{State: "failed", Message: "The files cannot be sent: " + err.Error() + "."}
+		}
+		response.ShareTransfer = transfer
+	case domain.ClassroomShareChunkOperation:
+		if len(request.ShareData) > domain.ClassroomShareChunkBytes {
+			return domain.ClassroomResponse{State: "failed", Message: "A piece of a file is too large."}
+		}
+		if err := worker.shares.Write(request.ShareTransfer, request.ShareIndex, request.ShareOffset, request.ShareData); err != nil {
+			return domain.ClassroomResponse{State: "failed", Message: "The files could not be prepared: " + err.Error() + "."}
+		}
+	case domain.ClassroomSharePlanOperation:
+		plan := worker.share.Plan(ctx, worker.repository, request.Requested, request.ShareTransfer)
+		plan.Message, plan.Issues = teacherMessage(plan.Message), teacherIssues(plan.Issues)
+		response.SharePlan = &plan
+	case domain.ClassroomShareApplyOperation:
+		if request.SharePlan == nil || request.SharePlan.Repository != worker.repository {
+			return classroomFailure(errors.New("share review does not belong to the fixed deployment"))
+		}
+		report := worker.share.Apply(ctx, *request.SharePlan, request.SharePlan.ReviewToken)
+		if report.State == "completed" {
+			worker.shares.Remove(request.SharePlan.Transfer)
+		}
+		response.ShareReport = &report
 	case domain.ClassroomViewOpenOperation:
 		if worker.view == nil || worker.viewOn == nil || !worker.viewOn() {
 			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}

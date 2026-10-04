@@ -3,6 +3,8 @@ package adapters
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,12 +24,23 @@ func TestClassroomAgentHelper(t *testing.T) {
 		_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeError, Code: classroomview.CodeNoAgent})
 		os.Exit(0)
 	}
+	received, chunks := 0, 0
 	for {
 		request, err := classroomview.Read(os.Stdin)
 		if err != nil {
 			os.Exit(0)
 		}
 		switch request.Type {
+		case classroomview.TypeLock:
+			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeLockState, Locked: request.Locked})
+		case classroomview.TypeFilesBegin:
+			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeFilesReady})
+		case classroomview.TypeFilesChunk:
+			received += len(request.Data)
+			chunks++
+			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeFilesAck, Index: request.Index})
+		case classroomview.TypeFilesEnd:
+			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeFilesDone, Detail: fmt.Sprintf("bytes %d\npieces %d", received, chunks)})
 		case classroomview.TypeHello:
 			_ = classroomview.Write(os.Stdout, classroomview.Message{Type: classroomview.TypeHello, Version: classroomview.ProtocolVersion, User: "student"})
 		case classroomview.TypeThumbnailRequest:
@@ -86,5 +99,35 @@ func TestClassroomAgentConnectorReportsAMissingAgent(t *testing.T) {
 	var agentError classroomview.AgentError
 	if !errors.As(err, &agentError) || agentError.Code != classroomview.CodeNoAgent {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestClassroomAgentConnectorLocksAndSendsFiles(t *testing.T) {
+	fakeSSH(t, "agent")
+	session, err := ClassroomAgentConnector{}.Connect(context.Background(), domain.HostMeta{Name: "pc01", IP: "192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	if locked, err := session.SetLocked(true); err != nil || !locked {
+		t.Fatalf("lock = %t, %v", locked, err)
+	}
+	size := int64(classroomview.MaxChunkBytes*2 + classroomview.MaxChunkBytes/2)
+	entries := []classroomview.FileEntry{{Path: "Lesson", Dir: true}, {Path: "Lesson/big.bin", Size: size}, {Path: "empty.txt"}}
+	placed, err := session.SendFiles(entries, func(index int) (io.ReadCloser, error) {
+		if index != 1 {
+			t.Errorf("opened entry %d", index)
+		}
+		return io.NopCloser(strings.NewReader(strings.Repeat("x", int(size)))), nil
+	})
+	if err != nil || strings.Join(placed, ",") != fmt.Sprintf("bytes %d,pieces 3", size) {
+		t.Fatalf("placed = %v, %v", placed, err)
+	}
+	// A file shorter than announced is an error, not a silent truncation.
+	_, err = session.SendFiles(entries, func(int) (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader("short")), nil
+	})
+	if err == nil {
+		t.Fatal("a short file was sent")
 	}
 }

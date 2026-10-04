@@ -184,7 +184,7 @@ async function postJSON(path, body) {
   return response.json();
 }
 
-async function runAction(action, computers) {
+async function runAction(action, computers, transfer) {
   // The dialog takes the keyboard: let go of every key on the student's side.
   if (controlling) {
     pressedCodes.clear();
@@ -201,7 +201,7 @@ async function runAction(action, computers) {
   actionCancel.textContent = 'Cancel';
   if (!actionDialog.open) actionDialog.showModal();
   try {
-    const review = await postJSON('/api/actions/plan', { action, computers });
+    const review = await postJSON('/api/actions/plan', transfer ? { action, computers, transfer } : { action, computers });
     actionTitle.textContent = review.title;
     actionMessage.textContent = review.ready ? '' : (review.message || 'This action is not possible now.');
     showRows(actionRows, review.rows);
@@ -247,13 +247,111 @@ actionConfirm.addEventListener('click', async () => {
 actionCancel.addEventListener('click', () => actionDialog.close());
 actionDialog.addEventListener('close', () => { actionID = ''; });
 
+// Send desktop: the teacher picks a folder (the desktop first); its files and
+// folders are prepared on the controller, then reviewed and sent like any
+// other action. Hidden files and links are not sent.
+const shareLimits = { entries: 2000, bytes: 500 * 1024 * 1024, piece: 512 * 1024 };
+
+async function collect(folder, prefix, entries, files) {
+  const children = [];
+  for await (const [name, handle] of folder.entries()) {
+    if (!name.startsWith('.')) children.push([name, handle]);
+  }
+  children.sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [name, handle] of children) {
+    const path = prefix ? prefix + '/' + name : name;
+    if (handle.kind === 'directory') {
+      entries.push({ path, dir: true });
+      await collect(handle, path, entries, files);
+    } else {
+      const file = await handle.getFile();
+      files.set(entries.length, file);
+      entries.push({ path, size: file.size });
+    }
+    if (entries.length > shareLimits.entries) return;
+  }
+}
+
+function showProgress(title, text) {
+  actionID = '';
+  actionTitle.textContent = title;
+  actionMessage.textContent = text;
+  showRows(actionRows, []);
+  showText(actionWarnings, []);
+  actionWordLabel.hidden = true;
+  actionConfirm.hidden = true;
+  actionCancel.textContent = 'Close';
+  if (!actionDialog.open) actionDialog.showModal();
+}
+
+async function sendDesktop(computers) {
+  if (!window.showDirectoryPicker) {
+    showProgress('Send desktop', 'This browser cannot open folders. Use Computers → Send desktop in Nixorium instead.');
+    return;
+  }
+  let folder;
+  try {
+    folder = await window.showDirectoryPicker({ id: 'nixorium-desktop', startIn: 'desktop', mode: 'read' });
+  } catch (error) {
+    return;
+  }
+  showProgress('Send desktop', 'Reading the folder…');
+  const entries = [];
+  const files = new Map();
+  try {
+    await collect(folder, '', entries, files);
+  } catch (error) {
+    showProgress('Send desktop', 'The folder could not be read.');
+    return;
+  }
+  const bytes = [...files.values()].reduce((total, file) => total + file.size, 0);
+  if (entries.length === 0) {
+    showProgress('Send desktop', 'The folder "' + folder.name + '" is empty.');
+    return;
+  }
+  if (entries.length > shareLimits.entries || bytes > shareLimits.bytes) {
+    showProgress('Send desktop', 'The folder is too large: at most 2000 files and folders and 500 MB can be sent at once.');
+    return;
+  }
+  let transfer;
+  try {
+    const started = await postJSON('/api/share/begin', { entries });
+    if (!started.transfer) {
+      showProgress('Send desktop', started.message || 'The files could not be prepared.');
+      return;
+    }
+    transfer = started.transfer;
+    let sent = 0;
+    for (const [index, file] of files) {
+      for (let offset = 0; offset < file.size; offset += shareLimits.piece) {
+        if (!actionDialog.open) return;
+        actionMessage.textContent = 'Preparing the files from "' + folder.name + '"… ' + Math.floor(sent * 100 / Math.max(bytes, 1)) + '%';
+        const piece = file.slice(offset, offset + shareLimits.piece);
+        const response = await fetch('/api/share/chunk?transfer=' + encodeURIComponent(transfer) + '&index=' + index + '&offset=' + offset, {
+          method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: piece,
+        });
+        if (!response.ok) throw new Error(await response.text());
+        sent += piece.size;
+      }
+    }
+  } catch (error) {
+    showProgress('Send desktop', 'The files could not be prepared: ' + (error.message || 'the controller did not answer') + '.');
+    return;
+  }
+  runAction('send-desktop', computers, transfer);
+}
+
+function startAction(action, computers) {
+  if (action === 'send-desktop') sendDesktop(computers); else runAction(action, computers);
+}
+
 for (const button of toolbarButtons) {
-  button.addEventListener('click', () => runAction(button.dataset.action, [...chosen].sort()));
+  button.addEventListener('click', () => startAction(button.dataset.action, [...chosen].sort()));
 }
 for (const button of document.querySelectorAll('.actions-menu button[data-action]')) {
   button.addEventListener('click', () => {
     button.closest('details').open = false;
-    if (selected) runAction(button.dataset.action, [selected]);
+    if (selected) startAction(button.dataset.action, [selected]);
   });
 }
 

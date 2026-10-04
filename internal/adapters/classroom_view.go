@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,6 +83,55 @@ func (session *sshAgentSession) SetLocked(locked bool) (bool, error) {
 		return false, classroomview.AgentError{Code: reply.Code}
 	}
 	return reply.Locked, nil
+}
+
+func (session *sshAgentSession) SendFiles(entries []classroomview.FileEntry, content func(int) (io.ReadCloser, error)) ([]string, error) {
+	expect := func(request classroomview.Message, want string, timeout time.Duration) (classroomview.Message, error) {
+		reply, err := session.exchange(request, timeout)
+		if err != nil {
+			return reply, err
+		}
+		if reply.Type != want {
+			return reply, classroomview.AgentError{Code: reply.Code}
+		}
+		return reply, nil
+	}
+	if _, err := expect(classroomview.Message{Type: classroomview.TypeFilesBegin, Entries: entries}, classroomview.TypeFilesReady, 30*time.Second); err != nil {
+		return nil, err
+	}
+	buffer := make([]byte, classroomview.MaxChunkBytes)
+	for index, entry := range entries {
+		if entry.Dir || entry.Size == 0 {
+			continue
+		}
+		reader, err := content(index)
+		if err != nil {
+			return nil, err
+		}
+		for sent := int64(0); sent < entry.Size; {
+			count, readErr := io.ReadFull(reader, buffer[:min(int64(len(buffer)), entry.Size-sent)])
+			if count > 0 {
+				if _, err := expect(classroomview.Message{Type: classroomview.TypeFilesChunk, Index: index, Data: buffer[:count]}, classroomview.TypeFilesAck, 30*time.Second); err != nil {
+					_ = reader.Close()
+					return nil, err
+				}
+				sent += int64(count)
+			}
+			if readErr != nil && sent < entry.Size {
+				_ = reader.Close()
+				return nil, readErr
+			}
+		}
+		_ = reader.Close()
+	}
+	reply, err := expect(classroomview.Message{Type: classroomview.TypeFilesEnd}, classroomview.TypeFilesDone, 60*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if reply.Detail == "" {
+		return []string{}, nil
+	}
+	return strings.Split(reply.Detail, "\n"), nil
 }
 
 // exchange sends one request and waits for its reply, closing the session
