@@ -1,11 +1,12 @@
 // Classroom view: a grid of the student computers' screens, refreshed every
-// two seconds. Images come only from this controller; nothing is stored.
+// two seconds. A computer opens in its own window (the same page with
+// ?screen=NAME), which the teacher can move, resize or put on full screen.
+// Images come only from this controller; nothing is stored.
 'use strict';
 
 const grid = document.getElementById('computers');
 const summary = document.getElementById('summary');
 const message = document.getElementById('message');
-const viewer = document.getElementById('viewer');
 const viewerName = document.getElementById('viewer-name');
 const viewerDetail = document.getElementById('viewer-detail');
 const viewerImage = document.getElementById('viewer-image');
@@ -15,6 +16,8 @@ const fullscreenButton = document.getElementById('viewer-fullscreen');
 const viewerPanel = document.getElementById('viewer-panel');
 const cards = new Map();
 let selected = null;
+const screenName = new URLSearchParams(location.search).get('screen');
+const screenMode = /^[a-z0-9-]{1,32}$/.test(screenName || '');
 
 const stateText = {
   connecting: 'Connecting…',
@@ -49,7 +52,7 @@ function card(computer) {
   state.className = 'state';
   label.append(name, state);
   button.append(screen, label);
-  button.addEventListener('click', () => open(computer.name));
+  button.addEventListener('click', () => openWindow(computer.name));
   item.append(button);
   grid.append(item);
   entry = { image, placeholder, state, imageAt: 0 };
@@ -116,15 +119,19 @@ async function frameLoop() {
   frameLoopRunning = false;
 }
 
-function open(name) {
+// Clicking a computer again brings its existing window forward.
+function openWindow(name) {
+  const width = Math.round(screen.availWidth * 0.8);
+  const height = Math.round(screen.availHeight * 0.8);
+  window.open('/?screen=' + encodeURIComponent(name), 'nixorium-screen-' + name, 'popup,width=' + width + ',height=' + height);
+}
+
+function showScreen(name) {
   selected = name;
-  frameSince = 0;
+  document.body.classList.add('screen-mode');
+  document.title = name + ' – Classroom view';
   viewerName.textContent = name;
-  viewerDetail.textContent = '';
-  const entry = cards.get(name);
   viewerImage.alt = 'Screen of ' + name;
-  viewerImage.src = entry && !entry.image.hidden ? entry.image.src : '';
-  viewer.showModal();
   frameLoop();
 }
 
@@ -157,6 +164,7 @@ function send(events, release) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ events, release: Boolean(release) }),
+    keepalive: true,
   }).catch(() => {});
 }
 
@@ -258,24 +266,7 @@ fullscreenButton.addEventListener('click', () => {
     viewerPanel.requestFullscreen().catch(() => {});
   }
 });
-// Outside full screen the viewer moves by dragging its bar.
 const viewerBar = viewerPanel.querySelector('.viewer-bar');
-let drag = null;
-viewerBar.addEventListener('pointerdown', (event) => {
-  if (document.fullscreenElement || event.button !== 0 || event.target.closest('button')) return;
-  const box = viewer.getBoundingClientRect();
-  drag = { dx: event.clientX - box.left, dy: event.clientY - box.top, width: box.width, height: box.height };
-  viewerBar.setPointerCapture(event.pointerId);
-  event.preventDefault();
-});
-viewerBar.addEventListener('pointermove', (event) => {
-  if (!drag) return;
-  const left = Math.min(Math.max(0, event.clientX - drag.dx), window.innerWidth - drag.width);
-  const top = Math.min(Math.max(0, event.clientY - drag.dy), window.innerHeight - drag.height);
-  Object.assign(viewer.style, { margin: '0', inset: 'auto', left: left + 'px', top: top + 'px' });
-});
-viewerBar.addEventListener('pointerup', () => { drag = null; });
-viewerBar.addEventListener('pointercancel', () => { drag = null; });
 
 // In full screen the bar appears when the pointer reaches the top edge.
 viewerPanel.addEventListener('pointermove', (event) => {
@@ -294,34 +285,37 @@ document.addEventListener('fullscreenchange', () => {
   }
   viewerImage.focus();
 });
-// While controlling, Escape belongs to the student's computer.
-viewer.addEventListener('cancel', (event) => { if (controlling) event.preventDefault(); });
-document.getElementById('viewer-close').addEventListener('click', () => viewer.close());
-viewer.addEventListener('close', () => {
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  viewer.removeAttribute('style');
-  setControl(false);
-  selected = null;
-});
+document.getElementById('viewer-close').addEventListener('click', () => window.close());
+// Closing the window gives control back and lets go of every key.
+window.addEventListener('pagehide', () => setControl(false));
 window.addEventListener('blur', () => { if (controlling) { pressedCodes.clear(); send([], true); } });
+
+// A computer's window has no grid: its bar shows the notice instead.
+function notice(text) {
+  if (screenMode) {
+    if (text) viewerDetail.textContent = text;
+  } else {
+    message.textContent = text;
+    message.hidden = !text;
+  }
+}
 
 async function refresh() {
   try {
     const response = await fetch('/api/computers', { cache: 'no-store' });
     if (response.status === 403) {
-      message.textContent = 'This page has expired. Open the classroom view again from Nixorium.';
-      message.hidden = false;
+      notice('This page has expired. Open the classroom view again from Nixorium.');
       return;
     }
     if (!response.ok) throw new Error(String(response.status));
     const data = await response.json();
-    message.hidden = true;
+    notice('');
     render(data.computers);
   } catch (error) {
-    message.textContent = 'The controller is not answering; trying again.';
-    message.hidden = false;
+    notice('The controller is not answering; trying again.');
   }
   setTimeout(refresh, 2000);
 }
 
+if (screenMode) showScreen(screenName);
 refresh();
