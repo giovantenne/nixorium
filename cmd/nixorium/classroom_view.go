@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
@@ -42,11 +43,53 @@ func openClassroomView(ctx context.Context) (string, error) {
 	return "The classroom view opened in a browser window. Student computers show a sharing notice while it is open.", nil
 }
 
+// classroomBrowserPreferences makes Chromium leave the title bar to the
+// desktop, so the classroom windows have GNOME's own minimize, maximize and
+// close buttons like every other window.
+const classroomBrowserPreferences = `{"browser":{"custom_chrome_frame":false}}` + "\n"
+
+// classroomBrowserProfile prepares a private Chromium profile for the
+// classroom view: its cookie stays out of the everyday browser, and the
+// launch options apply even while that browser is open.
+func classroomBrowserProfile() (string, error) {
+	state := os.Getenv("XDG_STATE_HOME")
+	if !filepath.IsAbs(state) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		state = filepath.Join(home, ".local", "state")
+	}
+	profile := filepath.Join(state, "nixorium", "classroom-browser")
+	if err := os.MkdirAll(filepath.Join(profile, "Default"), 0o700); err != nil {
+		return "", err
+	}
+	preferences := filepath.Join(profile, "Default", "Preferences")
+	file, err := os.OpenFile(preferences, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, os.ErrExist) {
+		return profile, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	_, err = file.WriteString(classroomBrowserPreferences)
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	return profile, err
+}
+
+// classroomBrowserArguments runs Chromium through XWayland, where GNOME draws
+// the window frame; on Wayland Chromium would draw its own.
+func classroomBrowserArguments(address, profile string) []string {
+	return []string{"chromium", "--user-data-dir=" + profile, "--ozone-platform=x11", "--no-first-run", "--no-default-browser-check", "--app=" + address}
+}
+
 // startBrowser opens the address in an app window, detached from the terminal.
 func startBrowser(address string) error {
-	candidates := [][]string{
-		{"chromium", "--app=" + address, "--new-window"},
-		{"xdg-open", address},
+	candidates := [][]string{{"xdg-open", address}}
+	if profile, err := classroomBrowserProfile(); err == nil {
+		candidates = append([][]string{classroomBrowserArguments(address, profile)}, candidates...)
 	}
 	for _, candidate := range candidates {
 		path, err := exec.LookPath(candidate[0])
