@@ -39,7 +39,6 @@ type pendingAction struct {
 	lock      *domain.LockPlan
 	internet  *domain.InternetPlan
 	power     *domain.ShutdownPlanReport
-	word      string
 	expires   time.Time
 }
 
@@ -51,8 +50,7 @@ type actionPlanRequest struct {
 }
 
 type actionApplyRequest struct {
-	ID   string `json:"id"`
-	Word string `json:"word"`
+	ID string `json:"id"`
 }
 
 type actionRow struct {
@@ -69,7 +67,6 @@ type actionReview struct {
 	Message  string      `json:"message,omitempty"`
 	Rows     []actionRow `json:"rows"`
 	Warnings []string    `json:"warnings,omitempty"`
-	Word     string      `json:"word,omitempty"`
 	Confirm  string      `json:"confirm,omitempty"`
 }
 
@@ -166,7 +163,7 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			operation.PowerAction = domain.ClientRestart
 		}
 		// Computers that cannot report their session stay eligible; the
-		// review shows them and the word confirms the interruption.
+		// review names them and those someone is using before the click.
 		operation.SessionPolicy = domain.ShutdownAcknowledgeUnknown
 		response := server.actions(ctx, operation)
 		if response.PowerPlan == nil {
@@ -335,7 +332,6 @@ func powerReview(plan domain.ShutdownPlanReport) (actionReview, pendingAction) {
 	if restart {
 		review.Title = "Restart"
 	}
-	busy := 0
 	for _, target := range plan.Targets {
 		row := actionRow{Name: target.Name}
 		switch {
@@ -343,10 +339,8 @@ func powerReview(plan domain.ShutdownPlanReport) (actionReview, pendingAction) {
 			row.Skip, row.Note = true, "Switched off or not reachable."
 		case target.Session == domain.ShutdownSessionActive:
 			row.Note = "Someone is using it: unsaved work is lost."
-			busy++
 		case target.Session == domain.ShutdownSessionUnknown:
 			row.Note = "It cannot tell whether someone is using it."
-			busy++
 		}
 		review.Rows = append(review.Rows, row)
 	}
@@ -361,11 +355,6 @@ func powerReview(plan domain.ShutdownPlanReport) (actionReview, pendingAction) {
 			verb = "Restart "
 		}
 		review.Confirm = verb + plural(plan.Eligible, "computer")
-		// Interrupting someone's work needs the same word as the TUI.
-		if busy > 0 {
-			review.Word = plan.Action.Confirmation()
-			pending.word = review.Word
-		}
 	}
 	return review, pending
 }
@@ -391,10 +380,6 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 	server.mutex.Unlock()
 	if !found || server.now().After(pending.expires) {
 		writePageJSON(writer, actionResult{State: "expired", Message: "This review has expired. Choose the action again.", Rows: []actionRow{}})
-		return
-	}
-	if pending.word != "" && strings.TrimSpace(body.Word) != pending.word {
-		writePageJSON(writer, actionResult{State: "refused", Message: "Type " + pending.word + " to confirm. Choose the action again.", Rows: []actionRow{}})
 		return
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Minute)

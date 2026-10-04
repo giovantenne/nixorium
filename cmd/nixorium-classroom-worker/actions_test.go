@@ -124,28 +124,24 @@ func TestPageActionsReviewThenApplyOnce(t *testing.T) {
 	}
 }
 
-func TestPagePowerActionNeedsTheWordWhenSomeoneWorks(t *testing.T) {
+func TestPagePowerActionWarnsAboutWorkInTheReview(t *testing.T) {
 	fake := &fakeActions{}
 	server, host, cookie := openedViewServer(t, fake)
 	origin := "http://" + host
-	plan := func() actionReview {
-		var review actionReview
-		response := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"restart","computers":["pc01"]}`)
-		if err := json.Unmarshal(response.Body.Bytes(), &review); err != nil {
-			t.Fatal(err)
-		}
-		return review
+	var review actionReview
+	response := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"restart","computers":["pc01"]}`)
+	if err := json.Unmarshal(response.Body.Bytes(), &review); err != nil {
+		t.Fatal(err)
 	}
-	review := plan()
-	if !review.Ready || review.Word != "RESTART" || review.Rows[0].Note == "" || fake.requests[0].SessionPolicy != domain.ShutdownAcknowledgeUnknown {
+	// The review names the computer someone is using; the explicit button
+	// confirms, with no word to type.
+	if !review.Ready || review.Confirm != "Restart 1 computer" || !strings.Contains(review.Rows[0].Note, "unsaved work") || fake.requests[0].SessionPolicy != domain.ShutdownAcknowledgeUnknown {
 		t.Fatalf("review = %+v", review)
 	}
-	refused := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`","word":"restart"}`)
-	if !strings.Contains(refused.Body.String(), `"refused"`) || len(fake.requests) != 1 {
-		t.Fatalf("wrong word = %s", refused.Body.String())
+	if typed := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`","word":"RESTART"}`); typed.Code == http.StatusOK {
+		t.Fatal("a typed word is still accepted as a field")
 	}
-	review = plan()
-	applied := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`","word":"RESTART"}`)
+	applied := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`"}`)
 	if !strings.Contains(applied.Body.String(), `"completed"`) {
 		t.Fatalf("apply = %s", applied.Body.String())
 	}
@@ -186,7 +182,7 @@ func TestPageLocksSelectedComputers(t *testing.T) {
 	origin := "http://" + host
 	plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"lock","computers":["pc01","pc02"]}`)
 	var review actionReview
-	if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready || review.Confirm != "Lock 1 computer" || review.Word != "" || !review.Rows[1].Skip {
+	if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready || review.Confirm != "Lock 1 computer" || !review.Rows[1].Skip {
 		t.Fatalf("review = %s", plan.Body.String())
 	}
 	if request := fake.requests[0]; request.Operation != domain.ClassroomLockPlanOperation || request.LockAction != domain.LockOn {

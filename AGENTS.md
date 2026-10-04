@@ -569,8 +569,11 @@ any shard must block publication.
   view, and every path that ends control must release pressed keys and
   buttons. Page actions on selected computers (Internet, power) call the
   worker's own typed plan/apply handling in process: the review token never
-  reaches the page, each review is applied at most once, and restart or
-  shutdown with active or unknown sessions requires the typed word. The
+  reaches the page, and each review is applied at most once. By owner
+  decision the page confirms with one explicit button, without a typed word,
+  after a review that names computers whose session is active or unknown;
+  the TUI keeps its own confirmation. The page shows the outcome as a brief
+  notice, not a dialog. The
   teacher's lock is the classroom extension's full-screen cover with a modal
   grab, requested by the agent on the session bus; logout and restart always
   end it. It is a classroom aid, not a security boundary: the session's own

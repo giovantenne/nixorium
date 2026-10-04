@@ -70,8 +70,8 @@ body.screen-mode #viewer-panel { display: flex; flex-direction: column; height: 
 #action-dialog li.skip { color: var(--muted); }
 #action-dialog li .note { color: var(--muted); }
 #action-warnings li { color: var(--warning); }
-#action-word-label { display: block; margin: 0.8rem 0; }
-#action-word-input { margin-left: 0.4rem; padding: 0.3rem 0.5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: inherit; font: inherit; }
+.toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 10; max-width: min(40rem, 92vw); padding: 0.7rem 1.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); box-shadow: 0 6px 24px rgb(0 0 0 / 0.4); }
+.toast.problem { border-color: var(--warning); }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
 .viewer-bar .controlling { flex: none; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--warning); color: #000; font-weight: 600; }
 #viewer-image.control { outline: 3px solid var(--warning); outline-offset: -3px; }

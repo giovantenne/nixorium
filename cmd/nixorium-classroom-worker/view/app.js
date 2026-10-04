@@ -155,9 +155,8 @@ const actionTitle = document.getElementById('action-title');
 const actionMessage = document.getElementById('action-message');
 const actionRows = document.getElementById('action-rows');
 const actionWarnings = document.getElementById('action-warnings');
-const actionWordLabel = document.getElementById('action-word-label');
-const actionWord = document.getElementById('action-word');
-const actionWordInput = document.getElementById('action-word-input');
+const toast = document.getElementById('toast');
+let toastTimer = 0;
 const actionCancel = document.getElementById('action-cancel');
 const actionConfirm = document.getElementById('action-confirm');
 let actionID = '';
@@ -202,8 +201,6 @@ async function runAction(action, computers, transfer) {
   actionMessage.textContent = '';
   showRows(actionRows, []);
   showText(actionWarnings, []);
-  actionWordLabel.hidden = true;
-  actionWordInput.value = '';
   actionConfirm.hidden = true;
   actionCancel.textContent = 'Cancel';
   if (!actionDialog.open) actionDialog.showModal();
@@ -217,9 +214,7 @@ async function runAction(action, computers, transfer) {
       actionID = review.id;
       actionConfirm.textContent = review.confirm;
       actionConfirm.hidden = false;
-      actionWordLabel.hidden = !review.word;
-      actionWord.textContent = review.word || '';
-      if (review.word) actionWordInput.focus(); else actionConfirm.focus();
+      actionConfirm.focus();
     }
   } catch (error) {
     actionTitle.textContent = 'The action could not start';
@@ -227,30 +222,39 @@ async function runAction(action, computers, transfer) {
   }
 }
 
+// The outcome appears briefly at the bottom, longer when some computers
+// did not take the action; no dialog needs closing.
+function showToast(text, problem) {
+  toast.textContent = text;
+  toast.classList.toggle('problem', Boolean(problem));
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, problem ? 10000 : 4000);
+}
+
 actionConfirm.addEventListener('click', async () => {
   if (!actionID) return;
   const id = actionID;
   actionID = '';
   actionConfirm.hidden = true;
-  actionWordLabel.hidden = true;
   actionMessage.textContent = 'Working…';
   try {
-    const result = await postJSON('/api/actions/apply', { id, word: actionWordInput.value });
+    const result = await postJSON('/api/actions/apply', { id });
     if (result.broadcast) startCasting(result.broadcast);
-    actionMessage.textContent = result.message || (result.state === 'completed' ? 'Done.' : '');
-    showRows(actionRows, result.rows);
-    showText(actionWarnings, []);
+    const missed = (result.rows || []).filter((row) => row.skip);
+    let text = result.message || (result.state === 'completed' ? 'Done.' : 'The action did not complete.');
+    if (missed.length) text += ' Not done on ' + missed.map((row) => row.name + (row.note ? ' (' + row.note.replace(/\.$/, '') + ')' : '')).join(', ') + '.';
+    showToast(text, missed.length > 0 || (result.state !== 'completed' && result.state !== 'started'));
     // Computers that did not take the action stay selected for a retry.
     if (!screenMode && result.rows && result.rows.length) {
       chosen.clear();
-      for (const row of result.rows) if (row.skip) chosen.add(row.name);
+      for (const row of missed) chosen.add(row.name);
       updateSelection();
     }
   } catch (error) {
-    actionMessage.textContent = 'The controller did not answer; the result is unknown. Check the computers before trying again.';
+    showToast('The controller did not answer; the result is unknown. Check the computers before trying again.', true);
   }
-  actionCancel.textContent = 'Close';
-  actionCancel.focus();
+  actionDialog.close();
 });
 actionCancel.addEventListener('click', () => actionDialog.close());
 actionDialog.addEventListener('close', () => {
@@ -293,7 +297,6 @@ function showProgress(title, text) {
   actionMessage.textContent = text;
   showRows(actionRows, []);
   showText(actionWarnings, []);
-  actionWordLabel.hidden = true;
   actionConfirm.hidden = true;
   actionCancel.textContent = 'Close';
   if (!actionDialog.open) actionDialog.showModal();

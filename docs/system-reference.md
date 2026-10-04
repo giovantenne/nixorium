@@ -345,8 +345,10 @@ Check boxes on the overview select computers for **Block/Allow Internet**,
 **Lock/Unlock**, **Restart** and **Shut down**; a computer's window offers the
 same in its **Actions** menu. The page calls the classroom service's own
 review and apply handling, as the classroom dashboard does: the review token
-stays in the service, each review applies once, and restarting or shutting
-down a computer whose session is active or unknown needs the typed word.
+stays in the service and each review applies once. The review names
+computers whose session is active or unknown; one explicit button (such as
+"Restart 3 computers") confirms, and the outcome appears as a brief notice
+that names the computers that did not take the action.
 
 **Lock** asks the agent to have the bundled Shell extension cover the whole
 screen with "Eyes on the teacher" and take the keyboard and mouse (a modal

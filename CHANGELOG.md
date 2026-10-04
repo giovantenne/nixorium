@@ -23,8 +23,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   session, and stopping control releases every key and button. Check boxes
   select computers for **Block/Allow Internet**, **Restart** and **Shut
   down**, also available for one computer in its window's **Actions** menu.
-  They use the same reviews as the classroom dashboard; restarting or
-  shutting down a computer that someone is using needs the typed word.
+  They use the same reviews as the classroom dashboard and confirm with one
+  explicit button; the review names computers that someone is using, and
+  the outcome appears as a brief notice.
   **Lock** covers the selected screens with "Eyes on the teacher" and takes
   their keyboard and mouse until **Unlock**, logout or restart; a locked
   computer is still visible but cannot be controlled. The same lock is in
