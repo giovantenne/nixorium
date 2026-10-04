@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.0.0-beta.1] - 2026-10-04
+
 - Backward-compatibility paths are removed; there are no older installations
   to carry. The student home is always restored at boot from the workspace
   profile (an empty profile when `mkLab` receives none), so the profile-free
@@ -1469,7 +1471,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.0.0-beta.1...HEAD
+[3.0.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v2.1.0...v3.0.0-beta.1
 [2.1.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.5...v2.0.0
 [2.0.0-beta.5]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.4...v2.0.0-beta.5
