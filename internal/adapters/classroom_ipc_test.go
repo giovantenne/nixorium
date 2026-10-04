@@ -21,7 +21,12 @@ func TestClassroomIPCExchangesOnlyTypedRequests(t *testing.T) {
 	path := filepath.Join(directory, "control.sock")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	server := NewClassroomIPCServer(path, func(_ context.Context, request domain.ClassroomRequest) domain.ClassroomResponse {
+	server := NewClassroomIPCServer(path, func(ctx context.Context, request domain.ClassroomRequest) domain.ClassroomResponse {
+		// The worker learns who asks from the kernel, not from the request.
+		uid, ok := ClassroomPeerUID(ctx)
+		if !ok || uid != os.Getuid() {
+			return domain.ClassroomResponse{State: "completed", Message: "unknown peer"}
+		}
 		return domain.ClassroomResponse{State: "completed", Message: string(request.Operation)}
 	})
 	done := make(chan error, 1)

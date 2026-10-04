@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 )
 
@@ -37,5 +38,23 @@ func TestClassroomBrowserProfileKeepsSystemFrames(t *testing.T) {
 		if !slices.Contains(arguments, want) {
 			t.Fatalf("arguments %v lack %s", arguments, want)
 		}
+	}
+}
+
+func TestClassroomBrowserRunningReadsTheSingletonLock(t *testing.T) {
+	profile := t.TempDir()
+	if classroomBrowserRunning(profile) {
+		t.Fatal("a profile without a browser was running")
+	}
+	if err := os.Symlink("pc99-"+strconv.Itoa(os.Getpid()), filepath.Join(profile, "SingletonLock")); err != nil {
+		t.Fatal(err)
+	}
+	if !classroomBrowserRunning(profile) {
+		t.Fatal("a live browser was not seen")
+	}
+	_ = os.Remove(filepath.Join(profile, "SingletonLock"))
+	_ = os.Symlink("pc99-999999999", filepath.Join(profile, "SingletonLock"))
+	if classroomBrowserRunning(profile) {
+		t.Fatal("a vanished browser was seen")
 	}
 }

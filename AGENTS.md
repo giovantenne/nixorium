@@ -588,8 +588,12 @@ any shard must block publication.
   nothing behind. The classroom worker prepares files in its private
   temporary folder under position-based names only, hashes each file, and
   binds the share review to paths, sizes and digests rather than to the
-  transfer identifier; the page may upload raw pieces only to its own
-  `/api/share/chunk` endpoint. Showing the teacher's screen sends JPEG
+  transfer identifier. The page never uploads files: its Send desktop asks
+  the service, which hands a job to the desktop helper of the page's own
+  user (the browser launcher, running as that user, long-polling
+  `desktop-wait`). Users are matched only by the classroom socket's kernel
+  peer credentials, recorded with the one-time view token; a job is
+  answered only by its own user. Showing the teacher's screen sends JPEG
   pictures (`broadcast.frame`, at most 2 MB); the agent writes them only to
   its own runtime folder and the extension shows them in a second modal
   cover above the lock, accepting only those file names. The showing ends

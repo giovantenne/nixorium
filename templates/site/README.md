@@ -168,7 +168,7 @@ computers after a review: hidden files and links are left out, at most 2000
 items and 500 MB are sent, the copies belong to the student and are never
 executable, and a name already on a student's desktop is kept as
 "name (2)". A restart empties the student's home, as usual. The classroom
-view page offers the same as **Send desktop**, where you choose the folder.
+view page offers the same as **Send desktop**.
 From a terminal: `nixorium desktop plan --on @lab`, then
 `nixorium desktop apply --on @lab --expect` with the review token.
 

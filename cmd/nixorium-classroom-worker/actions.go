@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -86,11 +85,7 @@ type computerLabels struct {
 }
 
 func decodePageJSON(writer http.ResponseWriter, request *http.Request, value any) bool {
-	return decodePageJSONLimit(writer, request, value, 64<<10)
-}
-
-func decodePageJSONLimit(writer http.ResponseWriter, request *http.Request, value any, limit int64) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, limit))
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 64<<10))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
 		http.Error(writer, "Invalid request.", http.StatusBadRequest)
@@ -509,56 +504,22 @@ func (server *viewServer) labelsFor(name string) (string, string) {
 	return labels.internet, power
 }
 
-type shareBeginRequest struct {
-	Entries []domain.ShareFile `json:"entries"`
-}
-
-// beginShare reserves room for the files the teacher chose to send.
-func (server *viewServer) beginShare(writer http.ResponseWriter, request *http.Request) {
-	var body shareBeginRequest
-	// Up to 2000 names: more room than other requests.
-	if !decodePageJSONLimit(writer, request, &body, 1<<20) {
+// shareDesktop prepares the desktop of the page's own user through that
+// user's desktop helper, and returns the transfer to review.
+func (server *viewServer) shareDesktop(writer http.ResponseWriter, request *http.Request) {
+	var body struct{}
+	if !decodePageJSON(writer, request, &body) {
 		return
 	}
-	operation, err := domain.NewClassroomRequest(domain.ClassroomShareBeginOperation)
+	grant, ok := server.session(request)
+	if !ok || server.desktops == nil {
+		http.Error(writer, "Not available.", http.StatusForbidden)
+		return
+	}
+	transfer, err := server.desktops.Request(request.Context(), grant.uid)
 	if err != nil {
-		http.Error(writer, "The files could not be prepared.", http.StatusInternalServerError)
+		writePageJSON(writer, map[string]string{"message": err.Error()})
 		return
 	}
-	for _, entry := range body.Entries {
-		if entry.SHA256 != "" {
-			http.Error(writer, "Invalid request.", http.StatusBadRequest)
-			return
-		}
-	}
-	operation.ShareFiles = body.Entries
-	response := server.actions(request.Context(), operation)
-	writePageJSON(writer, map[string]string{"transfer": response.ShareTransfer, "message": response.Message})
-}
-
-// shareChunk stores one piece of a file; the body is the raw content.
-func (server *viewServer) shareChunk(writer http.ResponseWriter, request *http.Request) {
-	query := request.URL.Query()
-	index, indexErr := strconv.Atoi(query.Get("index"))
-	offset, offsetErr := strconv.ParseInt(query.Get("offset"), 10, 64)
-	if indexErr != nil || offsetErr != nil {
-		http.Error(writer, "Invalid request.", http.StatusBadRequest)
-		return
-	}
-	data, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, domain.ClassroomShareChunkBytes))
-	if err != nil || len(data) == 0 {
-		http.Error(writer, "Invalid request.", http.StatusBadRequest)
-		return
-	}
-	operation, err := domain.NewClassroomRequest(domain.ClassroomShareChunkOperation)
-	if err != nil {
-		http.Error(writer, "The files could not be prepared.", http.StatusInternalServerError)
-		return
-	}
-	operation.ShareTransfer, operation.ShareIndex, operation.ShareOffset, operation.ShareData = query.Get("transfer"), index, offset, data
-	if response := server.actions(request.Context(), operation); response.State == "failed" {
-		http.Error(writer, response.Message, http.StatusConflict)
-		return
-	}
-	writer.WriteHeader(http.StatusNoContent)
+	writePageJSON(writer, map[string]string{"transfer": transfer})
 }

@@ -1,0 +1,112 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/giovantenne/nixorium/internal/domain"
+)
+
+// classroomBrowserCommand is the internal command that runs the classroom
+// view's browser and serves the user's desktop to the classroom service
+// while it is open ("Send desktop" in the page). It is not for operators.
+const classroomBrowserCommand = "__classroom-browser"
+
+// runClassroomBrowser starts the browser and, as the only desktop helper of
+// this user, answers the service's desktop jobs until the classroom
+// browser has closed.
+func runClassroomBrowser(address string) int {
+	profile, err := classroomBrowserProfile()
+	if err != nil {
+		return 1
+	}
+	arguments := classroomBrowserArguments(address, profile)
+	path, err := exec.LookPath(arguments[0])
+	if err != nil {
+		return 1
+	}
+	browser := exec.Command(path, arguments[1:]...)
+	if err := browser.Start(); err != nil {
+		return 1
+	}
+	browserDone := make(chan struct{})
+	go func() {
+		_ = browser.Wait()
+		close(browserDone)
+	}()
+	lock, err := os.OpenFile(filepath.Join(profile, "nixorium-desktop-helper.lock"), os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		<-browserDone
+		return 0
+	}
+	defer lock.Close()
+	// Another helper already serves this user: only open the page.
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		<-browserDone
+		return 0
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		<-browserDone
+		// A new window may have joined a browser that is still running.
+		for classroomBrowserRunning(profile) {
+			time.Sleep(5 * time.Second)
+		}
+		cancel()
+	}()
+	serveDesktopJobs(ctx)
+	return 0
+}
+
+func serveDesktopJobs(ctx context.Context) {
+	for ctx.Err() == nil {
+		waitCtx, stop := context.WithTimeout(ctx, time.Minute)
+		response, err := classroomRequest(waitCtx, domain.ClassroomDesktopWaitOperation, nil)
+		stop()
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			case <-time.After(5 * time.Second):
+			}
+			continue
+		}
+		if response.DesktopJob == "" {
+			continue
+		}
+		transfer, _, prepareErr := prepareDesktop(ctx)
+		message := ""
+		if prepareErr != nil {
+			message = strings.ToUpper(prepareErr.Error()[:1]) + prepareErr.Error()[1:] + "."
+		}
+		_, _ = classroomRequest(ctx, domain.ClassroomDesktopReadyOperation, func(request *domain.ClassroomRequest) {
+			request.DesktopJob, request.ShareTransfer, request.DesktopError = response.DesktopJob, transfer, message
+		})
+	}
+}
+
+// classroomBrowserRunning reads the browser's own singleton lock, a link
+// to "host-pid", to tell whether the classroom browser is still open.
+func classroomBrowserRunning(profile string) bool {
+	target, err := os.Readlink(filepath.Join(profile, "SingletonLock"))
+	if err != nil {
+		return false
+	}
+	index := strings.LastIndex(target, "-")
+	if index < 0 {
+		return false
+	}
+	pid, err := strconv.Atoi(target[index+1:])
+	if err != nil || pid <= 0 {
+		return false
+	}
+	err = syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
+}

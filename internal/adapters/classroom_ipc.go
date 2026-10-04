@@ -80,7 +80,40 @@ func (server *ClassroomIPCServer) Serve(ctx context.Context) error {
 	}
 }
 
+type classroomPeerKey struct{}
+
+// ClassroomPeerUID is the user of the process that sent a classroom request.
+func ClassroomPeerUID(ctx context.Context) (int, bool) {
+	uid, ok := ctx.Value(classroomPeerKey{}).(int)
+	return uid, ok
+}
+
+// WithClassroomPeerUID records the requesting user, as the socket does; for
+// tests and in-process callers.
+func WithClassroomPeerUID(ctx context.Context, uid int) context.Context {
+	return context.WithValue(ctx, classroomPeerKey{}, uid)
+}
+
+// peerUID reads the kernel's record of the connecting process's user.
+func peerUID(connection *net.UnixConn) (int, bool) {
+	raw, err := connection.SyscallConn()
+	if err != nil {
+		return 0, false
+	}
+	var credentials *syscall.Ucred
+	var credentialsErr error
+	if err := raw.Control(func(descriptor uintptr) {
+		credentials, credentialsErr = syscall.GetsockoptUcred(int(descriptor), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
+	}); err != nil || credentialsErr != nil {
+		return 0, false
+	}
+	return int(credentials.Uid), true
+}
+
 func (server *ClassroomIPCServer) serveConnection(ctx context.Context, connection *net.UnixConn) {
+	if uid, ok := peerUID(connection); ok {
+		ctx = context.WithValue(ctx, classroomPeerKey{}, uid)
+	}
 	_ = connection.SetDeadline(time.Now().Add(30 * time.Second))
 	frame, err := readRemoteIPCFrameBuffered(bufio.NewReaderSize(connection, 4096), domain.ClassroomMessageMaxBytes)
 	if err != nil {

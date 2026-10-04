@@ -85,11 +85,15 @@ func classroomBrowserArguments(address, profile string) []string {
 	return []string{"chromium", "--user-data-dir=" + profile, "--ozone-platform=x11", "--no-first-run", "--no-default-browser-check", "--app=" + address}
 }
 
-// startBrowser opens the address in an app window, detached from the terminal.
+// startBrowser opens the address in an app window, detached from the
+// terminal: Nixorium itself starts the browser and serves the user's
+// desktop to the page while it is open.
 func startBrowser(address string) error {
 	candidates := [][]string{{"xdg-open", address}}
-	if profile, err := classroomBrowserProfile(); err == nil {
-		candidates = append([][]string{classroomBrowserArguments(address, profile)}, candidates...)
+	if _, err := exec.LookPath("chromium"); err == nil {
+		if self, err := os.Executable(); err == nil {
+			candidates = append([][]string{{self, classroomBrowserCommand, address}}, candidates...)
+		}
 	}
 	for _, candidate := range candidates {
 		path, err := exec.LookPath(candidate[0])

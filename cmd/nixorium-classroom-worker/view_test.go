@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/classroomview"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -57,7 +58,7 @@ func viewRequest(server *viewServer, path, host, cookie string) *httptest.Respon
 
 func TestClassroomViewNeedsTheOneTimeTokenAndTheLoopbackHost(t *testing.T) {
 	server := newViewServer(fakeViewSource{})
-	address, err := server.Open()
+	address, err := server.Open(1000)
 	if err != nil || !strings.HasPrefix(address, "http://127.0.0.1:") || !strings.Contains(address, "/open?token=") {
 		t.Fatalf("address = %q, %v", address, err)
 	}
@@ -141,12 +142,13 @@ func TestClassroomViewNeedsTheOneTimeTokenAndTheLoopbackHost(t *testing.T) {
 
 func TestClassroomViewOpensOnlyWhenTurnedOn(t *testing.T) {
 	worker := classroomWorker{view: newViewServer(fakeViewSource{}), viewOn: func() bool { return false }}
-	response := worker.handle(context.Background(), domain.ClassroomRequest{Operation: domain.ClassroomViewOpenOperation})
+	ctx := adapters.WithClassroomPeerUID(context.Background(), 1000)
+	response := worker.handle(ctx, domain.ClassroomRequest{Operation: domain.ClassroomViewOpenOperation})
 	if response.State != "failed" || !strings.Contains(response.Message, "CLASSROOM-VIEW-OFF") || response.ViewURL != "" {
 		t.Fatalf("response = %+v", response)
 	}
 	worker.viewOn = func() bool { return true }
-	response = worker.handle(context.Background(), domain.ClassroomRequest{Operation: domain.ClassroomViewOpenOperation})
+	response = worker.handle(ctx, domain.ClassroomRequest{Operation: domain.ClassroomViewOpenOperation})
 	if response.State != "completed" || !strings.HasPrefix(response.ViewURL, "http://127.0.0.1:") {
 		t.Fatalf("response = %+v", response)
 	}

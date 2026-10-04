@@ -62,6 +62,9 @@ type options struct {
 }
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == classroomBrowserCommand {
+		os.Exit(runClassroomBrowser(os.Args[2]))
+	}
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr))
 }
 

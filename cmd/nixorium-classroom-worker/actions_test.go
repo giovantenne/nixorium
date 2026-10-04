@@ -77,7 +77,7 @@ func openedViewServer(t *testing.T, fake *fakeActions) (*viewServer, string, str
 	t.Helper()
 	server := newViewServer(fakeViewSource{})
 	server.actions = fake.handle
-	address, err := server.Open()
+	address, err := server.Open(1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,42 +198,32 @@ func TestPageLocksSelectedComputers(t *testing.T) {
 	}
 }
 
-func TestPageSendsPreparedFiles(t *testing.T) {
+func TestPageSendsTheDesktopOfItsOwnUser(t *testing.T) {
 	fake := &fakeActions{}
 	server, host, cookie := openedViewServer(t, fake)
+	server.desktops = newDesktopBroker()
 	origin := "http://" + host
-	begin := actionPost(server, host, cookie, origin, "/api/share/begin", `{"entries":[{"path":"notes.txt","size":5}]}`)
-	if !strings.Contains(begin.Body.String(), `"transfer":"t1"`) || len(fake.requests[0].ShareFiles) != 1 {
-		t.Fatalf("begin = %s", begin.Body.String())
+	// Without a helper the page is told to open the view again.
+	if response := actionPost(server, host, cookie, origin, "/api/share/desktop", `{}`); !strings.Contains(response.Body.String(), "open it again from Nixorium") {
+		t.Fatalf("no helper = %s", response.Body.String())
 	}
-	chunk := func(contentType, query, body string) int {
-		request := httptest.NewRequest(http.MethodPost, "/api/share/chunk?"+query, strings.NewReader(body))
-		request.Host = host
-		request.Header.Set("Origin", origin)
-		request.Header.Set("Content-Type", contentType)
-		request.AddCookie(&http.Cookie{Name: viewCookie, Value: cookie})
-		recorder := httptest.NewRecorder()
-		server.ServeHTTP(recorder, request)
-		return recorder.Code
+	// Another user's helper is never asked; the page's own user (1000) is.
+	asked := make(chan int, 2)
+	for _, uid := range []int{1001, 1000} {
+		go func() {
+			if job := server.desktops.Wait(context.Background(), uid); job != "" {
+				asked <- uid
+				if server.desktops.Ready(1001, job, "stolen", "") {
+					t.Error("another user answered the job")
+				}
+				server.desktops.Ready(uid, job, "t1", "")
+			}
+		}()
 	}
-	if code := chunk("application/octet-stream", "transfer=t1&index=0&offset=0", "hello"); code != http.StatusNoContent {
-		t.Fatalf("chunk = %d", code)
-	}
-	if request := fake.requests[1]; request.ShareIndex != 0 || string(request.ShareData) != "hello" {
-		t.Fatalf("chunk request = %+v", request)
-	}
-	for name, code := range map[string]int{
-		"form post":        chunk("application/x-www-form-urlencoded", "transfer=t1&index=0&offset=0", "hello"),
-		"unknown transfer": chunk("application/octet-stream", "transfer=t2&index=0&offset=0", "hello"),
-		"bad index":        chunk("application/octet-stream", "transfer=t1&index=x&offset=0", "hello"),
-		"empty":            chunk("application/octet-stream", "transfer=t1&index=0&offset=5", ""),
-	} {
-		if code == http.StatusNoContent {
-			t.Fatalf("%s was accepted", name)
-		}
-	}
-	if forged := actionPost(server, host, cookie, origin, "/api/share/begin", `{"entries":[{"path":"a","size":1,"sha256":"x"}]}`); forged.Code == http.StatusOK {
-		t.Fatal("a digest from the page was accepted")
+	time.Sleep(50 * time.Millisecond)
+	response := actionPost(server, host, cookie, origin, "/api/share/desktop", `{}`)
+	if !strings.Contains(response.Body.String(), `"transfer":"t1"`) || <-asked != 1000 {
+		t.Fatalf("desktop = %s", response.Body.String())
 	}
 	plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"send-desktop","computers":["pc01"],"transfer":"t1"}`)
 	var review actionReview
@@ -243,5 +233,10 @@ func TestPageSendsPreparedFiles(t *testing.T) {
 	apply := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`"}`)
 	if !strings.Contains(apply.Body.String(), "On the desktop: notes.txt.") {
 		t.Fatalf("apply = %s", apply.Body.String())
+	}
+	for _, removed := range []string{"/api/share/begin", "/api/share/chunk"} {
+		if response := actionPost(server, host, cookie, origin, removed, `{}`); response.Code == http.StatusOK || response.Code == http.StatusNoContent {
+			t.Fatalf("%s still answers", removed)
+		}
 	}
 }

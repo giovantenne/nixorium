@@ -360,10 +360,16 @@ lock is a classroom aid, not a security boundary. Locking also works from
 not take the administrative operation lock, since it changes no system
 state.
 
-**Send desktop** opens the browser's folder picker at the desktop. The page
-reads the chosen folder (hidden files and links are left out), prepares its
-files in the classroom service's private temporary folder in 512 KB pieces,
-then reviews the selected computers. The review binds each file's path,
+**Send desktop** sends the files and folders on the desktop of whoever uses
+the controller. The classroom service runs as `admin` and cannot read that
+user's home, so Nixorium starts the page's browser through a small helper
+running as the user; while the classroom browser is open, the helper waits
+on the classroom socket. When the page asks, the service gives that user's
+helper a job (users are told apart by the socket's kernel peer credentials,
+recorded with the one-time view token), and the helper reads the XDG
+desktop folder (hidden files and links are left out) and prepares its files
+in the service's private temporary folder in 512 KB pieces. The page then
+reviews the selected computers. The review binds each file's path,
 size and SHA-256, so the same files prepared again keep the review token.
 The service streams the files to at most four computers at a time with
 `files.begin`, `files.chunk` (1 MB pieces, each acknowledged) and

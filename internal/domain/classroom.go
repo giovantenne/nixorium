@@ -32,6 +32,10 @@ const (
 	ClassroomShareChunkOperation ClassroomOperation = "share-chunk"
 	ClassroomSharePlanOperation  ClassroomOperation = "share-plan"
 	ClassroomShareApplyOperation ClassroomOperation = "share-apply"
+	// The desktop helper of a classroom view page waits for a job and
+	// reports the transfer it prepared from its user's desktop.
+	ClassroomDesktopWaitOperation  ClassroomOperation = "desktop-wait"
+	ClassroomDesktopReadyOperation ClassroomOperation = "desktop-ready"
 	// ClassroomViewOpenOperation returns a one-time address of the
 	// experimental classroom view page.
 	ClassroomViewOpenOperation ClassroomOperation = "view-open"
@@ -45,6 +49,7 @@ func (o ClassroomOperation) Valid() bool {
 		ClassroomLockPlanOperation, ClassroomLockApplyOperation,
 		ClassroomShareBeginOperation, ClassroomShareChunkOperation,
 		ClassroomSharePlanOperation, ClassroomShareApplyOperation,
+		ClassroomDesktopWaitOperation, ClassroomDesktopReadyOperation,
 		ClassroomViewOpenOperation:
 		return true
 	default:
@@ -70,6 +75,8 @@ type ClassroomRequest struct {
 	ShareOffset    int64                 `json:"shareOffset,omitempty"`
 	ShareData      []byte                `json:"shareData,omitempty"`
 	SharePlan      *SharePlan            `json:"sharePlan,omitempty"`
+	DesktopJob     string                `json:"desktopJob,omitempty"`
+	DesktopError   string                `json:"desktopError,omitempty"`
 }
 
 // ClassroomShareChunkBytes keeps one uploaded piece, encoded, well below the
@@ -93,6 +100,7 @@ type ClassroomResponse struct {
 	ShareTransfer  string               `json:"shareTransfer,omitempty"`
 	SharePlan      *SharePlan           `json:"sharePlan,omitempty"`
 	ShareReport    *ShareReport         `json:"shareReport,omitempty"`
+	DesktopJob     string               `json:"desktopJob,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {

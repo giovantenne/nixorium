@@ -59,6 +59,7 @@ func run() error {
 	}
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
+	worker.view.desktops = newDesktopBroker()
 	// Showing the teacher's screen starts only from the page.
 	worker.view.broadcasts = &broadcaster{manager: app.NewBroadcastManager(lockSource{local, adapters.ClassroomAgentConnector{}}), repository: repository, viewOn: worker.viewOn}
 	return adapters.NewClassroomIPCServer(adapters.ClassroomSocketPath, worker.handle).Serve(ctx)
@@ -177,11 +178,25 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 			worker.shares.Remove(request.SharePlan.Transfer)
 		}
 		response.ShareReport = &report
+	case domain.ClassroomDesktopWaitOperation, domain.ClassroomDesktopReadyOperation:
+		uid, known := adapters.ClassroomPeerUID(ctx)
+		if !known || worker.view == nil || worker.view.desktops == nil {
+			return domain.ClassroomResponse{State: "failed", Message: "The desktop helper is not available."}
+		}
+		if request.Operation == domain.ClassroomDesktopWaitOperation {
+			response.DesktopJob = worker.view.desktops.Wait(ctx, uid)
+		} else if !worker.view.desktops.Ready(uid, request.DesktopJob, request.ShareTransfer, request.DesktopError) {
+			return domain.ClassroomResponse{State: "failed", Message: "This desktop job is unknown."}
+		}
 	case domain.ClassroomViewOpenOperation:
 		if worker.view == nil || worker.viewOn == nil || !worker.viewOn() {
 			return domain.ClassroomResponse{State: "failed", Message: errViewDisabled.Error()}
 		}
-		address, err := worker.view.Open()
+		uid, known := adapters.ClassroomPeerUID(ctx)
+		if !known {
+			return classroomFailure(errors.New("the classroom socket did not identify its caller"))
+		}
+		address, err := worker.view.Open(uid)
 		if err != nil {
 			return classroomFailure(err)
 		}

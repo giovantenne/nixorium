@@ -32,7 +32,7 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
-var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/begin": true, "/api/share/chunk": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
+var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/desktop": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
 
 // viewSource lists computers, their images, and forwards input.
 type viewSource interface {
@@ -55,17 +55,27 @@ type viewServer struct {
 	labels     map[string]computerLabels
 	mutex      sync.Mutex
 	address    string
-	tokens     map[string]time.Time
-	sessions   map[string]time.Time
-	now        func() time.Time
+	tokens     map[string]viewGrant
+	sessions   map[string]viewGrant
+	// desktops reaches the desktop helper of a page's user, if any.
+	desktops *desktopBroker
+	now      func() time.Time
 }
 
 func newViewServer(source viewSource) *viewServer {
-	return &viewServer{source: source, pending: map[string]pendingAction{}, labels: map[string]computerLabels{}, tokens: map[string]time.Time{}, sessions: map[string]time.Time{}, now: time.Now}
+	return &viewServer{source: source, pending: map[string]pendingAction{}, labels: map[string]computerLabels{}, tokens: map[string]viewGrant{}, sessions: map[string]viewGrant{}, now: time.Now}
 }
 
 // Open starts the page server on first use and returns a one-time address.
-func (server *viewServer) Open() (string, error) {
+// viewGrant is a one-time token or a page session, for one user of the
+// controller (whoever asked through the classroom socket).
+type viewGrant struct {
+	expires time.Time
+	uid     int
+}
+
+// Open returns a one-time address for the user uid.
+func (server *viewServer) Open(uid int) (string, error) {
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
 	if server.address == "" {
@@ -81,7 +91,7 @@ func (server *viewServer) Open() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	server.tokens[token] = server.now().Add(viewTokenTTL)
+	server.tokens[token] = viewGrant{expires: server.now().Add(viewTokenTTL), uid: uid}
 	return "http://" + server.address + "/open?token=" + token, nil
 }
 
@@ -106,8 +116,6 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// and only the page's own endpoints accept a POST from this page itself.
 	contentType := "application/json"
 	switch request.URL.Path {
-	case "/api/share/chunk":
-		contentType = "application/octet-stream"
 	case "/api/broadcast/frame":
 		contentType = "image/jpeg"
 	}
@@ -213,7 +221,7 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			return
 		}
 		writer.WriteHeader(http.StatusNoContent)
-	case "/api/actions/plan", "/api/actions/apply", "/api/share/begin", "/api/share/chunk":
+	case "/api/actions/plan", "/api/actions/apply", "/api/share/desktop":
 		if request.Method != http.MethodPost || server.actions == nil {
 			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)
 			return
@@ -223,10 +231,8 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			server.planAction(writer, request)
 		case "/api/actions/apply":
 			server.applyAction(writer, request)
-		case "/api/share/begin":
-			server.beginShare(writer, request)
 		default:
-			server.shareChunk(writer, request)
+			server.shareDesktop(writer, request)
 		}
 	case "/api/input":
 		if request.Method != http.MethodPost {
@@ -261,10 +267,10 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 func (server *viewServer) enter(writer http.ResponseWriter, request *http.Request) {
 	token := request.URL.Query().Get("token")
 	server.mutex.Lock()
-	expiry, found := server.tokens[token]
+	grant, found := server.tokens[token]
 	delete(server.tokens, token)
 	server.mutex.Unlock()
-	if !found || server.now().After(expiry) {
+	if !found || server.now().After(grant.expires) {
 		http.Error(writer, "This link has expired. Open the classroom view again from Nixorium.", http.StatusForbidden)
 		return
 	}
@@ -274,21 +280,27 @@ func (server *viewServer) enter(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	server.mutex.Lock()
-	server.sessions[session] = server.now().Add(viewSessionTTL)
+	server.sessions[session] = viewGrant{expires: server.now().Add(viewSessionTTL), uid: grant.uid}
 	server.mutex.Unlock()
 	http.SetCookie(writer, &http.Cookie{Name: viewCookie, Value: session, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: int(viewSessionTTL.Seconds())})
 	http.Redirect(writer, request, "/", http.StatusSeeOther)
 }
 
 func (server *viewServer) authorized(request *http.Request) bool {
+	_, ok := server.session(request)
+	return ok
+}
+
+// session returns the page session of a request.
+func (server *viewServer) session(request *http.Request) (viewGrant, bool) {
 	cookie, err := request.Cookie(viewCookie)
 	if err != nil {
-		return false
+		return viewGrant{}, false
 	}
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
-	expiry, found := server.sessions[cookie.Value]
-	return found && server.now().Before(expiry)
+	grant, found := server.sessions[cookie.Value]
+	return grant, found && server.now().Before(grant.expires)
 }
 
 func (server *viewServer) asset(writer http.ResponseWriter, name, contentType string) {
