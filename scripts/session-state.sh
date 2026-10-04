@@ -7,7 +7,7 @@ set -euo pipefail
 #   unused  user sessions exist, but none received keyboard or mouse input
 #           recently or since it started (for example an untouched autologin)
 #   active  a user session is in use, or its use cannot be determined
-# Older helpers print only "idle" or "active". Exit code 2 means unavailable.
+# Exit code 2 means unavailable.
 
 # A session without input for this long counts as not in use.
 UNUSED_AFTER_MS=600000

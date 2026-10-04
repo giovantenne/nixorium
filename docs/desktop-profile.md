@@ -4,8 +4,7 @@ The deployment-owned workstation module supplies a restrained GNOME 50 profile:
 
 - Native dark Adwaita decorations with blue accents, plus the Yaru-yellow icon
   theme used by Nixorium 1.0.0. GTK 4 applications retain their supported
-  native styling. Accounts still set to the removed MoreWaita theme move to
-  Yaru-yellow at their next login; other icon choices are kept.
+  native styling.
 - A static blue vector background for administrator and teacher accounts;
   reset student homes select one deployment-owned background at random on each
   boot, without animation or blur.
@@ -40,18 +39,16 @@ make that extra rendering layer unattractive for a small classroom VM and
 remote-control sessions. These reports describe specific configurations and
 versions; they do not prove all blur setups behave poorly.
 
-## Existing accounts and validation
+## Accounts and validation
 
 The login helper enables only the three required UUIDs, preserving other enabled
-extensions. It migrates the specific appearance keys once and records
-`~/.config/nixorium/desktop-style-v1`; later staff preferences survive. There
-are no new dconf locks or complete-database resets. A separate
-`~/.config/nixorium/desktop-dock-v1` migration changes only the four dock visibility
-keys, including for accounts that already completed the appearance migration.
-Later dock preferences remain editable. Student defaults return with the
-ordinary home reset, including a fresh random choice from the deployment's
-backgrounds. The login migration preserves that choice rather than replacing
-it with the staff wallpaper or modifying a live student's files.
+extensions. It applies the specific appearance keys once, at an account's first
+login, and records `~/.config/nixorium/desktop-style-v1`; later staff
+preferences, including the dock, survive. There are no dconf locks or
+complete-database resets. Student defaults return with the ordinary home
+reset, including a fresh random choice from the deployment's backgrounds. The
+login helper preserves that choice rather than replacing it with the staff
+wallpaper or modifying a live student's files.
 
 Run the optional `desktop-profile` check from `tests/source-checks.nix` for
 strict GSettings compilation, extension compatibility and login-script syntax.

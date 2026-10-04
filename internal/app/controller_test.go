@@ -22,7 +22,7 @@ type fakeControllerSource struct {
 
 func readyControllerSource() *fakeControllerSource {
 	source := &fakeControllerSource{
-		deployment: domain.DeploymentStatus{Ready: true},
+		deployment: domain.DeploymentStatus{Ready: true, Controller: &domain.ControllerReadiness{Ready: true}},
 		git:        domain.GitState{Available: true},
 		revision:   "0123456789abcdef0123456789abcdef01234567",
 		detail:     "reviewed controller configuration is not active",

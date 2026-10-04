@@ -59,30 +59,25 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   gsettings set org.gnome.desktop.interface color-scheme "'prefer-light'"
   gsettings set org.gnome.shell.extensions.dash-to-dock dock-position "'LEFT'"
   gsettings set org.gnome.shell.extensions.dash-to-dock autohide false
-  gsettings set org.gnome.desktop.interface icon-theme "'MoreWaita'"
+  gsettings set org.gnome.shell.extensions.ding show-home true
   apply_session_defaults managed-student "[]"
-  test "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'Yaru-yellow'"
   test "$(gsettings get org.gnome.shell favorite-apps)" = "['code.desktop']"
   test "$(gsettings get org.gnome.desktop.interface color-scheme)" = "'prefer-light'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'LEFT'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = false
   test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-style-v1"
-  test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-dock-v1"
-  test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-icons-v1"
   test "$(gsettings get org.gnome.shell.extensions.ding show-home)" = true
-  # The same opt-in script must retain the ordinary staff migration.
+  # The same opt-in script must keep the ordinary staff first-login defaults.
   apply_session_defaults staff "['org.gnome.TextEditor.desktop']"
   test "$(gsettings get org.gnome.shell favorite-apps)" = "['org.gnome.TextEditor.desktop']"
   test "$(gsettings get org.gnome.desktop.interface color-scheme)" = "'prefer-dark'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock dock-position)" = "'BOTTOM'"
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = true
   test -e "$XDG_CONFIG_HOME/nixorium/desktop-style-v1"
-  test -e "$XDG_CONFIG_HOME/nixorium/desktop-dock-v1"
   # Staff desktops show only their files; the trash is in the dock, once.
   test "$(gsettings get org.gnome.shell.extensions.ding show-home)" = false
   test "$(gsettings get org.gnome.shell.extensions.ding show-trash)" = false
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock show-trash)" = true
-  test -e "$XDG_CONFIG_HOME/nixorium/desktop-icons-v1"
   gsettings set org.gnome.shell.extensions.ding show-home true
   apply_session_defaults staff "['org.gnome.TextEditor.desktop']"
   test "$(gsettings get org.gnome.shell.extensions.ding show-home)" = true

@@ -236,7 +236,7 @@ func lockedResetTemplate(ctx context.Context, repository string) (map[string]dom
 		return nil, snapshot, errors.New("managed reset requires a simple GitHub framework declaration and a complete lock; custom sources need manual review")
 	}
 	if _, err := inspectPackageBase(snapshot); err != nil {
-		return nil, snapshot, errors.New("managed reset requires a direct locked NixOS channel and framework follows edge; legacy/custom input layouts need manual review")
+		return nil, snapshot, errors.New("managed reset requires a direct locked NixOS channel and framework follows edge; custom input layouts need manual review")
 	}
 	upstream, present, err := directRootInputNode(snapshot.LockContent, "nixorium")
 	var node struct {

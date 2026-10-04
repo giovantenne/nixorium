@@ -20,11 +20,8 @@
   # static IP derived from networkBase + masterHostNumber instead, so a DHCP address
   # change does NOT affect ongoing updates -- only new PXE installs.
   #
-  # If the DHCP address changes after netboot artifacts have been built,
-  # rebuild them before booting new clients:
-  #   nix build .#nixosConfigurations.netboot.config.system.build.kernel  --out-link result-kernel
-  #   nix build .#nixosConfigurations.netboot.config.system.build.netbootRamdisk --out-link result-initrd
-  #   nix build .#nixosConfigurations.netboot.config.system.build.netbootIpxeScript --out-link result-ipxe
+  # If the DHCP address changes after netboot artifacts have been prepared,
+  # run `nixorium pxe prepare` again before booting new clients.
   #
   # Find it with: ip -4 addr show dev <ifaceName>
   masterDhcpIp = "MASTER_DHCP_IP";

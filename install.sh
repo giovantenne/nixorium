@@ -12,7 +12,6 @@ DEPLOYMENT_NAME="nixorium-deployment"
 INSTALLER_REF="${NIXORIUM_INSTALLER_REF:-}"
 BOOTSTRAP_TTY="${NIXORIUM_BOOTSTRAP_TTY:-/dev/tty}"
 INSTALLER_ARGS=()
-BOOTSTRAP_VERSION=0
 BOOTSTRAP_TEACHER_USER="teacher"
 BOOTSTRAP_STUDENT_USER="student"
 BOOTSTRAP_TIME_ZONE="America/New_York"
@@ -382,10 +381,6 @@ collect_bootstrap_configuration() {
       fi
       case "${CONFIRMATION,,}" in
         ""|y|yes)
-          if [[ "$BOOTSTRAP_VERSION" == "1" ]]; then
-            exec {BOOTSTRAP_INPUT_FD}<&-
-            BOOTSTRAP_INPUT_FD=""
-          fi
           ui_success "Answers saved for the installation."
           return
           ;;
@@ -679,18 +674,13 @@ if ! CAPABILITY_SOURCE="$(curl -fsSL "$CAPABILITY_URL")"; then
   exit 1
 fi
 ui_success "Using Nixorium ${RELEASE}, revision ${UPSTREAM_REV}."
-if grep -Eq 'controllerBootstrapVersion[[:space:]]*=[[:space:]]*2;' <<< "$CAPABILITY_SOURCE"; then
-  BOOTSTRAP_VERSION=2
-elif grep -Eq 'controllerBootstrapVersion[[:space:]]*=[[:space:]]*1;' <<< "$CAPABILITY_SOURCE"; then
-  BOOTSTRAP_VERSION=1
+if ! grep -Eq 'controllerBootstrapVersion[[:space:]]*=[[:space:]]*2;' <<< "$CAPABILITY_SOURCE"; then
+  ui_error "${RELEASE} is too old for this installer." \
+    "Choose master or a newer release."
+  exit 1
 fi
 CAPABILITY_SOURCE=""
-if [[ "$BOOTSTRAP_VERSION" == "1" || "$BOOTSTRAP_VERSION" == "2" ]]; then
-  collect_bootstrap_configuration
-else
-  echo "Warning: ${RELEASE} uses the legacy post-install setup flow." >&2
-  echo "Choose master or a newer release for a controller that is ready at first boot." >&2
-fi
+collect_bootstrap_configuration
 
 if command -v git >/dev/null 2>&1; then
   GIT_COMMAND=(git)
@@ -728,20 +718,16 @@ curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
     echo "Error: could not configure the generated deployment for ${DECLARED_UPSTREAM_REF}." >&2
     exit 1
   fi
-  if [[ "$BOOTSTRAP_VERSION" == "1" || "$BOOTSTRAP_VERSION" == "2" ]]; then
-    configure_bootstrap_settings lab-settings.json
+  configure_bootstrap_settings lab-settings.json
+  PROFILE_HELPER="scripts/configure-software-profile.sh"
+  if [[ ! -r "$PROFILE_HELPER" ]]; then
+    echo "Error: the selected revision advertises software profiles but its template helper is missing." >&2
+    exit 1
   fi
-  if [[ "$BOOTSTRAP_VERSION" == "2" ]]; then
-    PROFILE_HELPER="scripts/configure-software-profile.sh"
-    if [[ ! -r "$PROFILE_HELPER" ]]; then
-      echo "Error: the selected revision advertises software profiles but its template helper is missing." >&2
-      exit 1
-    fi
-    # shellcheck source=/dev/null
-    source "$PROFILE_HELPER"
-    ui_step 4 "Applications"
-    configure_site_software_profile software-presets.json lab-software.json "$BOOTSTRAP_INPUT_FD"
-  fi
+  # shellcheck source=/dev/null
+  source "$PROFILE_HELPER"
+  ui_step 4 "Applications"
+  configure_site_software_profile software-presets.json lab-software.json "$BOOTSTRAP_INPUT_FD"
   "${GIT_COMMAND[@]}" init -q -b master
   "${GIT_COMMAND[@]}" add .
 )

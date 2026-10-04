@@ -228,27 +228,18 @@ test "$(grep -c -F 'Step 1 of 5 · Keyboard and time zone' "${TEST_ROOT}/review-
 test ! -e "$INSTALLER_LOG"
 : > "$CALL_LOG"
 
-V1_TARGET_ROOT="${TEST_ROOT}/v1-target"
-mkdir -p "${V1_TARGET_ROOT}/home/admin"
-rm -f "$INSTALLER_LOG"
-if ! NIXORIUM_TARGET_ROOT="$V1_TARGET_ROOT" \
+if NIXORIUM_TARGET_ROOT="${TEST_ROOT}/v1-target" \
   NIXORIUM_BOOTSTRAP_TTY="$BOOTSTRAP_INPUT" \
   BOOTSTRAP_CAPABILITY_VERSION=1 \
   timeout --foreground --kill-after=2s 10s \
   "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
   >"${TEST_ROOT}/v1-install.out" 2>&1; then
-  cat "${TEST_ROOT}/v1-install.out" >&2
+  echo "bootstrap accepted a release without capability version 2" >&2
   exit 1
 fi
-if grep -F "Step 4 of 5" "${TEST_ROOT}/v1-install.out" >/dev/null; then
-  echo "bootstrap capability version 1 unexpectedly prompted for software" >&2
-  exit 1
-fi
-cmp "$REPO_ROOT/templates/site/lab-software.json" \
-  "${V1_TARGET_ROOT}/home/admin/nixorium-deployment/lab-software.json"
-test -f "$INSTALLER_LOG"
+grep -F "too old for this installer" "${TEST_ROOT}/v1-install.out" >/dev/null
+test ! -e "$INSTALLER_LOG"
 : > "$CALL_LOG"
-rm -f "$INSTALLER_LOG"
 
 if ! NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_BOOTSTRAP_TTY="$BOOTSTRAP_INPUT" \

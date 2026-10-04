@@ -246,12 +246,9 @@ student homes choose randomly from `assets.backgrounds` at boot, and the login
 migration must preserve that choice. Tiling Assistant provides snap assist
 with small window gaps; no blur or animated wallpaper is required.
 
-Existing accounts receive a targeted, one-time migration marked by
-`~/.config/nixorium/desktop-style-v1`; later staff choices remain editable.
-A separate `desktop-dock-v1` migration updates only the four dock visibility
-keys for existing accounts: hide on overlap with any window, reveal at the
-bottom edge, and remain visible on a clear desktop. Later staff dock choices
-survive. Do not reset entire dconf databases. Students receive the defaults and
+Each account receives the managed appearance once, at its first login, marked
+by `~/.config/nixorium/desktop-style-v1`; later staff choices, including the
+dock, remain editable. Do not reset entire dconf databases. Students receive the defaults and
 a newly selected deployment-owned wallpaper after their normal home reset.
 Validate extension metadata against the locked GNOME major
 and compile GSettings schemas strictly before applying. Favorites still depend

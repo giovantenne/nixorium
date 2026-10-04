@@ -50,17 +50,6 @@ let
         [[ ! -e "$USB_RESERVATION" && ! -L "$USB_RESERVATION" ]] \
           || fail "a USB installation remains reserved; PXE start is blocked"
       fi
-      LEGACY_LOCK=/home/admin/.local/state/nixorium/operations/deploy.lock
-      if [[ -e "$LEGACY_LOCK" || -L "$LEGACY_LOCK" ]]; then
-        [[ -f "$LEGACY_LOCK" && ! -L "$LEGACY_LOCK" \
-            && "$(stat -c '%U:%G:%a' "$LEGACY_LOCK")" == admin:users:600 ]] \
-          || fail "legacy deployment lock is unsafe; close old Nixorium processes before migration"
-        # Linux flock remains exclusive on a read-only descriptor.
-        # Keep compatibility with services that protect the home as read-only.
-        exec 8<"$LEGACY_LOCK"
-        flock -n 8 \
-          || fail "a legacy Nixorium deployment is still running"
-      fi
 
       address_present() {
         local iface="$1"

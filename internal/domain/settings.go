@@ -63,7 +63,6 @@ type LabSettings struct {
 	ExtraLocale             string            `json:"extraLocale"`
 	KeyboardLayout          string            `json:"keyboardLayout"`
 	ConsoleKeyMap           string            `json:"consoleKeyMap"`
-	// Deprecated: retained for compatibility; every host uses native capture.
 }
 
 func (l LabSettings) ControllerInterface() string {

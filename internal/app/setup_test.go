@@ -83,10 +83,6 @@ func (f fakeSetupSource) ControllerApplied(context.Context, string) (bool, strin
 	return false, "reviewed controller configuration is not active"
 }
 
-func (fakeSetupSource) ArtifactState(_ string, name, path string) domain.ArtifactState {
-	return domain.ArtifactState{Name: name, Path: path, Present: false}
-}
-
 func (f fakeSetupSource) PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState {
 	return f.preparation
 }

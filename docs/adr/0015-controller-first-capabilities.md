@@ -56,8 +56,8 @@ installation. Capability version 2 adds a reviewed initial software-profile
 choice after those settings. The profile catalog and helper come from the same
 resolved template revision; the launcher writes the complete selected profile
 only to `lab-software.json`, without package-level exclusions, before Git
-initialization, Nix evaluation, or disk changes. Version 1 remains
-supported without the extra prompt. Both versions persist controller mode with
+initialization, Nix evaluation, or disk changes. The launcher refuses
+releases without version 2. Version 2 persists controller mode with
 US internal locales and defer client networking and keys. Installers for older
 revisions remain on their legacy workflow rather than invoking an unsupported
 command.

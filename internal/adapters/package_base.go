@@ -38,7 +38,7 @@ func (PackageBase) InspectUpdateInput(repository string) (domain.UpdateInputSnap
 func inspectPackageBase(s domain.UpdateInputSnapshot) (domain.UpdateInputSnapshot, error) {
 	matches := managedPackageBaseInput.FindAllSubmatch(s.FlakeContent, -1)
 	if len(matches) != 1 || !packageBaseFollows.Match(s.FlakeContent) {
-		return s, errors.New("a direct nixpkgs URL and nixorium.inputs.nixpkgs.follows = \"nixpkgs\" are required; legacy/custom deployments need an explicit reviewed migration")
+		return s, errors.New("a direct nixpkgs URL and nixorium.inputs.nixpkgs.follows = \"nixpkgs\" are required; custom deployments need a manual reviewed change")
 	}
 	url := string(matches[0][2])
 	match := stablePackageBaseURL.FindStringSubmatch(url)
@@ -47,7 +47,7 @@ func inspectPackageBase(s domain.UpdateInputSnapshot) (domain.UpdateInputSnapsho
 	}
 	nodeBytes, present, err := directRootInputNode(s.LockContent, "nixpkgs")
 	if err != nil || !present {
-		return s, errors.New("a direct locked root nixpkgs input is required; migrate legacy deployments at their exact current revision first")
+		return s, errors.New("a direct locked root nixpkgs input is required")
 	}
 	var node packageBaseNode
 	if err := json.Unmarshal(nodeBytes, &node); err != nil {

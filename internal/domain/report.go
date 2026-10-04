@@ -126,12 +126,12 @@ type ControllerReadiness struct {
 	RequiresKeys bool     `json:"requiresKeys"`
 }
 
-// Older upstreams have only fleet readiness. Preserve that strict fallback.
+// ControllerReadiness fails closed when the status omits controller readiness.
 func (s DeploymentStatus) ControllerReadiness() ControllerReadiness {
 	if s.Controller != nil {
 		return *s.Controller
 	}
-	return ControllerReadiness{Ready: s.Ready, Issues: s.Issues, RequiresKeys: true}
+	return ControllerReadiness{Issues: []string{"deployment status does not report controller readiness"}, RequiresKeys: true}
 }
 
 type GitState struct {

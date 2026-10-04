@@ -20,24 +20,17 @@ import (
 
 const (
 	managedCoordinationDirectory = "/var/lib/nixorium/coordination"
-	legacyDeploymentLockPath     = "/home/admin/.local/state/nixorium/operations/deploy.lock"
 	coordinationLockName         = "operation.lock"
 	remoteReservationName        = "usb-reservation.json"
 )
 
 type operationGate struct {
-	file   *os.File
-	legacy *os.File
+	file *os.File
 }
 
 func (gate *operationGate) Close() error {
 	if gate == nil || gate.file == nil {
 		return nil
-	}
-	if gate.legacy != nil {
-		_ = syscall.Flock(int(gate.legacy.Fd()), syscall.LOCK_UN)
-		_ = gate.legacy.Close()
-		gate.legacy = nil
 	}
 	clearOperationOwner(gate.file)
 	_ = syscall.Flock(int(gate.file.Fd()), syscall.LOCK_UN)
@@ -54,66 +47,11 @@ func (gate *operationGate) describe(label string) {
 }
 
 func acquireManagedOperationGate() (*operationGate, error) {
-	gate, err := acquireOperationGateAt(managedCoordinationDirectory, true)
-	if err != nil {
-		return nil, err
-	}
-	legacy, err := acquireLegacyDeploymentLock()
-	if err != nil {
-		gate.Close()
-		return nil, err
-	}
-	gate.legacy = legacy
-	return gate, nil
-}
-
-func acquireLegacyDeploymentLock() (*os.File, error) {
-	// Linux flock remains exclusive on a read-only descriptor, including when
-	// service sandboxing makes the legacy home read-only.
-	descriptor, err := syscall.Open(legacyDeploymentLockPath, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
-	if errors.Is(err, syscall.ENOENT) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("inspect legacy deployment lock: %w", err)
-	}
-	file := os.NewFile(uintptr(descriptor), legacyDeploymentLockPath)
-	if err := validatePrivateOwnedFile(file, syscall.S_IFREG, 0600); err != nil {
-		file.Close()
-		return nil, fmt.Errorf("inspect legacy deployment lock: %w", err)
-	}
-	administrator, err := user.Lookup("admin")
-	if err != nil {
-		file.Close()
-		return nil, errors.New("admin account is unavailable for legacy lock migration")
-	}
-	uid, err := strconv.ParseUint(administrator.Uid, 10, 32)
-	var stat syscall.Stat_t
-	if err != nil || syscall.Fstat(descriptor, &stat) != nil || stat.Uid != uint32(uid) {
-		file.Close()
-		return nil, errors.New("legacy deployment lock has the wrong owner")
-	}
-	if err := syscall.Flock(descriptor, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		file.Close()
-		return nil, errors.New("a legacy Nixorium deployment is still running; close it before using the managed operation gate")
-	}
-	return file, nil
+	return acquireOperationGateAt(managedCoordinationDirectory, true)
 }
 
 func managedOperationActive() (bool, error) {
-	active, err := operationActiveAt(managedCoordinationDirectory, true)
-	if err != nil || active {
-		return active, err
-	}
-	legacy, err := acquireLegacyDeploymentLock()
-	if err != nil {
-		return true, err
-	}
-	if legacy != nil {
-		_ = syscall.Flock(int(legacy.Fd()), syscall.LOCK_UN)
-		_ = legacy.Close()
-	}
-	return false, nil
+	return operationActiveAt(managedCoordinationDirectory, true)
 }
 
 func acquireOperationGateAt(directoryPath string, managed bool) (*operationGate, error) {
@@ -402,14 +340,6 @@ func acquireRecoveryGateAt(directoryPath string, managed bool) (*operationGate, 
 	if err := checkDeploymentPendingAt(directory); err != nil {
 		gate.Close()
 		return nil, err
-	}
-	if managed {
-		legacy, legacyErr := acquireLegacyDeploymentLock()
-		if legacyErr != nil {
-			gate.Close()
-			return nil, legacyErr
-		}
-		gate.legacy = legacy
 	}
 	return gate, nil
 }

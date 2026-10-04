@@ -104,10 +104,6 @@ func (f *fakeSource) ServiceState(_ context.Context, name string) domain.Service
 	return domain.ServiceState{Name: name, Loaded: true, State: "inactive"}
 }
 
-func (f *fakeSource) ArtifactState(_, name, path string) domain.ArtifactState {
-	return domain.ArtifactState{Name: name, Path: path, Present: true}
-}
-
 func (f *fakeSource) PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState {
 	return f.preparation
 }

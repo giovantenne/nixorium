@@ -13,7 +13,6 @@ type SetupSource interface {
 	LabMeta(ctx context.Context, repository string) (domain.LabMeta, error)
 	GitState(ctx context.Context, repository string) (domain.GitState, error)
 	ControllerApplied(ctx context.Context, repository string) (bool, string)
-	ArtifactState(repository, name, relativePath string) domain.ArtifactState
 	PXEPreparation(ctx context.Context, repository string, meta domain.LabMeta) domain.PXEPreparationState
 	CommandAvailable(name string) bool
 	KeyMaterial(ctx context.Context, repository string) []domain.KeyMaterialState
@@ -237,33 +236,10 @@ func (m SetupManager) status(ctx context.Context, repository string, initial boo
 		preparation = m.source.PXEPreparation(ctx, repository, evaluatedMeta)
 	}
 	if facts.Validation.Complete {
-		artifacts := []domain.ArtifactState{
-			m.source.ArtifactState(repository, "kernel", "result-kernel/bzImage"),
-			m.source.ArtifactState(repository, "initrd", "result-initrd/initrd"),
-			m.source.ArtifactState(repository, "iPXE script", "result-ipxe/netboot.ipxe"),
-			m.source.ArtifactState(repository, "iPXE firmware", "assets/ipxe/snponly.efi"),
-		}
-		if preparation.Ready {
-			artifacts = preparation.Artifacts
-		}
-		missingArtifacts := []string{}
-		for _, artifact := range artifacts {
-			if !artifact.Present {
-				missingArtifacts = append(missingArtifacts, artifact.Name)
-			}
-		}
-		facts.Artifacts.Complete = len(missingArtifacts) == 0
-		if facts.Artifacts.Complete {
-			if preparation.Ready {
-				facts.Artifacts.Detail = preparation.Detail
-			} else {
-				facts.Artifacts.Detail = "all compatibility installation artifacts are present"
-			}
-		} else {
-			facts.Artifacts.Detail = "missing: " + strings.Join(missingArtifacts, ", ")
-			if preparation.Present && preparation.Detail != "" {
-				facts.Artifacts.Detail = preparation.Detail
-			}
+		facts.Artifacts.Complete = preparation.Ready
+		facts.Artifacts.Detail = preparation.Detail
+		if facts.Artifacts.Detail == "" {
+			facts.Artifacts.Detail = "installation artifacts are not prepared"
 		}
 	} else {
 		facts.Artifacts.Detail = "prepare installation artifacts after configuration validation"

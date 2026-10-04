@@ -49,17 +49,6 @@ let
         "''${0##*/}" "''${USER:-root}" "$$" "''${OPERATION_OWNER_STAT[21]}" -1 > "$COORDINATION_LOCK" || true
     fi
     check_usb_reservation
-    LEGACY_LOCK=/home/admin/.local/state/nixorium/operations/deploy.lock
-    if [[ -e "$LEGACY_LOCK" || -L "$LEGACY_LOCK" ]]; then
-      [[ -f "$LEGACY_LOCK" && ! -L "$LEGACY_LOCK" \
-          && "$(stat -c '%U:%G:%a' "$LEGACY_LOCK")" == admin:users:600 ]] \
-        || fail "legacy deployment lock is unsafe; close old Nixorium processes before migration"
-      # Linux flock remains exclusive on a read-only descriptor.
-      # Keep compatibility with services that protect the home as read-only.
-      exec 8<"$LEGACY_LOCK"
-      flock -n 8 \
-        || fail "a legacy Nixorium deployment is still running"
-    fi
   '';
   installSecrets = pkgs.writeShellApplication {
     name = "nixorium-install-secrets";
@@ -250,7 +239,8 @@ let
       as_admin nixorium config validate --repo "$REPOSITORY" --json \
         || fail "deployment configuration validation failed"
       CONTROLLER_READINESS="$(as_admin nix eval "$FLAKE_URL#deploymentStatus" --json --no-write-lock-file \
-        | jq -ce '.controller // {ready: .ready, issues: .issues, requiresKeys: true}')"
+        | jq -ce '.controller')" \
+        || fail "deployment status does not report controller readiness"
       jq -e '.ready == true' <<<"$CONTROLLER_READINESS" >/dev/null \
         || fail "controller readiness must be true before controller apply"
 

@@ -467,9 +467,8 @@ student home reset chooses one of `assets.backgrounds` at random. No blur or
 background polling service is used. Super+arrow window shortcuts remain available.
 
 The login helper enables the three required extensions without replacing other
-enabled extensions. A one-time migration applies only the managed appearance
-keys to existing accounts; staff may then customize them. The separate
-`desktop-dock-v1` migration updates only dock visibility for existing accounts. Student accounts
+enabled extensions. It applies the managed appearance keys once, at an
+account's first login; staff may then customize them. Student accounts
 receive the defaults and a fresh random wallpaper after their ordinary home
 reset; the login helper preserves that wallpaper. All assets and
 extensions come from the locked Nix packages and work without login downloads.

@@ -39,48 +39,42 @@ if [[ -z "${MASTER_IP}" ]]; then
   exit 1
 fi
 
-if [[ -e "${PREPARATION_FILE}" ]]; then
-  [[ -f "${PREPARATION_FILE}" && ! -L "${PREPARATION_FILE}" ]] \
-    || { echo "Error: managed PXE preparation is not a regular file." >&2; exit 1; }
-  [[ "$(stat -c '%U:%G:%a' "${PREPARATION_FILE}")" == admin:users:644 ]] \
-    || { echo "Error: managed PXE preparation has unsafe ownership or permissions." >&2; exit 1; }
-  CURRENT_REVISION=$(git -c safe.directory="${REPO_ROOT}" -C "${REPO_ROOT}" rev-parse HEAD)
-  jq -e \
-    --arg revision "${CURRENT_REVISION}" \
-    --arg iface "${IFACE}" \
-    --arg dhcpIp "${MASTER_IP}" \
-    --argjson cachePort "${LAB_CACHE_PORT}" \
-    --argjson pxeHttpPort "${HTTP_PORT}" \
-    --argjson clientCount "${LAB_CLIENT_COUNT}" \
-    '.schemaVersion == 1 and .revision == $revision and
-     .controller.dhcpIp == $dhcpIp and .network.ifaceName == $iface and
-     .network.cachePort == $cachePort and .network.pxeHttpPort == $pxeHttpPort and
-     (.clients | length) == $clientCount and
-     .artifacts.kernel.relativePath == "bzImage" and
-     .artifacts.initrd.relativePath == "initrd" and
-     .artifacts.ipxeScript.relativePath == "netboot.ipxe" and
-     .artifacts.firmware.relativePath == "snponly.efi"' \
-    "${PREPARATION_FILE}" >/dev/null \
-    || { echo "Error: managed PXE preparation is stale or invalid; run nixorium pxe prepare." >&2; exit 1; }
-  KERNEL_ROOT=$(jq -er '.artifacts.kernel.storePath' "${PREPARATION_FILE}")
-  INITRD_ROOT=$(jq -er '.artifacts.initrd.storePath' "${PREPARATION_FILE}")
-  IPXE_SCRIPT_ROOT=$(jq -er '.artifacts.ipxeScript.storePath' "${PREPARATION_FILE}")
-  FIRMWARE_ROOT=$(jq -er '.artifacts.firmware.storePath' "${PREPARATION_FILE}")
-  for store_path in "${KERNEL_ROOT}" "${INITRD_ROOT}" "${IPXE_SCRIPT_ROOT}" "${FIRMWARE_ROOT}"; do
-    [[ "${store_path}" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ ]] \
-      || { echo "Error: managed PXE preparation contains an invalid store path." >&2; exit 1; }
-  done
-  KERNEL_FILE="${KERNEL_ROOT}/bzImage"
-  INITRD_FILE="${INITRD_ROOT}/initrd"
-  IPXE_SCRIPT_FILE="${IPXE_SCRIPT_ROOT}/netboot.ipxe"
-  FIRMWARE_FILE="${FIRMWARE_ROOT}/snponly.efi"
-else
-  # Advanced compatibility path for deployments prepared with result symlinks.
-  KERNEL_FILE="${REPO_ROOT}/result-kernel/bzImage"
-  INITRD_FILE="${REPO_ROOT}/result-initrd/initrd"
-  IPXE_SCRIPT_FILE="${REPO_ROOT}/result-ipxe/netboot.ipxe"
-  FIRMWARE_FILE="${REPO_ROOT}/assets/ipxe/snponly.efi"
-fi
+[[ -e "${PREPARATION_FILE}" ]] \
+  || { echo "Error: PXE artifacts are not prepared; run nixorium pxe prepare." >&2; exit 1; }
+[[ -f "${PREPARATION_FILE}" && ! -L "${PREPARATION_FILE}" ]] \
+  || { echo "Error: managed PXE preparation is not a regular file." >&2; exit 1; }
+[[ "$(stat -c '%U:%G:%a' "${PREPARATION_FILE}")" == admin:users:644 ]] \
+  || { echo "Error: managed PXE preparation has unsafe ownership or permissions." >&2; exit 1; }
+CURRENT_REVISION=$(git -c safe.directory="${REPO_ROOT}" -C "${REPO_ROOT}" rev-parse HEAD)
+jq -e \
+  --arg revision "${CURRENT_REVISION}" \
+  --arg iface "${IFACE}" \
+  --arg dhcpIp "${MASTER_IP}" \
+  --argjson cachePort "${LAB_CACHE_PORT}" \
+  --argjson pxeHttpPort "${HTTP_PORT}" \
+  --argjson clientCount "${LAB_CLIENT_COUNT}" \
+  '.schemaVersion == 1 and .revision == $revision and
+   .controller.dhcpIp == $dhcpIp and .network.ifaceName == $iface and
+   .network.cachePort == $cachePort and .network.pxeHttpPort == $pxeHttpPort and
+   (.clients | length) == $clientCount and
+   .artifacts.kernel.relativePath == "bzImage" and
+   .artifacts.initrd.relativePath == "initrd" and
+   .artifacts.ipxeScript.relativePath == "netboot.ipxe" and
+   .artifacts.firmware.relativePath == "snponly.efi"' \
+  "${PREPARATION_FILE}" >/dev/null \
+  || { echo "Error: managed PXE preparation is stale or invalid; run nixorium pxe prepare." >&2; exit 1; }
+KERNEL_ROOT=$(jq -er '.artifacts.kernel.storePath' "${PREPARATION_FILE}")
+INITRD_ROOT=$(jq -er '.artifacts.initrd.storePath' "${PREPARATION_FILE}")
+IPXE_SCRIPT_ROOT=$(jq -er '.artifacts.ipxeScript.storePath' "${PREPARATION_FILE}")
+FIRMWARE_ROOT=$(jq -er '.artifacts.firmware.storePath' "${PREPARATION_FILE}")
+for store_path in "${KERNEL_ROOT}" "${INITRD_ROOT}" "${IPXE_SCRIPT_ROOT}" "${FIRMWARE_ROOT}"; do
+  [[ "${store_path}" =~ ^/nix/store/[0-9a-z]{32}-[^/[:space:]]+$ ]] \
+    || { echo "Error: managed PXE preparation contains an invalid store path." >&2; exit 1; }
+done
+KERNEL_FILE="${KERNEL_ROOT}/bzImage"
+INITRD_FILE="${INITRD_ROOT}/initrd"
+IPXE_SCRIPT_FILE="${IPXE_SCRIPT_ROOT}/netboot.ipxe"
+FIRMWARE_FILE="${FIRMWARE_ROOT}/snponly.efi"
 
 for artifact in "${KERNEL_FILE}" "${INITRD_FILE}" "${IPXE_SCRIPT_FILE}" "${FIRMWARE_FILE}"; do
   [[ -f "${artifact}" ]] \
@@ -89,7 +83,7 @@ done
 
 CMDLINE=$(grep '^kernel ' "${IPXE_SCRIPT_FILE}" | sed 's/^kernel [^ ]* //')
 if [[ -z "${CMDLINE}" ]]; then
-  echo "Error: could not extract kernel cmdline from result-ipxe/netboot.ipxe." >&2
+  echo "Error: could not extract kernel cmdline from the prepared iPXE script." >&2
   exit 1
 fi
 

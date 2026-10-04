@@ -160,12 +160,6 @@ func (Local) ServiceState(ctx context.Context, name string) domain.ServiceState 
 	return state
 }
 
-func (Local) ArtifactState(repository, name, relativePath string) domain.ArtifactState {
-	path := filepath.Join(repository, relativePath)
-	_, err := os.Stat(path)
-	return domain.ArtifactState{Name: name, Path: relativePath, Present: err == nil}
-}
-
 func (Local) InterfaceAddresses(name string) ([]string, error) {
 	iface, err := net.InterfaceByName(name)
 	if err != nil {

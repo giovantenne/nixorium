@@ -32,14 +32,8 @@ let
       <path fill="#62a0ea" opacity=".06" d="M1880 2160 3500 0h340v240L2400 2160z"/>
     </svg>
   '';
-  # One source for fresh-account defaults and the targeted, one-time migration.
-  # No dconf locks: staff can adjust these choices after the first login.
-  dockVisibilitySettings = {
-    autohide = "true";
-    dock-fixed = "false";
-    intellihide = "true";
-    intellihide-mode = "'ALL_WINDOWS'";
-  };
+  # Defaults applied once to each account at its first login. No dconf locks:
+  # staff can adjust these choices later.
   appearanceSettings = {
     "org.gnome.desktop.interface" = {
       color-scheme = "'prefer-dark'";
@@ -58,7 +52,11 @@ let
       picture-uri-dark = "'file://${desktopBackground}'";
       picture-options = "'zoom'";
     };
-    "org.gnome.shell.extensions.dash-to-dock" = dockVisibilitySettings // {
+    "org.gnome.shell.extensions.dash-to-dock" = {
+      autohide = "true";
+      dock-fixed = "false";
+      intellihide = "true";
+      intellihide-mode = "'ALL_WINDOWS'";
       dock-position = "'BOTTOM'";
       extend-height = "false";
       dash-max-icon-size = "40";
@@ -84,13 +82,10 @@ let
     ) values)
   ) settings);
   applyStudentAppearance = applySettings studentAppearanceSettings;
-  applyStaffAppearance = applySettings appearanceSettings;
-  applyDockVisibility = applySettings {
-    "org.gnome.shell.extensions.dash-to-dock" = dockVisibilitySettings;
-  };
+  applyStaffAppearance = applySettings (lib.recursiveUpdate appearanceSettings staffDesktopIcons);
   # Staff desktops hold the files Send desktop copies to students, so they
   # show only those files; the trash moves to the dock.
-  applyStaffDesktopIcons = applySettings {
+  staffDesktopIcons = {
     "org.gnome.shell.extensions.ding" = {
       show-home = "false";
       show-trash = "false";
@@ -264,7 +259,7 @@ in
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "dash-to-dock@micxgx.gmail.com"
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "tiling-assistant@leleat-on-github"
         # Managed student preferences are seeded only at the normal boot reset.
-        # Extension enablement and unrelated staff/legacy migrations remain.
+        # Extension enablement remains.
         apply_session_defaults "$APPEARANCE_ROLE" "$FAVORITES"
         gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
       }
@@ -311,11 +306,6 @@ in
       apply_session_defaults() {
         local APPEARANCE_ROLE="$1"
         local FAVORITES="$2"
-        # MoreWaita is no longer installed: move accounts still using it to
-        # the Yaru icons, without touching any other choice.
-        if [ "$(gsettings get org.gnome.desktop.interface icon-theme)" = "'MoreWaita'" ]; then
-          gsettings set org.gnome.desktop.interface icon-theme "'Yaru-yellow'"
-        fi
         if [[ "$APPEARANCE_ROLE" == managed-student ]]; then
           return 0
         fi
@@ -333,18 +323,6 @@ in
           fi
           mkdir -p "$(dirname "$STYLE_STATE")"
           touch "$STYLE_STATE"
-        fi
-        DOCK_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-dock-v1"
-        if [ ! -e "$DOCK_STATE" ]; then
-          ${applyDockVisibility}
-          mkdir -p "$(dirname "$DOCK_STATE")"
-          touch "$DOCK_STATE"
-        fi
-        ICONS_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-icons-v1"
-        if [[ "$APPEARANCE_ROLE" == staff && ! -e "$ICONS_STATE" ]]; then
-          ${applyStaffDesktopIcons}
-          mkdir -p "$(dirname "$ICONS_STATE")"
-          touch "$ICONS_STATE"
         fi
       }
 

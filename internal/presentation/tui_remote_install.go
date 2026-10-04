@@ -819,8 +819,8 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 			}
 			remote.stage = remoteInstallResult
 			model.message = ""
-			// Older workers omit Session on a failed bootstrap. Return to
-			// physical verification directly; do not infer finalization success.
+			// A failed bootstrap leaves the artifacts ready. Return to physical
+			// verification directly; do not infer finalization success.
 			if message.response.State == "artifacts-ready" {
 				remote.stage = remoteInstallConsole
 				remote.formField = 0

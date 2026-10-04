@@ -865,8 +865,8 @@ builtins.mapAttrs (name: value:
 
   nixoriumSearchSoftwarePackages = softwarePackageTools.search;
   nixoriumResolveSoftwarePackage = softwarePackageTools.describe;
-  # Keep controller validation upstream: older site templates validate only
-  # clients in their software hook. Reuse every downstream extension unchanged.
+  # Controller validation stays upstream; the site software hook validates
+  # clients. Reuse every downstream extension unchanged.
   nixoriumValidateControllerSoftwareCandidate = rawSoftware:
     let
       candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko; }

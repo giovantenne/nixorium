@@ -28,7 +28,6 @@ type Source interface {
 	GitState(context.Context, string) (domain.GitState, error)
 	GitRevision(context.Context, string) (string, error)
 	ServiceState(context.Context, string) domain.ServiceState
-	ArtifactState(string, string, string) domain.ArtifactState
 	PXEPreparation(context.Context, string, domain.LabMeta) domain.PXEPreparationState
 	InterfaceAddresses(string) ([]string, error)
 	AddressOwners(string) ([]string, error)
@@ -109,15 +108,7 @@ func (i *Inspector) status(ctx context.Context, repository string, full, evaluat
 	var artifacts []domain.ArtifactState
 	if full {
 		preparation = i.source.PXEPreparation(ctx, root, meta)
-		artifacts = []domain.ArtifactState{
-			i.source.ArtifactState(root, "kernel", "result-kernel/bzImage"),
-			i.source.ArtifactState(root, "initrd", "result-initrd/initrd"),
-			i.source.ArtifactState(root, "iPXE script", "result-ipxe/netboot.ipxe"),
-			i.source.ArtifactState(root, "iPXE firmware", "assets/ipxe/snponly.efi"),
-		}
-		if preparation.Ready {
-			artifacts = preparation.Artifacts
-		}
+		artifacts = preparation.Artifacts
 	}
 	listener := i.source.ServiceState(ctx, PXEListenerUnit)
 	network := i.source.ServiceState(ctx, PXENetworkUnit)

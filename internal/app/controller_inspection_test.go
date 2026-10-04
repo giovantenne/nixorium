@@ -52,7 +52,7 @@ func TestControllerInspectionCannotBypassFreshReadinessOrRevision(t *testing.T) 
 			plan := manager.Plan(t.Context(), "/deployment")
 			switch change {
 			case "readiness":
-				source.deployment.Ready = false
+				source.deployment.Controller = &domain.ControllerReadiness{Issues: []string{"controller is not ready"}}
 			case "revision":
 				source.revision = "fedcba9876543210fedcba9876543210fedcba98"
 			case "dirty":
