@@ -401,11 +401,13 @@ if in_ci_shard profile-dev; then
     .vscodeHomeOwnership and .homeOwnershipOrdering
   ' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "Docker and VS Code added"
 fi
+# Base software (Chromium, the screensaver) stays even in a minimal profile.
 if in_ci_shard profile-minimal; then
   PROFILE_STATE=$(cat "$TEMP_DIR/profile-minimal.json")
   jq -e '
     .desktopExtensions and .desktopExtensionDefaults and .desktopExtensionRepair and
-    ((.chromiumPolicy or .docker or .screensaver or .vscodeHome or .vscodeHomeOwnership) | not) and
+    .chromiumPolicy and .screensaver and
+    ((.docker or .vscodeHome or .vscodeHomeOwnership) | not) and
     .homeOwnershipOrdering
   ' <<<"$PROFILE_STATE" >/dev/null || profile_check_failed "minimal software"
 fi
