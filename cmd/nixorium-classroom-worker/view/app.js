@@ -11,6 +11,8 @@ const viewerDetail = document.getElementById('viewer-detail');
 const viewerImage = document.getElementById('viewer-image');
 const controlButton = document.getElementById('viewer-control');
 const controllingNotice = document.getElementById('viewer-controlling');
+const fullscreenButton = document.getElementById('viewer-fullscreen');
+const viewerPanel = document.getElementById('viewer-panel');
 const cards = new Map();
 let selected = null;
 
@@ -68,7 +70,7 @@ function render(computers) {
     // Without an image the screen area already says why; avoid repeating it.
     entry.state.textContent = computer.state === 'viewing' ? screenAge(computer) : (computer.hasImage ? text : '');
     entry.state.classList.toggle('warning', computer.state !== 'viewing' && computer.state !== 'connecting');
-    if (computer.hasImage && computer.imageAt !== entry.imageAt) {
+    if (computer.hasImage && computer.imageAt !== entry.imageAt && !selected) {
       entry.imageAt = computer.imageAt;
       entry.image.src = '/api/thumbnail?name=' + encodeURIComponent(computer.name) + '&at=' + computer.imageAt;
       entry.image.hidden = false;
@@ -244,10 +246,32 @@ function setControl(on) {
 }
 
 controlButton.addEventListener('click', () => setControl(!controlling));
+
+// Full screen keeps the system keys (Alt+Tab, Super, Esc) for the student's
+// computer; holding Esc leaves it.
+fullscreenButton.addEventListener('click', () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  } else {
+    // A dialog itself cannot be full screen; its content can.
+    viewerPanel.requestFullscreen().catch(() => {});
+  }
+});
+document.addEventListener('fullscreenchange', () => {
+  const full = Boolean(document.fullscreenElement);
+  fullscreenButton.textContent = full ? 'Leave full screen' : 'Full screen';
+  if (full && navigator.keyboard && navigator.keyboard.lock) {
+    navigator.keyboard.lock().catch(() => {});
+  } else if (!full && navigator.keyboard && navigator.keyboard.unlock) {
+    navigator.keyboard.unlock();
+  }
+  viewerImage.focus();
+});
 // While controlling, Escape belongs to the student's computer.
 viewer.addEventListener('cancel', (event) => { if (controlling) event.preventDefault(); });
 document.getElementById('viewer-close').addEventListener('click', () => viewer.close());
 viewer.addEventListener('close', () => {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   setControl(false);
   selected = null;
 });

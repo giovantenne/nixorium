@@ -17,14 +17,17 @@
   <p id="message" class="message" hidden></p>
 </main>
 <dialog id="viewer" aria-label="Computer screen">
+  <div id="viewer-panel">
   <div class="viewer-bar">
     <strong id="viewer-name"></strong>
     <span id="viewer-detail"></span>
     <button type="button" id="viewer-control" class="primary">Take control</button>
+    <button type="button" id="viewer-fullscreen">Full screen</button>
     <button type="button" id="viewer-close">Close</button>
   </div>
-  <p id="viewer-controlling" class="controlling" hidden>You are controlling this computer: mouse and keyboard go to the student's screen. Press Stop control to give it back.</p>
+  <p id="viewer-controlling" class="controlling" hidden>You are controlling this computer: mouse and keyboard go to the student's screen. Press Stop control to give it back. In full screen, hold Esc to leave it.</p>
   <img id="viewer-image" alt="" tabindex="0">
+  </div>
 </dialog>
 </body>
 </html>

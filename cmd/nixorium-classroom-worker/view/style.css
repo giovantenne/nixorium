@@ -30,7 +30,8 @@ main { padding: 1.5rem; }
 .state.warning { color: var(--warning); }
 .message { color: var(--warning); }
 dialog { width: min(96vw, 1600px); max-height: 96vh; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); overflow: hidden; }
-dialog[open] { display: flex; flex-direction: column; }
+dialog[open], #viewer-panel { display: flex; flex-direction: column; min-height: 0; }
+#viewer-panel { flex: 1; background: var(--card); }
 dialog::backdrop { background: rgb(0 0 0 / 0.7); }
 .viewer-bar { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0.9rem; }
 .viewer-bar span { flex: 1; color: var(--muted); }
@@ -38,6 +39,7 @@ dialog::backdrop { background: rgb(0 0 0 / 0.7); }
 #viewer-image { display: block; width: 100%; min-height: 0; flex: 1; max-height: calc(96vh - 6rem); object-fit: contain; background: #000; }
 .viewer-bar button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
 .controlling { margin: 0; padding: 0.45rem 0.9rem; background: var(--warning); color: #000; font-weight: 600; }
-#viewer-image.control { cursor: none; outline: 3px solid var(--warning); outline-offset: -3px; }
+#viewer-image.control { cursor: crosshair; outline: 3px solid var(--warning); outline-offset: -3px; }
 #viewer-image:focus { outline: none; }
+#viewer-panel:fullscreen #viewer-image { max-height: none; }
 #viewer-image.control:focus { outline: 3px solid var(--warning); }
