@@ -376,6 +376,19 @@ the XDG desktop folder of whoever runs Nixorium and send it through the
 classroom service the same way; `desktop apply` prepares the files again
 and requires the token of the review.
 
+**Show my screen** exists only in the page. The browser asks GNOME which
+screen to share and the page refuses a window or a tab. After the review,
+the page draws the screen at up to 1280 pixels and sends a JPEG at most
+five times a second when it changed, and at least every four seconds. The
+classroom service keeps one channel per selected computer and always sends
+it the latest picture (`broadcast.frame`), so a slow computer skips
+pictures; a computer that is off or has nobody signed in is tried again
+every few seconds. The agent shows each picture through the Shell extension
+in a cover above everything, the lock included, with keyboard and mouse
+blocked. **Stop showing**, closing the page, the end of GNOME's sharing,
+ten seconds without pictures at the service or fifteen at the agent end
+the showing (`broadcast.stop`); a lock stays in place.
+
 Capture uses Mutter's own `ScreenCast` and `RemoteDesktop` D-Bus interfaces,
 so no consent dialog appears. It starts only when the controller asks for a
 frame and stops after 30 seconds without requests. While it runs, GNOME shows

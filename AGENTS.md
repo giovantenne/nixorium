@@ -591,7 +591,11 @@ any shard must block publication.
   its own runtime folder and the extension shows them in a second modal
   cover above the lock, accepting only those file names. The showing ends
   with `broadcast.stop`, the end of its connection, or 15 seconds without a
-  picture, and never ends a lock. The
+  picture, and never ends a lock. Only the page starts a showing (no
+  classroom socket operation): it captures the entire screen with the
+  browser's own consent, posts JPEGs to `/api/broadcast/frame`, and the
+  worker keeps one showing at a time, sending each computer only the latest
+  picture and ending after ten silent seconds. The
   "initial consent" rule below applies to Veyon only.
 - Temporary Internet control uses typed `internet plan`/`apply` callbacks,
   client-only evaluated identities, an expiring review and the shared fleet

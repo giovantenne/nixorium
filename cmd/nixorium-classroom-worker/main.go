@@ -59,6 +59,8 @@ func run() error {
 	}
 	// The page's actions go through the same handling as the dashboard.
 	worker.view.actions = worker.handle
+	// Showing the teacher's screen starts only from the page.
+	worker.view.broadcasts = &broadcaster{manager: app.NewBroadcastManager(lockSource{local, adapters.ClassroomAgentConnector{}}), repository: repository, viewOn: worker.viewOn}
 	return adapters.NewClassroomIPCServer(adapters.ClassroomSocketPath, worker.handle).Serve(ctx)
 }
 

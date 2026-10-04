@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"regexp"
@@ -31,7 +32,7 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
-var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/begin": true, "/api/share/chunk": true}
+var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/begin": true, "/api/share/chunk": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
 
 // viewSource lists computers, their images, and forwards input.
 type viewSource interface {
@@ -46,15 +47,17 @@ type viewSource interface {
 // administrator) becomes a browser session; other local users, such as the
 // student account, cannot enter.
 type viewServer struct {
-	source   viewSource
-	actions  classroomHandler
-	pending  map[string]pendingAction
-	labels   map[string]computerLabels
-	mutex    sync.Mutex
-	address  string
-	tokens   map[string]time.Time
-	sessions map[string]time.Time
-	now      func() time.Time
+	source  viewSource
+	actions classroomHandler
+	// broadcasts is nil when the page cannot show the teacher's screen.
+	broadcasts *broadcaster
+	pending    map[string]pendingAction
+	labels     map[string]computerLabels
+	mutex      sync.Mutex
+	address    string
+	tokens     map[string]time.Time
+	sessions   map[string]time.Time
+	now        func() time.Time
 }
 
 func newViewServer(source viewSource) *viewServer {
@@ -102,8 +105,11 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// A page on another site cannot reach this server through DNS tricks,
 	// and only the page's own endpoints accept a POST from this page itself.
 	contentType := "application/json"
-	if request.URL.Path == "/api/share/chunk" {
+	switch request.URL.Path {
+	case "/api/share/chunk":
 		contentType = "application/octet-stream"
+	case "/api/broadcast/frame":
+		contentType = "image/jpeg"
 	}
 	post := request.Method == http.MethodPost && postPaths[request.URL.Path] &&
 		request.Header.Get("Origin") == "http://"+address &&
@@ -139,11 +145,16 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			app.ClassroomComputer
 			Internet string `json:"internet,omitempty"`
 			Power    string `json:"power,omitempty"`
+			Showing  bool   `json:"showing,omitempty"`
+		}
+		showing := map[string]bool{}
+		if server.broadcasts != nil {
+			showing = server.broadcasts.Showing()
 		}
 		list := make([]pageComputer, 0, len(computers))
 		for _, computer := range computers {
 			internet, power := server.labelsFor(computer.Name)
-			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power})
+			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power, Showing: showing[computer.Name]})
 		}
 		header.Set("Content-Type", "application/json")
 		_ = json.NewEncoder(writer).Encode(map[string]any{"computers": list})
@@ -179,6 +190,29 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		}
 		header.Set("Content-Type", "image/jpeg")
 		_, _ = writer.Write(image)
+	case "/api/broadcast/frame", "/api/broadcast/stop":
+		if request.Method != http.MethodPost || server.broadcasts == nil {
+			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)
+			return
+		}
+		id := request.URL.Query().Get("id")
+		if request.URL.Path == "/api/broadcast/stop" {
+			server.broadcasts.Stop(id)
+			writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+		image, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, classroomview.MaxBroadcastBytes))
+		if err != nil || len(image) == 0 {
+			http.Error(writer, "Invalid picture.", http.StatusBadRequest)
+			return
+		}
+		if err := server.broadcasts.Frame(id, image); err != nil {
+			// Gone tells the page that the showing ended (silence, another
+			// showing, or the service restarted).
+			http.Error(writer, err.Error(), http.StatusGone)
+			return
+		}
+		writer.WriteHeader(http.StatusNoContent)
 	case "/api/actions/plan", "/api/actions/apply", "/api/share/begin", "/api/share/chunk":
 		if request.Method != http.MethodPost || server.actions == nil {
 			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)

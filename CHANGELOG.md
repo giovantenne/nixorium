@@ -37,6 +37,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   student's desktop is kept as "name (2)". **Computers → Send desktop**
   (teacher and administrator) and `nixorium desktop plan|apply --on
   <clients|@lab>` send the desktop of whoever runs Nixorium the same way.
+  **Show my screen** (classroom view page only) asks GNOME to share the
+  teacher's entire screen and, after a review, shows it over the whole
+  screen of the selected computers with their keyboard and mouse blocked,
+  above any lock, until **Stop showing**, closing the page, or ten seconds
+  without pictures; computers that sign in meanwhile get it too.
 
 - Veyon no longer crashes when it opens a file dialog (distributing files,
   saving the computer list): Veyon Master and the Configurator now carry the

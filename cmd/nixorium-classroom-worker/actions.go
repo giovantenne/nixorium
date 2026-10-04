@@ -25,6 +25,7 @@ const (
 	actionLock          = "lock"
 	actionUnlock        = "unlock"
 	actionSendDesktop   = "send-desktop"
+	actionShowScreen    = "show-screen"
 	maxActionComputers  = 200
 	// powerLabelTime keeps "Restarting…" on a card while the computer is away.
 	powerLabelTime = 3 * time.Minute
@@ -33,12 +34,13 @@ const (
 type classroomHandler func(context.Context, domain.ClassroomRequest) domain.ClassroomResponse
 
 type pendingAction struct {
-	share    *domain.SharePlan
-	lock     *domain.LockPlan
-	internet *domain.InternetPlan
-	power    *domain.ShutdownPlanReport
-	word     string
-	expires  time.Time
+	broadcast *domain.BroadcastPlan
+	share     *domain.SharePlan
+	lock      *domain.LockPlan
+	internet  *domain.InternetPlan
+	power     *domain.ShutdownPlanReport
+	word      string
+	expires   time.Time
 }
 
 type actionPlanRequest struct {
@@ -75,6 +77,8 @@ type actionResult struct {
 	State   string      `json:"state"`
 	Message string      `json:"message,omitempty"`
 	Rows    []actionRow `json:"rows"`
+	// Broadcast identifies a started showing of the teacher's screen.
+	Broadcast string `json:"broadcast,omitempty"`
 }
 
 // computerLabels are short card labels from the latest actions.
@@ -182,6 +186,12 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			break
 		}
 		review, pending = lockReview(*response.LockPlan)
+	case actionShowScreen:
+		if server.broadcasts == nil {
+			http.Error(writer, "Not available.", http.StatusBadRequest)
+			return
+		}
+		review, pending = broadcastReview(server.broadcasts.Plan(ctx, operation.Requested))
 	case actionSendDesktop:
 		operation.Operation = domain.ClassroomSharePlanOperation
 		operation.ShareTransfer = body.Transfer
@@ -242,6 +252,28 @@ func internetReview(plan domain.InternetPlan) (actionReview, pendingAction) {
 		review.Confirm = verb + plural(eligible, "computer")
 	}
 	return review, pendingAction{internet: &plan, expires: plan.ExpiresAt}
+}
+
+func broadcastReview(plan domain.BroadcastPlan) (actionReview, pendingAction) {
+	review := actionReview{Title: "Show my screen", Message: plan.Message, Rows: []actionRow{}}
+	eligible := 0
+	for _, target := range plan.Targets {
+		row := actionRow{Name: target.Name, Note: target.Detail}
+		if target.Eligible {
+			eligible++
+		} else {
+			row.Note += " It gets your screen when someone signs in."
+		}
+		review.Rows = append(review.Rows, row)
+	}
+	for _, issue := range plan.Issues {
+		review.Warnings = append(review.Warnings, issue.Message)
+	}
+	review.Ready = !plan.HasErrors() && eligible > 0
+	if review.Ready {
+		review.Confirm = "Show my screen on " + plural(eligible, "computer")
+	}
+	return review, pendingAction{broadcast: &plan, expires: plan.ExpiresAt}
 }
 
 func shareReview(plan domain.SharePlan) (actionReview, pendingAction) {
@@ -374,6 +406,16 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 	}
 	result := actionResult{Rows: []actionRow{}}
 	switch {
+	case pending.broadcast != nil:
+		id, err := server.broadcasts.Start(ctx, *pending.broadcast)
+		if err != nil {
+			result.State, result.Message = "failed", err.Error()
+			break
+		}
+		result.State, result.Message, result.Broadcast = "started", "Your screen is being shown.", id
+		for _, target := range pending.broadcast.Targets {
+			result.Rows = append(result.Rows, actionRow{Name: target.Name})
+		}
 	case pending.share != nil:
 		operation.Operation = domain.ClassroomShareApplyOperation
 		operation.SharePlan = pending.share

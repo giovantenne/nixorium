@@ -43,7 +43,7 @@ function updateSelection() {
   selectedCount.textContent = chosen.size === 0 ? 'None selected' : chosen.size + ' selected';
   selectAll.checked = chosen.size > 0 && chosen.size === cards.size;
   selectAll.indeterminate = chosen.size > 0 && chosen.size < cards.size;
-  for (const button of toolbarButtons) button.disabled = chosen.size === 0;
+  for (const button of toolbarButtons) button.disabled = chosen.size === 0 && !(button.dataset.action === 'show-screen' && casting);
 }
 
 selectAll.addEventListener('change', () => {
@@ -116,6 +116,7 @@ function render(computers) {
       entry.placeholder.textContent = text;
     }
     const labels = [];
+    if (computer.showing) labels.push('Showing your screen');
     if (computer.locked) labels.push('Locked');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
@@ -229,6 +230,7 @@ actionConfirm.addEventListener('click', async () => {
   actionMessage.textContent = 'Working…';
   try {
     const result = await postJSON('/api/actions/apply', { id, word: actionWordInput.value });
+    if (result.broadcast) startCasting(result.broadcast);
     actionMessage.textContent = result.message || (result.state === 'completed' ? 'Done.' : '');
     showRows(actionRows, result.rows);
     showText(actionWarnings, []);
@@ -245,7 +247,14 @@ actionConfirm.addEventListener('click', async () => {
   actionCancel.focus();
 });
 actionCancel.addEventListener('click', () => actionDialog.close());
-actionDialog.addEventListener('close', () => { actionID = ''; });
+actionDialog.addEventListener('close', () => {
+  actionID = '';
+  // A screen chosen for a showing that was not confirmed is released.
+  if (pendingStream && !casting) {
+    pendingStream.getTracks().forEach((track) => track.stop());
+    pendingStream = null;
+  }
+});
 
 // Send desktop: the teacher picks a folder (the desktop first); its files and
 // folders are prepared on the controller, then reviewed and sent like any
@@ -341,8 +350,104 @@ async function sendDesktop(computers) {
   runAction('send-desktop', computers, transfer);
 }
 
+// Show my screen: GNOME asks which screen to share (the whole screen is
+// required); after the review the page sends a picture whenever it changes,
+// at most five a second, and one every few seconds to keep the showing on.
+let pendingStream = null;
+let casting = null;
+
+async function showMyScreen(computers) {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { displaySurface: 'monitor', frameRate: { ideal: 5, max: 5 } },
+      audio: false,
+      monitorTypeSurfaces: 'include',
+      selfBrowserSurface: 'exclude',
+      surfaceSwitching: 'exclude',
+    });
+  } catch (error) {
+    return;
+  }
+  const surface = stream.getVideoTracks()[0].getSettings().displaySurface;
+  if (surface && surface !== 'monitor') {
+    stream.getTracks().forEach((track) => track.stop());
+    showProgress('Show my screen', 'Choose your entire screen, not a window or a tab.');
+    return;
+  }
+  pendingStream = stream;
+  runAction('show-screen', computers);
+}
+
+async function startCasting(id) {
+  const stream = pendingStream;
+  pendingStream = null;
+  if (!stream) return;
+  const video = document.createElement('video');
+  video.muted = true;
+  video.srcObject = stream;
+  await video.play().catch(() => {});
+  const canvas = document.createElement('canvas');
+  let lastDigest = '';
+  let lastSent = 0;
+  casting = { id, stream, timer: 0 };
+  stream.getVideoTracks()[0].addEventListener('ended', () => stopCasting());
+  updateCasting();
+  const tick = async () => {
+    if (!casting || casting.id !== id) return;
+    if (video.videoWidth > 0) {
+      const width = Math.min(1280, video.videoWidth);
+      canvas.width = width;
+      canvas.height = Math.round(video.videoHeight * width / video.videoWidth);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+      if (blob) {
+        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).join(',');
+        if (digest !== lastDigest || Date.now() - lastSent > 4000) {
+          const response = await fetch('/api/broadcast/frame?id=' + encodeURIComponent(id), {
+            method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
+          }).catch(() => null);
+          if (response && response.status === 410) {
+            stopCasting();
+            return;
+          }
+          lastDigest = digest;
+          lastSent = Date.now();
+        }
+      }
+    }
+    if (casting && casting.id === id) casting.timer = setTimeout(tick, 200);
+  };
+  tick();
+}
+
+function stopCasting() {
+  if (!casting) return;
+  const { id, stream, timer } = casting;
+  casting = null;
+  clearTimeout(timer);
+  stream.getTracks().forEach((track) => track.stop());
+  fetch('/api/broadcast/stop?id=' + encodeURIComponent(id), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', keepalive: true,
+  }).catch(() => {});
+  updateCasting();
+}
+
+function updateCasting() {
+  for (const button of document.querySelectorAll('[data-action="show-screen"]')) {
+    button.textContent = casting ? 'Stop showing' : 'Show my screen';
+    button.classList.toggle('primary', Boolean(casting));
+  }
+  updateSelection();
+}
+
+window.addEventListener('pagehide', () => stopCasting());
+
 function startAction(action, computers) {
-  if (action === 'send-desktop') sendDesktop(computers); else runAction(action, computers);
+  if (action === 'send-desktop') sendDesktop(computers);
+  else if (action === 'show-screen' && casting) stopCasting();
+  else if (action === 'show-screen') showMyScreen(computers);
+  else runAction(action, computers);
 }
 
 for (const button of toolbarButtons) {
