@@ -27,9 +27,6 @@ type receiver struct {
 	file    *os.File
 }
 
-// errFiles is what the teacher sees when a sending is refused.
-var errFiles = errors.New("the files could not be received")
-
 func newReceiver(home string, entries []classroomview.FileEntry) (*receiver, error) {
 	if err := classroomview.ValidateFileEntries(entries); err != nil {
 		return nil, err
