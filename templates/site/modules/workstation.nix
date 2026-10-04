@@ -14,6 +14,7 @@ let
     mkdir -p "$SCHEMA_DIR"
     cp ${dashToDock}/share/gnome-shell/extensions/${dashToDock.extensionUuid}/schemas/*.xml "$SCHEMA_DIR/"
     cp ${tilingAssistant}/share/gnome-shell/extensions/${tilingAssistant.extensionUuid}/schemas/*.xml "$SCHEMA_DIR/"
+    cp ${desktopIcons}/share/gnome-shell/extensions/${desktopIcons.extensionUuid}/schemas/*.xml "$SCHEMA_DIR/"
   '';
   desktopBackground = pkgs.writeText "nixorium-desktop.svg" ''
     <svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">
@@ -86,6 +87,17 @@ let
   applyStaffAppearance = applySettings appearanceSettings;
   applyDockVisibility = applySettings {
     "org.gnome.shell.extensions.dash-to-dock" = dockVisibilitySettings;
+  };
+  # Staff desktops hold the files Send desktop copies to students, so they
+  # show only those files; the trash moves to the dock.
+  applyStaffDesktopIcons = applySettings {
+    "org.gnome.shell.extensions.ding" = {
+      show-home = "false";
+      show-trash = "false";
+    };
+    "org.gnome.shell.extensions.dash-to-dock" = {
+      show-trash = "true";
+    };
   };
   gvariantList = values: "['${builtins.concatStringsSep "', '" values}']";
   studentFavorites = lib.optionals hasGhostty [ "com.mitchellh.ghostty.desktop" ]
@@ -284,6 +296,12 @@ in
           ${applyDockVisibility}
           mkdir -p "$(dirname "$DOCK_STATE")"
           touch "$DOCK_STATE"
+        fi
+        ICONS_STATE="''${XDG_CONFIG_HOME:-$HOME/.config}/nixorium/desktop-icons-v1"
+        if [[ "$APPEARANCE_ROLE" == staff && ! -e "$ICONS_STATE" ]]; then
+          ${applyStaffDesktopIcons}
+          mkdir -p "$(dirname "$ICONS_STATE")"
+          touch "$ICONS_STATE"
         fi
       }
 

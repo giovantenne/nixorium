@@ -68,6 +68,8 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = false
   test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-style-v1"
   test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-dock-v1"
+  test ! -e "$XDG_CONFIG_HOME/nixorium/desktop-icons-v1"
+  test "$(gsettings get org.gnome.shell.extensions.ding show-home)" = true
   # The same opt-in script must retain the ordinary staff migration.
   apply_session_defaults staff "['org.gnome.TextEditor.desktop']"
   test "$(gsettings get org.gnome.shell favorite-apps)" = "['org.gnome.TextEditor.desktop']"
@@ -76,6 +78,14 @@ pkgs.runCommand "nixorium-desktop-profile-check" {
   test "$(gsettings get org.gnome.shell.extensions.dash-to-dock autohide)" = true
   test -e "$XDG_CONFIG_HOME/nixorium/desktop-style-v1"
   test -e "$XDG_CONFIG_HOME/nixorium/desktop-dock-v1"
+  # Staff desktops show only their files; the trash is in the dock, once.
+  test "$(gsettings get org.gnome.shell.extensions.ding show-home)" = false
+  test "$(gsettings get org.gnome.shell.extensions.ding show-trash)" = false
+  test "$(gsettings get org.gnome.shell.extensions.dash-to-dock show-trash)" = true
+  test -e "$XDG_CONFIG_HOME/nixorium/desktop-icons-v1"
+  gsettings set org.gnome.shell.extensions.ding show-home true
+  apply_session_defaults staff "['org.gnome.TextEditor.desktop']"
+  test "$(gsettings get org.gnome.shell.extensions.ding show-home)" = true
   ${pkgs.lib.concatMapStringsSep "\n" (extension: ''
     jq -e --arg version '${pkgs.lib.versions.major pkgs.gnome-shell.version}' \
       '."shell-version" | index($version) != null' \
