@@ -223,9 +223,9 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, taskHelp(installationAreaTasks)...)
 		lines = append(lines, "r  Reattach the recorded USB operation when available")
 	case dashboardUSBInstall:
-		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.", "Use r for status, n for reconciliation, b for reviewed reboot, c to close without reboot, and v for post-boot verification when visible.")
+		lines = append(lines, "Tab or arrows move through console fields; the password is masked and cleared after use.", "Esc before apply requests confirmed cleanup. After apply, Esc detaches and never retries Disko.", "Use r to refresh, n to check an interrupted installation, b to review a reboot, c to close without reboot, and v to check the installed system.")
 		lines = append(lines, "While the installer job runs the view refreshes by itself with read-only status requests. d shows the raw result fields.")
-		lines = append(lines, "Artifacts-ready means the live session is not verified. Use a to connect with fresh physical key confirmation, or x to cancel safely, when visible.", "A failed connection's original error remains visible across status refreshes in this TUI session.")
+		lines = append(lines, "Installation files may be ready before the USB-booted computer is connected. Use a to connect and verify its fingerprint, or x to cancel safely.", "A failed connection's original error remains visible across status refreshes in this TUI session.")
 	case dashboardAdministration:
 		lines = append(lines, taskHelp(administrationTasks)...)
 	case dashboardHosts:
@@ -275,10 +275,10 @@ func (model dashboardModel) helpView() string {
 			"Choose Desktop, Dock, VSCode or Browser, then a supported field.",
 			"Inherit keeps the deployment baseline; Clear means an explicit empty list.",
 			"In a list: Space toggles, i inherits, c clears; Shift arrows reorder favorites.",
-			"Extensions: / searches every packaged extension of the pinned package set, not only the catalog.",
+			"Extensions: / searches all extensions available in this laboratory’s package versions.",
 			"Dependencies of searched extensions are checked when the system is built.",
 			"m downloads one Marketplace extension (publisher.name) into the controller's store and shows it before adding;",
-			"u checks pinned Marketplace extensions for newer versions the pinned VS Code accepts. The controller needs Internet for both.",
+			"u looks for Marketplace extension updates compatible with your VS Code version. Both actions need Internet.",
 			"Enter keeps a field in the draft; Esc cancels that field edit.",
 			"Other settings: a adds a name and value, e edits, d removes, p takes a pasted settings file.",
 			"Guided fields, update settings and settings that can start programs cannot be added there.",
@@ -331,7 +331,7 @@ func (model dashboardModel) helpView() string {
 			"Unavailable sections are not healthy results. Detailed logs are not included.")
 	case dashboardSoftware:
 		lines = append(lines, "F2 selected   F3 package search   F4 suggestions   Tab next view", "p add a deployment-owned profile   / search",
-			"Selected software: Enter opens details; c changes where it applies, x reviews its removal.", "Profile packages: Space include/exclude   Enter choose scope and review", "A profile adds missing declarations together; existing package scopes are preserved.")
+			"Configured software: Enter opens details; from there, c changes its computers and x reviews removal.", "Profile packages: Space include/exclude   Enter choose computers and review", "A profile adds a group of packages; existing packages keep their destinations.")
 		lines = append(lines, "After saving: Enter takes the displayed next step; Esc leaves it for later. Client deployment always has its own review and confirmation.")
 	default:
 		lines = append(lines, "Follow the contextual controls and review before applying.", "Text fields keep their normal typing keys; F1 opens help.")

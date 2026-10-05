@@ -64,7 +64,7 @@ func TestInstallationInterfaceFieldEditsClientOverride(t *testing.T) {
 	settings := wizardSettings()
 	settings.Lab.ControllerInterfaceName = "enp8s0"
 	model := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
-	view := model.View().Content
+	view := demoANSI.ReplaceAllString(model.View().Content, "")
 	if !strings.Contains(view, "Client computers' network interface") || !strings.Contains(view, "Controller network interface: enp8s0") {
 		t.Fatalf("interface roles are unclear: %s", view)
 	}

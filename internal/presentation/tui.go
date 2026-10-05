@@ -1749,7 +1749,7 @@ func (model dashboardModel) updateView() string {
 			tuiResult(failureTitle, false, model.isDark),
 			"",
 			failureDetail,
-			"No candidate can be selected and no file changed.",
+			"No update can be selected until this check succeeds. No files changed.",
 		)
 		notices := []tuiNotice{}
 		if model.message != "" {
@@ -2568,7 +2568,7 @@ func (model dashboardModel) pxeView() string {
 	lines := []string{
 		tuiTitle(title, model.isDark),
 		fmt.Sprintf("Installation mode:  %s", tuiStatus(model.report.PXE.Mode, pxeStatusKind(model.report.PXE.Mode), model.isDark)),
-		fmt.Sprintf("Prepared artifacts: %s", preparation),
+		fmt.Sprintf("Installation files: %s", preparation),
 		fmt.Sprintf("Interface:          %s", model.report.Meta.Network.Interface),
 		fmt.Sprintf("Service address:    %s", model.report.Meta.Controller.DHCPIP),
 	}
@@ -2808,7 +2808,7 @@ func (model dashboardModel) operationProgressView(operation domain.OperationProg
 		"starting":  "Starting",
 		"validate":  "Validating configuration",
 		"network":   "Checking network and cache",
-		"artifacts": "Building netboot artifacts",
+		"artifacts": "Building the network installer",
 		"clients":   "Building client systems",
 		"publish":   "Publishing preparation",
 		"complete":  "Complete",

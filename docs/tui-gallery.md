@@ -208,20 +208,19 @@ Nixorium  /  Software
 
 Software
 
-[F2] Selected   [F3] Search packages   [F4] Suggestions
-Choose desired configuration: applications and their computers.
+[F2] Configured   [F3] Search packages   [F4] Suggestions
 
 Find an application
-Search the pinned package set; choose a result, then its computers.
+Choose a package, then its computers; review before saving.
 
-› Package name  inkscape_
+› Package name: inkscape_
 
-› Inkscape
-    Create and edit vector graphics · inkscape · 1.4.2
+› Inkscape · 1.4.2
+    Create and edit vector graphics
 
-To apply saved changes to clients: Computers → Update computers.
+v checks installed state. Client changes: Computers → Update computers.
 
-Type Search  ·  ↑/↓ Results  ·  Enter Choose scope  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
+Type Search  ·  ↑/↓ Results  ·  Enter Choose computers  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
 ```
 
 ## Additive software profile review
@@ -230,22 +229,22 @@ Type Search  ·  ↑/↓ Results  ·  Enter Choose scope  ·  Tab Change view  �
 Nixorium  /  Software  /  Profile review
 
 Add Essential?
-One local change adds every missing declaration shown below.
+Save adds missing packages and keeps existing choices.
 
 Destination  this controller and all current or future clients
-Packages     4 add · 0 keep scope · 1 excluded
-Clients      5 affected by new declarations
+Packages     4 add · 0 already configured · 1 excluded
+Clients      5 included in the added packages
 
-✓ Validated together against the pinned package set
+✓ Selected packages passed the configuration checks
 › + chromium · add for this controller and all current or future clients
   + ghostty · add for this controller and all current or future clients
   + nodejs · add for this controller and all current or future clients
   + python3Packages.terminaltexteffects · add for this controller and all current or future clients
 
-Now          Save one update to lab-software.json
-Later        Apply to the controller and update affected computers through their normal reviews
+Now          Save and rebuild pc99 (this controller)
+Later        Review and update the affected client computers
 
-↑/↓ Inspect  ·  Enter Add profile  ·  Esc Scope  ·  F1 Help
+↑/↓ Inspect  ·  Enter Add profile  ·  Esc Computers  ·  F1 Help
 ```
 
 ## Contextual client deployment selection
@@ -736,7 +735,7 @@ Diagnostics
   Inspect the local cache service before retrying deployment.
 
 NOTICE
-! Cancelled; nothing was changed by this read.
+! Loading cancelled. Nothing was changed.
 
 e Support report  ·  ↑/↓ Select  ·  Enter Evidence  ·  r Check again  ·  Esc Maintenance  ·  F1 Help
 ```
@@ -793,7 +792,7 @@ Nixorium  /  Maintenance  /  Reset template
 Reset deployment template
 Replace local customizations. Keep settings, keys and exact input pins.
 
-Pinned upstream: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Configured Nixorium version: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 Replace software with: Essential (shared: controller and clients)
 Packages: chromium, ghostty, libreoffice
 Discard current custom software, home preferences, assets and modules listed below.

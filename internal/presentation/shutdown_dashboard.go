@@ -252,7 +252,7 @@ func (model shutdownModel) view(screen dashboardScreen, hosts []domain.HostMeta,
 	if context.busy != "" {
 		shell.body = context.busyView
 		if model.applying {
-			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Power requests are being dispatched", detail: "Closing is disabled until the reviewed operation returns."}}
+			shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: "Sending power commands to the selected computers", detail: "Closing is disabled until the reviewed operation returns."}}
 		}
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return shell

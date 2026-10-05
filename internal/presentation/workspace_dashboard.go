@@ -42,7 +42,7 @@ func (model dashboardModel) startWorkspaceRead(initial bool) (tea.Model, tea.Cmd
 	id := model.workspace.requestID
 	candidate := model.workspace.candidate
 	model.message = ""
-	model.busy = "Reviewing student preferences, pinned dependencies and destinations"
+	model.busy = "Checking student preferences, required software and affected computers"
 	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg {
 		var report domain.WorkspacePlanReport
 		if initial {
@@ -178,7 +178,7 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 				ids = append(ids, id)
 			}
 			if len(ids) == 0 {
-				model.message = "No Marketplace extensions are pinned in this draft."
+				model.message = "No Marketplace extensions have been added to these draft settings."
 				return model, nil
 			}
 			slices.Sort(ids)
@@ -206,11 +206,11 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 		case "enter":
 			if model.workspace.plan.State == "unchanged" {
 				model.workspace.stage = workspaceOverview
-				model.message = "The declaration is unchanged; no save was requested."
+				model.message = "The settings are unchanged; nothing needed saving."
 				return model, nil
 			}
 			if model.workspace.plan.HasErrors() || model.workspace.plan.State != "ready" || model.workspace.plan.Confirmation != "SAVE" || model.workspace.plan.ReviewToken == "" || model.workspace.confirmation != "SAVE" {
-				model.message = "Type SAVE to confirm this declaration-only change."
+				model.message = "Type SAVE to save these settings. Computers are updated separately."
 				return model, nil
 			}
 			model.workspace.saving = true
@@ -362,7 +362,7 @@ func (model dashboardModel) workspaceView() string {
 			fixed = "Save and record only the profile JSON; no system apply or reset.\nType SAVE: " + w.confirmation + "_"
 			label := "Save JSON"
 			if w.plan.State == "unchanged" {
-				fixed = "Declaration unchanged; live home state is not inferred."
+				fixed = "Settings unchanged. Student home folders have not been checked."
 				label = "Back"
 			}
 			actions = []tuiAction{{key: "↑/↓", label: "Scroll"}, {key: "Enter", label: label}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}

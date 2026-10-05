@@ -28,7 +28,7 @@ var workspaceFields = []workspaceField{
 	{"Dock", "Extend to screen edge", []string{"desktop", "dock", "extendHeight"}, "boolean", nil},
 	{"Dock", "Show trash", []string{"desktop", "dock", "showTrash"}, "boolean", nil},
 	{"Dock", "Show mounts", []string{"desktop", "dock", "showMounts"}, "boolean", nil},
-	{"VSCode", "Pinned VS Code extensions", []string{"vscode", "extensions"}, "extensions", nil},
+	{"VSCode", "VS Code extensions", []string{"vscode", "extensions"}, "extensions", nil},
 	{"VSCode", "Font size (8–40)", []string{"vscode", "settings", "editor.fontSize"}, "number", nil},
 	{"VSCode", "Tab size (1–8)", []string{"vscode", "settings", "editor.tabSize"}, "number", nil},
 	{"VSCode", "Insert spaces", []string{"vscode", "settings", "editor.insertSpaces"}, "boolean", nil},

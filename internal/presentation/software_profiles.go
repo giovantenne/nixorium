@@ -178,7 +178,7 @@ func (model softwareModel) profileActions(_ softwareViewContext) []tuiAction {
 	case softwareProfiles:
 		return []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Choose packages"}, {key: "Esc", label: "Catalog"}, {key: "F1", label: "Help"}}
 	case softwareProfilePackages:
-		return []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Include/exclude"}, {key: "Enter", label: "Choose scope"}, {key: "Esc", label: "Profiles"}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Include/exclude"}, {key: "Enter", label: "Choose computers"}, {key: "Esc", label: "Profiles"}, {key: "F1", label: "Help"}}
 	case softwareProfileScope:
 		actions := []tuiAction{{key: "↑/↓", label: "Select"}}
 		options := model.scopeOptions()
@@ -187,7 +187,7 @@ func (model softwareModel) profileActions(_ softwareViewContext) []tuiAction {
 		}
 		return append(actions, tuiAction{key: "Enter", label: "Review"}, tuiAction{key: "Esc", label: "Packages"}, tuiAction{key: "F1", label: "Help"})
 	case softwareProfileReview:
-		return []tuiAction{{key: "↑/↓", label: "Inspect"}, {key: "Enter", label: "Add profile"}, {key: "Esc", label: "Scope"}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "↑/↓", label: "Inspect"}, {key: "Enter", label: "Add profile"}, {key: "Esc", label: "Computers"}, {key: "F1", label: "Help"}}
 	default:
 		return nil
 	}
@@ -198,8 +198,8 @@ func (model softwareModel) profilesView(context softwareViewContext) []string {
 	lines := []string{
 		tuiTitle("Add a software profile", context.dark),
 		"",
-		"Profiles add missing package declarations as one reviewed change.",
-		tuiMuted("Existing packages keep their current scope. Profiles never remove software.", context.dark),
+		"A profile is a group of packages you can add together.",
+		tuiMuted("Packages already configured keep their destinations. Nothing is removed.", context.dark),
 		"",
 	}
 	capacity := max(1, (context.height-len(lines)-9)/2)
@@ -257,7 +257,7 @@ func (model softwareModel) profileScopeView(context softwareViewContext) []strin
 	lines := []string{
 		tuiTitle("Add "+preset.Label, context.dark),
 		"Choose one destination for every missing package in this profile.",
-		tuiMuted("Packages already configured keep their current scope.", context.dark),
+		tuiMuted("Packages already configured keep their destinations.", context.dark),
 		"",
 	}
 	options := model.scopeOptions()
@@ -301,13 +301,13 @@ func (model softwareModel) profileReviewView(context softwareViewContext) []stri
 	rows := model.profileReviewRows()
 	lines := []string{
 		tuiTitle("Add "+plan.Preset.Label+"?", context.dark),
-		"One local change adds every missing declaration shown below.",
+		"Save adds missing packages and keeps existing choices.",
 		"",
 		"Destination  " + softwareScopeLabel(plan.Request.Scope),
-		fmt.Sprintf("Packages     %d add · %d keep scope · %d excluded", len(plan.Additions), len(plan.Existing), len(plan.Request.Exclude)),
-		fmt.Sprintf("Clients      %d affected by new declarations", len(plan.AffectedClients)),
+		fmt.Sprintf("Packages     %d add · %d already configured · %d excluded", len(plan.Additions), len(plan.Existing), len(plan.Request.Exclude)),
+		fmt.Sprintf("Clients      %d included in the added packages", len(plan.AffectedClients)),
 		"",
-		tuiStatus("Validated together against the pinned package set", tuiStatusSuccess, context.dark),
+		tuiStatus("Selected packages passed the configuration checks", tuiStatusSuccess, context.dark),
 	}
 	capacity := max(1, context.height-len(lines)-12)
 	start, end := listWindow(len(rows), model.profileReviewCursor, capacity)
@@ -319,12 +319,14 @@ func (model softwareModel) profileReviewView(context softwareViewContext) []stri
 	} else if start > 0 || end < len(rows) {
 		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d reviewed packages", displayedLineStart(start, len(rows)), end, len(rows)), context.dark))
 	}
-	lines = append(lines, "", "Now          Save one update to "+plan.ManagedFile, "Later        Apply to the controller and update affected computers through their normal reviews")
-	if plan.AffectedController == "" {
-		lines[len(lines)-1] = "Later        Update affected computers through a fresh review"
+	now := "Now          Save these software choices"
+	if plan.AffectedController != "" {
+		now = "Now          Save and rebuild " + plan.AffectedController + " (this controller)"
 	}
+	later := "Later        Review and update the affected client computers"
 	if len(plan.AffectedClients) == 0 {
-		lines[len(lines)-1] = "Later        No computer update required"
+		later = "Later        No client update required"
 	}
+	lines = append(lines, "", now, later)
 	return lines
 }

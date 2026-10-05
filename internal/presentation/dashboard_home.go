@@ -26,7 +26,7 @@ func (task dashboardTask) FilterValue() string { return task.title + " " + task.
 var dashboardTasks = []dashboardTask{
 	{id: "computers", shortcut: "c", title: "Computers", description: "Inventory, updating computers, Internet access and power"},
 	{id: "installation", shortcut: "n", title: "Installation", description: "Configure the lab and install computers by PXE or the official USB ISO over SSH"},
-	{id: "software", shortcut: "w", title: "Software", description: "Review configured choices or search this lab's pinned packages"},
+	{id: "software", shortcut: "w", title: "Software", description: "Manage configured software or find packages to add"},
 	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
 }
 

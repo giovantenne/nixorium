@@ -165,7 +165,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Selected software") || !strings.Contains(model.View().Content, "desired configuration") {
+	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Configured software") || !strings.Contains(model.View().Content, "not a live list") {
 		t.Fatalf("software catalog missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
@@ -178,7 +178,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftware || model.software.stage != softwareScope || !strings.Contains(model.View().Content, "This is not the set of computers deployed today") {
+	if model.screen != dashboardSoftware || model.software.stage != softwareScope || !strings.Contains(model.View().Content, "Choose which computers should receive this package") {
 		t.Fatalf("software scope missing:\n%s", model.View().Content)
 	}
 	// Choose "All clients", after the two controller scopes.
@@ -194,7 +194,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Validated against the pinned package set", "Destination", "Clients", "Update lab-software.json locally", "Update computers to install"} {
+	for _, expected := range []string{"Package checked against this laboratory’s software versions", "Destination", "Clients", "Save these software choices", "Update computers to install"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
@@ -256,7 +256,7 @@ func TestDashboardSearchesPinnedPackagesAndIgnoresStaleResults(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if searches != 1 || model.software.searchBusy || !strings.Contains(model.View().Content, "hello") || !strings.Contains(model.View().Content, "2.12") || !strings.Contains(model.View().Content, "blocked-unfree") {
+	if searches != 1 || model.software.searchBusy || !strings.Contains(model.View().Content, "hello") || !strings.Contains(model.View().Content, "2.12") || !strings.Contains(model.View().Content, "license settings") {
 		t.Fatalf("search result missing:\n%s", model.View().Content)
 	}
 
@@ -295,7 +295,7 @@ func TestDashboardExplainsBlockedSearchResultBeforeScope(t *testing.T) {
 	}
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if command != nil || model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "licensing policy") {
+	if command != nil || model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "license settings") {
 		t.Fatalf("blocked package was not explained:\n%s", model.View().Content)
 	}
 }
@@ -341,7 +341,7 @@ func TestDashboardSoftwareResultDistinguishesNoChangeAndUncertainSave(t *testing
 	model := dashboardModel{screen: dashboardSoftware, width: 100, height: 30, software: softwareModel{stage: softwareResult}}
 	model.software.result = domain.SoftwareChangeApplyReport{State: "unchanged", Message: "GIMP already has the requested declaration."}
 	view := model.View().Content
-	if !strings.Contains(view, "already current") || !strings.Contains(view, "No file changed") || strings.Contains(view, "declaration saved") {
+	if !strings.Contains(view, "already saved") || !strings.Contains(view, "No file changed") || strings.Contains(view, "declaration saved") {
 		t.Fatalf("unchanged software result is misleading:\n%s", view)
 	}
 
@@ -930,7 +930,7 @@ func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	view = model.View().Content
-	if model.screen != dashboardPXE || !strings.Contains(view, "Prepared artifacts: ready") || !strings.Contains(view, "Next: start network installation") {
+	if model.screen != dashboardPXE || !strings.Contains(view, "Installation files: ready") || !strings.Contains(view, "Next: start network installation") {
 		t.Fatalf("PXE screen is incomplete:\n%s", view)
 	}
 }
@@ -1034,7 +1034,7 @@ func TestDashboardReviewsAndRunsAllClientDeployment(t *testing.T) {
 	}
 	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
-	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
+	if quitCommand != nil || !strings.Contains(model.message, "Wait for the result") {
 		t.Fatal("dashboard allowed quit while deployment was running")
 	}
 	updated, command = model.Update(command())
@@ -1333,7 +1333,7 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
-	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
+	if quitCommand != nil || !strings.Contains(model.message, "Wait for the result") {
 		t.Fatal("dashboard allowed quit while update apply was running")
 	}
 	updated, command = model.Update(command())
@@ -1421,7 +1421,7 @@ func TestNixoriumUpdateDiscoveryFailureHasNoEditableFallback(t *testing.T) {
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	if !strings.Contains(view, "Updates could not be fetched") || !strings.Contains(view, "No candidate can be selected") || strings.Contains(view, "Target: >") {
+	if !strings.Contains(view, "Updates could not be fetched") || !strings.Contains(view, "No update can be selected") || strings.Contains(view, "Target: >") {
 		t.Fatalf("failed discovery exposed an unsafe fallback:\n%s", view)
 	}
 	updated, planCommand := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -1632,7 +1632,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	if command == nil || model.busy == "" {
 		t.Fatalf("settings plan did not start: %+v", model)
 	}
-	if !strings.Contains(model.View().Content, "Validating the complete settings candidate") {
+	if !strings.Contains(model.View().Content, "Checking that the proposed settings") {
 		t.Fatalf("settings editor could not render while validation starts:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(command())
@@ -1647,7 +1647,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	}
 	updated, quitCommand := model.Update(tea.KeyPressMsg{Text: "q"})
 	model = updated.(dashboardModel)
-	if quitCommand != nil || !strings.Contains(model.message, "wait for its result") {
+	if quitCommand != nil || !strings.Contains(model.message, "Wait for the result") {
 		t.Fatal("dashboard allowed quit while settings apply was running")
 	}
 	updated, _ = model.Update(command())

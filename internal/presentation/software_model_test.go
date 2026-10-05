@@ -60,10 +60,10 @@ func TestSoftwareModelRendersItsOwnWorkflowStage(t *testing.T) {
 	if strings.Join(shell.path, "/") != "Software/Review" {
 		t.Fatalf("path = %#v", shell.path)
 	}
-	if !strings.Contains(shell.body, "Validated against the pinned package set") {
+	if !strings.Contains(shell.body, "Package checked against this laboratory’s software versions") {
 		t.Fatalf("review body = %q", shell.body)
 	}
-	if len(shell.actions) < 2 || shell.actions[0].label != "Save" || shell.actions[1].label != "Scope" {
+	if len(shell.actions) < 2 || shell.actions[0].label != "Save" || shell.actions[1].label != "Computers" {
 		t.Fatalf("review actions = %#v", shell.actions)
 	}
 }
@@ -116,4 +116,37 @@ func keyPress(value string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	}
 	return tea.KeyPressMsg{Text: value}
+}
+
+// Catalog loading is a read, not an action needing a success/warning notice.
+// Failures must still reach the operator instead of looking like an empty list.
+func TestSoftwareCatalogReadShowsOnlyFailuresAsNotices(t *testing.T) {
+	m := softwareModel{}
+	_, result := m.loadCatalog(domain.SoftwareCatalogReport{
+		State: "ready", Message: "Supported software was resolved from the pinned package set.",
+	})
+	if !result.accepted || result.message != "" {
+		t.Fatalf("successful read produced a notice: %+v", result)
+	}
+	failure := domain.SoftwareCatalogReport{State: "failed", Message: "Cannot load the software configuration.",
+		Issues: []domain.ValidationIssue{{Field: "source", Message: "Unavailable"}},
+	}
+	_, result = m.loadCatalog(failure)
+	if !result.accepted || result.message != failure.Message {
+		t.Fatalf("read failure was hidden: %+v", result)
+	}
+}
+
+func TestConfiguredPackageEnterOpensDetailsWithoutRequestingAChange(t *testing.T) {
+	m := softwareModel{mode: softwareConfigured, catalog: domain.SoftwareCatalogReport{
+		Packages: []domain.SoftwareDeclaration{{Package: "ghostty", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}},
+	}}
+	m, intent := m.update(keyPress("enter"))
+	if m.stage != softwareDetails || m.selected != "ghostty" || intent.kind != softwareNoIntent {
+		t.Fatalf("opening details requested a change: stage=%v intent=%+v", m.stage, intent)
+	}
+	body := strings.Join(m.detailsView(softwareViewContext{}), "\n")
+	if strings.Contains(body, "Managed package from") || !strings.Contains(body, "Review removing") || !strings.Contains(body, "all current or future clients") {
+		t.Fatalf("details do not explain destinations/actions: %s", body)
+	}
 }

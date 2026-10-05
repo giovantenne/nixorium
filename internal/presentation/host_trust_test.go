@@ -42,7 +42,7 @@ func TestHostTrustReadCancellationIgnoresLateResult(t *testing.T) {
 	}
 	updated, _ = model.Update(late)
 	model = updated.(dashboardModel)
-	if model.screen != dashboardHosts || model.busy != "" || !strings.Contains(model.message, "nothing was changed") {
+	if model.screen != dashboardHosts || model.busy != "" || !strings.Contains(model.message, "Nothing was changed") {
 		t.Fatal("late reply resumed cancelled action")
 	}
 }
@@ -94,7 +94,7 @@ func TestHostTrustTUIRequiresConfirmationAndProtectsMutation(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	model = updated.(dashboardModel)
-	if strings.Contains(model.message, "nothing was changed") {
+	if strings.Contains(model.message, "Nothing was changed") {
 		t.Fatal("successful write described as cancelled")
 	}
 }

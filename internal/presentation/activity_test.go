@@ -33,7 +33,7 @@ func TestReadActivityCancelsContextAndIgnoresLateReplies(t *testing.T) {
 	}
 	updated, next := model.Update(keyPress("esc"))
 	model = updated.(dashboardModel)
-	if next != nil || ctx.Err() != context.Canceled || model.busy != "" || !strings.Contains(model.message, "Cancelled") {
+	if next != nil || ctx.Err() != context.Canceled || model.busy != "" || !strings.Contains(model.message, "Loading cancelled") {
 		t.Fatalf("read was not cancelled: %+v", model.read)
 	}
 	select {
@@ -57,7 +57,7 @@ func TestReadTimeoutDoesNotPublishASuccessOrStartFollowUp(t *testing.T) {
 	})
 	updated, followUp := opened.(dashboardModel).Update(command())
 	model = updated.(dashboardModel)
-	if followUp != nil || model.screen != dashboardSettingsEdit || model.busy != "" || !strings.Contains(model.message, "timed out") || !strings.Contains(model.message, "Retry") {
+	if followUp != nil || model.screen != dashboardSettingsEdit || model.busy != "" || !strings.Contains(model.message, "took too long") || !strings.Contains(model.message, "Reopen") {
 		t.Fatalf("timeout did not fail closed: screen=%d message=%s", model.screen, model.message)
 	}
 }
@@ -76,7 +76,7 @@ func TestReadActivityReturnsToOriginAndShowsUnavailableKeys(t *testing.T) {
 	updated, next := model.Update(keyPress("x"))
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, want := range []string{"Elapsed:", "Read-only", "Esc", "A read is running"} {
+	for _, want := range []string{"Elapsed:", "Read-only", "Esc", "Loading information"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("missing %q: %s", want, view)
 		}

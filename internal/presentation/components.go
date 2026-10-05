@@ -322,11 +322,20 @@ func tuiNoticeText(value string, kind tuiStatusKind, dark bool) string {
 
 // A focused input stays recognizable in monochrome through its prompt marker.
 func tuiInputField(label, value string, focused, dark bool) string {
-	text := tuiSection(label, dark) + "  " + value
-	if focused {
-		return tuiSelectionMarker(true, dark) + tuiFocusStyle(dark).Render(label+"  "+value)
+	text := tuiFieldValue(value, dark)
+	if label != "" {
+		text = tuiMuted(label+":", dark) + " " + text
 	}
-	return "  " + text
+	return tuiSelectionMarker(focused, dark) + text
+}
+
+// Labels stay neutral; values use the same accent as the input cursor.
+func tuiFieldValue(value string, dark bool) string {
+	return lipgloss.NewStyle().Foreground(newTUITheme(dark).accent).Render(value)
+}
+
+func tuiFieldDetail(label, value string, dark bool) string {
+	return tuiMuted(label+":", dark) + " " + tuiFieldValue(value, dark)
 }
 
 func tuiStepHeading(step, total int, title string, dark bool) string {

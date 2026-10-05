@@ -16,7 +16,7 @@ func TestGalleryRenderingIsDeterministicAndSemantic(t *testing.T) {
 	for _, expected := range []string{
 		"[F3] Search packages",
 		"Profile review",
-		"4 add · 0 keep scope · 1 excluded",
+		"4 add · 0 already configured · 1 excluded",
 		"Opened from a saved software change",
 		"Deployment completed and verified",
 		"Type START to continue",

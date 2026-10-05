@@ -101,7 +101,7 @@ func (model dashboardModel) remoteInstallView() string {
 		consoleTitle := "Keep the PC's screen visible"
 		consoleDetail := "The controller only reads the PC's fingerprint; no password is sent yet. You compare it on the next step."
 		if remote.recovery {
-			consoleTitle = "Restore access only to reconcile the reserved operation"
+			consoleTitle = "Restore the connection to check the interrupted installation"
 			consoleDetail = "Re-enter the original live address. The controller will compare its observed key with the reserved identity before any password is sent."
 		}
 		lines = append(lines, "",
@@ -336,13 +336,13 @@ func (model dashboardModel) remoteInstallDetailLines() []string {
 		lines = append(lines, "Operation log:       "+response.Session.LogID)
 	}
 	if response.Session != nil && response.Session.DispatchUncertain {
-		lines = append(lines, "Dispatch is uncertain: do not repeat apply; reconcile the same operation ID.")
+		lines = append(lines, "The installation command may have started. Do not start it again; check the existing operation.")
 	}
 	if response.State == "ready-to-reboot" {
 		lines = append(lines, "", "Remove the USB stick (or make the disk boot first) before restarting.")
 	}
 	if response.State == "reconciliation-required" {
-		lines = append(lines, "", "Do not start another installation. Refresh this operation until its remote receipt is known.")
+		lines = append(lines, "", "Do not start another installation. Refresh this operation until its result can be confirmed.")
 	}
 	return lines
 }
@@ -369,7 +369,7 @@ func (model dashboardModel) remoteInstallResultActions() []tuiAction {
 		actions = append(actions, tuiAction{key: "v", label: label})
 	}
 	if state == "reconciliation-required" {
-		actions = append(actions, tuiAction{key: "n", label: "Reconcile remote receipt"}, tuiAction{key: "a", label: "Restore live recovery access"})
+		actions = append(actions, tuiAction{key: "n", label: "Check interrupted installation"}, tuiAction{key: "a", label: "Restore live recovery access"})
 	}
 	if remoteInstallSafelyCancellable(response) {
 		actions = append(actions, tuiAction{key: "x", label: "Cancel safely"})
@@ -599,7 +599,7 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			return model.remoteInstallCommand("verify", domain.RemoteInstallRequest{Operation: domain.RemoteInstallVerifyOperation, OperationID: remote.operationID})
 		case "n":
 			if remote.response.State == "reconciliation-required" {
-				model.busy = "Reconciling the recorded operation with the remote receipt"
+				model.busy = "Checking how far the interrupted installation reached"
 				return model.remoteInstallCommand("reconcile", domain.RemoteInstallRequest{Operation: domain.RemoteInstallReconcileOperation, OperationID: remote.operationID})
 			}
 		case "a":
@@ -841,7 +841,7 @@ func (model dashboardModel) handleRemoteInstallMessage(message dashboardRemoteIn
 	case "bootstrap":
 		if message.response.State == "recovery-attached" {
 			remote.recovery = false
-			model.busy = "Reconciling the reserved operation without replaying apply"
+			model.busy = "Checking the existing installation without starting it again"
 			return model.remoteInstallCommand("reconcile", domain.RemoteInstallRequest{Operation: domain.RemoteInstallReconcileOperation, OperationID: remote.operationID})
 		}
 		remote.stage = remoteInstallBootstrap

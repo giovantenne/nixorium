@@ -189,7 +189,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case overviewRefreshMsg:
 		model.busy = ""
 		if message.err != nil {
-			model.message = "Local refresh failed; previous observations retained."
+			model.message = "Controller information could not be refreshed. The previous results are still shown."
 			return model, nil
 		}
 		message.report.PXEPreparation = model.report.PXEPreparation
@@ -198,7 +198,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.usbReserved = message.usbReserved
 		model.observeSetupController(message.setup)
 		model.observeRecoveryController(message.recovery)
-		model.message = "Local observations refreshed; clients were not checked."
+		model.message = "Controller information refreshed. Client computers were not checked."
 		return model, nil
 	case dashboardDoctorMsg:
 		model.busy = ""
@@ -795,7 +795,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settings.editor = settingsWizardModel{}
 		model.settings.plan = message.report
 		if message.report.HasErrors() {
-			model.message = "Candidate validation failed: " + settingsIssueMessage(message.report.Issues)
+			model.message = "The proposed settings did not pass validation: " + settingsIssueMessage(message.report.Issues)
 			if model.settings.returnScreen == dashboardSetup || model.installation.flow {
 				title := "Nixorium — First setup / Laboratory settings"
 				if model.installation.flow {
@@ -1183,7 +1183,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			}
 			fallthrough
 		default:
-			model.message = "A read is running. Press Esc to cancel, or F1 for help."
+			model.message = "Loading information. Press Esc to cancel, or F1 for help."
 			return model, nil
 		}
 	}
@@ -1243,7 +1243,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	if (key.String() == "ctrl+c" || key.String() == "q") && ((model.busy != "" && !model.hasCancellableRead() && !model.installation.pxePreparing) || model.hostTrust.applying || model.deployment.applying || model.controller.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
-		model.message = "A mutating operation is running; wait for its result before closing Nixorium."
+		model.message = "Changes are being applied. Wait for the result before closing Nixorium."
 		return model, nil
 	}
 	exitKey := key.String() == "ctrl+c" || (key.String() == "q" && !model.textEntry())

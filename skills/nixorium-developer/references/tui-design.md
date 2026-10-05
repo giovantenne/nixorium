@@ -54,6 +54,17 @@ verified success, amber for attention, and red for failure or danger. A selected
 Status must retain a symbol and textual label for monochrome or limited-color
 terminals.
 
+Text inputs keep the terminal background. Distinguish neutral field labels from
+accent-colored values, and keep a cursor/focus marker for monochrome terminals.
+Examples belong in help text, never inside an empty editable value.
+
+Use operator language in routine views: configured software, target computers,
+installation files, checking an interrupted installation. Keep package pins,
+review tokens, remote receipts and similar internals in technical details.
+Successful background reads should populate the view without a warning notice.
+Explain saved choices separately from observed installation state, and name
+what Enter will do before the user presses it.
+
 Avoid decorative borders, badges, and colors that do not improve hierarchy.
 Review both light and dark backgrounds and ASCII, ANSI, and ANSI-256 output.
 

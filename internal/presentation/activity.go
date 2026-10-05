@@ -86,7 +86,7 @@ func (model dashboardModel) finishRead(message activityResultMsg) (tea.Model, te
 	if message.err != nil {
 		model = model.cancelActivity()
 		if errors.Is(message.err, context.DeadlineExceeded) {
-			model.message = "The read timed out; nothing was changed by this read. Retry this view, or check Diagnostics if it happens again."
+			model.message = "Loading took too long. Nothing was changed. Reopen this view, or use Maintenance → Diagnostics if it happens again."
 		}
 		return model, nil
 	}
@@ -127,7 +127,7 @@ func (model dashboardModel) cancelActivity() dashboardModel {
 	if model.screen != dashboardSettingsEdit && model.screen != dashboardSettingsPasswords {
 		model.installation.flow, model.installation.failed = false, false
 	}
-	model.message = "Cancelled; nothing was changed by this read."
+	model.message = "Loading cancelled. Nothing was changed."
 	return model
 }
 

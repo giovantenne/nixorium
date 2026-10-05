@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Use plain input fields and distinct label/value colors; explain configured
+  software and simplify routine TUI messages, keeping technical detail separate.
+
 - Guide the first administrator launch through an operational disclaimer and
   separate optional telemetry choice; skipping consent repeats it next launch.
 - Explain unconfigured clients and software actions, improve PXE/USB instructions

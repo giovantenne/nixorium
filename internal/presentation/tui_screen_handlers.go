@@ -242,7 +242,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.software = model.software.open()
 			model.controller.plan = domain.ControllerRebuildPlanReport{}
 			model.controller.result = domain.ControllerRebuildExecutionReport{}
-			model.busy = "Loading supported software from pinned inputs"
+			model.busy = "Loading this laboratory’s software choices"
 			model.message = ""
 			if model.actions.LoadSoftware == nil {
 				model.busy = ""
@@ -379,7 +379,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 				return model, nil
 			}
 			model.screen = dashboardPXE
-			model.busy = "Preparing netboot artifacts and client closures"
+			model.busy = "Building the network installer and client systems"
 			model.installation.pxePreparing = true
 			model.installation.pxeProgress = domain.OperationProgress{}
 			model.installation.pxeStarted = time.Now().UTC()
@@ -577,7 +577,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 					return dashboardSettingsPasswordMsg{candidate: command.candidate, err: err}
 				})
 			}
-			model.busy = "Validating the complete settings candidate through Nix"
+			model.busy = "Checking that the proposed settings can build a valid system"
 			model.message = ""
 			candidate := model.settings.candidate
 			return model.startRead(func(ctx context.Context) tea.Msg {
@@ -1240,7 +1240,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 				return model, nil
 			}
 			model.updates.target = target
-			model.busy = "Starting candidate validation"
+			model.busy = "Checking the proposed update"
 			model.message = ""
 			allowPrerelease := selected.Channel == domain.UpdateChannelPrerelease
 			if model.actions.PlanUpdateWithProgress != nil {

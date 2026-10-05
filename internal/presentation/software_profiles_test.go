@@ -87,7 +87,7 @@ func TestSoftwareProfileModelBuildsOneTypedReview(t *testing.T) {
 	}
 	model, planned := model.finishProfilePlan(plan)
 	view := strings.Join(model.profileReviewView(softwareViewContext{width: 80, height: 24}), "\n")
-	for _, expected := range []string{"3 add", "1 keep scope", "1 excluded", "already present; keep pc01", "Validated together"} {
+	for _, expected := range []string{"3 add", "1 already configured", "1 excluded", "already present; keep pc01", "Selected packages passed"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("profile review omits %q:\n%s", expected, view)
 		}

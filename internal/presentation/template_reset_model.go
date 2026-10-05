@@ -58,7 +58,7 @@ func (model dashboardModel) openTemplateReset() (tea.Model, tea.Cmd) {
 	ctx, activityID := model.beginRead(dashboardReadTimeout)
 	model.templateReset = templateResetModel{requestID: id, cancel: model.read.cancel, stage: "select"}
 	model.screen, model.pageScroll, model.message = dashboardTemplateReset, 0, ""
-	model.busy = "Reading the exact pinned upstream template; no files changed"
+	model.busy = "Reading the template for your configured Nixorium version"
 	load := model.actions.LoadTemplateReset
 	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg { return templateResetCatalogMsg{id, load(ctx)} })
 }
@@ -86,7 +86,7 @@ func (model dashboardModel) startTemplateResetPlan() (tea.Model, tea.Cmd) {
 	m.cancel, m.stage, m.confirmation, m.scroll = model.read.cancel, "planning", "", 0
 	m.events = make(chan tea.Msg, 8)
 	id, events, preset, action := m.requestID, m.events, m.catalog.Catalog.Presets[m.cursor].ID, model.actions.PlanTemplateReset
-	model.busy, model.message = "Preparing an isolated template reset candidate", ""
+	model.busy, model.message = "Preparing a preview of the template reset", ""
 	return model, func() tea.Msg {
 		go func() {
 			defer close(events)
@@ -226,7 +226,7 @@ func (model dashboardModel) templateResetViewport() int { return max(3, model.he
 func (model dashboardModel) templateResetLines() []string {
 	p := model.templateReset.plan
 	lines := []string{
-		"Pinned upstream: " + p.UpstreamRevision,
+		"Configured Nixorium version: " + p.UpstreamRevision,
 		"Replace software with: " + p.Preset.Label + " (shared: controller and clients)",
 		"Packages: " + strings.Join(p.Preset.Packages, ", "),
 		"Discard current custom software, home preferences, assets and modules listed below.",
@@ -240,7 +240,7 @@ func (model dashboardModel) templateResetLines() []string {
 		lines = append(lines, check.ID+": "+check.Message)
 	}
 	if len(p.PreviousSoftware) != 0 {
-		lines = append(lines, "", "Current software declarations to replace (including their scopes):")
+		lines = append(lines, "", "Configured packages and destinations that will be replaced:")
 		for _, declaration := range p.PreviousSoftware {
 			lines = append(lines, "  "+declaration.Package+" · "+softwareScopeLabel(declaration.Scope))
 		}
@@ -291,7 +291,7 @@ func (model dashboardModel) templateResetView() string {
 		}
 		actions = model.saveFollowupActions("Maintenance")
 	case m.catalog.Error != "" || len(m.catalog.Catalog.Presets) == 0:
-		lines = append(lines, "The pinned template catalog could not be loaded. No file was changed.")
+		lines = append(lines, "The template for your Nixorium version could not be loaded. No file changed.")
 		actions = append([]tuiAction{{key: "r", label: "Retry"}}, actions...)
 	default:
 		lines = append(lines, "Upstream: "+m.catalog.UpstreamRevision, "", "Choose the replacement software preset:")

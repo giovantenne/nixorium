@@ -139,7 +139,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 			{
 				name:     "configured",
 				model:    dashboardModel{screen: dashboardSoftware, software: softwareModel{catalog: catalog}},
-				expected: []string{"Software", "Selected", "Details", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
+				expected: []string{"Software", "Configured", "View details", "Tab", "Change view", "/", "Search", "Esc", "Overview", "F1", "Help"},
 			},
 			{
 				name: "search input",
@@ -165,7 +165,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						clients:      map[string]bool{"pc03": true},
 					},
 				},
-				expected: []string{"Software  /  Scope", "pc03", "Space", "Toggle", "Enter", "Review", "Esc", "Catalog", "Help"},
+				expected: []string{"Software  /  Computers", "pc03", "Space", "Toggle", "Enter", "Review", "Esc", "Catalog", "Help"},
 			},
 			{
 				name: "review",
@@ -180,7 +180,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						},
 					},
 				},
-				expected: []string{"Software  /  Review", "Validated against the pinned package set", "Enter", "Save", "Esc", "Scope", "Help"},
+				expected: []string{"Software  /  Review", "Package checked against this laboratory’s software versions", "Enter", "Save", "Esc", "Computers", "Help"},
 			},
 			{
 				name: "partial result",
@@ -231,11 +231,11 @@ func TestConfiguredSoftwareViewportKeepsFocusedItemVisible(t *testing.T) {
 		for index := range catalog.Packages {
 			model.software.cursor = index
 			view := model.View().Content
-			label := fmt.Sprintf("%-20s", fmt.Sprintf("Package %02d", index+1))
+			label := fmt.Sprintf("Package %02d", index+1)
 			if !strings.Contains(view, tuiSelection(label, true, true)) {
 				t.Fatalf("focused software %d hidden at %dx%d:\n%s", index+1, size[0], size[1], view)
 			}
-			if !strings.Contains(view, "software selections") || !strings.Contains(view, "Enter") || !strings.Contains(view, "Details") {
+			if !strings.Contains(view, "software selections") || !strings.Contains(view, "Enter") || !strings.Contains(view, "View details") {
 				t.Fatalf("software viewport context or actions hidden at %dx%d:\n%s", size[0], size[1], view)
 			}
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

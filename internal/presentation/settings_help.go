@@ -11,7 +11,7 @@ type settingHelp struct{ description, example string }
 
 var settingsHelp = map[string]settingHelp{
 	"lab.controllerIfaceName": {"Network device on this controller; empty uses the shared fallback.", "enp1s0"},
-	"lab.clientIfaceName":     {"Device name on the client computers; empty uses the shared fallback.", "enp1s0"},
+	"lab.clientIfaceName":     {"Network device used to connect client computers to the laboratory.", "enp1s0"},
 	"lab.ifaceName":           {"Device used when no controller, client or host override is set.", "enp1s0"},
 	"lab.masterDhcpIp":        {"Controller address assigned by the site's DHCP, used during installation.", "192.168.1.20"},
 	"lab.networkBase":         {"Static lab network; must not contain the controller DHCP address.", "10.0.0.0"},
@@ -80,7 +80,7 @@ func (model settingsWizardModel) networkPreview() []string {
 	if err != nil {
 		return []string{"Address preview unavailable until network and host number are valid."}
 	}
-	lines := []string{"Controller static address: " + controller}
+	lines := []string{tuiFieldDetail("Controller static address", controller, model.isDark)}
 	if candidate.Lab.PCCount > 0 {
 		lab := candidate.Lab
 		lab.MasterHostNumber = 1
@@ -88,7 +88,7 @@ func (model settingsWizardModel) networkPreview() []string {
 		lab.MasterHostNumber = lab.PCCount
 		last, e2 := domain.ControllerStaticAddress(lab)
 		if e1 == nil && e2 == nil {
-			lines = append(lines, fmt.Sprintf("Client addresses: %s – %s", first, last))
+			lines = append(lines, tuiFieldDetail("Client addresses", fmt.Sprintf("%s – %s", first, last), model.isDark))
 		}
 	}
 	for _, issue := range candidate.Validate() {

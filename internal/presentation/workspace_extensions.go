@@ -77,7 +77,7 @@ func (model dashboardModel) startWorkspaceSearch() (tea.Model, tea.Cmd) {
 	model.workspace.cancel = model.read.cancel
 	id := model.workspace.requestID
 	model.message = ""
-	model.busy = "Searching editor extensions in the pinned package set"
+	model.busy = "Searching extensions available for this laboratory"
 	search := model.actions.SearchSoftware
 	return model, boundedReadCommand(ctx, activityID, func(ctx context.Context) tea.Msg {
 		return dashboardWorkspaceSearchMsg{id: id, query: query, report: search(ctx, workspaceExtensionPrefix+query)}
@@ -182,7 +182,7 @@ func (model *workspaceModel) confirmMarketplace(key tea.KeyPressMsg) string {
 			}
 		}
 		model.pending = nil
-		message := id + " selected with its Marketplace pin; press Enter to keep the draft."
+		message := id + " selected at this exact version; press Enter to keep it in the draft."
 		if len(missing) != 0 {
 			message += " Also select what it depends on: " + strings.Join(missing, ", ") + "."
 		}
@@ -199,7 +199,7 @@ func (w workspaceModel) marketplaceView(width int) []string {
 		workspaceShort(c.Entry.ID()+"  "+*c.Entry.Version+"  "+c.DisplayName, width),
 		workspaceShort(c.Description, width),
 		"",
-		"Editor requirement: " + safeWorkspaceText(c.Engine) + " · pinned VS Code " + safeWorkspaceText(c.EditorVersion),
+		"Editor requirement: " + safeWorkspaceText(c.Engine) + " · configured VS Code " + safeWorkspaceText(c.EditorVersion),
 	}
 	if c.Entry.Platform != nil {
 		lines = append(lines, "Package for: "+*c.Entry.Platform)
@@ -210,7 +210,7 @@ func (w workspaceModel) marketplaceView(width int) []string {
 	if len(c.Pack) != 0 {
 		lines = append(lines, workspaceShort("Recommends (pack): "+strings.Join(c.Pack, ", "), width))
 	}
-	lines = append(lines, "", "Third-party code, pinned by hash, runs as the student. Nixorium has not tested it.")
+	lines = append(lines, "", "This exact extension version will run as the student. It is third-party code, not tested by Nixorium.")
 	if c.Native {
 		lines = append(lines, "Contains native programs that are not adapted to NixOS: they often fail to start.")
 	}
@@ -248,7 +248,7 @@ func (model dashboardModel) finishWorkspaceSearch(message dashboardWorkspaceSear
 	}
 	w.searching, w.query = false, ""
 	if len(found) == 0 {
-		model.message = fmt.Sprintf("No packaged extension matches %q in the pinned package set.", message.query)
+		model.message = fmt.Sprintf("No extension matching %q is available in this laboratory’s package versions.", message.query)
 		return model, nil
 	}
 	w.choice = slices.Index(w.choices, found[0])

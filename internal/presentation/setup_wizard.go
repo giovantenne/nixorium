@@ -383,12 +383,12 @@ func (model settingsWizardModel) View() tea.View {
 		tuiStepHeading(model.index+1, len(model.fields), field.group, model.isDark),
 		"", tuiSection(field.label, model.isDark), "",
 	}
-	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-4)).Render(info.description+"\nExample: "+info.example))
+	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-4)).Render(tuiMuted(info.description, model.isDark)+"\n"+tuiFieldDetail("Example", info.example, model.isDark)))
 	lines = append(lines, model.networkPreview()...)
 	if field.group == "Network" {
-		lines = append(lines, "Controller network interface: "+model.settings.Lab.ControllerInterface())
+		lines = append(lines, tuiFieldDetail("Controller network interface", model.settings.Lab.ControllerInterface(), model.isDark))
 		if field.id == "lab.clientIfaceName" {
-			lines = append(lines, "Proposed: the controller's card (client PCs are often the same model).", "Empty uses the shared fallback: "+model.settings.Lab.InterfaceName)
+			lines = append(lines, tuiMuted("Use the same device name only if the client hardware matches.", model.isDark), tuiFieldDetail("If left empty", model.settings.Lab.InterfaceName+" (shared fallback)", model.isDark))
 		}
 	}
 	if strings.Contains(model.title, "First setup") || strings.Contains(model.title, "first-run") {
@@ -401,7 +401,7 @@ func (model settingsWizardModel) View() tea.View {
 		if model.custom {
 			lines = append(lines, "", "Custom value; it will be validated before continuing.")
 		}
-		lines = append(lines, "", tuiInputField("Value", model.drafts[model.index]+"█", true, model.isDark))
+		lines = append(lines, "", tuiInputField("", model.drafts[model.index]+"█", true, model.isDark))
 	}
 	if model.err != "" {
 		lines = append(lines, "", tuiError("Invalid: "+model.err, model.isDark))
