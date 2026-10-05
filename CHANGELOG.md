@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Organize the project README around administrators and teachers, with the
+  administrator menu and the classroom grid shown in their respective sections.
+
 ## [3.0.0] - 2026-10-05
 
 The first stable release of the 3.x line includes the classroom controls and

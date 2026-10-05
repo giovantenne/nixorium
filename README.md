@@ -41,22 +41,14 @@ Nixorium bridges that gap with a local-first workflow:
   software and the student desktop.
 - Everyday tasks run from a guided menu on the controller.
 
-## Features
+## For administrators
 
-**For teachers**
+**One configuration for the whole room.** On the controller, sign in as
+`admin` and open **Nixorium** from the dock, or run `nixorium` in a terminal.
+The guided menu groups everyday tasks into **Computers**, **Installation**,
+**Software** and **Maintenance**.
 
-- **A clean desktop at every boot.** Every student PC starts with the same
-  GNOME desktop and applications. The last five sessions stay on that PC as
-  snapshots, so a lost file can be recovered from **Snapshots** in the Files
-  sidebar.
-- **Classroom view.** On the controller, see every student screen at once,
-  open one in its own window and take control, lock screens, share your own
-  screen, and send a file or folder to the students' desktops.
-- **A classroom dashboard.** On the controller, see which PCs are on, pause or
-  restore Internet on selected PCs, and shut them down or restart them. The
-  dashboard cannot change the lab.
-
-**For technicians**
+![The Nixorium administrator menu, with the Computers, Installation, Software and Maintenance areas](docs/images/nixorium-tui.png)
 
 - **One description, every PC.** Add software or change the student desktop
   once, then update one PC, a group or the whole room. Every change is
@@ -75,6 +67,30 @@ Nixorium bridges that gap with a local-first workflow:
 
 Under the hood: NixOS builds every PC from the same description, Colmena
 deploys it, Harmonia serves the cache and Disko lays out the disks.
+
+[Administrator guide](templates/site/README.md) · [Menu tour](docs/tui-gallery.md)
+
+## For teachers
+
+**Every PC ready for the lesson.** Sign in to the controller with your teacher
+account and open **Classroom view** from the dock to see the student computers
+together. Open **Nixorium** for the restricted classroom dashboard.
+
+![Classroom view on the controller, showing a grid of twelve student computers with screen previews and classroom controls](docs/images/nixorium-classroom-view.webp)
+
+- **A clean desktop at every boot.** Every student PC starts with the same
+  GNOME desktop and applications. The last five sessions stay on that PC as
+  snapshots, so a lost file can be recovered from **Snapshots** in the Files
+  sidebar.
+- **Help students from your desk.** See every student screen at once, open
+  one in its own window and take control, lock screens, share your own screen,
+  and send a file or folder to the students' desktops.
+- **Control the room.** See which PCs are on, pause or restore Internet on
+  selected PCs, and shut them down or restart them. Teacher controls do not
+  change the laboratory configuration.
+
+[Teacher overview](https://nixorium.org/teachers/) ·
+[Classroom dashboard tour](docs/tui-gallery.md#restricted-teacher-dashboard)
 
 ## Project status
 
@@ -138,23 +154,6 @@ trial on virtual machines, follow the
    session, a reboot and an update from **Computers → Update computers**. Make
    the first backup from **Maintenance → Back up the controller** and keep it
    away from the controller. Then install the other PCs.
-
-## Using Nixorium
-
-![The Nixorium administrator menu, with the Computers, Installation, Software and Maintenance areas](docs/images/nixorium-tui.png)
-
-On the controller, sign in as `admin` and open **Nixorium** from the dock, or
-run `nixorium` in a terminal. The administrator menu has four areas:
-
-| Area | What it is for |
-|---|---|
-| **Computers** | Inventory, updating computers, temporary Internet access and power controls |
-| **Installation** | Laboratory settings, network boot and USB over SSH |
-| **Software** | Packages and where they apply (every PC, the controller, all clients, a group or single PCs), search, suggestions and profiles |
-| **Maintenance** | Settings and the student workspace, diagnostics, updates, logs, the controller backup and advanced tools |
-
-Teachers sign in to the controller with their own account and open the
-restricted classroom dashboard from the same **Nixorium** icon.
 
 ## Security
 
