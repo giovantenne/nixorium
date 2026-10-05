@@ -283,10 +283,20 @@ fi
 export XDG_CACHE_HOME="$BOOTSTRAP_CACHE"
 CURRENT_STEP="fixing the exact versions of the lab configuration"
 ui_log "[2/3] Fixing the exact versions of the lab configuration..."
+# Start from the nixpkgs revision this release was validated with, not the
+# newest commit of its channel. The lock still declares the channel, so later
+# package-base updates move it forward through the reviewed workflow.
+PACKAGE_BASE_REVISION="$(nix --extra-experimental-features "nix-command flakes" \
+  eval --raw "${UPSTREAM_REF}#lib.packageBase.referenceRevision")"
+if [[ ! "$PACKAGE_BASE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Error: the release does not name a validated nixpkgs revision." >&2
+  exit 1
+fi
 (
   cd "$DEPLOYMENT_PATH"
   nix --extra-experimental-features "nix-command flakes" \
-    flake lock --override-input nixorium "$UPSTREAM_REF"
+    flake lock --override-input nixorium "$UPSTREAM_REF" \
+    --override-input nixpkgs "github:NixOS/nixpkgs/${PACKAGE_BASE_REVISION}"
 )
 if [[ ! -f "${DEPLOYMENT_PATH}/flake.lock" ]]; then
   echo "Error: the private deployment lock was not created." >&2

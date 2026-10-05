@@ -8,6 +8,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [3.0.0-beta.1] - 2026-10-04
 
+- A new controller now starts from the nixpkgs revision its release was
+  validated with, instead of the newest commit of the channel. A channel update
+  (kernel 6.18.55) broke the VirtualBox guest additions build and stopped every
+  fresh installation; the channel is still declared, so package-base updates
+  move the pin forward through the reviewed workflow.
+
 - Backward-compatibility paths are removed; there are no older installations
   to carry. The student home is always restored at boot from the workspace
   profile (an empty profile when `mkLab` receives none), so the profile-free

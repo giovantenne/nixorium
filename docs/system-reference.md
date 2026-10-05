@@ -58,14 +58,16 @@ bootstrap stages use only the official NixOS binary cache and its published
 signing key; signature checking is never disabled. The
 template, installer, local Disko layout, and initial lock use that full Git
 revision, while `flake.nix` retains the selected channel for later managed
-updates. Resolution failure stops before the installer is invoked.
-For bootstrap-capability version 1, account and regional input is collected by
-the small shell launcher before it invokes Nix. Version 2 keeps that sequence,
-then selects and reviews the initial deployment-owned software profile from the
-same immutable template revision. It writes only ordinary `shared` declarations
-for the complete selected profile to `lab-software.json` before Git
-initialization, Nix evaluation, or disk changes. Version 1 remains supported
-without a software prompt. The supported
+updates. The initial lock pins nixpkgs to the revision that release was
+validated with (`lib.packageBase.referenceRevision`), not the newest commit of
+its channel; package-base updates move it forward later. Resolution failure
+stops before the installer is invoked. The small shell launcher collects
+account and regional input before it invokes Nix, then selects and reviews the
+initial deployment-owned software profile from the same immutable template
+revision. It writes only ordinary `shared` declarations for the complete
+selected profile to `lab-software.json` before Git initialization, Nix
+evaluation, or disk changes. It refuses releases without bootstrap capability
+version 2. The supported
 bootstrap environment is the official NixOS Minimal ISO booted in UEFI mode,
 which starts in the required Linux text console. Keyboard is collected and
 activated first, then time zone is collected before account details, so all

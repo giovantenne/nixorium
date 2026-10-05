@@ -176,8 +176,10 @@ any shard must block publication.
 - Public controller bootstrap must resolve the selected branch/tag once to a
   full Git revision. Its template, installer, Disko layout, and initial lock
   must use that revision; keep the human-selected channel in the generated
-  `flake.nix` for managed updates. Never restore independently moving bootstrap
-  downloads; see ADR 0018.
+  `flake.nix` for managed updates. The initial lock also pins nixpkgs to that
+  revision's `lib.packageBase.referenceRevision`, the package base it was
+  validated with, while declaring the channel. Never restore independently
+  moving bootstrap downloads; see ADR 0018.
 - New deployment templates own the direct `nixpkgs` input and make Nixorium's
   input follow it. `lib.packageBase` describes a reference source/channel;
   `Update Nixorium` must preserve the complete deployment-owned lock node.

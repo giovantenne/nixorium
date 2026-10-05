@@ -41,6 +41,9 @@ cat > "${MOCK_BIN}/nix" <<'EOF'
 set -euo pipefail
 config=${NIX_CONFIG//$'\n'/;}
 printf 'nix|%s|%s|%s\n' "$config" "${XDG_CACHE_HOME:-}" "$*" >> "$CONTROLLER_INSTALLER_LOG"
+if [[ "$*" == *"#lib.packageBase.referenceRevision"* ]]; then
+  printf '%s' 0123456789abcdef0123456789abcdef01234567
+fi
 if [[ "$*" == *"flake lock --override-input nixorium "* ]]; then
   printf '{"nodes":{},"root":"root","version":7}\n' > "$NIXORIUM_DEPLOYMENT_PATH/flake.lock"
 fi
@@ -111,7 +114,7 @@ STUDENT_USER=student \
   bash "${REPO_ROOT}/scripts/install-controller.sh" /dev/vda \
   > "${TEST_ROOT}/output"
 
-test "$(grep -c '^nix|' "$ACTION_LOG")" -eq 2
+test "$(grep -c '^nix|' "$ACTION_LOG")" -eq 3
 test "$(grep -c -- '--dry-run' "$ACTION_LOG" || true)" -eq 0
 grep -F 'max-jobs = 1' "$ACTION_LOG" >/dev/null
 grep -F 'cores = 1' "$ACTION_LOG" >/dev/null
@@ -122,7 +125,7 @@ if grep -F '6NCHdD59X431o0gWypbMrAURkbJ16ZPMQX27P3FJrRo=' "$ACTION_LOG"; then
   exit 1
 fi
 grep -F 'run github:giovantenne/nixorium/revision#disko -- --mode disko ' "$ACTION_LOG" >/dev/null
-grep -F 'flake lock --override-input nixorium github:giovantenne/nixorium/revision' "$ACTION_LOG" >/dev/null
+grep -F 'flake lock --override-input nixorium github:giovantenne/nixorium/revision --override-input nixpkgs github:NixOS/nixpkgs/0123456789abcdef0123456789abcdef01234567' "$ACTION_LOG" >/dev/null
 grep -F 'btrfs|filesystem mkswapfile --size 4G' "$ACTION_LOG" >/dev/null
 grep -F 'swapon|' "$ACTION_LOG" >/dev/null
 grep -F 'swapoff|' "$ACTION_LOG" >/dev/null
