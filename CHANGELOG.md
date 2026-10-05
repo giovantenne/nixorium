@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The overview no longer asks to prepare network boot files on a lab
+  installed from USB, and no longer reports a saved configuration as
+  unapplied after a controller review finds it already running.
+
 ## [3.0.0-beta.1] - 2026-10-04
 
 - A new controller now starts from the nixpkgs revision its release was

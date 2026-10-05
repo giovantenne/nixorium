@@ -62,8 +62,6 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			id = "pending-git"
 		case domain.SetupStageApply:
 			id = "pending-controller"
-		case domain.SetupStageArtifacts:
-			id = "pending-pxe"
 		}
 		if id != "pending-controller" || !controllerVerifiedForSave(model.pendingRevision, model.controller.result) {
 			add(id, notice.title, notice.detail)
@@ -73,7 +71,7 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 		add("pending-git", "Configuration has uncommitted changes", "Last local Git observation; inspect paths before recording anything.")
 	}
 	// Low disk space is shown in Maintenance, next to Free disk space.
-	if (model.pendingRevision != "" && !controllerVerifiedForSave(model.pendingRevision, model.controller.result)) || (model.controller.plan.Operation != "" && !model.controller.plan.HasErrors() && !model.controller.plan.Current && !controllerVerifiedForSave(model.controller.plan.Revision, model.controller.result)) {
+	if (model.pendingRevision != "" && !model.controllerRunsRevision(model.pendingRevision)) || (model.controller.plan.Operation != "" && !model.controller.plan.HasErrors() && !model.controller.plan.Current && !controllerVerifiedForSave(model.controller.plan.Revision, model.controller.result)) {
 		add("pending-controller", "Saved configuration needs applying to this controller", "Observed in this session. Open a fresh controller review.")
 	}
 	if model.report.PXEPreparation.Present && !model.report.PXEPreparation.Ready {

@@ -208,10 +208,10 @@ func setupOverviewNotice(setup domain.SetupReport) (tuiNotice, bool) {
 	case domain.SetupStageApply:
 		notice.title = "Saved configuration needs applying to this controller"
 		notice.detail = "Open Maintenance > Apply to controller for a fresh review."
-	case domain.SetupStageArtifacts:
-		notice.title = "Installation files need preparing"
-		notice.detail = "Open Installation > Network boot (PXE) before installing computers."
 	default:
+		// Network boot files are needed only for PXE installation; a lab
+		// installed from USB never prepares them. Installation > Network boot
+		// asks for them when it is used.
 		return tuiNotice{}, false
 	}
 	return notice, true
