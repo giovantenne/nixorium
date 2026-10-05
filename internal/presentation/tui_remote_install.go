@@ -63,9 +63,10 @@ func (model dashboardModel) selectedRemoteInstallDisk() (domain.RemoteDisk, bool
 
 func (model dashboardModel) remoteInstallView() string {
 	remote := model.installation.remote
+	// The breadcrumb names the task; the step heading is the page title.
 	lines := []string{tuiTitle("Install one computer from USB", model.isDark)}
 	if step, name := remoteInstallStep(remote.stage); step > 0 && model.busy == "" {
-		lines = append(lines, "", tuiStepHeading(step, 6, name, model.isDark))
+		lines = []string{tuiStepHeading(step, 6, name, model.isDark)}
 	}
 	notices := []tuiNotice{}
 	actions := []tuiAction{{key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
@@ -99,19 +100,20 @@ func (model dashboardModel) remoteInstallView() string {
 		}
 		actions = []tuiAction{{key: "↑/↓", label: "Select computer"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
 	case remoteInstallConsole:
+		// Compact so the three commands and the address field fit together on
+		// small screens: each command is one row with what it is for.
 		lines = append(lines, "",
 			tuiSection("On the PC to install ("+remote.host+")", model.isDark),
-			"Boot the official NixOS Minimal 26.05 USB in UEFI mode.",
-			"Connect the PC to the network, then run these commands there:", "",
-			remoteInstallConsoleCommand(1, "Set a password for the next connection", "passwd", model.isDark), "",
-			remoteInstallConsoleCommand(2, "Check SSH — the result should be active", "systemctl is-active sshd", model.isDark),
-			tuiMuted("   If inactive, run: sudo systemctl start sshd", model.isDark), "",
-			remoteInstallConsoleCommand(3, "Find the PC's IPv4 address", "ip -4 -br address show scope global", model.isDark),
+			"Boot NixOS Minimal 26.05 from USB (UEFI), connect it to the network, run:",
 		)
+		lines = append(lines, tuiFields(model.isDark,
+			[2]string{"1", tuiFieldValue("passwd", model.isDark) + tuiMuted("   set a temporary password", model.isDark)},
+			[2]string{"2", tuiFieldValue("systemctl is-active sshd", model.isDark) + tuiMuted("   if not active: sudo systemctl start sshd", model.isDark)},
+			[2]string{"3", tuiFieldValue("ip -4 -br address show scope global", model.isDark) + tuiMuted("   shows its IP address", model.isDark)},
+		)...)
 		fixedBody = strings.Join([]string{
-			tuiSection("Back on this controller", model.isDark),
-			"Type the address from command 3, without the /xx suffix.",
-			model.remoteInstallInput("IP address of the PC", remote.address, "e.g. 192.168.1.20", false),
+			tuiSection("On this controller: IP address of the PC", model.isDark) + tuiMuted(" (command 3, no /xx)", model.isDark),
+			tuiInputField("", remote.address+"█", true, model.isDark) + map[bool]string{true: tuiMuted("e.g. 192.168.1.20", model.isDark), false: ""}[remote.address == ""],
 			tuiMuted("Enter checks the PC's identity; no password is sent yet.", model.isDark),
 		}, "\n")
 		if remote.passwordAgain {
@@ -264,7 +266,9 @@ func (model dashboardModel) remoteInstallView() string {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: sanitizeRemoteInstallText(model.message)})
 	}
 	if remote.bootstrapError != "" {
-		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Live connection failed", detail: remote.bootstrapError})
+		// One line of technical detail keeps the instructions on screen.
+		detail := ansi.Truncate(remote.bootstrapError, max(30, model.width-12), "…")
+		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Could not connect to the PC: check its IP address and command 2", detail: detail})
 	}
 	return model.renderShell(tuiShell{path: []string{"Installation", "USB over SSH"}, body: strings.Join(lines, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
 }
@@ -488,7 +492,11 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			model.remoteInstallRemoveInputRune()
 		case "enter":
 			if remote.address == "" || model.actions.ObserveRemoteInstall == nil {
-				model.message = "The live IPv4 address is required before reading the host key."
+				model.message = "Type the IP address shown by command 3 on the PC to install."
+				return model, nil
+			}
+			if controller := model.report.Meta.Controller; remote.address == controller.DHCPIP || remote.address == controller.StaticIP {
+				model.message = remote.address + " is this controller's address. Type the address of the PC to install, shown by command 3 on that PC."
 				return model, nil
 			}
 			remote.fingerprint = ""

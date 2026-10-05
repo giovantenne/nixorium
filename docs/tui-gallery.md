@@ -471,8 +471,6 @@ Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
 ```text
 Nixorium  /  Installation  /  USB over SSH
 
-Install one computer from USB
-
 Step 6 of 6  Check before erasing
 
 Disk to erase        × /dev/nvme0n1 · 137.4 GB
@@ -485,7 +483,9 @@ Technical details
 Size               137438953472 bytes
 PC fingerprint     SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 Revision           0123456789abcdef0123456789abcdef01234567
-Shift ↑/↓ scroll · ? help
+System             /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo
+Signed cache       http://10.42.0.99:5000
+Replace known key  no
 
 Type exactly
   ERASE

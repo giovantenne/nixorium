@@ -3,6 +3,8 @@ package presentation
 import (
 	"bytes"
 	"context"
+
+	tea "charm.land/bubbletea/v2"
 	"os"
 	"strings"
 	"testing"
@@ -251,9 +253,12 @@ func TestUSBConsoleInstructionsScrollWithInputVisible(t *testing.T) {
 		}
 		seen.WriteString(view)
 	}
+	// At 80x24 the three commands and the address field fit without scrolling.
+	m.pageScroll = 0
+	first := demoANSI.ReplaceAllString(m.View().Content, "")
 	for _, command := range []string{"passwd", "systemctl is-active sshd", "ip -4 -br address show scope global"} {
-		if !strings.Contains(seen.String(), command) {
-			t.Fatal("unreachable console command", command)
+		if !strings.Contains(first, command) {
+			t.Fatal("console command not visible at 80x24", command, first)
 		}
 	}
 }
@@ -286,5 +291,18 @@ func TestSavedRefusalNeverDisplaysInvitationDuringLoad(t *testing.T) {
 	m = updated.(dashboardModel)
 	if m.screen != dashboardHome {
 		t.Fatal("saved refusal was offered again")
+	}
+}
+
+func TestUSBConsoleRefusesTheControllerAddress(t *testing.T) {
+	m := experienceFixture(2)
+	m.screen = dashboardUSBInstall
+	m.report.Meta.Controller.DHCPIP = "192.0.2.10"
+	m.actions.ObserveRemoteInstall = func(context.Context, string) (string, error) { return "", nil }
+	m.installation.remote = remoteInstallationModel{stage: remoteInstallConsole, host: "pc01", address: "192.0.2.10"}
+	updated, command := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(dashboardModel)
+	if command != nil || m.installation.remote.stage != remoteInstallConsole || !strings.Contains(m.message, "this controller's address") {
+		t.Fatalf("controller address accepted: stage=%d message=%q", m.installation.remote.stage, m.message)
 	}
 }
