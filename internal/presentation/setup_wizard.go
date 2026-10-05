@@ -187,7 +187,7 @@ func (model settingsWizardModel) choiceWidth() int {
 }
 
 func (model settingsWizardModel) choiceHeight() int {
-	height := model.height - 12
+	height := model.height - 14
 	if height < 4 {
 		return 4
 	}
@@ -380,8 +380,8 @@ func (model settingsWizardModel) View() tea.View {
 	lines := []string{
 		tuiTitle(model.title, model.isDark),
 		"",
-		fmt.Sprintf("Step %d of %d — %s", model.index+1, len(model.fields), field.group),
-		field.label,
+		tuiStepHeading(model.index+1, len(model.fields), field.group, model.isDark),
+		"", tuiSection(field.label, model.isDark), "",
 	}
 	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-4)).Render(info.description+"\nExample: "+info.example))
 	lines = append(lines, model.networkPreview()...)
@@ -401,7 +401,7 @@ func (model settingsWizardModel) View() tea.View {
 		if model.custom {
 			lines = append(lines, "", "Custom value; it will be validated before continuing.")
 		}
-		lines = append(lines, "", "> "+model.drafts[model.index]+"█")
+		lines = append(lines, "", tuiInputField("Value", model.drafts[model.index]+"█", true, model.isDark))
 	}
 	if model.err != "" {
 		lines = append(lines, "", tuiError("Invalid: "+model.err, model.isDark))

@@ -22,6 +22,14 @@ func (model dashboardModel) taskMenu(tasks []dashboardTask, cursor int) string {
 	if model.height == 0 {
 		rows = len(tasks)
 	}
+	if model.height > 0 {
+		for _, task := range tasks {
+			if strings.HasPrefix(task.id, "pending-") {
+				rows = max(1, rows/2)
+				break
+			}
+		}
+	}
 	start, end := listWindow(len(tasks), cursor, rows)
 	lines := []string{}
 	rowWidth := 0
@@ -36,7 +44,17 @@ func (model dashboardModel) taskMenu(tasks []dashboardTask, cursor int) string {
 		if task.advanced && (index == 0 || !tasks[index-1].advanced) {
 			lines = append(lines, "", tuiMuted("  Advanced", model.isDark))
 		}
-		if index == cursor {
+		pending := strings.HasPrefix(task.id, "pending-")
+		if index > start && (pending || strings.HasPrefix(tasks[index-1].id, "pending-")) {
+			lines = append(lines, "")
+		}
+		if pending {
+			marker := "  "
+			if index == cursor {
+				marker = "› "
+			}
+			lines = append(lines, tuiNoticeText(marker+menuTitle(task.shortcut, task.title), tuiStatusAttention, model.isDark))
+		} else if index == cursor {
 			lines = append(lines, tuiSelection(lipgloss.NewStyle().Width(rowWidth).Render(menuTitle(task.shortcut, task.title)), true, model.isDark))
 		} else {
 			lines = append(lines, "  "+tuiShortcut("["+task.shortcut+"]", model.isDark)+" "+task.title)

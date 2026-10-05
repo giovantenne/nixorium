@@ -57,7 +57,7 @@ func TestTelemetryUIRequiresExplicitChoice(t *testing.T) {
 }
 
 func TestTelemetryFirstInvitationChoices(t *testing.T) {
-	for _, key := range []string{"e", "enter", "d", "esc"} {
+	for _, key := range []string{"e", "enter", "n", "d", "esc"} {
 		t.Run(key, func(t *testing.T) {
 			m := experienceFixture(2)
 			m.screen = dashboardHome
@@ -91,8 +91,8 @@ func TestTelemetryFirstInvitationChoices(t *testing.T) {
 				m = workspaceComplete(t, m, cmd)
 			}
 			if key == "esc" {
-				if m.screen != dashboardTelemetry || !m.telemetry.firstOffer || m.message == "" {
-					t.Fatal("escape bypassed first choice")
+				if m.screen != dashboardHome || m.telemetry.firstOffer {
+					t.Fatal("escape did not skip without consent")
 				}
 			} else if m.screen != dashboardHome {
 				t.Fatal("first choice did not return home")
@@ -103,7 +103,7 @@ func TestTelemetryFirstInvitationChoices(t *testing.T) {
 			if (key == "e" || key == "enter") && (len(calls) != 1 || calls[0] != "enable") {
 				t.Fatal(calls)
 			}
-			if key == "d" && (len(calls) != 1 || calls[0] != "disable") {
+			if (key == "d" || key == "n") && (len(calls) != 1 || calls[0] != "disable") {
 				t.Fatal(calls)
 			}
 		})
@@ -197,7 +197,7 @@ func TestTelemetryDetailGalleryAndInvitationExitLegend(t *testing.T) {
 						t.Fatal("missing choice or details", size, detail, action)
 					}
 				}
-				if (detail != "") != strings.Contains(view, "Esc") {
+				if !strings.Contains(view, "Esc") || !strings.Contains(view, "Exit") {
 					t.Fatal("incorrect first-invitation exit legend", detail)
 				}
 				if detail == "" && strings.Contains(view, "Version:") {

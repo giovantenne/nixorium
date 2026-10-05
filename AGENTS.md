@@ -352,7 +352,10 @@ any shard must block publication.
   selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
 - Adoption telemetry is controller-only and off without explicit administrator
-  consent. The first administrator invitation requires acceptance or refusal;
+  consent. The first administrator launch acknowledges the operational disclaimer before
+  offering telemetry. Enter/e accepts, n declines, Esc skips to the menu and q
+  exits. Skipping saves no decision and reoffers at the next launch; a saved
+  refusal is remembered;
   preview and privacy views never save a choice. Keep its allowlisted payload and monthly identity separate from support
   exports. Preview/status never upload or probe; network failures never block lab
   operations. Keep state outside backups/Git/store, serialize consent with sending,
@@ -408,9 +411,13 @@ any shard must block publication.
   token-bound `flake.nix`/`flake.lock` proposal under the deployment-root lock;
   the TUI records it transparently and then invokes typed controller plan/apply.
   Never imply a branch, push, PXE action, or client deployment.
-  Remote enumeration belongs only to explicit `update check`, must use the
-  configured public upstream with bounded time/output/results and no Git
-  prompting, credential helpers, or user/system Git configuration.
+  Remote enumeration belongs to explicit `update check` and the administrator
+  TUI advisory check (at most once per 24 hours, including failed attempts and
+  restarts). Both must use the configured public upstream with bounded
+  time/output/results and no Git prompting, credential helpers, or user/system
+  Git configuration. The advisory cache and per-version dismissal live outside
+  the deployment; follow only the saved channel, never authorize or apply from
+  cached discovery, and never interrupt the current screen.
   The TUI must reuse this typed plan/apply boundary, with presentation limited
   to target/policy input, bounded review scrolling, exact confirmation, and
   typed result rendering.
@@ -735,7 +742,8 @@ set -euo pipefail
 - `nixorium workspace marketplace` (and the TUI Marketplace actions) may
   contact only the fixed public gallery and the pinned download URL, only
   when invoked, and write only to the Nix store
-- `nixorium update` may use controller internet only when explicitly invoked;
+- `nixorium update` may use controller internet when explicitly invoked; the
+  administrator TUI may also run its bounded, cached advisory discovery;
   it must never accept an arbitrary replacement source URL, expose ignored
   private files to Nix, or introduce client-side network requirements
 - `keys/cache-public-key` and `keys/admin-ssh.pub` are public and may be committed

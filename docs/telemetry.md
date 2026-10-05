@@ -7,11 +7,13 @@ send these reports.
 
 In **Maintenance → Adoption statistics**, inspect the payload and explicitly
 choose whether to share it. The first ordinary administrator startup offers
-this choice until a decision is saved, with a benefit-first summary of the report.
+this choice after the operational disclaimer, until a decision is saved.
+The disclaimer acknowledgement is separate from telemetry consent.
 Press `p` for the exact local JSON and `i` for Privacy & retention. On the overview,
-`e` or Enter explicitly accepts sharing; `d` declines. Esc returns from details
-but cannot skip the first choice. Exiting the application without deciding keeps
-sharing off and offers the choice next time. A saved refusal is not reoffered.
+`e` or Enter explicitly accepts sharing; `n` declines (`d` remains an alias).
+Esc returns from details, or skips the invitation and opens the menu without
+saving a decision. Sharing remains off and the invitation returns at the next
+TUI launch. `q` exits with the same undecided behavior. A saved refusal is not reoffered.
 The first invitation returns to the overview after saving either choice.
 Adoption statistics is the last entry in Maintenance.
 You can return at any time. The command-line equivalents are:

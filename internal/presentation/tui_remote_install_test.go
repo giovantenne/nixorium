@@ -499,7 +499,7 @@ func TestUSBInstallReviewFitsSupportedLayoutsAndSanitizesControlText(t *testing.
 			if _, err := writer.Write([]byte(view)); err != nil {
 				t.Fatal(err)
 			}
-			for _, expected := range []string{"Step 6 of 6 · Check before erasing", "Disk to erase", "/dev/nvme0n1", "Type exactly", "Cancel safely"} {
+			for _, expected := range []string{"STEP 6 / 6", "Disk to erase", "/dev/nvme0n1", "Type exactly", "Cancel safely"} {
 				if !strings.Contains(output.String(), expected) {
 					t.Fatalf("USB review lost %q with profile %v", expected, profile)
 				}

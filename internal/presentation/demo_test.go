@@ -62,7 +62,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 		t.Fatal("main demo pauses on the intermediate declaration result")
 	}
 	search := demoFrameWithLabel(main.Frames, "Open Software directly in Search")
-	if !strings.Contains(search.Text, "[F3] Search packages") || !strings.Contains(search.Text, "Package name  _") || strings.Contains(search.Text, "VLC") || strings.Contains(search.Text, "[Selected]") {
+	if !strings.Contains(search.Text, "[F3] Search packages") || !strings.Contains(search.Text, "Type a package name…") || strings.Contains(search.Text, "VLC") || strings.Contains(search.Text, "[Selected]") {
 		t.Fatalf("main demo does not open directly in package search:\n%s", search.Text)
 	}
 	result := demoFrameWithLabel(main.Frames, "Find Inkscape in the pinned package set")
@@ -74,7 +74,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range installation.Frames {
 		installationText += frame.Text
 	}
-	for _, expected := range []string{"Service address:    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Type START to continue", "Next: install computers", "Boot one configured computer using UEFI network boot", "run /installer/setup.sh"} {
+	for _, expected := range []string{"Service address:    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Type START to continue", "Next: install computers", "Start UEFI network boot", "guided installer opens automatically"} {
 		if !strings.Contains(installationText, expected) {
 			t.Fatalf("installation demo omits %q", expected)
 		}
@@ -88,7 +88,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 		}
 	}
 	completed := demoFrameWithLabel(installation.Frames, "Complete every controller-side installation step")
-	for _, step := range []string{"✓ Laboratory settings", "✓ Save configuration", "✓ Controller keys", "✓ Activate controller", "✓ Prepare clients", "✓ Start PXE"} {
+	for _, step := range []string{"✓ 1. Laboratory settings", "✓ 2. Save configuration", "✓ 3. Controller keys", "✓ 4. Activate controller", "✓ 5. Prepare clients", "✓ 6. Start PXE"} {
 		if !strings.Contains(completed.Text, step) {
 			t.Fatalf("completed installation frame omits green step %q:\n%s", step, completed.Text)
 		}
@@ -98,7 +98,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 		t.Fatalf("completed controller animation still looks active:\n%s", controllerCompleted.Text)
 	}
 	lastInstallationFrame := installation.Frames[len(installation.Frames)-1]
-	if lastInstallationFrame.Label != "Follow the installation steps on each client" || !strings.Contains(lastInstallationFrame.Text, "Only the disk confirmed locally in the installer is erased") {
+	if lastInstallationFrame.Label != "Follow the installation steps on each client" || !strings.Contains(lastInstallationFrame.Text, "type ERASE only for the right disk") {
 		t.Fatalf("installation demo does not finish on client instructions:\n%s", lastInstallationFrame.Text)
 	}
 	shutdown := bundle.Scenarios[2]

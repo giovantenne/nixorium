@@ -126,6 +126,22 @@ when something blocks them, the screen says whether to try again later or to
 ask the administrator, with a short code explained in the
 [troubleshooting guide](TROUBLESHOOTING.md#codes-shown-to-the-teacher).
 
+### First administrator launch
+
+The TUI first displays the operational disclaimer: Enter acknowledges it and
+q exits. This acknowledgement is remembered for this administrator and
+deployment, separately from the optional adoption statistics choice.
+
+On the statistics invitation, Enter accepts, n declines, Esc opens the menu
+without deciding, and q exits. Skipping leaves sharing off and repeats the
+invitation at the next launch; a saved refusal is not repeated. Exact report
+and Privacy & retention remain available before choosing.
+
+Computers warns when client configuration is incomplete and offers Installation
+as the next step. In Software, Enter on a configured application opens its
+details and available actions. Removal and destination changes require a
+separate review. Client updates remain a separate operation.
+
 ## Classroom view
 
 Clients expose only SSH (22) to the controller's static IPv4 address on the
@@ -1067,8 +1083,12 @@ nix run .#nixorium -- update plan --target v2.0.0
 nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
 ```
 
-`update check` is the only command that enumerates the configured public
-upstream. It disables Git credential prompting and helpers, stops after 15
+`update check` explicitly enumerates the configured public upstream. The
+administrator TUI also performs a cached background check, at most once per
+24 hours across restarts, with no Nix evaluation or deployment changes.
+Its dismissible Overview notice follows the configured channel and remembers
+the exact dismissed version. Opening it starts an ordinary update review.
+Discovery disables Git credential prompting and helpers, stops after 15
 seconds, bounds remote output, and lists the `master` development branch plus at
 most the newest 20 stable and 20 prerelease tags separately. It does not change
 the repository. Skip it and use an explicit target when the controller is

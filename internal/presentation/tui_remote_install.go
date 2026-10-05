@@ -17,7 +17,7 @@ import (
 func (model dashboardModel) installationAreaView() string {
 	lines := []string{
 		tuiTitle("Install client computers", model.isDark),
-		"Both methods install the same reviewed NixOS closure and shared Disko layout.",
+		"Choose how to start the client PC. Both methods erase its chosen disk.",
 		"",
 	}
 	lines = append(lines, model.taskMenu(installationAreaTasks, model.installationAreaCursor))
@@ -64,7 +64,7 @@ func (model dashboardModel) remoteInstallView() string {
 	remote := model.installation.remote
 	lines := []string{tuiTitle("Install one computer from USB", model.isDark)}
 	if step, name := remoteInstallStep(remote.stage); step > 0 && model.busy == "" {
-		lines = append(lines, tuiMuted(fmt.Sprintf("Step %d of 6 · %s", step, name), model.isDark))
+		lines = append(lines, "", tuiStepHeading(step, 6, name, model.isDark))
 	}
 	notices := []tuiNotice{}
 	actions := []tuiAction{{key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
@@ -108,14 +108,13 @@ func (model dashboardModel) remoteInstallView() string {
 			"On the PC to install, start the official NixOS Minimal 26.05 ISO from USB",
 			"in UEFI mode, connect it to the network, then type these commands:",
 			"",
-			"  1. passwd                                           set a temporary password",
-			"  2. systemctl is-active sshd                         should print: active",
-			"  3. ip -4 -br address show scope global              shows its IP address",
-			"  4. ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub shows its fingerprint",
+			tuiInstruction(1, "Set a temporary password", "passwd", model.isDark), "",
+			tuiInstruction(2, "Check SSH — it should print active", "systemctl is-active sshd", model.isDark), "",
+			tuiInstruction(3, "Read the PC's network address", "ip -4 -br address show scope global", model.isDark), "",
+			tuiInstruction(4, "Read its fingerprint", "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub", model.isDark),
 			"",
-			remoteInstallField("Computer", remote.host, false, false),
-			remoteInstallField("IP address of the PC", remote.address, true, false),
 		)
+		fixedBody = remoteInstallField("Computer", remote.host, false, false) + "\n" + remoteInstallField("IP address of the PC", remote.address, true, false)
 		if remote.passwordAgain {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Network card saved. Type passwd again on the PC", detail: "The previous temporary password was locked; set a new one, then continue."})
 		}

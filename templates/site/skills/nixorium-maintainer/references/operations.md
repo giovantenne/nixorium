@@ -569,7 +569,9 @@ nixorium update plan --target RELEASE_TAG
 nixorium update apply --target RELEASE_TAG --expect REVIEW_TOKEN
 ```
 
-`update check` is the only remote-enumerating operation. It queries only the
+`update check` explicitly enumerates updates. The administrator TUI also checks
+in the background at most once per 24 hours while open (hourly cache polling),
+including after restarts. Both query only the
 configured public GitHub upstream, with Git prompts/helpers/config overrides
 disabled, a 15-second timeout, bounded output, and at most 20 newest stable plus
 20 newest prerelease tags. It is read-only and optional; use an explicit target
@@ -577,7 +579,13 @@ without enumeration if the required sources are already available. An explicit
 target does not guarantee offline validation: resolving/building it may need
 controller Internet access.
 
-It preserves upstream identity, validates a candidate lock outside the checkout,
+The Overview notification follows the saved channel: master revisions, newer
+stable tags, or newer prerelease tags. Dismissing remembers that exact target
+and revision per administrator and deployment; another version can appear.
+Offline attempts are cached too. Notification checks do not evaluate Nix, edit
+files in the deployment, or start updates; opening one starts the ordinary review.
+
+Update planning preserves upstream identity, validates a candidate lock outside the checkout,
 builds representative outputs, and writes only `flake.nix`/`flake.lock` after
 reviewed CLI confirmation. Preserve the deployment-owned `nixpkgs` lock node;
 a framework update is not a package-base refresh. In supported controller-only
@@ -653,10 +661,12 @@ deployment on a real classroom computer.
 ## Optional adoption statistics
 
 Telemetry is controller-only and disabled without explicit administrator consent.
-The first administrator TUI invitation requires an explicit choice: e or Enter
-on the overview shares statistics; d declines. Exact report and Privacy & retention
-are local views available before choosing. Esc returns from details but cannot skip
-the invitation; exiting without deciding leaves sharing off and reoffers it next time.
+The first administrator TUI launch acknowledges the operational disclaimer
+before the telemetry invitation. Enter or e on the invitation shares statistics;
+n declines (d remains an alias). Exact report and Privacy & retention
+are local views available before choosing. Esc returns from details or skips the invitation to the menu without saving
+a choice. Skipping or exiting with q leaves sharing off and reoffers it on
+the next TUI launch.
 A saved refusal is remembered. Maintenance lists Adoption statistics last.
 Downloading the installer does not authorize controller reports.
 Use `nixorium telemetry preview --json` or `nixorium telemetry status --json` for

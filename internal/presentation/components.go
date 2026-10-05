@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"fmt"
 	"github.com/giovantenne/nixorium/internal/domain"
 	"strings"
 
@@ -21,6 +22,7 @@ type tuiTheme struct {
 	controls            color.Color
 	text                color.Color
 	muted               color.Color
+	notice              color.Color
 	success             color.Color
 	attention           color.Color
 	failure             color.Color
@@ -34,6 +36,7 @@ func newTUITheme(dark bool) tuiTheme {
 		controls:            lipgloss.LightDark(dark)(lipgloss.Color("#374151"), lipgloss.Color("#CBD5E1")),
 		selectionBackground: lipgloss.LightDark(dark)(lipgloss.Color("#245566"), lipgloss.Color("#285665")),
 		text:                lipgloss.LightDark(dark)(lipgloss.Color("#292524"), lipgloss.Color("#E7E5E4")),
+		notice:              lipgloss.LightDark(dark)(lipgloss.Color("#0369A1"), lipgloss.Color("#7DD3FC")),
 		muted:               lipgloss.LightDark(dark)(lipgloss.Color("#596273"), lipgloss.Color("#A3ADBA")),
 		success:             lipgloss.LightDark(dark)(lipgloss.Color("#047857"), lipgloss.Color("#86EFAC")),
 		attention:           lipgloss.LightDark(dark)(lipgloss.Color("#B45309"), lipgloss.Color("#FBBF24")),
@@ -180,14 +183,17 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 		fixedBody: strings.TrimSpace(shell.fixedBody),
 	}
 	if len(shell.notices) > 0 {
-		lines := []string{tuiMuted("NOTICE", darkBackground)}
-		for _, notice := range shell.notices {
-			lines = append(lines, tuiStatus(notice.title, notice.kind, darkBackground))
+		lines := []string{tuiNoticeText("NOTICE", tuiStatusNeutral, darkBackground)}
+		for index, notice := range shell.notices {
+			if index > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, tuiNoticeTitle(notice.title, notice.kind, darkBackground))
 			if notice.detail != "" {
-				lines = append(lines, "  "+notice.detail)
+				lines = append(lines, tuiNoticeText("  "+notice.detail, notice.kind, darkBackground))
 			}
 			if line := noticeNextStep(notice); line != "" {
-				lines = append(lines, "  "+line)
+				lines = append(lines, tuiNoticeText("  "+line, notice.kind, darkBackground))
 			}
 		}
 		regions.notices = strings.Join(lines, "\n")
@@ -298,4 +304,42 @@ func noticeNextStep(notice tuiNotice) string {
 		line += " (" + step.TUI + ")"
 	}
 	return line
+}
+
+func tuiNoticeText(value string, kind tuiStatusKind, dark bool) string {
+	theme := newTUITheme(dark)
+	tone := theme.notice
+	switch kind {
+	case tuiStatusAttention:
+		tone = theme.attention
+	case tuiStatusFailure:
+		tone = theme.failure
+	case tuiStatusSuccess:
+		tone = theme.success
+	}
+	return lipgloss.NewStyle().Foreground(tone).Render(value)
+}
+
+// A focused input stays recognizable in monochrome through its prompt marker.
+func tuiInputField(label, value string, focused, dark bool) string {
+	text := tuiSection(label, dark) + "  " + value
+	if focused {
+		return tuiSelectionMarker(true, dark) + tuiFocusStyle(dark).Render(label+"  "+value)
+	}
+	return "  " + text
+}
+
+func tuiStepHeading(step, total int, title string, dark bool) string {
+	return tuiNoticeText(fmt.Sprintf("STEP %d / %d", step, total), tuiStatusNeutral, dark) + "  " + tuiSection(title, dark)
+}
+
+func tuiInstruction(step int, title, detail string, dark bool) string {
+	return tuiSection(fmt.Sprintf("%d. %s", step, title), dark) + "\n" + tuiMuted("   "+detail, dark)
+}
+
+func tuiNoticeTitle(title string, kind tuiStatusKind, dark bool) string {
+	if kind != tuiStatusNeutral {
+		return tuiStatus(title, kind, dark)
+	}
+	return tuiNoticeText("○ "+title, kind, dark)
 }

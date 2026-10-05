@@ -697,7 +697,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		return model.profileActions(context)
 	}
 	if model.stage == softwareDetails {
-		return []tuiAction{{key: "c", label: "Change where it applies"}, {key: "x", label: "Remove"}, {key: "Esc", label: "Selected software"}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "c", label: "Change where it applies"}, {key: "x", label: "Remove (review)"}, {key: "Esc", label: "Selected software"}, {key: "F1", label: "Help"}}
 	}
 	if model.stage == softwareScope {
 		actions := []tuiAction{{key: "↑/↓", label: "Select"}}
@@ -743,7 +743,11 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		return []tuiAction{{key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
 	}
 	if model.searching {
-		return []tuiAction{{key: "Type", label: "Search"}, {key: "↑/↓", label: "Results"}, {key: "Tab", label: "Change view"}, {key: "Esc", label: "Stop typing"}, {key: "F1", label: "Help"}}
+		actions := []tuiAction{{key: "Type", label: "Search"}, {key: "↑/↓", label: "Results"}}
+		if len(model.items()) > 0 {
+			actions = append(actions, tuiAction{key: "Enter", label: "Choose scope"})
+		}
+		return append(actions, tuiAction{key: "Tab", label: "Change view"}, tuiAction{key: "Esc", label: "Stop typing"}, tuiAction{key: "F1", label: "Help"})
 	}
 	actions := []tuiAction{
 		{key: "↑/↓", label: "Select"},
@@ -751,7 +755,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 	if len(model.items()) > 0 {
 		primary := "Choose scope"
 		if model.mode == softwareConfigured {
-			primary = "Details"
+			primary = "Details / actions"
 		} else {
 			items := model.items()
 			if items[min(model.cursor, len(items)-1)].Availability != "available" {
@@ -790,22 +794,28 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		tuiTitle("Software", context.dark),
 		"",
 		softwareModeTabs(model.mode, context.dark),
-		tuiMuted("Choose desired software here. Running clients change only when you update them.", context.dark),
+		tuiMuted("Choose desired configuration: applications and their computers.", context.dark),
 		"",
 	}
 	switch model.mode {
 	case softwareConfigured:
-		lines = append(lines, tuiSection("Selected software", context.dark), tuiMuted("Enter opens the highlighted item: change where it applies or remove it. Use Search or Suggestions to add software.", context.dark), "")
+		lines = append(lines, tuiSection("Selected software", context.dark), tuiNoticeText("Enter views details. Changes and removal have a separate review.", tuiStatusNeutral, context.dark), "")
 	case softwareSearch:
 		cursor := ""
 		if model.searching {
 			cursor = "_"
 		}
-		lines = append(lines, tuiSection("Search packages", context.dark), tuiMuted("Uses this deployment's locked Nix packages and overlays; inputs are never updated.", context.dark), "", "Package name  "+tuiTitle(model.query+cursor, context.dark), "")
+		query := model.query + cursor
+		if query == "_" || query == "" {
+			query = "Type a package name…"
+		}
+		lines = append(lines, tuiSection("Find an application", context.dark),
+			tuiMuted("Search the pinned package set; choose a result, then its computers.", context.dark), "",
+			tuiInputField("Package name", query, model.searching, context.dark), "")
 		if model.searchBusy {
-			lines = append(lines, "Searching pinned packages…", "")
+			lines = append(lines, tuiNoticeText("Searching pinned packages…", tuiStatusNeutral, context.dark), "")
 		} else if model.query == "" {
-			lines = append(lines, "Type at least two characters. Use a dotted prefix for nested sets, for example python3Packages.num.", "")
+			lines = append(lines, "Type at least two characters, e.g. firefox or python3Packages.num.", "")
 		} else if len(model.query) == 1 {
 			lines = append(lines, "Type one more character to start searching.", "")
 		} else if domain.ValidateSoftwareSearchQuery(strings.TrimSpace(model.query)) != nil {
@@ -843,7 +853,7 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 	if len(items) == 0 && model.mode == softwareConfigured {
 		lines = append(lines, "No software is selected through this screen yet.", "", "Open Suggestions or Search packages to add one.")
 	}
-	lines = append(lines, "", "This is desired configuration; use Computers → Update computers to change clients.")
+	lines = append(lines, "", tuiMuted("To apply saved changes to clients: Computers → Update computers.", context.dark))
 	return lines
 }
 
@@ -903,7 +913,11 @@ func (model softwareModel) detailsView(context softwareViewContext) []string {
 		tuiTitle(item.Label, context.dark),
 		tuiMuted(item.Summary+" · "+item.ID+version, context.dark),
 		"",
-		"Applies to   " + softwareScopeLabel(entry.Scope),
+		tuiSection("Applies to", context.dark),
+		"  " + softwareScopeLabel(entry.Scope), "",
+		tuiSection("Choose an action", context.dark),
+		tuiShortcut("c", context.dark) + "  Change which computers receive this application",
+		tuiShortcut("x", context.dark) + "  Review removing it from the configuration",
 	}
 	if softwareScopeAffectsController(entry.Scope) {
 		lines = append(lines, "", "Removing it or changing where it applies rebuilds this controller right after saving.")
@@ -996,7 +1010,7 @@ func (model softwareModel) resultView(context softwareViewContext) []string {
 		lines = append(lines, "", result.Message, "No system was built or deployed.", "Retry completes the local save without duplicating the change.", softwareResultIssue(result))
 	} else if result.State == "saved" {
 		if result.AffectedController != "" && !verified {
-			lines = append(lines, "", "The configuration remains saved; retrying the controller does not duplicate it.", context.message)
+			lines = append(lines, "", "The configuration remains saved; retrying the controller does not duplicate it.")
 		} else if len(result.AffectedClients) > 0 {
 			lines = append(lines, "", "Select computers and confirm a fresh deployment review; no client changed here.")
 		} else {

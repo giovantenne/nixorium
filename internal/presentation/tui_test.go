@@ -954,7 +954,7 @@ func TestPXEScreenRecommendsOnlyTheObservedNextStage(t *testing.T) {
 
 	report = testDashboardReport("active")
 	view = (dashboardModel{report: report, screen: dashboardPXE}).View().Content
-	for _, expected := range []string{"Next: install computers", "/installer/setup.sh", "x", "stop PXE"} {
+	for _, expected := range []string{"Next: install computers", "guided installer opens automatically", "x", "stop PXE"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("active PXE guidance omits %q:\n%s", expected, view)
 		}

@@ -15,7 +15,7 @@
   checks-workspace-systems = [ "workspace-offline" "workspace-systems" ];
   checks-home-reset = [ "home-reset-filesystem-vm" "workspace-reset-service-vm" ];
   checks-editor = [ "workspace-editor-vm" "programming-profile-vm" ];
-  checks-management = [ "management-vm" "telemetry-vm" ];
+  checks-management = [ "management-vm" "telemetry-vm" "onboarding-vm" ];
   checks-session = [ "session-state-vm" "clean-generations-vm" "classroom-view-vm" ];
   checks-installer = [ "client-installer" "client-installer-vm" ];
   checks-remote-installer = [ "remote-client-installer-vm" ];

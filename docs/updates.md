@@ -71,6 +71,25 @@ active closure matches. It does not prove a subsequent boot, graphical login,
 the classroom view, audio/video, printing or every hardware driver.
 Record those practical checks and the tested machines.
 
+## Update notifications
+
+After the administrator opens the TUI, a background check reads the configured
+Nixorium input and queries its public upstream at most once every 24 hours.
+Hourly polling reuses a local cache, including failed attempts, across TUI
+restarts. No process runs while the TUI is closed; reopening performs a due
+check. Discovery is bounded, does not evaluate Nix, and never applies an update.
+The classroom dashboard does not run it.
+
+The Overview notice follows the chosen channel: newer master revisions, newer
+stable tags for a stable pin, or newer prerelease tags for a prerelease pin.
+It does not switch channels. `u` opens the ordinary fresh update check and review;
+`x` dismisses that exact version/revision. Another version can notify again.
+Acknowledgement, the advisory cache and dismissal are private local UI state
+under `$XDG_STATE_HOME/nixorium/dashboard` (normally `~/.local/state/nixorium/dashboard`),
+scoped to the administrator and deployment, outside Git and the Nix store.
+Network failures do not interrupt work; the last successful observation may
+remain visible until the next successful check.
+
 ## CLI: advanced reviewed workflow
 
 From the private deployment:

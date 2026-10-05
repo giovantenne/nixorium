@@ -8,6 +8,11 @@ with `scripts/generate-docs.sh --write`.
 
 ## Workflow guide
 
+The first administrator launch shows the operational disclaimer (Enter accepts,
+q exits), then the optional telemetry invitation (Enter accepts, n declines,
+Esc skips to the menu, q exits). Skipping saves no consent and repeats the
+invitation next launch. A saved refusal is remembered.
+
 The overview opens Computers, Installation, Software and Maintenance. Startup
 reads saved configuration and local service/Git state; inventory, client probes and expensive
 readiness checks run when the selected task needs them. Deferred checks never
@@ -83,6 +88,101 @@ starts; unavailable unit state is not treated as idle. Checks retry every two
 seconds after the previous bounded observation finishes.
 
 <!-- BEGIN GENERATED: tui-gallery -->
+## Operational disclaimer
+
+```text
+Nixorium  /  Welcome  /  Disclaimer
+
+Welcome to Nixorium
+
+Before you manage this laboratory
+Nixorium can erase disks, install systems, reset student homes,
+change configurations and interrupt active sessions.
+
+! Check every computer, disk and action before confirming.
+Keep tested backups. Local snapshots are not backups.
+Use Nixorium only on computers and networks you may administer.
+
+Nixorium is provided under the MIT License, without warranty.
+You are responsible for testing changes and verifying their results.
+Full terms: DISCLAIMER.md and LICENSE in the Nixorium repository.
+
+Enter acknowledges these operational risks and continues.
+The next screen asks separately about optional adoption statistics.
+
+Enter Accept & continue  ·  ↑/↓ Scroll  ·  q Exit
+```
+
+## Optional adoption statistics
+
+```text
+Nixorium  /  Welcome  /  Adoption statistics
+
+Help improve Nixorium
+Share basic statistics to understand adoption and lab sizes,
+and help prioritize development.
+
+Sharing is optional and off by default. Nixorium works fully without it.
+
+Daily: version, system mode, client count band and boot status;
+an identifier that changes every month.
+
+No names, files, logs or configuration files are included.
+Sent to telemetry.nixorium.org via Cloudflare, which sees your IP.
+
+Disable anytime in Maintenance. See Privacy & retention for details.
+
+Status: Off — no adoption reports are being sent.
+
+e/Enter Share statistics  ·  n No thanks  ·  p Exact report  ·  i Privacy & retention  ·  ↑/↓ Scroll  ·  Esc Menu
+q Exit  ·  F1 Help
+```
+
+## Unconfigured clients
+
+```text
+Nixorium  /  Computers
+
+Manage client computers
+Observed state is loaded only by Computer inventory or an operation that needs it.
+
+› [h] Computer inventory
+  [d] Update computers
+  [x] Power controls
+  [i] Internet access
+
+Check reachability and compare observed systems with the intended revision
+
+NOTICE
+! Client computers have not been configured yet
+  Open Installation to configure clients before installing or managing them.
+
+n Configure clients  ·  ↑/↓ Select  ·  Enter Open  ·  Esc Overview  ·  F1 Help
+```
+
+## Channel update notification
+
+```text
+Nixorium  /  Overview
+
+Laboratory overview
+Choose an area. Observed state is loaded only when the selected task needs it.
+
+› [c] Computers
+  [n] Installation
+  [w] Software
+  [a] Maintenance
+
+Inventory, updating computers, Internet access and power
+
+NOTICE
+○ Nixorium update available: v3.1.0
+  Chosen channel: stable. u reviews updates; x dismisses this version.
+
+u Review update  ·  x Dismiss update  ·  ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help
+q Quit
+```
+
 ## Overview
 
 ```text
@@ -109,19 +209,19 @@ Nixorium  /  Software
 Software
 
 [F2] Selected   [F3] Search packages   [F4] Suggestions
-Choose desired software here. Running clients change only when you update them.
+Choose desired configuration: applications and their computers.
 
-Search packages
-Uses this deployment's locked Nix packages and overlays; inputs are never updated.
+Find an application
+Search the pinned package set; choose a result, then its computers.
 
-Package name  inkscape_
+› Package name  inkscape_
 
 › Inkscape
     Create and edit vector graphics · inkscape · 1.4.2
 
-This is desired configuration; use Computers → Update computers to change clients.
+To apply saved changes to clients: Computers → Update computers.
 
-Type Search  ·  ↑/↓ Results  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
+Type Search  ·  ↑/↓ Results  ·  Enter Choose scope  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
 ```
 
 ## Additive software profile review
@@ -169,6 +269,7 @@ Not checked in this session · r checks the computers now
 
 NOTICE
 ○ Opened from a saved software change. Review deploys the complete current configuration.
+
 ! Software selection saved locally.
 
 Space Select  ·  a All  ·  n Those needing update  ·  r Check computers  ·  Enter Review  ·  Esc Computers
@@ -382,7 +483,8 @@ Enter Continue  ·  e Edit settings  ·  Esc Back  ·  F1 Help
 Nixorium  /  Installation  /  USB over SSH
 
 Install one computer from USB
-Step 6 of 6 · Check before erasing
+
+STEP 6 / 6  Check before erasing
   Disk to erase          /dev/nvme0n1 · 137.4 GB (137438953472 bytes)
   Disk serial / WWN      NVME-DEMO / demo-wwn
   Computer               pc01
@@ -834,6 +936,7 @@ Choose an area. Observed state is loaded only when the selected task needs it.
 Needs attention — press the number to open it
 
   [1] Controller configuration — running
+
 › [c] Computers
   [n] Installation
   [w] Software

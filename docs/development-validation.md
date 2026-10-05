@@ -370,3 +370,19 @@ the Internet scenario in the same management VM, using software emulation:
 ```sh
 nix build --file tests/source-checks.nix internet-management-vm-tcg --no-link
 ```
+
+### First administrator launch
+
+`onboarding-vm` exercises the packaged TUI in a real pseudo-terminal: disclaimer
+exit and acknowledgement, skipping telemetry without saving consent, invitation
+on the next launch, remembered refusal and the unconfigured-client notice.
+The fixture blocks external endpoints and starts no telemetry sender. For hosts
+without KVM, run the same test using software emulation:
+
+```sh
+nix build --file tests/source-checks.nix onboarding-vm-tcg --no-link
+```
+
+The normal KVM check belongs to the full gate's management shard. Unit tests
+cover update channel selection, persistent cache/dismissal, late replies and
+rendering at 80×24, 120×30 and 180×45.

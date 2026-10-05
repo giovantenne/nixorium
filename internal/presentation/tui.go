@@ -20,13 +20,18 @@ import (
 // stop action, not the read-only Esc path. PreparePXE is systemd-owned;
 // ApplyController waits for a managed job while the foreground UI stays protected.
 type DashboardActions struct {
-	LoadManagedJobs    func(context.Context) ([]domain.ManagedJob, error)
-	PlanHostTrust      func(context.Context, string) domain.HostTrustPlan
-	ApplyHostTrust     func(domain.HostTrustPlan) domain.HostTrustResult
-	LoadTemplateReset  func(context.Context) domain.TemplateResetCatalog
-	PlanTemplateReset  func(context.Context, string, func(string)) domain.TemplateResetPlan
-	ApplyTemplateReset func(domain.TemplateResetPlan) domain.TemplateResetResult
-	ClassroomMode      bool
+	LoadClientSetup           func(context.Context) (bool, error)
+	LoadDisclaimer            func(context.Context) (bool, error)
+	AcceptDisclaimer          func() error
+	CheckUpdateNotification   func(context.Context) (domain.UpdateNotification, error)
+	DismissUpdateNotification func(domain.UpdateNotification) error
+	LoadManagedJobs           func(context.Context) ([]domain.ManagedJob, error)
+	PlanHostTrust             func(context.Context, string) domain.HostTrustPlan
+	ApplyHostTrust            func(domain.HostTrustPlan) domain.HostTrustResult
+	LoadTemplateReset         func(context.Context) domain.TemplateResetCatalog
+	PlanTemplateReset         func(context.Context, string, func(string)) domain.TemplateResetPlan
+	ApplyTemplateReset        func(domain.TemplateResetPlan) domain.TemplateResetResult
+	ClassroomMode             bool
 	// OpenClassroomView opens the classroom view page and
 	// returns a sentence for the operator.
 	OpenClassroomView func(context.Context) (string, error)
@@ -176,6 +181,7 @@ const (
 	dashboardTemplateReset
 	dashboardHostTrust
 	dashboardManagedJobs
+	dashboardDisclaimer
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -362,6 +368,8 @@ type dashboardModel struct {
 	hostTrust              hostTrustModel
 	updateDetails          bool
 	returnAdmin            bool
+	disclaimerChecking     bool
+	computerSetup          string
 	computers              computersModel
 	installationAreaCursor int
 	areaReturn             dashboardScreen
@@ -395,6 +403,7 @@ type dashboardModel struct {
 	updates                updateModel
 	settings               settingsModel
 	workspace              workspaceModel
+	updateNotification     domain.UpdateNotification
 	telemetry              telemetryModel
 	support                supportModel
 	templateReset          templateResetModel
@@ -663,6 +672,10 @@ func RunLoadingDashboard(actions DashboardActions, setupMode bool) error {
 	if actions.ClassroomMode {
 		model.busy = "Opening classroom controls"
 	}
+	if actions.LoadDisclaimer != nil && !actions.ClassroomMode {
+		model.disclaimerChecking = true
+		model.busy = "Reading local acknowledgement"
+	}
 	_, err := tea.NewProgram(model).Run()
 	return err
 }
@@ -683,7 +696,9 @@ func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, act
 
 func (model dashboardModel) Init() tea.Cmd {
 	commands := []tea.Cmd{tea.RequestBackgroundColor, model.activitySpinner.Tick}
-	if model.initializing && model.actions.LoadInitial != nil {
+	if model.disclaimerChecking || model.screen == dashboardDisclaimer {
+		commands = append(commands, model.loadDisclaimer())
+	} else if model.initializing && model.actions.LoadInitial != nil {
 		commands = append(commands, func() tea.Msg { return dashboardBeginInitialMsg{} })
 	} else if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
 		commands = append(commands, model.loadManagedJobs(model.jobs.id))
@@ -1113,6 +1128,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.administrationView()
 	case dashboardDiagnostics:
 		content = model.diagnosticsView()
+	case dashboardDisclaimer:
+		content = model.disclaimerView()
 	case dashboardTelemetry:
 		content = model.telemetryView()
 	case dashboardSupport:
@@ -2678,8 +2695,9 @@ func (model dashboardModel) pxeView() string {
 }
 
 func (model dashboardModel) computerInstallationSteps(labels []string) []string {
-	lines := []string{""}
+	lines := []string{tuiSection("Preparation progress", model.isDark), ""}
 	for index, label := range labels {
+		label = fmt.Sprintf("%d. %s", index+1, label)
 		switch {
 		case index < model.installation.stage:
 			lines = append(lines, tuiStatus(label, tuiStatusSuccess, model.isDark))
@@ -2743,22 +2761,18 @@ func (model dashboardModel) pxeActions() []tuiAction {
 func (model dashboardModel) pxeNextStepView() []string {
 	switch model.report.PXE.Mode {
 	case "active":
-		title := "Next: install computers"
-		lines := []string{
-			tuiResult(title, true, model.isDark),
-			"  1. Boot one configured computer using UEFI network boot.",
-			"  2. In the downloaded installer, run /installer/setup.sh.",
+		return []string{
+			tuiResult("Next: install computers", true, model.isDark), "",
+			tuiInstruction(1, "At the client PC", "Start UEFI network boot. The guided installer opens automatically.", model.isDark), "",
+			tuiInstruction(2, "Review the computer and disk", "Choose its configured identity and type ERASE only for the right disk.", model.isDark), "",
+			tuiInstruction(3, "After installation", "Reboot from the installed disk and verify the computer.", model.isDark), "",
+			tuiInstruction(4, "Back on this controller", "Press x when finished to stop PXE and restore normal networking.", model.isDark),
 		}
-		lines = append(lines, "  3. Choose its configured identity and inspect the target disk.")
-		return append(lines,
-			"  4. When installations are finished, press x here to stop PXE.",
-			tuiStatus("Only the disk confirmed locally in the installer is erased.", tuiStatusAttention, model.isDark),
-		)
 	case "degraded", "recovery-required":
 		return []string{
 			tuiResult("Next: recover normal controller networking", false, model.isDark),
 			"  A previous PXE transition was interrupted.",
-			"  Press r to restore its recorded network state and stop managed PXE services.",
+			"  Press n to restore its recorded network state and stop managed PXE services.",
 		}
 	}
 	if !model.report.PXEPreparation.Ready {

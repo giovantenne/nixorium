@@ -110,7 +110,12 @@ type galleryFrame struct {
 
 func renderGallery() string {
 	bundle := presentation.RenderDemoBundle(demoRevision, demoDate)
+	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderOnboardingDemo(demoRevision, 120, 30))
 	frames := []galleryFrame{
+		{title: "Operational disclaimer", scenarioID: "onboarding", label: "Read the operational disclaimer"},
+		{title: "Optional adoption statistics", scenarioID: "onboarding", label: "Choose optional adoption statistics"},
+		{title: "Unconfigured clients", scenarioID: "onboarding", label: "Configure clients before managing them"},
+		{title: "Channel update notification", scenarioID: "onboarding", label: "A dismissible update on the chosen channel"},
 		{title: "Overview", scenarioID: "software-all-clients", label: "Overview"},
 		{title: "Pinned package search", scenarioID: "software-all-clients", label: "Find Inkscape in the pinned package set"},
 		{title: "Additive software profile review", scenarioID: "software-profile", label: "Review the complete profile addition"},

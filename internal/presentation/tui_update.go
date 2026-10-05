@@ -14,6 +14,24 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case computerSetupMsg:
+		return model.finishComputerSetup(message)
+	case disclaimerMsg:
+		return model.finishDisclaimer(message)
+	case updateNotificationTickMsg:
+		return model, model.checkUpdateNotification()
+	case updateNotificationMsg:
+		return model.finishUpdateNotification(message)
+	case updateNotificationDismissedMsg:
+		if message.key == model.updateNotification.Key {
+			if message.err == nil {
+				model.updateNotification = domain.UpdateNotification{}
+			} else {
+				model.message = "Could not remember dismissal. Try again with x."
+			}
+		}
+		return model, nil
+
 	case managedJobsTickMsg:
 		if message.id != model.jobs.id {
 			return model, nil
@@ -114,7 +132,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.setup = message.setup
 		model.observeSetupController(message.setup)
 		model.observeRecoveryController(message.recovery)
-		if (model.setupMode || setupNeedsImmediateAttention(message.setup)) && model.managedJobConflict() == "" {
+		if (model.setupMode || (model.actions.LoadDisclaimer == nil && setupNeedsImmediateAttention(message.setup))) && model.managedJobConflict() == "" {
 			next, command := model.beginComputerInstallation("")
 			return next, tea.Batch(command, poll)
 		} else if model.actions.ClassroomMode {
@@ -123,7 +141,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.screen = dashboardHome
 		}
 		model.message = ""
-		return model, tea.Batch(poll, model.checkTelemetryOffer())
+		if model.actions.LoadDisclaimer != nil && !model.actions.ClassroomMode {
+			next, invitation := model.beginTelemetryInvitation()
+			return next, tea.Batch(poll, invitation, model.checkUpdateNotification())
+		}
+		return model, tea.Batch(poll, model.checkTelemetryOffer(), model.checkUpdateNotification())
 	case dashboardPXEOverviewMsg:
 		model.busy = ""
 		model.installation.stateError = message.err != nil
@@ -1079,6 +1101,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 
 func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd) {
 	key, ok := message.(tea.KeyPressMsg)
+	if ok && model.screen == dashboardDisclaimer {
+		return model.updateDisclaimer(key)
+	}
 	if !ok {
 		if model.busy != "" {
 			if _, pasted := message.(tea.PasteMsg); pasted {

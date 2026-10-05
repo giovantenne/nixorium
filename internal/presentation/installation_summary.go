@@ -27,10 +27,11 @@ func (model dashboardModel) installationSummaryView() string {
 	if model.busy != "" {
 		lines = append(lines, "", model.busyView())
 	}
+	notices := []tuiNotice{}
 	if model.message != "" {
-		lines = append(lines, "", model.message)
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: []string{"Installation", "Network boot", "Saved settings"}, body: strings.Join(lines, "\n"), actions: []tuiAction{{key: "Enter", label: "Continue"}, {key: "e", label: "Edit settings"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}})
+	return model.renderShell(tuiShell{path: []string{"Installation", "Network boot", "Saved settings"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Continue"}, {key: "e", label: "Edit settings"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) updateInstallationSummary(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {

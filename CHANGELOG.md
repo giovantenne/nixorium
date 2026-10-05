@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Guide the first administrator launch through an operational disclaimer and
+  separate optional telemetry choice; skipping consent repeats it next launch.
+- Explain unconfigured clients and software actions, improve PXE/USB instructions
+  and search layouts, and visually separate notices from menu choices.
+- Notify administrators of updates on their selected Nixorium channel using a
+  daily cached background check and persistent per-version dismissal.
+
 - Organize the project README around administrators and teachers, with the
   administrator menu and the classroom grid shown in their respective sections.
 

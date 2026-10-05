@@ -211,6 +211,9 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "Compare the offered fingerprint with this computer's physical console.", "Only a deliberately reinstalled client is eligible for reviewed key rotation.", "Esc cancels the read or review without changes; saving cannot be interrupted.")
 	case dashboardHome:
 		lines = append(lines, taskHelp(dashboardTasks)...)
+		if model.updateNotification.Key != "" {
+			lines = append(lines, "u  Review available updates", "x  Dismiss this update version")
+		}
 		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
 			lines = append(lines, "v  View existing managed work without starting or resuming it")
 		}
@@ -319,7 +322,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "e  Preview a minimized support report; no save or upload yet")
 		}
 	case dashboardTelemetry:
-		lines = append(lines, "Optional daily adoption statistics. e or Enter on the overview shares statistics; d declines or disables sharing.", "p opens the local exact report; i opens Privacy & retention. Arrow keys scroll; r refreshes local settings.", "Esc returns from details. The first invitation requires e/Enter or d; later Esc returns to Maintenance. Opening this screen uploads no adoption report.", "After the first invitation, change your choice in Maintenance → Adoption statistics.")
+		lines = append(lines, "Optional daily adoption statistics. e or Enter on the overview shares statistics; n declines or disables sharing.", "p opens the local exact report; i opens Privacy & retention. Arrow keys scroll; r refreshes local settings.", "Esc returns from details, or skips the first invitation to the menu without deciding. It returns next launch until you accept or decline. q exits. Opening this screen uploads no adoption report.", "After the first invitation, change your choice in Maintenance → Adoption statistics.")
 	case dashboardSupport:
 		lines = append(lines, "↑/↓, PgUp/PgDown, Home/End scroll the exact filtered JSON.",
 			"Enter saves this preview to a private local file; nothing is uploaded.",
@@ -402,7 +405,7 @@ func (model dashboardModel) frame(content string) string {
 }
 
 func (model dashboardModel) renderShell(shell tuiShell) string {
-	if model.busy != "" {
+	if model.busy != "" && model.screen != dashboardDisclaimer {
 		if !strings.Contains(shell.body, model.busy) && !strings.Contains(shell.fixedBody, model.busy) {
 			shell.fixedBody = strings.TrimSpace(model.busyView() + "\n" + shell.fixedBody)
 		}

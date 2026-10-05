@@ -206,6 +206,14 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 			return model, nil
 		}
+		if model.updateNotification.Key != "" {
+			if key.String() == "x" {
+				return model.dismissUpdateNotification()
+			}
+			if key.String() == "u" {
+				return model.openMaintenanceTask("u")
+			}
+		}
 		model.syncHomeTasks()
 		if key.String() == "r" {
 			return model.refreshOverview()
@@ -228,8 +236,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		case "a":
 			model.screen = dashboardAdministration
 		case "c":
-			model.screen = dashboardComputersArea
-			model.message = ""
+			return model.openComputersArea()
 		case "w":
 			model.screen = dashboardSoftware
 			model.software = model.software.open()
@@ -253,6 +260,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			return model, command
 		}
 	case dashboardComputersArea:
+		if key.String() == "n" && model.computerSetup != "" && model.computerSetup != "ready" && !model.actions.ClassroomMode {
+			return model.startComputerInstallation()
+		}
 		tasks := model.availableComputerTasks()
 		action := key.String()
 		if action == "enter" {

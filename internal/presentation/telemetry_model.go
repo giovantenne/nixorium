@@ -11,18 +11,20 @@ import (
 )
 
 type telemetryModel struct {
-	report     domain.TelemetryReport
-	applying   bool
-	id         uint64
-	firstOffer bool
-	detail     string
+	report       domain.TelemetryReport
+	applying     bool
+	id           uint64
+	loadingOffer bool
+	firstOffer   bool
+	detail       string
 }
 type telemetryMsg struct {
-	report domain.TelemetryReport
-	err    error
-	id     uint64
-	offer  bool
-	choice bool
+	report  domain.TelemetryReport
+	err     error
+	id      uint64
+	offer   bool
+	choice  bool
+	startup bool
 }
 
 func (model dashboardModel) checkTelemetryOffer() tea.Cmd {
@@ -49,6 +51,7 @@ func (model dashboardModel) openTelemetry() (tea.Model, tea.Cmd) {
 	model.telemetry.id++
 	model.telemetry.report = domain.TelemetryReport{}
 	model.telemetry.firstOffer = false
+	model.telemetry.loadingOffer = false
 	model.telemetry.detail = ""
 	model.pageScroll = 0
 	model.message = ""
@@ -61,7 +64,19 @@ func (model dashboardModel) openTelemetry() (tea.Model, tea.Cmd) {
 }
 func (model dashboardModel) finishTelemetry(msg telemetryMsg) (tea.Model, tea.Cmd) {
 	if msg.offer {
-		if msg.err != nil || model.screen != dashboardHome || model.busy != "" || model.managedJobConflict() != "" || model.actions.ClassroomMode {
+		if msg.startup && (model.screen != dashboardTelemetry || !model.telemetry.firstOffer || msg.id != model.telemetry.id) {
+			return model, nil
+		}
+		awaiting := model.screen == dashboardTelemetry && model.telemetry.firstOffer
+		if !awaiting && (model.screen != dashboardHome || model.busy != "" || model.managedJobConflict() != "" || model.actions.ClassroomMode) {
+			return model, nil
+		}
+		model.telemetry.loadingOffer = false
+		if msg.err != nil || msg.report.Consent != "undecided" {
+			if awaiting {
+				model.screen = dashboardHome
+				model.telemetry.firstOffer = false
+			}
 			return model, nil
 		}
 		model.screen = dashboardTelemetry
@@ -90,6 +105,9 @@ func (model dashboardModel) finishTelemetry(msg telemetryMsg) (tea.Model, tea.Cm
 	return model, nil
 }
 func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.telemetry.loadingOffer && key.String() != "esc" {
+		return model, nil
+	}
 	if model.telemetry.applying {
 		model.message = "Saving your choice locally. Please wait."
 		return model, nil
@@ -103,7 +121,13 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 			return model, nil
 		}
 		if model.telemetry.firstOffer {
-			model.message = "Choose e or Enter to share statistics, or d for No thanks."
+			model.screen = dashboardHome
+			model.telemetry.firstOffer = false
+			model.message = "Adoption statistics remain off. Choose later in Maintenance."
+			if model.telemetry.loadingOffer {
+				model.message = "No statistics choice was saved. Manage it in Maintenance."
+			}
+			model.telemetry.loadingOffer = false
 			return model, nil
 		}
 		model.screen = dashboardAdministration
@@ -124,16 +148,16 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 		}
 		model.pageScroll = 0
 		model.message = ""
-	case "e", "enter", "d":
+	case "e", "enter", "n", "d":
 		// Enter invokes the displayed primary action only on the overview.
 		if key.String() == "enter" && model.telemetry.detail != "" {
 			return model, nil
 		}
-		if model.actions.Telemetry == nil || (key.String() != "d" && model.telemetry.report.Consent == "") {
+		if model.actions.Telemetry == nil || (key.String() != "d" && key.String() != "n" && model.telemetry.report.Consent == "") {
 			return model, nil
 		}
 		actionName := "disable"
-		if key.String() != "d" {
+		if key.String() != "d" && key.String() != "n" {
 			actionName = "enable"
 		}
 		model.telemetry.applying = true
@@ -154,20 +178,20 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 	return model, nil
 }
 func (model dashboardModel) telemetryView() string {
+	if model.telemetry.loadingOffer {
+		return model.renderShell(tuiShell{path: []string{"Welcome"}, body: tuiTitle("Reading your saved statistics choice", model.isDark) + "\n\nThis local check uploads no adoption report.", actions: []tuiAction{{key: "Esc", label: "Menu"}, {key: "q", label: "Exit"}}})
+	}
+
 	r := model.telemetry.report
 	body := []string{tuiTitle("Help improve Nixorium", model.isDark),
-		"Share basic installation statistics to help us understand",
-		"adoption and lab sizes, and prioritize development.", "",
-		"Sharing is optional and off by default.",
-		"Nixorium works fully without it.", "",
-		"Daily report: Nixorium version, system mode, configured",
-		"client count band, client boot status, and an identifier",
-		"that changes every month.", "",
+		"Share basic statistics to understand adoption and lab sizes,",
+		"and help prioritize development.", "",
+		"Sharing is optional and off by default. Nixorium works fully without it.", "",
+		"Daily: version, system mode, client count band and boot status;",
+		"an identifier that changes every month.", "",
 		"No names, files, logs or configuration files are included.",
-		"Reports go to telemetry.nixorium.org via Cloudflare,",
-		"which receives your connection IP address.", "",
-		"Disable sharing anytime in Maintenance to stop future reports.",
-		"See Privacy & retention for storage and backup periods.", ""}
+		"Sent to telemetry.nixorium.org via Cloudflare, which sees your IP.", "",
+		"Disable anytime in Maintenance. See Privacy & retention for details."}
 	state := "Status: Off — no adoption reports are being sent."
 	if r.Consent == "enabled" {
 		state = "Status: On — at most one adoption report per UTC day."
@@ -210,14 +234,20 @@ func (model dashboardModel) telemetryView() string {
 	if model.telemetry.detail != "" {
 		acceptKey = "e"
 	}
-	actions := []tuiAction{{key: acceptKey, label: "Share statistics"}, {key: "d", label: decline},
+	actions := []tuiAction{{key: acceptKey, label: "Share statistics"}, {key: "n", label: decline},
 		{key: "p", label: "Exact report"}, {key: "i", label: "Privacy & retention"}, {key: "↑/↓", label: "Scroll"}}
-	if !model.telemetry.firstOffer || model.telemetry.detail != "" {
-		actions = append(actions, tuiAction{key: "Esc", label: "Back"})
+	back := "Back"
+	if model.telemetry.firstOffer && model.telemetry.detail == "" {
+		back = "Menu"
 	}
+	actions = append(actions, tuiAction{key: "Esc", label: back}, tuiAction{key: "q", label: "Exit"})
 	actions = append(actions, tuiAction{key: "F1", label: "Help"})
 	if model.telemetry.applying {
 		actions = []tuiAction{{key: "F1", label: "Help"}}
 	}
-	return model.renderShell(tuiShell{path: []string{"Maintenance", "Adoption statistics"}, body: strings.Join(body, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
+	path := []string{"Maintenance", "Adoption statistics"}
+	if model.telemetry.firstOffer {
+		path = []string{"Welcome", "Adoption statistics"}
+	}
+	return model.renderShell(tuiShell{path: path, body: strings.Join(body, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
 }

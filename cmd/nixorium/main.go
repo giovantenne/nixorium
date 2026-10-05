@@ -269,6 +269,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	gitReviewManager := app.NewGitReviewManager(local)
 	gitCommitManager := app.NewGitCommitManager(local)
 	updateManager := app.NewUpdateManager(local)
+	updateNotifications := app.NewUpdateNotificationManager(local)
 	baseSource := adapters.PackageBase{}
 	baseManager := app.NewPackageBaseManager(baseSource)
 	settingsManager := app.NewSettingsManager(local)
@@ -288,6 +289,16 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	lockManager := app.NewLockManager(lockSource{Local: local})
 	progressManager := app.NewOperationProgressManager(local)
 	actions := presentation.DashboardActions{
+		LoadClientSetup: func(context.Context) (bool, error) {
+			settings, _, err := settingsManager.CurrentForEditing(repository)
+			return settings.InstallationSettingsComplete(), err
+		},
+		LoadDisclaimer:   func(context.Context) (bool, error) { return local.DisclaimerAccepted(repository) },
+		AcceptDisclaimer: func() error { return local.AcceptDisclaimer(repository) },
+		CheckUpdateNotification: func(ctx context.Context) (domain.UpdateNotification, error) {
+			return updateNotifications.Check(ctx, repository)
+		},
+		DismissUpdateNotification: func(notice domain.UpdateNotification) error { return updateNotifications.Dismiss(repository, notice) },
 		LoadTemplateReset: func(requestContext context.Context) domain.TemplateResetCatalog {
 			return templateResetManager.Catalog(requestContext, repository)
 		},

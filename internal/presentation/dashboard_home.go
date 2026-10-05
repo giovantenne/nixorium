@@ -183,6 +183,14 @@ func (model dashboardModel) homeView() string {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
 	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "r", label: "Refresh local state"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}}
+	if model.updateNotification.Key != "" {
+		label := model.updateNotification.Target
+		if label == "master" {
+			label += " · " + shortRevision(model.updateNotification.Revision)
+		}
+		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "Nixorium update available: " + label, detail: "Chosen channel: " + string(model.updateNotification.Channel) + ". u reviews updates; x dismisses this version."})
+		actions = append([]tuiAction{{key: "u", label: "Review update"}, {key: "x", label: "Dismiss update"}}, actions...)
+	}
 	if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
 		actions = append([]tuiAction{{key: "v", label: "View progress"}}, actions...)
 	}
@@ -226,6 +234,14 @@ func (model dashboardModel) areaView(path, title, description string, tasks []da
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
 	actions := []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Overview"}, {key: "F1", label: "Help"}}
+	if path == "Computers" && !model.actions.ClassroomMode && (model.computerSetup == "missing" || model.computerSetup == "unknown") {
+		title := "Client computers have not been configured yet"
+		if model.computerSetup == "unknown" {
+			title = "Client configuration could not be checked"
+		}
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: title, detail: "Open Installation to configure clients before installing or managing them."})
+		actions = append([]tuiAction{{key: "n", label: "Configure clients"}}, actions...)
+	}
 	if model.actions.ClassroomMode && path == "Computers" {
 		actions = []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "F1", label: "Help"}, {key: "q", label: "Quit"}}
 	}
