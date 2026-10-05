@@ -648,7 +648,7 @@ async function refresh() {
   try {
     const response = await fetch('/api/computers', { cache: 'no-store' });
     if (response.status === 403) {
-      notice('This page has expired. Open the classroom view again from Nixorium.');
+      notice('This page has expired. Close this window and open the classroom view again from Nixorium.');
       return;
     }
     if (!response.ok) throw new Error(String(response.status));

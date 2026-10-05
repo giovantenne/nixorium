@@ -47,6 +47,7 @@ type DashboardActions struct {
 	LoadInventory           func(context.Context) (domain.StatusReport, error)
 	LoadInitial             func(context.Context) (domain.StatusReport, domain.SetupReport, error)
 	LoadDoctor              func(context.Context) (domain.DoctorReport, error)
+	Telemetry               func(context.Context, string) (domain.TelemetryReport, error)
 	PreviewSupport          func(context.Context) (domain.SupportSnapshot, error)
 	ExportSupport           func(domain.SupportSnapshot) domain.SupportExportResult
 	Refresh                 func(context.Context) (domain.StatusReport, error)
@@ -171,6 +172,7 @@ const (
 	dashboardShutdownResult
 	dashboardWorkspace
 	dashboardSupport
+	dashboardTelemetry
 	dashboardTemplateReset
 	dashboardHostTrust
 	dashboardManagedJobs
@@ -393,6 +395,7 @@ type dashboardModel struct {
 	updates                updateModel
 	settings               settingsModel
 	workspace              workspaceModel
+	telemetry              telemetryModel
 	support                supportModel
 	templateReset          templateResetModel
 	software               softwareModel
@@ -1108,6 +1111,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.administrationView()
 	case dashboardDiagnostics:
 		content = model.diagnosticsView()
+	case dashboardTelemetry:
+		content = model.telemetryView()
 	case dashboardSupport:
 		content = model.supportView()
 	case dashboardTemplateReset:

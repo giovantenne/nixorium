@@ -94,8 +94,12 @@ let
     ++ lib.optionals hasChromium [ "chromium-browser.desktop" ]
     ++ lib.optionals hasCode [ "code.desktop" ]
     ++ [ "org.gnome.Nautilus.desktop" "org.gnome.TextEditor.desktop" ];
-  # The Nixorium launcher exists only on the controller; staff find it first.
+  # The Nixorium launchers exist only on the controller; staff find theirs
+  # first: the administrator the dashboard, the teacher the classroom view.
   staffFavorites = lib.optionals isController [ "nixorium.desktop" ]
+    ++ studentFavorites;
+  teacherFavorites = lib.optionals isController
+    [ (if labSettings.classroomView or true then "nixorium-classroom.desktop" else "nixorium.desktop") ]
     ++ studentFavorites;
   enabledExtensions = [
     "ding@rastersoft.com"
@@ -240,8 +244,10 @@ in
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "dash-to-dock@micxgx.gmail.com"
         ${pkgs.gnome-shell}/bin/gnome-extensions enable "tiling-assistant@leleat-on-github"
         # Student preferences are seeded only at the normal boot reset.
-        if [[ "$USER" != ${labSettings.studentUser} ]]; then
+        if [[ "$USER" == admin ]]; then
           apply_staff_defaults ${lib.escapeShellArg (gvariantList staffFavorites)}
+        elif [[ "$USER" == ${labSettings.teacherUser} ]]; then
+          apply_staff_defaults ${lib.escapeShellArg (gvariantList teacherFavorites)}
         fi
         gsettings set org.gnome.shell welcome-dialog-last-shown-version '9999'
       }

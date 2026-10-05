@@ -663,19 +663,15 @@ let
       fi
     '';
   };
+  # The dashboard's terminal window carries this class, so the Nixorium icon
+  # brings an open dashboard forward instead of starting another.
+  dashboardWindowClass = "org.nixorium.Nixorium";
   nixoriumOpen = pkgs.writeShellApplication {
     name = "nixorium-open";
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
-      # The teacher goes straight to the classroom view when the laboratory
-      # has it; the dashboard opens if the view cannot.
-      ${lib.optionalString (labSettings.classroomView or true) ''
-        if [[ "$(id -un)" == ${lib.escapeShellArg labSettings.teacherUser} ]] && ${nixoriumPackage}/bin/nixorium classroom-view; then
-          exit 0
-        fi
-      ''}
       SESSION=${nixoriumSession}/bin/nixorium-session
-      if command -v ghostty >/dev/null; then exec ghostty -e "$SESSION"; fi
+      if command -v ghostty >/dev/null; then exec ghostty --class=${dashboardWindowClass} -e "$SESSION"; fi
       if command -v kgx >/dev/null; then exec kgx -- "$SESSION"; fi
       if command -v gnome-terminal >/dev/null; then exec gnome-terminal -- "$SESSION"; fi
       if command -v xterm >/dev/null; then exec xterm -e "$SESSION"; fi
@@ -691,6 +687,25 @@ let
     # The mark used on nixorium.org, so the dock shows the product.
     icon = "${../assets/nixorium-icon.svg}";
     categories = [ "System" "Settings" ];
+    startupWMClass = dashboardWindowClass;
+  };
+  # The teacher's icon. The classroom view's windows carry this class
+  # (cmd/nixorium/classroom_view.go), so it brings an open view forward; the
+  # dashboard opens if the view cannot.
+  classroomOpen = pkgs.writeShellApplication {
+    name = "nixorium-classroom-open";
+    text = ''
+      ${nixoriumPackage}/bin/nixorium classroom-view >/dev/null || exec ${nixoriumOpen}/bin/nixorium-open
+    '';
+  };
+  classroomLauncher = pkgs.makeDesktopItem {
+    name = "nixorium-classroom";
+    desktopName = "Classroom view";
+    comment = "See and manage the student computers of this classroom";
+    exec = "${classroomOpen}/bin/nixorium-classroom-open";
+    icon = "${../assets/nixorium-icon.svg}";
+    categories = [ "Education" ];
+    startupWMClass = "nixorium-classroom";
   };
 
   # Remove this controller's old system generations reviewed under the
@@ -741,6 +756,8 @@ in
       nixoriumLauncher
       pkgs.colmena
       pkgs.git
+    ] ++ lib.optionals (labSettings.classroomView or true) [
+      classroomLauncher
       # The classroom view's Send files opens it to choose a file or folder.
       pkgs.zenity
     ];
@@ -980,6 +997,8 @@ in
         ReadWritePaths = [
           "/run/nixorium/remote-install"
           "/var/lib/nixorium/remote-install"
+          # Save only the optional historical verified-boot telemetry flag.
+          "-/var/lib/nixorium/telemetry"
           "/var/lib/nixorium/coordination"
           # Only host trust data needs atomic replacement, never SSH keys/config.
           "/home/admin/.ssh/nixorium-known-hosts"

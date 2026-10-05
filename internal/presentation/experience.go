@@ -318,6 +318,8 @@ func (model dashboardModel) helpView() string {
 		if model.actions.PreviewSupport != nil && !model.actions.ClassroomMode {
 			lines = append(lines, "e  Preview a minimized support report; no save or upload yet")
 		}
+	case dashboardTelemetry:
+		lines = append(lines, "Optional daily adoption statistics. e enables sharing; d disables it. Esc leaves without enabling. Arrow keys scroll the exact payload. No data is sent by opening this screen.")
 	case dashboardSupport:
 		lines = append(lines, "↑/↓, PgUp/PgDown, Home/End scroll the exact filtered JSON.",
 			"Enter saves this preview to a private local file; nothing is uploaded.",

@@ -6,6 +6,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- On the controller, **Classroom view** has its own launcher, first in the
+  teacher's dock, and **Nixorium** opens the dashboard, first in the
+  administrator's dock. Clicking an icon again brings its open window forward
+  instead of opening another classroom view or dashboard.
+
+- Add optional controller adoption statistics, disabled until the administrator
+  explicitly enables them. CLI/TUI previews show the allowlisted daily payload;
+  monthly identities and consent remain outside backups. Offline reporting
+  failures do not affect laboratory operations.
+
 - **Send files** replaces Send desktop. In the classroom view page it offers
   **A file…** and **A folder…**, which open the system file chooser in the
   teacher's home; in the TUI the path starts at the user's home; from a

@@ -461,8 +461,9 @@ dependency of the controller management workflows. The screensaver therefore
 remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and
 Tiling Assistant are installed as workstation basics in every profile. The
 compact bottom dock hides when a window overlaps it and reappears at the bottom
-edge. It stays visible on a clear desktop. On the controller, the administrator
-and teacher docks start with the Nixorium launcher. Desktop files appear on the desktop, and
+edge. It stays visible on a clear desktop. On the controller, the administrator's
+dock starts with Nixorium and the teacher's with the Classroom view; clicking an
+icon again brings its window forward. Desktop files appear on the desktop, and
 dragging a window to an edge offers an adjacent window with small 8 px gaps.
 Yaru-yellow icons, as in Nixorium 1.0.0, complement native Adwaita decorations. Administrator and
 teacher accounts start with blue accents and a static vector wallpaper; every
@@ -1148,3 +1149,26 @@ git push origin master
 ```
 
 </details>
+
+## Optional adoption statistics
+
+In Maintenance → Adoption statistics, review the small daily report and explicitly
+choose whether to share it. Sharing is off by default and never required to use
+the lab. Only the controller sends reports. Preview/status are local; the timer
+runs without the TUI after consent. Disable stops future sends and removes the
+local identity. Controller backups exclude telemetry identity and consent.
+
+```sh
+nixorium telemetry preview --json
+nixorium telemetry status --json
+nixorium telemetry enable
+nixorium telemetry disable
+```
+
+Reports contain a monthly pseudonym, installed version/mode, client-count band
+and historical verified-client-boot flag. They exclude hostnames, users, files,
+configuration and logs. Cloudflare receives the connection IP; these statistics
+are pseudonymous, not guaranteed anonymous. Raw observations target 90-day
+retention plus provider recovery copies; monthly aggregates last 24 months.
+Offline or failed sends never prevent lab operation. Previously received records
+are not erased by disabling locally.

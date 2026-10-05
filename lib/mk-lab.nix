@@ -173,6 +173,7 @@ let
     (upstreamRoot + "/modules/home-reset.nix")
     (upstreamRoot + "/modules/classroom-view.nix")
     (upstreamRoot + "/modules/management.nix")
+    (upstreamRoot + "/modules/telemetry.nix")
     (upstreamRoot + "/modules/pxe.nix")
   ] ++ lib.optional (nixosVersionMetadata != null) ({ lib, ... }: {
     system.nixos.versionSuffix = lib.mkForce nixosVersionMetadata.versionSuffix;

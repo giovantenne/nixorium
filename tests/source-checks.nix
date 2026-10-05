@@ -66,6 +66,7 @@ in
   programming-profile-vm = import ./programming-profile-vm.nix { inherit pkgs; };
   session-state-vm = import ./session-state-vm.nix { inherit pkgs; };
   classroom-view-vm = import ./classroom-view-vm.nix { inherit pkgs; };
+  telemetry-vm = import ./telemetry-vm.nix { inherit pkgs; };
   clean-generations-vm = import ./clean-generations-vm.nix { inherit pkgs; };
   workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
     touch "$out"

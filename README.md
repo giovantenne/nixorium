@@ -170,6 +170,7 @@ and the [security policy](SECURITY.md).
 
 - [Administrator guide](templates/site/README.md): setup, daily operation and customization
 - [Troubleshooting](docs/troubleshooting.md): failures, recovery and [backups](docs/troubleshooting.md#backups-and-restoration)
+- [Optional adoption statistics](docs/telemetry.md): preview, consent and privacy
 - [Update guide](docs/updates.md): Nixorium, NixOS and package updates
 - [Management interface](docs/tui-gallery.md) and [support reports](docs/support-report.md)
 - [Template reset](docs/deployment-template-reset.md) for an outdated deployment

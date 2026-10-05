@@ -25,6 +25,11 @@ func classroomViewAction() func(context.Context) (string, error) {
 // openClassroomView asks the classroom service for a one-time address and
 // opens it in a browser window of the current graphical session.
 func openClassroomView(ctx context.Context) (string, error) {
+	// One classroom view per user: GNOME brings the open window forward
+	// from the Nixorium icon (same window class), so never open another.
+	if profile, err := classroomBrowserProfile(); err == nil && classroomBrowserRunning(profile) {
+		return "The classroom view is already open.", nil
+	}
 	response, err := classroomRequest(ctx, domain.ClassroomViewOpenOperation, nil)
 	if err != nil {
 		return "", err
@@ -82,10 +87,14 @@ func classroomBrowserProfile() (string, error) {
 
 // classroomBrowserArguments runs Chromium through XWayland, where GNOME draws
 // the window frame; on Wayland Chromium would draw its own.
+// classroomWindowClass is the X11 window class of the classroom view; the
+// Nixorium launcher declares it as StartupWMClass.
+const classroomWindowClass = "nixorium-classroom"
+
 // Through XWayland Chromium does not see GNOME's dark style, so the page
 // and its windows follow it only when told.
 func classroomBrowserArguments(address, profile string, dark bool) []string {
-	arguments := []string{"chromium", "--user-data-dir=" + profile, "--ozone-platform=x11", "--no-first-run", "--no-default-browser-check"}
+	arguments := []string{"chromium", "--user-data-dir=" + profile, "--ozone-platform=x11", "--class=" + classroomWindowClass, "--no-first-run", "--no-default-browser-check"}
 	if dark {
 		arguments = append(arguments, "--force-dark-mode")
 	}

@@ -74,6 +74,7 @@ var installationAreaTasks = []dashboardTask{
 // Maintenance lists frequent tasks first; advanced tools follow in a
 // visually separate group so the default selection is never destructive.
 var administrationTasks = []dashboardTask{
+	{id: "telemetry", shortcut: "a", title: "Adoption statistics", description: "Preview optional daily reports, enable or disable sharing"},
 	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git and controller keys"},
 	{id: "diagnostics", shortcut: "i", title: "Diagnostics", description: "Check the lab and see recovery instructions"},
 	{id: "package-base", shortcut: "b", title: "Update system and packages", description: "Refresh the NixOS base or review a channel migration"},

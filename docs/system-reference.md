@@ -698,3 +698,11 @@ The public repository contains two different Agent Skills:
   private laboratory's configuration and operation.
 
 Only the maintainer skill is copied into generated deployment repositories.
+
+## Optional controller telemetry
+
+The built-in telemetry module installs only on the controller. It exposes the
+installed generation’s version, deployment mode and client-count band in
+`/etc/nixorium/telemetry.json`. Its daily systemd service runs as admin and sends
+nothing until runtime consent is explicitly enabled. It opens no listening ports
+and adds no client-side Internet requirement. See [telemetry](telemetry.md).

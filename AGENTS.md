@@ -346,6 +346,11 @@ any shard must block publication.
   deployment mode 0700, exclude the student, reject repository/address/command
   selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
+- Adoption telemetry is controller-only and off without explicit administrator
+  consent. Keep its allowlisted payload and monthly identity separate from support
+  exports. Preview/status never upload or probe; network failures never block lab
+  operations. Keep state outside backups/Git/store, serialize consent with sending,
+  and preserve the authenticated historical-boot evidence boundary. See docs/telemetry.md.
 - Support export must use the separate immutable allowlisted snapshot, never
   serialize detailed reports or error strings. Preview and confirmed local
   export share exact bytes. Preserve unavailable/omitted evidence, no-build

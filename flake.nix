@@ -153,6 +153,7 @@
         programming-profile-vm = import ./tests/programming-profile-vm.nix { inherit pkgs; };
         session-state-vm = import ./tests/session-state-vm.nix { inherit pkgs; };
         classroom-view-vm = import ./tests/classroom-view-vm.nix { inherit pkgs; };
+        telemetry-vm = import ./tests/telemetry-vm.nix { inherit pkgs; };
         clean-generations-vm = import ./tests/clean-generations-vm.nix { inherit pkgs; };
         config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''
           touch "$out"

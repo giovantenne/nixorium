@@ -317,7 +317,9 @@ func (Local) SSHStatus(ctx context.Context, hosts []domain.HostMeta, timeout tim
 }
 
 func (Local) CurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration) map[string]domain.HostSystemProbe {
-	return probeCurrentSystems(ctx, hosts, timeout, probeCurrentSystem)
+	probes := probeCurrentSystems(ctx, hosts, timeout, probeCurrentSystem)
+	rememberTelemetryBoot(probes)
+	return probes
 }
 
 func probeCurrentSystems(ctx context.Context, hosts []domain.HostMeta, timeout time.Duration, probe func(context.Context, domain.HostMeta, time.Duration) domain.HostSystemProbe) map[string]domain.HostSystemProbe {

@@ -25,7 +25,9 @@ let
 in
 # Staff find the Nixorium launcher first in the controller's dock only.
 assert pkgs.lib.hasInfix "apply_staff_defaults '['\\''nixorium.desktop'" controllerScript;
+assert pkgs.lib.hasInfix "apply_staff_defaults '['\\''nixorium-classroom.desktop'" controllerScript;
 assert !(pkgs.lib.hasInfix "nixorium.desktop" clientScript);
+assert !(pkgs.lib.hasInfix "nixorium-classroom.desktop" clientScript);
 pkgs.runCommand "nixorium-desktop-profile-check" {
   nativeBuildInputs = [ pkgs.glib pkgs.jq pkgs.bash ];
 } ''

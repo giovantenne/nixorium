@@ -34,7 +34,7 @@ func TestClassroomBrowserProfileKeepsSystemFrames(t *testing.T) {
 		t.Fatalf("existing preferences were replaced: %q", content)
 	}
 	arguments := classroomBrowserArguments("http://127.0.0.1:1/open?token=x", profile, false)
-	for _, want := range []string{"--user-data-dir=" + profile, "--ozone-platform=x11", "--app=http://127.0.0.1:1/open?token=x"} {
+	for _, want := range []string{"--user-data-dir=" + profile, "--ozone-platform=x11", "--class=nixorium-classroom", "--app=http://127.0.0.1:1/open?token=x"} {
 		if !slices.Contains(arguments, want) {
 			t.Fatalf("arguments %v lack %s", arguments, want)
 		}

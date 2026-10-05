@@ -65,6 +65,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case templateResetResultMsg:
 		return model.finishTemplateResetResult(message)
+	case telemetryMsg:
+		return model.finishTelemetry(message)
 	case dashboardSupportPreviewMsg:
 		return model.finishSupportPreview(message)
 	case dashboardSupportExportMsg:
@@ -119,7 +121,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.screen = dashboardHome
 		}
 		model.message = ""
-		return model, poll
+		return model, tea.Batch(poll, model.checkTelemetryOffer())
 	case dashboardPXEOverviewMsg:
 		model.busy = ""
 		model.installation.stateError = message.err != nil
@@ -1139,6 +1141,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			model.message = "A read is running. Press Esc to cancel, or F1 for help."
 			return model, nil
 		}
+	}
+	if model.screen == dashboardTelemetry && (model.telemetry.applying || (key.String() != "ctrl+c" && key.String() != "q")) {
+		return model.updateTelemetryKey(key)
 	}
 	if model.screen == dashboardSupport && key.String() != "ctrl+c" && key.String() != "q" {
 		return model.updateSupportKey(key)

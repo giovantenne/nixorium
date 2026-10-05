@@ -23,7 +23,11 @@ type InstalledRemoteState struct {
 }
 
 func VerifyInstalledRemote(ctx context.Context, runtimeRoot, installedPrivateKey string, preparation domain.RemoteInstallPreparation) (InstalledRemoteState, error) {
-	return verifyInstalledRemoteWithExecutable(ctx, runtimeRoot, installedPrivateKey, preparation, "ssh")
+	state, err := verifyInstalledRemoteWithExecutable(ctx, runtimeRoot, installedPrivateKey, preparation, "ssh")
+	if err == nil {
+		rememberTelemetryBoot(map[string]domain.HostSystemProbe{"verified": {SystemPath: state.SystemPath, Revision: state.Revision}})
+	}
+	return state, err
 }
 
 func verifyInstalledRemoteWithExecutable(ctx context.Context, runtimeRoot, installedPrivateKey string, preparation domain.RemoteInstallPreparation, sshExecutable string) (InstalledRemoteState, error) {

@@ -640,3 +640,13 @@ notice stays visible while the teacher watches. Updates to the classroom
 Shell extension take effect at the student's next login. Validate the
 overview, control, lock, sharing the teacher's screen and Send files after
 deployment on a real classroom computer.
+
+## Optional adoption statistics
+
+Telemetry is controller-only and disabled without explicit administrator consent.
+Use `nixorium telemetry preview --json` or `nixorium telemetry status --json` for
+local inspection. Enable only when the user explicitly asks to participate:
+`nixorium telemetry enable`. Stop with `nixorium telemetry disable`; this removes
+the local identity, not server history. Never enable to fix diagnostics or
+readiness. Backups exclude consent and identity; a replacement controller requires
+a new choice. Raw support reports remain local and are never sent by telemetry.

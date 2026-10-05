@@ -77,6 +77,8 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 
 func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.Cmd) {
 	switch action {
+	case "a":
+		return model.openTelemetry()
 	case "f":
 		return model.openCleanup()
 	case "y":

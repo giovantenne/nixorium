@@ -135,3 +135,10 @@ examples are not authorization.
 
 The [administrator guide](README.md) covers operation; [troubleshooting](TROUBLESHOOTING.md)
 covers failures and encrypted backups. Local home snapshots are not backups.
+
+## Optional adoption statistics
+
+Controller telemetry requires explicit administrator consent. Inspect with
+`nixorium telemetry preview --json`; never enable sharing as a diagnostic or
+installation prerequisite. Support reports remain local. Consent and monthly
+identity secrets stay outside the deployment repository and controller backups.

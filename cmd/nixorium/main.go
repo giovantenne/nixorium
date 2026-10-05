@@ -96,6 +96,9 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		usage(stdout)
 		return 0
 	}
+	if options.command == "telemetry" {
+		return runTelemetryCommand(ctx, options, stdout, stderr)
+	}
 	// The classroom view needs only the classroom service: the teacher
 	// cannot read the deployment repository.
 	if options.command == "classroom-view" {
@@ -337,6 +340,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		LoadDoctor: func(ctx context.Context) (domain.DoctorReport, error) {
 			return inspector.Doctor(ctx, repository, app.DoctorOptions{})
 		},
+		Telemetry: app.NewTelemetryManager(adapters.DefaultTelemetry()).Run,
 		PreviewSupport: func(requestContext context.Context) (domain.SupportSnapshot, error) {
 			return supportManager.Preview(requestContext, repository, nixoriumVersion)
 		},
@@ -675,6 +679,9 @@ func commandRequiresRepository(options options) bool {
 }
 
 func parseArguments(arguments []string) (options, error) {
+	if len(arguments) > 0 && arguments[0] == "telemetry" {
+		return parseTelemetryArguments(arguments[1:])
+	}
 	if len(arguments) > 0 && arguments[0] == "host-key" {
 		return parseHostTrustArguments(arguments[1:])
 	}
@@ -1375,6 +1382,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
 	fmt.Fprintln(writer, "       host-key apply --host <pcNN> --expect <review-token> [--yes] rotates only the reviewed key")
+	fmt.Fprintln(writer, "       telemetry status|preview [--json], telemetry enable|disable: optional controller adoption statistics")
 	fmt.Fprintln(writer, "       support preview [--json] shows the filtered diagnostic payload without saving")
 	fmt.Fprintln(writer, "       support export reviews and confirms a private local file; no upload or build")
 	fmt.Fprintln(writer, "       workspace apply --file <candidate.json> --expect <review-token> [--yes] saves only the profile JSON")
