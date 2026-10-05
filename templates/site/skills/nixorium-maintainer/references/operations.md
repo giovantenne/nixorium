@@ -644,8 +644,11 @@ deployment on a real classroom computer.
 ## Optional adoption statistics
 
 Telemetry is controller-only and disabled without explicit administrator consent.
-The first administrator TUI invitation shows a readable report and an optional
-exact JSON preview. Enter never accepts; declining or leaving keeps sharing off.
+The first administrator TUI invitation requires an explicit choice: e or Enter
+on the overview shares statistics; d declines. Exact report and Privacy & retention
+are local views available before choosing. Esc returns from details but cannot skip
+the invitation; exiting without deciding leaves sharing off and reoffers it next time.
+A saved refusal is remembered. Maintenance lists Adoption statistics last.
 Downloading the installer does not authorize controller reports.
 Use `nixorium telemetry preview --json` or `nixorium telemetry status --json` for
 local inspection. Enable only when the user explicitly asks to participate:

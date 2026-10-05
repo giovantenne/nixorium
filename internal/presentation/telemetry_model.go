@@ -15,7 +15,7 @@ type telemetryModel struct {
 	applying   bool
 	id         uint64
 	firstOffer bool
-	details    bool
+	detail     string
 }
 type telemetryMsg struct {
 	report domain.TelemetryReport
@@ -34,10 +34,9 @@ func (model dashboardModel) checkTelemetryOffer() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 		defer cancel()
 		r, e := action(ctx, "status")
-		if e != nil || r.Prompted || r.Consent != "undecided" {
+		if e != nil || r.Consent != "undecided" {
 			return telemetryMsg{offer: true, err: fmt.Errorf("no offer")}
 		}
-		r, e = action(ctx, "dismiss")
 		return telemetryMsg{offer: true, report: r, err: e}
 	}
 }
@@ -50,7 +49,7 @@ func (model dashboardModel) openTelemetry() (tea.Model, tea.Cmd) {
 	model.telemetry.id++
 	model.telemetry.report = domain.TelemetryReport{}
 	model.telemetry.firstOffer = false
-	model.telemetry.details = false
+	model.telemetry.detail = ""
 	model.pageScroll = 0
 	model.message = ""
 	model.busy = "Reading local telemetry settings; no upload"
@@ -67,7 +66,7 @@ func (model dashboardModel) finishTelemetry(msg telemetryMsg) (tea.Model, tea.Cm
 		}
 		model.screen = dashboardTelemetry
 		model.telemetry.firstOffer = true
-		model.telemetry.details = false
+		model.telemetry.detail = ""
 		model.pageScroll = 0
 	} else if model.screen != dashboardTelemetry || msg.id != model.telemetry.id {
 		return model, nil
@@ -97,10 +96,17 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 	}
 	switch key.String() {
 	case "esc":
-		model.screen = dashboardAdministration
-		if model.telemetry.firstOffer {
-			model.screen = dashboardHome
+		if model.telemetry.detail != "" {
+			model.telemetry.detail = ""
+			model.pageScroll = 0
+			model.message = ""
+			return model, nil
 		}
+		if model.telemetry.firstOffer {
+			model.message = "Choose e or Enter to share statistics, or d for No thanks."
+			return model, nil
+		}
+		model.screen = dashboardAdministration
 		model.telemetry.firstOffer = false
 		model.message = ""
 		return model, nil
@@ -110,15 +116,24 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 		updated := next.(dashboardModel)
 		updated.telemetry.firstOffer = firstOffer
 		return updated, cmd
-	case "p":
-		model.telemetry.details = !model.telemetry.details
+	case "p", "i":
+		if model.telemetry.detail == key.String() {
+			model.telemetry.detail = ""
+		} else {
+			model.telemetry.detail = key.String()
+		}
 		model.pageScroll = 0
-	case "e", "d":
-		if model.actions.Telemetry == nil || (key.String() == "e" && model.telemetry.report.Consent == "") {
+		model.message = ""
+	case "e", "enter", "d":
+		// Enter invokes the displayed primary action only on the overview.
+		if key.String() == "enter" && model.telemetry.detail != "" {
+			return model, nil
+		}
+		if model.actions.Telemetry == nil || (key.String() != "d" && model.telemetry.report.Consent == "") {
 			return model, nil
 		}
 		actionName := "disable"
-		if key.String() == "e" {
+		if key.String() != "d" {
 			actionName = "enable"
 		}
 		model.telemetry.applying = true
@@ -140,32 +155,48 @@ func (model dashboardModel) updateTelemetryKey(key tea.KeyPressMsg) (tea.Model, 
 }
 func (model dashboardModel) telemetryView() string {
 	r := model.telemetry.report
-	body := []string{tuiTitle("Help improve Nixorium?", model.isDark),
-		"Share a small daily report to help us understand adoption and lab sizes.",
-		"Your choice is optional. Nixorium works fully with sharing off.", ""}
-	if r.Consent != "" {
-		state := "Off · nothing is sent without your explicit choice"
-		if r.Consent == "enabled" {
-			state = "On · at most one report per UTC day"
-		}
-		boot := "Unknown (not a failed installation)"
+	body := []string{tuiTitle("Help improve Nixorium", model.isDark),
+		"Share basic installation statistics to help us understand",
+		"adoption and lab sizes, and prioritize development.", "",
+		"Sharing is optional and off by default.",
+		"Nixorium works fully without it.", "",
+		"Daily report: Nixorium version, system mode, configured",
+		"client count band, client boot status, and an identifier",
+		"that changes every month.", "",
+		"No names, files, logs or configuration files are included.",
+		"Reports go to telemetry.nixorium.org via Cloudflare,",
+		"which receives your connection IP address.", "",
+		"Disable sharing anytime in Maintenance to stop future reports.",
+		"See Privacy & retention for storage and backup periods.", ""}
+	state := "Status: Off — no adoption reports are being sent."
+	if r.Consent == "enabled" {
+		state = "Status: On — at most one adoption report per UTC day."
+	}
+	if r.Consent == "" {
+		state = "Status: Reading local settings…"
+	}
+	fixedBody := state
+	if model.telemetry.detail != "" {
+		fixedBody = ""
+	}
+	switch model.telemetry.detail {
+	case "p":
+		b, _ := json.MarshalIndent(r.Payload, "", "  ")
+		boot := "Unknown"
 		if r.Payload.ClientBootVerified != nil && *r.Payload.ClientBootVerified {
 			boot = "At least one installed client previously verified"
 		}
-		body = append(body, state, "",
-			"Version: "+r.Payload.Version+"   Mode: "+r.Payload.DeploymentMode,
-			"Configured clients: "+r.Payload.ConfiguredClients,
-			"Client boot: "+boot,
-			"A monthly pseudonym counts this controller within one UTC month.", "",
-			"No names, files, logs or configuration. Cloudflare sees the connection IP.",
-			"Sent to telemetry.nixorium.org. Change your choice anytime in Maintenance.",
-			"Daily records: 90-day target; monthly totals: 24 months.",
-			"Provider recovery copies expire separately. Disabling stops future sends.")
-		if model.telemetry.details {
-			b, _ := json.MarshalIndent(r.Payload, "", "  ")
-			body = []string{tuiTitle("Exact report and privacy details", model.isDark), string(b), "", domain.TelemetryNotice,
-				"", "Last attempt: " + r.LastAttempt, "Last success: " + r.LastSuccess, "Result: " + r.Result}
-		}
+		body = []string{tuiTitle("Exact report", model.isDark),
+			"This preview is generated locally; opening it sends no report.", "",
+			"Version: " + r.Payload.Version + "   Mode: " + r.Payload.DeploymentMode,
+			"Configured clients: " + r.Payload.ConfiguredClients,
+			"Client boot status: " + boot,
+			"An unknown boot status is not counted as an installation failure.",
+			"Verified boot is historical evidence, not current lab health.", "", string(b), "",
+			"Before consent, the monthly identifier is a placeholder.",
+			"Last attempt: " + r.LastAttempt, "Last success: " + r.LastSuccess, "Result: " + r.Result}
+	case "i":
+		body = []string{tuiTitle("Privacy & retention", model.isDark), domain.TelemetryNotice}
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
@@ -175,13 +206,18 @@ func (model dashboardModel) telemetryView() string {
 	if r.Consent == "enabled" {
 		decline = "Disable sharing"
 	}
-	preview := "Exact report"
-	if model.telemetry.details {
-		preview = "Overview"
+	acceptKey := "e/Enter"
+	if model.telemetry.detail != "" {
+		acceptKey = "e"
 	}
-	actions := []tuiAction{{key: "e", label: "Enable sharing"}, {key: "d", label: decline}, {key: "p", label: preview}, {key: "↑/↓", label: "Scroll"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+	actions := []tuiAction{{key: acceptKey, label: "Share statistics"}, {key: "d", label: decline},
+		{key: "p", label: "Exact report"}, {key: "i", label: "Privacy & retention"}, {key: "↑/↓", label: "Scroll"}}
+	if !model.telemetry.firstOffer || model.telemetry.detail != "" {
+		actions = append(actions, tuiAction{key: "Esc", label: "Back"})
+	}
+	actions = append(actions, tuiAction{key: "F1", label: "Help"})
 	if model.telemetry.applying {
 		actions = []tuiAction{{key: "F1", label: "Help"}}
 	}
-	return model.renderShell(tuiShell{path: []string{"Maintenance", "Adoption statistics"}, body: strings.Join(body, "\n"), notices: notices, actions: actions})
+	return model.renderShell(tuiShell{path: []string{"Maintenance", "Adoption statistics"}, body: strings.Join(body, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
 }

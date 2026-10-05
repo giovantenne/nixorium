@@ -7,10 +7,13 @@ send these reports.
 
 In **Maintenance → Adoption statistics**, inspect the payload and explicitly
 choose whether to share it. The first ordinary administrator startup offers
-this choice once, with a readable summary of the report. Press `p` to inspect
-the exact JSON and privacy details, `e` to enable sharing, or `d` to decline.
-There is no default acceptance: Enter does nothing and Esc leaves sharing off.
+this choice until a decision is saved, with a benefit-first summary of the report.
+Press `p` for the exact local JSON and `i` for Privacy & retention. On the overview,
+`e` or Enter explicitly accepts sharing; `d` declines. Esc returns from details
+but cannot skip the first choice. Exiting the application without deciding keeps
+sharing off and offers the choice next time. A saved refusal is not reoffered.
 The first invitation returns to the overview after saving either choice.
+Adoption statistics is the last entry in Maintenance.
 You can return at any time. The command-line equivalents are:
 
 ```sh
@@ -65,7 +68,7 @@ computer checks and successful USB post-boot verification may record this one
 historical boolean after consent. Saving this evidence cannot fail the operation.
 
 The payload excludes hostnames, school names, IP addresses, usernames, machine
-IDs, hardware identifiers, packages, configuration, repository revisions, paths,
+IDs, hardware identifiers, packages, configuration files, repository revisions, paths,
 logs, credentials, files and student screens. Unsupported version strings become
 `unknown`. The local support-report feature remains separate and never uploads.
 
@@ -83,13 +86,26 @@ A full disk clone that also preserves machine-id needs `disable` followed by
 an explicit `enable` on the independent controller. Do not enable telemetry on
 cloned test systems unless you intend to include them in the adoption counts.
 
-The backend targets removal of individual daily observations after 90 days,
-with bounded daily cleanup, and retains only ID-free monthly aggregates for
-24 calendar months. Provider recovery copies have a separate retention window.
-Before a public pilot, the service operator must document the actual Cloudflare
-backup/log settings and contact for privacy requests. This document describes
-the implementation contract; it does not certify a service deployment or data
-residency.
+The collection is operated by Claudio Benvenuti, the Nixorium maintainer.
+For privacy requests, contact [hello@nixorium.org](mailto:hello@nixorium.org).
+Its purpose is to understand adoption and lab sizes and prioritize development.
+
+Scheduled daily cleanup deletes individual observations aged 89 days or more,
+normally within 90 days of server receipt, without a fixed row cap or dependence
+on successful aggregation. Outages or exhausted Cloudflare quotas can delay
+physical deletion; records aged 90 days are excluded from report calculations.
+ID-free monthly aggregates and separate installer totals retain 24 calendar
+months including the current month, with scheduled cleanup and report filtering.
+If expiry preceded delayed aggregation, the monthly result stays provisional.
+
+On the deployed Workers Free plan, Cloudflare D1 recovery history lasts
+[7 days](https://developers.cloudflare.com/d1/reference/time-travel/), so deleted
+records may remain recoverable for up to 7 further days. The service creates no
+separate adoption-record exports or backups, and Worker request logging is disabled.
+Cloudflare's infrastructure processing follows its
+[privacy policy](https://www.cloudflare.com/privacypolicy/); disabling Worker
+logs does not mean the provider processes no connection data. This is not a
+guarantee of exclusively European processing.
 
 `disable` stops new dispatches and removes the local secret and attempt history.
 It waits for an already-running bounded request to finish; transmitted bytes

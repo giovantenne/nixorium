@@ -10,7 +10,36 @@ import (
 )
 
 const TelemetryEndpoint = "https://telemetry.nixorium.org/v1/heartbeat"
-const TelemetryNotice = "Optional daily adoption statistics to telemetry.nixorium.org: monthly pseudonym, installed version, mode, configured client-size band and historical verified client boot. No hostnames, IPs, users, files, configuration or logs in the payload. Cloudflare receives the connection IP. Raw records: 90-day retention target plus provider recovery copies; monthly aggregates: 24 months. Disable stops future sends, not previously received records."
+const TelemetryNotice = `Operator: Claudio Benvenuti, Nixorium maintainer.
+Privacy contact: hello@nixorium.org
+
+Purpose: understand adoption and lab sizes, and prioritize development.
+Participation is optional. Nixorium works fully without sharing.
+
+Reports contain the installed version, system mode, configured client-count
+band, historical client boot status and a pseudonym changing each UTC month.
+These are pseudonymous statistics, not guaranteed anonymous data.
+No names, hostnames, files, logs or configuration files are included.
+
+Reports go to telemetry.nixorium.org via Cloudflare. Cloudflare receives your
+connection IP. We do not store it in adoption records or application logs.
+The Worker uses it transiently to limit excessive requests.
+Cloudflare's own infrastructure processing follows its privacy policy:
+https://www.cloudflare.com/privacypolicy/
+
+Daily records: scheduled cleanup deletes records aged 89 days or more,
+normally within 90 days of receipt. Outages or exhausted Cloudflare quotas
+can delay deletion; records aged 90 days are excluded from reports.
+Monthly aggregate totals contain no identifiers and are kept for 24 calendar
+months, including the current month, with scheduled expiry cleanup.
+Cloudflare D1 recovery history on our Free plan lasts 7 days. Deleted records
+may remain recoverable for up to 7 further days. We create no separate exports
+or backups of adoption records. Worker request logging is disabled.
+
+Disable sharing anytime in Maintenance to stop future reports and remove
+the local identity. Previously received reports follow the retention rules;
+turning sharing off does not delete them immediately. Refusal is remembered.
+Preview and status are entirely local and never upload or probe clients.`
 
 type TelemetryPayload struct {
 	SchemaVersion      int    `json:"schemaVersion"`
