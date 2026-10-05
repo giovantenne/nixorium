@@ -6,6 +6,29 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-05
+
+The first stable release of the 3.x line includes the classroom controls and
+controller bootstrap improvements introduced in
+[3.0.0-beta.1](https://github.com/giovantenne/nixorium/releases/tag/v3.0.0-beta.1), together with
+the changes below.
+
+### Upgrade notes
+
+- Classroom view replaces Veyon. Remove `publicKeys.veyon`,
+  `keys/veyon-public-key.pem` and `veyonNativeHosts` from existing deployments;
+  these settings are no longer accepted.
+- Student homes always reset from the workspace seed at boot. The profile-free
+  reset, `nixoriumWorkspace.runtimeEnabled` field and standalone
+  `run-harmonia`/`run-pxe-proxy` apps are removed. Deployments must expose
+  `deploymentStatus.controller`, `labMeta.deploymentMode` and
+  `nixoriumSoftware.controller`.
+- Existing deployments retain their template files and software declarations.
+  New template defaults require an explicitly reviewed template reset or
+  corresponding deployment-owned changes.
+
+### Changed and fixed
+
 - Reuse the teacher and student account names saved during first setup when
   preparing PXE or USB installations. Change names through Settings → Accounts.
 
@@ -1516,7 +1539,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0-beta.1...v3.0.0
 [3.0.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v2.1.0...v3.0.0-beta.1
 [2.1.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0-beta.5...v2.0.0

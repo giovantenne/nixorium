@@ -2,7 +2,7 @@
   description = "Private Nixorium deployment";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-  inputs.nixorium.url = "github:giovantenne/nixorium/v3.0.0-beta.1";
+  inputs.nixorium.url = "github:giovantenne/nixorium/v3.0.0";
   inputs.nixorium.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { self, nixpkgs, nixorium }:
