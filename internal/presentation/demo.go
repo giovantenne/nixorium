@@ -680,7 +680,7 @@ func renderUSBInstallationDemo(revision string, width, height int) DemoScenario 
 	r.model.installation.remote.stage = remoteInstallReview
 	r.model.installation.remote.plan = plan
 	r.capture("Review physical identity, logical identity and disk", 3200)
-	r.model.installation.remote.confirmation = plan.Confirmation
+	r.model.installation.remote.confirmation = "ERASE"
 	r.capture("Type the disk-bound destructive confirmation", 2200)
 	r.model.installation.remote.confirmation = ""
 	r.model.installation.remote.stage = remoteInstallApplying

@@ -248,6 +248,16 @@ func TestUSBInstallPasswordIsMaskedAndClearedBeforeCallbackResult(t *testing.T) 
 	if view := model.View().Content; strings.Contains(view, "temporary-secret") || !strings.Contains(view, "••••") {
 		t.Fatalf("password was not masked in the form:\n%s", view)
 	}
+	for _, text := range []string{"On this controller", "passwd", "Temporary password", "Connect to PC"} {
+		if !strings.Contains(model.View().Content, text) {
+			t.Fatalf("password entry does not explain %q", text)
+		}
+	}
+	model.installation.remote.password = ""
+	if view := model.View().Content; !strings.Contains(view, "Type here (hidden)") || !strings.Contains(view, "█") {
+		t.Fatal("empty password entry has no visible input")
+	}
+	model.installation.remote.password = "temporary-secret"
 	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	if command == nil || model.installation.remote.password != "" || strings.Contains(model.View().Content, "temporary-secret") {
@@ -366,6 +376,11 @@ func TestUSBInstallRequiresEligibleDiskAndExactReviewConfirmation(t *testing.T) 
 	if len(requests) != 1 || requests[0].Disk != "/dev/nvme0n1" || model.installation.remote.stage != remoteInstallReview {
 		t.Fatalf("disk review request=%+v stage=%d", requests, model.installation.remote.stage)
 	}
+	updated, command = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || len(requests) != 1 || model.installation.remote.stage != remoteInstallReview {
+		t.Fatal("empty confirmation started installation")
+	}
 	for _, character := range "WRONG" {
 		updated, _ = model.Update(tea.KeyPressMsg{Text: string(character)})
 		model = updated.(dashboardModel)
@@ -375,7 +390,7 @@ func TestUSBInstallRequiresEligibleDiskAndExactReviewConfirmation(t *testing.T) 
 	if command != nil || len(requests) != 1 {
 		t.Fatal("wrong destructive confirmation sent apply")
 	}
-	for _, character := range model.installation.remote.plan.Confirmation {
+	for _, character := range "ERASE" {
 		key := tea.KeyPressMsg{Text: string(character)}
 		if character == ' ' {
 			key = tea.KeyPressMsg{Code: tea.KeySpace}
@@ -389,7 +404,7 @@ func TestUSBInstallRequiresEligibleDiskAndExactReviewConfirmation(t *testing.T) 
 		t.Fatal("exact destructive confirmation did not dispatch apply")
 	}
 	_ = command()
-	if len(requests) != 2 || requests[1].Operation != domain.RemoteInstallApplyOperation || requests[1].Confirmation != "ERASE /dev/nvme0n1 FOR pc01" {
+	if len(requests) != 2 || requests[1].Operation != domain.RemoteInstallApplyOperation || requests[1].Confirmation != "ERASE /dev/nvme0n1 FOR pc01" || requests[1].ReviewToken != model.installation.remote.plan.ReviewToken || requests[1].OperationID != remoteTUITestOperationID {
 		t.Fatalf("apply request=%+v", requests)
 	}
 }
@@ -490,7 +505,7 @@ func TestUSBInstallReviewFitsSupportedLayoutsAndSanitizesControlText(t *testing.
 		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 			t.Fatalf("USB review overflows %dx%d", size[0], size[1])
 		}
-		if strings.Contains(view, "\x1b[31m") || strings.ContainsRune(view, '\x00') || !strings.Contains(view, "ERASE /dev/nvme0n1 FOR pc01") || !strings.Contains(view, "Cancel safely") {
+		if strings.Contains(view, "\x1b[31m") || strings.ContainsRune(view, '\x00') || !strings.Contains(view, "ERASE") || strings.Contains(view, "ERASE /dev/") || !strings.Contains(view, "Cancel safely") {
 			t.Fatalf("USB review lost safety meaning at %dx%d:\n%s", size[0], size[1], view)
 		}
 		for _, profile := range []colorprofile.Profile{colorprofile.ASCII, colorprofile.ANSI, colorprofile.ANSI256} {

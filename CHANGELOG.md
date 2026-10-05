@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Simplify settings forms with empty-field hints and explicit network defaults;
+  move examples and extended context into help. Separate USB instructions by
+  computer and make address/password entry and the next action explicit.
+- Confirm USB disk erasure with `ERASE` in the TUI while preserving the
+  reviewed computer, disk and worker authorization checks.
+
 - Use plain input fields and distinct label/value colors; explain configured
   software and simplify routine TUI messages, keeping technical detail separate.
 

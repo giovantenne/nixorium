@@ -48,9 +48,11 @@ func settingsFieldIndex(id string) int {
 
 func TestSettingsWizardCanAcceptAllDefaults(t *testing.T) {
 	model := newSettingsWizardModel(wizardSettings())
-	if !strings.Contains(model.View().Content, "All settings are collected first; passwords and one complete validation follow.") {
-		t.Fatalf("first-run guidance is missing:\n%s", model.View().Content)
+	model.helpOpen = true
+	if !strings.Contains(model.View().Content, "All settings are reviewed before saving") {
+		t.Fatalf("first-run help is missing:\n%s", model.View().Content)
 	}
+	model.helpOpen = false
 	for range settingsFields {
 		updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model = updated.(settingsWizardModel)
@@ -64,7 +66,9 @@ func TestInstallationInterfaceFieldEditsClientOverride(t *testing.T) {
 	settings := wizardSettings()
 	settings.Lab.ControllerInterfaceName = "enp8s0"
 	model := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
+	model.helpOpen = true
 	view := demoANSI.ReplaceAllString(model.View().Content, "")
+	model.helpOpen = false
 	if !strings.Contains(view, "Client computers' network interface") || !strings.Contains(view, "Controller network interface: enp8s0") {
 		t.Fatalf("interface roles are unclear: %s", view)
 	}

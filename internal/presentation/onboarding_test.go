@@ -243,7 +243,7 @@ func TestUSBConsoleInstructionsScrollWithInputVisible(t *testing.T) {
 	for offset := 0; offset < 24; offset++ {
 		m.pageScroll = offset
 		view := demoANSI.ReplaceAllString(m.View().Content, "")
-		if !strings.Contains(view, "IP address of the PC") || !strings.Contains(view, "192.0.2.20") || !strings.Contains(view, "Read fingerprint") {
+		if !strings.Contains(view, "IP address of the PC") || !strings.Contains(view, "192.0.2.20") || !strings.Contains(view, "Check PC identity") {
 			t.Fatal("input or action scrolled away", view)
 		}
 		if lipgloss.Height(view) > 24 || lipgloss.Width(view) > 80 {
@@ -251,7 +251,7 @@ func TestUSBConsoleInstructionsScrollWithInputVisible(t *testing.T) {
 		}
 		seen.WriteString(view)
 	}
-	for _, command := range []string{"passwd", "systemctl is-active sshd", "ip -4 -br address show scope global", "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub"} {
+	for _, command := range []string{"passwd", "systemctl is-active sshd", "ip -4 -br address show scope global"} {
 		if !strings.Contains(seen.String(), command) {
 			t.Fatal("unreachable console command", command)
 		}

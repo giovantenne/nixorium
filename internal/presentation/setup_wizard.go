@@ -60,7 +60,7 @@ var keyboardChoices = []settingsChoice{
 }
 
 var settingsFields = []settingsField{
-	{id: "lab.clientIfaceName", group: "Network", label: "Client computers' network interface (optional override)"},
+	{id: "lab.clientIfaceName", group: "Network", label: "Client computers' network interface"},
 	{id: "lab.masterDhcpIp", group: "Network", label: "Current controller DHCP address"},
 	{id: "lab.networkBase", group: "Network", label: "Static laboratory network address"},
 	{id: "lab.networkPrefixLength", group: "Network", label: "Network prefix length"},
@@ -371,11 +371,27 @@ func (model settingsWizardModel) acceptCurrentField() (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
+func (model settingsWizardModel) optionalInterface() bool {
+	id := model.fields[model.index].id
+	return id == "lab.clientIfaceName" || id == "lab.controllerIfaceName"
+}
+
 func (model settingsWizardModel) View() tea.View {
 	field := model.fields[model.index]
 	info := settingsHelp[field.id]
 	if model.helpOpen {
-		return tea.NewView(lipgloss.NewStyle().Width(max(20, model.width-4)).Render(tuiTitle(field.label, model.isDark) + "\n\n" + info.description + "\nExample: " + info.example + "\n\nEnter continues after validation.\nShift Tab returns to the previous question.\nEsc cancels; existing settings are preserved.\n/ searches suggested values.\n\nEsc / F1 closes help."))
+		lines := []string{tuiTitle(field.label, model.isDark), "", info.description,
+			tuiFieldDetail("Example", info.example, model.isDark)}
+		if model.optionalInterface() {
+			lines = append(lines, "", tuiFieldDetail("Default when empty", model.settings.Lab.InterfaceName, model.isDark),
+				tuiFieldDetail("Controller network interface", model.settings.Lab.ControllerInterface(), model.isDark),
+				"Use the controller's device name only if the client hardware matches.")
+		}
+		lines = append(lines, "", "Faint text in an empty field is a hint, not a saved value.",
+			"Enter continues after validation. All settings are reviewed before saving.",
+			"Shift Tab returns to the previous question.", "Esc cancels; existing settings are preserved.",
+			"/ searches suggested values.", "", "Esc / F1 closes help.")
+		return tea.NewView(lipgloss.NewStyle().Width(max(20, model.width-4)).Render(strings.Join(lines, "\n")))
 	}
 	lines := []string{
 		tuiTitle(model.title, model.isDark),
@@ -383,17 +399,11 @@ func (model settingsWizardModel) View() tea.View {
 		tuiStepHeading(model.index+1, len(model.fields), field.group, model.isDark),
 		"", tuiSection(field.label, model.isDark), "",
 	}
-	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-4)).Render(tuiMuted(info.description, model.isDark)+"\n"+tuiFieldDetail("Example", info.example, model.isDark)))
-	lines = append(lines, model.networkPreview()...)
-	if field.group == "Network" {
-		lines = append(lines, tuiFieldDetail("Controller network interface", model.settings.Lab.ControllerInterface(), model.isDark))
-		if field.id == "lab.clientIfaceName" {
-			lines = append(lines, tuiMuted("Use the same device name only if the client hardware matches.", model.isDark), tuiFieldDetail("If left empty", model.settings.Lab.InterfaceName+" (shared fallback)", model.isDark))
-		}
+	description := info.description
+	if model.optionalInterface() {
+		description = "Change this only if a different network device is needed."
 	}
-	if strings.Contains(model.title, "First setup") || strings.Contains(model.title, "first-run") {
-		lines = append(lines, "All settings are collected first; passwords and one complete validation follow.")
-	}
+	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-4)).Render(tuiMuted(description, model.isDark)))
 	if len(field.choices) > 0 && !model.custom {
 		lines = append(lines, "", "Choose a suggested value, or press / to filter.", "", model.selector.View())
 		lines = append(lines, "", "↑/↓ choose   enter continue   / search   esc cancel   F1 help")
@@ -401,7 +411,19 @@ func (model settingsWizardModel) View() tea.View {
 		if model.custom {
 			lines = append(lines, "", "Custom value; it will be validated before continuing.")
 		}
-		lines = append(lines, "", tuiInputField("", model.drafts[model.index]+"█", true, model.isDark))
+		input := tuiInputField("", model.drafts[model.index]+"█", true, model.isDark)
+		if model.drafts[model.index] == "" {
+			hint := "e.g. " + info.example
+			if model.optionalInterface() {
+				hint = model.settings.Lab.InterfaceName + " (default)"
+			}
+			input += tuiMuted(hint, model.isDark)
+		}
+		lines = append(lines, "", input)
+	}
+	if preview := model.networkPreview(); len(preview) > 0 {
+		lines = append(lines, "", tuiMuted("Address preview", model.isDark))
+		lines = append(lines, preview...)
 	}
 	if model.err != "" {
 		lines = append(lines, "", tuiError("Invalid: "+model.err, model.isDark))
@@ -411,8 +433,12 @@ func (model settingsWizardModel) View() tea.View {
 		if model.custom {
 			backLabel = "suggestions"
 		}
+		enterLabel := "continue"
+		if model.optionalInterface() && model.drafts[model.index] == "" {
+			enterLabel = "use default"
+		}
 		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", "continue"),
+			tuiHelpBinding([]string{"enter"}, "enter", enterLabel),
 			tuiHelpBinding([]string{"shift+tab", "up"}, "shift+tab/up", "previous"),
 			tuiHelpBinding([]string{"esc"}, "esc", backLabel),
 		))

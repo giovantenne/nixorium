@@ -495,7 +495,7 @@ STEP 6 / 6  Check before erasing
   Replace known key      no
 
 Type exactly
-  ERASE /dev/nvme0n1 FOR pc01
+  ERASE
 > _
 
 NOTICE

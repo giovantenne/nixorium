@@ -56,7 +56,16 @@ terminals.
 
 Text inputs keep the terminal background. Distinguish neutral field labels from
 accent-colored values, and keep a cursor/focus marker for monochrome terminals.
-Examples belong in help text, never inside an empty editable value.
+Keep the main form to one question, a short explanation and its input. Show
+format hints only in empty fields, in muted text and separate from the draft.
+Distinguish examples from real defaults; Enter must never save an example hint.
+Keep extended examples and network context in F1 help.
+
+USB instructions must distinguish commands on the client PC from input on the
+controller. Keep IP/password entry visible while instructions scroll; show the
+fingerprint command at the comparison step. The TUI asks for `ERASE` after
+displaying the reviewed disk and computer, then forwards the original worker
+confirmation and review token without weakening the worker checks.
 
 Use operator language in routine views: configured software, target computers,
 installation files, checking an interrupted installation. Keep package pins,

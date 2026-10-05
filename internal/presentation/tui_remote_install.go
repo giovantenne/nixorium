@@ -98,33 +98,36 @@ func (model dashboardModel) remoteInstallView() string {
 		}
 		actions = []tuiAction{{key: "↑/↓", label: "Select computer"}, {key: "Enter", label: "Prepare"}, {key: "Esc", label: "Installation"}, {key: "F1", label: "Help"}}
 	case remoteInstallConsole:
-		consoleTitle := "Keep the PC's screen visible"
-		consoleDetail := "The controller only reads the PC's fingerprint; no password is sent yet. You compare it on the next step."
-		if remote.recovery {
-			consoleTitle = "Restore the connection to check the interrupted installation"
-			consoleDetail = "Re-enter the original live address. The controller will compare its observed key with the reserved identity before any password is sent."
-		}
 		lines = append(lines, "",
-			"On the PC to install, start the official NixOS Minimal 26.05 ISO from USB",
-			"in UEFI mode, connect it to the network, then type these commands:",
-			"",
-			tuiInstruction(1, "Set a temporary password", "passwd", model.isDark), "",
-			tuiInstruction(2, "Check SSH — it should print active", "systemctl is-active sshd", model.isDark), "",
-			tuiInstruction(3, "Read the PC's network address", "ip -4 -br address show scope global", model.isDark), "",
-			tuiInstruction(4, "Read its fingerprint", "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub", model.isDark),
-			"",
+			tuiSection("On the PC to install ("+remote.host+")", model.isDark),
+			"Boot the official NixOS Minimal 26.05 USB in UEFI mode.",
+			"Connect the PC to the network, then run these commands there:", "",
+			remoteInstallConsoleCommand(1, "Set a password for the next connection", "passwd", model.isDark), "",
+			remoteInstallConsoleCommand(2, "Check SSH — the result should be active", "systemctl is-active sshd", model.isDark),
+			tuiMuted("   If inactive, run: sudo systemctl start sshd", model.isDark), "",
+			remoteInstallConsoleCommand(3, "Find the PC's IPv4 address", "ip -4 -br address show scope global", model.isDark),
 		)
-		fixedBody = remoteInstallField("Computer", remote.host, false, false) + "\n" + remoteInstallField("IP address of the PC", remote.address, true, false)
+		fixedBody = strings.Join([]string{
+			tuiSection("Back on this controller", model.isDark),
+			"Type the address from command 3, without the /xx suffix.",
+			model.remoteInstallInput("IP address of the PC", remote.address, "e.g. 192.168.1.20", false),
+			tuiMuted("Enter checks the PC's identity; no password is sent yet.", model.isDark),
+		}, "\n")
 		if remote.passwordAgain {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Network card saved. Type passwd again on the PC", detail: "The previous temporary password was locked; set a new one, then continue."})
 		}
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: consoleTitle, detail: consoleDetail})
-		actions = []tuiAction{{key: "Enter", label: "Read fingerprint"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+		if remote.recovery {
+			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Reconnect to the same USB-booted PC", detail: "Use its original address. Its identity will be checked against the interrupted installation before any password is sent."})
+		}
+		actions = []tuiAction{{key: "Enter", label: "Check PC identity"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallFingerprint:
 		lines = append(lines, "",
-			"Compare this fingerprint with the one shown on the PC's screen (command 4).",
-			"It must be identical, character by character.",
-			"",
+			tuiSection("On the PC to install ("+remote.host+")", model.isDark),
+			"Run this command to display its identity (the SSH fingerprint):",
+			tuiFieldValue("ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub", model.isDark), "",
+			tuiSection("Back on this controller", model.isDark),
+			"Compare the SHA256 fingerprint with the one below.",
+			"Every character must match.", "",
 			remoteInstallField("Computer", remote.host, false, false),
 			remoteInstallField("IP address of the PC", remote.address, false, false),
 			remoteInstallField("Fingerprint", remote.fingerprint, false, false),
@@ -132,19 +135,23 @@ func (model dashboardModel) remoteInstallView() string {
 		if remote.recovery && remote.response.Session != nil && remote.response.Session.Bootstrap != nil {
 			lines = append(lines, remoteInstallField("Reserved fingerprint", remote.response.Session.Bootstrap.HostFingerprint, false, false))
 		}
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Type MATCH only if the two fingerprints are identical", detail: "This proves the controller is talking to the PC in front of you. The password has not been sent yet."})
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Type MATCH only if the two fingerprints are identical", detail: "This checks that you are connecting to the intended PC. No password has been sent."})
 		actions = []tuiAction{{key: "Enter", label: "Confirm match"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallPassword:
 		lines = append(lines, "",
-			"The fingerprint matches. Type the temporary password you set with passwd.",
-			"",
-			remoteInstallField("Computer", remote.host, false, false),
-			remoteInstallField("IP address of the PC", remote.address, false, false),
-			remoteInstallField("Fingerprint", remote.fingerprint, false, false),
-			remoteInstallField("Temporary password", remote.password, true, true),
+			tuiSection("On this controller", model.isDark),
+			"Enter the password you set with passwd on the PC to install.",
+			"Use that temporary password, not your controller login password.", "",
+			tuiFieldDetail("PC to connect to", remote.host+" at "+remote.address, model.isDark),
+			tuiStatus("PC identity confirmed", tuiStatusSuccess, model.isDark),
 		)
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "The password is used only once", detail: "It connects the controller, is replaced by a one-time key and is then forgotten."})
-		actions = []tuiAction{{key: "Enter", label: "Connect"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
+		next := "Enter connects to this PC. You will choose its disk next."
+		if remote.recovery {
+			next = "Enter reconnects to check the interrupted installation."
+		}
+		fixedBody = model.remoteInstallInput("Temporary password", remote.password, "Type here (hidden)", true) + "\n" + tuiMuted(next, model.isDark)
+		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: "The password is used only for this connection", detail: "It is replaced by a temporary connection key and then forgotten."})
+		actions = []tuiAction{{key: "Enter", label: "Connect to PC"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallSelectDisk:
 		lines = append(lines, "",
 			fmt.Sprintf("Connected to the PC that becomes %s (%s). Choose the disk to install on.", remote.host, remote.address),
@@ -240,7 +247,7 @@ func (model dashboardModel) remoteInstallView() string {
 		case remoteInstallRotateHostKey:
 			expected = "ROTATE HOST KEY"
 		case remoteInstallReview:
-			expected = remote.plan.Confirmation
+			expected = "ERASE"
 		case remoteInstallConfirmReboot:
 			expected = "REBOOT"
 		case remoteInstallConfirmClose:
@@ -255,6 +262,22 @@ func (model dashboardModel) remoteInstallView() string {
 		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Live connection failed", detail: remote.bootstrapError})
 	}
 	return model.renderShell(tuiShell{path: []string{"Installation", "USB over SSH"}, body: strings.Join(lines, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
+}
+
+func remoteInstallConsoleCommand(step int, title, command string, dark bool) string {
+	return tuiSection(fmt.Sprintf("%d. %s", step, title), dark) + "\n   " + tuiFieldValue(command, dark)
+}
+
+func (model dashboardModel) remoteInstallInput(label, value, hint string, secret bool) string {
+	display := value
+	if secret {
+		display = strings.Repeat("•", min(24, utf8.RuneCountInString(value)))
+	}
+	input := tuiInputField("", display+"█", true, model.isDark)
+	if value == "" {
+		input += tuiMuted(hint, model.isDark)
+	}
+	return tuiSection(label, model.isDark) + "\n" + input
 }
 
 func remoteInstallField(label, value string, focused, secret bool) string {
@@ -561,10 +584,12 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			return model.planRemoteInstall(disk.Path, true)
 		})
 	case remoteInstallReview:
-		return model.updateRemoteInstallConfirmation(key, remote.plan.Confirmation, func(model dashboardModel) (tea.Model, tea.Cmd) {
+		return model.updateRemoteInstallConfirmation(key, "ERASE", func(model dashboardModel) (tea.Model, tea.Cmd) {
 			remote := &model.installation.remote
 			remote.stage = remoteInstallApplying
 			model.busy = "Checking everything again and starting the installation"
+			// ERASE confirms the disk and computer visible in this review. Keep
+			// the worker's original confirmation and content-bound token intact.
 			request := domain.RemoteInstallRequest{Operation: domain.RemoteInstallApplyOperation, OperationID: remote.operationID, ReviewToken: remote.plan.ReviewToken, Confirmation: remote.plan.Confirmation}
 			return model.remoteInstallCommand("apply", request)
 		})

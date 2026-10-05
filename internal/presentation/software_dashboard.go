@@ -818,13 +818,17 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 			cursor = "_"
 		}
 		query := model.query + cursor
+		input := tuiInputField("Package name", query, model.searching, context.dark)
+		if model.query == "" {
+			input += tuiMuted("e.g. firefox", context.dark)
+		}
 		lines = append(lines, tuiSection("Find an application", context.dark),
 			tuiMuted("Choose a package, then its computers; review before saving.", context.dark), "",
-			tuiInputField("Package name", query, model.searching, context.dark), "")
+			input, "")
 		if model.searchBusy {
 			lines = append(lines, tuiNoticeText("Searching available packages…", tuiStatusNeutral, context.dark), "")
 		} else if model.query == "" {
-			lines = append(lines, "Type at least two characters. Examples: firefox, libreoffice.", "")
+			lines = append(lines, "Type at least two characters.", "")
 		} else if len(model.query) == 1 {
 			lines = append(lines, "Type one more character to start searching.", "")
 		} else if domain.ValidateSoftwareSearchQuery(strings.TrimSpace(model.query)) != nil {

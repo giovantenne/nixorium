@@ -463,7 +463,7 @@ func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 	if loaded != 1 || model.screen != dashboardSettingsEdit || len(model.settings.editor.fields) != len(settingsFields) {
 		t.Fatalf("setup did not open one complete settings sequence: loaded=%d screen=%d fields=%d", loaded, model.screen, len(model.settings.editor.fields))
 	}
-	if view := model.View().Content; !strings.Contains(view, "First setup / Laboratory settings") || !strings.Contains(view, "one complete validation") || strings.Contains(view, "exit and run") {
+	if view := model.View().Content; !strings.Contains(view, "First setup / Laboratory settings") || !strings.Contains(view, "STEP 1 / 11") || strings.Contains(view, "exit and run") {
 		t.Fatalf("setup settings are not a continuous English flow:\n%s", view)
 	}
 }
