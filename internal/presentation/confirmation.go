@@ -78,7 +78,7 @@ func ConfirmPXEStart(input io.Reader, output io.Writer, report domain.PXELifecyc
 func ConfirmDeploymentApply(input io.Reader, output io.Writer, report domain.DeploymentPlanReport) (bool, error) {
 	fmt.Fprintln(output, "Update computers: review")
 	fmt.Fprintf(output, "Revision: %s\n", report.Revision)
-	fmt.Fprintf(output, "Targets: %s (%d computer(s))\n", report.ColmenaSelector, len(report.Targets))
+	fmt.Fprintf(output, "Targets: %s (%s)\n", report.ColmenaSelector, countNoun(len(report.Targets), "computer"))
 	fmt.Fprintln(output, "Action: build every selected configuration, then apply it with Colmena")
 	fmt.Fprintln(output, "Impact: target services may restart; offline or failed targets will be reported")
 	fmt.Fprintln(output, "Retry: safe; Nixorium revalidates the revision and rebuilds before every apply")
@@ -127,7 +127,7 @@ func ConfirmUpdate(input io.Reader, output io.Writer, report domain.UpdatePlanRe
 func ConfirmSoftwareChange(input io.Reader, output io.Writer, report domain.SoftwareChangePlanReport) (bool, error) {
 	fmt.Fprintln(output, "Software declaration review")
 	fmt.Fprintf(output, "Package: %s\n", report.Request.Package)
-	fmt.Fprintf(output, "Configuration scope: %s (%d client(s))\n", report.Request.Scope.Kind, len(report.AffectedClients))
+	fmt.Fprintf(output, "Configuration scope: %s (%s)\n", report.Request.Scope.Kind, countNoun(len(report.AffectedClients), "client"))
 	if report.AffectedController != "" {
 		fmt.Fprintf(output, "Controller configuration: %s (not activated by saving)\n", report.AffectedController)
 	}
@@ -166,15 +166,15 @@ func ConfirmShutdown(input io.Reader, output io.Writer, report domain.ShutdownPl
 		label = "restart"
 	}
 	fmt.Fprintf(output, "Client %s review\n", label)
-	fmt.Fprintf(output, "Targets: %d eligible of %d selected computer(s)\n", report.Eligible, len(report.Targets))
+	fmt.Fprintf(output, "Targets: %d eligible of %s selected\n", report.Eligible, countNoun(len(report.Targets), "computer"))
 	fmt.Fprintln(output, "Controller: always excluded")
 	fmt.Fprintf(output, "Session safety: %s\n", shutdownPolicyLabel(report.Policy))
 	fmt.Fprintln(output, "Impact: unsaved user work may be lost; checks run again before dispatch")
 	if active := shutdownActiveCount(report); active > 0 {
-		fmt.Fprintf(output, "Explicit confirmation: %s authorizes %s of %d computer(s) with an active user session\n", report.Confirmation, label, active)
+		fmt.Fprintf(output, "Explicit confirmation: %s authorizes %s of %s with an active user session\n", report.Confirmation, label, countNoun(active, "computer"))
 	}
 	if unused := shutdownUnusedCount(report); unused > 0 {
-		fmt.Fprintf(output, "Logged in but not in use: %d computer(s) without recent keyboard or mouse input\n", unused)
+		fmt.Fprintf(output, "Logged in but not in use: %s without recent keyboard or mouse input\n", countNoun(unused, "computer"))
 	}
 	fmt.Fprintln(output, "Outcome: acceptance confirms only that the operating system received the request, not physical power state")
 	fmt.Fprintln(output, "Retry: do not retry an unconfirmed request blindly")

@@ -49,7 +49,7 @@ func TestCleanupScreenRequiresTypedConfirmation(t *testing.T) {
 		t.Fatalf("requested = %q", requested)
 	}
 	view := model.View().Content
-	if !strings.Contains(view, "remove 3 old version(s) (1 2 3)") || !strings.Contains(view, "off or not reachable") || !strings.Contains(view, "Type CLEAN to continue") {
+	if !strings.Contains(view, "remove 3 old versions (1 2 3)") || !strings.Contains(view, "off or not reachable") || !strings.Contains(view, "Type CLEAN to continue") {
 		t.Fatalf("review view:\n%s", view)
 	}
 	for _, key := range "clean" {

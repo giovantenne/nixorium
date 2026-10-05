@@ -277,7 +277,7 @@ Nixorium  /  Computers  /  Update computers
 
 Update these computers?
 
-Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)
+Affects  pc01,pc02,pc03,pc04,pc05 · 5 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
@@ -336,7 +336,7 @@ Nixorium  /  Computers  /  Update computers
 
 Update these computers?
 
-Affects  pc01,pc02 · 2 computer(s)
+Affects  pc01,pc02 · 2 computers
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
@@ -361,7 +361,7 @@ Nixorium  /  Computers  /  Update computers
 
 Update these computers?
 
-Affects  pc01 · 1 computer(s)
+Affects  pc01 · 1 computer
 
 Reviewed revision  0123456789abcdef0123456789abcdef01234567
 
@@ -519,23 +519,22 @@ r Refresh status  ·  d Details  ·  v Verify installed system  ·  Esc Detach  
 ```text
 Nixorium  /  Computers  /  Power controls
 
-Shut down 2 eligible client(s)?
+Shut down 2 eligible clients?
 
-Selected  3
-Eligible  2
-Controller  excluded
+Selected        3
+Eligible        2
+Controller      excluded
 Session safety  unknown states protected
 
 ! pc02 · In use · will shut down
 ✓ pc04 · Logged in, not in use · Ready
 ○ pc05 · Not reachable · not sent
 
-! 1 computer(s) are in use: those sessions will be shut down and unsaved work may be lost.
+! 1 computer is in use: those sessions will be shut down and unsaved work may be lost.
 Access and session state are checked again immediately before requests are sent.
 An accepted request does not prove that a computer is physically off.
 
-Type SHUTDOWN to confirm shutdown of active sessions:
-> _
+Press Enter to shut down 2 computers. 1 session in use will be interrupted.
 
 Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 ```
@@ -563,11 +562,11 @@ Check reachability and compare observed systems with the intended revision
 ```text
 Nixorium  /  Computers  /  Power controls
 
-Restart 1 eligible client(s)?
+Restart 1 eligible client?
 
-Selected  1
-Eligible  1
-Controller  excluded
+Selected        1
+Eligible        1
+Controller      excluded
 Session safety  unknown states protected
 
 ✓ pc01 · Ready
@@ -576,8 +575,7 @@ Session safety  unknown states protected
 Access and session state are checked again immediately before requests are sent.
 An accepted request does not prove that the computer completed its restart.
 
-Type RESTART to continue:
-> _
+Press Enter to restart 1 computer.
 
 Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 ```

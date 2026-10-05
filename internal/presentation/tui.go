@@ -2372,7 +2372,7 @@ func (model dashboardModel) deployView() string {
 		lines := []string{
 			tuiTitle("Update these computers?", model.isDark),
 			"",
-			fmt.Sprintf("Affects  %s · %d computer(s)", model.deployment.plan.ColmenaSelector, len(model.deployment.plan.Targets)),
+			fmt.Sprintf("Affects  %s · %s", model.deployment.plan.ColmenaSelector, countNoun(len(model.deployment.plan.Targets), "computer")),
 			"",
 			tuiMuted("Reviewed revision  "+model.deployment.plan.Revision, model.isDark),
 		}

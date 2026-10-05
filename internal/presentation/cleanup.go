@@ -59,7 +59,7 @@ func cleanupTargetSummary(t domain.CleanupTargetPlan) string {
 	if !t.Eligible {
 		return t.Detail
 	}
-	return fmt.Sprintf("remove %d old version(s) %s; keep %s; %s free now", len(t.Remove), cleanupNumbers(t.Remove), cleanupKept(t.Keep), humanBytes(t.FreeBytes))
+	return fmt.Sprintf("remove %s %s; keep %s; %s free now", countNoun(len(t.Remove), "old version"), cleanupNumbers(t.Remove), cleanupKept(t.Keep), humanBytes(t.FreeBytes))
 }
 
 func cleanupOutcomeSummary(t domain.CleanupTargetOutcome) string {

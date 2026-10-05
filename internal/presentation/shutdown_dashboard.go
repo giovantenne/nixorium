@@ -104,28 +104,15 @@ func (model shutdownModel) update(screen dashboardScreen, key tea.KeyPressMsg, h
 			}
 			model.confirmation = ""
 			return model, shutdownIntent{kind: shutdownPlanIntent, requested: model.requested(hosts)}
-		case "backspace":
-			value := []rune(model.confirmation)
-			if len(value) > 0 {
-				model.confirmation = string(value[:len(value)-1])
-			}
-		case "space":
-			model.confirmation += " "
 		case "enter":
+			// Like the classroom view, Enter confirms the review shown; the
+			// application still checks the reviewed plan's token.
 			if model.plan.HasErrors() || model.plan.State != "ready" {
 				return model, shutdownIntent{message: "No eligible power request can be sent from this plan."}
-			}
-			if model.confirmation != model.plan.Confirmation {
-				model.confirmation = ""
-				return model, shutdownIntent{message: "Confirmation did not match; no power request was sent."}
 			}
 			model.applying = true
 			model.confirmation = ""
 			return model, shutdownIntent{kind: shutdownApplyIntent}
-		default:
-			if key.Text != "" {
-				model.confirmation += key.Text
-			}
 		}
 	case dashboardShutdownResult:
 		switch key.String() {
@@ -333,7 +320,14 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		verb = "Restart"
 		pastVerb = "restarted"
 	}
-	lines := []string{tuiSection(fmt.Sprintf("%s %d eligible client(s)?", verb, plan.Eligible), context.dark), "", fmt.Sprintf("Selected  %d", len(plan.Targets)), fmt.Sprintf("Eligible  %d", plan.Eligible), "Controller  excluded", "Session safety  " + shutdownPolicyLabel(plan.Policy), ""}
+	lines := []string{tuiSection(fmt.Sprintf("%s %s?", verb, countNoun(plan.Eligible, "eligible client")), context.dark), ""}
+	lines = append(lines, tuiFields(context.dark,
+		[2]string{"Selected", fmt.Sprint(len(plan.Targets))},
+		[2]string{"Eligible", fmt.Sprint(plan.Eligible)},
+		[2]string{"Controller", "excluded"},
+		[2]string{"Session safety", shutdownPolicyLabel(plan.Policy)},
+	)...)
+	lines = append(lines, "")
 	start, end := listWindow(len(plan.Targets), 0, max(3, context.height-20))
 	for _, target := range plan.Targets[start:end] {
 		lines = append(lines, shutdownTargetStatus(target, context.dark))
@@ -343,9 +337,13 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 	}
 	warning := "Selected computers will be " + pastVerb + "; unsaved user work may be lost."
 	if active := shutdownActiveCount(plan); active > 0 {
-		warning = fmt.Sprintf("%d computer(s) are in use: those sessions will be shut down and unsaved work may be lost.", active)
+		inUse := countNoun(active, "computer") + " is in use"
+		if active != 1 {
+			inUse = countNoun(active, "computer") + " are in use"
+		}
+		warning = inUse + ": those sessions will be shut down and unsaved work may be lost."
 		if plan.Action == domain.ClientRestart {
-			warning = fmt.Sprintf("%d computer(s) are in use: the restart interrupts those sessions and unsaved work may be lost.", active)
+			warning = inUse + ": the restart interrupts those sessions and unsaved work may be lost."
 		}
 	} else if shutdownUnusedCount(plan) > 0 {
 		warning = "Nobody is using the selected computers now; logged-in sessions without recent input are closed."
@@ -363,14 +361,15 @@ func (model shutdownModel) reviewView(context shutdownViewContext) ([]string, []
 		}
 	}
 	if plan.State == "ready" {
-		confirmationPrompt := "Type " + plan.Confirmation + " to continue:"
-		if shutdownActiveCount(plan) > 0 {
-			confirmationPrompt = "Type " + plan.Confirmation + " to confirm shutdown of active sessions:"
-			if plan.Action == domain.ClientRestart {
-				confirmationPrompt = "Type " + plan.Confirmation + " to confirm restart of active sessions:"
-			}
+		verb := "shut down"
+		if plan.Action == domain.ClientRestart {
+			verb = "restart"
 		}
-		return lines, []string{tuiSection(confirmationPrompt, context.dark), "> " + model.confirmation + "_"}
+		prompt := fmt.Sprintf("Press Enter to %s %s.", verb, countNoun(plan.Eligible, "computer"))
+		if active := shutdownActiveCount(plan); active > 0 {
+			prompt += fmt.Sprintf(" %s in use will be interrupted.", countNoun(active, "session"))
+		}
+		return lines, []string{tuiSection(prompt, context.dark)}
 	} else {
 		lines = append(lines, "", tuiStatus("No request can be sent from this plan", tuiStatusAttention, context.dark), plan.Message)
 	}

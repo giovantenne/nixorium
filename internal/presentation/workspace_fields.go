@@ -102,7 +102,7 @@ func workspaceValueText(value any) string {
 		return "Inherit"
 	}
 	if settings, ok := value.(map[string]any); ok {
-		return fmt.Sprintf("%d setting(s)", len(settings))
+		return countNoun(len(settings), "setting")
 	}
 	if entries, ok := value.([]any); ok {
 		if len(entries) == 0 {

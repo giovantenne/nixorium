@@ -267,7 +267,7 @@ func (model dashboardModel) workspaceView() string {
 		switch w.stage {
 		case workspaceOverview:
 			fixed = "Packaged extensions update with Maintenance → Update system and packages;\nMarketplace pins with u in VSCode → extensions."
-			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %d client(s)", resolved.StudentUser, len(resolved.Targets)-1), workspaceApplicationText(), "")
+			lines = append(lines, fmt.Sprintf("Student: %s · Controller + %s", resolved.StudentUser, countNoun(len(resolved.Targets)-1, "client")), workspaceApplicationText(), "")
 			if w.loaded.Inspection.Base == nil {
 				lines = append(lines, "No saved profile; this is a new draft.")
 			}

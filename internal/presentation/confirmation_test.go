@@ -174,7 +174,7 @@ func TestConfirmShutdownRequiresSingleExactWord(t *testing.T) {
 	}{{"SHUTDOWN\n", true}, {"shutdown\n", false}, {"SHUTDOWN pc01,pc02\n", false}, {"\n", false}} {
 		var output bytes.Buffer
 		approved, err := ConfirmShutdown(strings.NewReader(test.input), &output, report)
-		if err != nil || approved != test.want || !strings.Contains(output.String(), "Controller: always excluded") || !strings.Contains(output.String(), "SHUTDOWN authorizes shutdown of 1 computer(s) with an active user session") || !strings.Contains(output.String(), "not physical power state") {
+		if err != nil || approved != test.want || !strings.Contains(output.String(), "Controller: always excluded") || !strings.Contains(output.String(), "SHUTDOWN authorizes shutdown of 1 computer with an active user session") || !strings.Contains(output.String(), "not physical power state") {
 			t.Fatalf("confirmation %q = %t, %v:\n%s", test.input, approved, err, output.String())
 		}
 	}

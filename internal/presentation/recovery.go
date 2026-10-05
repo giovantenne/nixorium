@@ -12,7 +12,7 @@ func RecoveryText(writer io.Writer, report domain.RecoveryReport) {
 		fmt.Fprintln(writer, "Nothing blocks Nixorium operations.")
 		return
 	}
-	fmt.Fprintf(writer, "%d item(s) need attention:\n", len(report.Conditions))
+	fmt.Fprintf(writer, "%s %s attention:\n", countNoun(len(report.Conditions), "item"), map[bool]string{true: "needs", false: "need"}[len(report.Conditions) == 1])
 	for _, condition := range report.Conditions {
 		fmt.Fprintf(writer, "\n- %s\n", condition.Title)
 		if condition.Detail != "" {

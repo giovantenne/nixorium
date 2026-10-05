@@ -83,7 +83,7 @@ func TestWorkspaceOtherSettingsAddEditRemove(t *testing.T) {
 	if !reflect.DeepEqual(got, map[string]any{"workbench.colorTheme": "Default Dark+"}) {
 		t.Fatalf("unexpected draft: %v", got)
 	}
-	if !strings.Contains(m.workspaceView(), "1 setting(s)") {
+	if !strings.Contains(m.workspaceView(), "1 setting") {
 		t.Fatal("field list does not summarize the settings")
 	}
 	// Removing every entry omits the field instead of storing an empty object.
@@ -128,7 +128,7 @@ func TestWorkspaceOtherSettingsPasteAndCancel(t *testing.T) {
 	if !reflect.DeepEqual(m.workspace.settings.values, want) {
 		t.Fatalf("imported %v", m.workspace.settings.values)
 	}
-	for _, name := range []string{"3 setting(s)", "bad name", "editor.fontSize", "terminal.integrated.env.linux", "update.mode", "with.null"} {
+	for _, name := range []string{"3 settings", "bad name", "editor.fontSize", "terminal.integrated.env.linux", "update.mode", "with.null"} {
 		if !strings.Contains(m.message, name) {
 			t.Fatalf("import summary lacks %q: %s", name, m.message)
 		}
@@ -222,7 +222,7 @@ func TestWorkspaceExtensionSearchAddsPackagedChoices(t *testing.T) {
 	if len(queries) != 1 || queries[0] != "vscode-extensions.python" {
 		t.Fatalf("unexpected search %v", queries)
 	}
-	if m.workspace.searching || !strings.Contains(m.message, "2 packaged extension(s)") {
+	if m.workspace.searching || !strings.Contains(m.message, "2 packaged extensions") {
 		t.Fatalf("results not reported: %q", m.message)
 	}
 	for _, id := range []string{"other.blocked", "python3"} {

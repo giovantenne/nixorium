@@ -567,7 +567,7 @@ func TestLayoutKeepsFocusedComputerAndReviewVisible(t *testing.T) {
 					t.Fatalf("deployment confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardShutdownReview {
-				if !strings.Contains(view, "to continue:") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
+				if !strings.Contains(view, "Press Enter to") || !strings.Contains(view, "Esc") || !strings.Contains(view, "Cancel") {
 					t.Fatalf("shutdown confirmation hidden screen %d size %v:\n%s", screen, size, view)
 				}
 			} else if screen == dashboardPXEStartReview || screen == dashboardPXELeaveReview {

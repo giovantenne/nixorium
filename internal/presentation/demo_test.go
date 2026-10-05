@@ -47,7 +47,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range main.Frames {
 		joined += frame.Text
 	}
-	for _, expected := range []string{"all clients, including future ones", "Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)", "Reviewed revision  " + bundle.SourceCommit, "Authenticated: 5/5", "Deployment completed and verified"} {
+	for _, expected := range []string{"all clients, including future ones", "Affects  pc01,pc02,pc03,pc04,pc05 · 5 computers", "Reviewed revision  " + bundle.SourceCommit, "Authenticated: 5/5", "Deployment completed and verified"} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("main demo omits %q", expected)
 		}
@@ -120,7 +120,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 			t.Fatalf("profile demo omits %q", expected)
 		}
 	}
-	for _, expected := range []string{"In use · will shut down", "Type SHUTDOWN to confirm shutdown of active sessions", "pc02       accepted", "Accepted  2"} {
+	for _, expected := range []string{"In use · will shut down", "in use will be interrupted", "pc02       accepted", "Accepted  2"} {
 		if !strings.Contains(shutdownText, expected) {
 			t.Fatalf("shutdown demo omits %q", expected)
 		}
@@ -149,7 +149,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range classroom.Frames {
 		classroomText += frame.Text
 	}
-	for _, expected := range []string{"Classroom controls", "Computer inventory", "Power controls", "Internet access", "Action  Restart", "Type RESTART", "Restart requests accepted"} {
+	for _, expected := range []string{"Classroom controls", "Computer inventory", "Power controls", "Internet access", "Action  Restart", "Press Enter to restart", "Restart requests accepted"} {
 		if !strings.Contains(classroomText, expected) {
 			t.Fatalf("classroom demo omits %q", expected)
 		}

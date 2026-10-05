@@ -17,7 +17,7 @@ func TestPowerReviewSeparatesSessionsInUseFromUnusedLogins(t *testing.T) {
 	m := shutdownModel{plan: plan}
 	lines, prompt := m.reviewView(shutdownViewContext{height: 40})
 	text := strings.Join(append(lines, prompt...), "\n")
-	for _, want := range []string{"pc01 · Logged in, not in use · Ready", "Nobody is using the selected computers now", "Type SHUTDOWN to continue:"} {
+	for _, want := range []string{"pc01 · Logged in, not in use · Ready", "Nobody is using the selected computers now", "Press Enter to shut down"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("unused review lacks %q:\n%s", want, text)
 		}
@@ -29,14 +29,14 @@ func TestPowerReviewSeparatesSessionsInUseFromUnusedLogins(t *testing.T) {
 	m.plan = plan
 	lines, prompt = m.reviewView(shutdownViewContext{height: 40})
 	text = strings.Join(append(lines, prompt...), "\n")
-	if !strings.Contains(text, "1 computer(s) are in use") || !strings.Contains(text, "to confirm shutdown of active sessions") {
+	if !strings.Contains(text, "1 computer is in use") || !strings.Contains(text, "1 session in use will be interrupted") {
 		t.Fatalf("session in use not highlighted:\n%s", text)
 	}
 	var output bytes.Buffer
 	if _, err := ConfirmShutdown(strings.NewReader("no\n"), &output, plan); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Logged in but not in use: 1 computer(s)") || !strings.Contains(output.String(), "of 1 computer(s) with an active user session") {
+	if !strings.Contains(output.String(), "Logged in but not in use: 1 computer") || !strings.Contains(output.String(), "of 1 computer with an active user session") {
 		t.Fatalf("CLI review:\n%s", output.String())
 	}
 }

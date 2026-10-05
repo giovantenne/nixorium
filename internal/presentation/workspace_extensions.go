@@ -252,6 +252,6 @@ func (model dashboardModel) finishWorkspaceSearch(message dashboardWorkspaceSear
 		return model, nil
 	}
 	w.choice = slices.Index(w.choices, found[0])
-	model.message = fmt.Sprintf("%d packaged extension(s) match %q and were added to the list. Space selects.", len(found), message.query)
+	model.message = fmt.Sprintf("%s matching %q added to the list. Space selects.", countNoun(len(found), "packaged extension"), message.query)
 	return model, nil
 }

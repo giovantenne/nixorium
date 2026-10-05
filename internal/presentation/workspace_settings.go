@@ -207,7 +207,7 @@ func (editor *workspaceSettingsEditor) importSettings(source string) (message st
 		added++
 	}
 	sort.Strings(skipped)
-	message = fmt.Sprintf("%d setting(s) taken from the pasted text.", added)
+	message = countNoun(added, "setting") + " taken from the pasted text."
 	if len(skipped) != 0 {
 		shown := skipped
 		if len(shown) > 8 {

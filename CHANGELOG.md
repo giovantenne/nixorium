@@ -16,7 +16,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   search and pagination use the theme colors; notices drop the NOTICE label and
   keep explanations in ordinary text; steps read "Step 2 of 6". Restarting or
   closing after a USB installation no longer asks for a typed word, and the
-  disk review separates the facts to check from technical details.
+  disk review separates the facts to check from technical details. In Power
+  controls, Enter confirms the reviewed restart or shutdown, as in the
+  classroom view, and the review says how many sessions in use it interrupts.
+  Counts read "1 computer" or "3 computers" instead of "computer(s)".
 
 - Simplify settings forms with empty-field hints and explicit network defaults;
   move examples and extended context into help. Separate USB instructions by

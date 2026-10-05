@@ -834,7 +834,7 @@ func readyText(ready bool) string {
 
 func cleanText(dirty bool, changes int) string {
 	if dirty {
-		return fmt.Sprintf("%d changed path(s)", changes)
+		return countNoun(changes, "changed path")
 	}
 	return "clean"
 }
