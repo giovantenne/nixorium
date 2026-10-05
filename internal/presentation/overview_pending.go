@@ -55,23 +55,20 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 	case "recovery-required", "degraded":
 		add("pending-pxe", "Controller network recovery required", "Inspect the installation session; recovery remains separately confirmed.")
 	}
-	if notice, ok := setupOverviewNotice(model.setup); ok {
+	// Controller setup evidence enters the same ordered observation as saves
+	// and reviews; never revive it by reading the older setup report again.
+	if notice, ok := setupOverviewNotice(model.setup); ok && model.setup.CurrentStage != domain.SetupStageApply {
 		id := "pending-setup"
-		switch model.setup.CurrentStage {
-		case domain.SetupStageReview:
+		if model.setup.CurrentStage == domain.SetupStageReview {
 			id = "pending-git"
-		case domain.SetupStageApply:
-			id = "pending-controller"
 		}
-		if id != "pending-controller" || !controllerVerifiedForSave(model.pendingRevision, model.controller.result) {
-			add(id, notice.title, notice.detail)
-		}
+		add(id, notice.title, notice.detail)
 	}
 	if model.report.Git.Dirty {
 		add("pending-git", "Configuration has uncommitted changes", "Last local Git observation; inspect paths before recording anything.")
 	}
 	// Low disk space is shown in Maintenance, next to Free disk space.
-	if (model.pendingRevision != "" && !model.controllerRunsRevision(model.pendingRevision)) || (model.controller.plan.Operation != "" && !model.controller.plan.HasErrors() && !model.controller.plan.Current && !controllerVerifiedForSave(model.controller.plan.Revision, model.controller.result)) {
+	if model.controllerObservation == controllerOverviewPending {
 		add("pending-controller", "Saved configuration needs applying to this controller", "Observed in this session. Open a fresh controller review.")
 	}
 	if model.report.PXEPreparation.Present && !model.report.PXEPreparation.Ready {

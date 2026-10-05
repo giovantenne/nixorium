@@ -112,6 +112,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.initialError = false
 		model.report = message.report
 		model.setup = message.setup
+		model.observeSetupController(message.setup)
+		model.observeRecoveryController(message.recovery)
 		if (model.setupMode || setupNeedsImmediateAttention(message.setup)) && model.managedJobConflict() == "" {
 			next, command := model.beginComputerInstallation("")
 			return next, tea.Batch(command, poll)
@@ -159,7 +161,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case recoveryMsg:
 		model.busy = ""
-		model.recovery = message.report
+		model.observeRecoveryController(message.report)
 		model.recoveryCursor = min(model.recoveryCursor, max(0, len(message.report.Conditions)-1))
 		return model, nil
 	case overviewRefreshMsg:
@@ -172,7 +174,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		message.report.Meta = model.report.Meta
 		model.report, model.setup = message.report, message.setup
 		model.usbReserved = message.usbReserved
-		model.recovery = message.recovery
+		model.observeSetupController(message.setup)
+		model.observeRecoveryController(message.recovery)
 		model.message = "Local observations refreshed; clients were not checked."
 		return model, nil
 	case dashboardDoctorMsg:
@@ -192,6 +195,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardSetupMsg:
 		model.busy = ""
 		model.setup = message.report
+		model.observeSetupController(message.report)
 		if model.installation.flow {
 			return model.continueComputerInstallation(message.report)
 		}
@@ -216,6 +220,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardSetupKeysMsg:
 		model.busy = ""
+		if !message.save.HasErrors() && message.save.State == "saved" {
+			model.noteControllerSave(message.save.Revision)
+		}
 		if model.installation.flow {
 			switch {
 			case message.keyErr != nil:
@@ -267,6 +274,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case dashboardSetupSaveMsg:
 		model.busy = ""
+		if !message.report.HasErrors() && message.report.State == "saved" {
+			model.noteControllerSave(message.report.Revision)
+		}
 		if model.installation.flow {
 			if message.report.HasErrors() || (message.report.State != "saved" && message.report.State != "unchanged") {
 				return model.failComputerInstallation(message.report.Message)
@@ -462,6 +472,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardControllerPlanMsg:
 		model.busy = ""
 		model.controller.plan = message.report
+		model.controller.result = domain.ControllerRebuildExecutionReport{}
+		model.observeControllerPlan(message.report)
 		if model.installation.flow {
 			if message.report.HasErrors() {
 				return model.failComputerInstallation(controllerPlanIssues(message.report))
@@ -507,6 +519,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.controller.applying = false
 		model.controller.result = message.report
+		model.observeControllerResult(message.report)
 		model.message = message.report.Message
 		model.controller.details = false
 		if message.statusErr != nil {
@@ -603,6 +616,9 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardGitCommitResultMsg:
 		model.computers.hosts = domain.HostsReport{}
 		model.busy = ""
+		if !message.report.HasErrors() && message.report.Committed {
+			model.noteControllerSave(message.report.Revision)
+		}
 		model.maintenance.gitCommitResult = message.report
 		model.maintenance.gitReview = message.review
 		model.maintenance.gitScroll = 0
@@ -672,7 +688,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = message.report.Message
 		model.screen = dashboardUpdate
 		if !message.report.HasErrors() && message.report.Updated {
-			model.pendingRevision = message.report.Revision
+			model.noteControllerSave(message.report.Revision)
 			return model.startUpdateControllerApply()
 		}
 		return model, nil
@@ -682,6 +698,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.updates.applying = false
 		model.controller.plan = message.plan
 		model.controller.result = message.report
+		model.observeControllerPlan(message.plan)
+		model.observeControllerResult(message.report)
 		if message.plan.HasErrors() {
 			model.message = controllerPlanIssues(message.plan)
 		} else {
@@ -823,7 +841,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settings.applying = false
 		model.settings.result = message.report
 		if !message.report.HasErrors() && message.report.State == "saved" {
-			model.pendingRevision = message.report.Revision
+			model.noteControllerSave(message.report.Revision)
 			model.settings.current = model.settings.candidate
 			model.message = message.report.Message
 		} else if message.report.State == "unchanged" {
@@ -901,7 +919,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSoftwareApplyMsg:
 		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
-			model.pendingRevision = message.report.Revision
+			model.noteControllerSave(message.report.Revision)
 		}
 		model.busy = ""
 		software, result := model.software.finishApply(message.report)
@@ -925,7 +943,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		return model, nil
 	case dashboardSoftwarePresetApplyMsg:
 		if !message.report.HasErrors() && message.report.State == "saved" && message.report.AffectedController != "" {
-			model.pendingRevision = message.report.Revision
+			model.noteControllerSave(message.report.Revision)
 		}
 		model.busy = ""
 		software, result := model.software.finishProfileApply(message.report)
@@ -940,6 +958,8 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.controller.applying = false
 		model.controller.plan = message.plan
 		model.controller.result = message.report
+		model.observeControllerPlan(message.plan)
+		model.observeControllerResult(message.report)
 		software, result := model.software.finishController(message.plan, message.report)
 		model.software = software
 		model.message = result.message

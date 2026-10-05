@@ -300,7 +300,12 @@ any shard must block publication.
 - Overview pending work uses local Git/service observations and
   previously computed session evidence only. It lists only items that need
   action (no empty-state line, no last-client-check reminder; Computer
-  inventory shows dated observations). Keep local refresh free of Nix/client
+  inventory shows dated observations). Reconcile controller reminders in the
+  order of accepted typed observations: a fresh current review or verified
+  activation supersedes older saves/setup/drift notices, including intervening
+  commits; a later save or observed drift invalidates that evidence. Preserve
+  exact revision matching in save results and operation authorization.
+  Keep local refresh free of Nix/client
   probes, and selectable follow-ups read-only until their ordinary review and
   confirmation. Low store space is shown in
   Maintenance beside Free disk space, not on the Overview. The backup reminder

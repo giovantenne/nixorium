@@ -38,15 +38,6 @@ func controllerVerifiedForSave(revision string, result domain.ControllerRebuildE
 	return revision != "" && result.Revision == revision && result.Operation != "" && !result.HasErrors() && result.Applied && result.Verified
 }
 
-// controllerRunsRevision is true when this session verified an apply of the
-// revision, or a later controller review found it already active (applied
-// through another path, such as computer installation).
-func (model dashboardModel) controllerRunsRevision(revision string) bool {
-	plan := model.controller.plan
-	return controllerVerifiedForSave(revision, model.controller.result) ||
-		(revision != "" && plan.Operation != "" && !plan.HasErrors() && plan.Current && plan.Revision == revision)
-}
-
 func workspaceRecordNeedsInspection(result domain.WorkspaceApplyReport) bool {
 	return result.RecoveryRequired || result.State == "conflict" || (result.State == "saved" && !result.Recorded)
 }

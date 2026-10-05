@@ -1,9 +1,11 @@
 package presentation
 
 import (
-	"github.com/giovantenne/nixorium/internal/domain"
 	"strings"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 func TestOverviewDistinguishesConfigurationFromPendingApplication(t *testing.T) {
@@ -40,11 +42,18 @@ func TestOverviewDoesNotAskForNetworkBootFilesAfterUSBInstallation(t *testing.T)
 func TestOverviewClearsSavedRevisionThatTheControllerAlreadyRuns(t *testing.T) {
 	model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "ready"}, DashboardActions{}, false)
 	model.screen = dashboardHome
-	model.pendingRevision = "222c026dcb9046c902363ee5120d7c03e4854ea2"
+	revision := "222c026dcb9046c902363ee5120d7c03e4854ea2"
+	model.noteControllerSave(revision)
 	if view := model.View().Content; !strings.Contains(view, "Saved configuration needs applying") {
 		t.Fatalf("unapplied revision was not reported: %s", view)
 	}
-	model.controller.plan = domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "current", Current: true, Revision: model.pendingRevision}
+	updated, _ := model.Update(dashboardControllerPlanMsg{report: domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "current", Current: true, Revision: revision}})
+	model = updated.(dashboardModel)
+	model, _ = workspaceKey(model, demoCode(tea.KeyEscape))
+	model, _ = workspaceKey(model, demoCode(tea.KeyEscape))
+	if model.screen != dashboardHome {
+		t.Fatal("did not return to Overview after controller review")
+	}
 	if view := model.View().Content; strings.Contains(view, "Saved configuration needs applying") {
 		t.Fatalf("revision already running on the controller is still reported: %s", view)
 	}

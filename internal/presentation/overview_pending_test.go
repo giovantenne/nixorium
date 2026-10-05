@@ -23,6 +23,7 @@ func TestOverviewPendingRowsAndEmptyState(t *testing.T) {
 	free := uint64(1 << 30)
 	m.report.StoreFreeBytes, m.report.StoreSpaceLow = &free, true
 	m.setup = domain.SetupReport{State: "action-required", CurrentStage: domain.SetupStageApply}
+	m.observeSetupController(m.setup)
 	m.computers.hosts = domain.HostsReport{GeneratedAt: time.Date(2026, 9, 30, 10, 0, 0, 0, time.UTC), Deployment: domain.HostDeploymentSummary{Outdated: 2}}
 	seen := map[string]bool{}
 	for _, task := range m.pendingTasks() {
@@ -68,11 +69,13 @@ func TestOverviewRefreshIsLocalAndPreservesClientObservation(t *testing.T) {
 	if len(m.computers.hosts.Hosts) != 1 || m.screen != dashboardHome {
 		t.Fatal("lost dated client evidence or navigated")
 	}
-	m.pendingRevision = strings.Repeat("a", 40)
+	revision := strings.Repeat("a", 40)
+	m.noteControllerSave(revision)
 	if len(m.pendingTasks()) != 1 {
 		t.Fatal("unapplied save not visible")
 	}
-	m.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", Revision: m.pendingRevision, Applied: true, Verified: true}
+	updated, _ := m.Update(dashboardControllerResultMsg{report: domain.ControllerRebuildExecutionReport{Operation: "controller-apply", Revision: revision, Applied: true, Verified: true}})
+	m = updated.(dashboardModel)
 	if len(m.pendingTasks()) != 0 {
 		t.Fatal("verified saved revision remains pending")
 	}

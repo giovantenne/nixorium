@@ -742,7 +742,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 			} else {
 				model.screen = dashboardHome
 			}
-			if model.controller.result.Operation != "" && !model.controller.result.HasErrors() {
+			if model.controllerObservation == controllerOverviewCurrent && controllerVerifiedForSave(model.controller.result.Revision, model.controller.result) {
 				model.message = "Controller configuration activated and verified."
 			} else {
 				model.message = ""

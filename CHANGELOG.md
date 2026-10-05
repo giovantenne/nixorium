@@ -40,7 +40,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 - The overview no longer asks to prepare network boot files on a lab
   installed from USB, and no longer reports a saved configuration as
-  unapplied after a controller review finds it already running.
+  unapplied after a controller review finds it already running. Controller
+  reminders now follow the latest verified review, activation or setup check,
+  including intervening commits and software/update follow-ups. New saves and
+  observed drift remain visible; unverified results never show a success notice.
 
 ## [3.0.0-beta.1] - 2026-10-04
 

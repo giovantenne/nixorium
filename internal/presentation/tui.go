@@ -355,7 +355,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
-	pendingRevision        string
+	controllerObservation  controllerOverviewObservation
 	jobs                   managedJobsModel
 	read                   readActivity
 	busyStarted            time.Time
@@ -673,10 +673,12 @@ func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, act
 		screen = dashboardSetup
 		setupMode = true
 	}
-	return dashboardModel{
+	model := dashboardModel{
 		report: report, setup: setup, setupMode: setupMode, screen: screen, actions: actions,
 		homeMenu: newDashboardTaskMenu(false, 80, 24), activitySpinner: newTUISpinner(false), shutdown: newShutdownModel(),
 	}
+	model.observeSetupController(setup)
+	return model
 }
 
 func (model dashboardModel) Init() tea.Cmd {

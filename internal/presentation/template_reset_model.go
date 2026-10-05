@@ -128,7 +128,7 @@ func (model dashboardModel) finishTemplateResetResult(msg templateResetResultMsg
 	model.templateReset.saving, model.templateReset.stage = false, "result"
 	model.templateReset.result = msg.result
 	if msg.result.State == "saved" && !msg.result.RecoveryRequired {
-		model.pendingRevision = msg.result.Revision
+		model.noteControllerSave(msg.result.Revision)
 	}
 	model.templateReset.scroll, model.pageScroll = 0, 0
 	model.busy, model.message = "", ""

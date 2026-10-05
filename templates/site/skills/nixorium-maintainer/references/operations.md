@@ -9,6 +9,11 @@ show the time of the last session observation, not live state. Refresh local
 state updates only saved configuration and local observations; open inventory
 to check clients. An empty list is not evidence that the fleet is current.
 
+A fresh controller review that finds the current saved deployment active, or
+a verified activation, clears older controller reminders even if setup added
+another commit after the original save. New saves and freshly observed drift
+raise the reminder again. Failed, cancelled or unverified work never clears it.
+
 `nixorium recovery status` (TUI: Overview rows, or safe mode when the
 laboratory cannot be read) lists persistent blockers — interrupted client
 update, unfinished USB installation, interrupted template reset, controller
