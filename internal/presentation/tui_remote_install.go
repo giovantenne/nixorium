@@ -495,10 +495,6 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 				model.message = "Type the IP address shown by command 3 on the PC to install."
 				return model, nil
 			}
-			if controller := model.report.Meta.Controller; remote.address == controller.DHCPIP || remote.address == controller.StaticIP {
-				model.message = remote.address + " is this controller's address. Type the address of the PC to install, shown by command 3 on that PC."
-				return model, nil
-			}
 			remote.fingerprint = ""
 			remote.confirmation = ""
 			remote.stage = remoteInstallFingerprint
