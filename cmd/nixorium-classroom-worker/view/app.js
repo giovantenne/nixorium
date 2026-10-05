@@ -410,6 +410,17 @@ function startAction(action, computers) {
   else runAction(action, computers);
 }
 
+// One menu is open at a time; a click elsewhere closes it.
+const menus = document.querySelectorAll('details.actions-menu');
+for (const menu of menus) {
+  menu.addEventListener('toggle', () => {
+    if (menu.open) for (const other of menus) if (other !== menu) other.open = false;
+  });
+}
+document.addEventListener('click', (event) => {
+  for (const menu of menus) if (menu.open && !menu.contains(event.target)) menu.open = false;
+});
+
 for (const button of toolbarButtons) {
   button.addEventListener('click', () => {
     button.closest('details')?.removeAttribute('open');

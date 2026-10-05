@@ -20,10 +20,6 @@ header { display: flex; flex-wrap: wrap; align-items: center; justify-content: s
 header .title { display: flex; align-items: baseline; gap: 1rem; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; }
 .toolbar .group { display: flex; gap: 0.4rem; }
-/* Opposite actions sit together as one control. */
-.toolbar .pair { display: inline-flex; }
-.toolbar .pair button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.toolbar .pair button:last-child { margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .toolbar .actions-menu.disabled summary, .viewer-actions.disabled summary { opacity: 0.45; pointer-events: none; }
 .toolbar .actions-menu .menu { right: auto; left: 0; }
 #selected-count { color: var(--muted); min-width: 7rem; }

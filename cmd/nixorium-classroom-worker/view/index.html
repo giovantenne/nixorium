@@ -16,14 +16,20 @@
   <div class="toolbar" role="toolbar" aria-label="Actions on the selected computers">
     <label class="select-all"><input type="checkbox" id="select-all"> Select all</label>
     <span id="selected-count">None selected</span>
-    <span class="pair" role="group" aria-label="Screens">
-      <button type="button" data-action="lock">Lock</button>
-      <button type="button" data-action="unlock">Unlock</button>
-    </span>
-    <span class="pair" role="group" aria-label="Internet">
-      <button type="button" data-action="internet-block">Block Internet</button>
-      <button type="button" data-action="internet-allow">Allow Internet</button>
-    </span>
+    <details class="actions-menu">
+      <summary>Lock</summary>
+      <div class="menu">
+        <button type="button" data-action="lock">Lock</button>
+        <button type="button" data-action="unlock">Unlock</button>
+      </div>
+    </details>
+    <details class="actions-menu">
+      <summary>Internet</summary>
+      <div class="menu">
+        <button type="button" data-action="internet-block">Block Internet</button>
+        <button type="button" data-action="internet-allow">Allow Internet</button>
+      </div>
+    </details>
     <button type="button" data-action="show-screen" title="Share your screen, a window or a tab on the selected computers, with their keyboard and mouse blocked">Share screen</button>
     <details class="actions-menu send-menu" title="Copy a file or a folder to the desktops of the selected computers">
       <summary>Send files</summary>

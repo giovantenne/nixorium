@@ -11,8 +11,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   teacher's home; in the TUI the path starts at the user's home; from a
   terminal it is `nixorium send plan|apply --file <file-or-folder>`. A folder
   arrives on the students' desktops with its name and contents. The page's
-  buttons are grouped in pairs: Lock/Unlock, Internet, **Share screen**
-  (formerly Show my screen), Send files and Power.
+  toolbar reads Lock, Internet, **Share screen** (formerly Show my screen),
+  Send files and Power; Lock, Internet, Send files and Power are menus, and
+  only one stays open.
 
 - The classroom view follows GNOME's dark style. In a computer's own window,
   actions and **Take control** are unavailable while the computer is off or
