@@ -644,6 +644,9 @@ deployment on a real classroom computer.
 ## Optional adoption statistics
 
 Telemetry is controller-only and disabled without explicit administrator consent.
+The first administrator TUI invitation shows a readable report and an optional
+exact JSON preview. Enter never accepts; declining or leaving keeps sharing off.
+Downloading the installer does not authorize controller reports.
 Use `nixorium telemetry preview --json` or `nixorium telemetry status --json` for
 local inspection. Enable only when the user explicitly asks to participate:
 `nixorium telemetry enable`. Stop with `nixorium telemetry disable`; this removes

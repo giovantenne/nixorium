@@ -7,8 +7,11 @@ send these reports.
 
 In **Maintenance → Adoption statistics**, inspect the payload and explicitly
 choose whether to share it. The first ordinary administrator startup offers
-this choice once; leaving the screen does not enable sharing. You can return
-at any time. The command-line equivalents are:
+this choice once, with a readable summary of the report. Press `p` to inspect
+the exact JSON and privacy details, `e` to enable sharing, or `d` to decline.
+There is no default acceptance: Enter does nothing and Esc leaves sharing off.
+The first invitation returns to the overview after saving either choice.
+You can return at any time. The command-line equivalents are:
 
 ```sh
 nixorium telemetry preview --json
@@ -22,6 +25,20 @@ they do not upload data or probe clients. Before consent, the preview contains
 an explicitly marked placeholder for the identity. The daily system service
 uses the same payload builder as the preview. Opening the TUI is not required
 for subsequent sends.
+
+## Installer request counts
+
+The public `https://nixorium.org/install.sh` download endpoint separately counts
+GET requests as daily UTC totals, including curl, browsers, bots and retries.
+It cannot establish unique visitors, script execution or successful installations.
+HEAD requests and direct GitHub downloads are not counted. The counter stores
+only the day and total, with no cookies, IP addresses, user agents or visitor
+identifiers; Cloudflare still receives the connection IP. Daily totals are kept
+for 24 calendar months and are not linked to controller reports. Counting is
+best effort, so service outages or quotas can cause undercounts.
+
+Downloading the installer never enables daily controller telemetry. The
+controller administrator makes that separate choice in the TUI after installation.
 
 ## Data and purpose
 

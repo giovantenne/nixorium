@@ -319,7 +319,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "e  Preview a minimized support report; no save or upload yet")
 		}
 	case dashboardTelemetry:
-		lines = append(lines, "Optional daily adoption statistics. e enables sharing; d disables it. Esc leaves without enabling. Arrow keys scroll the exact payload. No data is sent by opening this screen.")
+		lines = append(lines, "Optional daily adoption statistics. e explicitly enables sharing; d declines or disables it.", "p switches between the readable overview and exact JSON report. Arrow keys scroll; r refreshes local settings.", "Enter never enables sharing. Esc leaves without enabling. Opening this screen sends nothing.", "After the first invitation, change your choice in Maintenance → Adoption statistics.")
 	case dashboardSupport:
 		lines = append(lines, "↑/↓, PgUp/PgDown, Home/End scroll the exact filtered JSON.",
 			"Enter saves this preview to a private local file; nothing is uploaded.",

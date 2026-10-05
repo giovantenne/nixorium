@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Present the optional adoption-statistics invitation with a readable report,
+  explicit accept/decline actions and an exact JSON preview. The first choice
+  returns to the overview; Enter never accepts telemetry.
+
 - On the controller, **Classroom view** has its own launcher, first in the
   teacher's dock, and **Nixorium** opens the dashboard, first in the
   administrator's dock. Clicking an icon again brings its open window forward
