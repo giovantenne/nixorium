@@ -74,9 +74,12 @@ var settingsFields = []settingsField{
 }
 
 var installationSettingsFields = func() []settingsField {
-	fields := make([]settingsField, 0, len(settingsFields)-2)
+	fields := make([]settingsField, 0, len(settingsFields)-4)
 	for _, field := range settingsFields {
-		if field.id != "lab.timeZone" && field.id != "lab.keyboardLayout" {
+		switch field.id {
+		case "lab.timeZone", "lab.keyboardLayout", "lab.teacherUser", "lab.studentUser":
+			// Installation reuses accounts and regional settings from first setup.
+		default:
 			fields = append(fields, field)
 		}
 	}

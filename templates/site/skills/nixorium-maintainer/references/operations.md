@@ -50,6 +50,10 @@ the operator continue or edit. It proves only form completeness: continuation
 still checks keys, configuration, controller and installation files, and does
 not replace the separately reviewed start of network installation.
 
+PXE and USB preparation reuse the teacher/student account names saved during
+first setup. To change them, use Maintenance → Change settings → Accounts;
+the installation form does not ask for them again.
+
 ## After saving configuration
 
 On supporting pins, result screens separate local configuration, this

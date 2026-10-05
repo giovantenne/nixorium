@@ -146,7 +146,8 @@ baseline failures before any destructive scenario.
 2. Reboot without the installation medium and sign in as `admin`.
 3. Confirm `nixorium` and the private deployment are available.
 4. Open **Installation → Network boot (PXE)**, complete Laboratory settings,
-   verify that time zone and keyboard are not requested again, and let the flow
+   verify that teacher/student names, time zone and keyboard are not requested
+   again and retain their saved values, and let the flow
    create missing keys and activate the controller.
 5. Before starting PXE or rebooting, verify that the configured static
    laboratory address is present on the selected interface.

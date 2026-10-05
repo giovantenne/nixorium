@@ -91,11 +91,12 @@ func TestFirstRunOmitsGitIdentityAndGroupsEssentialFields(t *testing.T) {
 	}
 }
 
-func TestInstallationSettingsReuseControllerRegionalSettings(t *testing.T) {
+func TestInstallationSettingsReuseControllerAccountsAndRegionalSettings(t *testing.T) {
 	settings := wizardSettings()
+	settings.Lab.TeacherUser, settings.Lab.StudentUser = "professor", "pupil"
 	model := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
 	for _, field := range model.fields {
-		if field.id == "lab.timeZone" || field.id == "lab.keyboardLayout" {
+		if field.id == "lab.timeZone" || field.id == "lab.keyboardLayout" || field.id == "lab.teacherUser" || field.id == "lab.studentUser" {
 			t.Fatalf("installation asks for existing controller setting %q", field.id)
 		}
 	}
@@ -105,6 +106,9 @@ func TestInstallationSettingsReuseControllerRegionalSettings(t *testing.T) {
 	}
 	if !model.accepted || model.settings.Lab.TimeZone != settings.Lab.TimeZone || model.settings.Lab.KeyboardLayout != settings.Lab.KeyboardLayout || model.settings.Lab.ConsoleKeyMap != settings.Lab.ConsoleKeyMap {
 		t.Fatalf("installation did not preserve controller regional settings: %+v", model.settings.Lab)
+	}
+	if model.settings.Lab.TeacherUser != settings.Lab.TeacherUser || model.settings.Lab.StudentUser != settings.Lab.StudentUser || model.settings.Lab.TeacherPassword != settings.Lab.TeacherPassword || model.settings.Lab.StudentPassword != settings.Lab.StudentPassword {
+		t.Fatalf("installation did not preserve saved accounts: %+v", model.settings.Lab)
 	}
 }
 
@@ -195,5 +199,32 @@ func TestClientInterfaceProposesTheControllerCardOnlyBeforeClientsExist(t *testi
 	settings.Lab.DeploymentMode = "controller"
 	if got := draft(settings); got != "enp3s0" {
 		t.Fatalf("saved client card replaced by %q", got)
+	}
+}
+
+func TestAccountNamesRemainEditableInFirstSetupAndSettings(t *testing.T) {
+	var accountFields []settingsField
+	for _, group := range routineSettingsGroups {
+		if group.id == "accounts" {
+			accountFields = group.fields
+		}
+	}
+	for _, fields := range [][]settingsField{settingsFields, accountFields} {
+		editor := newSettingsEditorModel(wizardSettings(), fields, "Accounts")
+		for i, field := range fields {
+			switch field.id {
+			case "lab.teacherUser":
+				editor.drafts[i] = "professor"
+			case "lab.studentUser":
+				editor.drafts[i] = "pupil"
+			}
+		}
+		for range fields {
+			next, _ := editor.Update(demoCode(tea.KeyEnter))
+			editor = next.(settingsWizardModel)
+		}
+		if !editor.accepted || editor.settings.Lab.TeacherUser != "professor" || editor.settings.Lab.StudentUser != "pupil" {
+			t.Fatal("account names cannot be changed in setup or Settings")
+		}
 	}
 }

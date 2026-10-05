@@ -269,16 +269,47 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	if model.screen != dashboardSettingsEdit || model.settings.editor.settings.Lab.DeploymentMode != "laboratory" || model.settings.editor.settings.Lab.PCCount != 20 || len(model.settings.editor.fields) != len(installationSettingsFields) {
 		t.Fatalf("client setup editor = %+v", model.settings.editor)
 	}
-	if model.settings.editor.title != "Nixorium — Install computers / Laboratory settings" || model.settings.editor.fields[6].label != "Teacher user name" {
+	if model.settings.editor.title != "Nixorium — Install computers / Laboratory settings" {
 		t.Fatalf("complete laboratory settings are not shown: title=%q fields=%+v", model.settings.editor.title, model.settings.editor.fields)
 	}
 	for _, field := range model.settings.editor.fields {
-		if field.id == "lab.timeZone" || field.id == "lab.keyboardLayout" {
+		if field.id == "lab.timeZone" || field.id == "lab.keyboardLayout" || field.id == "lab.teacherUser" || field.id == "lab.studentUser" {
 			t.Fatalf("installation asks for controller regional setting %q", field.id)
 		}
 	}
 	if model.settings.editor.settings.Lab.TimeZone != settings.Lab.TimeZone || model.settings.editor.settings.Lab.KeyboardLayout != settings.Lab.KeyboardLayout {
 		t.Fatalf("installation changed controller regional settings: %+v", model.settings.editor.settings.Lab)
+	}
+}
+
+func TestPXEAndUSBPreparationReuseSavedAccountNames(t *testing.T) {
+	for _, method := range []domain.RemoteInstallMethod{"pxe", domain.RemoteInstallUSBSSH} {
+		t.Run(string(method), func(t *testing.T) {
+			settings := wizardSettings()
+			settings.Lab.DeploymentMode = "controller"
+			settings.Lab.PCCount = 0
+			settings.Lab.TeacherUser, settings.Lab.StudentUser = "professor", "pupil"
+			model := experienceFixture(2)
+			model.actions.LoadSettings = func(context.Context) (domain.LabSettingsFile, error) { return settings, nil }
+			next, command := model.beginComputerInstallation(method)
+			model = workspaceComplete(t, next.(dashboardModel), command)
+			if model.screen != dashboardSettingsEdit {
+				t.Fatal("installation form did not open", model.screen)
+			}
+			editor := model.settings.editor
+			for _, field := range editor.fields {
+				if field.id == "lab.teacherUser" || field.id == "lab.studentUser" {
+					t.Fatal("installation asks for saved account name", field.id)
+				}
+			}
+			for range editor.fields {
+				next, _ := editor.Update(demoCode(tea.KeyEnter))
+				editor = next.(settingsWizardModel)
+			}
+			if !editor.accepted || editor.settings.Lab.TeacherUser != "professor" || editor.settings.Lab.StudentUser != "pupil" {
+				t.Fatal("installation did not retain saved account names")
+			}
+		})
 	}
 }
 

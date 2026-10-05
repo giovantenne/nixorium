@@ -123,7 +123,8 @@ trial on virtual machines, follow the
    the dock (or run `nixorium`). In **Installation**, choose **Network boot
    (PXE)** or **USB over SSH**; the first time, the guided flow asks for the
    laboratory settings, creates the keys, activates the controller and
-   prepares the clients.
+   prepares the clients. Teacher and student account names are reused from
+   first setup; change them under **Maintenance → Change settings → Accounts**.
 
 3. **Install the first client.** With network boot, start the client from the
    network; the installer opens on its screen, asks which configured computer

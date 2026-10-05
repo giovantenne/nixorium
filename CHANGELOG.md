@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Reuse the teacher and student account names saved during first setup when
+  preparing PXE or USB installations. Change names through Settings → Accounts.
+
 - Present the optional adoption-statistics invitation with a readable report,
   explicit accept/decline actions, an exact JSON preview and separate privacy
   details. The first invitation requires a choice: `e` or Enter accepts, `d`
