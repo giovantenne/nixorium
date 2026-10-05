@@ -33,11 +33,17 @@ func TestClassroomBrowserProfileKeepsSystemFrames(t *testing.T) {
 	if content, _ := os.ReadFile(preferences); string(content) != "{}" {
 		t.Fatalf("existing preferences were replaced: %q", content)
 	}
-	arguments := classroomBrowserArguments("http://127.0.0.1:1/open?token=x", profile)
+	arguments := classroomBrowserArguments("http://127.0.0.1:1/open?token=x", profile, false)
 	for _, want := range []string{"--user-data-dir=" + profile, "--ozone-platform=x11", "--app=http://127.0.0.1:1/open?token=x"} {
 		if !slices.Contains(arguments, want) {
 			t.Fatalf("arguments %v lack %s", arguments, want)
 		}
+	}
+	if slices.Contains(arguments, "--force-dark-mode") {
+		t.Fatal("light desktop forced the dark style")
+	}
+	if dark := classroomBrowserArguments("http://127.0.0.1:1/open?token=x", profile, true); !slices.Contains(dark, "--force-dark-mode") || dark[len(dark)-1] != "--app=http://127.0.0.1:1/open?token=x" {
+		t.Fatalf("dark desktop arguments: %v", dark)
 	}
 }
 

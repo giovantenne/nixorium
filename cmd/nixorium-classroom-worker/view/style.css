@@ -24,7 +24,7 @@ header .title { display: flex; align-items: baseline; gap: 1rem; }
 .toolbar .pair { display: inline-flex; }
 .toolbar .pair button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .toolbar .pair button:last-child { margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
-.toolbar .power-menu.disabled summary { opacity: 0.45; pointer-events: none; }
+.toolbar .power-menu.disabled summary, .viewer-actions.disabled summary { opacity: 0.45; pointer-events: none; }
 .toolbar .actions-menu .menu { right: auto; left: 0; }
 #selected-count { color: var(--muted); min-width: 7rem; }
 button { padding: 0.35rem 0.9rem; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: inherit; font: inherit; cursor: pointer; }
@@ -61,6 +61,7 @@ body.screen-mode #viewer-panel { display: flex; flex-direction: column; height: 
 .actions-menu .menu { position: absolute; top: calc(100% + 0.3rem); right: 0; z-index: 2; display: flex; flex-direction: column; gap: 0.3rem; min-width: 12rem; padding: 0.4rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 4px 16px rgb(0 0 0 / 0.35); }
 .actions-menu .menu button { text-align: left; }
 #viewer-image { display: block; width: 100%; min-height: 0; flex: 1; object-fit: contain; background: #000; }
+#viewer-image.stale { opacity: 0.35; }
 .viewer-bar button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
 #action-dialog { width: min(32rem, 92vw); padding: 1.2rem 1.4rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
 #action-dialog::backdrop { background: rgb(0 0 0 / 0.55); }

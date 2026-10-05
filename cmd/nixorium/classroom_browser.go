@@ -27,7 +27,7 @@ func runClassroomBrowser(address string) int {
 	if err != nil {
 		return 1
 	}
-	arguments := classroomBrowserArguments(address, profile)
+	arguments := classroomBrowserArguments(address, profile, desktopPrefersDark())
 	path, err := exec.LookPath(arguments[0])
 	if err != nil {
 		return 1

@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The classroom view follows GNOME's dark style. In a computer's own window,
+  actions and **Take control** are unavailable while the computer is off or
+  restarting, and its last picture is dimmed; without a student session only
+  Internet and power actions remain.
+
 - The overview no longer asks to prepare network boot files on a lab
   installed from USB, and no longer reports a saved configuration as
   unapplied after a controller review finds it already running.

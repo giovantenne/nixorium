@@ -11,6 +11,7 @@ const viewerName = document.getElementById('viewer-name');
 const viewerDetail = document.getElementById('viewer-detail');
 const viewerImage = document.getElementById('viewer-image');
 const controlButton = document.getElementById('viewer-control');
+const viewerActions = document.querySelector('.viewer-actions');
 const controllingNotice = document.getElementById('viewer-controlling');
 const fullscreenButton = document.getElementById('viewer-fullscreen');
 const viewerPanel = document.getElementById('viewer-panel');
@@ -133,14 +134,26 @@ function render(computers) {
     if (computer.state === 'viewing') viewing += 1;
     if (computer.name === selected) {
       viewerDetail.textContent = computer.state === 'viewing' ? (computer.locked ? 'Locked' : '') : text;
-      // A locked computer is seen, not controlled: unlock it first.
-      if (computer.locked && controlling) setControl(false);
-      controlButton.disabled = Boolean(computer.locked);
-      controlButton.title = computer.locked ? 'Unlock this computer to take control.' : '';
+      // A computer that is off or restarting accepts nothing; without a
+      // student session only Internet and power apply. The last picture
+      // stays, dimmed, so the teacher sees it is no longer live.
+      const reachable = computer.state !== 'unreachable';
+      // The student's own screen lock keeps the session: classroom actions
+      // still apply, but there is nothing to control.
+      const session = computer.state === 'viewing' || computer.state === 'locked';
+      const canControl = computer.state === 'viewing' && !computer.locked;
+      if (!canControl && controlling) setControl(false);
+      controlButton.disabled = !canControl;
+      controlButton.title = computer.locked ? 'Unlock this computer to take control.' : (canControl ? '' : text);
+      viewerImage.classList.toggle('stale', !session);
+      viewerActions.classList.toggle('disabled', !reachable);
+      if (!reachable) viewerActions.open = false;
       // This computer's menu offers only the change that applies.
       const offer = { lock: !computer.locked, unlock: Boolean(computer.locked), 'internet-block': computer.internet !== 'blocked', 'internet-allow': computer.internet === 'blocked' };
-      for (const button of document.querySelectorAll('.viewer-actions button[data-action]')) {
+      const needsSession = ['lock', 'unlock', 'show-screen', 'send-desktop'];
+      for (const button of viewerActions.querySelectorAll('button[data-action]')) {
         if (button.dataset.action in offer) button.hidden = !offer[button.dataset.action];
+        button.disabled = !reachable || (needsSession.includes(button.dataset.action) && !session);
       }
     }
   }

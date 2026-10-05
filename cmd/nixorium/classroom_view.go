@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
@@ -81,8 +82,20 @@ func classroomBrowserProfile() (string, error) {
 
 // classroomBrowserArguments runs Chromium through XWayland, where GNOME draws
 // the window frame; on Wayland Chromium would draw its own.
-func classroomBrowserArguments(address, profile string) []string {
-	return []string{"chromium", "--user-data-dir=" + profile, "--ozone-platform=x11", "--no-first-run", "--no-default-browser-check", "--app=" + address}
+// Through XWayland Chromium does not see GNOME's dark style, so the page
+// and its windows follow it only when told.
+func classroomBrowserArguments(address, profile string, dark bool) []string {
+	arguments := []string{"chromium", "--user-data-dir=" + profile, "--ozone-platform=x11", "--no-first-run", "--no-default-browser-check"}
+	if dark {
+		arguments = append(arguments, "--force-dark-mode")
+	}
+	return append(arguments, "--app="+address)
+}
+
+// desktopPrefersDark reports GNOME's style for the current user.
+func desktopPrefersDark() bool {
+	output, err := exec.Command("gsettings", "get", "org.gnome.desktop.interface", "color-scheme").Output()
+	return err == nil && strings.TrimSpace(string(output)) == "'prefer-dark'"
 }
 
 // startBrowser opens the address in an app window, detached from the
