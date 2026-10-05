@@ -60,7 +60,7 @@ func TestSoftwareModelRendersItsOwnWorkflowStage(t *testing.T) {
 	if strings.Join(shell.path, "/") != "Software/Review" {
 		t.Fatalf("path = %#v", shell.path)
 	}
-	if !strings.Contains(shell.body, "Package checked against this laboratory’s software versions") {
+	if !strings.Contains(shell.body, "Available in this laboratory’s software versions") {
 		t.Fatalf("review body = %q", shell.body)
 	}
 	if len(shell.actions) < 2 || shell.actions[0].label != "Save" || shell.actions[1].label != "Computers" {
@@ -139,14 +139,33 @@ func TestSoftwareCatalogReadShowsOnlyFailuresAsNotices(t *testing.T) {
 
 func TestConfiguredPackageEnterOpensDetailsWithoutRequestingAChange(t *testing.T) {
 	m := softwareModel{mode: softwareConfigured, catalog: domain.SoftwareCatalogReport{
-		Packages: []domain.SoftwareDeclaration{{Package: "ghostty", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}},
+		Packages: []domain.SoftwareDeclaration{{Package: "gimp", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}},
 	}}
 	m, intent := m.update(keyPress("enter"))
-	if m.stage != softwareDetails || m.selected != "ghostty" || intent.kind != softwareNoIntent {
+	if m.stage != softwareDetails || m.selected != "gimp" || intent.kind != softwareNoIntent {
 		t.Fatalf("opening details requested a change: stage=%v intent=%+v", m.stage, intent)
 	}
 	body := strings.Join(m.detailsView(softwareViewContext{}), "\n")
-	if strings.Contains(body, "Managed package from") || !strings.Contains(body, "Review removing") || !strings.Contains(body, "all current or future clients") {
+	if strings.Contains(body, "Managed package from") || !strings.Contains(body, "Installed on") || !strings.Contains(body, "all clients, including future ones") || len(m.actions(softwareViewContext{})) != 4 {
 		t.Fatalf("details do not explain destinations/actions: %s", body)
+	}
+}
+
+func TestBaseSoftwareDetailsOfferNoChange(t *testing.T) {
+	m := softwareModel{mode: softwareConfigured, catalog: domain.SoftwareCatalogReport{
+		Packages: []domain.SoftwareDeclaration{{Package: "chromium", Scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}}},
+	}}
+	m, _ = m.update(keyPress("enter"))
+	body := strings.Join(m.detailsView(softwareViewContext{}), "\n")
+	if !strings.Contains(body, "always has it") {
+		t.Fatalf("base package details: %s", body)
+	}
+	for _, action := range m.actions(softwareViewContext{}) {
+		if action.key == "c" || action.key == "x" {
+			t.Fatalf("base package offers %q", action.label)
+		}
+	}
+	if changed, _ := m.update(keyPress("x")); changed.stage != softwareDetails {
+		t.Fatal("base package removal started")
 	}
 }

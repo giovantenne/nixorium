@@ -84,17 +84,17 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 					}(),
 					screen: dashboardPXE,
 				},
-				expected: []string{"Network installation", "Configure / prepare", "Start PXE", "Esc", "Help"},
+				expected: []string{"Network installation", "Settings and preparation", "Review start", "Esc", "Help"},
 			},
 			{
 				name:     "setup installation",
 				model:    dashboardModel{report: testDashboardReport("ready"), screen: dashboardPXE, setupMode: true},
-				expected: []string{"Install computers", "Start PXE", "Esc", "Help"},
+				expected: []string{"Install computers", "Review start", "Esc", "Help"},
 			},
 			{
 				name:     "active setup installation",
 				model:    dashboardModel{report: testDashboardReport("active"), screen: dashboardPXE, setupMode: true},
-				expected: []string{"Install computers", "Stop PXE", "Quit", "Help"},
+				expected: []string{"Install computers", "Finish installation", "Esc", "Help"},
 			},
 			{
 				name: "start review",
@@ -108,7 +108,7 @@ func TestNetworkInstallationShellKeepsPrimaryActionsVisible(t *testing.T) {
 			{
 				name:     "recovery",
 				model:    dashboardModel{report: testDashboardReport("recovery-required"), screen: dashboardPXE, setupMode: true},
-				expected: []string{"recovery", "Recover", "Esc", "Installation", "Help"},
+				expected: []string{"interrupted", "Recover", "Esc", "Installation", "Help"},
 			},
 		}
 
@@ -150,7 +150,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						searching: true, query: "gi",
 					},
 				},
-				expected: []string{"Search packages", "Package name", "gi_", "Type", "Search", "Results", "Stop typing", "Help"},
+				expected: []string{"Search for software", "Package name", "gi_", "Type", "Search", "Results", "Stop typing", "Help"},
 			},
 			{
 				name: "scope",
@@ -165,7 +165,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						clients:      map[string]bool{"pc03": true},
 					},
 				},
-				expected: []string{"Software  /  Computers", "pc03", "Space", "Toggle", "Enter", "Review", "Esc", "Catalog", "Help"},
+				expected: []string{"Software  /  Computers", "pc03", "Space", "Toggle", "Enter", "Review", "Esc", "Software", "Help"},
 			},
 			{
 				name: "review",
@@ -180,7 +180,7 @@ func TestSoftwareShellKeepsContextAndActionsVisible(t *testing.T) {
 						},
 					},
 				},
-				expected: []string{"Software  /  Review", "Package checked against this laboratory’s software versions", "Enter", "Save", "Esc", "Computers", "Help"},
+				expected: []string{"Software  /  Review", "Available in this laboratory’s software versions", "Enter", "Save", "Esc", "Computers", "Help"},
 			},
 			{
 				name: "partial result",
@@ -235,7 +235,7 @@ func TestConfiguredSoftwareViewportKeepsFocusedItemVisible(t *testing.T) {
 			if !strings.Contains(view, tuiSelection(label, true, true)) {
 				t.Fatalf("focused software %d hidden at %dx%d:\n%s", index+1, size[0], size[1], view)
 			}
-			if !strings.Contains(view, "software selections") || !strings.Contains(view, "Enter") || !strings.Contains(view, "View details") {
+			if !strings.Contains(view, "packages") || !strings.Contains(view, "Enter") || !strings.Contains(view, "View details") {
 				t.Fatalf("software viewport context or actions hidden at %dx%d:\n%s", size[0], size[1], view)
 			}
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
@@ -257,7 +257,7 @@ func TestConfiguredSoftwareListSummarizesExplicitClientScope(t *testing.T) {
 		software: softwareModel{catalog: catalog, mode: softwareConfigured},
 	}
 	view := model.View().Content
-	if !strings.Contains(view, "20 selected clients") || strings.Contains(view, "pc01, pc02") {
+	if !strings.Contains(view, "20 chosen clients") || strings.Contains(view, "pc01, pc02") {
 		t.Fatalf("configured software scope is not compact:\n%s", view)
 	}
 }

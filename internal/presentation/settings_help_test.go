@@ -68,7 +68,7 @@ func TestEmptyInterfaceHintUsesFallbackWithoutSavingAnOverride(t *testing.T) {
 	settings.Lab.InterfaceName = "enp0s3"
 	m := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
 	view := demoANSI.ReplaceAllString(m.View().Content, "")
-	if !strings.Contains(view, "enp0s3 (default)") || !strings.Contains(view, "use default") || strings.Contains(view, "enp8s0") || strings.Contains(view, "Example:") {
+	if !strings.Contains(view, "enp0s3 (default)") || !strings.Contains(view, "Use default") || strings.Contains(view, "enp8s0") || strings.Contains(view, "Example:") {
 		t.Fatalf("default is ambiguous: %s", view)
 	}
 	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

@@ -153,7 +153,6 @@ Observed state is loaded only by Computer inventory or an operation that needs i
 
 Check reachability and compare observed systems with the intended revision
 
-NOTICE
 ! Client computers have not been configured yet
   Open Installation to configure clients before installing or managing them.
 
@@ -175,7 +174,6 @@ Choose an area. Observed state is loaded only when the selected task needs it.
 
 Inventory, updating computers, Internet access and power
 
-NOTICE
 ○ Nixorium update available: v3.1.0
   Chosen channel: stable. u reviews updates; x dismisses this version.
 
@@ -206,19 +204,17 @@ Inventory, updating computers, Internet access and power
 ```text
 Nixorium  /  Software
 
-Software
+  [F2] Configured   ▸ [F3] Search     [F4] Suggested
 
-[F2] Configured   [F3] Search packages   [F4] Suggestions
-
-Find an application
-Choose a package, then its computers; review before saving.
+Search for software
+Choose a package, then its computers; you review before saving.
 
 › Package name: inkscape_
 
 › Inkscape · 1.4.2
     Create and edit vector graphics
 
-v checks installed state. Client changes: Computers → Update computers.
+Saved choices reach the client computers with Computers → Update computers.
 
 Type Search  ·  ↑/↓ Results  ·  Enter Choose computers  ·  Tab Change view  ·  Esc Stop typing  ·  F1 Help
 ```
@@ -231,15 +227,15 @@ Nixorium  /  Software  /  Profile review
 Add Essential?
 Save adds missing packages and keeps existing choices.
 
-Destination  this controller and all current or future clients
+Destination  this controller and all clients, including future ones
 Packages     4 add · 0 already configured · 1 excluded
 Clients      5 included in the added packages
 
 ✓ Selected packages passed the configuration checks
-› + chromium · add for this controller and all current or future clients
-  + ghostty · add for this controller and all current or future clients
-  + nodejs · add for this controller and all current or future clients
-  + python3Packages.terminaltexteffects · add for this controller and all current or future clients
+› + chromium · add for this controller and all clients, including future ones
+  + ghostty · add for this controller and all clients, including future ones
+  + nodejs · add for this controller and all clients, including future ones
+  + python3Packages.terminaltexteffects · add for this controller and all clients, including future ones
 
 Now          Save and rebuild pc99 (this controller)
 Later        Review and update the affected client computers
@@ -266,7 +262,6 @@ Not checked in this session · r checks the computers now
   [x] pc04       10.42.0.14 · Not checked
   [x] pc05       10.42.0.15 · Not checked
 
-NOTICE
 ○ Opened from a saved software change. Review deploys the complete current configuration.
 
 ! Software selection saved locally.
@@ -296,7 +291,6 @@ pc05  10.42.0.15  Reachable at last check
 Type DEPLOY to continue:
 > _
 
-NOTICE
 ! Target services may restart; unreachable computers may remain unchanged
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
 interrupted apply may require recovery before another operation.
@@ -327,9 +321,9 @@ pc03 — Updated
 
 pc04 — Updated
   Authenticated at the reviewed revision.
+
 Shift ↑/↓ scroll · ? help
 
-NOTICE
 ○ All five clients report the reviewed revision.
 
 n New review  ·  l Logs  ·  Enter Computers  ·  F1 Help
@@ -353,7 +347,6 @@ pc02  10.42.0.12  Not reached at last check
 Type DEPLOY to continue:
 > _
 
-NOTICE
 ! Target services may restart; unreachable computers may remain unchanged
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
 interrupted apply may require recovery before another operation.
@@ -378,7 +371,6 @@ pc01  10.42.0.11  Reachable at last check
 Type DEPLOY to continue:
 > _
 
-NOTICE
 ! Target services may restart; unreachable computers may remain unchanged
   Availability is a brief SSH-port check, not authenticated identity or proof of power state. A failed or
 interrupted apply may require recovery before another operation.
@@ -428,7 +420,6 @@ pc02 — Not reached
   Check power and networking. The update outcome is not known; this does not prove the computer is off or
 unchanged. Activation completion is unconfirmed; use reviewed recovery, not a retry.
 
-NOTICE
 ! Recovery required before another operation
   An active revision alone does not prove activation completed. See TROUBLESHOOTING.md: Interrupted client
 deployment.
@@ -448,7 +439,6 @@ Affects  enp1s0 · controller network
 Type START to continue:
 > _
 
-NOTICE
 ! Temporarily remove 10.42.0.99/24; remote connections may be interrupted
   Serve ProxyDHCP, TFTP, HTTP and cache via 192.168.1.123. Institutional DHCP remains authoritative; stop or
 reboot recovery restores normal addressing.
@@ -483,22 +473,24 @@ Nixorium  /  Installation  /  USB over SSH
 
 Install one computer from USB
 
-STEP 6 / 6  Check before erasing
-  Disk to erase          /dev/nvme0n1 · 137.4 GB (137438953472 bytes)
-  Disk serial / WWN      NVME-DEMO / demo-wwn
-  Computer               pc01
-  Address afterwards     10.42.0.11 on enp1s0
-  PC on the USB stick    192.168.1.141 · SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-  Revision               0123456789abcdef0123456789abcdef01234567
-  System                 /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-pc01-demo
-  Signed cache           http://10.42.0.99:5000
-  Replace known key      no
+Step 6 of 6  Check before erasing
+
+Disk to erase        × /dev/nvme0n1 · 137.4 GB
+Disk serial / WWN    NVME-DEMO / demo-wwn
+Computer             pc01
+Address afterwards   10.42.0.11 on enp1s0
+PC on the USB stick  192.168.1.141
+
+Technical details
+Size               137438953472 bytes
+PC fingerprint     SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Revision           0123456789abcdef0123456789abcdef01234567
+Shift ↑/↓ scroll · ? help
 
 Type exactly
   ERASE
 > _
 
-NOTICE
 × Everything on this disk will be permanently deleted
   Only this disk is erased. Computer, disk and revision are checked again just before erasing.
 
@@ -517,7 +509,6 @@ Next: It now appears among the configured computers.
 
 Technical details are hidden; press d to show them.
 
-NOTICE
 ✓ verified pc01 at 10.42.0.11 with the reviewed revision and system closure
 
 r Refresh status  ·  d Details  ·  v Verify installed system  ·  Esc Detach  ·  F1 Help
@@ -672,7 +663,6 @@ Press Enter to build, activate, and verify this controller.
 Technical details
 Revision  0123456789abcdef0123456789abcdef01234567
 
-NOTICE
 ! Services and networking may restart
   This connection may be interrupted. Nixorium builds, activates and verifies the reviewed configuration; a reboot
 is not normally required.
@@ -734,7 +724,6 @@ Diagnostics
 › ! Binary cache could not be reached
   Inspect the local cache service before retrying deployment.
 
-NOTICE
 ! Loading cancelled. Nothing was changed.
 
 e Support report  ·  ↑/↓ Select  ·  Enter Evidence  ·  r Check again  ·  Esc Maintenance  ·  F1 Help

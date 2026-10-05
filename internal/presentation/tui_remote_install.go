@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -196,31 +197,39 @@ func (model dashboardModel) remoteInstallView() string {
 		if plan.HostKeyRotation {
 			rotation = "yes"
 		}
-		lines = append(lines,
-			remoteInstallField("Disk to erase", fmt.Sprintf("%s · %s (%d bytes)", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes), plan.Disk.SizeBytes), false, false),
-			remoteInstallField("Disk serial / WWN", plan.Disk.Serial+" / "+plan.Disk.WWN, false, false),
-			remoteInstallField("Computer", plan.Host.Name, false, false),
-			remoteInstallField("Address afterwards", plan.Host.StaticIP+" on "+plan.Host.Interface, false, false),
-			remoteInstallField("PC on the USB stick", plan.Host.LiveIP+" · "+remoteInstallPlanFingerprint(remote.response), false, false),
-			tuiMuted(fmt.Sprintf("  %-22s %s", "Revision", plan.Revision), model.isDark),
-			tuiMuted(fmt.Sprintf("  %-22s %s", "System", plan.SystemPath), model.isDark),
-			tuiMuted(fmt.Sprintf("  %-22s %s", "Signed cache", plan.CacheURL), model.isDark),
-			tuiMuted(fmt.Sprintf("  %-22s %s", "Replace known key", rotation), model.isDark),
-		)
+		lines = append(lines, "")
+		lines = append(lines, tuiFields(model.isDark,
+			[2]string{"Disk to erase", tuiStatus(fmt.Sprintf("%s · %s", plan.Disk.Path, humanBytes(plan.Disk.SizeBytes)), tuiStatusFailure, model.isDark)},
+			[2]string{"Disk serial / WWN", plan.Disk.Serial + " / " + plan.Disk.WWN},
+			[2]string{"Computer", plan.Host.Name},
+			[2]string{"Address afterwards", plan.Host.StaticIP + " on " + plan.Host.Interface},
+			[2]string{"PC on the USB stick", plan.Host.LiveIP},
+		)...)
+		// Exact identifiers stay available for audit, below the facts to check.
+		lines = append(lines, "", tuiMuted("Technical details", model.isDark))
+		for _, row := range tuiFields(model.isDark,
+			[2]string{"Size", fmt.Sprintf("%d bytes", plan.Disk.SizeBytes)},
+			[2]string{"PC fingerprint", remoteInstallPlanFingerprint(remote.response)},
+			[2]string{"Revision", plan.Revision},
+			[2]string{"System", plan.SystemPath},
+			[2]string{"Signed cache", plan.CacheURL},
+			[2]string{"Replace known key", rotation},
+		) {
+			lines = append(lines, tuiMuted(ansi.Strip(row), model.isDark))
+		}
 		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Everything on this disk will be permanently deleted", detail: "Only this disk is erased. Computer, disk and revision are checked again just before erasing."})
 		actions = []tuiAction{{key: "Enter", label: "Erase and install"}, {key: "Esc", label: "Cancel safely"}, {key: "F1", label: "Help"}}
 	case remoteInstallConfirmReboot, remoteInstallConfirmClose:
-		word := "REBOOT"
-		title := "Reboot the installed computer?"
+		label := "Restart the PC"
+		title := "Restart the installed computer?"
 		detail := "Remove the USB stick first (or make the disk boot first). The PC restarts once, then the controller checks that it came back as installed."
 		if remote.stage == remoteInstallConfirmClose {
-			word = "CLOSE"
-			title = "Close without rebooting?"
+			label = "Close"
+			title = "Close without restarting?"
 			detail = "The controller stops using the PC and frees its reservation. Restart the PC yourself when ready."
 		}
-		lines = append(lines, tuiTitle(title, model.isDark), detail)
-		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: "Type " + word + " to continue"})
-		actions = []tuiAction{{key: "Enter", label: word}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		lines = append(lines, "", tuiSection(title, model.isDark), detail)
+		actions = []tuiAction{{key: "Enter", label: label}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	case remoteInstallResult:
 		lines = append(lines, model.remoteInstallResultLines()...)
 		kind := tuiStatusNeutral
@@ -239,7 +248,7 @@ func (model dashboardModel) remoteInstallView() string {
 		actions = model.remoteInstallResultActions()
 	}
 
-	if remote.stage == remoteInstallFingerprint || remote.stage == remoteInstallRotateHostKey || remote.stage == remoteInstallReview || remote.stage == remoteInstallConfirmReboot || remote.stage == remoteInstallConfirmClose {
+	if remote.stage == remoteInstallFingerprint || remote.stage == remoteInstallRotateHostKey || remote.stage == remoteInstallReview {
 		expected := ""
 		switch remote.stage {
 		case remoteInstallFingerprint:
@@ -248,10 +257,6 @@ func (model dashboardModel) remoteInstallView() string {
 			expected = "ROTATE HOST KEY"
 		case remoteInstallReview:
 			expected = "ERASE"
-		case remoteInstallConfirmReboot:
-			expected = "REBOOT"
-		case remoteInstallConfirmClose:
-			expected = "CLOSE"
 		}
 		fixedBody = tuiSection("Type exactly", model.isDark) + "\n  " + expected + "\n> " + remote.confirmation + "_"
 	}
@@ -594,12 +599,12 @@ func (model dashboardModel) updateRemoteInstallKey(key tea.KeyPressMsg) (tea.Mod
 			return model.remoteInstallCommand("apply", request)
 		})
 	case remoteInstallConfirmReboot:
-		return model.updateRemoteInstallConfirmation(key, "REBOOT", func(model dashboardModel) (tea.Model, tea.Cmd) {
+		return model.updateRemoteInstallConfirmation(key, "", func(model dashboardModel) (tea.Model, tea.Cmd) {
 			model.busy = "Asking the PC to restart"
 			return model.remoteInstallCommand("reboot", domain.RemoteInstallRequest{Operation: domain.RemoteInstallRebootOperation, OperationID: model.installation.remote.operationID})
 		})
 	case remoteInstallConfirmClose:
-		return model.updateRemoteInstallConfirmation(key, "CLOSE", func(model dashboardModel) (tea.Model, tea.Cmd) {
+		return model.updateRemoteInstallConfirmation(key, "", func(model dashboardModel) (tea.Model, tea.Cmd) {
 			model.busy = "Closing the connection to the PC"
 			return model.remoteInstallCommand("close", domain.RemoteInstallRequest{Operation: domain.RemoteInstallCloseOperation, OperationID: model.installation.remote.operationID})
 		})
@@ -725,7 +730,8 @@ func (model dashboardModel) updateRemoteInstallConfirmation(key tea.KeyPressMsg,
 			remote.confirmation += " "
 		}
 	case "enter":
-		if remote.confirmation != expected {
+		// An empty expectation is a plain Enter confirmation (no typed word).
+		if expected != "" && remote.confirmation != expected {
 			remote.confirmation = ""
 			model.message = "Confirmation did not match; no action was sent."
 			return model, nil
@@ -734,7 +740,7 @@ func (model dashboardModel) updateRemoteInstallConfirmation(key tea.KeyPressMsg,
 		model.message = ""
 		return accepted(model)
 	default:
-		if key.Text != "" && len(remote.confirmation)+len(key.Text) <= 512 {
+		if expected != "" && key.Text != "" && len(remote.confirmation)+len(key.Text) <= 512 {
 			remote.confirmation += key.Text
 		}
 	}

@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -140,14 +139,16 @@ func newRoutineSettingsMenu(isDark bool, width, height int) routineSettingsMenu 
 	for index, group := range routineSettingsGroups {
 		items = append(items, routineSettingsGroupItem{index: index, group: group})
 	}
+	// Like the other menus: rows show their shortcut and name, and the
+	// selected row's description follows the list.
 	delegate := tuiListDelegate(isDark)
+	delegate.ShowDescription = false
 	menu := list.New(items, delegate, settingsMenuWidth(width), settingsMenuHeight(height))
 	menu.Title = "Settings categories"
 	menu.SetShowTitle(false)
 	menu.SetShowStatusBar(false)
 	menu.SetShowHelp(false)
-	menu.Styles = list.DefaultStyles(isDark)
-	menu.Help.Styles = help.DefaultStyles(isDark)
+	themeList(&menu, isDark)
 	return routineSettingsMenu{list: menu}
 }
 
@@ -155,7 +156,13 @@ func settingsMenuWidth(width int) int {
 	return max(28, min(108, width-10))
 }
 
+// The settings menu is only as tall as its rows (plus the search line), so
+// the selected row's description follows the list directly.
 func settingsMenuHeight(height int) int {
+	return min(len(routineSettingsGroups)+3, routineMenuHeight(height))
+}
+
+func routineMenuHeight(height int) int {
 	height -= 13
 	if height < 4 {
 		return 4
@@ -196,8 +203,7 @@ func newRoutinePasswordMenu(isDark bool, width, height int) routinePasswordMenu 
 	menu.SetShowStatusBar(false)
 	menu.SetShowHelp(false)
 	menu.SetFilteringEnabled(false)
-	menu.Styles = list.DefaultStyles(isDark)
-	menu.Help.Styles = help.DefaultStyles(isDark)
+	themeList(&menu, isDark)
 	return routinePasswordMenu{list: menu, initialized: true}
 }
 
@@ -287,7 +293,10 @@ func (model dashboardModel) settingsView() string {
 	}
 	switch model.screen {
 	case dashboardSettingsEdit:
-		return model.settings.editor.View().Content
+		if model.settings.editor.helpOpen {
+			return model.settings.editor.View().Content
+		}
+		return model.renderShell(model.settings.editor.shell())
 	case dashboardSettingsPasswords:
 		return model.settingsPasswordsView()
 	case dashboardSettingsReview:
@@ -325,8 +334,11 @@ func (model dashboardModel) settingsView() string {
 	lines = append(lines,
 		intro,
 		"",
-		model.settings.menu.list.View(),
+		trimBlankLines(model.settings.menu.list.View()),
 	)
+	if group, ok := model.settings.menu.selected(); ok {
+		lines = append(lines, "", tuiMuted(group.description, model.isDark))
+	}
 	if len(model.settings.repair) > 0 {
 		notices = append(notices, settingsRepairNotice(model.settings.repair))
 	}

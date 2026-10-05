@@ -269,7 +269,7 @@ func TestInstallNewComputersConvertsControllerModeThroughOneNetworkForm(t *testi
 	if model.screen != dashboardSettingsEdit || model.settings.editor.settings.Lab.DeploymentMode != "laboratory" || model.settings.editor.settings.Lab.PCCount != 20 || len(model.settings.editor.fields) != len(installationSettingsFields) {
 		t.Fatalf("client setup editor = %+v", model.settings.editor)
 	}
-	if model.settings.editor.title != "Nixorium — Install computers / Laboratory settings" {
+	if model.settings.editor.title != "Installation / Laboratory settings" {
 		t.Fatalf("complete laboratory settings are not shown: title=%q fields=%+v", model.settings.editor.title, model.settings.editor.fields)
 	}
 	for _, field := range model.settings.editor.fields {
@@ -463,7 +463,7 @@ func TestSetupEditsConfigurationWithoutLeavingTheTUI(t *testing.T) {
 	if loaded != 1 || model.screen != dashboardSettingsEdit || len(model.settings.editor.fields) != len(settingsFields) {
 		t.Fatalf("setup did not open one complete settings sequence: loaded=%d screen=%d fields=%d", loaded, model.screen, len(model.settings.editor.fields))
 	}
-	if view := model.View().Content; !strings.Contains(view, "First setup / Laboratory settings") || !strings.Contains(view, "STEP 1 / 11") || strings.Contains(view, "exit and run") {
+	if view := demoANSI.ReplaceAllString(model.View().Content, ""); !strings.Contains(view, "First setup  /  Laboratory settings") || !strings.Contains(view, "Step 1 of 11") || strings.Contains(view, "exit and run") {
 		t.Fatalf("setup settings are not a continuous English flow:\n%s", view)
 	}
 }

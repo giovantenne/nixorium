@@ -6,6 +6,18 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- The administrator TUI is more consistent. Software uses one wording for where
+  a package is installed, shows details without repeating the actions, never
+  offers to remove or limit base software, and its reviews list facts in
+  aligned rows. Network installation shows plain states (off, on, out of date)
+  and offers each action once. The settings editor, also used when preparing
+  installation, uses the same breadcrumb, action bar and margins as every other
+  screen, and the settings menu lists its areas like the other menus. Lists,
+  search and pagination use the theme colors; notices drop the NOTICE label and
+  keep explanations in ordinary text; steps read "Step 2 of 6". Restarting or
+  closing after a USB installation no longer asks for a typed word, and the
+  disk review separates the facts to check from technical details.
+
 - Simplify settings forms with empty-field hints and explicit network defaults;
   move examples and extended context into help. Separate USB instructions by
   computer and make address/password entry and the next action explicit.

@@ -519,7 +519,7 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			if group.id == "workspace" {
 				return model.openWorkspace()
 			}
-			model.settings.editor = newSettingsEditorModel(model.settings.current, group.fields, "Nixorium — Edit "+group.label)
+			model.settings.editor = newSettingsEditorModel(model.settings.current, group.fields, "Maintenance / Settings / "+group.label)
 			model.settings.editor.width = model.width
 			model.settings.editor.height = model.height
 			model.settings.editor.isDark = model.isDark

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -118,7 +117,7 @@ func RunSettingsWizard(settings domain.LabSettingsFile) (domain.LabSettingsFile,
 }
 
 func newSettingsWizardModel(settings domain.LabSettingsFile) settingsWizardModel {
-	return newSettingsEditorModel(settings, settingsFields, "Nixorium first-run configuration")
+	return newSettingsEditorModel(settings, settingsFields, "First setup / Laboratory settings")
 }
 
 func newSettingsEditorModel(settings domain.LabSettingsFile, fields []settingsField, title string) settingsWizardModel {
@@ -174,8 +173,7 @@ func (model *settingsWizardModel) prepareCurrentField() {
 	model.selector.SetShowTitle(false)
 	model.selector.SetShowStatusBar(false)
 	model.selector.SetShowHelp(false)
-	model.selector.Styles = list.DefaultStyles(model.isDark)
-	model.selector.Help.Styles = help.DefaultStyles(model.isDark)
+	themeList(&model.selector, model.isDark)
 	model.selector.Select(selected)
 }
 
@@ -393,23 +391,32 @@ func (model settingsWizardModel) View() tea.View {
 			"/ searches suggested values.", "", "Esc / F1 closes help.")
 		return tea.NewView(lipgloss.NewStyle().Width(max(20, model.width-4)).Render(strings.Join(lines, "\n")))
 	}
+	view := tea.NewView(renderTUIShell(model.shell(), model.width, model.isDark))
+	view.AltScreen = true
+	return view
+}
+
+// shell lays out one question in the common screen shell: breadcrumb, step,
+// question, input, notices and the action bar.
+func (model settingsWizardModel) shell() tuiShell {
+	field := model.fields[model.index]
+	info := settingsHelp[field.id]
 	lines := []string{
-		tuiTitle(model.title, model.isDark),
-		"",
 		tuiStepHeading(model.index+1, len(model.fields), field.group, model.isDark),
-		"", tuiSection(field.label, model.isDark), "",
+		"", tuiTitle(field.label, model.isDark),
 	}
 	description := info.description
 	if model.optionalInterface() {
 		description = "Change this only if a different network device is needed."
 	}
-	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-4)).Render(tuiMuted(description, model.isDark)))
+	lines = append(lines, lipgloss.NewStyle().Width(max(20, model.width-10)).Render(tuiMuted(description, model.isDark)))
+	actions := []tuiAction{}
 	if len(field.choices) > 0 && !model.custom {
-		lines = append(lines, "", "Choose a suggested value, or press / to filter.", "", model.selector.View())
-		lines = append(lines, "", "↑/↓ choose   enter continue   / search   esc cancel   F1 help")
+		lines = append(lines, "", "Choose a suggested value, or press / to search.", "", trimBlankLines(model.selector.View()))
+		actions = append(actions, tuiAction{key: "↑/↓", label: "Choose"}, tuiAction{key: "Enter", label: "Continue"}, tuiAction{key: "/", label: "Search"}, tuiAction{key: "Esc", label: "Cancel"})
 	} else {
 		if model.custom {
-			lines = append(lines, "", "Custom value; it will be validated before continuing.")
+			lines = append(lines, "", "Custom value; it is checked before continuing.")
 		}
 		input := tuiInputField("", model.drafts[model.index]+"█", true, model.isDark)
 		if model.drafts[model.index] == "" {
@@ -420,32 +427,31 @@ func (model settingsWizardModel) View() tea.View {
 			input += tuiMuted(hint, model.isDark)
 		}
 		lines = append(lines, "", input)
+		enterLabel := "Continue"
+		if model.optionalInterface() && model.drafts[model.index] == "" {
+			enterLabel = "Use default"
+		}
+		backLabel := "Cancel"
+		if model.custom {
+			backLabel = "Suggestions"
+		}
+		actions = append(actions, tuiAction{key: "Enter", label: enterLabel}, tuiAction{key: "Shift+Tab", label: "Previous"}, tuiAction{key: "Esc", label: backLabel})
 	}
 	if preview := model.networkPreview(); len(preview) > 0 {
 		lines = append(lines, "", tuiMuted("Address preview", model.isDark))
 		lines = append(lines, preview...)
 	}
+	notices := []tuiNotice{}
 	if model.err != "" {
-		lines = append(lines, "", tuiError("Invalid: "+model.err, model.isDark))
+		notices = append(notices, tuiNotice{kind: tuiStatusFailure, title: "Invalid: " + model.err})
 	}
-	if len(field.choices) == 0 || model.custom {
-		backLabel := "cancel"
-		if model.custom {
-			backLabel = "suggestions"
-		}
-		enterLabel := "continue"
-		if model.optionalInterface() && model.drafts[model.index] == "" {
-			enterLabel = "use default"
-		}
-		lines = append(lines, "", tuiHelp(model.width, model.isDark,
-			tuiHelpBinding([]string{"enter"}, "enter", enterLabel),
-			tuiHelpBinding([]string{"shift+tab", "up"}, "shift+tab/up", "previous"),
-			tuiHelpBinding([]string{"esc"}, "esc", backLabel),
-		))
-	}
-	view := tea.NewView(strings.Join(lines, "\n") + "\n")
-	view.AltScreen = true
-	return view
+	return tuiShell{path: model.path(), body: strings.Join(lines, "\n"), notices: notices, actions: append(actions, tuiAction{key: "F1", label: "Help"})}
+}
+
+// path turns the editor title ("Installation / Laboratory settings") into
+// breadcrumb parts.
+func (model settingsWizardModel) path() []string {
+	return strings.Split(model.title, " / ")
 }
 
 type configReviewModel struct {

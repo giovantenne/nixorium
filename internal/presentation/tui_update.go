@@ -768,7 +768,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 				model.settings.current.Lab.PCCount = 20
 			}
 			model.settings.collectPasswords = model.settings.current.Lab.AdminPassword == domain.DefaultPasswordHash || model.settings.current.Lab.TeacherPassword == domain.DefaultPasswordHash || model.settings.current.Lab.StudentPassword == domain.DefaultPasswordHash
-			model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Nixorium — Install computers / Laboratory settings")
+			model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
 			model.settings.editor.width = model.width
 			model.settings.editor.height = model.height
 			model.settings.editor.isDark = model.isDark
@@ -778,7 +778,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			return model, nil
 		}
 		if model.settings.returnScreen == dashboardSetup {
-			model.settings.editor = newSettingsEditorModel(model.settings.current, settingsFields, "Nixorium — First setup / Laboratory settings")
+			model.settings.editor = newSettingsEditorModel(model.settings.current, settingsFields, "First setup / Laboratory settings")
 			model.settings.editor.width = model.width
 			model.settings.editor.height = model.height
 			model.settings.editor.isDark = model.isDark
@@ -797,9 +797,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		if message.report.HasErrors() {
 			model.message = "The proposed settings did not pass validation: " + settingsIssueMessage(message.report.Issues)
 			if model.settings.returnScreen == dashboardSetup || model.installation.flow {
-				title := "Nixorium — First setup / Laboratory settings"
+				title := "First setup / Laboratory settings"
 				if model.installation.flow {
-					title = "Nixorium — Install computers / Laboratory settings"
+					title = "Installation / Laboratory settings"
 				}
 				fields := settingsFields
 				if model.installation.flow {

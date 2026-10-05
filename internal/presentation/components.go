@@ -10,7 +10,9 @@ import (
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"image/color"
 )
 
@@ -53,15 +55,45 @@ func tuiProgress(width int, dark bool) progress.Model {
 }
 
 func tuiListDelegate(dark bool) list.DefaultDelegate {
+	theme := newTUITheme(dark)
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles = list.NewDefaultItemStyles(dark)
 	delegate.SetSpacing(0)
-	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Foreground(newTUITheme(dark).text)
-	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Foreground(newTUITheme(dark).muted)
+	delegate.Styles.NormalTitle = delegate.Styles.NormalTitle.Foreground(theme.text)
+	delegate.Styles.NormalDesc = delegate.Styles.NormalDesc.Foreground(theme.muted)
+	// While searching, other rows keep the theme instead of fixed greys.
+	delegate.Styles.DimmedTitle = delegate.Styles.DimmedTitle.Foreground(theme.muted)
+	delegate.Styles.DimmedDesc = delegate.Styles.DimmedDesc.Foreground(theme.muted)
+	delegate.Styles.FilterMatch = lipgloss.NewStyle().Underline(true)
 	delegate.Styles.SelectedTitle = tuiFocusStyle(dark).
 		BorderStyle(lipgloss.Border{Left: "›"}).BorderLeft(true).BorderForeground(tuiAccent(dark)).PaddingLeft(1)
 	delegate.Styles.SelectedDesc = lipgloss.NewStyle().Foreground(newTUITheme(dark).muted).PaddingLeft(2)
 	return delegate
+}
+
+// tuiListStyles themes a list's search prompt and pagination.
+func tuiListStyles(dark bool) list.Styles {
+	theme := newTUITheme(dark)
+	styles := list.DefaultStyles(dark)
+	for _, state := range []*textinput.StyleState{&styles.Filter.Focused, &styles.Filter.Blurred} {
+		state.Prompt = lipgloss.NewStyle().Foreground(theme.muted)
+		state.Text = lipgloss.NewStyle().Foreground(theme.accent)
+	}
+	styles.ActivePaginationDot = lipgloss.NewStyle().Foreground(theme.accent).SetString("•")
+	styles.InactivePaginationDot = lipgloss.NewStyle().Foreground(theme.muted).SetString("•")
+	styles.DividerDot = lipgloss.NewStyle().Foreground(theme.muted).SetString(" • ")
+	return styles
+}
+
+// themeList applies the theme to a list after list.New, which copies its
+// default pagination and search styles when it builds the model.
+func themeList(menu *list.Model, dark bool) {
+	menu.Styles = tuiListStyles(dark)
+	menu.Help.Styles = help.DefaultStyles(dark)
+	menu.Paginator.ActiveDot = menu.Styles.ActivePaginationDot.String()
+	menu.Paginator.InactiveDot = menu.Styles.InactivePaginationDot.String()
+	menu.FilterInput.Prompt = "Search: "
+	menu.FilterInput.SetStyles(menu.Styles.Filter)
 }
 
 type tuiStatusKind int
@@ -183,17 +215,19 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 		fixedBody: strings.TrimSpace(shell.fixedBody),
 	}
 	if len(shell.notices) > 0 {
-		lines := []string{tuiNoticeText("NOTICE", tuiStatusNeutral, darkBackground)}
+		// The status symbol and color mark the title; explanations stay in
+		// ordinary text so long notices remain readable.
+		lines := []string{}
 		for index, notice := range shell.notices {
 			if index > 0 {
 				lines = append(lines, "")
 			}
 			lines = append(lines, tuiNoticeTitle(notice.title, notice.kind, darkBackground))
 			if notice.detail != "" {
-				lines = append(lines, tuiNoticeText("  "+notice.detail, notice.kind, darkBackground))
+				lines = append(lines, "  "+notice.detail)
 			}
 			if line := noticeNextStep(notice); line != "" {
-				lines = append(lines, tuiNoticeText("  "+line, notice.kind, darkBackground))
+				lines = append(lines, "  "+line)
 			}
 		}
 		regions.notices = strings.Join(lines, "\n")
@@ -334,12 +368,39 @@ func tuiFieldValue(value string, dark bool) string {
 	return lipgloss.NewStyle().Foreground(newTUITheme(dark).accent).Render(value)
 }
 
+// trimBlankLines drops the empty rows a fixed-height component adds above
+// and below its content, so the page keeps its usual single blank lines.
+func trimBlankLines(value string) string {
+	lines := strings.Split(value, "\n")
+	for len(lines) > 0 && strings.TrimSpace(ansi.Strip(lines[0])) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(ansi.Strip(lines[len(lines)-1])) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// tuiFields renders facts as aligned rows: muted labels, ordinary values.
+// Values may carry their own status style.
+func tuiFields(dark bool, rows ...[2]string) []string {
+	width := 0
+	for _, row := range rows {
+		width = max(width, lipgloss.Width(row[0]))
+	}
+	lines := make([]string, 0, len(rows))
+	for _, row := range rows {
+		lines = append(lines, tuiMuted(row[0]+strings.Repeat(" ", width-lipgloss.Width(row[0])+2), dark)+row[1])
+	}
+	return lines
+}
+
 func tuiFieldDetail(label, value string, dark bool) string {
 	return tuiMuted(label+":", dark) + " " + tuiFieldValue(value, dark)
 }
 
 func tuiStepHeading(step, total int, title string, dark bool) string {
-	return tuiNoticeText(fmt.Sprintf("STEP %d / %d", step, total), tuiStatusNeutral, dark) + "  " + tuiSection(title, dark)
+	return tuiMuted(fmt.Sprintf("Step %d of %d", step, total), dark) + "  " + tuiSection(title, dark)
 }
 
 func tuiInstruction(step int, title, detail string, dark bool) string {

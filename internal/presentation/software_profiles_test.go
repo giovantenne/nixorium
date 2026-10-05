@@ -283,7 +283,7 @@ func TestSoftwareDetailsChangeScopeAndControllerRemovalWarning(t *testing.T) {
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, want := range []string{"Applies to", "this controller and all current or future clients", "rebuilds this controller", "Change where it applies", "Remove"} {
+	for _, want := range []string{"Installed on", "this controller and all clients, including future ones", "applied to this controller", "Change computers", "Remove"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("details lack %q:\n%s", want, view)
 		}
@@ -314,7 +314,7 @@ func TestSoftwareDetailsChangeScopeAndControllerRemovalWarning(t *testing.T) {
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if view := model.View().Content; !strings.Contains(view, "the controller is rebuilt right away") {
+	if view := model.View().Content; !strings.Contains(view, "removes it from this controller right away") {
 		t.Fatalf("controller removal does not say it rebuilds now:\n%s", view)
 	}
 }

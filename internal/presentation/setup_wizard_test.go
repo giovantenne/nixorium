@@ -131,7 +131,7 @@ func TestRegionalFieldsExposeOnlyTimeZoneAndKeyboard(t *testing.T) {
 	}
 	model := newSettingsWizardModel(wizardSettings())
 	model = model.moveToField(settingsFieldIndex("lab.keyboardLayout"))
-	if !model.selector.FilteringEnabled() || !strings.Contains(model.View().Content, "press / to filter") {
+	if !model.selector.FilteringEnabled() || !strings.Contains(model.View().Content, "press / to search") {
 		t.Fatalf("keyboard selector is not searchable:\n%s", model.View().Content)
 	}
 	updated, _ := model.Update(tea.KeyPressMsg{Code: '/', Text: "/"})

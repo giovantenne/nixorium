@@ -48,7 +48,7 @@ func TestSoftwareControllerScopesAndPendingReview(t *testing.T) {
 		AffectedController: "pc99",
 	}
 	review := strings.Join(model.software.reviewView(softwareViewContext{dark: model.isDark}), "\n")
-	if !strings.Contains(review, "rebuild pc99") || !strings.Contains(review, "this controller and all current or future clients") {
+	if !strings.Contains(review, "(pc99) is rebuilt") || !strings.Contains(review, "this controller and all clients, including future ones") {
 		t.Fatalf("unclear review: %s", review)
 	}
 	model.software.result = domain.SoftwareChangeApplyReport{State: "saved", AffectedController: "pc99"}
@@ -165,14 +165,14 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	}
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Configured software") || !strings.Contains(model.View().Content, "not a live list") {
+	if model.screen != dashboardSoftware || !strings.Contains(model.View().Content, "Configured software") || !strings.Contains(model.View().Content, "not a check of what is installed") {
 		t.Fatalf("software catalog missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	model = updated.(dashboardModel)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	model = updated.(dashboardModel)
-	if !strings.Contains(model.View().Content, "Suggestions") {
+	if !strings.Contains(model.View().Content, "Suggested software") {
 		t.Fatalf("suggested software view missing:\n%s", model.View().Content)
 	}
 
@@ -194,7 +194,7 @@ func TestDashboardGuidesReviewedSoftwareDeclarationWithoutDeploying(t *testing.T
 	updated, _ = model.Update(command())
 	model = updated.(dashboardModel)
 	view := model.View().Content
-	for _, expected := range []string{"Package checked against this laboratory’s software versions", "Destination", "Clients", "Save these software choices", "Update computers to install"} {
+	for _, expected := range []string{"Available in this laboratory’s software versions", "Installed on", "Client computers", "the software choices are saved", "Update computers installs it"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("software review omits %q:\n%s", expected, view)
 		}
@@ -930,7 +930,7 @@ func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "p"})
 	model = updated.(dashboardModel)
 	view = model.View().Content
-	if model.screen != dashboardPXE || !strings.Contains(view, "Installation files: ready") || !strings.Contains(view, "Next: start network installation") {
+	if model.screen != dashboardPXE || !strings.Contains(demoANSI.ReplaceAllString(view, ""), "Installation files    ✓ ready") || !strings.Contains(view, "Next: start network installation") {
 		t.Fatalf("PXE screen is incomplete:\n%s", view)
 	}
 }
@@ -948,13 +948,13 @@ func TestPXEScreenRecommendsOnlyTheObservedNextStage(t *testing.T) {
 	report := testDashboardReport("ready")
 	report.PXEPreparation = domain.PXEPreparationState{}
 	view := (dashboardModel{report: report, screen: dashboardPXE}).View().Content
-	if !strings.Contains(view, "Next: prepare installation files") || strings.Contains(view, "start PXE") {
+	if !strings.Contains(view, "Next: prepare the installation files") || strings.Contains(view, "start network installation") {
 		t.Fatalf("unprepared PXE guidance is ambiguous:\n%s", view)
 	}
 
 	report = testDashboardReport("active")
 	view = (dashboardModel{report: report, screen: dashboardPXE}).View().Content
-	for _, expected := range []string{"Next: install computers", "guided installer opens automatically", "x", "stop PXE"} {
+	for _, expected := range []string{"Next: install computers", "guided installer opens automatically", "Finish installation", "stop network installation"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("active PXE guidance omits %q:\n%s", expected, view)
 		}
@@ -1618,7 +1618,7 @@ func TestDashboardEditsReviewsAndAppliesManagedSettings(t *testing.T) {
 	model.settings.menu.list.Select(5)
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = updated.(dashboardModel)
-	if model.screen != dashboardSettingsEdit || !strings.Contains(model.View().Content, "Edit Git") {
+	if model.screen != dashboardSettingsEdit || !strings.Contains(demoANSI.ReplaceAllString(model.View().Content, ""), "Settings  /  Git") {
 		t.Fatalf("Git settings editor missing:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(tea.KeyPressMsg{Text: "Lab Student"})

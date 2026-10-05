@@ -355,12 +355,12 @@ func (model softwareModel) update(key tea.KeyPressMsg) (softwareModel, softwareI
 			model.stage = softwareCatalog
 			return model, softwareIntent{setMessage: true}
 		case "c":
-			if found {
+			if found && !domain.IsBaseSoftware(model.selected) {
 				model = model.startScopeChange(entry.Scope)
 			}
 			return model, softwareIntent{setMessage: true}
 		case "x":
-			if !found {
+			if !found || domain.IsBaseSoftware(model.selected) {
 				return model, softwareIntent{}
 			}
 			return model, softwareIntent{kind: softwarePlanIntent, request: domain.SoftwareChangeRequest{Package: model.selected, Present: false, Scope: entry.Scope}}
@@ -702,7 +702,10 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		return model.profileActions(context)
 	}
 	if model.stage == softwareDetails {
-		return []tuiAction{{key: "c", label: "Change where it applies"}, {key: "x", label: "Remove (review)"}, {key: "Esc", label: "Configured software"}, {key: "F1", label: "Help"}}
+		if domain.IsBaseSoftware(model.selected) {
+			return []tuiAction{{key: "Esc", label: "Configured software"}, {key: "F1", label: "Help"}}
+		}
+		return []tuiAction{{key: "c", label: "Change computers"}, {key: "x", label: "Remove"}, {key: "Esc", label: "Configured software"}, {key: "F1", label: "Help"}}
 	}
 	if model.stage == softwareScope {
 		actions := []tuiAction{{key: "↑/↓", label: "Select"}}
@@ -710,7 +713,7 @@ func (model softwareModel) actions(context softwareViewContext) []tuiAction {
 		if len(options) > 0 && options[min(model.scopeCursor, len(options)-1)].scope.Kind == domain.SoftwareScopeClients {
 			actions = append(actions, tuiAction{key: "Space", label: "Toggle"})
 		}
-		back := "Catalog"
+		back := "Software"
 		if model.changingScope {
 			back = "Details"
 		}
@@ -801,17 +804,11 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		return []string{tuiTitle("Software", context.dark), "", tuiResult("Software information unavailable", false, context.dark), model.catalog.Message, "", "Return after the deployment inputs are available."}
 	}
 	items := model.items()
-	lines := []string{
-		tuiTitle("Software", context.dark),
-		"",
-		softwareModeTabs(model.mode, context.dark),
-		"",
-	}
+	lines := []string{softwareModeTabs(model.mode, context.dark), ""}
 	switch model.mode {
 	case softwareConfigured:
-		lines = append(lines, tuiSection("Configured software", context.dark),
-			tuiMuted("Saved package choices, not a live list of installed programs.", context.dark),
-			"Enter opens details and actions. F3 finds software to add.", "")
+		lines = append(lines, tuiTitle("Configured software", context.dark),
+			tuiMuted("The saved choices, not a check of what is installed. Enter shows a package; F3 finds more.", context.dark), "")
 	case softwareSearch:
 		cursor := ""
 		if model.searching {
@@ -822,8 +819,8 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		if model.query == "" {
 			input += tuiMuted("e.g. firefox", context.dark)
 		}
-		lines = append(lines, tuiSection("Find an application", context.dark),
-			tuiMuted("Choose a package, then its computers; review before saving.", context.dark), "",
+		lines = append(lines, tuiTitle("Search for software", context.dark),
+			tuiMuted("Choose a package, then its computers; you review before saving.", context.dark), "",
 			input, "")
 		if model.searchBusy {
 			lines = append(lines, tuiNoticeText("Searching available packages…", tuiStatusNeutral, context.dark), "")
@@ -837,7 +834,7 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 			lines = append(lines, "No matches in the package versions used by this laboratory.", "")
 		}
 	case softwareSuggested:
-		lines = append(lines, tuiSection("Suggestions", context.dark), tuiMuted("Choose a package, then its computers; review before saving.", context.dark), "")
+		lines = append(lines, tuiTitle("Suggested software", context.dark), tuiMuted("Choose a package, then its computers; you review before saving.", context.dark), "")
 	}
 	capacity := model.catalogListCapacity(context, lines, len(items))
 	start, end := listWindow(len(items), model.cursor, capacity)
@@ -856,10 +853,10 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 		detail := item.Summary
 		if model.mode == softwareConfigured {
 			if entry, found := model.declaration(item.ID); found {
-				detail = "For: " + softwareScopeListLabel(entry.Scope)
+				detail = "Installed on " + softwareScopeLabel(entry.Scope)
 			}
 		} else if entry, found := model.declaration(item.ID); found {
-			detail = "Already configured for: " + softwareScopeListLabel(entry.Scope)
+			detail = "Already installed on " + softwareScopeLabel(entry.Scope)
 		} else if item.Availability != "available" {
 			detail = softwareAvailabilityLabel(item.Availability)
 		}
@@ -868,12 +865,12 @@ func (model softwareModel) catalogView(context softwareViewContext) []string {
 			"    "+tuiMuted(ansi.Truncate(detail, width-2, "…"), context.dark))
 	}
 	if start > 0 || end < len(items) {
-		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d software selections", displayedLineStart(start, len(items)), end, len(items)), context.dark))
+		lines = append(lines, tuiMuted(fmt.Sprintf("%d–%d of %d packages", displayedLineStart(start, len(items)), end, len(items)), context.dark))
 	}
 	if len(items) == 0 && model.mode == softwareConfigured {
 		lines = append(lines, "No packages have been added through this screen.", "", "Press F3 to find software, or F4 for suggestions.")
 	}
-	lines = append(lines, "", tuiMuted("v checks installed state. Client changes: Computers → Update computers.", context.dark))
+	lines = append(lines, "", tuiMuted("Saved choices reach the client computers with Computers → Update computers.", context.dark))
 	return lines
 }
 
@@ -929,24 +926,23 @@ func (model softwareModel) detailsView(context softwareViewContext) []string {
 	if item.Version != "" {
 		version = " · " + item.Version
 	}
-	lines := []string{
-		tuiTitle(item.Label, context.dark),
-		tuiFieldDetail("Package", item.ID+version, context.dark),
+	lines := []string{tuiTitle(item.Label, context.dark)}
+	if item.ID != item.Label || version != "" {
+		lines = append(lines, tuiMuted("Package "+item.ID+version, context.dark))
 	}
 	if item.Summary != "" {
 		lines = append(lines, tuiMuted(item.Summary, context.dark))
 	}
-	lines = append(lines, "",
-		tuiSection("Applies to", context.dark),
-		"  "+softwareScopeLabel(entry.Scope), "",
-		tuiSection("Choose an action", context.dark),
-		tuiShortcut("c", context.dark)+"  Change which computers receive this application",
-		tuiShortcut("x", context.dark)+"  Review removing it from the configuration",
-	)
-	if softwareScopeAffectsController(entry.Scope) {
-		lines = append(lines, "", "Removing it or changing where it applies rebuilds this controller right after saving.")
+	lines = append(lines, "")
+	lines = append(lines, tuiFields(context.dark, [2]string{"Installed on", softwareScopeLabel(entry.Scope)})...)
+	lines = append(lines, "")
+	if domain.IsBaseSoftware(item.ID) {
+		return append(lines, "Every laboratory computer always has it: it cannot be removed or limited to some computers.")
 	}
-	return append(lines, "Client computers change only when you update them from Computers.")
+	if softwareScopeAffectsController(entry.Scope) {
+		lines = append(lines, "A change is applied to this controller right after saving.")
+	}
+	return append(lines, "Client computers change only when you update them from Computers → Update computers.")
 }
 
 func (model softwareModel) scopeView(context softwareViewContext) []string {
@@ -978,34 +974,33 @@ func (model softwareModel) scopeView(context softwareViewContext) []string {
 
 func (model softwareModel) reviewView(context softwareViewContext) []string {
 	plan := model.plan
-	action := "Add"
-	changeNow := "Save now"
-	later := "Later        Update computers to install this change"
-	if !plan.Request.Present {
-		action = "Remove"
-		changeNow = "Remove now"
-		later = "Later        Update computers to remove this software"
-	}
 	item := model.item(plan.Request.Package)
-	lines := []string{
-		tuiTitle(action+" "+item.Label+"?", context.dark),
-		tuiMuted(plan.Request.Package, context.dark),
-		"",
-		"Destination  " + softwareScopeLabel(plan.Request.Scope),
-		fmt.Sprintf("Clients      %d included in this change", len(plan.AffectedClients)),
-		"",
-		tuiStatus("Package checked against this laboratory’s software versions", tuiStatusSuccess, context.dark),
-		fmt.Sprintf("%-12s Save these software choices", changeNow),
-		later,
+	title, now, later := "Add "+item.Label+"?", "the software choices are saved", "Update computers installs it on the client computers"
+	if !plan.Request.Present {
+		title, later = "Remove "+item.Label+"?", "Update computers removes it from the client computers"
+	} else if model.changingScope {
+		title = "Change where " + item.Label + " is installed?"
 	}
 	if plan.AffectedController != "" {
-		lines[len(lines)-2] = fmt.Sprintf("%-12s Save and rebuild %s (this controller)", changeNow, plan.AffectedController)
+		now += " and this controller (" + plan.AffectedController + ") is rebuilt"
 	}
 	if len(plan.AffectedClients) == 0 {
-		lines[len(lines)-1] = "Later        No client update required"
+		later = "no client computer needs updating"
 	}
+	lines := []string{tuiTitle(title, context.dark)}
+	if item.ID != item.Label {
+		lines = append(lines, tuiMuted("Package "+item.ID, context.dark))
+	}
+	lines = append(lines, "")
+	lines = append(lines, tuiFields(context.dark,
+		[2]string{"Installed on", softwareScopeLabel(plan.Request.Scope)},
+		[2]string{"Client computers", countNoun(len(plan.AffectedClients), "computer")},
+		[2]string{"Now", now},
+		[2]string{"Later", later},
+	)...)
+	lines = append(lines, "", tuiStatus("Available in this laboratory’s software versions", tuiStatusSuccess, context.dark))
 	if plan.AffectedController != "" && !plan.Request.Present {
-		lines = append(lines, "", tuiStatus("Saving removes it from "+plan.AffectedController+" now: the controller is rebuilt right away", tuiStatusAttention, context.dark))
+		lines = append(lines, "", tuiStatus("Saving removes it from this controller right away", tuiStatusAttention, context.dark))
 	}
 	return lines
 }
@@ -1024,7 +1019,8 @@ func (model softwareModel) resultView(context softwareViewContext) []string {
 	} else if result.State == "unchanged" {
 		title = "Software choices are already saved"
 	}
-	success := !result.HasErrors() && !result.RecoveryRequired && (result.AffectedController == "" || verified || result.State == "unchanged")
+	success := result.State == "unchanged" ||
+		(result.State == "saved" && !result.HasErrors() && !result.RecoveryRequired && (result.AffectedController == "" || verified))
 	lines := []string{tuiResult(title, success, context.dark), ""}
 	lines = append(lines, saveStatusLines(result.State, result.RecoveryRequired, result.AffectedController != "", len(result.AffectedClients) > 0, verified)...)
 	if model.profileResult.Operation != "" {
@@ -1117,14 +1113,16 @@ func (model *softwareModel) scheduleSearch(search func(context.Context, string) 
 }
 
 func softwareModeTabs(mode softwareListMode, dark bool) string {
-	labels := []string{"Configured", "Search packages", "Suggestions"}
+	labels := []string{"Configured", "Search", "Suggested"}
 	parts := make([]string, len(labels))
 	for index, label := range labels {
 		label = menuTitle(fmt.Sprintf("F%d", index+2), label)
+		// The page title below is the violet heading; the current tab is
+		// marked by weight and a marker, also without colour.
 		if index == int(mode) {
-			parts[index] = tuiTitle(label, dark)
+			parts[index] = tuiSection("▸ "+label, dark)
 		} else {
-			parts[index] = tuiMuted(label, dark)
+			parts[index] = tuiMuted("  "+label, dark)
 		}
 	}
 	return strings.Join(parts, "   ")
@@ -1205,10 +1203,14 @@ func (model softwareModel) selectedScope() (domain.SoftwareScope, string) {
 }
 
 func (model softwareModel) scopeOptions() []softwareScopeOption {
+	option := func(scope domain.SoftwareScope) softwareScopeOption {
+		label := softwareScopeLabel(scope)
+		return softwareScopeOption{label: strings.ToUpper(label[:1]) + label[1:], scope: scope}
+	}
 	result := []softwareScopeOption{
-		{label: "This controller and all current or future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeShared}},
-		{label: "Only this controller", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeController}},
-		{label: "All clients, including future clients", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}},
+		option(domain.SoftwareScope{Kind: domain.SoftwareScopeShared}),
+		option(domain.SoftwareScope{Kind: domain.SoftwareScopeController}),
+		option(domain.SoftwareScope{Kind: domain.SoftwareScopeAllClients}),
 	}
 	names := make([]string, 0, len(model.catalog.Groups))
 	for name := range model.catalog.Groups {
@@ -1216,48 +1218,41 @@ func (model softwareModel) scopeOptions() []softwareScopeOption {
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		result = append(result, softwareScopeOption{label: "Group " + name + fmt.Sprintf(" (%d clients)", len(model.catalog.Groups[name])), scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: name}})
+		result = append(result, softwareScopeOption{label: fmt.Sprintf("Group %s (%s)", name, countNoun(len(model.catalog.Groups[name]), "client")), scope: domain.SoftwareScope{Kind: domain.SoftwareScopeGroup, Group: name}})
 	}
 	if len(model.catalog.Clients) > 0 {
-		result = append(result, softwareScopeOption{label: "Selected configured computers", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeClients}})
+		result = append(result, softwareScopeOption{label: "Chosen clients…", scope: domain.SoftwareScope{Kind: domain.SoftwareScopeClients}})
 	}
 	return result
 }
 
+// countNoun writes "1 client" or "3 clients".
+func countNoun(count int, noun string) string {
+	if count == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", count, noun)
+}
+
+// softwareScopeLabel is the one wording for where software applies, used in
+// lists, details, choices and reviews.
 func softwareScopeLabel(scope domain.SoftwareScope) string {
 	switch scope.Kind {
 	case domain.SoftwareScopeShared:
-		return "this controller and all current or future clients"
+		return "this controller and all clients, including future ones"
 	case domain.SoftwareScopeController:
 		return "only this controller"
 	case domain.SoftwareScopeAllClients:
-		return "all clients, including future clients"
+		return "all clients, including future ones"
 	case domain.SoftwareScopeGroup:
 		return "group " + scope.Group
 	case domain.SoftwareScopeClients:
-		return strings.Join(scope.Clients, ", ")
+		if len(scope.Clients) > 0 && len(scope.Clients) <= 3 {
+			return strings.Join(scope.Clients, ", ")
+		}
+		return countNoun(len(scope.Clients), "chosen client")
 	}
 	return "unknown destination"
-}
-
-func softwareScopeListLabel(scope domain.SoftwareScope) string {
-	switch scope.Kind {
-	case domain.SoftwareScopeShared:
-		return "controller + all clients (including future clients)"
-	case domain.SoftwareScopeController:
-		return "this controller only"
-	case domain.SoftwareScopeAllClients:
-		return "all clients (including future clients)"
-	case domain.SoftwareScopeGroup:
-		return "group " + scope.Group
-	case domain.SoftwareScopeClients:
-	default:
-		return "unknown destination"
-	}
-	if len(scope.Clients) == 1 {
-		return "1 selected client"
-	}
-	return fmt.Sprintf("%d selected clients", len(scope.Clients))
 }
 
 func softwareCatalogItemForView(items []domain.SoftwareCatalogItem, id string) (domain.SoftwareCatalogItem, bool) {

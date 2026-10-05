@@ -47,7 +47,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range main.Frames {
 		joined += frame.Text
 	}
-	for _, expected := range []string{"all clients, including future clients", "Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)", "Reviewed revision  " + bundle.SourceCommit, "Authenticated: 5/5", "Deployment completed and verified"} {
+	for _, expected := range []string{"all clients, including future ones", "Affects  pc01,pc02,pc03,pc04,pc05 · 5 computer(s)", "Reviewed revision  " + bundle.SourceCommit, "Authenticated: 5/5", "Deployment completed and verified"} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("main demo omits %q", expected)
 		}
@@ -62,7 +62,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 		t.Fatal("main demo pauses on the intermediate declaration result")
 	}
 	search := demoFrameWithLabel(main.Frames, "Open Software directly in Search")
-	if !strings.Contains(search.Text, "[F3] Search packages") || !strings.Contains(search.Text, "Package name:") || strings.Contains(search.Text, "VLC") || strings.Contains(search.Text, "[Selected]") {
+	if !strings.Contains(search.Text, "[F3] Search") || !strings.Contains(search.Text, "Package name:") || strings.Contains(search.Text, "VLC") || strings.Contains(search.Text, "[Selected]") {
 		t.Fatalf("main demo does not open directly in package search:\n%s", search.Text)
 	}
 	result := demoFrameWithLabel(main.Frames, "Find Inkscape in the pinned package set")
@@ -74,7 +74,7 @@ func TestDemoBundleUsesRealRendererForRequiredScenarios(t *testing.T) {
 	for _, frame := range installation.Frames {
 		installationText += frame.Text
 	}
-	for _, expected := range []string{"Service address:    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Type START to continue", "Next: install computers", "Start UEFI network boot", "guided installer opens automatically"} {
+	for _, expected := range []string{"Controller address    " + demoServiceAddress, "Building system · Running", "Activating system · Running", "Verifying activation · Running", "Controller operation completed", "Type START to continue", "Next: install computers", "Start UEFI network boot", "guided installer opens automatically"} {
 		if !strings.Contains(installationText, expected) {
 			t.Fatalf("installation demo omits %q", expected)
 		}

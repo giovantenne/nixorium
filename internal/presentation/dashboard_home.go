@@ -3,7 +3,6 @@ package presentation
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -108,8 +107,7 @@ func newDashboardTaskMenu(isDark bool, width, height int) dashboardTaskMenu {
 	menu.SetShowStatusBar(false)
 	menu.SetShowHelp(false)
 	menu.SetFilteringEnabled(false)
-	menu.Styles = list.DefaultStyles(isDark)
-	menu.Help.Styles = help.DefaultStyles(isDark)
+	themeList(&menu, isDark)
 	return dashboardTaskMenu{list: menu}
 }
 

@@ -41,7 +41,7 @@ func (model dashboardModel) updateInstallationSummary(key tea.KeyPressMsg) (tea.
 		model.screen = dashboardPXE
 	case "e":
 		model.installation.savedSummary = false
-		model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Nixorium — Install computers / Laboratory settings")
+		model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
 		model.settings.editor.width, model.settings.editor.height, model.settings.editor.isDark = model.width, model.height, model.isDark
 		model.settings.editor.prepareCurrentField()
 		model.screen = dashboardSettingsEdit

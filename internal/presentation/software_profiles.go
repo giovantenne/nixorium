@@ -176,7 +176,7 @@ func (model softwareModel) profileExclusions() []string {
 func (model softwareModel) profileActions(_ softwareViewContext) []tuiAction {
 	switch model.stage {
 	case softwareProfiles:
-		return []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Choose packages"}, {key: "Esc", label: "Catalog"}, {key: "F1", label: "Help"}}
+		return []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Choose packages"}, {key: "Esc", label: "Software"}, {key: "F1", label: "Help"}}
 	case softwareProfilePackages:
 		return []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Space", label: "Include/exclude"}, {key: "Enter", label: "Choose computers"}, {key: "Esc", label: "Profiles"}, {key: "F1", label: "Help"}}
 	case softwareProfileScope:
@@ -242,7 +242,7 @@ func (model softwareModel) profilePackagesView(context softwareViewContext) []st
 		}
 		status := ""
 		if existing, found := model.declaration(packageID); found {
-			status = "  " + tuiStatus("already configured for "+softwareScopeLabel(existing.Scope), tuiStatusSuccess, context.dark)
+			status = "  " + tuiMuted("already on "+softwareScopeLabel(existing.Scope), context.dark)
 		}
 		lines = append(lines, tuiSelection(checked+" "+packageID, index == model.profilePackageCursor, context.dark)+status)
 	}
@@ -276,8 +276,20 @@ func (model softwareModel) profileScopeView(context softwareViewContext) []strin
 			lines = append(lines, tuiSelection(fmt.Sprintf("%s %s", checked, name), index == model.clientCursor, context.dark))
 		}
 	}
-	lines = append(lines, "", fmt.Sprintf("Included packages: %d", len(preset.Packages)-len(model.profileExclusions())), "Managed file: "+model.catalog.ManagedFile)
+	lines = append(lines, "")
+	lines = append(lines, tuiFields(context.dark, [2]string{"Packages to add", fmt.Sprint(model.profilePackagesToAdd())})...)
 	return lines
+}
+
+// profilePackagesToAdd counts included packages not configured yet.
+func (model softwareModel) profilePackagesToAdd() int {
+	count := 0
+	for _, packageID := range model.selectedProfile().Packages {
+		if _, found := model.declaration(packageID); !found && !model.profileExcluded[packageID] {
+			count++
+		}
+	}
+	return count
 }
 
 func (model softwareModel) profileReviewRows() []string {

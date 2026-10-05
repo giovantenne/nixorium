@@ -2546,12 +2546,12 @@ func (model dashboardModel) deploymentProgressView() []string {
 func (model dashboardModel) hostsView() string { return model.computersView() }
 
 func (model dashboardModel) pxeView() string {
-	preparation := "missing"
+	preparation := tuiStatus("not prepared", tuiStatusNeutral, model.isDark)
 	if model.report.PXEPreparation.Present {
-		preparation = "stale"
+		preparation = tuiStatus("out of date; prepare them again", tuiStatusAttention, model.isDark)
 	}
 	if model.report.PXEPreparation.Ready {
-		preparation = "ready"
+		preparation = tuiStatus("ready", tuiStatusSuccess, model.isDark)
 	}
 	path := []string{"Installation", "Network boot (PXE)"}
 	title := "Network installation"
@@ -2567,11 +2567,14 @@ func (model dashboardModel) pxeView() string {
 	}
 	lines := []string{
 		tuiTitle(title, model.isDark),
-		fmt.Sprintf("Installation mode:  %s", tuiStatus(model.report.PXE.Mode, pxeStatusKind(model.report.PXE.Mode), model.isDark)),
-		fmt.Sprintf("Installation files: %s", preparation),
-		fmt.Sprintf("Interface:          %s", model.report.Meta.Network.Interface),
-		fmt.Sprintf("Service address:    %s", model.report.Meta.Controller.DHCPIP),
+		"",
 	}
+	lines = append(lines, tuiFields(model.isDark,
+		[2]string{"Network installation", tuiStatus(pxeModeLabel(model.report.PXE.Mode), pxeStatusKind(model.report.PXE.Mode), model.isDark)},
+		[2]string{"Installation files", preparation},
+		[2]string{"Network interface", model.report.Meta.Network.Interface},
+		[2]string{"Controller address", model.report.Meta.Controller.DHCPIP},
+	)...)
 	if model.installation.flow {
 		steps := []string{"Laboratory settings", "Save configuration", "Controller keys", "Activate controller", "Prepare clients", "Start PXE"}
 		lines = append(lines, "")
@@ -2733,64 +2736,86 @@ func (model dashboardModel) pxeActions() []tuiAction {
 	}
 	primary := model.pxePrimaryAction()
 	actions := []tuiAction{{key: "Enter", label: primary.label}}
+	// The primary action is offered once, on Enter, not again on its letter.
+	add := func(action tuiAction) {
+		if action.key != primary.key {
+			actions = append(actions, action)
+		}
+	}
 	if model.installation.stateError {
 		return append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: "Installation"}, tuiAction{key: "F1", label: "Help"})
 	}
 	recovery := model.report.PXE.Mode == "degraded" || model.report.PXE.Mode == "recovery-required"
 	if model.report.PXE.Mode != "active" && !recovery {
-		actions = append(actions, tuiAction{key: "p", label: "Configure / prepare"})
+		add(tuiAction{key: "p", label: "Settings and preparation"})
 		if model.report.PXEPreparation.Ready {
-			actions = append(actions, tuiAction{key: "s", label: "Start PXE"})
+			add(tuiAction{key: "s", label: "Start"})
 		}
 	}
 	if model.report.PXE.Mode == "active" || recovery {
-		actions = append(actions, tuiAction{key: "x", label: "Stop PXE"})
+		add(tuiAction{key: "x", label: "Stop"})
 	}
-	backLabel := "Installation"
 	if recovery {
-		actions = append(actions, tuiAction{key: "n", label: "Recover network"})
+		add(tuiAction{key: "n", label: "Recover network"})
 	}
-	return append(actions,
-		tuiAction{key: "r", label: "Refresh"},
-		tuiAction{key: "Esc", label: backLabel},
-		tuiAction{key: "q", label: "Quit"},
-		tuiAction{key: "F1", label: "Help"},
-	)
+	actions = append(actions, tuiAction{key: "r", label: "Refresh"}, tuiAction{key: "Esc", label: "Installation"})
+	if model.report.PXE.Mode == "active" {
+		// Quitting reviews whether to leave network installation on.
+		actions = append(actions, tuiAction{key: "q", label: "Quit"})
+	}
+	return append(actions, tuiAction{key: "F1", label: "Help"})
 }
 
 func (model dashboardModel) pxeNextStepView() []string {
 	switch model.report.PXE.Mode {
 	case "active":
 		return []string{
-			tuiResult("Next: install computers", true, model.isDark), "",
+			tuiSection("Next: install computers", model.isDark), "",
 			tuiInstruction(1, "At the client PC", "Start UEFI network boot. The guided installer opens automatically.", model.isDark), "",
 			tuiInstruction(2, "Review the computer and disk", "Choose its configured identity and type ERASE only for the right disk.", model.isDark), "",
 			tuiInstruction(3, "After installation", "Reboot from the installed disk and verify the computer.", model.isDark), "",
-			tuiInstruction(4, "Back on this controller", "Press x when finished to stop PXE and restore normal networking.", model.isDark),
+			tuiInstruction(4, "Back on this controller", "Press Enter when finished to stop network installation and restore normal networking.", model.isDark),
 		}
 	case "degraded", "recovery-required":
 		return []string{
-			tuiResult("Next: recover normal controller networking", false, model.isDark),
+			tuiStatus("Next: recover normal controller networking", tuiStatusFailure, model.isDark),
 			"  A previous PXE transition was interrupted.",
-			"  Press n to restore its recorded network state and stop managed PXE services.",
+			"  Press Enter to restore its recorded network state and stop network installation.",
 		}
 	}
 	if !model.report.PXEPreparation.Ready {
 		return []string{
-			tuiResult("Next: prepare installation files", false, model.isDark),
+			tuiSection("Next: prepare the installation files", model.isDark),
 			"  Press Enter to review lab settings, prepare the controller and build installation files.",
 		}
 	}
 	return []string{
-		tuiResult("Next: start network installation", false, model.isDark),
-		"  Press s to review the temporary address change and start PXE.",
+		tuiSection("Next: start network installation", model.isDark),
+		"  Press Enter to review the temporary network change and start.",
 	}
+}
+
+// pxeModeLabel names the network installation state in plain words.
+func pxeModeLabel(mode string) string {
+	switch mode {
+	case "ready", "stopped":
+		return "off"
+	case "active":
+		return "on; client PCs can start from the network"
+	case "preparing":
+		return "starting"
+	case "degraded", "recovery-required":
+		return "interrupted; recover the network"
+	case "":
+		return "unknown"
+	}
+	return mode
 }
 
 func pxeStatusKind(mode string) tuiStatusKind {
 	switch mode {
 	case "ready", "stopped":
-		return tuiStatusSuccess
+		return tuiStatusNeutral
 	case "active", "preparing":
 		return tuiStatusAttention
 	case "degraded", "recovery-required":
