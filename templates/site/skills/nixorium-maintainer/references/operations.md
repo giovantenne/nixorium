@@ -638,5 +638,5 @@ port is opened. Client SSH accepts only the controller's static IPv4 address
 on the lab interface; other sources and IPv6 are blocked. GNOME's sharing
 notice stays visible while the teacher watches. Updates to the classroom
 Shell extension take effect at the student's next login. Validate the
-overview, control, lock, showing the teacher's screen and Send desktop after
+overview, control, lock, sharing the teacher's screen and Send files after
 deployment on a real classroom computer.

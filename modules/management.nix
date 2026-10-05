@@ -741,6 +741,8 @@ in
       nixoriumLauncher
       pkgs.colmena
       pkgs.git
+      # The classroom view's Send files opens it to choose a file or folder.
+      pkgs.zenity
     ];
 
     # Console and SSH logins of the administrator say how to start and what

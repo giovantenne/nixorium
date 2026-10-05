@@ -50,7 +50,7 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 			return model, nil
 		}
 		model.screen = dashboardShare
-		model.share = shareModel{chosen: map[string]bool{}}
+		model.share = newShareModel()
 		model.message = ""
 	case "x":
 		model.screen = dashboardShutdown

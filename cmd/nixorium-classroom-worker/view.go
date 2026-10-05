@@ -32,7 +32,7 @@ const (
 
 var computerNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
-var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/desktop": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
+var postPaths = map[string]bool{"/api/input": true, "/api/actions/plan": true, "/api/actions/apply": true, "/api/share/choose": true, "/api/broadcast/frame": true, "/api/broadcast/stop": true}
 
 // viewSource lists computers, their images, and forwards input.
 type viewSource interface {
@@ -227,7 +227,7 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			return
 		}
 		writer.WriteHeader(http.StatusNoContent)
-	case "/api/actions/plan", "/api/actions/apply", "/api/share/desktop":
+	case "/api/actions/plan", "/api/actions/apply", "/api/share/choose":
 		if request.Method != http.MethodPost || server.actions == nil {
 			http.Error(writer, "Not available.", http.StatusMethodNotAllowed)
 			return
@@ -238,7 +238,7 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		case "/api/actions/apply":
 			server.applyAction(writer, request)
 		default:
-			server.shareDesktop(writer, request)
+			server.shareChosen(writer, request)
 		}
 	case "/api/input":
 		if request.Method != http.MethodPost {

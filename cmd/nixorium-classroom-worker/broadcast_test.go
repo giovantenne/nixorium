@@ -68,7 +68,7 @@ func TestPageShowsTheTeachersScreen(t *testing.T) {
 	origin := "http://" + host
 	plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"show-screen","computers":["pc01"]}`)
 	var review actionReview
-	if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready || review.Confirm != "Show my screen on 1 computer" {
+	if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready || review.Confirm != "Share your screen on 1 computer" {
 		t.Fatalf("review = %s", plan.Body.String())
 	}
 	apply := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`"}`)

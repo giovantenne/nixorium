@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -74,5 +75,31 @@ func TestCollectFolderSkipsHiddenNamesAndLinks(t *testing.T) {
 	}
 	if err := ValidateFileEntries(entries); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCollectItemSendsAFileOrAFolderUnderItsName(t *testing.T) {
+	root := t.TempDir()
+	lesson := filepath.Join(root, "lesson")
+	if err := os.MkdirAll(filepath.Join(lesson, "part"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lesson, "part", "notes.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parent, entries, err := CollectItem(lesson + "/")
+	want := []FileEntry{{Path: "lesson", Dir: true}, {Path: "lesson/part", Dir: true}, {Path: "lesson/part/notes.txt", Size: 5}}
+	if err != nil || parent != root || !slices.Equal(entries, want) || ValidateFileEntries(entries) != nil {
+		t.Fatalf("folder = %q %+v %v", parent, entries, err)
+	}
+	parent, entries, err = CollectItem(filepath.Join(lesson, "part", "notes.txt"))
+	if err != nil || parent != filepath.Join(lesson, "part") || !slices.Equal(entries, []FileEntry{{Path: "notes.txt", Size: 5}}) {
+		t.Fatalf("file = %q %+v %v", parent, entries, err)
+	}
+	if err := os.Symlink(lesson, filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := CollectItem(filepath.Join(root, "link")); err == nil {
+		t.Fatal("a link was collected")
 	}
 }

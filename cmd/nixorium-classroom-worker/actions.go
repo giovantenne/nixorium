@@ -23,7 +23,7 @@ const (
 	actionShutdown      = "shutdown"
 	actionLock          = "lock"
 	actionUnlock        = "unlock"
-	actionSendDesktop   = "send-desktop"
+	actionSendFiles     = "send-files"
 	actionShowScreen    = "show-screen"
 	maxActionComputers  = 200
 	// powerLabelTime keeps "Restarting…" on a card while the computer is away.
@@ -44,7 +44,7 @@ type pendingAction struct {
 type actionPlanRequest struct {
 	Action    string   `json:"action"`
 	Computers []string `json:"computers"`
-	// Transfer names files prepared with /api/share for send-desktop.
+	// Transfer names files prepared with /api/share for send-files.
 	Transfer string `json:"transfer,omitempty"`
 }
 
@@ -184,12 +184,12 @@ func (server *viewServer) planAction(writer http.ResponseWriter, request *http.R
 			return
 		}
 		review, pending = broadcastReview(server.broadcasts.Plan(ctx, operation.Requested))
-	case actionSendDesktop:
+	case actionSendFiles:
 		operation.Operation = domain.ClassroomSharePlanOperation
 		operation.ShareTransfer = body.Transfer
 		response := server.actions(ctx, operation)
 		if response.SharePlan == nil {
-			review = actionReview{Title: "Send desktop", Message: response.Message}
+			review = actionReview{Title: "Send files", Message: response.Message}
 			break
 		}
 		review, pending = shareReview(*response.SharePlan)
@@ -247,7 +247,7 @@ func internetReview(plan domain.InternetPlan) (actionReview, pendingAction) {
 }
 
 func broadcastReview(plan domain.BroadcastPlan) (actionReview, pendingAction) {
-	review := actionReview{Title: "Show my screen", Message: plan.Message, Rows: []actionRow{}}
+	review := actionReview{Title: "Share screen", Message: plan.Message, Rows: []actionRow{}}
 	eligible := 0
 	for _, target := range plan.Targets {
 		row := actionRow{Name: target.Name, Note: target.Detail}
@@ -263,13 +263,13 @@ func broadcastReview(plan domain.BroadcastPlan) (actionReview, pendingAction) {
 	}
 	review.Ready = !plan.HasErrors() && eligible > 0
 	if review.Ready {
-		review.Confirm = "Show my screen on " + plural(eligible, "computer")
+		review.Confirm = "Share your screen on " + plural(eligible, "computer")
 	}
 	return review, pendingAction{broadcast: &plan, expires: plan.ExpiresAt}
 }
 
 func shareReview(plan domain.SharePlan) (actionReview, pendingAction) {
-	review := actionReview{Title: "Send desktop", Message: plan.Message, Rows: []actionRow{}}
+	review := actionReview{Title: "Send files", Message: plan.Message, Rows: []actionRow{}}
 	eligible := 0
 	for _, target := range plan.Targets {
 		review.Rows = append(review.Rows, actionRow{Name: target.Name, Note: target.Detail, Skip: !target.Eligible})
@@ -504,11 +504,17 @@ func (server *viewServer) labelsFor(name string) (string, string) {
 	return labels.internet, power
 }
 
-// shareDesktop prepares the desktop of the page's own user through that
-// user's desktop helper, and returns the transfer to review.
-func (server *viewServer) shareDesktop(writer http.ResponseWriter, request *http.Request) {
-	var body struct{}
+// shareChosen has the page's own user choose a file or folder through that
+// user's desktop helper, and returns the prepared transfer to review.
+func (server *viewServer) shareChosen(writer http.ResponseWriter, request *http.Request) {
+	var body struct {
+		Kind string `json:"kind"`
+	}
 	if !decodePageJSON(writer, request, &body) {
+		return
+	}
+	if body.Kind != domain.DesktopChooseFile && body.Kind != domain.DesktopChooseFolder {
+		http.Error(writer, "Choose a file or a folder.", http.StatusBadRequest)
 		return
 	}
 	grant, ok := server.session(request)
@@ -516,10 +522,13 @@ func (server *viewServer) shareDesktop(writer http.ResponseWriter, request *http
 		http.Error(writer, "Not available.", http.StatusForbidden)
 		return
 	}
-	transfer, err := server.desktops.Request(request.Context(), grant.uid)
-	if err != nil {
-		writePageJSON(writer, map[string]string{"message": err.Error()})
-		return
+	transfer, cancelled, err := server.desktops.Request(request.Context(), grant.uid, body.Kind)
+	switch {
+	case err != nil:
+		writePageJSON(writer, map[string]any{"message": err.Error()})
+	case cancelled:
+		writePageJSON(writer, map[string]any{"cancelled": true})
+	default:
+		writePageJSON(writer, map[string]any{"transfer": transfer})
 	}
-	writePageJSON(writer, map[string]string{"transfer": transfer})
 }

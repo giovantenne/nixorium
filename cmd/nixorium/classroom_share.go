@@ -12,9 +12,9 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-// Send desktop from the terminal: the files and folders on the desktop of
-// whoever runs Nixorium (teacher or administrator) are prepared through the
-// classroom service, which alone reaches the students' computers.
+// Send files: a file or folder chosen by whoever runs Nixorium (teacher or
+// administrator) is prepared through the classroom service, which alone
+// reaches the students' computers, and lands on their desktops.
 
 func shareFailure(message string) domain.SharePlan {
 	return domain.SharePlan{SchemaVersion: domain.SchemaVersion, Operation: "share-plan", State: "blocked", Message: message, Files: []domain.ShareFile{}, Targets: []domain.ShareTarget{}, Issues: []domain.ValidationIssue{{Field: "share", Message: message}}}
@@ -30,26 +30,22 @@ func classroomMessage(response domain.ClassroomResponse, err error, fallback str
 	return fallback
 }
 
-// prepareDesktop uploads the caller's desktop and returns the transfer and
-// the folder it came from.
-func prepareDesktop(ctx context.Context) (string, string, error) {
-	home, err := os.UserHomeDir()
+// prepareShare uploads one file, or one folder with its contents, and
+// returns the transfer.
+func prepareShare(ctx context.Context, item string) (string, error) {
+	item, err := filepath.Abs(item)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	folder, err := classroomview.DesktopDirectory(home)
-	if err != nil {
-		return "", "", err
-	}
-	entries, err := classroomview.CollectFolder(folder)
-	if errors.Is(err, os.ErrNotExist) || (err == nil && len(entries) == 0) {
-		return "", folder, fmt.Errorf("your desktop folder %s is empty", folder)
+	parent, entries, err := classroomview.CollectItem(item)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("%s does not exist", item)
 	}
 	if err == nil {
 		err = classroomview.ValidateFileEntries(entries)
 	}
 	if err != nil {
-		return "", folder, fmt.Errorf("your desktop cannot be sent: %w", err)
+		return "", fmt.Errorf("%s cannot be sent: %w", item, err)
 	}
 	files := make([]domain.ShareFile, len(entries))
 	for index, entry := range entries {
@@ -59,7 +55,7 @@ func prepareDesktop(ctx context.Context) (string, string, error) {
 		request.ShareFiles = files
 	})
 	if err != nil || response.ShareTransfer == "" {
-		return "", folder, errors.New(classroomMessage(response, err, "The files could not be prepared."))
+		return "", errors.New(classroomMessage(response, err, "The files could not be prepared."))
 	}
 	transfer := response.ShareTransfer
 	buffer := make([]byte, domain.ClassroomShareChunkBytes)
@@ -67,11 +63,11 @@ func prepareDesktop(ctx context.Context) (string, string, error) {
 		if entry.Dir || entry.Size == 0 {
 			continue
 		}
-		if err := uploadFile(ctx, transfer, index, filepath.Join(folder, filepath.FromSlash(entry.Path)), entry.Size, buffer); err != nil {
-			return "", folder, err
+		if err := uploadFile(ctx, transfer, index, filepath.Join(parent, filepath.FromSlash(entry.Path)), entry.Size, buffer); err != nil {
+			return "", err
 		}
 	}
-	return transfer, folder, nil
+	return transfer, nil
 }
 
 func uploadFile(ctx context.Context, transfer string, index int, name string, size int64, buffer []byte) error {
@@ -100,8 +96,8 @@ func uploadFile(ctx context.Context, transfer string, index int, name string, si
 	return nil
 }
 
-func planDesktopShare(ctx context.Context, requested string) domain.SharePlan {
-	transfer, folder, err := prepareDesktop(ctx)
+func planShare(ctx context.Context, requested, item string) domain.SharePlan {
+	transfer, err := prepareShare(ctx, item)
 	if err != nil {
 		return shareFailure(err.Error() + ".")
 	}
@@ -112,11 +108,11 @@ func planDesktopShare(ctx context.Context, requested string) domain.SharePlan {
 		return shareFailure(classroomMessage(response, err, "Sending files is unavailable."))
 	}
 	plan := *response.SharePlan
-	plan.Message = "From " + folder + ": " + plan.Message
+	plan.Message = "Sending " + filepath.Base(filepath.Clean(item)) + ": " + plan.Message
 	return plan
 }
 
-func applyDesktopShare(ctx context.Context, plan domain.SharePlan) domain.ShareReport {
+func applyShare(ctx context.Context, plan domain.SharePlan) domain.ShareReport {
 	response, err := classroomRequest(ctx, domain.ClassroomShareApplyOperation, func(request *domain.ClassroomRequest) {
 		request.SharePlan = &plan
 	})

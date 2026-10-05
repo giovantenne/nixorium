@@ -195,8 +195,9 @@ func (worker classroomWorker) handle(ctx context.Context, request domain.Classro
 			return domain.ClassroomResponse{State: "failed", Message: "The desktop helper is not available."}
 		}
 		if request.Operation == domain.ClassroomDesktopWaitOperation {
-			response.DesktopJob = worker.view.desktops.Wait(ctx, uid)
-		} else if !worker.view.desktops.Ready(uid, request.DesktopJob, request.ShareTransfer, request.DesktopError) {
+			offer := worker.view.desktops.Wait(ctx, uid)
+			response.DesktopJob, response.DesktopKind = offer.id, offer.kind
+		} else if !worker.view.desktops.Ready(uid, request.DesktopJob, request.ShareTransfer, request.DesktopError, request.DesktopCancelled) {
 			return domain.ClassroomResponse{State: "failed", Message: "This desktop job is unknown."}
 		}
 	case domain.ClassroomViewOpenOperation:

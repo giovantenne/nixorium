@@ -16,7 +16,6 @@
   <div class="toolbar" role="toolbar" aria-label="Actions on the selected computers">
     <label class="select-all"><input type="checkbox" id="select-all"> Select all</label>
     <span id="selected-count">None selected</span>
-    <button type="button" data-action="show-screen" title="Show your whole screen on the selected computers, with their keyboard and mouse blocked">Show my screen</button>
     <span class="pair" role="group" aria-label="Screens">
       <button type="button" data-action="lock">Lock</button>
       <button type="button" data-action="unlock">Unlock</button>
@@ -25,7 +24,14 @@
       <button type="button" data-action="internet-block">Block Internet</button>
       <button type="button" data-action="internet-allow">Allow Internet</button>
     </span>
-    <button type="button" data-action="send-desktop" title="Copy the files and folders on your desktop to the desktops of the selected computers">Send desktop</button>
+    <button type="button" data-action="show-screen" title="Share your screen, a window or a tab on the selected computers, with their keyboard and mouse blocked">Share screen</button>
+    <details class="actions-menu send-menu" title="Copy a file or a folder to the desktops of the selected computers">
+      <summary>Send files</summary>
+      <div class="menu">
+        <button type="button" data-action="send-file">A file…</button>
+        <button type="button" data-action="send-folder">A folder…</button>
+      </div>
+    </details>
     <details class="actions-menu power-menu">
       <summary>Power</summary>
       <div class="menu">
@@ -49,10 +55,11 @@
       <div class="menu">
         <button type="button" data-action="lock">Lock</button>
         <button type="button" data-action="unlock">Unlock</button>
-        <button type="button" data-action="show-screen">Show my screen</button>
-        <button type="button" data-action="send-desktop">Send desktop</button>
         <button type="button" data-action="internet-block">Block Internet</button>
         <button type="button" data-action="internet-allow">Allow Internet</button>
+        <button type="button" data-action="show-screen">Share screen</button>
+        <button type="button" data-action="send-file">Send a file…</button>
+        <button type="button" data-action="send-folder">Send a folder…</button>
         <button type="button" data-action="restart">Restart</button>
         <button type="button" data-action="shutdown">Shut down</button>
       </div>

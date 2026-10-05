@@ -16,7 +16,7 @@ import (
 
 // classroomBrowserCommand is the internal command that runs the classroom
 // view's browser and serves the user's desktop to the classroom service
-// while it is open ("Send desktop" in the page). It is not for operators.
+// while it is open ("Send files" in the page). It is not for operators.
 const classroomBrowserCommand = "__classroom-browser"
 
 // runClassroomBrowser starts the browser and, as the only desktop helper of
@@ -81,15 +81,46 @@ func serveDesktopJobs(ctx context.Context) {
 		if response.DesktopJob == "" {
 			continue
 		}
-		transfer, _, prepareErr := prepareDesktop(ctx)
-		message := ""
-		if prepareErr != nil {
-			message = strings.ToUpper(prepareErr.Error()[:1]) + prepareErr.Error()[1:] + "."
+		transfer, message := "", ""
+		item, chosen, chooseErr := chooseShareItem(ctx, response.DesktopKind)
+		if chooseErr == nil && chosen {
+			transfer, chooseErr = prepareShare(ctx, item)
+		}
+		if chooseErr != nil {
+			message = strings.ToUpper(chooseErr.Error()[:1]) + chooseErr.Error()[1:] + "."
 		}
 		_, _ = classroomRequest(ctx, domain.ClassroomDesktopReadyOperation, func(request *domain.ClassroomRequest) {
 			request.DesktopJob, request.ShareTransfer, request.DesktopError = response.DesktopJob, transfer, message
+			request.DesktopCancelled = chooseErr == nil && !chosen
 		})
 	}
+}
+
+// chooseShareItem shows the system file chooser, starting in the home
+// folder, for a file or a folder. chosen is false when the user closes it.
+func chooseShareItem(ctx context.Context, kind string) (string, bool, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", false, err
+	}
+	arguments := []string{"--file-selection", "--title=Choose a file to send", "--filename=" + home + "/"}
+	switch kind {
+	case domain.DesktopChooseFile:
+	case domain.DesktopChooseFolder:
+		arguments = append(arguments, "--directory")
+		arguments[1] = "--title=Choose a folder to send"
+	default:
+		return "", false, errors.New("the page asked for an unknown choice")
+	}
+	output, err := exec.CommandContext(ctx, "zenity", arguments...).Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, errors.New("the file chooser could not open")
+	}
+	return strings.TrimSuffix(string(output), "\n"), true, nil
 }
 
 // classroomBrowserRunning reads the browser's own singleton lock, a link

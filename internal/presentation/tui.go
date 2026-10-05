@@ -36,9 +36,10 @@ type DashboardActions struct {
 	// laboratory has no classroom view.
 	PlanLock  func(context.Context, string, domain.LockAction) domain.LockPlan
 	ApplyLock func(domain.LockPlan) domain.LockReport
-	// PlanShare prepares the caller's desktop and reviews sending it to the
-	// selected students' desktops; nil without the classroom view.
-	PlanShare               func(context.Context, string) domain.SharePlan
+	// PlanShare prepares a file or folder (its path is the last argument)
+	// and reviews sending it to the selected students' desktops; nil
+	// without the classroom view.
+	PlanShare               func(context.Context, string, string) domain.SharePlan
 	ApplyShare              func(domain.SharePlan) domain.ShareReport
 	PlanCleanup             func(context.Context, string) domain.CleanupPlanReport
 	ApplyCleanup            func(domain.CleanupPlanReport) domain.CleanupApplyReport

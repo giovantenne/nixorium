@@ -156,21 +156,24 @@ offers the same as **Lock** and **Unlock**. From a terminal:
 `nixorium lock plan --on @lab --action lock`, then `nixorium lock apply` with
 the same options and `--expect` set to the review token.
 
-## Send desktop
+## Send files
 
-With the classroom view, **Computers → Send desktop** copies the files and
-folders on your own desktop to the desktop of the selected students'
-computers after a review: hidden files and links are left out, at most 2000
+With the classroom view, **Computers → Send files** copies a file or a folder
+to the desktop of the selected students' computers after a review. The path
+starts at your home folder; edit it to choose what to send. A folder arrives
+with its name and contents: hidden files and links are left out, at most 2000
 items and 500 MB are sent, the copies belong to the student and are never
 executable, and a name already on a student's desktop is kept as
-"name (2)". A restart empties the student's home, as usual. The classroom
-view page offers the same as **Send desktop**.
-From a terminal: `nixorium desktop plan --on @lab`, then
-`nixorium desktop apply --on @lab --expect` with the review token.
+"name (2)". A restart empties the student's home, as usual. In the classroom
+view page, **Send files** offers **A file…** and **A folder…**, which open
+the system file chooser in your home folder.
+From a terminal: `nixorium send plan --file <file-or-folder> --on @lab`,
+then `nixorium send apply --file <file-or-folder> --on @lab --expect` with
+the review token.
 
-In the classroom view page, **Show my screen** shows your screen (or the
+In the classroom view page, **Share screen** shows your screen (or the
 window or tab you choose) on the selected computers, over their whole screen and with their keyboard
-and mouse blocked, until **Stop showing** or until you close the page.
+and mouse blocked, until **Stop sharing** or until you close the page.
 
 ## Local customization
 

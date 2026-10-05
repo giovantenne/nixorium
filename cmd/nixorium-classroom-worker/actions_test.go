@@ -198,34 +198,50 @@ func TestPageLocksSelectedComputers(t *testing.T) {
 	}
 }
 
-func TestPageSendsTheDesktopOfItsOwnUser(t *testing.T) {
+func TestPageSendsFilesChosenByItsOwnUser(t *testing.T) {
 	fake := &fakeActions{}
 	server, host, cookie := openedViewServer(t, fake)
 	server.desktops = newDesktopBroker()
 	origin := "http://" + host
+	// Only a file or a folder can be asked for.
+	if response := actionPost(server, host, cookie, origin, "/api/share/choose", `{"kind":"home"}`); response.Code != http.StatusBadRequest {
+		t.Fatalf("unknown kind = %d", response.Code)
+	}
 	// Without a helper the page is told to open the view again.
-	if response := actionPost(server, host, cookie, origin, "/api/share/desktop", `{}`); !strings.Contains(response.Body.String(), "open it again from Nixorium") {
+	if response := actionPost(server, host, cookie, origin, "/api/share/choose", `{"kind":"file"}`); !strings.Contains(response.Body.String(), "open it again from Nixorium") {
 		t.Fatalf("no helper = %s", response.Body.String())
 	}
-	// Another user's helper is never asked; the page's own user (1000) is.
-	asked := make(chan int, 2)
-	for _, uid := range []int{1001, 1000} {
-		go func() {
-			if job := server.desktops.Wait(context.Background(), uid); job != "" {
-				asked <- uid
-				if server.desktops.Ready(1001, job, "stolen", "") {
-					t.Error("another user answered the job")
+	// Another user's helper is never asked; the page's own user (1000) is,
+	// with the kind the page asked for. A closed chooser sends nothing.
+	answer := func(transfer string, cancelled bool) chan int {
+		asked := make(chan int, 2)
+		for _, uid := range []int{1001, 1000} {
+			go func() {
+				if job := server.desktops.Wait(context.Background(), uid); job.id != "" {
+					if job.kind != domain.DesktopChooseFolder {
+						t.Errorf("helper asked for %q", job.kind)
+					}
+					asked <- uid
+					if server.desktops.Ready(1001, job.id, "stolen", "", false) {
+						t.Error("another user answered the job")
+					}
+					server.desktops.Ready(uid, job.id, transfer, "", cancelled)
 				}
-				server.desktops.Ready(uid, job, "t1", "")
-			}
-		}()
+			}()
+		}
+		time.Sleep(50 * time.Millisecond)
+		return asked
 	}
-	time.Sleep(50 * time.Millisecond)
-	response := actionPost(server, host, cookie, origin, "/api/share/desktop", `{}`)
+	asked := answer("", true)
+	if response := actionPost(server, host, cookie, origin, "/api/share/choose", `{"kind":"folder"}`); !strings.Contains(response.Body.String(), `"cancelled":true`) || <-asked != 1000 {
+		t.Fatalf("cancelled = %s", response.Body.String())
+	}
+	asked = answer("t1", false)
+	response := actionPost(server, host, cookie, origin, "/api/share/choose", `{"kind":"folder"}`)
 	if !strings.Contains(response.Body.String(), `"transfer":"t1"`) || <-asked != 1000 {
-		t.Fatalf("desktop = %s", response.Body.String())
+		t.Fatalf("chosen = %s", response.Body.String())
 	}
-	plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"send-desktop","computers":["pc01"],"transfer":"t1"}`)
+	plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"send-files","computers":["pc01"],"transfer":"t1"}`)
 	var review actionReview
 	if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready || review.Confirm != "Send to 1 computer" {
 		t.Fatalf("review = %s", plan.Body.String())

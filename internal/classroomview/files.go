@@ -175,3 +175,31 @@ func CollectFolder(folder string) ([]FileEntry, error) {
 	})
 	return entries, err
 }
+
+// CollectItem lists one file, or one folder with its contents, for sending
+// under its own name. Paths are relative to the item's parent folder, which
+// is returned with them.
+func CollectItem(item string) (string, []FileEntry, error) {
+	item = filepath.Clean(item)
+	info, err := os.Lstat(item)
+	if err != nil {
+		return "", nil, err
+	}
+	parent, name := filepath.Dir(item), filepath.Base(item)
+	switch {
+	case info.IsDir():
+		inner, err := CollectFolder(item)
+		if err != nil {
+			return parent, nil, err
+		}
+		entries := append(make([]FileEntry, 0, len(inner)+1), FileEntry{Path: name, Dir: true})
+		for _, entry := range inner {
+			entry.Path = name + "/" + entry.Path
+			entries = append(entries, entry)
+		}
+		return parent, entries, nil
+	case info.Mode().IsRegular():
+		return parent, []FileEntry{{Path: name, Size: info.Size()}}, nil
+	}
+	return parent, nil, errors.New("only files and folders can be sent")
+}

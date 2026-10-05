@@ -9,11 +9,11 @@ import (
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
 
-// runDesktopCommand sends the caller's desktop through the classroom
-// service. Apply prepares the files again and needs the same review token,
-// which binds the files' paths, sizes and contents.
-func runDesktopCommand(ctx context.Context, options options, stdout, stderr io.Writer) int {
-	plan := planDesktopShare(ctx, options.on)
+// runSendCommand sends a file or folder to the students' desktops through
+// the classroom service. Apply prepares the files again and needs the same
+// review token, which binds the files' paths, sizes and contents.
+func runSendCommand(ctx context.Context, options options, stdout, stderr io.Writer) int {
+	plan := planShare(ctx, options.on, options.file)
 	if options.subcommand == "plan" || plan.HasErrors() {
 		if options.json {
 			_ = presentation.JSON(stdout, plan)
@@ -26,12 +26,12 @@ func runDesktopCommand(ctx context.Context, options options, stdout, stderr io.W
 		return 0
 	}
 	if options.expect != plan.ReviewToken {
-		fmt.Fprintln(stderr, "Your desktop or the computers changed since the review; create a fresh plan.")
+		fmt.Fprintln(stderr, "The files or the computers changed since the review; create a fresh plan.")
 		return 1
 	}
 	if !options.yes {
 		if !presentation.IsInteractive(os.Stdin) {
-			fmt.Fprintln(stderr, "Desktop apply requires an interactive terminal or --yes.")
+			fmt.Fprintln(stderr, "Send apply requires an interactive terminal or --yes.")
 			return 2
 		}
 		approved, err := presentation.ConfirmShare(os.Stdin, stderr, plan)
@@ -43,7 +43,7 @@ func runDesktopCommand(ctx context.Context, options options, stdout, stderr io.W
 			return 0
 		}
 	}
-	report := applyDesktopShare(ctx, plan)
+	report := applyShare(ctx, plan)
 	if options.json {
 		_ = presentation.JSON(stdout, report)
 	} else {

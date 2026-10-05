@@ -324,14 +324,15 @@ lock is a classroom aid, not a security boundary. Locking also works from
 not take the administrative operation lock, since it changes no system
 state.
 
-**Send desktop** sends the files and folders on the desktop of whoever uses
-the controller. The classroom service runs as `admin` and cannot read that
+**Send files** sends a file, or a folder with its name and contents, chosen
+by whoever uses the controller. The classroom service runs as `admin` and cannot read that
 user's home, so Nixorium starts the page's browser through a small helper
 running as the user; while the classroom browser is open, the helper waits
 on the classroom socket. When the page asks, the service gives that user's
 helper a job (users are told apart by the socket's kernel peer credentials,
-recorded with the one-time view token), and the helper reads the XDG
-desktop folder (hidden files and links are left out) and prepares its files
+recorded with the one-time view token), and the helper opens the system file
+chooser (zenity) in the user's home for a file or a folder, then reads the
+choice (hidden files and links inside a folder are left out) and prepares its files
 in the service's private temporary folder in 512 KB pieces. The page then
 reviews the selected computers. The review binds each file's path,
 size and SHA-256, so the same files prepared again keep the review token.
@@ -342,13 +343,14 @@ folder of the home with explicit 0755/0644 modes and moves the top-level
 items to the XDG desktop folder only when everything arrived; an existing
 name becomes "name (2)". At most 2000 items and 500 MB are sent at once, and
 at most three prepared sendings exist, each removed after 30 unused minutes
-or once delivered everywhere. **Computers → Send desktop** (teacher and
-administrator) and `nixorium desktop plan|apply --on <clients|@lab>` read
-the XDG desktop folder of whoever runs Nixorium and send it through the
-classroom service the same way; `desktop apply` prepares the files again
-and requires the token of the review.
+or once delivered everywhere. **Computers → Send files** (teacher and
+administrator, with a path that starts at the user's home) and
+`nixorium send plan|apply --file <file-or-folder> --on <clients|@lab>` read
+the chosen file or folder as whoever runs Nixorium and send it through the
+classroom service the same way; `send apply` prepares the files again and
+requires the token of the review.
 
-**Show my screen** exists only in the page. The browser asks GNOME what to
+**Share screen** exists only in the page. The browser asks GNOME what to
 share: the entire screen is offered first, and a window or another tab works
 too (never the classroom view page itself). After the review,
 the page draws the screen at up to 1920 pixels (JPEG quality 0.85) and sends a JPEG at most

@@ -45,7 +45,7 @@ function updateSelection() {
   selectAll.checked = chosen.size > 0 && chosen.size === cards.size;
   selectAll.indeterminate = chosen.size > 0 && chosen.size < cards.size;
   for (const button of toolbarButtons) button.disabled = chosen.size === 0 && !(button.dataset.action === 'show-screen' && casting);
-  document.querySelector('.power-menu').classList.toggle('disabled', chosen.size === 0);
+  for (const menu of document.querySelectorAll('.toolbar .actions-menu')) menu.classList.toggle('disabled', chosen.size === 0);
 }
 
 selectAll.addEventListener('change', () => {
@@ -118,7 +118,7 @@ function render(computers) {
       entry.placeholder.textContent = text;
     }
     const labels = [];
-    if (computer.showing) labels.push('Showing your screen');
+    if (computer.showing) labels.push('Sharing your screen');
     if (computer.locked) labels.push('Locked');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
@@ -150,7 +150,7 @@ function render(computers) {
       if (!reachable) viewerActions.open = false;
       // This computer's menu offers only the change that applies.
       const offer = { lock: !computer.locked, unlock: Boolean(computer.locked), 'internet-block': computer.internet !== 'blocked', 'internet-allow': computer.internet === 'blocked' };
-      const needsSession = ['lock', 'unlock', 'show-screen', 'send-desktop'];
+      const needsSession = ['lock', 'unlock', 'show-screen', 'send-file', 'send-folder'];
       for (const button of viewerActions.querySelectorAll('button[data-action]')) {
         if (button.dataset.action in offer) button.hidden = !offer[button.dataset.action];
         button.disabled = !reachable || (needsSession.includes(button.dataset.action) && !session);
@@ -279,9 +279,9 @@ actionDialog.addEventListener('close', () => {
   }
 });
 
-// Send desktop: the files and folders on the desktop of whoever uses the
-// controller are prepared by Nixorium (which started this browser), then
-// reviewed and sent like any other action.
+// Send files: Nixorium (which started this browser) shows the system file
+// chooser and prepares the chosen file or folder, which is then reviewed and
+// sent like any other action.
 function showProgress(title, text) {
   actionID = '';
   actionTitle.textContent = title;
@@ -293,24 +293,28 @@ function showProgress(title, text) {
   if (!actionDialog.open) actionDialog.showModal();
 }
 
-async function sendDesktop(computers) {
-  showProgress('Send desktop', 'Preparing the files on your desktop…');
+async function sendFiles(kind, computers) {
+  showProgress('Send files', 'Choose the ' + kind + ' to send in the window that opens…');
   let prepared;
   try {
-    prepared = await postJSON('/api/share/desktop', {});
+    prepared = await postJSON('/api/share/choose', { kind });
   } catch (error) {
-    showProgress('Send desktop', 'The controller did not answer. Try again.');
+    showProgress('Send files', 'The controller did not answer. Try again.');
     return;
   }
   if (!actionDialog.open) return;
-  if (!prepared.transfer) {
-    showProgress('Send desktop', prepared.message || 'Your desktop could not be prepared.');
+  if (prepared.cancelled) {
+    actionDialog.close();
     return;
   }
-  runAction('send-desktop', computers, prepared.transfer);
+  if (!prepared.transfer) {
+    showProgress('Send files', prepared.message || 'The files could not be prepared.');
+    return;
+  }
+  runAction('send-files', computers, prepared.transfer);
 }
 
-// Show my screen: GNOME asks what to share (the whole screen is offered
+// Share screen: GNOME asks what to share (the whole screen is offered
 // first; a window or a tab works too, but not this page itself); after the
 // review the page sends a picture whenever it changes, at most five a
 // second, and one every few seconds to keep the showing on.
@@ -391,7 +395,7 @@ function stopCasting() {
 
 function updateCasting() {
   for (const button of document.querySelectorAll('[data-action="show-screen"]')) {
-    button.textContent = casting ? 'Stop showing' : 'Show my screen';
+    button.textContent = casting ? 'Stop sharing' : 'Share screen';
     button.classList.toggle('primary', Boolean(casting));
   }
   updateSelection();
@@ -400,7 +404,7 @@ function updateCasting() {
 window.addEventListener('pagehide', () => stopCasting());
 
 function startAction(action, computers) {
-  if (action === 'send-desktop') sendDesktop(computers);
+  if (action === 'send-file' || action === 'send-folder') sendFiles(action === 'send-file' ? 'file' : 'folder', computers);
   else if (action === 'show-screen' && casting) stopCasting();
   else if (action === 'show-screen') showMyScreen(computers);
   else runAction(action, computers);

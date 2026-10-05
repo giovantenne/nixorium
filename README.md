@@ -50,8 +50,8 @@ Nixorium bridges that gap with a local-first workflow:
   snapshots, so a lost file can be recovered from **Snapshots** in the Files
   sidebar.
 - **Classroom view.** On the controller, see every student screen at once,
-  open one in its own window and take control, lock screens, show your own
-  screen, and send the files on your desktop to the students' desktops.
+  open one in its own window and take control, lock screens, share your own
+  screen, and send a file or folder to the students' desktops.
 - **A classroom dashboard.** On the controller, see which PCs are on, pause or
   restore Internet on selected PCs, and shut them down or restart them. The
   dashboard cannot change the lab.

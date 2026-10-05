@@ -206,8 +206,8 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		return runInternetCommand(ctx, repository, options, stdout, stderr)
 	case "lock":
 		return runLockCommand(ctx, repository, options, stdout, stderr)
-	case "desktop":
-		return runDesktopCommand(ctx, options, stdout, stderr)
+	case "send":
+		return runSendCommand(ctx, options, stdout, stderr)
 	case "cleanup":
 		return runCleanupCommand(ctx, repository, options, stdout, stderr)
 	case "shutdown", "restart":
@@ -422,10 +422,10 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		ApplyLock: func(plan domain.LockPlan) domain.LockReport {
 			return lockManager.Apply(ctx, plan, plan.ReviewToken)
 		},
-		// The administrator's desktop goes through the classroom service too.
-		PlanShare: planDesktopShare,
+		// The administrator's files go through the classroom service too.
+		PlanShare: planShare,
 		ApplyShare: func(plan domain.SharePlan) domain.ShareReport {
-			return applyDesktopShare(ctx, plan)
+			return applyShare(ctx, plan)
 		},
 		ApplyCleanup: func(plan domain.CleanupPlanReport) domain.CleanupApplyReport {
 			report := cleanupManager.Apply(ctx, plan, plan.ReviewToken)
@@ -817,7 +817,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "desktop", "classroom-view", "install", "support", "cleanup", "recovery", "template-reset", "backup":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "send", "classroom-view", "install", "support", "cleanup", "recovery", "template-reset", "backup":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -884,7 +884,7 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "recover-plan"
 				continue
 			}
-			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "workspace" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "desktop" && result.command != "cleanup") || result.subcommand != "" {
+			if (result.command != "config" && result.command != "deploy" && result.command != "controller" && result.command != "update" && result.command != "package-base" && result.command != "software" && result.command != "workspace" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "send" && result.command != "cleanup") || result.subcommand != "" {
 				return options{}, errors.New("plan must follow config, deploy, controller, update, software, workspace, shutdown, restart, Internet, or git commit")
 			}
 			result.subcommand = "plan"
@@ -920,7 +920,7 @@ func parseArguments(arguments []string) (options, error) {
 				result.subcommand = "recover-apply"
 				continue
 			}
-			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "lock" || result.command == "desktop" || result.command == "cleanup") && result.subcommand == "" {
+			if (result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "lock" || result.command == "send" || result.command == "cleanup") && result.subcommand == "" {
 				result.subcommand = "apply"
 				continue
 			}
@@ -1027,7 +1027,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.verifyOnly && (result.command != "setup" || result.subcommand != "keys") {
 		return options{}, errors.New("--verify-only is only valid with setup keys")
 	}
-	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "lock" || result.command == "desktop" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && (result.subcommand == "commit-apply" || result.subcommand == "discard-apply")) || result.subcommand == "recover-apply") {
+	if result.yes && !((result.command == "setup" && result.subcommand == "apply") || (result.command == "pxe" && result.subcommand == "start") || ((result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "lock" || result.command == "send" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "services" && result.subcommand == "restart") || (result.command == "git" && (result.subcommand == "commit-apply" || result.subcommand == "discard-apply")) || result.subcommand == "recover-apply") {
 		return options{}, errors.New("--yes is only valid with setup apply, pxe start, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, services restart, or git commit apply")
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
@@ -1036,13 +1036,13 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "bootstrap" && result.subcommand != "configure" {
 		return options{}, errors.New("bootstrap requires the configure subcommand")
 	}
-	if result.file != "" && ((result.command != "config" && result.command != "workspace") || (result.subcommand != "plan" && result.subcommand != "apply")) {
-		return options{}, errors.New("--file is only valid with config or workspace plan/apply")
+	if result.file != "" && ((result.command != "config" && result.command != "workspace" && result.command != "send") || (result.subcommand != "plan" && result.subcommand != "apply")) {
+		return options{}, errors.New("--file is only valid with config, workspace or send plan/apply")
 	}
 	if result.command == "config" && (result.subcommand == "plan" || result.subcommand == "apply") && result.file == "" {
 		return options{}, fmt.Errorf("config %s requires --file", result.subcommand)
 	}
-	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "lock" || result.command == "desktop" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && (result.subcommand == "commit-apply" || result.subcommand == "discard-apply")) || result.subcommand == "recover-apply") {
+	if result.expect != "" && !(((result.command == "config" || result.command == "deploy" || result.command == "controller" || result.command == "update" || result.command == "package-base" || result.command == "software" || result.command == "workspace" || result.command == "shutdown" || result.command == "restart" || result.command == "internet" || result.command == "lock" || result.command == "send" || result.command == "cleanup") && result.subcommand == "apply") || (result.command == "software" && result.subcommand == "preset-apply") || (result.command == "git" && (result.subcommand == "commit-apply" || result.subcommand == "discard-apply")) || result.subcommand == "recover-apply") {
 		return options{}, errors.New("--expect is only valid with config apply, deploy apply, controller apply, update apply, software apply, workspace apply, shutdown/restart apply, cleanup apply, or git commit apply")
 	}
 	if result.extension != "" && (result.command != "workspace" || result.subcommand != "marketplace") {
@@ -1062,7 +1062,7 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("workspace apply requires --expect from workspace plan")
 		}
 	}
-	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "desktop" && result.command != "cleanup") || (result.subcommand != "plan" && result.subcommand != "apply")) {
+	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "send" && result.command != "cleanup") || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, Internet or cleanup plan/apply")
 	}
 	if result.command == "cleanup" {
@@ -1178,12 +1178,12 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("lock apply requires --expect from lock plan")
 		}
 	}
-	if result.command == "desktop" {
-		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" {
-			return options{}, errors.New("desktop requires plan/apply and --on")
+	if result.command == "send" {
+		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" || result.file == "" {
+			return options{}, errors.New("send requires plan/apply, --file and --on")
 		}
 		if result.subcommand == "apply" && result.expect == "" {
-			return options{}, errors.New("desktop apply requires --expect from desktop plan")
+			return options{}, errors.New("send apply requires --expect from send plan")
 		}
 	}
 	if result.internetAction != "" && result.command != "internet" {
@@ -1370,7 +1370,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|desktop plan|desktop apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       workspace marketplace --extension <publisher.name> [--json] downloads one Marketplace version and prints its pin")
 	fmt.Fprintln(writer, "       host-key plan --host <pcNN> [--json] reviews changed SSH trust after reinstall")
@@ -1393,8 +1393,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       internet apply --on <clients|@lab> --action <block|unblock> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       lock plan --on <clients|@lab> --action <lock|unlock> reviews locking students' screens (classroom view)")
 	fmt.Fprintln(writer, "       lock apply --on <clients|@lab> --action <lock|unlock> --expect <review-token> [--yes]")
-	fmt.Fprintln(writer, "       desktop plan --on <clients|@lab> reviews copying your desktop to students' desktops (classroom view)")
-	fmt.Fprintln(writer, "       desktop apply --on <clients|@lab> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       send plan --file <file-or-folder> --on <clients|@lab> reviews copying it to students' desktops (classroom view)")
+	fmt.Fprintln(writer, "       send apply --file <file-or-folder> --on <clients|@lab> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
 	fmt.Fprintln(writer, "       backup create --to <directory> [--passphrase-file <file>]")

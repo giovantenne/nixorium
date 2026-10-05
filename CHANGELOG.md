@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Send files** replaces Send desktop. In the classroom view page it offers
+  **A file…** and **A folder…**, which open the system file chooser in the
+  teacher's home; in the TUI the path starts at the user's home; from a
+  terminal it is `nixorium send plan|apply --file <file-or-folder>`. A folder
+  arrives on the students' desktops with its name and contents. The page's
+  buttons are grouped in pairs: Lock/Unlock, Internet, **Share screen**
+  (formerly Show my screen), Send files and Power.
+
 - The classroom view follows GNOME's dark style. In a computer's own window,
   actions and **Take control** are unavailable while the computer is off or
   restarting, and its last picture is dimmed; without a student session only

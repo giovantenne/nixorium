@@ -77,7 +77,16 @@ type ClassroomRequest struct {
 	SharePlan      *SharePlan            `json:"sharePlan,omitempty"`
 	DesktopJob     string                `json:"desktopJob,omitempty"`
 	DesktopError   string                `json:"desktopError,omitempty"`
+	// DesktopCancelled: the user closed the file chooser without a choice.
+	DesktopCancelled bool `json:"desktopCancelled,omitempty"`
 }
+
+// Send files from the classroom view page: what the user's file chooser
+// asks for.
+const (
+	DesktopChooseFile   = "file"
+	DesktopChooseFolder = "folder"
+)
 
 // ClassroomShareChunkBytes keeps one uploaded piece, encoded, well below the
 // classroom message limit.
@@ -101,6 +110,7 @@ type ClassroomResponse struct {
 	SharePlan      *SharePlan           `json:"sharePlan,omitempty"`
 	ShareReport    *ShareReport         `json:"shareReport,omitempty"`
 	DesktopJob     string               `json:"desktopJob,omitempty"`
+	DesktopKind    string               `json:"desktopKind,omitempty"`
 }
 
 func NewClassroomRequest(operation ClassroomOperation) (ClassroomRequest, error) {
