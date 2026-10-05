@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Protect configured laboratories from accidental address changes in managed
+  settings: block subnet, prefix and controller host-number changes while clients
+  are configured, warn about interface changes, and distinguish the PXE address
+  hint from live addressing. Remove generic controller-first network advice.
+
+- Show Classroom view first in the Computers menu when available.
+
 - The administrator TUI is more consistent. Software uses one wording for where
   a package is installed, shows details without repeating the actions, never
   offers to remove or limit base software, and its reviews list facts in

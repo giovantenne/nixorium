@@ -131,7 +131,7 @@ func TestClassroomViewEntryAppearsOnlyWhenAvailable(t *testing.T) {
 		return "The classroom view opened in a browser window.", nil
 	}
 	tasks := model.availableComputerTasks()
-	if tasks[len(tasks)-1].id != "view" || !strings.Contains(model.View().Content, "Classroom view") {
+	if tasks[0].id != "view" || !strings.Contains(model.View().Content, "Classroom view") {
 		t.Fatalf("tasks = %+v\n%s", tasks, model.View().Content)
 	}
 	next, command := model.updatePrimaryScreenKey(tea.KeyPressMsg{Code: 'v', Text: "v"})

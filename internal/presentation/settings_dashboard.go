@@ -316,7 +316,7 @@ func (model dashboardModel) settingsView() string {
 			fmt.Sprintf("State: %s   Changed fields: %d", model.settings.result.State, len(model.settings.result.Changes)),
 		)
 		lines = append(lines, saveStatusLines(model.settings.result.State, model.settings.result.RecoveryRequired, true, true, controllerVerifiedForSave(model.settings.result.Revision, model.controller.result))...)
-		lines = append(lines, "", "Apply to this controller first, then review which computers to update.", "Keyboard and student-home changes may take effect at the next computer start.")
+		lines = append(lines, "", "Review controller and client changes separately before applying.", "For network changes, check device names and local console access first.", "Keyboard and student-home changes may take effect at the next computer start.")
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
@@ -428,7 +428,7 @@ func settingsIssueMessage(issues []domain.ValidationIssue) string {
 	if len(issues) == 0 {
 		return "settings operation failed"
 	}
-	return issues[0].Field + ": " + issues[0].Message
+	return settingLabel(issues[0].Field) + ": " + issues[0].Message
 }
 
 // settingsRepairNotice explains settings that no longer validate and how

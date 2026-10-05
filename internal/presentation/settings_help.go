@@ -13,7 +13,7 @@ var settingsHelp = map[string]settingHelp{
 	"lab.controllerIfaceName": {"Network device on this controller; empty uses the shared fallback.", "enp1s0"},
 	"lab.clientIfaceName":     {"Network device used to connect client computers to the laboratory.", "enp1s0"},
 	"lab.ifaceName":           {"Device used when no controller, client or host override is set.", "enp1s0"},
-	"lab.masterDhcpIp":        {"Controller address assigned by the site's DHCP, used during installation.", "192.168.1.20"},
+	"lab.masterDhcpIp":        {"PXE address hint only; changing it does not change the DHCP lease or static addresses.", "192.168.1.20"},
 	"lab.networkBase":         {"Static lab network; must not contain the controller DHCP address.", "10.0.0.0"},
 	"lab.networkPrefixLength": {"Network size in CIDR bits; /24 contains 254 usable host addresses.", "24"},
 	"lab.pcCount":             {"Clients are numbered from pc01; do not include the controller.", "20"},

@@ -18,6 +18,24 @@ var controllerOnlySettings = map[string]bool{
 	"lab.masterDhcpIp": true, "lab.controllerIfaceName": true, "lab.adminGitName": true, "lab.adminGitEmail": true,
 }
 
+// SettingsTransitionIssues protects the management connection while clients are
+// configured. Use the saved count, including when the candidate removes clients.
+// This is a transition rule, not a restriction on valid initial configurations.
+func SettingsTransitionIssues(base, candidate LabSettingsFile) []ValidationIssue {
+	if base.Lab.PCCount <= 0 {
+		return nil
+	}
+	var issues []ValidationIssue
+	for _, change := range DiffLabSettings(base, candidate) {
+		switch change.Field {
+		case "lab.networkBase", "lab.networkPrefixLength", "lab.masterHostNumber":
+			issues = append(issues, ValidationIssue{Field: change.Field, Message: fmt.Sprintf(
+				"Cannot change laboratory addressing while %d client computers are configured. They would keep their old network settings and could lose contact with the controller. Keep the saved value; guided network migration is not available yet.", base.Lab.PCCount)})
+		}
+	}
+	return issues
+}
+
 // SettingsImpacts classifies reviewed changes into what happens next.
 func SettingsImpacts(base, candidate LabSettingsFile, changes []SettingChange) []SettingImpact {
 	if len(changes) == 0 {
@@ -43,7 +61,27 @@ func SettingsImpacts(base, candidate LabSettingsFile, changes []SettingChange) [
 	}
 	if changed["lab.networkBase"] || changed["lab.networkPrefixLength"] || changed["lab.masterHostNumber"] {
 		impacts = append(impacts, SettingImpact{Kind: "client-addresses", Warning: true,
-			Detail: "This renumbers the laboratory. Installed computers keep their old addresses and cannot be updated at the new ones; there is no guided address change yet. Keep the current network unless you will reinstall the computers."})
+			Detail: "Applying these settings changes the laboratory addresses or routing. Check the proposed subnet and controller address before applying locally; the current connection may close."})
+	}
+	if changed["lab.masterDhcpIp"] {
+		impacts = append(impacts, SettingImpact{Kind: "pxe-address", Detail: "This changes only the controller address hint for PXE preparation. It does not change the DHCP lease or the static addresses used to manage installed computers. Prepare network installation again before using PXE."})
+	}
+	for _, change := range changes {
+		var detail string
+		switch change.Field {
+		case "lab.controllerIfaceName":
+			detail = "Applying to the controller can move its laboratory connection to another network device and disconnect clients or this session. An empty value uses the shared fallback."
+		case "lab.clientIfaceName":
+			detail = "Updating clients can move their laboratory connection to another network device and make them unreachable. An empty value uses the shared fallback; per-computer overrides still take priority."
+		case "lab.ifaceName":
+			detail = "Changing the shared fallback can disconnect the controller and clients that have no interface override when their settings are applied."
+		case "lab.hostIfaceNames":
+			detail = "Changing per-computer overrides can disconnect the affected computers when their settings are applied. Overrides take priority over controller, client and shared settings."
+		}
+		if detail != "" {
+			impacts = append(impacts, SettingImpact{Kind: "network-interface", Warning: true,
+				Detail: detail + " Verify the old and new device names, cabling and access to each affected computer's local console before applying."})
+		}
 	}
 	if candidate.Lab.PCCount < base.Lab.PCCount {
 		impacts = append(impacts, SettingImpact{Kind: "computers-removed", Warning: true,

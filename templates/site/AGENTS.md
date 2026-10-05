@@ -32,8 +32,13 @@ configuration, software, home customization, diagnostics, and operations.
   managed software. Prefer reviewed `config` and `software` plan/apply commands;
   application policy and home content belong in local modules/assets.
 - Keep the controller DHCP address outside the configured static laboratory
-  prefix. Supporting validators block overlap; change the planned subnet
-  through the reviewed settings workflow, never by ad-hoc live network edits.
+  prefix. Supporting validators block overlap; choose the subnet before
+  configuring clients. On supporting pins, managed settings refuse subnet,
+  prefix and controller host-number changes once the saved client count is
+  nonzero. Do not bypass this by removing clients or editing JSON manually;
+  guided network migration is not available. Interface changes require review
+  of connection risks and local console access, not a universal controller-first
+  update order. The DHCP hint affects PXE preparation, not live addressing.
 - Optional `software-presets.json` is a deployment-owned catalog of additive
   starting selections. Apply a profile through one reviewed preset plan/apply;
   preserve existing declarations and scopes, and do not treat the profile as

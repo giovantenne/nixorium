@@ -136,3 +136,44 @@ func TestFirstSetupValidatesAndSavesTheCompleteCandidateOnce(t *testing.T) {
 		t.Fatalf("setup did not resume after one save: refreshes=%d setup=%+v", refreshes, model.setup)
 	}
 }
+
+func TestSettingsBlockedNetworkChangeReturnsWithoutSaving(t *testing.T) {
+	base := wizardSettings()
+	base.Lab.PCCount = 20
+	candidate := base
+	candidate.Lab.NetworkBase = "10.1.0.0"
+	model := dashboardModel{screen: dashboardSettings, width: 120, height: 30,
+		settings: settingsModel{current: base, candidate: candidate, menu: newRoutineSettingsMenu(true, 120, 30)},
+		actions: DashboardActions{SaveSettings: func(domain.LabSettingsFile, domain.ConfigPlanReport) domain.ConfigurationSaveReport {
+			t.Fatal("blocked network change tried to save")
+			return domain.ConfigurationSaveReport{}
+		}},
+	}
+	next, command := model.Update(dashboardSettingsPlanMsg{report: domain.ConfigPlanReport{
+		State: "invalid", Issues: domain.SettingsTransitionIssues(base, candidate),
+	}})
+	model = next.(dashboardModel)
+	if command != nil || model.screen != dashboardSettings || model.settings.current.Lab.NetworkBase != base.Lab.NetworkBase {
+		t.Fatal("blocked change did not preserve saved settings")
+	}
+	if !strings.Contains(model.message, "Keep the saved value") || strings.Contains(model.message, "lab.networkBase:") {
+		t.Fatalf("unclear refusal: %s", model.message)
+	}
+}
+
+func TestSettingsInterfaceReviewShowsBothValuesAndWarning(t *testing.T) {
+	base := wizardSettings()
+	base.Lab.ControllerInterfaceName = "enp0s3"
+	candidate := base
+	candidate.Lab.ControllerInterfaceName = "enp1s0"
+	changes := domain.DiffLabSettings(base, candidate)
+	model := dashboardModel{screen: dashboardSettingsReview, width: 120, height: 45,
+		settings: settingsModel{plan: domain.ConfigPlanReport{State: "valid", Changes: changes, Impacts: domain.SettingsImpacts(base, candidate, changes)}},
+	}
+	view := model.View().Content
+	for _, want := range []string{"enp0s3", "enp1s0", "disconnect", "local console", "Save", "Cancel"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q in review:\n%s", want, view)
+		}
+	}
+}

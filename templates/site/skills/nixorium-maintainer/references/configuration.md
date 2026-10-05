@@ -87,8 +87,22 @@ address.
 
 On supporting pins, both Go and Nix validation reject a controller DHCP
 address inside that static prefix. The draft preview is guidance, not readiness
-evidence. Correct an overlapping subnet through a reviewed settings change;
-do not bypass validation or change the live network to make an update pass.
+evidence. Before clients are configured, correct an overlapping subnet through a
+reviewed settings change. Once the saved client count is nonzero, the managed
+TUI and CLI refuse changes to `networkBase`, `networkPrefixLength` and
+`masterHostNumber`. The check uses the saved count even if the candidate removes
+all clients, and runs again before writing reviewed settings. Keep the existing
+addressing: guided migration is not available. Do not reset the client count or
+edit JSON by hand to bypass this protection. If existing addressing must change,
+stop and plan migration/recovery with the administrator before any activation.
+
+Interface changes remain reviewable. Compare the old and new device names and
+verify cabling and local console access before applying to affected computers.
+Controller, client and per-host overrides can limit which computers use a changed
+shared fallback. Saving does not change the live network; applying the controller
+or updating a client can disconnect it. Do not assume controller-first updates
+are safe for network changes. This protection checks managed settings transitions,
+not historical installations or arbitrary changes in deployment modules.
 
 `masterDhcpIp` is the initial address/hint used only during PXE installation.
 Preparation prefers it while assigned, otherwise captures the only usable

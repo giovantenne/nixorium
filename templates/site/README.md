@@ -49,10 +49,19 @@ The controller is named `pc99` by default because
 identity: changing it to `42`, for example, produces the hostname `pc42` and
 also moves the controller's static laboratory address to host number `42` in
 the configured subnet. Change it from **Maintenance → Change settings →
-Computers → Controller host number**, then save and rebuild the controller.
-The number must be greater than `pcCount` and must fit inside the subnet; choose
-it before rolling out clients when possible to avoid an unnecessary controller
-rename later.
+Computers → Controller host number** before configuring clients, then save and
+review the controller update. The number must be greater than `pcCount` and fit
+inside the subnet. Once clients are configured, managed settings block changes
+to this number, the static network address and its prefix: installed clients
+would retain their previous network settings. Guided network migration is not
+available yet; do not reduce the client count to bypass the block.
+
+Changes to network interfaces remain available, with warnings in the review.
+Check old and new device names, cabling and local console access before applying:
+changing the controller interface or a shared fallback can interrupt client
+management. Saving alone does not change the live network. The controller DHCP
+address field is only a hint for PXE preparation; it does not change the lease
+or the static addresses used to manage clients.
 
 The student session uses the network configured by the system but cannot change
 NetworkManager connections, radios, DNS, or other host network state through
@@ -835,8 +844,10 @@ automatically; import of existing private keys is available only from
 fallback. This permits different predictable interface names on controller and
 client hardware without changing existing deployments.
 The controller DHCP address must be outside the static lab prefix. Both
-validators block overlap; choose a distinct static subnet before saving or
-updating an overlapping deployment. Field help explains each value and the
+validators block overlap; choose a distinct static subnet before configuring
+clients. With clients already configured, keep the current addressing and plan
+recovery with the administrator rather than bypassing the managed settings block.
+Field help explains each value and the
 editor previews the first/last client and controller addresses from the draft.
 The installation form asks for the client computers' interface and shows the
 controller interface separately. Before any client exists it proposes the

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 
@@ -153,5 +154,85 @@ func TestSettingsThatNoLongerValidateAreRepairedBySaving(t *testing.T) {
 	}
 	if _, _, err := NewSettingsManager(fakeSettingsSource{data: []byte("not json")}).CurrentForEditing("/repo"); err == nil {
 		t.Fatal("unparseable JSON was repaired")
+	}
+}
+
+func TestSettingsAddressChangesCannotDisconnectConfiguredClients(t *testing.T) {
+	template, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, issues := domain.DecodeLabSettings(template)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	for _, field := range []string{"lab.networkBase", "lab.networkPrefixLength", "lab.masterHostNumber"} {
+		for _, removeClients := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/remove=%v", field, removeClients), func(t *testing.T) {
+				candidate := base
+				switch field {
+				case "lab.networkBase":
+					candidate.Lab.NetworkBase = "10.1.0.0"
+				case "lab.networkPrefixLength":
+					candidate.Lab.NetworkPrefix = 23
+				case "lab.masterHostNumber":
+					candidate.Lab.MasterHostNumber = 100
+				}
+				if removeClients {
+					candidate.Lab.PCCount = 0
+					candidate.Lab.DeploymentMode = "controller"
+				}
+				written := domain.LabSettingsFile{}
+				manager := NewSettingsManager(fakeSettingsSource{data: template, written: &written, candidateErr: errors.New("must reject before Nix")})
+				plan := manager.PlanSettings(context.Background(), "/repo", candidate)
+				if !plan.HasErrors() || plan.State != "invalid" || plan.Issues[0].Field != field {
+					t.Fatalf("plan = %+v", plan)
+				}
+				applied := manager.ApplySettings(context.Background(), "/repo", candidate, plan.BaseFingerprint)
+				if !applied.HasErrors() || written.SchemaVersion != 0 {
+					t.Fatalf("applied = %+v; written = %+v", applied, written)
+				}
+				// Even an old successful review cannot bypass the write-time rule.
+				candidateData, err := domain.MarshalLabSettings(candidate)
+				if err != nil {
+					t.Fatal(err)
+				}
+				oldReview := domain.ConfigPlanReport{State: "valid", BaseFingerprint: domain.SettingsFingerprint(template), CandidateFingerprint: domain.SettingsFingerprint(candidateData)}
+				applied = manager.ApplyReviewedSettings("/repo", candidate, oldReview)
+				if !applied.HasErrors() || applied.Issues[0].Field != field || written.SchemaVersion != 0 {
+					t.Fatalf("reviewed apply = %+v; written = %+v", applied, written)
+				}
+			})
+		}
+	}
+}
+
+func TestSettingsAddressChangesRemainAvailableBeforeClientConfiguration(t *testing.T) {
+	template, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, _ := domain.DecodeLabSettings(template)
+	base.Lab.PCCount = 0
+	base.Lab.DeploymentMode = "controller"
+	baseData, err := domain.MarshalLabSettings(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate := base
+	candidate.Lab.DeploymentMode = "laboratory"
+	candidate.Lab.PCCount = 20
+	candidate.Lab.NetworkBase = "10.1.0.0"
+	candidate.Lab.NetworkPrefix = 23
+	candidate.Lab.MasterHostNumber = 100
+	written := domain.LabSettingsFile{}
+	manager := NewSettingsManager(fakeSettingsSource{data: baseData, written: &written})
+	plan := manager.PlanSettings(context.Background(), "/repo", candidate)
+	if plan.HasErrors() || plan.State != "valid" {
+		t.Fatalf("initial configuration = %+v", plan)
+	}
+	applied := manager.ApplyReviewedSettings("/repo", candidate, plan)
+	if applied.HasErrors() || written.Lab.NetworkBase != "10.1.0.0" || written.Lab.PCCount != 20 {
+		t.Fatalf("initial save = %+v; written = %+v", applied, written)
 	}
 }

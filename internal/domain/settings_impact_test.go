@@ -22,7 +22,7 @@ func TestSettingsImpacts(t *testing.T) {
 		t.Fatalf("no changes = %+v", impacts)
 	}
 	controllerOnly := SettingsImpacts(base, base, []SettingChange{{Field: "lab.masterDhcpIp"}})
-	if kinds(controllerOnly) != "controller-apply" {
+	if kinds(controllerOnly) != "controller-apply,pxe-address" {
 		t.Fatalf("controller-only = %s", kinds(controllerOnly))
 	}
 	smaller := base
@@ -38,5 +38,20 @@ func TestSettingsImpacts(t *testing.T) {
 	larger.Lab.PCCount = 21
 	if got := kinds(SettingsImpacts(base, larger, []SettingChange{{Field: "lab.pcCount"}})); !strings.Contains(got, "computers-added") {
 		t.Fatalf("added = %s", got)
+	}
+}
+
+func TestSettingsInterfaceChangesExplainConnectionRisk(t *testing.T) {
+	base := LabSettingsFile{Lab: LabSettings{PCCount: 20, InterfaceName: "enp0s3"}}
+	for _, field := range []string{"lab.controllerIfaceName", "lab.clientIfaceName", "lab.ifaceName", "lab.hostIfaceNames"} {
+		t.Run(field, func(t *testing.T) {
+			impacts := SettingsImpacts(base, base, []SettingChange{{Field: field}})
+			for _, impact := range impacts {
+				if impact.Kind == "network-interface" && impact.Warning && strings.Contains(impact.Detail, "local console") {
+					return
+				}
+			}
+			t.Fatalf("missing interface warning: %+v", impacts)
+		})
 	}
 }

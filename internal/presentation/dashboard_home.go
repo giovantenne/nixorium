@@ -60,7 +60,7 @@ func (model dashboardModel) availableComputerTasks() []dashboardTask {
 		tasks = append(append([]dashboardTask{}, tasks...), sendDesktopTask)
 	}
 	if model.actions.OpenClassroomView != nil {
-		tasks = append(append([]dashboardTask{}, tasks...), classroomViewTask)
+		tasks = append([]dashboardTask{classroomViewTask}, tasks...)
 	}
 	return tasks
 }

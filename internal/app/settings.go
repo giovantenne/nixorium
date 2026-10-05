@@ -135,6 +135,10 @@ func (m SettingsManager) ApplyReviewedSettings(repository string, candidate doma
 		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$fingerprint", Message: "the managed settings changed after review; create a new plan"})
 		return report
 	}
+	report.Issues = append(report.Issues, domain.SettingsTransitionIssues(base, candidate)...)
+	if len(report.Issues) > 0 {
+		return report
+	}
 	report.Changes = withRemovedFields(domain.DiffLabSettings(base, candidate), removed)
 	if len(report.Changes) == 0 && len(base.Validate()) == 0 {
 		report.State = "unchanged"
@@ -241,6 +245,11 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 	if len(candidateIssues) > 0 {
 		return report, baseData, candidate
 	}
+	report.Changes = withRemovedFields(domain.DiffLabSettings(base, candidate), removed)
+	report.Issues = append(report.Issues, domain.SettingsTransitionIssues(base, candidate)...)
+	if len(report.Issues) > 0 {
+		return report, baseData, candidate
+	}
 	if err := m.source.ValidateCandidate(ctx, repository, candidate); err != nil {
 		report.Issues = append(report.Issues, domain.ValidationIssue{
 			Field:   "$nix",
@@ -248,7 +257,6 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 		})
 		return report, baseData, candidate
 	}
-	report.Changes = withRemovedFields(domain.DiffLabSettings(base, candidate), removed)
 	report.Impacts = domain.SettingsImpacts(base, candidate, report.Changes)
 	if len(report.Changes) == 0 && len(base.Validate()) == 0 {
 		report.State = "unchanged"
