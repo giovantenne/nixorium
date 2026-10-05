@@ -695,6 +695,8 @@ else
     git
   )
 fi
+# Background maintenance would change .git while it is copied to the disk.
+GIT_COMMAND+=(-c maintenance.auto=false -c gc.auto=0)
 
 ui_section "Preparing the lab configuration"
 ui_log "Downloading the installer and the lab configuration template..."
