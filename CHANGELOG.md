@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Restrict the laboratory maintainer skill to supported proposals and bounded
+  diagnostics. Explicitly prohibit invasive module/overlay/script changes and
+  agent-executed saves or live operations; the human operator uses native
+  reviews. Instructions are not a sandbox, and existing deployments need a
+  separate reviewed refresh of their copied guidance.
+
 ## [3.1.1] - 2026-10-06
 
 Version 3.1.0 was tagged but never published: its release validation failed

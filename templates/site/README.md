@@ -5,7 +5,13 @@ implementation is pinned as the `nixorium` Flake input.
 
 The repository includes the `nixorium-maintainer` Agent Skill and discovery
 links for Codex, OpenCode, Claude Code and Pi. Agents can load it automatically
-for lab configuration, validation and upstream-update work.
+for proposal-only software/workspace assistance and bounded diagnostics.
+The agent does not edit this deployment, save proposals or perform live
+operations; the human operator uses the native reviews. These instructions
+are not a sandbox and cannot guarantee safety for an unrestricted agent.
+The manual procedures below are for the human administrator, not permission
+for an agent to bypass its skill. Existing copied skills need a separate
+reviewed refresh; updating the Nixorium input alone does not replace them.
 
 > [!IMPORTANT]
 > Keep this repository private. It contains password hashes and internal

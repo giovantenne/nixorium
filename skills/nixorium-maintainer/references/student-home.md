@@ -1,304 +1,85 @@
-# Student home and desktop customization
+# Student home and desktop proposals
 
-## Understand what is reset
-
-Inspect the deployment's imported modules and assets before choosing files.
-The current template uses `modules/home-profile.nix` for student template
-content, `modules/workstation.nix` for desktop/application policy, and assets
-for editor settings/backgrounds. Existing labs may have different local layouts.
-
-The saved workspace profile supplies the student preferences restored at boot.
-Changing a student's live home is not a persistent customization. Saving a
-profile does not change an already logged-in student's home.
-
-Do not edit `/var/lib/home-template` directly as a durable solution, reset a
-live home, or reboot without authorization. Explain when students will see the
-change. Local rotating snapshots exclude some ephemeral content and are not
-backups. Do not capture credentials, histories, browser profiles, SSH material,
-or private workspace data into a shared template.
-
-There is no supported “capture this student's home” command in this contract.
-If asked for snapshots as a new template feature, distinguish that upstream
-design request from the currently available declarative customization.
+Inherit the proposal-only boundary in [the skill](../SKILL.md).
 
 ## Student preferences
 
-The template includes an active `workspace-profile.json` with Essential
-defaults: Ghostty, Chromium, Files, Text Editor, dark appearance and a compact
-bottom dock. Leave it unchanged to keep those defaults. Customize it through
-Maintenance → Settings → Student workspace; no separate activation switch or
-migration workflow is needed.
+One profile supplies initial student preferences on controller and clients.
+Staff homes are separate. Normal boot restores the managed seed; saving does
+not reset the active home or immediately change a student's session.
+Prepared metadata is not evidence of build, activation or successful reset.
 
-The deployment-owned catalog supplies a baseline and available choices, not
-additional software. Keep prerequisite packages present on every destination,
-including the controller in controller-only mode. The example JSON is a reset
-proposal, never an implicit replacement for a missing or invalid saved profile.
+Inspect the existing non-secret profile and pinned capabilities. Preserve
+unrelated preferences; omission inherits and empty lists explicitly clear.
+Never replace an invalid/missing profile with an example implicitly.
 
-`nixoriumWorkspace` and its candidate hooks describe configured preferences,
-destinations and pinned prerequisites. Their `prepared` state and seed path
-are not proof of deployment or a successful home reset. Candidate resolution
-must still compose the deployment's validation hook and bind the source, pin,
-base file and exact proposal before saving. Workspace data enters the Nix store:
-never include credentials or private session data.
-
-A supplied profile always configures the managed reset. Saving the declaration,
-building/applying systems, and the next normal boot are separate steps. The
-student on the controller and clients receives the profile at boot; controller
-autologin and staff preferences do not change. Rebuilds do not reset a current
-home, and login does not reapply supported preferences. Students can change
-them during the session until the next boot reset.
-
-The seed includes supported preferences, neutral shell/Git defaults and standard
-XDG folders with stable English names. It never captures a live home or imports
-arbitrary application assets. Omitted values inherit the deployment baseline
-or system/application defaults. Desktop themes, shortcuts and other policy
-outside the profile schema remain in deployment modules.
-
-If reset fails, inspect `home-reset.service` read-only and preserve private
-`/var/lib/home-snapshots/.workspace-reset` recovery evidence. Its pending marker
-blocks retries and normal login across reboot. Do not remove it, disable the
-profile, or invoke the helper as a retry. Request separately authorized recovery
-based on the actual snapshot/home state. Sanitized, read-only managed snapshots
-under `/var/lib/home-snapshots/workspace` are not external backups.
-
-The Programming software profile has its own starting profile,
-`workspace-profile.programming.example.json`: VS Code and MySQL Workbench in the
-dock, the lab's editor defaults as `vscode.extraSettings`, and extensions for
-web/PHP, C/C++, Python and Java. Bootstrap copies it to `workspace-profile.json`
-when Programming is chosen, and a template reset to Programming uses it too.
-Adding the Programming software later does not change a saved profile: select
-VS Code and its extensions in the editor. The profile needs every Programming
-package on every destination.
-
-The managed seed supports VS Code through the typed settings, reviewed
-`vscode.extraSettings` (themes, telemetry, chat and extension preferences;
-terminal profile, shell and environment keys are refused), selected extensions
-and fixed `.vscode/argv.json` launch defaults (basic password store, no crash
-reporter). `assets/vscode-settings.json` configures staff homes
-only; nothing is imported from it automatically.
+Only supported schema fields may enter a candidate. Unknown application
+settings, arbitrary home files, new catalogs and Nix modules are outside this
+skill. Never edit live homes, staff settings assets or reset scripts, or capture
+dconf databases, browser sessions, histories, credentials or project data.
 
 ## Review and save a profile
 
-In the administrative TUI, open **Maintenance → Settings → Student workspace**.
-It loads the saved declaration, never the example. The supplied template already
-has a profile; preserve its defaults and any existing customization.
-Choose Desktop, Dock, VSCode or Browser, then a supported field:
+The agent prepares a candidate; only the operator saves the deployment.
+Create a new private temporary directory outside the checkout and a regular
+candidate JSON file derived from the existing profile and requested changes.
+Do not use a predictable shared filename or overwrite the saved profile.
 
-- Use “Inherit” (or an empty numeric field) to omit an override. “Clear” on a
-  list means an explicit empty list, not inheritance.
-- Favorites come from the pinned deployment catalog. Extensions list the
-  catalog, and `/` searches every packaged extension of the pinned package
-  set by name. Space toggles entries; Shift arrows reorder selected
-  favorites. A searched extension has no catalog prerequisites: install the
-  language tools it needs through the software workflow, select the
-  extensions it depends on, and expect a missing dependency to stop the
-  system build. Catalog entries (prerequisites, `writable` for extensions
-  that create files in their own folder or copy their own templates into
-  projects) remain a deployment change.
-- Extensions that are not packaged can come from the Marketplace: `m` takes
-  an exact `publisher.name`, downloads the newest stable Linux version the
-  pinned VS Code accepts into the controller's Nix store, and shows its
-  requirement, dependencies and native programs before Enter adds it (with
-  its pin) to the draft. `u` checks existing pins for newer compatible
-  versions. Both need Internet on the controller only at that moment. This is
-  third-party code: warn that native programs are not adapted to NixOS and
-  often fail, and qualify loading on one computer before the classroom.
-- VSCode → Other settings holds further editor defaults as name and value:
-  `a` adds one, `e` edits, `d` removes, and `p` takes a pasted settings file
-  (comments and trailing commas are accepted). Plain text is stored as text;
-  `true`, numbers, lists and objects keep their JSON meaning. Guided fields,
-  update keys, workspace trust, automatic tasks and integrated-terminal
-  profile/shell/environment keys are refused or skipped by name. These are
-  starting values, not policy: students can change them until the next reset.
-  Never paste tokens or account data; the profile enters the Nix store.
-- Enter keeps a field in the draft; Esc cancels that field. Leaving the editor
-  discards unsaved changes. Use the visible Review action (`v`) to evaluate the
-  complete candidate without writing it, then inspect the scrollable review.
-- On supporting pins, confirmed `SAVE` writes and records only the reviewed
-  profile locally. Pre-existing profile edits are refused; unrelated staged
-  files remain untouched. The result offers a separate controller review,
-then fresh client selection after verified application. No save applies a
-  system, deploys clients or resets a home.
-- If writing or recording is unconfirmed, inspect the file and Git state
-  through the result's Git review action. Do not replay the old save token or
-  apply systems before recovery. Older pins may leave recording separate.
-
-Review may be cancelled while metadata is loading; a save already in progress
-must finish before quitting. If the original profile changed during editing,
-leave and reload it before preparing another proposal. Do not automatically
-retry a stale review or an uncertain-durability result. The editor supports only
-the versioned fields: other application settings, whole-home imports and
-system application remain outside it. The teacher dashboard has no editor.
-
-Where supported, prepare the candidate in a separate regular JSON file rather
-than overwriting `workspace-profile.json` before review. Preserve existing
-preferences; the inactive example is only a starting point for a first profile.
-The candidate supports the strict workspace schema, not arbitrary home files,
-program settings or secrets. Use the deployment catalog and prerequisites on
-every destination, including the controller student.
+After checking help, replace this example path with that private file:
 
 ```sh
-nixorium workspace plan --repo . --file /tmp/student-profile.json --json
-nixorium workspace apply --repo . --file /tmp/student-profile.json --expect <review-token> --yes --json
+nixorium workspace plan --repo . --file /PRIVATE_TEMP_DIRECTORY/student-profile.json --json
 ```
 
-Review the current/proposed declarations, effective baseline, student account,
-destinations, resolved package/extension versions and dependencies. Use the exact
-`reviewToken` from that plan only after authorization to save. Without `--yes`,
-apply requires an interactive terminal and confirmation for a changed profile.
-It re-evaluates the candidate and rejects stale source, pin, catalog or file
-identity; do not automatically renew a failed token and retry the write.
+Planning must retain validation hooks and verify prerequisites, student identity
+and destinations, including the controller. A failed hook, missing dependency
+or stale source is not permission to alter catalogs, disable checks or update
+the pin. Stop and report the operator step; do not run apply or Git mutations.
 
-The CLI operation writes only `workspace-profile.json`, mode `0600`. It does not
-stage or commit it, edit the catalog/lock/modules, build systems,
-deploy or reset any home. `saved` and `unchanged` are declaration states, not
-evidence of live preferences. Review/commit and activation/distribution remain
-separate authorized workflows; do not assume this save token authorizes them.
-A first save leaves the profile untracked, so Nix cannot consume it until it is
-explicitly tracked. If authorized, use the existing exact-path Git review/commit
-workflow, selecting only the intended files and its separate commit token. A
-workspace save token is not a Git commit token.
-The profile is classified as managed and its schema is checked before a managed
-commit. This check is not a substitute for the source-bound workspace review,
-system validation or deployment. Missing/invalid profiles block this commit
-path; removing a profile is not a way to bypass reset recovery.
+Hand over reviewed values and the candidate path. The TUI Student workspace
+editor has a native complete review; on supporting pins its save also commits
+exactly that profile. Controller application and client distribution are
+separate reviews. A human-run CLI save is declaration-only, not a commit.
+The agent must not automate either route or its confirmations.
 
-```sh
-nixorium git commit plan --repo . --paths workspace-profile.json --json
-nixorium git commit apply --repo . --paths workspace-profile.json --expect <commit-review-token> --yes --json
-```
+Changed candidates or deployments require fresh review. Unconfirmed durability
+or a partial save/commit requires inspection, not token replay. A first saved
+profile needs explicit tracking before the Flake consumes it; the agent must
+not stage it as an implicit next step.
 
-The deployment must have a committed revision and tracked `flake.nix` and
-`flake.lock`. Existing unrelated staged/unstaged edits are preserved and included
-in the source review. Untracked files are not Nix inputs; explicitly review any
-needed catalog/module additions before tracking them. Symlinked deployment paths,
-non-regular profile files, unresolved Git entries and submodules are refused.
-A `partial` durability result means the JSON was replaced but durable storage
-could not be confirmed: inspect the profile and Git state before another plan.
+## Extensions and settings
 
-## VS Code extensions and settings
+Resolve extensions using the pinned package set and existing catalog; never
+invent attributes, identities, versions or hashes. Explain prerequisite tools.
+For an unavailable extension, hand off to the product's native Marketplace
+workflow if supported; do not download/install it or edit the catalog.
 
-For an agent without the TUI, this prints a Marketplace pin after the same
-download and checks; add it under `vscode.marketplace`, select its ID in
-`vscode.extensions`, and review the candidate with `workspace plan`:
+Extensions are executable third-party code. Packaging/build success proves
+neither trustworthiness nor loading. Recommend an operator-led single-computer
+test before distribution.
 
-```sh
-nixorium workspace marketplace --repo . --extension platformio.platformio-ide --json
-```
+VS Code extra settings retain native refused-key checks. Do not encode command
+execution, terminal profiles, automatic tasks, workspace-trust bypasses or
+credentials in other fields to evade validation. Staff assets do not supply
+student defaults automatically.
 
-Do not invent or copy hashes from elsewhere, and do not pin a version the
-command did not report as compatible.
+A plugin needing writable installation files requires an existing integration
+or separate development work. Do not chmod homes, mark all extensions writable
+or generate ad hoc hooks. Packaged updates follow the package-base pin, not a
+profile re-save; explain broad impact and hand off.
 
-For existing prepared profiles, framework and package-base update reviews show
-current/proposed pinned package and extension versions, prerequisites and
-effective preferences. Compare these before authorizing the input change;
-they do not describe live home state or the latest vendor release. The full
-comparison is token-bound; source changes still require a fresh review.
-Changed boot behavior, student identity or destinations require separate
-configuration review; an input update must not silently alter them.
+## Desktop, project content and reset failures
 
-Use Maintenance → Update system and packages (or `package-base plan`/`apply`)
-for packaged extensions. Explain that the same pin can change the editor,
-desktop, services and kernel; repeatedly saving a profile does not update an
-extension. Preserve disabled editor/extension auto-update checks in the managed
-seed. Build success is not plugin-loading evidence: test the reviewed candidate
-on one client before fleet distribution, without changing active homes at save.
+Use supported desktop/dock/browser fields and existing application IDs.
+New assets, desktop modules, arbitrary project scaffolds and prepopulated npm
+content are outside the schema. Explain the limitation rather than adding
+login scripts or changing staff settings.
 
-For “prepare VS Code for Python”, inspect whether VS Code is selected for the
-intended hosts. Resolve extensions from the deployment's pinned package set;
-verify attribute names, dependencies, and the installed extension directory
-inside each package rather than assuming Marketplace IDs are Nix attributes.
+Student npm globals and agent credentials/state are ephemeral and excluded
+from managed snapshots. Never change exclusions or seed secrets for persistence.
+Local snapshots are not external backups.
 
-Add only the agreed extensions to the local profile, preserving existing
-ones and any settings unrelated to Python. Inspect current activation ordering
-and ownership; keep the profile conditional on the effective VS Code package.
-Settings assets affect admin and teacher only; student requests belong in the
-workspace profile. Do not broaden a student-only request to staff.
-
-Create staff application directories with their final owner instead of relying
-on `install -D -o` for intermediate directories. Core repairs the managed
-`.config/Code`, `.vscode/extensions`, and npm trees for admin and teacher
-during activation; student ownership is assigned at reset,
-not repaired during an active session. Do not use world-writable modes.
-`/run/user/<uid>` is created by logind, while activation only reconciles an
-already existing top-level directory whose ownership or mode is wrong.
-
-Linked extensions are read-only. An extension that writes into its own
-folder fails with `EACCES`, and one that copies its own files into a project
-(Maven “New Project”, Java “Create Java Project → No build tools”) leaves
-read-only files and folders there. Mark such extensions `writable` in
-`workspace-catalog.nix` rather than relaxing modes in the home; see
-[the troubleshooting entry](https://github.com/giovantenne/nixorium/blob/master/docs/troubleshooting.md#a-vs-code-extension-reports-permission-denied).
-Do not mark every extension writable: copies count against the seed size and
-entry limits.
-
-Build a representative affected system and check the extension payload/settings.
-Do not rely on a Marketplace download at student login: clients must receive
-required artifacts from the prepared system without direct Internet access.
-Runtime sign-in, optional cloud features, and project dependency downloads are
-separate requirements and must not be described as offline-ready automatically.
-
-## Background and dock
-
-Use local assets and desktop modules; keep referenced assets inside the
-deployment. Resolve installed desktop application IDs for dock entries and
-keep favorites conditional on package scope. Inspect whether the existing
-policy affects student only or staff too, and whether it supplies initial
-defaults or reapplies settings at login. Avoid blindly copying an entire
-dconf database or overwriting unrelated desktop settings.
-
-The supplied workstation module installs Desktop Icons NG, Dash to Dock and
-Tiling Assistant independently of the application profile. Keep their enablement
-additive so unrelated extensions survive. The compact bottom dock with intelligent hiding,
-Yaru-yellow icons, native Adwaita decoration and blue accent are deployment-owned
-defaults. Persistent staff accounts use the static vector background. Reset
-student homes choose randomly from `assets.backgrounds` at boot, and the login
-migration must preserve that choice. Tiling Assistant provides snap assist
-with small window gaps; no blur or animated wallpaper is required.
-
-Each account receives the managed appearance once, at its first login, marked
-by `~/.config/nixorium/desktop-style-v1`; later staff choices, including the
-dock, remain editable. Do not reset entire dconf databases. Students receive the defaults and
-a newly selected deployment-owned wallpaper after their normal home reset.
-Validate extension metadata against the locked GNOME major
-and compile GSettings schemas strictly before applying. Favorites still depend
-on effective package scope.
-
-Every supplied software profile includes Ghostty and
-`python3Packages.terminaltexteffects`, so the site screensaver is present even
-with Essential. Preserve both declarations when editing the built-in profiles;
-the screensaver module deliberately follows their effective host scope.
-
-## npm and project content
-
-Distinguish a globally available CLI, a starter project with dependencies,
-and an npm download cache. Prefer a pinned Nix package for a suitable CLI;
-reproducible project dependencies need their lockfile and a verified offline
-packaging strategy. The default profile creates an npm prefix, not a
-prepopulated package set.
-
-The supplied site profiles provide Git, system-managed Pi and OpenCode, plus
-Node/npm to every user. A user may install `@mariozechner/pi-coding-agent` or
-`opencode-ai` globally without `sudo`; `NPM_CONFIG_PREFIX=$HOME/.local/npm`
-makes that version user-owned and earlier on PATH than the Nix baseline. Such
-an override persists for admin and teacher. For the reset student account,
-`.local/npm`, `.npm`, Pi state, and OpenCode configuration/data are removed
-before snapshots and an empty prefix is restored from the clean template.
-Student updates and authentication therefore last only for the current boot.
-Do not remove these exclusions or seed agent credentials into the template to
-make updates persistent; use a reviewed Nix package/override for a common lab
-version.
-
-Never run `sudo npm install` or write into the Nix store. Do not fetch mutable
-packages in activation or student login. Explain that a populated npm cache
-alone is not proof a project installs offline, and that live student-installed
-packages may disappear on reset. Test the requested offline use case before
-claiming it works.
-
-## Validate and hand off
-
-Follow [operations](operations.md): evaluate the actual affected roles, build
-one representative client when needed, and test installer equivalence if the
-change affects assets/module inclusion in the offline bundle. Avoid building
-every client. Report files changed, intended users/hosts, validation evidence,
-and the remaining deploy/reset step separately.
+After a failed reset, keep pending evidence, login barriers and the profile
+unchanged. Do not retry the helper, reboot or clear markers. Use
+[operations](operations.md) for operator-led diagnosis/recovery. Distinguish
+proposed preferences from runtime behavior that has actually been tested.

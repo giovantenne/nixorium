@@ -1,194 +1,60 @@
-# Deployment configuration
+# Deployment configuration: inspect and hand off
 
-## Supported customization
+Inherit the proposal-only boundary in [the skill](../SKILL.md).
 
-The deployment passes these values to `nixorium.lib.mkLab`:
+## Ownership is not edit permission
 
-- `labConfig`: typed site settings loaded from the machine-owned
-  `lab-settings.json`
-- `publicKeys`: cache and SSH public-key paths
-- `assets`: logo, backgrounds, MIME defaults, and VS Code settings
-- `labSoftware`: package declarations loaded from `lab-software.json`
-- `softwareCatalog`: local suggestions loaded from `software-catalog.nix`
-- `softwarePresets`: optional versioned profiles loaded from `software-presets.json`
-- `sharedModules`: every installed host
-- `controllerModules`: controller only
-- `clientModules`: student PCs only
-- `hostModules`: modules keyed by a generated host name
-- `netbootModules`: the PXE environment
+A deployment owns its settings, software, workspace, catalogs, assets and local
+modules; upstream supplies mechanisms through `nixorium.lib.mkLab`.
+Do not turn this ownership into permission to edit those files.
 
-Unknown settings, asset names, public-key names, and host names are
-rejected. Keep every referenced file inside the deployment
-repository.
-
-The generated template owns the workstation profile in its package declaration,
-catalog, focused `modules/`, `assets/`, and optional `scripts/`. Profile modules
-receive `hostSoftwarePackages`, the effective managed package IDs for the host
-being evaluated. Keep browser/editor favorites, shortcuts, services, and home
-content conditional on the related ID so changing a package scope does not
-leave stale policy.
-
-`lab-settings.json` is deterministic, versioned JSON owned by the management
-application. Validate it through both schema layers after any edit:
+Inspect only relevant non-secret fields. Do not load `lab-settings.json`
+wholesale: it can contain password hashes. For a requested settings diagnosis,
+on a known trusted deployment and after checking installed help:
 
 ```sh
-nix run .#nixorium -- config validate
+nixorium config validate
 ```
 
-For an administrator using the current TUI, open Installation and choose PXE
-or USB over SSH. PXE observes current state first; preparation guides settings,
-validation/save, keys, controller activation and client preparation, then stops
-at reviewed start. Active sessions offer finish or recovery in that same view.
-The preparation form is not a save-only editor.
-For the first-run CLI settings/key workflow:
+Use safe field/error summaries, not raw sensitive values. Explain the desired
+settings change for the operator's native form; do not generate a complete
+settings candidate or migrate legacy Nix configuration.
 
-```sh
-nix run .#nixorium -- setup
-```
+## Network and identity
 
-It proposes detected network values, retains prior entries when navigating
-back, accepts normal passwords without echo, hashes them locally, validates the
-complete candidate through Nix, and presents a redacted review before writing.
-Bare `setup` then reconciles the two key pairs; `setup configure` runs only
-the settings stage.
+Network addresses, interfaces, host counts, accounts, permissions, boot, disks,
+reset policy and SSH trust are operator-controlled. Do not change them here.
 
-For a machine-generated complete candidate, use the review/apply protocol:
+A controller DHCP hint must not overlap the static laboratory prefix. On
+supporting pins, saved clients prevent managed changes to subnet, prefix and
+controller host number. Never remove clients or edit JSON to bypass this.
+There is no assumed guided network migration capability.
 
-```sh
-nix run .#nixorium -- config plan --file candidate.json --json
-nix run .#nixorium -- config apply --file candidate.json \
-  --expect 'sha256:fingerprint-from-plan'
-```
+Interface changes can disconnect computers; do not prescribe a universal
+controller-first order. USB/SSH can use Wi-Fi on supporting pins, but live-ISO
+credentials do not configure the installed system. PXE compatibility depends
+on hardware and networking.
 
-The plan evaluates the candidate through the deployment Flake and redacts
-password hashes. Apply changes only `lab-settings.json`, uses an atomic write,
-and rejects stale fingerprints or concurrent edits. Never place plaintext
-passwords in a candidate file.
+Never relax student network-administration restrictions, share the deployment
+with teachers/students or copy credentials to bypass a refusal.
 
-Do not make the application rewrite arbitrary Nix. Existing deployments that
-still import `lab-config.nix` remain supported but read-only until an explicit
-equivalence-checked migration is available.
+## Unsupported customization and setup
 
-## Regional settings
+Modules, assets, catalogs, scripts, per-host code, services and overrides are
+outside this skill. Report the missing capability and a separate development
+task; do not provide a runnable bypass recipe.
 
-The guided forms offer time zone and keyboard selectors, not a locale selector.
-Bootstrap uses `en_US.UTF-8`. Change the desktop locale through `defaultLocale`
-and `extraLocale` in a complete `lab-settings.json` candidate, using the reviewed
-configuration plan/apply protocol above. Saving does not activate the locale;
-apply the controller and update client computers separately.
+This explicitly forbids invasive changes through new or existing NixOS/Home
+Manager modules, overlays, mkForce/package overrides, custom derivations,
+activation/login scripts, services/timers and shell startup hooks. Do not wire
+them into Flake imports, module lists or specialArgs, and do not alter upstream
+mechanisms to bypass a managed refusal. The prohibition includes proposing
+ready-to-run bypass code for a human to paste, not only executing it yourself.
 
-## Network settings
+Key generation, secret installation and first setup belong to the human-run
+managed workflow. Do not read/replace existing keys. Private keys, passwords
+and provider tokens must never enter Git, the Nix store or model context.
 
-`networkBase` is a full IPv4 network address, such as `10.0.0.0`, and
-`networkPrefixLength` is its CIDR prefix. Client and controller host numbers
-are offsets within that network. The controller number must be greater than
-the client count, and every generated address must fit before the broadcast
-address.
-
-On supporting pins, both Go and Nix validation reject a controller DHCP
-address inside that static prefix. The draft preview is guidance, not readiness
-evidence. Before clients are configured, correct an overlapping subnet through a
-reviewed settings change. Once the saved client count is nonzero, the managed
-TUI and CLI refuse changes to `networkBase`, `networkPrefixLength` and
-`masterHostNumber`. The check uses the saved count even if the candidate removes
-all clients, and runs again before writing reviewed settings. Keep the existing
-addressing: guided migration is not available. Do not reset the client count or
-edit JSON by hand to bypass this protection. If existing addressing must change,
-stop and plan migration/recovery with the administrator before any activation.
-
-Interface changes remain reviewable. Compare the old and new device names and
-verify cabling and local console access before applying to affected computers.
-Controller, client and per-host overrides can limit which computers use a changed
-shared fallback. Saving does not change the live network; applying the controller
-or updating a client can disconnect it. Do not assume controller-first updates
-are safe for network changes. This protection checks managed settings transitions,
-not historical installations or arbitrary changes in deployment modules.
-
-`masterDhcpIp` is the initial address/hint used only during PXE installation.
-Preparation prefers it while assigned, otherwise captures the only usable
-non-static, non-link-local IPv4 address on the configured interface. Update the
-hint only if multiple candidate addresses make runtime selection ambiguous.
-
-The student account consumes system-managed connectivity but is deliberately
-excluded from the `networkmanager` group and denied NetworkManager polkit
-actions. Do not grant it access through a deployment module unless the admin
-explicitly requests a reviewed relaxation of this security boundary. Teacher
-and admin retain network-management access.
-
-## Per-host customization
-
-Create a deployment module and register it under the exact generated host name.
-For example:
-
-```nix
-hostModules.pc05 = [ ./modules/pc05.nix ];
-```
-
-A name such as `pc5` is invalid when the generated host is `pc05`. Build
-only that host before deploying it.
-
-## Readiness and keys
-
-Run:
-
-```sh
-nix eval .#deploymentStatus --json --no-write-lock-file
-```
-
-Do not install clients or deploy to them until `ready` is true. The status detects
-the DHCP placeholder, missing public keys, and unchanged public password
-hashes.
-
-Controller-only mode instead uses `deploymentStatus.controller` when supported;
-it permits local activation without clients or laboratory keys. Never turn this
-exception into permission for client/PXE operations. Derive interface names
-from evaluated metadata: per-host and controller/client overrides take priority
-over the shared `ifaceName` fallback.
-
-Private files stay outside Git:
-
-- `secret-key`
-- `admin-ssh`
-
-Only their public counterparts belong under `keys/`.
-
-Create or reconcile both pairs with:
-
-```sh
-nix run .#nixorium -- setup keys
-```
-
-The operation creates only missing material, restricts private modes, verifies
-public/private correspondence, and refuses to overwrite public-only or
-mismatched pairs. Commit only the resulting files under `keys/`.
-
-Install verified controller-side copies through the narrow privileged action:
-
-```sh
-nix run .#nixorium -- setup install-secrets
-```
-
-The source is the fixed `services.nixorium.deploymentPath` (default
-`/home/admin/nixorium-deployment`). The systemd service rejects symlink
-sources/destinations and refuses to replace different existing material.
-
-Commit the reviewed settings and public keys, then apply this controller with:
-
-```sh
-nix run .#nixorium -- setup apply
-```
-
-The worktree must be clean. Use the confirmation requested by the CLI after
-reviewing the networking/service warning. The fixed service builds the Git
-view of the deployment as `admin`, which excludes the three ignored private
-files from the Nix store, then activates only that exact closure as root.
-Inspect failures with `journalctl -u nixorium-apply-controller.service` and
-retry after correcting the reported preflight, build, or activation error.
-Completion requires a root-owned receipt matching both the current Git
-revision and active closure; `/run/current-system` alone is insufficient. After
-upgrading from a version without receipts, run one reviewed `setup apply` to
-create that proof even if the closure already matches.
-
-For routine controller changes, use `nixorium controller plan` and its reviewed
-apply command; see [operations](operations.md). Keep first-run compatibility
-distinct from the ordinary rebuild workflow.
+Controller-only mode does not need invented clients or lab keys. Controller
+readiness is distinct from fleet readiness. Passing validation does not permit
+activation, installation or deployment. Use [operations](operations.md).

@@ -195,10 +195,14 @@ validation and safety rules:
 repository (it is also included in the deployment template) and
 [`nixorium-developer`](skills/nixorium-developer/SKILL.md) for this one.
 Discovery links are included for Codex, OpenCode, Claude Code and Pi; for
-example, ask: “Use nixorium-maintainer to add Firefox for all computers and
-validate the configuration without deploying.” Skills guide an agent; they do
-not replace your review or authorize installing, deploying, committing or
-pushing.
+example, ask: “Use nixorium-maintainer to prepare a Firefox proposal for all
+computers without changing the deployment.” The maintainer skill is
+proposal-only: supported software/workspace previews and bounded diagnostics;
+the operator performs saves and live operations through native reviews.
+It does not permit arbitrary Nix/module edits or autonomous administration.
+Skills are instructions, not a sandbox: do not rely on them to constrain an
+agent with root access or unrestricted execution permissions. Existing
+deployments need a separate reviewed refresh of their copied instructions.
 
 ## Development
 

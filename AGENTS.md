@@ -3,7 +3,9 @@
 For public API, built-in module, installer, CI, template, and release work, use
 `skills/nixorium-developer/SKILL.md`. The separate
 `skills/nixorium-maintainer/SKILL.md` is dedicated to operating private lab
-deployments and is the only skill copied into the site template. Discovery
+deployments in a proposal-only role and is the only skill copied into the site
+template. It does not authorize deployment edits or live operations; do not
+broaden that role through developer instructions. Discovery
 links for Codex, OpenCode, Claude Code, and Pi are versioned with the repository.
 
 Nixorium manages a multi-PC NixOS lab using Nix Flakes,

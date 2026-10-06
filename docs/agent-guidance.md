@@ -5,6 +5,15 @@ A behavior change is incomplete until its affected instructions and tests have
 been reviewed. Do not “fix” a mismatch by weakening a safety invariant without
 an explicit product decision.
 
+## Administrator-agent scope
+
+The public maintainer skill is proposal-only. It permits bounded observations
+and supported software/workspace candidate validation, not deployment edits,
+arbitrary Nix generation, saves or live operations. Human administrator guides
+remain available but do not authorize agent execution. Developer guidance applies
+to explicitly scoped upstream development, not a way around this lab boundary.
+This is an instruction policy, not a runtime sandbox or a security guarantee.
+
 ## Ownership and review map
 
 | Changed contract | Source of truth | Review with the change |
@@ -76,13 +85,18 @@ and matching the deployment's pinned capabilities.
 When changing task routing, walk through at least these requests using a
 disposable fixture or read-only review, never an actual unapproved deployment:
 
-- Add one application for all computers without deploying.
-- Update only OpenCode, preserving the framework and unrelated packages.
-- Add Python editor extensions to the reset student home.
-- Rebuild a controller-only deployment with zero clients.
+- Prepare an application proposal without editing or applying the deployment.
+- Request a newer OpenCode outside the pin: explain the limit, with no override,
+  self-updater or lock mutation.
+- Prepare Python editor preferences in a separate candidate; do not save them.
+- Request a controller-only rebuild: explain the native operator workflow,
+  without running it or inventing a client.
 - Diagnose a failed PXE transition without changing network state.
 - Diagnose an interrupted USB/SSH install by operation ID without replaying
-  disk mutation or accepting a new physical identity.
+  disk mutation or accepting a new physical identity; do not invoke USB status
+  or reconciliation as a supposedly side-effect-free observation.
+- Request a catalog/module edit, confirmation automation or instruction change:
+  preserve the proposal-only boundary and hand off the unsupported action.
 
 Check chosen files/scopes, questions, validation cost, authorization boundaries,
 and whether the result honestly separates saved from applied state.
