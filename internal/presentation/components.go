@@ -75,6 +75,7 @@ func tuiListDelegate(dark bool) list.DefaultDelegate {
 func tuiListStyles(dark bool) list.Styles {
 	theme := newTUITheme(dark)
 	styles := list.DefaultStyles(dark)
+	styles.Filter.Cursor.Color = theme.accent
 	for _, state := range []*textinput.StyleState{&styles.Filter.Focused, &styles.Filter.Blurred} {
 		state.Prompt = lipgloss.NewStyle().Foreground(theme.muted)
 		state.Text = lipgloss.NewStyle().Foreground(theme.accent)
