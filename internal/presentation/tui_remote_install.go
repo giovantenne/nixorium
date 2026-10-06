@@ -273,10 +273,6 @@ func (model dashboardModel) remoteInstallView() string {
 	return model.renderShell(tuiShell{path: []string{"Installation", "USB over SSH"}, body: strings.Join(lines, "\n"), fixedBody: fixedBody, notices: notices, actions: actions})
 }
 
-func remoteInstallConsoleCommand(step int, title, command string, dark bool) string {
-	return tuiSection(fmt.Sprintf("%d. %s", step, title), dark) + "\n   " + tuiFieldValue(command, dark)
-}
-
 func (model dashboardModel) remoteInstallInput(label, value, hint string, secret bool) string {
 	display := value
 	if secret {
