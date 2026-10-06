@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-06
+
 - **Update computers** can include computers that are switched off: the
   review queues them by default (F3 turns it off; CLI
   `deploy apply --queue-unreachable`). A controller timer updates each one, one
@@ -1591,7 +1593,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0-beta.1...v3.0.0
 [3.0.0-beta.1]: https://github.com/giovantenne/nixorium/compare/v2.1.0...v3.0.0-beta.1
 [2.1.0]: https://github.com/giovantenne/nixorium/compare/v2.0.0...v2.1.0
