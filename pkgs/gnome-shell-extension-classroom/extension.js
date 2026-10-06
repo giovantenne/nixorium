@@ -13,6 +13,10 @@
 // While the teacher shows their screen, a second cover above everything,
 // the lock included, shows the latest picture the agent received, again
 // with keyboard and mouse taken. When it ends, the lock (if any) remains.
+//
+// When an update from the controller replaces the running system, the system
+// writes /run/nixorium/update-notice.json; a notification tells the person at
+// the computer, with a Restart button when a restart finishes the update.
 import Clutter from 'gi://Clutter';
 import Cogl from 'gi://Cogl';
 import GdkPixbuf from 'gi://GdkPixbuf';
@@ -21,7 +25,14 @@ import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
+import * as SystemActions from 'resource:///org/gnome/shell/misc/systemActions.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+
+const NoticeDirectory = '/run/nixorium';
+const NoticeFile = 'update-notice.json';
+// An update without a needed restart is announced only while it is recent.
+const RecentNoticeSeconds = 30 * 60;
 
 const BusName = 'org.nixorium.Classroom';
 const ObjectPath = '/org/nixorium/Classroom';
@@ -46,9 +57,14 @@ export default class NixoriumClassroomExtension extends Extension {
         this._service.export(Gio.DBus.session, ObjectPath);
         this._nameId = Gio.bus_own_name_on_connection(Gio.DBus.session, BusName,
             Gio.BusNameOwnerFlags.NONE, null, null);
+        this._watchUpdates();
     }
 
     disable() {
+        this._noticeMonitor?.cancel();
+        this._noticeMonitor = null;
+        this._notice?.destroy();
+        this._notice = null;
         this.StopBroadcast();
         this._setLocked(false);
         if (this._nameId) {
@@ -58,6 +74,54 @@ export default class NixoriumClassroomExtension extends Extension {
         this._service?.unexport();
         this._service = null;
         this._restoreIndicator();
+    }
+
+    _watchUpdates() {
+        const directory = Gio.File.new_for_path(NoticeDirectory);
+        try {
+            this._noticeMonitor = directory.monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, null);
+            this._noticeMonitor.connect('changed', (_monitor, file, other) => {
+                if (file.get_basename() === NoticeFile || other?.get_basename() === NoticeFile)
+                    this._showUpdate(false);
+            });
+        } catch (error) {
+            console.warn(`Nixorium: cannot watch ${NoticeDirectory}: ${error.message}`);
+        }
+        // An update made before this login (or while nobody was logged in).
+        this._showUpdate(true);
+    }
+
+    _showUpdate(atLogin) {
+        let notice;
+        try {
+            const [, contents] = Gio.File.new_for_path(`${NoticeDirectory}/${NoticeFile}`).load_contents(null);
+            notice = JSON.parse(new TextDecoder().decode(contents));
+        } catch {
+            return;
+        }
+        if (typeof notice.updatedAt !== 'number' || notice.updatedAt === this._shownUpdate)
+            return;
+        const age = GLib.get_real_time() / 1e6 - notice.updatedAt;
+        if (atLogin && !notice.restart && age > RecentNoticeSeconds)
+            return;
+        this._shownUpdate = notice.updatedAt;
+        this._notice?.destroy();
+        const body = notice.restart
+            ? 'Restart it to finish the update. Save your work first.'
+            : 'The changes are ready to use.';
+        this._notice = new MessageTray.Notification({
+            source: MessageTray.getSystemSource(),
+            title: 'This computer was updated',
+            body,
+            isTransient: false,
+            urgency: notice.restart ? MessageTray.Urgency.HIGH : MessageTray.Urgency.NORMAL,
+        });
+        if (notice.restart)
+            this._notice.addAction('Restart', () => SystemActions.getDefault().activateRestart());
+        this._notice.connect('destroy', () => {
+            this._notice = null;
+        });
+        MessageTray.getSystemSource().addNotification(this._notice);
     }
 
     // D-Bus: called by the classroom agent.

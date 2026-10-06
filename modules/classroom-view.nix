@@ -48,6 +48,30 @@ in
       };
     };
 
+    # After an update replaces the running system (never at boot), record it
+    # for the classroom extension, which tells the person at the computer.
+    # A restart is needed when the kernel, initrd, modules or systemd change,
+    # as NixOS itself checks. /run is emptied by the restart.
+    systemd.tmpfiles.rules = [ "d /run/nixorium 0755 root root -" ];
+    system.activationScripts.nixoriumUpdateNotice = {
+      deps = [ "specialfs" ];
+      text = ''
+        if [ -e /run/current-system ] && [ "$(readlink -f /run/current-system)" != "$(readlink -f "$systemConfig")" ]; then
+          restart=false
+          for part in kernel initrd kernel-modules systemd; do
+            if [ "$(readlink -f "/run/booted-system/$part")" != "$(readlink -f "$systemConfig/$part")" ]; then
+              restart=true
+            fi
+          done
+          ${pkgs.coreutils}/bin/install -d -m 0755 /run/nixorium
+          printf '{"updatedAt":%s,"restart":%s}\n' "$(${pkgs.coreutils}/bin/date +%s)" "$restart" \
+            > /run/nixorium/update-notice.json.new
+          ${pkgs.coreutils}/bin/chmod 0644 /run/nixorium/update-notice.json.new
+          ${pkgs.coreutils}/bin/mv -f /run/nixorium/update-notice.json.new /run/nixorium/update-notice.json
+        fi
+      '';
+    };
+
     # Enable the indicator extension in every session; gnome-extensions keeps
     # other enabled extensions.
     systemd.user.services.nixorium-classroom-extension = {

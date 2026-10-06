@@ -34,6 +34,9 @@ pkgs.testers.runNixOSTest {
     services.displayManager.autoLogin = { enable = true; user = "student"; };
     users.users.student = { isNormalUser = true; uid = 1000; };
     services.openssh.enable = true;
+    # A configuration change without a new kernel: the update notice says
+    # the computer was updated, without asking for a restart.
+    specialisation.updated.configuration.environment.etc."nixorium-test-update".text = "updated\n";
     system.stateVersion = "26.05";
   };
   testScript = ''
@@ -41,6 +44,13 @@ pkgs.testers.runNixOSTest {
     client.wait_until_succeeds("pgrep -u student gnome-shell", timeout=180)
     client.wait_until_succeeds("systemctl --user -M student@ is-active nixorium-classroom-agent", timeout=120)
     client.wait_until_succeeds("test \"$(stat -c %a:%U /run/user/1000/nixorium-classroom.sock)\" = 600:student", timeout=30)
+
+    # No notice at boot; an update replacing the running system writes one.
+    client.succeed("test -d /run/nixorium && test ! -e /run/nixorium/update-notice.json")
+    client.succeed("/run/current-system/specialisation/updated/bin/switch-to-configuration test")
+    client.succeed("grep -F '\"restart\":false' /run/nixorium/update-notice.json && test \"$(stat -c %a /run/nixorium/update-notice.json)\" = 644")
+    client.sleep(3)
+    client.fail("journalctl -b --no-pager | grep -F 'JS ERROR' | grep -i nixorium")
 
     # Local relay as root, then the same command over SSH like the controller.
     client.succeed("${agent} probe nixorium-classroom-connect | grep -F 'hello version=1' | grep -F 'user=student'")
