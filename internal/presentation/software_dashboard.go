@@ -1024,7 +1024,7 @@ func (model softwareModel) resultView(context softwareViewContext) []string {
 	lines := []string{tuiResult(title, success, context.dark), ""}
 	lines = append(lines, saveStatusLines(result.State, result.RecoveryRequired, result.AffectedController != "", len(result.AffectedClients) > 0, verified)...)
 	if model.profileResult.Operation != "" {
-		lines = append(lines, "", fmt.Sprintf("%s: %d packages added; existing destinations kept.", model.profileResult.Preset.Label, len(model.profileResult.Additions)))
+		lines = append(lines, "", fmt.Sprintf("%s: %s added; existing destinations kept.", model.profileResult.Preset.Label, countNoun(len(model.profileResult.Additions), "package")))
 	}
 	if result.RecoveryRequired || result.State == "partial" {
 		lines = append(lines, "", result.Message, "No system was built or deployed.", "Retry completes the local save without duplicating the change.", softwareResultIssue(result))
