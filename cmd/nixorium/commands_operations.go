@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
@@ -21,7 +22,10 @@ func commandOutputError(err error, stderr io.Writer) int {
 
 func runDeploymentCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
 	if options.subcommand == "apply" {
-		return runDeploymentApply(ctx, repository, stdout, stderr, options.on, options.expect, options.yes, options.json)
+		return runDeploymentApply(ctx, repository, stdout, stderr, options.on, options.expect, options.yes, options.json, options.queueUnreachable)
+	}
+	if strings.HasPrefix(options.subcommand, "queue") {
+		return runDeploymentQueueCommand(ctx, repository, options, stdout, stderr)
 	}
 	report := app.NewDeploymentManager(adapters.Local{}).Plan(ctx, repository, options.on)
 	var err error

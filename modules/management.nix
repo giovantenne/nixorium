@@ -1014,6 +1014,52 @@ in
       };
     };
 
+    # Client updates queued for computers that were off: each pass updates,
+    # one at a time and under the operation gate, those that answer again
+    # (nixorium deploy queue run). Without a queue nothing starts.
+    systemd.services.nixorium-deferred-updates = {
+      description = "Apply queued Nixorium client updates to computers that are back";
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      unitConfig.ConditionPathExists = "/var/lib/nixorium/coordination/deferred-updates.json";
+      path = [ pkgs.colmena pkgs.git pkgs.nix pkgs.openssh pkgs.util-linux ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${nixoriumPackage}/bin/nixorium --repo ${lib.escapeShellArg cfg.deploymentPath} deploy queue run";
+        User = "admin";
+        Group = "users";
+        SupplementaryGroups = [ "nixorium-operations" ];
+        UMask = "0077";
+        TimeoutStartSec = "3h";
+        Environment = [
+          "XDG_CACHE_HOME=/var/cache/nixorium/admin"
+          "XDG_STATE_HOME=/home/admin/.local/state"
+        ];
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ProtectHome = "read-only";
+        ReadOnlyPaths = [ cfg.deploymentPath "/etc/nixorium/deployment-path" "/home/admin/.ssh/id_ed25519" "/home/admin/.ssh/id_ed25519.pub" ];
+        ReadWritePaths = [
+          "/var/lib/nixorium/coordination"
+          "/home/admin/.ssh/nixorium-known-hosts"
+          "-/home/admin/.local/state/nixorium"
+          "-/var/cache/nixorium/admin"
+        ];
+        NoNewPrivileges = true;
+        CapabilityBoundingSet = "";
+        RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_NETLINK" "AF_UNIX" ];
+        LimitCORE = 0;
+      };
+    };
+    systemd.timers.nixorium-deferred-updates = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "2min";
+        OnUnitInactiveSec = "1min";
+        AccuracySec = "10s";
+      };
+    };
+
     systemd.services.nixorium-classroom = {
       description = "Restricted Nixorium classroom operations worker";
       wantedBy = [ "multi-user.target" ];

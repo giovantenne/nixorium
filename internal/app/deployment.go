@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -350,6 +351,18 @@ func (m *DeploymentManager) PlanReachable(ctx context.Context, repository string
 		return deploymentIssue(domain.DeploymentPlanReport{SchemaVersion: domain.SchemaVersion, Operation: "deploy-plan", State: "blocked", BuildFirst: true}, "selector", "no reachable-only subset is available; review the selected computers again")
 	}
 	return m.Plan(ctx, repository, strings.Join(names, ","))
+}
+
+// SplitDeploymentByAvailability separates a reviewed plan's computers that
+// answered the SSH check from those that did not (off or unreachable).
+func SplitDeploymentByAvailability(plan domain.DeploymentPlanReport) (reachable, unreachable []string) {
+	reachable = reachableDeploymentNames(plan)
+	for _, target := range plan.Targets {
+		if !slices.Contains(reachable, target.Name) {
+			unreachable = append(unreachable, target.Name)
+		}
+	}
+	return reachable, unreachable
 }
 
 func reachableDeploymentNames(plan domain.DeploymentPlanReport) []string {

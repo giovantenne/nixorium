@@ -83,7 +83,7 @@ func parseSoftwareScope(value string) (domain.SoftwareScope, error) {
 	return scope, nil
 }
 
-func runDeploymentApply(ctx context.Context, repository string, stdout, stderr io.Writer, requested, expectedRevision string, assumeYes, jsonOutput bool) int {
+func runDeploymentApply(ctx context.Context, repository string, stdout, stderr io.Writer, requested, expectedRevision string, assumeYes, jsonOutput, queueUnreachable bool) int {
 	local := adapters.Local{}
 	manager := app.NewDeploymentManager(local)
 	plan := manager.Plan(ctx, repository, requested)
@@ -132,6 +132,19 @@ func runDeploymentApply(ctx context.Context, repository string, stdout, stderr i
 	if jsonOutput {
 		stream = stderr
 	}
+	if queueUnreachable {
+		// Computers that did not answer get this revision when they do.
+		reachable, err := queueUnreachableComputers(plan, stream)
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: queue the unreachable computers:", err)
+			return 1
+		}
+		if reachable == "" {
+			fmt.Fprintln(stream, "No selected computer is reachable now; all of them update when switched on.")
+			return 0
+		}
+		requested = reachable
+	}
 	report := executeDeploymentOperation(ctx, manager, repository, requested, expectedRevision, stream)
 	var renderErr error
 	if jsonOutput {
@@ -154,8 +167,16 @@ func executeDeploymentOperation(ctx context.Context, manager *app.DeploymentMana
 }
 
 func executeDeploymentOperationWithProgress(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+	report, _ := executeDeploymentOperationGated(ctx, manager, repository, requested, expectedRevision, stream, observe)
+	return report
+}
+
+// executeDeploymentOperationGated also reports a busy operation gate, in
+// which case nothing was attempted.
+func executeDeploymentOperationGated(ctx context.Context, manager *app.DeploymentManager, repository, requested, expectedRevision string, stream io.Writer, observe func(domain.DeploymentProgress)) (domain.DeploymentExecutionReport, bool) {
 	operation, err := adapters.OpenDeploymentOperation()
 	if err != nil {
+		var busy *adapters.OperationBusyError
 		plan := manager.Plan(ctx, repository, requested)
 		return domain.DeploymentExecutionReport{
 			SchemaVersion:   domain.SchemaVersion,
@@ -170,7 +191,7 @@ func executeDeploymentOperationWithProgress(ctx context.Context, manager *app.De
 			RetrySafe:       true,
 			Message:         "prepare deployment operation: " + err.Error(),
 			Issues:          plan.Issues,
-		}
+		}, errors.As(err, &busy)
 	}
 	progress := io.MultiWriter(stream, operation.Writer())
 	report := manager.ExecuteWithProgress(ctx, repository, requested, expectedRevision, operation.Path, progress, observe)
@@ -180,7 +201,7 @@ func executeDeploymentOperationWithProgress(ctx context.Context, manager *app.De
 		report.Message = fmt.Sprintf("%s; finalize durable log: %v", report.Message, closeErr)
 	}
 	report.Message = operationRecordMessage(report.Message, report)
-	return report
+	return report, false
 }
 
 func runGitCommitApply(ctx context.Context, manager *app.GitCommitManager, repository string, stdout, stderr io.Writer, paths, expectedToken string, assumeYes, jsonOutput bool) int {

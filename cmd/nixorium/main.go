@@ -55,6 +55,7 @@ type options struct {
 	// acknowledgeUnreachable confirms that computers that could not be
 	// checked during a recovery review were inspected at their console.
 	acknowledgeUnreachable bool
+	queueUnreachable       bool
 	backupTarget           string
 	backupFile             string
 	passphraseFile         string
@@ -812,6 +813,23 @@ func parseArguments(arguments []string) (options, error) {
 			result.acknowledgeUnknown = true
 		case "--acknowledge-unreachable":
 			result.acknowledgeUnreachable = true
+		case "--queue-unreachable":
+			result.queueUnreachable = true
+		case "queue", "run":
+			// deploy queue status|cancel|run: client updates that wait for
+			// their computers.
+			if result.command != "deploy" {
+				return options{}, fmt.Errorf("%s must follow deploy", arguments[index])
+			}
+			if arguments[index] == "queue" && result.subcommand == "" {
+				result.subcommand = "queue"
+				continue
+			}
+			if arguments[index] != "queue" && result.subcommand == "queue" {
+				result.subcommand = "queue-" + arguments[index]
+				continue
+			}
+			return options{}, errors.New("use deploy queue status, deploy queue cancel or deploy queue run")
 		case "--json":
 			result.json = true
 		case "--full":
@@ -823,6 +841,10 @@ func parseArguments(arguments []string) (options, error) {
 		case "-h", "--help", "help":
 			result.help = true
 		case "status":
+			if result.command == "deploy" && result.subcommand == "queue" {
+				result.subcommand = "queue-status"
+				continue
+			}
 			if result.command == "install" && result.subcommand == "usb" {
 				result.subcommand = "usb-status"
 				continue
@@ -1015,6 +1037,10 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "usb-verify"
 		case "reconcile", "reboot", "cancel", "close":
+			if arguments[index] == "cancel" && result.command == "deploy" && result.subcommand == "queue" {
+				result.subcommand = "queue-cancel"
+				continue
+			}
 			if result.command != "install" || result.subcommand != "usb" {
 				return options{}, fmt.Errorf("%s must follow install usb", arguments[index])
 			}
@@ -1080,8 +1106,8 @@ func parseArguments(arguments []string) (options, error) {
 			return options{}, errors.New("workspace apply requires --expect from workspace plan")
 		}
 	}
-	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "send" && result.command != "cleanup") || (result.subcommand != "plan" && result.subcommand != "apply")) {
-		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, Internet or cleanup plan/apply")
+	if result.on != "" && ((result.command != "deploy" && result.command != "shutdown" && result.command != "restart" && result.command != "internet" && result.command != "lock" && result.command != "send" && result.command != "cleanup") || (result.subcommand != "plan" && result.subcommand != "apply" && result.subcommand != "queue-cancel")) {
+		return options{}, errors.New("--on is only valid with deploy, shutdown, restart, Internet or cleanup plan/apply, and deploy queue cancel")
 	}
 	if result.command == "cleanup" {
 		if (result.subcommand != "plan" && result.subcommand != "apply") || result.on == "" {
@@ -1110,7 +1136,25 @@ func parseArguments(arguments []string) (options, error) {
 		return options{}, errors.New("--acknowledge-unreachable is only valid with deploy recover")
 	}
 	recovering := strings.HasPrefix(result.subcommand, "recover-")
-	if result.command == "deploy" && !recovering && result.subcommand != "plan" && result.subcommand != "apply" {
+	queueing := strings.HasPrefix(result.subcommand, "queue")
+	if result.command == "deploy" && queueing {
+		switch result.subcommand {
+		case "queue-status", "queue-run":
+			if result.on != "" {
+				return options{}, fmt.Errorf("deploy %s does not take --on", strings.ReplaceAll(result.subcommand, "-", " "))
+			}
+		case "queue-cancel":
+			if result.on == "" {
+				return options{}, errors.New("deploy queue cancel requires --on <pcNN,...|@all>")
+			}
+		default:
+			return options{}, errors.New("use deploy queue status, deploy queue cancel or deploy queue run")
+		}
+	}
+	if result.queueUnreachable && (result.command != "deploy" || result.subcommand != "apply") {
+		return options{}, errors.New("--queue-unreachable is only valid with deploy apply")
+	}
+	if result.command == "deploy" && !recovering && !queueing && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("deploy requires the plan or apply subcommand")
 	}
 	if result.command == "controller" && result.subcommand != "plan" && result.subcommand != "apply" {
@@ -1261,7 +1305,7 @@ func parseArguments(arguments []string) (options, error) {
 	if result.command == "git" && gitPaths && result.paths == "" {
 		return options{}, fmt.Errorf("git %s requires --paths", strings.ReplaceAll(result.subcommand, "-", " "))
 	}
-	if result.command == "deploy" && !recovering && result.on == "" {
+	if result.command == "deploy" && !recovering && !queueing && result.on == "" {
 		return options{}, fmt.Errorf("deploy %s requires --on", result.subcommand)
 	}
 	if result.command == "config" && result.subcommand == "apply" && result.expect == "" {
@@ -1412,6 +1456,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       internet apply --on <clients|@lab> --action <block|unblock> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       lock plan --on <clients|@lab> --action <lock|unlock> reviews locking students' screens (classroom view)")
 	fmt.Fprintln(writer, "       lock apply --on <clients|@lab> --action <lock|unlock> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       deploy apply --on <clients|@lab> --expect <revision> --queue-unreachable  also queues computers that are off")
+	fmt.Fprintln(writer, "       deploy queue status|run  shows or applies queued client updates; deploy queue cancel --on <clients|@all>")
 	fmt.Fprintln(writer, "       send plan --file <file-or-folder> --on <clients|@lab> reviews copying it to students' desktops (classroom view)")
 	fmt.Fprintln(writer, "       send apply --file <file-or-folder> --on <clients|@lab> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
