@@ -75,3 +75,22 @@ func queueUnreachableComputers(plan domain.DeploymentPlanReport, stdout io.Write
 	fmt.Fprintf(stdout, "Queued for when they are switched on: %s\n", strings.Join(unreachable, ", "))
 	return strings.Join(reachable, ","), nil
 }
+
+// applyDeploymentQueued queues the reviewed plan's computers that did not
+// answer and updates the others now, at the same reviewed revision.
+func applyDeploymentQueued(ctx context.Context, manager *app.DeploymentManager, repository string, plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+	reachable, unreachable := app.SplitDeploymentByAvailability(plan)
+	if len(unreachable) > 0 {
+		if err := newDeferredUpdateManager().Queue(plan, unreachable); err != nil {
+			return domain.DeploymentExecutionReport{SchemaVersion: domain.SchemaVersion, Operation: "deploy-apply", State: "blocked", Repository: plan.Repository, Requested: plan.Requested, Revision: plan.Revision, Targets: []domain.DeploymentTarget{}, Phase: domain.DeploymentPhasePreflight, RetrySafe: true,
+				Message: "the computers that are off could not be queued; nothing was started: " + err.Error(), Issues: []domain.ValidationIssue{{Field: "queue", Message: err.Error()}}}
+		}
+	}
+	if len(reachable) == 0 {
+		return domain.DeploymentExecutionReport{SchemaVersion: domain.SchemaVersion, Operation: "deploy-apply", State: "completed", Repository: plan.Repository, Requested: plan.Requested, Revision: plan.Revision, Targets: []domain.DeploymentTarget{}, Phase: domain.DeploymentPhaseComplete, RetrySafe: true, Queued: unreachable,
+			Message: "no selected computer is reachable now; all of them update when switched on", Issues: []domain.ValidationIssue{}}
+	}
+	report := executeDeploymentOperationWithProgress(ctx, manager, repository, strings.Join(reachable, ","), plan.Revision, io.Discard, observe)
+	report.Queued = unreachable
+	return report
+}

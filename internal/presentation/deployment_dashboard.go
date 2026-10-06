@@ -82,6 +82,9 @@ func (model deploymentModel) update(screen dashboardScreen, key tea.KeyPressMsg,
 		}
 	case dashboardDeployReview:
 		switch key.String() {
+		case "f3":
+			model.queueOff = !model.queueOff
+			return model, deploymentIntent{}
 		case "f2":
 			if model.plan.ReachableRequested != "" {
 				model.confirmation = ""
@@ -178,7 +181,11 @@ func (model dashboardModel) updateDeployment(key tea.KeyPressMsg) (tea.Model, te
 		ctx, cancel := context.WithCancel(context.Background())
 		model.deployment.cancel = cancel
 		model.deployment.stopReview, model.deployment.stopRequested = false, false
-		return model, startDeployment(ctx, model.actions.ApplyDeployment, plan, events)
+		apply := model.actions.ApplyDeployment
+		if model.deployment.queueOff && model.actions.ApplyDeploymentQueued != nil && len(deploymentOffComputers(plan)) > 0 {
+			apply = model.actions.ApplyDeploymentQueued
+		}
+		return model, startDeployment(ctx, apply, plan, events)
 	case deploymentLogsIntent:
 		if model.actions.LoadLogs == nil {
 			model.message = "Operation logs are not available in this deployment."

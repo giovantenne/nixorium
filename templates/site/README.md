@@ -632,6 +632,21 @@ state. Inspect the log and fresh **Computer inventory** results, make a new plan
 and retry; never infer rollback or completion from a lost terminal. `--yes` is
 for deliberate automation and never removes the revision check.
 
+#### Computers that are off
+
+When some selected computers do not answer, the review offers to update them
+when they are switched on (on by default; **F3** turns it off). The others are
+updated now; the controller then checks every minute and updates each waiting
+computer, one at a time, as soon as it answers, with the same build, check and
+record. **Computers → Queued updates** lists them and removes entries. An entry
+is never applied once the configuration changed after queueing: review the
+update again. From a terminal: `deploy apply ... --queue-unreachable`,
+`deploy queue status`, `deploy queue cancel --on pc02` (or `@all`).
+
+After any update the person at the computer sees a GNOME notification that it
+was updated; when the kernel or systemd changed it asks for a restart, with a
+**Restart** button. The computer never restarts on its own.
+
 ### Power controls
 
 Open **Power controls**, choose shutdown or restart with Tab, select the

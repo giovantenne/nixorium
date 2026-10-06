@@ -468,6 +468,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		ApplyDeployment: func(requestContext context.Context, plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
 			return executeDeploymentOperationWithProgress(requestContext, deploymentManager, repository, plan.Requested, plan.Revision, io.Discard, observe)
 		},
+		ApplyDeploymentQueued: func(requestContext context.Context, plan domain.DeploymentPlanReport, observe func(domain.DeploymentProgress)) domain.DeploymentExecutionReport {
+			return applyDeploymentQueued(requestContext, deploymentManager, repository, plan, observe)
+		},
 		PlanController: func(ctx context.Context) domain.ControllerRebuildPlanReport {
 			return controllerManager.Plan(ctx, repository)
 		},
@@ -603,6 +606,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		RemoteReservationPresent: local.RemoteReservationPresent,
 		LoadRecovery: func(ctx context.Context) domain.RecoveryReport {
 			return app.NewRecoveryInspector(local).Observe(ctx, repository)
+		},
+		LoadDeferredUpdates: func(ctx context.Context) domain.DeferredUpdateStatus {
+			return newDeferredUpdateManager().Status(ctx, repository)
+		},
+		CancelDeferredUpdates: func(hosts []string) error {
+			_, err := newDeferredUpdateManager().Cancel(hosts)
+			return err
 		},
 		PlanDeploymentRecovery: func(ctx context.Context, acknowledge bool) domain.DeploymentRecoveryPlan {
 			return app.NewDeploymentRecoveryManager(local).Plan(ctx, repository, acknowledge)

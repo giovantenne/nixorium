@@ -34,6 +34,11 @@ func (model dashboardModel) openComputerTask(action string) (tea.Model, tea.Cmd)
 		})
 	}
 	switch action {
+	case "u":
+		if model.actions.LoadDeferredUpdates == nil {
+			return model, nil
+		}
+		return model.openDeferredUpdates()
 	case "i":
 		model.screen = dashboardInternet
 		model.internet = internetModel{chosen: map[string]bool{}, action: domain.InternetBlock}
@@ -731,6 +736,8 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 		return model.updateLock(key)
 	case dashboardShare:
 		return model.updateShare(key)
+	case dashboardDeferredUpdates:
+		return model.updateDeferredUpdates(key)
 	case dashboardCleanup:
 		return model.updateCleanup(key)
 	case dashboardRecovery:

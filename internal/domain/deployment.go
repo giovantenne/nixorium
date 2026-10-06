@@ -84,6 +84,9 @@ type DeploymentExecutionReport struct {
 	LogPath          string                        `json:"logPath,omitempty"`
 	Message          string                        `json:"message,omitempty"`
 	Issues           []ValidationIssue             `json:"issues"`
+	// Queued names reviewed computers that were off: they get this revision
+	// when they answer again (deferred updates).
+	Queued []string `json:"queued,omitempty"`
 }
 
 type LastSuccessfulDeployment struct {

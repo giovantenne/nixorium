@@ -340,6 +340,16 @@ any shard must block publication.
   bounded inventory probe; an open SSH port is not authenticated identity or
   proof of power state. A reachable-only choice creates a fresh explicit-target
   plan and confirmation, never edits or silently shrinks an approved execution.
+- Queued client updates (`internal/app/deferred_updates.go`) hold only reviewed
+  computers at the reviewed revision in the coordination directory, changed
+  under the operation gate. The controller timer applies one computer at a time
+  through the ordinary deploy, verify and record path, never holds the gate
+  while waiting, backs off failures, and never applies a stale entry (the
+  repository moved on). Queueing is a visible review choice, never implicit.
+- Every client update that replaces the running system writes
+  `/run/nixorium/update-notice.json` during activation; the classroom extension
+  notifies the user and offers GNOME's restart dialog when kernel, initrd,
+  modules or systemd changed. Never restart automatically.
   Per-computer outcomes must retain uncertainty and recovery requirements;
   never infer individual activation success from an aggregate batch result.
 - Client shutdown expands only evaluated client identities and never the controller. The session helper (`scripts/session-state.sh`) is a versioned one-word contract: `idle`, `unused` (local graphical session without input for ten minutes or since login, read from the user's GNOME Shell) or `active`, which it must keep for anything it cannot observe; older clients print only `active`/`idle`. Active sessions remain eligible after an explicit data-loss warning; when any are present, the review must state that the one-word `SHUTDOWN` confirmation authorizes their interruption. Preserve explicit acknowledgement for unknown sessions, expiring content-bound review, PXE/recovery conflict check, immediate inventory/session recheck, and the same non-blocking lock used by deployment. Adapters may issue only the fixed `nixorium-session-state` and `systemctl poweroff --no-block` SSH commands. Report accepted/not-sent/unconfirmed requests without inferring physical power state or retrying unconfirmed dispatches.

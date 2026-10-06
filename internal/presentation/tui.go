@@ -77,30 +77,37 @@ type DashboardActions struct {
 	PlanDeployment          func(context.Context, string) domain.DeploymentPlanReport
 	PlanReachableDeployment func(context.Context, domain.DeploymentPlanReport) domain.DeploymentPlanReport
 	ApplyDeployment         func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
-	PlanController          func(context.Context) domain.ControllerRebuildPlanReport
-	ApplyController         func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
-	LoadControllerProgress  func() (domain.OperationProgress, error)
-	LoadServices            func(context.Context) domain.ServicesReport
-	RestartService          func(string) domain.ServiceActionReport
-	LoadLogs                func(context.Context) domain.OperationLogsReport
-	LoadLog                 func(context.Context, string) domain.OperationLogReport
-	LoadGitReview           func(context.Context) domain.GitReviewReport
-	PlanGitCommit           func(context.Context, string) domain.GitCommitPlanReport
-	PlanGitDiscard          func(context.Context, string) domain.GitCommitPlanReport
-	ApplyGitDiscard         func(domain.GitCommitPlanReport) domain.GitCommitReport
-	ApplyGitCommit          func(domain.GitCommitPlanReport) domain.GitCommitReport
-	CheckUpdate             func(context.Context) domain.UpdateCheckReport
-	PlanUpdate              func(context.Context, string, bool, bool) domain.UpdatePlanReport
-	PlanUpdateWithProgress  func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
-	SaveUpdate              func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadPackageBase         func(context.Context) domain.PackageBaseStatus
-	PlanPackageBase         func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
-	SavePackageBase         func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	SettingsRepairIssues    func() []domain.ValidationIssue
-	LoadSettings            func(context.Context) (domain.LabSettingsFile, error)
-	LoadWorkspace           func(context.Context) domain.WorkspacePlanReport
-	PlanWorkspace           func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
-	SaveWorkspace           func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
+	// ApplyDeploymentQueued updates the reachable computers of the reviewed
+	// plan now and queues the others for when they answer; nil hides the
+	// choice.
+	ApplyDeploymentQueued func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
+	// LoadDeferredUpdates and CancelDeferredUpdates show and edit the queue.
+	LoadDeferredUpdates    func(context.Context) domain.DeferredUpdateStatus
+	CancelDeferredUpdates  func([]string) error
+	PlanController         func(context.Context) domain.ControllerRebuildPlanReport
+	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
+	LoadControllerProgress func() (domain.OperationProgress, error)
+	LoadServices           func(context.Context) domain.ServicesReport
+	RestartService         func(string) domain.ServiceActionReport
+	LoadLogs               func(context.Context) domain.OperationLogsReport
+	LoadLog                func(context.Context, string) domain.OperationLogReport
+	LoadGitReview          func(context.Context) domain.GitReviewReport
+	PlanGitCommit          func(context.Context, string) domain.GitCommitPlanReport
+	PlanGitDiscard         func(context.Context, string) domain.GitCommitPlanReport
+	ApplyGitDiscard        func(domain.GitCommitPlanReport) domain.GitCommitReport
+	ApplyGitCommit         func(domain.GitCommitPlanReport) domain.GitCommitReport
+	CheckUpdate            func(context.Context) domain.UpdateCheckReport
+	PlanUpdate             func(context.Context, string, bool, bool) domain.UpdatePlanReport
+	PlanUpdateWithProgress func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	SaveUpdate             func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadPackageBase        func(context.Context) domain.PackageBaseStatus
+	PlanPackageBase        func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	SavePackageBase        func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	SettingsRepairIssues   func() []domain.ValidationIssue
+	LoadSettings           func(context.Context) (domain.LabSettingsFile, error)
+	LoadWorkspace          func(context.Context) domain.WorkspacePlanReport
+	PlanWorkspace          func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
+	SaveWorkspace          func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
 	// ResolveMarketplace downloads one Marketplace version into the store
 	// and proposes a pin; it never writes deployment files.
 	ResolveMarketplace     func(context.Context, string) domain.WorkspaceMarketplaceReport
@@ -168,6 +175,7 @@ const (
 	dashboardInternet
 	dashboardLock
 	dashboardShare
+	dashboardDeferredUpdates
 	dashboardCleanup
 	dashboardRecovery
 	dashboardRecoveryReview
@@ -203,6 +211,26 @@ type deploymentModel struct {
 	cancel        context.CancelFunc
 	stopReview    bool
 	stopRequested bool
+	// queueOff: computers that are off get the update when they answer
+	// again (default when some did not answer the availability check).
+	queueOff bool
+}
+
+// deploymentOffComputers names the reviewed computers that did not answer.
+func deploymentOffComputers(plan domain.DeploymentPlanReport) []string {
+	off := []string{}
+	for _, target := range plan.Targets {
+		reachable := false
+		for _, observed := range plan.Availability {
+			if observed.Name == target.Name && observed.IP == target.IP && observed.Reachability == domain.ReachabilityReachable && observed.SSH == domain.SSHAvailable {
+				reachable = true
+			}
+		}
+		if !reachable {
+			off = append(off, target.Name)
+		}
+	}
+	return off
 }
 
 // controllerModel is the shared activation boundary used after settings,
@@ -398,6 +426,7 @@ type dashboardModel struct {
 	confirmation           string
 	installation           installationModel
 	deployment             deploymentModel
+	deferred               deferredModel
 	controller             controllerModel
 	maintenance            maintenanceModel
 	updates                updateModel
@@ -1146,6 +1175,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.lockView()
 	case dashboardShare:
 		content = model.shareView()
+	case dashboardDeferredUpdates:
+		content = model.deferredUpdatesView()
 	case dashboardCleanup:
 		content = model.cleanupView()
 	case dashboardRecovery:
@@ -2380,6 +2411,16 @@ func (model dashboardModel) deployView() string {
 		for _, target := range model.deployment.plan.Targets {
 			lines = append(lines, fmt.Sprintf("%s  %s  %s", target.Name, target.IP, deploymentAvailabilityLabel(model.deployment.plan, target.Name, target.IP)))
 		}
+		off := deploymentOffComputers(model.deployment.plan)
+		queueable := len(off) > 0 && model.actions.ApplyDeploymentQueued != nil
+		if queueable {
+			mark := "[ ]"
+			if model.deployment.queueOff {
+				mark = "[x]"
+			}
+			lines = append(lines, "", tuiSelection(mark+" Update "+strings.Join(off, ", ")+" when switched on", true, model.isDark),
+				tuiMuted("    The controller updates each of them as soon as it answers, and its user sees a notification.", model.isDark))
+		}
 		shell.body = strings.Join(lines, "\n")
 		shell.fixedBody = tuiSection("Type DEPLOY to continue:", model.isDark) + "\n> " + model.deployment.confirmation + "_"
 		shell.notices = append(shell.notices, tuiNotice{
@@ -2391,6 +2432,9 @@ func (model dashboardModel) deployView() string {
 			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
 		shell.actions = []tuiAction{{key: "Enter", label: "Update computers"}, {key: "Esc", label: "Selection"}, {key: "F1", label: "Help"}}
+		if queueable {
+			shell.actions = append([]tuiAction{{key: "F3", label: "Off computers: later / skip"}}, shell.actions...)
+		}
 		if model.actions.PlanReachableDeployment != nil && model.deployment.plan.ReachableRequested != "" {
 			shell.actions = append([]tuiAction{{key: "F2", label: "Reachable only"}}, shell.actions...)
 		}

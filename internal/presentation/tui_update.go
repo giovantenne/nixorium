@@ -440,11 +440,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.message = ""
 		model.screen = dashboardHosts
 		return model, nil
+	case deferredUpdatesMsg:
+		model.busy = ""
+		model.deferred = deferredModel{status: message.status, loaded: true}
+		return model, nil
 	case dashboardDeploymentUSBMsg:
 		return model.handleDeploymentUSBMessage(message)
 	case dashboardDeploymentPlanMsg:
 		model.busy = ""
 		model.deployment.plan = message.report
+		model.deployment.queueOff = len(deploymentOffComputers(message.report)) > 0
 		if message.report.HasErrors() {
 			model.message = deploymentPlanIssues(message.report)
 			model.screen = dashboardDeploy

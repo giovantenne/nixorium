@@ -112,6 +112,10 @@ configuration, software, home customization, diagnostics, and operations.
   administrator-authorized host-key plan/apply on supporting pins, with a
   physical-console fingerprint comparison. Preserve protected work, unrelated
   trust and backups; never rotate automatically or disable SSH verification.
+- Deployment review can queue computers that did not answer (visible choice,
+  CLI `--queue-unreachable`); the controller updates them when they answer, at
+  the reviewed revision only. Never edit the queue file by hand: use
+  `nixorium deploy queue status|cancel`.
 - On supporting pins, deployment review can create a new reachable-only plan.
   Review its exact targets and confirm again; do not silently omit computers.
   A port check is neither authentication nor proof a computer is powered off.

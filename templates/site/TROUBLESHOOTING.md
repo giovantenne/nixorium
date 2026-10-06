@@ -71,6 +71,7 @@ same code. The codes are stable:
 | `DISK-LOW` | The Nix store is low on space | Maintenance → Free disk space |
 | `CONTROLLER-NOT-APPLIED` | The controller does not run the saved configuration | [Controller apply failed](#controller-apply-failed) |
 | `BACKUP-DUE` | No recent backup, or keys or settings changed since it | [Backups and restoration](#backups-and-restoration) |
+| `UPDATES-QUEUED` | Computers that were off wait for a queued update | Nothing to do; Computers → Queued updates shows them. Review again those marked as changed |
 | `EVAL-FAILED` | The configuration does not evaluate | Run `nixorium doctor`; fix the first reported error; do not retry other operations |
 
 ## The controller DHCP lease changed

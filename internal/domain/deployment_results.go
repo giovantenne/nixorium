@@ -47,12 +47,19 @@ func (report DeploymentExecutionReport) ResultSummary() DeploymentResultSummary 
 		}
 		summary.Computers = append(summary.Computers, result)
 	}
+	for _, name := range report.Queued {
+		summary.Computers = append(summary.Computers, DeploymentComputerResult{Name: name, Outcome: "Queued", Guidance: "Updates automatically when it is switched on and reachable."})
+	}
 	switch {
+	case len(report.Targets) == 0 && len(report.Queued) > 0 && !report.HasErrors():
+		summary.Headline = "The selected computers update when switched on"
 	case report.RecoveryRequired:
 		summary.Headline = "Deployment requires recovery"
 		if notReached {
 			summary.Headline += " — some computers were not reached"
 		}
+	case !report.HasErrors() && len(report.Queued) > 0:
+		summary.Headline = "Deployment completed; the computers that are off update when switched on"
 	case !report.HasErrors():
 		summary.Headline = "Deployment completed and verified"
 	case updateFailed:

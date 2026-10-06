@@ -75,4 +75,7 @@ const (
 	RecoveryOperationBusy     = "operation-busy"
 	RecoverySettingsInvalid   = "settings-invalid"
 	RecoveryControllerChanged = "controller-not-applied"
+	// RecoveryDeferredUpdates: computers wait for a queued update; it blocks
+	// nothing.
+	RecoveryDeferredUpdates = "deferred-updates"
 )

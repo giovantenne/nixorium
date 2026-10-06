@@ -43,6 +43,9 @@ func (model dashboardModel) recoveryFlow(condition domain.BlockingCondition) (te
 	case domain.RecoveryBackupDue:
 		next, command := model.openBackup()
 		return next, command, true
+	case domain.RecoveryDeferredUpdates:
+		next, command := model.openDeferredUpdates()
+		return next, command, true
 	case domain.RecoveryPXE:
 		next, command := model.openNetworkInstallation()
 		return next, command, true

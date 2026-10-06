@@ -44,6 +44,8 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 			add("pending-controller", condition.Title, condition.Detail)
 		case domain.RecoveryBackupDue:
 			add("pending-backup", condition.Title, condition.Detail)
+		case domain.RecoveryDeferredUpdates:
+			add("pending-deferred", condition.Title, condition.Detail)
 		}
 	}
 	if model.usbReserved {
@@ -146,6 +148,8 @@ func (model dashboardModel) openPendingTask(id string) (tea.Model, tea.Cmd) {
 		return model.openRecovery()
 	case "pending-backup":
 		return model.openBackup()
+	case "pending-deferred":
+		return model.openDeferredUpdates()
 	case "pending-settings":
 		return model.openMaintenanceTask("e")
 	case "pending-busy":

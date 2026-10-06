@@ -224,7 +224,13 @@ On supporting pins, review probes only selected computers with a brief SSH-port
 check. **F2 — Reachable only** creates a new plan for the observed reachable
 subset with an open SSH port; review the new revision/targets and confirm again.
 Esc during that read retains the original review with its confirmation cleared.
-No target is silently skipped, queued or retried. CLI plans show the same
+Computers that did not answer are queued only with the review's visible choice
+(**F3**, on by default; CLI `--queue-unreachable`): the controller's timer then
+updates each one when it answers, at the reviewed revision only; an entry whose
+configuration changed since is stale and never applied. Check them with
+**Computers → Queued updates** or `nixorium deploy queue status`; remove with
+`deploy queue cancel --on <pcNN|@all>`. Nothing else is silently skipped or
+retried. CLI plans show the same
 observations and, when available, an explicit selector for another `deploy plan`.
 A port check does not authenticate identity or prove whether a computer is off.
 Results list each computer; scroll long reports and retain the private log.

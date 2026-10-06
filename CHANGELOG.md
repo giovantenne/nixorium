@@ -6,6 +6,17 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Update computers** can include computers that are switched off: the
+  review queues them by default (F3 turns it off; CLI
+  `deploy apply --queue-unreachable`). A controller timer updates each one, one
+  at a time, as soon as it answers, through the same build, check and record;
+  an entry is never applied once the configuration changed after queueing.
+  **Computers → Queued updates** and `nixorium deploy queue status|cancel` show
+  and remove them, and the Overview mentions them.
+- After an update, the person at a client computer sees a GNOME notification
+  that it was updated; when the kernel or systemd changed, it asks for a
+  restart with a **Restart** button. Nothing restarts automatically.
+
 - Protect configured laboratories from accidental address changes in managed
   settings: block subnet, prefix and controller host-number changes while clients
   are configured, warn about interface changes, and distinguish the PXE address

@@ -69,6 +69,10 @@ var nextSteps = map[string]NextStep{
 		Code: "CONTROLLER-NOT-APPLIED", Action: "Apply the saved configuration to this controller.",
 		TUI: "Maintenance → Apply to controller", Command: "nixorium controller plan",
 	},
+	"UPDATES-QUEUED": {
+		Code: "UPDATES-QUEUED", Action: "Nothing to do: these computers update when they are switched on. Review again those whose configuration changed.",
+		TUI: "Computers → Queued updates", Command: "nixorium deploy queue status",
+	},
 	"BACKUP-DUE": {
 		Code: "BACKUP-DUE", Action: "Create an encrypted backup of this controller and keep it, and its passphrase, away from it.",
 		TUI: "Maintenance → Back up the controller", Command: "nixorium backup create --to DIRECTORY",
