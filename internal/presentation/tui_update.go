@@ -1086,7 +1086,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.isDark = message.IsDark()
 		model.activitySpinner.Style = newTUISpinner(model.isDark).Style
 		selected := model.homeMenu.list.Index()
-		model.homeMenu = newDashboardTaskMenu(model.isDark, model.width, model.height)
+		model.homeMenu = newDashboardTaskMenu(model.homeAreas(), model.isDark, model.width, model.height)
 		model.homeMenu.list.Select(selected)
 		if model.screen == dashboardSettings {
 			model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)

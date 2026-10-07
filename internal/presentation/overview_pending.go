@@ -85,7 +85,7 @@ func (model dashboardModel) usbReservationPresent() bool {
 }
 
 func (model dashboardModel) overviewTasks() []dashboardTask {
-	return append(model.pendingTasks(), dashboardTasks...)
+	return append(model.pendingTasks(), model.homeAreas()...)
 }
 
 type overviewRefreshMsg struct {

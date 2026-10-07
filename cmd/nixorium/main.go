@@ -289,7 +289,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	internetManager := app.NewInternetManager(local)
 	lockManager := app.NewLockManager(lockSource{Local: local})
 	progressManager := app.NewOperationProgressManager(local)
+	assistantConfig, _ := adapters.LoadAssistantConfig("/etc/nixorium/assistant.json")
 	actions := presentation.DashboardActions{
+		Assistant: assistantConfig,
 		LoadClientSetup: func(context.Context) (bool, error) {
 			settings, _, err := settingsManager.CurrentForEditing(repository)
 			return settings.InstallationSettingsComplete(), err

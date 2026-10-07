@@ -32,6 +32,7 @@ type DashboardActions struct {
 	PlanTemplateReset         func(context.Context, string, func(string)) domain.TemplateResetPlan
 	ApplyTemplateReset        func(domain.TemplateResetPlan) domain.TemplateResetResult
 	ClassroomMode             bool
+	Assistant                 domain.AssistantConfig
 	// OpenClassroomView opens the classroom view page and
 	// returns a sentence for the operator.
 	OpenClassroomView func(context.Context) (string, error)
@@ -190,6 +191,7 @@ const (
 	dashboardHostTrust
 	dashboardManagedJobs
 	dashboardDisclaimer
+	dashboardAssistant
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -717,8 +719,9 @@ func newDashboardModel(report domain.StatusReport, setup domain.SetupReport, act
 	}
 	model := dashboardModel{
 		report: report, setup: setup, setupMode: setupMode, screen: screen, actions: actions,
-		homeMenu: newDashboardTaskMenu(false, 80, 24), activitySpinner: newTUISpinner(false), shutdown: newShutdownModel(),
+		activitySpinner: newTUISpinner(false), shutdown: newShutdownModel(),
 	}
+	model.homeMenu = newDashboardTaskMenu(model.homeAreas(), false, 80, 24)
 	model.observeSetupController(setup)
 	return model
 }
@@ -1066,7 +1069,7 @@ func (model dashboardModel) loadConfigurationState() (tea.Model, tea.Cmd) {
 
 func (model *dashboardModel) ensureHomeMenu() {
 	if len(model.homeMenu.list.Items()) == 0 {
-		model.homeMenu = newDashboardTaskMenu(model.isDark, model.width, model.height)
+		model.homeMenu = newDashboardTaskMenu(model.homeAreas(), model.isDark, model.width, model.height)
 	}
 }
 
@@ -1159,6 +1162,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.diagnosticsView()
 	case dashboardDisclaimer:
 		content = model.disclaimerView()
+	case dashboardAssistant:
+		content = model.assistantView()
 	case dashboardTelemetry:
 		content = model.telemetryView()
 	case dashboardSupport:

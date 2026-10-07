@@ -210,13 +210,15 @@ func (model dashboardModel) helpView() string {
 	case dashboardHostTrust:
 		lines = append(lines, "Compare the offered fingerprint with this computer's physical console.", "Only a deliberately reinstalled client is eligible for reviewed key rotation.", "Esc cancels the read or review without changes; saving cannot be interrupted.")
 	case dashboardHome:
-		lines = append(lines, taskHelp(dashboardTasks)...)
+		lines = append(lines, taskHelp(model.homeAreas())...)
 		if model.updateNotification.Key != "" {
 			lines = append(lines, "u  Review available updates", "x  Dismiss this update version")
 		}
 		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
 			lines = append(lines, "v  View existing managed work without starting or resuming it")
 		}
+	case dashboardAssistant:
+		lines = append(lines, "Esc  Back to the overview")
 	case dashboardComputersArea:
 		lines = append(lines, taskHelp(model.availableComputerTasks())...)
 	case dashboardInstallationArea:

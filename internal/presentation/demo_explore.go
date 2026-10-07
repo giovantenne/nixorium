@@ -226,7 +226,7 @@ func demoExploreModel(revision string, width, height int, classroom bool) dashbo
 	actions.ClassroomMode = classroom
 	model := newDashboardModel(demoExploreStatus(revision), demoSetupReady(), actions, false)
 	model.width, model.height, model.isDark = width, height, true
-	model.homeMenu = newDashboardTaskMenu(true, model.width, model.height)
+	model.homeMenu = newDashboardTaskMenu(model.homeAreas(), true, model.width, model.height)
 	model.ensureActivitySpinner()
 	model.computers.hosts = demoExploreHosts(revision)
 	if classroom {

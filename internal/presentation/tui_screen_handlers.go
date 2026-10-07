@@ -238,6 +238,8 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			}
 		}
 		switch action {
+		case "m":
+			return model.openAssistant()
 		case "a":
 			model.screen = dashboardAdministration
 		case "c":
@@ -264,6 +266,12 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			model.homeMenu, command = model.homeMenu.update(key)
 			return model, command
 		}
+	case dashboardAssistant:
+		if key.String() == "esc" {
+			model.screen = dashboardHome
+			model.message = ""
+		}
+		return model, nil
 	case dashboardComputersArea:
 		if key.String() == "n" && model.computerSetup != "" && model.computerSetup != "ready" && !model.actions.ClassroomMode {
 			return model.startComputerInstallation()

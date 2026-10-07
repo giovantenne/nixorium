@@ -256,7 +256,7 @@ type demoRecorder struct {
 func newDemoRecorder(actions DashboardActions, revision string, width, height int) demoRecorder {
 	model := newDashboardModel(demoStatus("ready", revision), demoSetupReady(), actions, false)
 	model.width, model.height, model.isDark = width, height, true
-	model.homeMenu = newDashboardTaskMenu(true, model.width, model.height)
+	model.homeMenu = newDashboardTaskMenu(model.homeAreas(), true, model.width, model.height)
 	model.ensureActivitySpinner()
 	return demoRecorder{model: model}
 }

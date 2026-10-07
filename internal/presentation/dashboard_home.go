@@ -29,6 +29,16 @@ var dashboardTasks = []dashboardTask{
 	{id: "admin", shortcut: "a", title: "Maintenance", description: "Settings, controller updates, services, revisions, logs and diagnostics"},
 }
 
+var assistantTask = dashboardTask{id: "assistant", shortcut: "m", title: "Assistant", description: "Describe a lab customization; review the proposal before saving"}
+
+func (model dashboardModel) homeAreas() []dashboardTask {
+	tasks := append([]dashboardTask(nil), dashboardTasks...)
+	if model.actions.Assistant.Enabled && !model.actions.ClassroomMode {
+		tasks = append(tasks, assistantTask)
+	}
+	return tasks
+}
+
 var computersAreaTasks = []dashboardTask{
 	{id: "hosts", shortcut: "h", title: "Computer inventory", description: "Check reachability and compare observed systems with the intended revision"},
 	{id: "deploy", shortcut: "d", title: "Update computers", description: "Make the selected client computers run the saved configuration"},
@@ -100,9 +110,9 @@ type dashboardTaskMenu struct {
 	list list.Model
 }
 
-func newDashboardTaskMenu(isDark bool, width, height int) dashboardTaskMenu {
-	items := make([]list.Item, 0, len(dashboardTasks))
-	for _, task := range dashboardTasks {
+func newDashboardTaskMenu(tasks []dashboardTask, isDark bool, width, height int) dashboardTaskMenu {
+	items := make([]list.Item, 0, len(tasks))
+	for _, task := range tasks {
 		items = append(items, task)
 	}
 	delegate := list.NewDefaultDelegate()
@@ -160,7 +170,7 @@ func (model dashboardModel) homeView() string {
 	model.syncHomeTasks()
 	menu := model.homeMenu
 	if len(menu.list.Items()) == 0 {
-		menu = newDashboardTaskMenu(model.isDark, model.width, model.height)
+		menu = newDashboardTaskMenu(model.homeAreas(), model.isDark, model.width, model.height)
 	}
 	if model.initialError {
 		return model.safeModeView()

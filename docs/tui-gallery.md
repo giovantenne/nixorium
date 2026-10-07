@@ -199,6 +199,25 @@ Inventory, updating computers, Internet access and power
 ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```
 
+## Optional administrator Assistant
+
+```text
+Nixorium  /  Overview
+
+Laboratory overview
+Choose an area. Observed state is loaded only when the selected task needs it.
+
+› [c] Computers
+  [n] Installation
+  [w] Software
+  [a] Maintenance
+  [m] Assistant
+
+Inventory, updating computers, Internet access and power
+
+↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
+```
+
 ## Pinned package search
 
 ```text
