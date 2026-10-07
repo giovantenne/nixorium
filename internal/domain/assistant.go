@@ -96,3 +96,9 @@ type AssistantTurnResult struct {
 	Summary  string
 	Messages []AssistantMessage
 }
+
+type AssistantEvaluation struct {
+	OK           bool     `json:"ok"`
+	ChangedHosts []string `json:"changedHosts"`
+	Error        string   `json:"error,omitempty"`
+}

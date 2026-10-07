@@ -300,6 +300,14 @@ let
       (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages)));
     interface = ifaceForHost name;
   }) validClientNames;
+  singleClassHosts = lib.unique ([ masterHostName ] ++ builtins.attrNames hostModules ++ updateValidationHosts);
+  hostClasses = lib.sort (a: b: a.representative < b.representative) (
+    map (name: { representative = name; members = [ name ]; }) singleClassHosts
+    ++ map (members: { representative = builtins.head members; inherit members; })
+      (builtins.filter (members: members != []) (map
+        (members: builtins.filter (name: !(builtins.elem name singleClassHosts)) members)
+        (builtins.attrValues updateClientVariants)))
+  );
   defaultPasswordHash = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
   credentialIssues =
     lib.optional (teacherPassword == defaultPasswordHash) "teacherPassword still uses the public default"
@@ -698,7 +706,7 @@ builtins.mapAttrs (name: value:
   if builtins.elem name [
     "labMeta" "nixoriumSoftware" "nixoriumSoftwarePresets"
     "nixoriumSearchSoftwarePackages" "nixoriumResolveSoftwarePackage"
-    "nixoriumUpdateTargets"
+    "nixoriumUpdateTargets" "nixoriumHostClasses"
   ] then value
   # Nix probes packages.<system>.<name> before a top-level installable. Keep
   # those namespace lookups cheap; force validation when selecting an entry.
@@ -760,6 +768,13 @@ builtins.mapAttrs (name: value:
   };
 
   inherit labMeta;
+
+  # Every configured host belongs to exactly one cheaply discovered class.
+  nixoriumHostClasses =
+    assert lib.sort builtins.lessThan (lib.concatMap (class: class.members) hostClasses)
+      == lib.sort builtins.lessThan validHostNames
+      || throw "nixoriumHostClasses must contain every configured host exactly once";
+    hostClasses;
 
   # Build each materially different graph, not repeated identical client roles.
   # Private modules branching on hostName must declare extra validation hosts.

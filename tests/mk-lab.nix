@@ -145,6 +145,15 @@ let
     labConfig = labConfig // { deploymentMode = "controller"; pcCount = 0; };
     labSoftware = scopedSoftware;
   });
+  hostClassLab = mkLab (baseArgs // {
+    labConfig = labConfig // { pcCount = 6; };
+    hostModules.pc04 = [];
+    updateValidationHosts = [ "pc05" ];
+    labSoftware = {
+      schemaVersion = 1;
+      packages = [ { package = "hello"; scope = { kind = "clients"; clients = [ "pc06" ]; }; } ];
+    };
+  });
   hasPackage = lab: host: pname:
     builtins.any (package: (package.pname or "") == pname)
       lab.nixosConfigurations.${host}.config.environment.systemPackages;
@@ -189,6 +198,16 @@ let
   colmenaBaseGnomeRemoteDesktop = subnetLab.colmena.meta.nixpkgs.gnome-remote-desktop;
   clientGnomeRemoteDesktop = subnetLab.nixosConfigurations.pc01.pkgs.gnome-remote-desktop;
 in
+assert hostClassLab.nixoriumHostClasses == [
+  { representative = "pc01"; members = [ "pc01" "pc02" "pc03" ]; }
+  { representative = "pc04"; members = [ "pc04" ]; }
+  { representative = "pc05"; members = [ "pc05" ]; }
+  { representative = "pc06"; members = [ "pc06" ]; }
+  { representative = "pc99"; members = [ "pc99" ]; }
+];
+assert lib.sort builtins.lessThan (lib.concatMap (class: class.members) hostClassLab.nixoriumHostClasses)
+  == [ "pc01" "pc02" "pc03" "pc04" "pc05" "pc06" "pc99" ];
+assert controllerOnlyLab.nixoriumHostClasses == [ { representative = "pc99"; members = [ "pc99" ]; } ];
 assert controllerOnlyLab.labMeta.deploymentMode == "controller";
 assert controllerOnly.virtualisation.virtualbox.guest.enable;
 assert subnetLab.nixosConfigurations.pc99.config.virtualisation.virtualbox.guest.enable;

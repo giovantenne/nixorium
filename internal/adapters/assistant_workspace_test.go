@@ -50,7 +50,7 @@ func assistantWorkspaceFixture(t *testing.T) (*AssistantWorkspace, AssistantWork
 	repo := workspaceRepository(t)
 	for path, content := range map[string]string{
 		"lab-settings.json": `{"lab":{"name":"Synthetic","PASSWORD":"private-marker","nested":{"ApiToken":"private-marker","count":1}},"array":[{"credential":"private-marker"}]}`,
-		"flake.nix":         "{ outputs = _: {}; }\n", "keys/public": "hidden-marker", "modules/.env.local": "hidden-marker", "AGENTS.md": "Read-only instructions", ".gitignore": "ignored.txt\n", "binary.bin": "\x00\x01", "secrets-in-text.nix": "sk-example ghp_example Bearer abcdef_123 $6$salt$hash\n", "large.txt": strings.Repeat("a", 70000),
+		"flake.nix":         "{ outputs = _: {}; }\n", "keys/public": "hidden-marker", "modules/.env.local": "hidden-marker", "AGENTS.md": "Read-only instructions", ".gitignore": "ignored.txt\n", "binary.bin": "\x00\x01", "secrets-in-text.nix": "sk-example ghp_example Bearer abcdef_123 $6$salt$hash\n", "large.txt": strings.Repeat("a", 70000), "base-folder/child.nix": "{}",
 	} {
 		writeGitReviewFile(t, repo, path, content)
 	}
@@ -258,18 +258,8 @@ func TestAssistantRejectsDirtyRepositoryAndChangedHead(t *testing.T) {
 	workspaceTestGit(t, repo, "reset", "--soft", w.Conversation.Base)
 }
 
-func TestAssistantConversationCleanupAndUnavailableC6Tools(t *testing.T) {
+func TestAssistantConversationCleanup(t *testing.T) {
 	workspace, store, _ := assistantWorkspaceFixture(t)
-	for _, name := range []string{"evaluate", "search_packages"} {
-		args := json.RawMessage(`{}`)
-		if name == "search_packages" {
-			args = json.RawMessage(`{"query":"python"}`)
-		}
-		result := AssistantWorkspaceTools{Store: store}.Execute(t.Context(), workspace.Conversation, domain.AssistantToolCall{ID: "c", Name: name, Arguments: args})
-		if !strings.Contains(result, "not available") {
-			t.Fatal("C6 tool was unexpectedly implemented")
-		}
-	}
 	old := workspace.Conversation
 	old.CreatedAt = time.Now().Add(-31 * 24 * time.Hour).UTC().Format(time.RFC3339)
 	data, _ := json.Marshal(old)
@@ -297,5 +287,45 @@ func TestAssistantConversationCleanupAndUnavailableC6Tools(t *testing.T) {
 	}
 	if data, err = os.ReadFile(filepath.Join(outside, "preserve")); err != nil || string(data) != "private" {
 		t.Fatal("cleanup followed link")
+	}
+}
+
+func TestAssistantRejectsFileFolderCollisionsAndAllowsDeletedPaths(t *testing.T) {
+	w, _, _ := assistantWorkspaceFixture(t)
+	for _, path := range []string{"flake.nix/child.nix", "base-folder", "modules"} {
+		// modules/.env.local is hidden: use a visible overlay descendant as well.
+		if path == "modules" {
+			if err := w.Write("modules/a/b.nix", "{}", false); err != nil {
+				t.Fatal(err)
+			}
+		}
+		result := assistantFileCall(t, w, "write_file", map[string]any{"path": path, "content": "{}"})
+		if result["error"] != "invalid_arguments" || result["message"] != "A file and a folder cannot have the same path." {
+			t.Fatal(result)
+		}
+	}
+	if err := w.Delete("modules/a/b.nix"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write("modules", "{}", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Delete("modules"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write("modules/new.nix", "{}", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Delete("base-folder/child.nix"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write("base-folder", "{}", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Delete("flake.nix"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write("flake.nix/child.nix", "{}", false); err != nil {
+		t.Fatal(err)
 	}
 }

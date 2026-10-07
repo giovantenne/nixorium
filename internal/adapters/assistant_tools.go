@@ -21,6 +21,9 @@ func assistantToolResult(value any) string {
 	return domain.RedactForModel(string(data))
 }
 func assistantToolFailure(err error) string {
+	if errors.Is(err, errAssistantPathCollision) {
+		return assistantToolResult(map[string]any{"ok": false, "error": "invalid_arguments", "message": err.Error()})
+	}
 	code := "invalid_arguments"
 	switch {
 	case errors.Is(err, fs.ErrPermission):

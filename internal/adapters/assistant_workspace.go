@@ -21,6 +21,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var errAssistantPathCollision = errors.New("A file and a folder cannot have the same path.")
+
 type AssistantWorkspaceStore struct{ Directory string }
 type assistantBaseFile struct {
 	size int
@@ -426,6 +428,11 @@ func (workspace *AssistantWorkspace) Write(path, content string, executable bool
 	if err != nil {
 		return err
 	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Path, path+"/") || strings.HasPrefix(path, entry.Path+"/") {
+			return errAssistantPathCollision
+		}
+	}
 	total, count := len(content), 1
 	for deletedPath := range workspace.deleted {
 		if deletedPath != path {
@@ -506,6 +513,24 @@ func (workspace *AssistantWorkspace) Delete(path string) error {
 		}
 	} else if !errors.Is(err, unix.ENOENT) {
 		return err
+	}
+	// Remove only empty overlay parents so a deleted folder can become a file.
+	for directory := filepath.Dir(path); directory != "."; directory = filepath.Dir(directory) {
+		parent, name, err := assistantParent(overlay, directory, false)
+		if errors.Is(err, unix.ENOENT) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		err = unix.Unlinkat(int(parent.Fd()), name, unix.AT_REMOVEDIR)
+		parent.Close()
+		if errors.Is(err, unix.ENOTEMPTY) || errors.Is(err, unix.EEXIST) {
+			break
+		}
+		if err != nil && !errors.Is(err, unix.ENOENT) {
+			return err
+		}
 	}
 	workspace.deleted[path] = true
 	delete(workspace.modes, path)

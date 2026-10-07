@@ -131,10 +131,6 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	if !domain.ValidateAssistantArguments(call.Name, call.Arguments) {
 		return assistantToolFailure(nil)
 	}
-	// C6 is deliberately separate: these two tools cannot evaluate or search yet.
-	if call.Name == "evaluate" || call.Name == "search_packages" {
-		return assistantToolResult(map[string]any{"ok": false, "error": "invalid_arguments", "message": "This tool is not available in this client version."})
-	}
 	workspace, err := tools.Store.Open(conversation.ID)
 	if err != nil {
 		return assistantToolFailure(err)
@@ -147,7 +143,35 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	if token != "" {
 		call.Arguments = []byte(strings.ReplaceAll(string(call.Arguments), token, "[REDACTED]"))
 	}
-	result := AssistantFileTools{}.Execute(ctx, workspace, call)
+	result := ""
+	switch call.Name {
+	case "search_packages":
+		var args struct{ Query string }
+		json.Unmarshal(call.Arguments, &args)
+		searchCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+		items, err := (Local{}).SearchSoftwarePackages(searchCtx, workspace.Conversation.Repository, args.Query, 50)
+		if err != nil {
+			result = assistantToolResult(map[string]any{"ok": false, "error": "evaluation_failed"})
+		} else {
+			packages := []map[string]string{}
+			for _, item := range items {
+				packages = append(packages, map[string]string{"attr": item.ID, "version": item.Version, "description": item.Summary})
+			}
+			result = assistantToolResult(map[string]any{"ok": true, "packages": packages})
+		}
+	case "evaluate":
+		evaluation, err := EvaluateAssistantCandidate(ctx, workspace)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			result = assistantToolResult(map[string]any{"ok": false, "error": "timeout"})
+		} else if err != nil || !evaluation.OK {
+			result = assistantToolResult(map[string]any{"ok": false, "error": "evaluation_failed", "message": evaluation.Error})
+		} else {
+			result = assistantToolResult(map[string]any{"ok": true, "changedHosts": evaluation.ChangedHosts})
+		}
+	default:
+		result = AssistantFileTools{}.Execute(ctx, workspace, call)
+	}
 	if token != "" {
 		result = strings.ReplaceAll(result, token, "[REDACTED]")
 	}
