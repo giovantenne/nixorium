@@ -61,7 +61,7 @@ same code. The codes are stable:
 | `OP-BUSY` | Another operation holds the lock | Wait or open its progress; see [Another operation is already running](#another-operation-is-already-running) |
 | `DEPLOY-PENDING` | An interrupted client update blocks operations | [Interrupted client deployment](#interrupted-client-deployment) |
 | `USB-RESERVED` | A USB installation is unfinished | [A USB installation was interrupted](#a-usb-installation-was-interrupted) |
-| `RESET-PENDING` | A deployment template reset was interrupted | [Deployment template reset recovery](https://github.com/giovantenne/nixorium/blob/master/docs/deployment-template-reset.md#backup-and-recovery) |
+| `RESET-PENDING` | A deployment template reset or Assistant save was interrupted | [Deployment template reset recovery](https://github.com/giovantenne/nixorium/blob/master/docs/deployment-template-reset.md#backup-and-recovery) |
 | `GIT-DIRTY` | The configuration has uncommitted changes | [The Git tree is dirty](#the-git-tree-is-dirty) |
 | `REVIEW-EXPIRED` | The review is too old | Create a new review and confirm again |
 | `REVIEW-CHANGED` | Computers or files changed after the review | Create a new review and confirm again |
@@ -697,3 +697,15 @@ After restoring, verify ownership and mode `0600` for private keys, run
 `nixorium setup keys --verify-only`, reinstall verified secrets, apply the
 reviewed controller configuration, and prepare PXE artifacts again. Do not
 restore stale active-session markers onto a different controller.
+
+## Assistant proposal or save stopped
+
+If the deployment or proposal changed, reopen the review; if HEAD moved, start
+a new chat. A failed Nix evaluation remains readable but cannot be saved.
+Ask the assistant to correct it and review the new comparison.
+
+An interrupted save retains its backup and shared template-reset journal.
+Open the pending condition in Overview, or Recover from the save result, and
+follow the existing reviewed recovery. Do not delete the marker or retry the
+save as a workaround. A recovered commit still requires separate controller
+and client application. See the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md#interrupted-save).

@@ -402,6 +402,13 @@ Overview
                     Git review, deployment template reset
 ```
 
+With controller opt-in, a fifth **Assistant** area prepares a private candidate
+through seven fixed tools. Typed callbacks connect the turn runner, evaluation
+and native review/save. The save shares the template-reset transaction and
+recovery journal, with an Assistant-specific backup prefix and journal kind.
+Subscription admission and separate consent precede content sharing. No model
+tool saves, builds or applies systems. See [Assistant](assistant.md).
+
 The [generated TUI gallery](tui-gallery.md) shows the current screens.
 
 Each action has a review screen before mutation. Long operations show the

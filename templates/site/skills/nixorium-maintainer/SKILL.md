@@ -79,6 +79,16 @@ does not expand this role. Hand excluded actions to the operator; do not switch
 to a developer skill to perform them in the lab. Product defects belong in a
 separate upstream task, not a local patch to safety mechanisms.
 
+## Native Assistant is a separate operator workflow
+
+An opted-in controller can offer the subscription-based Assistant in Nixorium.
+Its confined candidate tools and reviewed local save belong to that native
+application, not to this external-agent skill. Explain the operator's next
+review when relevant; do not drive activation, consent, saving or recovery
+confirmations, or send deployment content to another service under this skill.
+Its availability does not permit edits, arbitrary Nix generation or operations
+excluded above. See the [operator guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md).
+
 ## References
 
 Read the relevant reference before using its commands:

@@ -39,7 +39,7 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 }
 
 func (model dashboardModel) assistantGateView() string {
-	title, body := "Assistant needs an active subscription", "Your request was not sent. Subscribe at "+model.actions.Assistant.SubscribeURL+", then press a and\nenter the activation code you receive by email."
+	title, body := "Assistant needs an active subscription", "Your request was not sent. Subscribe at "+model.actions.Assistant.SubscribeURL+", then press a and\nenter the activation code shown after payment."
 	actions := []tuiAction{{key: "a", label: "Enter activation code"}, {key: "Esc", label: "Back to the message"}, {key: "F1", label: "Help"}}
 	switch model.assistant.state {
 	case "cta-inactive":

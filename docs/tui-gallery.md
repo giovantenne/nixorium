@@ -18,6 +18,11 @@ reads saved configuration and local service/Git state; inventory, client probes 
 readiness checks run when the selected task needs them. Deferred checks never
 imply that installation or deployment is ready.
 
+An opted-in controller adds Assistant (`m`). Its subscription and consent
+checks precede content sharing. Ctrl+R reviews candidate changes and their Nix
+evaluation; SAVE records a local commit with a backup. Controller application
+and Update computers remain separate reviews. See [Assistant](assistant.md).
+
 Installation offers network boot (PXE) and USB over SSH. PXE preparation builds
 the configured client artifacts before reviewing the temporary controller
 network change; client identity and disk erasure are confirmed on each client.
@@ -242,7 +247,7 @@ Nixorium  /  Assistant
 Assistant needs an active subscription
 
 Your request was not sent. Subscribe at https://nixorium.org/assistant/, then press a and
-enter the activation code you receive by email.
+enter the activation code shown after payment.
 
 a Enter activation code  ·  Esc Back to the message  ·  F1 Help
 ```
@@ -260,6 +265,88 @@ The service does not keep their content. Passwords and private keys in your
 deployment are never sent. Logs and student files are never read.
 
 Enter Accept and send  ·  Esc Back
+```
+
+## Assistant candidate ready
+
+```text
+Nixorium  /  Assistant
+
+Prepared the course for pc01.
+
+When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service.
+Do not enter passwords or student data.
+
+› Prepare Python with Jupyter on pc01–pc10
+›
+›
+
+○ Proposal ready: 1 file changed. Press Ctrl+R to review.
+
+Ctrl+R Review proposal  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat  ·  Esc Back
+F1 Help
+```
+
+## Assistant proposal review
+
+```text
+Nixorium  /  Assistant  /  Proposal
+
+Summary from the assistant
+Prepared the course for pc01.
+
+Checked by Nixorium
+Files: 0 added, 1 changed, 0 removed
+Computers whose system changes: pc01
+Nix evaluation: passed
+
+Full comparison
+--- a/modules/course.nix
++++ b/modules/course.nix
+-{ course = 1; }
++{ course = 2; }
+
+Lines 1–13 / 13
+Type SAVE to record this proposal in a local commit with a backup. Nothing is built or activated.
+›
+
+↑/↓ PgUp/PgDn Home/End Scroll  ·  Enter Save  ·  Esc Chat  ·  F1 Help
+```
+
+## Assistant evaluation failure
+
+```text
+Nixorium  /  Assistant  /  Proposal
+
+Summary from the assistant
+Prepared the course for pc01.
+
+Checked by Nixorium
+Files: 0 added, 1 changed, 0 removed
+Computers whose system changes: pc01
+Nix evaluation: failed
+The candidate module does not evaluate.
+
+Full comparison
+--- a/modules/course.nix
++++ b/modules/course.nix
+-{ course = 1; }
++{ course = 2; }
+
+Lines 1–14 / 14
+Saving is not available: the proposal does not evaluate. Return to the chat and ask the assistant to fix it.
+
+↑/↓ PgUp/PgDn Home/End Scroll  ·  Esc Chat  ·  F1 Help
+```
+
+## Assistant saved configuration
+
+```text
+Nixorium  /  Assistant  /  Proposal
+
+Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Nothing was built or activated.
+
+Enter Apply to this controller  ·  Esc Chat  ·  F1 Help
 ```
 
 ## Pinned package search

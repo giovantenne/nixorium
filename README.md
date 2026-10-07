@@ -41,6 +41,14 @@ Nixorium bridges that gap with a local-first workflow:
   software and the student desktop.
 - Everyday tasks run from a guided menu on the controller.
 
+## Optional Assistant
+
+Enable `lab.assistant` and apply the controller to add **Assistant** to the
+administrator menu. This subscription service prepares a candidate change;
+you review the files and evaluation before a local commit with a backup.
+Controller application and client updates remain separate reviewed actions.
+See [Assistant: activation, privacy and recovery](docs/assistant.md).
+
 ## For administrators
 
 **One configuration for the whole room.** On the controller, sign in as

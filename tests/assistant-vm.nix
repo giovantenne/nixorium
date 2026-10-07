@@ -125,10 +125,14 @@
               time.sleep(0.3)
               send("q")
           else:
-              wait("Overview")
+              # The breadcrumb also appears during startup; wait for the menu actions.
+              wait("Refresh local state")
               assert "Assistant" not in output()
               send("q")
           assert process.wait(timeout=15) == 0
+      except BaseException:
+          print(output())
+          raise
       finally:
           if process.poll() is None:
               process.terminate()

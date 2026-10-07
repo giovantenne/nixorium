@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 	"unicode"
 
 	"charm.land/bubbles/v2/textarea"
@@ -18,7 +17,6 @@ import (
 // AssistantActions keeps service calls and private filesystem state in the
 // command/application layers. Presentation owns only the interaction state.
 type AssistantActions struct {
-	Version             string
 	ChangedFiles        func(string) (int, error)
 	PlanSave            func(context.Context, string) domain.AssistantSavePlan
 	Save                func(context.Context, domain.AssistantSavePlan) domain.TemplateResetResult
@@ -28,9 +26,6 @@ type AssistantActions struct {
 	ReadConsent         func() (bool, error)
 	WriteConsent        func() error
 	Activate            func(context.Context, string) (domain.AssistantActivation, error)
-	OpenTurn            func(context.Context, string) (domain.AssistantTurn, error)
-	Step                func(context.Context, string, string, domain.AssistantStepRequest, func(domain.AssistantEvent)) error
-	Cancel              func(context.Context, string, string) error
 	Cleanup             func() error
 	PrepareConversation func(string) (domain.AssistantConversation, error)
 	Run                 func(context.Context, domain.AssistantConversation, string, func(domain.AssistantEvent)) (domain.AssistantTurnResult, error)
@@ -45,7 +40,7 @@ type assistantModel struct {
 	code                        textinput.Model
 	messages                    []domain.AssistantMessage
 	streamed, summary, activity string
-	token, turnID               string
+	token                       string
 	historyScroll               int
 	id                          uint64
 	cancel                      context.CancelFunc
@@ -57,7 +52,6 @@ type assistantAccessMsg struct {
 	id      uint64
 	token   string
 	consent bool
-	turn    domain.AssistantTurn
 	err     error
 }
 type assistantActivationMsg struct {
@@ -138,14 +132,9 @@ func (model dashboardModel) assistantAccess(ctx context.Context, id uint64, acce
 	if result.err != nil || !result.consent {
 		return result
 	}
-	if actions.Run != nil {
-		return result
-	}
-	if actions.OpenTurn == nil {
+	if actions.Run == nil {
 		result.err = errors.New("Assistant service unavailable")
-		return result
 	}
-	result.turn, result.err = actions.OpenTurn(ctx, result.token)
 	return result
 }
 
@@ -206,49 +195,8 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 		}
 		return model, nil
 	}
-	model.assistant.token, model.assistant.turnID = message.token, message.turn.TurnID
-	if model.actions.AssistantService.Run != nil {
-		return model.startAssistantRunner()
-	}
-	model.assistant.activity = "Preparing a proposal"
-	model.assistant.streamed, model.assistant.summary = "", ""
-	prompt := strings.ReplaceAll(model.assistant.input.Value(), message.token, "[REDACTED]")
-	model.assistant.messages = append(model.assistant.messages, domain.AssistantMessage{Role: "user", Content: prompt})
-	request := domain.AssistantStepRequest{Messages: append([]domain.AssistantMessage(nil), model.assistant.messages...)}
-	actions := model.actions.AssistantService
-	if len(model.assistant.messages) == 1 {
-		request.Context = &domain.AssistantContext{Nixorium: actions.Version, Files: []string{}}
-	}
-	// Streaming has its own cancellation context; OpenTurn is already finished.
-	if model.assistant.cancel != nil {
-		model.assistant.cancel()
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	model.assistant.cancel = cancel
-	events := make(chan tea.Msg, 32)
-	model.assistant.events = events
-	id, token, turnID := model.assistant.id, message.token, message.turn.TurnID
-	return model, func() tea.Msg {
-		go func() {
-			defer close(events)
-			var err error
-			if actions.Step == nil {
-				err = errors.New("Assistant streaming unavailable")
-			} else {
-				err = actions.Step(ctx, token, turnID, request, func(event domain.AssistantEvent) {
-					select {
-					case events <- assistantStreamMsg{id: id, event: event}:
-					case <-ctx.Done():
-					}
-				})
-			}
-			select {
-			case events <- assistantStreamMsg{id: id, done: true, err: err}:
-			case <-ctx.Done():
-			}
-		}()
-		return <-events
-	}
+	model.assistant.token = message.token
+	return model.startAssistantRunner()
 }
 
 func (model dashboardModel) waitAssistantStream() tea.Cmd {
@@ -275,11 +223,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model.assistant.summary = message.result.Summary
 		}
 		if message.err != nil {
-			if model.actions.AssistantService.Run != nil {
-				return model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
-			}
-			model.message = assistantServiceNotice(message.err, model.actions.Assistant.SubscribeURL)
-			return model, model.cancelAssistantRemote()
+			return model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
 		}
 		if model.assistant.changedFiles > 0 {
 			model.message = "Proposal ready: " + countNoun(model.assistant.changedFiles, "file") + " changed. Press Ctrl+R to review."
@@ -300,34 +244,8 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		model.assistant.messages = append(model.assistant.messages, domain.AssistantMessage{Role: "assistant", Content: model.assistant.streamed})
 	case "error":
 		model.message = assistantServiceNotice(&domain.AssistantError{Code: event.Code}, model.actions.Assistant.SubscribeURL)
-	case "tool_calls":
-		// Tool execution is added by C5, after the candidate workspace exists.
-		model.assistant.state = "chat"
-		if model.assistant.cancel != nil {
-			model.assistant.cancel()
-			model.assistant.cancel = nil
-		}
-		model.message = "This Assistant client cannot execute tools yet. Return to the chat after updating Nixorium."
-		return model, model.cancelAssistantRemote()
 	}
 	return model, model.waitAssistantStream()
-}
-
-func (model dashboardModel) cancelAssistantRemote() tea.Cmd {
-	actions := model.actions.AssistantService
-	token, turnID := model.assistant.token, model.assistant.turnID
-	if actions == nil || actions.Cancel == nil || token == "" || turnID == "" {
-		return nil
-	}
-	if actions.Run != nil {
-		return nil
-	}
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		_ = actions.Cancel(ctx, token, turnID)
-		return nil
-	}
 }
 
 func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -341,7 +259,7 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 			model.assistant.id++
 			model.assistant.state = "chat"
 			model.message = "Stopped. Your deployment is unchanged."
-			return model, model.cancelAssistantRemote()
+			return model, nil
 		}
 		return model, nil
 	case "cta-none", "cta-inactive":

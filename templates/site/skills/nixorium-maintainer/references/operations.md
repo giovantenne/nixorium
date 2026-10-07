@@ -59,6 +59,9 @@ Never clear evidence, weaken permissions/trust or replay work to unstick it.
 - PXE/network: managed operator recovery, not interface/firewall workarounds.
 - Home reset: preserve the login barrier and snapshot evidence; no helper retry,
   reboot or marker deletion as a shortcut.
+- Assistant save: keep its Git backup and shared template-reset journal; the
+  operator opens native reviewed recovery. Never remove the marker or replay
+  the save. A saved proposal is not an applied system.
 - Workspace metadata failure: explain the pin/capability problem; do not
   silently reset the deployment, update inputs or copy an example profile.
 

@@ -366,6 +366,18 @@ any shard must block publication.
 - `lab.assistant` is off by default and preserved by settings saves. Only an
   opted-in controller installs `/etc/nixorium/assistant.json` and its private
   state directory. Service and subscription URL overrides are for staging/tests.
+- Assistant tools write only the private candidate, never the deployment.
+  Preserve relative-path confinement, hidden credentials/untracked files and
+  read-only settings/locks/instructions, plus redaction of all model-facing
+  content and separation of the laboratory token. Seven fixed tools only:
+  no shell, service control, builds, activation, logs or student-home access.
+  Evaluate a temporary clone with IFD disabled and bounded time/output; compare
+  `nixoriumHostClasses` representatives. Host-name-dependent exceptions must
+  declare hostModules or updateValidationHosts. Only the native reviewed save
+  can commit, after fresh evaluation/token checks, under the operation gate,
+  with a durable backup and shared recovery journal. Keep startup free of Nix
+  evaluation and keep controller/client application separately reviewed.
+  See docs/assistant.md; the external maintainer skill remains proposal-only.
 - Adoption telemetry is controller-only and off without explicit administrator
   consent. The first administrator launch acknowledges the operational disclaimer before
   offering telemetry. Enter/e accepts, n declines, Esc skips to the menu and q
@@ -540,7 +552,7 @@ any shard must block publication.
   the update token; do not silently change identity or targets. Extension versions come from
   the package base, not independent home downloads or vendor-latest promises.
 - Save results distinguish local configuration, controller verification at the
-  saved revision, and unobserved client state. Settings, workspace and template
+  saved revision, and unobserved client state. Settings, workspace, Assistant and template
   reset offer a separate controller review, never automatic activation; later
   client selection requires fresh inventory, planning and confirmation. Preserve
   existing automatic controller follow-up for Software/Update only. Never infer

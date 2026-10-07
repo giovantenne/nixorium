@@ -95,6 +95,12 @@ the previous tracked configuration as a new commit. Inspect conflicts and newer
 edits first; do not force an overwrite. Applying/rebooting that reverted system
 is again a separate decision, not a student-data restore.
 
+The same reviewed recovery also handles an interrupted native Assistant save.
+Its journal has `kind: "assistant-save"` and its original backup uses
+`refs/nixorium/assistant-backups/`. The Overview condition retains the
+shared template-reset title; the recovery report identifies the Assistant save.
+See [Assistant recovery](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md#interrupted-save).
+
 **Guided recovery.** The dashboard opens in safe mode with **A deployment
 template reset was interrupted**; open it, or run:
 

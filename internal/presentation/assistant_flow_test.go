@@ -10,10 +10,12 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/giovantenne/nixorium/internal/adapters"
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -93,10 +95,15 @@ func assistantFlowFixture(t *testing.T, handler http.HandlerFunc) (dashboardMode
 	}
 	client := adapters.AssistantClient{Endpoint: server.URL + "/v1", Version: "3.2.0"}
 	actions := DashboardActions{Assistant: domain.AssistantConfig{Enabled: true, Endpoint: server.URL + "/v1", SubscribeURL: "https://example.org/subscribe"}, AssistantService: &AssistantActions{
-		Version: client.Version, ReadToken: store.ReadToken, WriteToken: store.WriteToken, DeleteToken: store.DeleteToken,
+		ReadToken: store.ReadToken, WriteToken: store.WriteToken, DeleteToken: store.DeleteToken,
 		ReadConsent: store.ReadConsent, WriteConsent: store.WriteConsent, Activate: client.Activate,
-		OpenTurn: client.OpenTurn, Step: client.Step, Cancel: client.Cancel,
 	}}
+	fixture := &assistantFlowStore{AssistantStateStore: store}
+	runner := app.AssistantTurnRunner{Client: client, Store: fixture, Tools: fixture, Version: client.Version}
+	actions.AssistantService.Run = runner.Run
+	actions.AssistantService.PrepareConversation = func(string) (domain.AssistantConversation, error) {
+		return domain.AssistantConversation{ID: flowTurnID}, nil
+	}
 	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, actions, false)
 	m.width, m.height = 120, 30
 	opened, _ := m.openAssistant()
@@ -272,10 +279,14 @@ func TestAssistantEscCancelsContextAndRemoteTurn(t *testing.T) {
 	store.WriteConsent()
 	updated, command := m.Update(keyPress("ctrl+s"))
 	m = updated.(dashboardModel)
-	updated, command = m.Update(command())
-	m = updated.(dashboardModel)
-	updated, _ = m.Update(command())
-	m = updated.(dashboardModel)
+	for i := 0; m.assistant.streamed != "Working"; i++ {
+		if i > 10 || command == nil {
+			t.Fatal("stream did not start")
+		}
+		updated, command = m.Update(command())
+		m = updated.(dashboardModel)
+	}
+
 	if m.assistant.state != "running" || m.assistant.streamed != "Working" {
 		t.Fatal("stream did not start")
 	}
@@ -283,6 +294,10 @@ func TestAssistantEscCancelsContextAndRemoteTurn(t *testing.T) {
 	m = updated.(dashboardModel)
 	if command != nil {
 		command()
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for cancelled.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
 	}
 	if cancelled.Load() != 1 || m.message != "Stopped. Your deployment is unchanged." || m.assistant.input.Value() == "" {
 		t.Fatal("Esc did not cancel safely")
@@ -336,5 +351,45 @@ func TestAssistantRunnerFlowAndStaleChatResults(t *testing.T) {
 	m = updated.(dashboardModel)
 	if m.assistant.streamed != "" || m.assistant.conversation.ID != "" {
 		t.Fatal("old chat updated new chat")
+	}
+}
+
+// The real turn runner uses a small in-memory conversation in HTTP flow tests.
+// File confinement and Git state are covered by adapter and VM integration tests.
+type assistantFlowStore struct {
+	adapters.AssistantStateStore
+	messages []domain.AssistantMessage
+}
+
+func (s *assistantFlowStore) ReadTranscript(domain.AssistantConversation) ([]domain.AssistantMessage, error) {
+	return s.messages, nil
+}
+func (s *assistantFlowStore) WriteTranscript(_ domain.AssistantConversation, m []domain.AssistantMessage) error {
+	s.messages = m
+	return nil
+}
+func (s *assistantFlowStore) VisibleFiles(domain.AssistantConversation) ([]string, error) {
+	return []string{}, nil
+}
+func (s *assistantFlowStore) Execute(context.Context, domain.AssistantConversation, domain.AssistantToolCall) string {
+	panic("unexpected tool call in HTTP-only flow test")
+}
+
+func TestAssistantProposalReadyUsesActualChangeCount(t *testing.T) {
+	for _, count := range []int{0, 1, 2} {
+		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("render made HTTP request") })
+		m.assistant.state = "running"
+		updated, _ := m.finishAssistantStream(assistantStreamMsg{id: m.assistant.id, done: true, changedFiles: count, result: &domain.AssistantTurnResult{Summary: "Prepared"}})
+		m = updated.(dashboardModel)
+		if count == 0 {
+			if strings.Contains(m.View().Content, "Proposal ready") {
+				t.Fatal("empty workspace advertised")
+			}
+		} else {
+			want := "Proposal ready: " + countNoun(count, "file") + " changed. Press Ctrl+R to review."
+			if m.message != want || !strings.Contains(m.View().Content, "Review proposal") {
+				t.Fatal(m.View().Content)
+			}
+		}
 	}
 }

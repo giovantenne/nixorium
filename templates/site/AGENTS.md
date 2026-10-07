@@ -69,3 +69,13 @@ Use [administrator instructions](README.md), [troubleshooting](TROUBLESHOOTING.m
 procedures, not authorize agent execution. Unsupported customization is a
 separate development task. Updating inputs does not automatically refresh copied
 agent instructions; that requires a separate reviewed operator change.
+
+## Native Assistant
+
+The optional subscription-based Assistant is a separate native operator
+workflow with a confined candidate and explicit review/save. Its availability
+does not expand this external agent's proposal-only authority. Do not drive
+its activation, consent, save or recovery confirmations. Host-specific private
+modules that branch on networking.hostName must declare their exceptional
+hosts in hostModules or updateValidationHosts for representative evaluation;
+identifying a missing declaration is a handoff, not permission to edit it.

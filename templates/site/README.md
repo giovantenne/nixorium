@@ -21,9 +21,24 @@ reviewed refresh; updating the Nixorium input alone does not replace them.
 
 - [First setup](#first-setup)
 - [Local customization](#local-customization)
+- [Optional Assistant](#optional-assistant)
 - [Occasional interventions](#occasional-interventions)
 - [Updating Nixorium](#updating-nixorium)
 - [Troubleshooting and recovery](TROUBLESHOOTING.md)
+
+## Optional Assistant
+
+Set `lab.assistant` to `true` in the existing `lab-settings.json` and apply the
+controller through its ordinary review. The optional subscription service then
+appears in the administrator menu. Activate it with the code shown after
+payment and accept its separate data-sharing consent. Review each proposal;
+saving creates a local commit and backup, with separate system-application
+and computer-update reviews afterwards.
+
+Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
+for privacy, host classes, tool limits, local retention and interrupted-save
+recovery. This native workflow does not expand the authority of external
+agents using the proposal-only maintainer skill.
 
 ## First setup
 

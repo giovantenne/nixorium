@@ -664,6 +664,20 @@ private evidence before administrator-led recovery; never delete the marker
 or rerun the reset just to clear an error. Snapshot recovery, external backups
 and reverting the declared profile are distinct operations.
 
+## Optional Assistant
+
+`lab.assistant` enables the administrator Assistant menu only on the controller,
+after applying its configuration. See [Assistant](assistant.md) for the
+subscription, consent, confined tools and reviewed local-save workflow.
+
+`nixoriumHostClasses` is a cheap `mkLab` output: sorted records with
+`representative` and `members`, covering every host exactly once. The controller,
+`hostModules` hosts and `updateValidationHosts` are singleton classes; remaining
+clients group by applicable software and interface. Private modules branching
+on `networking.hostName` must declare exceptional hosts through those inputs.
+Assistant evaluates representatives and conservatively includes hosts whose
+assigned representative changes, even when their own system is unchanged.
+
 ## Public Flake outputs
 
 The upstream keeps its standalone example evaluable while private deployments

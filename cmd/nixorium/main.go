@@ -297,11 +297,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	actions := presentation.DashboardActions{
 		Assistant: assistantConfig,
 		AssistantService: &presentation.AssistantActions{
-			Version:   nixoriumVersion,
 			ReadToken: assistantStore.ReadToken, WriteToken: assistantStore.WriteToken,
 			DeleteToken: assistantStore.DeleteToken, ReadConsent: assistantStore.ReadConsent,
 			WriteConsent: assistantStore.WriteConsent, Activate: assistantClient.Activate,
-			OpenTurn: assistantClient.OpenTurn, Step: assistantClient.Step, Cancel: assistantClient.Cancel,
 			Cleanup: assistantWorkspace.Cleanup,
 			PrepareConversation: func(id string) (domain.AssistantConversation, error) {
 				return assistantWorkspace.PrepareConversation(repository, id)

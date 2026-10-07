@@ -6,8 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- Add the off-by-default `lab.assistant` opt-in and controller-only Assistant
-  service configuration. Settings saves preserve the option.
+- Add optional subscription-based Assistant, visible in the administrator menu
+  only with `lab.assistant` enabled on the controller. Separate activation and
+  consent precede content sharing. Fixed tools prepare an isolated candidate;
+  host-class evaluation and a full comparison precede an explicit local save
+  with a recoverable Git backup. Applying systems remains separately reviewed.
+  Settings saves preserve the option.
 
 - Restrict the laboratory maintainer skill to supported proposals and bounded
   diagnostics. Explicitly prohibit invasive module/overlay/script changes and
