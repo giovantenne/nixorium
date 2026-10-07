@@ -281,6 +281,9 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model.message = assistantServiceNotice(message.err, model.actions.Assistant.SubscribeURL)
 			return model, model.cancelAssistantRemote()
 		}
+		if model.assistant.changedFiles > 0 {
+			model.message = "Proposal ready: " + countNoun(model.assistant.changedFiles, "file") + " changed. Press Ctrl+R to review."
+		}
 		return model, nil
 	}
 	event := message.event
@@ -489,7 +492,7 @@ func (model dashboardModel) assistantView() string {
 	fixedBody := assistantDisclosure + "\n\n" + input.View()
 	actions := []tuiAction{{key: "Ctrl+S", label: "Send"}, {key: "Enter", label: "New line"}, {key: "PgUp/PgDn", label: "History"}, {key: "Ctrl+N", label: "New chat"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	if model.assistant.changedFiles > 0 {
-		actions = append([]tuiAction{{key: "Ctrl+R", label: "Review"}}, actions...)
+		actions = append([]tuiAction{{key: "Ctrl+R", label: "Review proposal"}}, actions...)
 	}
 	if model.assistant.state == "running" {
 		fixedBody = model.activitySpinner.View() + " " + assistantDisplayText(model.assistant.activity) + "\n\n" + fixedBody

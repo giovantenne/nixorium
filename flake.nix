@@ -69,6 +69,9 @@
         inherit workspaceRuntimeLab workspaceRuntimeControllerLab defaultLab;
         labConfig = import ./lab-config.nix;
       };
+      assistantVmTest = pkgs.testers.runNixOSTest (import ./tests/assistant-vm.nix {
+        nixoriumPackage = defaultLab.packages.${system}.nixorium;
+      });
       managementVmTest = pkgs.testers.runNixOSTest (import ./tests/management-vm.nix {
         nixoriumPackage = defaultLab.packages.${system}.nixorium;
       });
@@ -217,6 +220,7 @@
         client-installer-vm = clientInstallerVmTest;
         remote-client-installer-vm = remoteClientInstallerVmTest;
         management-vm = managementVmTest;
+        assistant-vm = assistantVmTest;
       };
       templates.site = {
         path = ./templates/site;
