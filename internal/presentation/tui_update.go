@@ -14,6 +14,12 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case assistantAccessMsg:
+		return model.finishAssistantAccess(message)
+	case assistantActivationMsg:
+		return model.finishAssistantActivation(message)
+	case assistantStreamMsg:
+		return model.finishAssistantStream(message)
 	case computerSetupMsg:
 		return model.finishComputerSetup(message)
 	case disclaimerMsg:
@@ -1110,6 +1116,11 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model.updateDisclaimer(key)
 	}
 	if !ok {
+		if model.screen == dashboardAssistant && !model.helpOpen && model.assistant.state == "chat" {
+			var command tea.Cmd
+			model.assistant.input, command = model.assistant.input.Update(message)
+			return model, command
+		}
 		if model.busy != "" {
 			if _, pasted := message.(tea.PasteMsg); pasted {
 				model.message = "Text cannot be changed while work is running. Use the available actions below."
@@ -1159,6 +1170,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.helpOpen = true
 		model.pageScroll = 0
 		return model, nil
+	}
+	if model.screen == dashboardAssistant {
+		return model.updateAssistantKey(key)
 	}
 	if model.read.cancel == nil && model.screen == dashboardWorkspace && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
 		return model.updateWorkspaceKey(key)

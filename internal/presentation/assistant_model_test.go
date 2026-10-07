@@ -31,9 +31,9 @@ func TestAssistantMenuIsExplicitAndAdministratorOnly(t *testing.T) {
 			if test.visible && areas[4] != assistantTask {
 				t.Fatal("Assistant is not fifth and last")
 			}
-			updated, command := m.Update(keyPress(assistantTask.shortcut))
+			updated, _ := m.Update(keyPress(assistantTask.shortcut))
 			m = updated.(dashboardModel)
-			if command != nil || (m.screen == dashboardAssistant) != test.visible {
+			if (m.screen == dashboardAssistant) != test.visible {
 				t.Fatal("shortcut bypassed opt-in or classroom boundary")
 			}
 			if test.visible {

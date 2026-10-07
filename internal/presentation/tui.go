@@ -33,6 +33,7 @@ type DashboardActions struct {
 	ApplyTemplateReset        func(domain.TemplateResetPlan) domain.TemplateResetResult
 	ClassroomMode             bool
 	Assistant                 domain.AssistantConfig
+	AssistantService          *AssistantActions
 	// OpenClassroomView opens the classroom view page and
 	// returns a sentence for the operator.
 	OpenClassroomView func(context.Context) (string, error)
@@ -422,6 +423,7 @@ type dashboardModel struct {
 	setupMode              bool
 	homeMenu               dashboardTaskMenu
 	actions                DashboardActions
+	assistant              assistantModel
 	screen                 dashboardScreen
 	busy                   string
 	message                string

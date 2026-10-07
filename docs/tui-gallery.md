@@ -218,6 +218,51 @@ Inventory, updating computers, Internet access and power
 ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```
 
+## Assistant message disclosure
+
+```text
+Nixorium  /  Assistant
+
+When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service.
+Do not enter passwords or student data.
+
+
+
+› Prepare Python with Jupyter on pc01–pc10
+›
+›
+
+Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat  ·  Esc Back  ·  F1 Help
+```
+
+## Assistant subscription before sending
+
+```text
+Nixorium  /  Assistant
+
+Assistant needs an active subscription
+
+Your request was not sent. Subscribe at https://nixorium.org/assistant/, then press a and
+enter the activation code you receive by email.
+
+a Enter activation code  ·  Esc Back to the message  ·  F1 Help
+```
+
+## Separate Assistant consent
+
+```text
+Nixorium  /  Assistant
+
+Before you send
+
+Your messages, and the configuration files the assistant reads, are sent to
+the Nixorium Assistant service and to its AI provider to prepare a proposal.
+The service does not keep their content. Passwords and private keys in your
+deployment are never sent. Logs and student files are never read.
+
+Enter Accept and send  ·  Esc Back
+```
+
 ## Pinned package search
 
 ```text

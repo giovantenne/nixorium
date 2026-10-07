@@ -218,7 +218,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "v  View existing managed work without starting or resuming it")
 		}
 	case dashboardAssistant:
-		lines = append(lines, "Esc  Back to the overview")
+		lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Esc Back (Stop during a request)", "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:
 		lines = append(lines, taskHelp(model.availableComputerTasks())...)
 	case dashboardInstallationArea:
@@ -509,6 +509,9 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 }
 
 func (model dashboardModel) textEntry() bool {
+	if model.screen == dashboardAssistant {
+		return model.assistant.state == "chat" || model.assistant.state == "activate"
+	}
 	if model.screen == dashboardHostTrust {
 		return model.hostTrust.cancel == nil && !model.hostTrust.applying && model.hostTrust.result.Operation == "" && !model.hostTrust.plan.HasErrors()
 	}
