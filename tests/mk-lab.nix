@@ -29,6 +29,16 @@ let
   classroomViewLab = mkLab (baseArgs // {
     labConfig = labConfig // { classroomView = true; };
   });
+  assistantLab = mkLab (baseArgs // {
+    labConfig = labConfig // { assistant = true; };
+  });
+  assistantTestLab = mkLab (baseArgs // {
+    labConfig = labConfig // { assistant = true; };
+    controllerModules = [ ./fixtures/assistant-options.nix ];
+  });
+  assistantOffLab = mkLab (baseArgs // {
+    labConfig = labConfig // { assistant = false; };
+  });
   roleInterfaceLab = mkLab (baseArgs // {
     labConfig = labConfig // {
       controllerIfaceName = "eno1";
@@ -314,6 +324,29 @@ assert !((mkLab (baseArgs // { labConfig = labConfig // { classroomView = false;
 # It adds no network port: the controller reaches it through SSH.
 assert lib.hasInfix "tcp dport 22 accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
+# Assistant configuration and private state exist only on opted-in controllers.
+assert !(plainLab.nixosConfigurations.pc99.config.environment.etc ? "nixorium/assistant.json");
+assert !(assistantOffLab.nixosConfigurations.pc99.config.environment.etc ? "nixorium/assistant.json");
+assert !(assistantLab.nixosConfigurations.pc01.config.environment.etc ? "nixorium/assistant.json");
+assert assistantLab.nixosConfigurations.pc99.config.environment.etc."nixorium/assistant.json".mode == "0444";
+assert builtins.fromJSON assistantLab.nixosConfigurations.pc99.config.environment.etc."nixorium/assistant.json".text == {
+  schemaVersion = 1;
+  enabled = true;
+  endpoint = "https://assistant.nixorium.org/v1";
+  subscribeUrl = "https://nixorium.org/assistant/";
+};
+assert builtins.fromJSON assistantTestLab.nixosConfigurations.pc99.config.environment.etc."nixorium/assistant.json".text == {
+  schemaVersion = 1;
+  enabled = true;
+  endpoint = "http://127.0.0.1:18480/v1";
+  subscribeUrl = "https://subscribe.example.org/";
+};
+assert builtins.elem "d /var/lib/nixorium/assistant 0700 admin users -"
+  assistantLab.nixosConfigurations.pc99.config.systemd.tmpfiles.rules;
+assert !(builtins.elem "d /var/lib/nixorium/assistant 0700 admin users -"
+  assistantLab.nixosConfigurations.pc01.config.systemd.tmpfiles.rules);
+assert !(builtins.elem "d /var/lib/nixorium/assistant 0700 admin users -"
+  assistantOffLab.nixosConfigurations.pc99.config.systemd.tmpfiles.rules);
 # Base software is installed whatever lab-software.json declares.
 assert builtins.all (host: builtins.all (pname: hasPackage subnetLab host pname)
   [ "chromium" "ghostty" "git" "terminaltexteffects" ]) [ "pc99" "pc01" ];

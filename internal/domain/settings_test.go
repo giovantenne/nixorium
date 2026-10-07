@@ -3,6 +3,7 @@ package domain
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -262,5 +263,38 @@ func TestClassroomViewIsOnUnlessTurnedOff(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("turning the classroom view off is not reviewed: %+v", changes)
+	}
+}
+
+func TestAssistantRequiresOptInAndSurvivesSettingsSave(t *testing.T) {
+	settings := validSettings()
+	data, err := MarshalLabSettings(settings)
+	if err != nil || strings.Contains(string(data), `"assistant"`) || settings.Lab.AssistantOn() {
+		t.Fatalf("absent Assistant setting: %s, %v", data, err)
+	}
+	for _, enabled := range []bool{false, true} {
+		settings.Lab.Assistant = &enabled
+		data, err = MarshalLabSettings(settings)
+		if err != nil {
+			t.Fatal(err)
+		}
+		loaded, issues := DecodeLabSettings(data)
+		if len(issues) != 0 || loaded.Lab.Assistant == nil || loaded.Lab.AssistantOn() != enabled {
+			t.Fatalf("decoded Assistant setting: %+v, %v", loaded.Lab.Assistant, issues)
+		}
+		loaded.Lab.HomepageURL = "https://changed.example.org"
+		saved, err := MarshalLabSettings(loaded)
+		if err != nil || !strings.Contains(string(saved), fmt.Sprintf(`"assistant": %t`, enabled)) {
+			t.Fatalf("Assistant lost on save: %s, %v", saved, err)
+		}
+	}
+	on := true
+	changes := DiffLabSettings(LabSettingsFile{}, LabSettingsFile{Lab: LabSettings{Assistant: &on}})
+	found := false
+	for _, change := range changes {
+		found = found || (change.Field == "lab.assistant" && change.Before == false && change.After == true)
+	}
+	if !found {
+		t.Fatalf("Assistant opt-in is not reviewed: %+v", changes)
 	}
 }

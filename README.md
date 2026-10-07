@@ -70,6 +70,8 @@ deploys it, Harmonia serves the cache and Disko lays out the disks.
 
 [Administrator guide](templates/site/README.md) · [Menu tour](docs/tui-gallery.md)
 
+The optional Assistant subscription service is off by default; set `lab.assistant` to `true` in `lab-settings.json` and apply the controller to enable its administrator menu entry.
+
 ## For teachers
 
 **Every PC ready for the lesson.** Sign in to the controller with your teacher

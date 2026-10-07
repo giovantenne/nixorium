@@ -85,6 +85,7 @@ let
   inherit (config) keyboardLayout;
   inherit (config) consoleKeyMap;
   inherit (config) classroomView;
+  inherit (config) assistant;
 
   networkOctets = map lib.toInt (lib.splitString "." networkBase);
   networkAddress =
@@ -146,6 +147,7 @@ let
     inherit keyboardLayout;
     inherit consoleKeyMap;
     inherit classroomView;
+    inherit assistant;
     inherit cachePublicKey;
     inherit cachePort;
     inherit pxeHttpPort;
@@ -174,6 +176,7 @@ let
     (upstreamRoot + "/modules/classroom-view.nix")
     (upstreamRoot + "/modules/management.nix")
     (upstreamRoot + "/modules/telemetry.nix")
+    (upstreamRoot + "/modules/assistant.nix")
     (upstreamRoot + "/modules/pxe.nix")
   ] ++ lib.optional (nixosVersionMetadata != null) ({ lib, ... }: {
     system.nixos.versionSuffix = lib.mkForce nixosVersionMetadata.versionSuffix;

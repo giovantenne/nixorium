@@ -1,6 +1,10 @@
 {
   "invalid": [
     {
+      "name": "Assistant opt-in must be boolean",
+      "overrides": { "assistant": "true" }
+    },
+    {
       "name": "DHCP address overlaps static laboratory prefix",
       "overrides": { "masterDhcpIp": "10.0.0.42", "networkBase": "10.0.0.0", "networkPrefixLength": 24 }
     },

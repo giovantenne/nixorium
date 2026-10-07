@@ -40,6 +40,11 @@ let
             default = true;
             description = "Classroom view agent on client computers (on unless set to false)";
           };
+          assistant = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Optional Assistant subscription service in the administrator TUI";
+          };
           deploymentMode = lib.mkOption {
             type = lib.types.enum [ "laboratory" "controller" ];
             default = "laboratory";

@@ -71,6 +71,37 @@ func TestWriteSettingsIsAtomicAndPrivate(t *testing.T) {
 	}
 }
 
+func TestSettingsFilePreservesAssistantOptIn(t *testing.T) {
+	directory := t.TempDir()
+	local := Local{}
+	settings := adapterSettings()
+	enabled := true
+	settings.Lab.Assistant = &enabled
+	if err := local.WriteSettings(directory, settings); err != nil {
+		t.Fatal(err)
+	}
+	before, err := local.ReadSettings(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, issues := domain.DecodeLabSettings(before)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	loaded.Lab.HomepageURL = "https://changed.example.org"
+	if err := local.WriteSettingsIfUnchanged(directory, before, loaded); err != nil {
+		t.Fatal(err)
+	}
+	after, err := local.ReadSettings(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, issues := domain.DecodeLabSettings(after)
+	if len(issues) != 0 || !decoded.Lab.AssistantOn() || decoded.Lab.HomepageURL != loaded.Lab.HomepageURL {
+		t.Fatalf("Assistant opt-in lost during settings save: %+v, %v", decoded, issues)
+	}
+}
+
 func TestWriteSettingsRejectsSymlinkTarget(t *testing.T) {
 	directory := t.TempDir()
 	target := filepath.Join(t.TempDir(), "target")

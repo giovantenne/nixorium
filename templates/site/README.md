@@ -157,6 +157,8 @@ as the next step. In Software, Enter on a configured application opens its
 details and available actions. Removal and destination changes require a
 separate review. Client updates remain a separate operation.
 
+The optional Assistant subscription service is off by default; set `lab.assistant` to `true` in `lab-settings.json` and apply the controller to enable its administrator menu entry. This option is not in the settings editor.
+
 ## Classroom view
 
 Clients expose only SSH (22) to the controller's static IPv4 address on the

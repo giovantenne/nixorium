@@ -35,10 +35,16 @@ func (settings LabSettings) ClassroomViewOn() bool {
 	return settings.ClassroomView == nil || *settings.ClassroomView
 }
 
+// AssistantOn requires an explicit opt-in to the subscription service.
+func (settings LabSettings) AssistantOn() bool {
+	return settings.Assistant != nil && *settings.Assistant
+}
+
 type LabSettings struct {
 	DeploymentMode string `json:"deploymentMode,omitempty"`
 	// ClassroomView is on unless set to false; see ClassroomViewOn.
 	ClassroomView           *bool             `json:"classroomView,omitempty"`
+	Assistant               *bool             `json:"assistant,omitempty"`
 	MasterDHCPIP            string            `json:"masterDhcpIp"`
 	NetworkBase             string            `json:"networkBase"`
 	NetworkPrefix           int               `json:"networkPrefixLength"`

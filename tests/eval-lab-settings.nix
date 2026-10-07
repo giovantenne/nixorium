@@ -9,6 +9,9 @@ let
     (builtins.tryEval (builtins.deepSeq (evalLabSettings settings) true)).success;
 in
 assert evaluates valid;
+assert evaluates (valid // { lab = valid.lab // { assistant = true; }; });
+assert evaluates (valid // { lab = valid.lab // { assistant = false; }; });
+assert !(evaluates (valid // { lab = valid.lab // { assistant = "true"; }; }));
 assert !(evaluates (valid // { schemaVersion = 2; }));
 assert !(evaluates (valid // { unknown = true; }));
 assert !(evaluates (builtins.removeAttrs valid [ "lab" ]));
