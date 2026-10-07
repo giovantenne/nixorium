@@ -19,6 +19,9 @@ import (
 // command/application layers. Presentation owns only the interaction state.
 type AssistantActions struct {
 	Version             string
+	ChangedFiles        func(string) (int, error)
+	PlanSave            func(context.Context, string) domain.AssistantSavePlan
+	Save                func(context.Context, domain.AssistantSavePlan) domain.TemplateResetResult
 	ReadToken           func() (string, error)
 	WriteToken          func(string) error
 	DeleteToken         func() error
@@ -35,6 +38,8 @@ type AssistantActions struct {
 
 type assistantModel struct {
 	initialized                 bool
+	changedFiles                int
+	review                      assistantReviewModel
 	state                       string
 	input                       textarea.Model
 	code                        textinput.Model
@@ -66,6 +71,7 @@ type assistantStreamMsg struct {
 	done         bool
 	err          error
 	result       *domain.AssistantTurnResult
+	changedFiles int
 	conversation domain.AssistantConversation
 }
 
@@ -264,6 +270,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model.assistant.conversation = message.conversation
 		}
 		if message.result != nil {
+			model.assistant.changedFiles = message.changedFiles
 			model.assistant.messages = message.result.Messages
 			model.assistant.summary = message.result.Summary
 		}
@@ -400,6 +407,8 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 	case "esc":
 		model.screen = dashboardHome
 		return model, nil
+	case "ctrl+r":
+		return model.openAssistantReview()
 	case "ctrl+s":
 		return model.sendAssistant(false)
 	case "ctrl+n":
@@ -479,6 +488,9 @@ func (model dashboardModel) assistantView() string {
 	body := strings.Join(lines[start:end], "\n")
 	fixedBody := assistantDisclosure + "\n\n" + input.View()
 	actions := []tuiAction{{key: "Ctrl+S", label: "Send"}, {key: "Enter", label: "New line"}, {key: "PgUp/PgDn", label: "History"}, {key: "Ctrl+N", label: "New chat"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+	if model.assistant.changedFiles > 0 {
+		actions = append([]tuiAction{{key: "Ctrl+R", label: "Review"}}, actions...)
+	}
 	if model.assistant.state == "running" {
 		fixedBody = model.activitySpinner.View() + " " + assistantDisplayText(model.assistant.activity) + "\n\n" + fixedBody
 		actions = []tuiAction{{key: "Esc", label: "Stop"}, {key: "F1", label: "Help"}}
@@ -542,8 +554,12 @@ func (model dashboardModel) finishAssistantPrepared(message assistantPreparedMsg
 				case <-ctx.Done():
 				}
 			})
+			changedFiles := 0
+			if actions.ChangedFiles != nil {
+				changedFiles, _ = actions.ChangedFiles(message.conversation.ID)
+			}
 			select {
-			case events <- assistantStreamMsg{id: id, done: true, result: &result, conversation: message.conversation, err: err}:
+			case events <- assistantStreamMsg{id: id, done: true, result: &result, changedFiles: changedFiles, conversation: message.conversation, err: err}:
 			case <-ctx.Done():
 			}
 		}()

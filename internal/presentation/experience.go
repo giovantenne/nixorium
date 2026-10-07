@@ -217,6 +217,8 @@ func (model dashboardModel) helpView() string {
 		if model.actions.LoadManagedJobs != nil && !model.actions.ClassroomMode {
 			lines = append(lines, "v  View existing managed work without starting or resuming it")
 		}
+	case dashboardAssistantReview:
+		lines = append(lines, "Arrows, PgUp/PgDn and Home/End scroll the full comparison.", "Type SAVE and Enter only after a successful Nix evaluation; Esc returns to the chat.", "Saving records a local commit and a backup. Controller application and computer updates require separate reviews.")
 	case dashboardAssistant:
 		switch model.assistant.state {
 		case "cta-none", "cta-inactive":
@@ -228,7 +230,7 @@ func (model dashboardModel) helpView() string {
 		case "running":
 			lines = append(lines, "Esc Stop; the deployment remains unchanged")
 		default:
-			lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Esc Back")
+			lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back")
 		}
 		lines = append(lines, "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:
@@ -521,6 +523,9 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 }
 
 func (model dashboardModel) textEntry() bool {
+	if model.screen == dashboardAssistantReview {
+		return model.assistant.review.result.State == "" && model.assistant.review.plan.State == "ready"
+	}
 	if model.screen == dashboardAssistant {
 		return model.assistant.state == "chat" || model.assistant.state == "activate"
 	}

@@ -306,7 +306,14 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			PrepareConversation: func(id string) (domain.AssistantConversation, error) {
 				return assistantWorkspace.PrepareConversation(repository, id)
 			},
-			Run: assistantRunner.Run,
+			Run:          assistantRunner.Run,
+			ChangedFiles: assistantWorkspace.ChangedFiles,
+			PlanSave: func(ctx context.Context, id string) domain.AssistantSavePlan {
+				return adapters.PlanAssistantSave(ctx, assistantWorkspace, id)
+			},
+			Save: func(ctx context.Context, plan domain.AssistantSavePlan) domain.TemplateResetResult {
+				return adapters.SaveAssistant(ctx, assistantWorkspace, plan)
+			},
 		},
 		LoadClientSetup: func(context.Context) (bool, error) {
 			settings, _, err := settingsManager.CurrentForEditing(repository)

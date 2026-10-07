@@ -17,6 +17,7 @@ import (
 )
 
 type resetJournal struct {
+	Kind              string `json:"kind,omitempty"`
 	SchemaVersion     int    `json:"schemaVersion"`
 	Branch            string `json:"branch"`
 	OriginalRevision  string `json:"originalRevision"`
@@ -35,25 +36,8 @@ func (TemplateReset) ApplyTemplateReset(ctx context.Context, plan domain.Templat
 	}
 	defer gate.Close()
 	gate.describe("Reset deployment template")
-	// These units can continue serving an installation after its initiating TUI
-	// has closed. A template reset must not invalidate that preparation in flight.
-	for _, unit := range []string{"nixorium-pxe.service", "nixorium-pxe-network.service"} {
-		command := exec.CommandContext(ctx, "systemctl", "show", unit, "--property=LoadState", "--property=ActiveState", "--no-pager")
-		out := &boundedCommandBuffer{limit: 4096}
-		command.Stdout, command.Stderr = out, &boundedCommandBuffer{limit: 4096}
-		if err := command.Run(); err != nil || out.truncated {
-			return fail(errors.New("could not verify PXE service state; no reset was attempted"))
-		}
-		properties := map[string]string{}
-		for _, line := range strings.Split(out.buffer.String(), "\n") {
-			key, value, ok := strings.Cut(line, "=")
-			if ok {
-				properties[key] = value
-			}
-		}
-		if (properties["LoadState"] != "loaded" && properties["LoadState"] != "not-found") || properties["ActiveState"] != "inactive" {
-			return fail(errors.New("finish or recover the active PXE operation before resetting the deployment"))
-		}
+	if err := configurationCheckoutIdle(ctx); err != nil {
+		return fail(err)
 	}
 	root, err := openWorkspaceRoot(plan.Repository, unix.LOCK_EX)
 	if err != nil {
@@ -63,40 +47,77 @@ func (TemplateReset) ApplyTemplateReset(ctx context.Context, plan domain.Templat
 	return applyResetTransaction(ctx, root, plan, nil)
 }
 
+func configurationCheckoutIdle(ctx context.Context) error {
+	// These units can continue serving an installation after its initiating TUI
+	// has closed. A template reset must not invalidate that preparation in flight.
+	for _, unit := range []string{"nixorium-pxe.service", "nixorium-pxe-network.service"} {
+		command := exec.CommandContext(ctx, "systemctl", "show", unit, "--property=LoadState", "--property=ActiveState", "--no-pager")
+		out := &boundedCommandBuffer{limit: 4096}
+		command.Stdout, command.Stderr = out, &boundedCommandBuffer{limit: 4096}
+		if err := command.Run(); err != nil || out.truncated {
+			return errors.New("could not verify PXE service state; no reset was attempted")
+		}
+		properties := map[string]string{}
+		for _, line := range strings.Split(out.buffer.String(), "\n") {
+			key, value, ok := strings.Cut(line, "=")
+			if ok {
+				properties[key] = value
+			}
+		}
+		if (properties["LoadState"] != "loaded" && properties["LoadState"] != "not-found") || properties["ActiveState"] != "inactive" {
+			return errors.New("finish or recover the active PXE operation before resetting the deployment")
+		}
+	}
+	return nil
+}
+
+type configurationCommit struct {
+	Kind, CommitMessage, BackupPrefix, InterruptedMessage, SavedMessage, RefLogMessage string
+}
+
 // A multi-file checkout is not atomic. The durable backup and intent survive
 // every subsequent failure; general operation preflight rejects that marker.
 // afterCheckout is only a fault-injection seam for real-Git transaction tests.
 func applyResetTransaction(ctx context.Context, root *os.File, plan domain.TemplateResetPlan, afterCheckout func() error) domain.TemplateResetResult {
+	token, err := domain.TemplateResetToken(plan)
+	if err != nil || plan.HasErrors() || plan.ReviewToken != token || plan.Confirmation != "RESET DEPLOYMENT" || root.Name() != plan.Repository {
+		return domain.TemplateResetResult{State: "blocked", Message: "a complete unchanged reset review is required"}
+	}
+	return commitConfigurationTree(ctx, root, plan.Proposal, token, configurationCommit{
+		CommitMessage:      "Reset deployment to pinned template (" + plan.Preset.ID + ")",
+		BackupPrefix:       "refs/nixorium/template-backups/",
+		InterruptedMessage: "Reset interrupted. Keep .git/" + resetPendingName + " and the backup ref. Do not apply or deploy this worktree. See docs/deployment-template-reset.md for recovery.",
+		SavedMessage:       "Deployment template reset and committed locally. Settings, keys, ignored files and input pins were preserved. Guided home is configured, not applied: review controller/client application and reboot separately. Nothing was pushed.",
+		RefLogMessage:      "Nixorium template reset",
+	}, afterCheckout)
+}
+func commitConfigurationTree(ctx context.Context, root *os.File, proposal domain.TemplateResetProposal, token string, spec configurationCommit, afterCheckout func() error) domain.TemplateResetResult {
 	result := domain.TemplateResetResult{State: "blocked"}
 	fail := func(err error) domain.TemplateResetResult {
 		result.Message = err.Error()
 		if result.RecoveryRequired {
 			result.State = "recovery-required"
-			result.Message = "Reset interrupted. Keep .git/" + resetPendingName + " and the backup ref. Do not apply or deploy this worktree. See docs/deployment-template-reset.md for recovery."
+			result.Message = spec.InterruptedMessage
 		}
 		return result
-	}
-	token, err := domain.TemplateResetToken(plan)
-	if err != nil || plan.HasErrors() || plan.ReviewToken != token || plan.Confirmation != "RESET DEPLOYMENT" || root.Name() != plan.Repository {
-		return fail(errors.New("a complete unchanged reset review is required"))
 	}
 	source, err := inspectResetRepository(ctx, root)
 	if err != nil {
 		return fail(err)
 	}
-	expected := plan.Proposal
+	expected := proposal
 	expected.Candidate, expected.UpstreamRevision = nil, ""
 	if resetFileDigest(source) != resetFileDigest(expected) {
 		return fail(errors.New("deployment changed after review; no tracked file was replaced"))
 	}
-	if err := resetCheckCandidateDestinations(root, plan.Proposal.Candidate); err != nil {
+	if err := resetCheckCandidateDestinations(root, proposal.Candidate); err != nil {
 		return fail(err)
 	}
-	tree, err := resetWriteTree(ctx, root.Name(), plan.Proposal.Candidate)
+	tree, err := resetWriteTree(ctx, root.Name(), proposal.Candidate)
 	if err != nil {
 		return fail(err)
 	}
-	commit, err := resetGit(ctx, root.Name(), nil, 256, "commit-tree", tree, "-p", plan.Revision, "-m", "Reset deployment to pinned template ("+plan.Preset.ID+")")
+	commit, err := resetGit(ctx, root.Name(), nil, 256, "commit-tree", tree, "-p", proposal.Revision, "-m", spec.CommitMessage)
 	if err != nil {
 		return fail(err)
 	}
@@ -104,7 +125,7 @@ func applyResetTransaction(ctx context.Context, root *os.File, plan domain.Templ
 	if !fullGitObjectIDPattern.MatchString(commit) {
 		return fail(errors.New("invalid candidate commit"))
 	}
-	if _, err := resetGit(ctx, root.Name(), nil, 4096, "read-tree", "--dry-run", "-m", "-u", plan.Revision, commit); err != nil {
+	if _, err := resetGit(ctx, root.Name(), nil, 4096, "read-tree", "--dry-run", "-m", "-u", proposal.Revision, commit); err != nil {
 		return fail(err)
 	}
 	// Recheck immediately before creating the recovery intent. No source file is
@@ -116,19 +137,19 @@ func applyResetTransaction(ctx context.Context, root *os.File, plan domain.Templ
 	if resetFileDigest(source) != resetFileDigest(current) {
 		return fail(errors.New("deployment changed while preparing its backup"))
 	}
-	backup := "refs/nixorium/template-backups/" + time.Now().UTC().Format("20060102T150405.000000000Z") + "-" + plan.Revision[:12]
-	if _, err := resetGit(ctx, root.Name(), nil, 4096, "update-ref", backup, plan.Revision, strings.Repeat("0", 40)); err != nil {
+	backup := spec.BackupPrefix + time.Now().UTC().Format("20060102T150405.000000000Z") + "-" + proposal.Revision[:12]
+	if _, err := resetGit(ctx, root.Name(), nil, 4096, "update-ref", backup, proposal.Revision, strings.Repeat("0", 40)); err != nil {
 		return fail(err)
 	}
 	result.BackupRef = backup
-	journal := resetJournal{1, source.Branch, plan.Revision, commit, backup, token}
+	journal := resetJournal{Kind: spec.Kind, SchemaVersion: 1, Branch: source.Branch, OriginalRevision: proposal.Revision, CandidateRevision: commit, BackupRef: backup, ReviewToken: token}
 	result.RecoveryRequired = true
 	if err := writeResetJournal(root, journal); err != nil {
 		return fail(err)
 	}
 	// Unlike --reset -u, the two-tree merge refuses tracked local modifications.
 	// All ignored/untracked collisions were independently rejected above.
-	if _, err := resetGit(ctx, root.Name(), nil, 4096, "read-tree", "-m", "-u", plan.Revision, commit); err != nil {
+	if _, err := resetGit(ctx, root.Name(), nil, 4096, "read-tree", "-m", "-u", proposal.Revision, commit); err != nil {
 		return fail(err)
 	}
 	if afterCheckout != nil {
@@ -136,10 +157,10 @@ func applyResetTransaction(ctx context.Context, root *os.File, plan domain.Templ
 			return fail(err)
 		}
 	}
-	if err := resetSyncCandidate(root, plan.Proposal.Candidate); err != nil {
+	if err := resetSyncCandidate(root, proposal.Candidate); err != nil {
 		return fail(err)
 	}
-	if err := resetSyncRemovedParents(root, plan.Proposal.Original); err != nil {
+	if err := resetSyncRemovedParents(root, proposal.Original); err != nil {
 		return fail(err)
 	}
 	if _, err := resetGit(ctx, root.Name(), nil, 4096, "diff", "--quiet", "--no-ext-diff", "--no-textconv", commit, "--"); err != nil {
@@ -152,14 +173,14 @@ func applyResetTransaction(ctx context.Context, root *os.File, plan domain.Templ
 	if err != nil || strings.TrimSpace(branch) != source.Branch {
 		return fail(errors.New("active branch changed during reset"))
 	}
-	if _, err := resetGit(ctx, root.Name(), nil, 4096, "update-ref", "-m", "Nixorium template reset", source.Branch, commit, plan.Revision); err != nil {
+	if _, err := resetGit(ctx, root.Name(), nil, 4096, "update-ref", "-m", spec.RefLogMessage, source.Branch, commit, proposal.Revision); err != nil {
 		return fail(err)
 	}
 	if err := clearResetJournal(root); err != nil {
 		return fail(err)
 	}
 	result.State, result.Revision, result.RecoveryRequired = "saved", commit, false
-	result.Message = "Deployment template reset and committed locally. Settings, keys, ignored files and input pins were preserved. Guided home is configured, not applied: review controller/client application and reboot separately. Nothing was pushed."
+	result.Message = spec.SavedMessage
 	return result
 }
 

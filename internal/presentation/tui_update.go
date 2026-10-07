@@ -14,6 +14,12 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case assistantSavePlanMsg:
+		model.busy = ""
+		model.assistant.review.plan = message.plan
+		return model, nil
+	case assistantSaveResultMsg:
+		return model.finishAssistantSave(message)
 	case assistantCleanupMsg:
 		if message.err != nil && model.screen == dashboardAssistant {
 			model.message = "Could not clean expired Assistant chats. Apply the controller configuration and try again."
@@ -1180,6 +1186,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	}
 	if model.screen == dashboardAssistant {
 		return model.updateAssistantKey(key)
+	}
+	if model.screen == dashboardAssistantReview && model.read.cancel == nil {
+		return model.updateAssistantReviewKey(key)
 	}
 	if model.read.cancel == nil && model.screen == dashboardWorkspace && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
 		return model.updateWorkspaceKey(key)

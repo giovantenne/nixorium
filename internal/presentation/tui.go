@@ -193,6 +193,7 @@ const (
 	dashboardManagedJobs
 	dashboardDisclaimer
 	dashboardAssistant
+	dashboardAssistantReview
 )
 
 // deploymentModel owns target selection and the lifecycle of one reviewed
@@ -1164,6 +1165,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.diagnosticsView()
 	case dashboardDisclaimer:
 		content = model.disclaimerView()
+	case dashboardAssistantReview:
+		content = model.assistantReviewView()
 	case dashboardAssistant:
 		content = model.assistantView()
 	case dashboardTelemetry:

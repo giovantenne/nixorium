@@ -1,6 +1,9 @@
 package domain
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // AssistantConfig describes the controller's installed, explicit opt-in.
 type AssistantConfig struct {
@@ -101,4 +104,21 @@ type AssistantEvaluation struct {
 	OK           bool     `json:"ok"`
 	ChangedHosts []string `json:"changedHosts"`
 	Error        string   `json:"error,omitempty"`
+}
+
+type AssistantSavePlan struct {
+	State          string                `json:"state"`
+	Message        string                `json:"message"`
+	Repository     string                `json:"repository"`
+	ConversationID string                `json:"conversationId"`
+	Base           string                `json:"base"`
+	Added          []string              `json:"added"`
+	Changed        []string              `json:"changed"`
+	Removed        []string              `json:"removed"`
+	ChangedHosts   []string              `json:"changedHosts"`
+	Evaluation     AssistantEvaluation   `json:"evaluation"`
+	Diff           string                `json:"diff"`
+	ReviewToken    string                `json:"reviewToken"`
+	ExpiresAt      time.Time             `json:"expiresAt"`
+	Proposal       TemplateResetProposal `json:"-"`
 }

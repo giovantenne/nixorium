@@ -19,7 +19,7 @@ const templateResetRecoveryWindow = 10 * time.Minute
 
 // PlanTemplateResetRecovery classifies an interrupted template reset from Git
 // state only and proposes the one safe way out. It changes nothing.
-func (TemplateReset) PlanTemplateResetRecovery(ctx context.Context, repository string) domain.TemplateResetRecoveryPlan {
+func (TemplateReset) PlanTemplateResetRecovery(ctx context.Context, repository string) (out domain.TemplateResetRecoveryPlan) {
 	plan := domain.TemplateResetRecoveryPlan{SchemaVersion: domain.SchemaVersion, Operation: "template-reset-recover-plan", State: "blocked", Issues: []domain.ValidationIssue{}}
 	root, err := filepath.Abs(repository)
 	if err != nil {
@@ -32,6 +32,14 @@ func (TemplateReset) PlanTemplateResetRecovery(ctx context.Context, repository s
 	}
 	defer directory.Close()
 	journal, present, err := readResetJournal(directory)
+	if journal.Kind == "assistant-save" {
+		defer func() {
+			out.Message = assistantRecoveryMessage(out.Message)
+			for i := range out.Issues {
+				out.Issues[i].Message = assistantRecoveryMessage(out.Issues[i].Message)
+			}
+		}()
+	}
 	if !present {
 		plan.State = "unchanged"
 		plan.Message = "No interrupted template reset is recorded."
@@ -86,13 +94,21 @@ func (TemplateReset) ApplyTemplateResetRecovery(ctx context.Context, plan domain
 	return applyTemplateResetRecovery(ctx, plan, result, refuse)
 }
 
-func applyTemplateResetRecovery(ctx context.Context, plan domain.TemplateResetRecoveryPlan, result domain.TemplateResetRecoveryResult, refuse func(string) domain.TemplateResetRecoveryResult) domain.TemplateResetRecoveryResult {
+func applyTemplateResetRecovery(ctx context.Context, plan domain.TemplateResetRecoveryPlan, result domain.TemplateResetRecoveryResult, refuse func(string) domain.TemplateResetRecoveryResult) (out domain.TemplateResetRecoveryResult) {
 	directory, err := openWorkspaceRoot(plan.Repository, unix.LOCK_EX)
 	if err != nil {
 		return refuse(err.Error())
 	}
 	defer directory.Close()
 	journal, present, err := readResetJournal(directory)
+	if journal.Kind == "assistant-save" {
+		defer func() {
+			out.Message = assistantRecoveryMessage(out.Message)
+			for i := range out.Issues {
+				out.Issues[i].Message = assistantRecoveryMessage(out.Issues[i].Message)
+			}
+		}()
+	}
 	if !present || err != nil {
 		return refuse("the template reset marker changed after review; create a fresh review")
 	}
@@ -256,7 +272,8 @@ func readResetJournal(root *os.File) (resetJournal, bool, error) {
 		return journal, true, errors.New("the template reset marker is not valid JSON")
 	}
 	if journal.SchemaVersion != 1 || !strings.HasPrefix(journal.Branch, "refs/heads/") || !fullGitObjectIDPattern.MatchString(journal.OriginalRevision) ||
-		!fullGitObjectIDPattern.MatchString(journal.CandidateRevision) || !strings.HasPrefix(journal.BackupRef, "refs/nixorium/template-backups/") {
+		!fullGitObjectIDPattern.MatchString(journal.CandidateRevision) || !((journal.Kind == "" && strings.HasPrefix(journal.BackupRef, "refs/nixorium/template-backups/")) ||
+		(journal.Kind == "assistant-save" && strings.HasPrefix(journal.BackupRef, "refs/nixorium/assistant-backups/"))) {
 		return journal, true, errors.New("the template reset marker is incomplete")
 	}
 	return journal, true, nil
@@ -298,4 +315,8 @@ func resetRecoveryIssue(plan domain.TemplateResetRecoveryPlan, field, message st
 		plan.Message = message
 	}
 	return plan
+}
+
+func assistantRecoveryMessage(message string) string {
+	return strings.NewReplacer("template reset", "Assistant save", "Template reset", "Assistant save", "the reset", "the Assistant save", "The reset", "The Assistant save", "new template", "new configuration").Replace(message)
 }

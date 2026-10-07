@@ -44,6 +44,9 @@ func workspaceRecordNeedsInspection(result domain.WorkspaceApplyReport) bool {
 
 func (model dashboardModel) saveFollowupState() (saved bool, revision string) {
 	switch model.screen {
+	case dashboardAssistantReview:
+		r := model.assistant.review.result
+		return r.State == "saved" && !r.RecoveryRequired, r.Revision
 	case dashboardSettings:
 		r := model.settings.result
 		return !r.HasErrors() && !r.RecoveryRequired && (r.State == "saved" || r.State == "unchanged"), r.Revision
