@@ -292,6 +292,8 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	assistantConfig, _ := adapters.LoadAssistantConfig("/etc/nixorium/assistant.json")
 	assistantClient := adapters.AssistantClient{Endpoint: assistantConfig.Endpoint, Version: nixoriumVersion}
 	assistantStore := adapters.AssistantStateStore{Directory: "/var/lib/nixorium/assistant"}
+	assistantWorkspace := adapters.AssistantWorkspaceStore{Directory: assistantStore.Directory}
+	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace}, Store: assistantWorkspace, Version: nixoriumVersion}
 	actions := presentation.DashboardActions{
 		Assistant: assistantConfig,
 		AssistantService: &presentation.AssistantActions{
@@ -300,6 +302,11 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			DeleteToken: assistantStore.DeleteToken, ReadConsent: assistantStore.ReadConsent,
 			WriteConsent: assistantStore.WriteConsent, Activate: assistantClient.Activate,
 			OpenTurn: assistantClient.OpenTurn, Step: assistantClient.Step, Cancel: assistantClient.Cancel,
+			Cleanup: assistantWorkspace.Cleanup,
+			PrepareConversation: func(id string) (domain.AssistantConversation, error) {
+				return assistantWorkspace.PrepareConversation(repository, id)
+			},
+			Run: assistantRunner.Run,
 		},
 		LoadClientSetup: func(context.Context) (bool, error) {
 			settings, _, err := settingsManager.CurrentForEditing(repository)

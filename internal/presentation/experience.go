@@ -218,7 +218,19 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "v  View existing managed work without starting or resuming it")
 		}
 	case dashboardAssistant:
-		lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Esc Back (Stop during a request)", "Messages and files leave the controller only after subscription and consent checks.")
+		switch model.assistant.state {
+		case "cta-none", "cta-inactive":
+			lines = append(lines, "a Enter activation code; Esc Back to the message")
+		case "activate":
+			lines = append(lines, "Enter Activate; Esc Cancel")
+		case "consent":
+			lines = append(lines, "Enter Accept and send; Esc Back without sending")
+		case "running":
+			lines = append(lines, "Esc Stop; the deployment remains unchanged")
+		default:
+			lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Esc Back")
+		}
+		lines = append(lines, "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:
 		lines = append(lines, taskHelp(model.availableComputerTasks())...)
 	case dashboardInstallationArea:

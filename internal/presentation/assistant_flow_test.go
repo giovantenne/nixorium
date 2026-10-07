@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -54,6 +55,9 @@ func TestAssistantAllGateLayoutsFit(t *testing.T) {
 			m.assistant.state = state
 			m.assistant.streamed = strings.Repeat("Synthetic streaming text ", 100)
 			view := m.View().Content
+			if (state == "chat" || state == "running") && !strings.Contains(view, "Synthetic private request") {
+				t.Fatal("history obscured the draft")
+			}
 			if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 				t.Fatalf("%s exceeds %dx%d", state, size[0], size[1])
 			}
@@ -302,5 +306,35 @@ func TestAssistantNewChatAndInputKeys(t *testing.T) {
 	m = updated.(dashboardModel)
 	if command != nil || m.assistant.state != "chat" {
 		t.Fatal("empty prompt sent")
+	}
+}
+
+func TestAssistantRunnerFlowAndStaleChatResults(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("presentation bypassed runner") })
+	actions := m.actions.AssistantService
+	actions.ReadToken = func() (string, error) { return flowToken, nil }
+	actions.ReadConsent = func() (bool, error) { return true, nil }
+	actions.PrepareConversation = func(id string) (domain.AssistantConversation, error) {
+		return domain.AssistantConversation{ID: flowTurnID}, nil
+	}
+	calls := 0
+	actions.Run = func(ctx context.Context, c domain.AssistantConversation, prompt string, emit func(domain.AssistantEvent)) (domain.AssistantTurnResult, error) {
+		calls++
+		emit(domain.AssistantEvent{Type: "text", Delta: "Prepared"})
+		emit(domain.AssistantEvent{Type: "final", Summary: "Ready"})
+		return domain.AssistantTurnResult{Summary: "Ready", Messages: []domain.AssistantMessage{{Role: "user", Content: prompt}, {Role: "assistant", Content: "Prepared"}}}, nil
+	}
+	updated, command := m.Update(keyPress("ctrl+s"))
+	m = assistantWork(t, updated.(dashboardModel), command)
+	if calls != 1 || m.assistant.conversation.ID != flowTurnID || m.assistant.summary != "Ready" || len(m.assistant.messages) != 2 {
+		t.Fatal("runner flow missing")
+	}
+	oldID := m.assistant.id
+	updated, _ = m.Update(keyPress("ctrl+n"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(assistantStreamMsg{id: oldID, event: domain.AssistantEvent{Type: "text", Delta: "stale"}})
+	m = updated.(dashboardModel)
+	if m.assistant.streamed != "" || m.assistant.conversation.ID != "" {
+		t.Fatal("old chat updated new chat")
 	}
 }

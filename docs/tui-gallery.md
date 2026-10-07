@@ -223,10 +223,9 @@ Inventory, updating computers, Internet access and power
 ```text
 Nixorium  /  Assistant
 
+
 When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service.
 Do not enter passwords or student data.
-
-
 
 › Prepare Python with Jupyter on pc01–pc10
 ›

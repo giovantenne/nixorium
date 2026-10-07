@@ -91,3 +91,8 @@ type AssistantConversation struct {
 	Base       string `json:"base"`
 	CreatedAt  string `json:"createdAt"`
 }
+
+type AssistantTurnResult struct {
+	Summary  string
+	Messages []AssistantMessage
+}

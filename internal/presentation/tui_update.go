@@ -14,6 +14,13 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case assistantCleanupMsg:
+		if message.err != nil && model.screen == dashboardAssistant {
+			model.message = "Could not clean expired Assistant chats. Apply the controller configuration and try again."
+		}
+		return model, nil
+	case assistantPreparedMsg:
+		return model.finishAssistantPrepared(message)
 	case assistantAccessMsg:
 		return model.finishAssistantAccess(message)
 	case assistantActivationMsg:

@@ -12,6 +12,12 @@ const assistantNetworkNotice = "The Assistant service could not be reached. Chec
 const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service does not keep their content. Passwords and private keys in your\ndeployment are never sent. Logs and student files are never read."
 
 func assistantServiceNotice(err error, subscribeURL string) string {
+	if err != nil {
+		switch err.Error() {
+		case "Commit or discard the deployment changes before using Assistant.", "The deployment changed since this chat started. Press Ctrl+N to start a new chat.":
+			return err.Error()
+		}
+	}
 	var serviceError *domain.AssistantError
 	if errors.As(err, &serviceError) {
 		switch serviceError.Code {
@@ -23,6 +29,8 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 			return "Update Nixorium to keep using Assistant."
 		case "request_too_large":
 			return "This chat became too long. Press Ctrl+N to start a new chat."
+		case "step_limit":
+			return "This Assistant request reached its limit. Start a new request."
 		case "protocol_error":
 			return "The Assistant service returned an invalid response. Try again after updating Nixorium."
 		}

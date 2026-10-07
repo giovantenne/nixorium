@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -255,4 +256,46 @@ func TestAssistantRejectsDirtyRepositoryAndChangedHead(t *testing.T) {
 		t.Fatal(err)
 	}
 	workspaceTestGit(t, repo, "reset", "--soft", w.Conversation.Base)
+}
+
+func TestAssistantConversationCleanupAndUnavailableC6Tools(t *testing.T) {
+	workspace, store, _ := assistantWorkspaceFixture(t)
+	for _, name := range []string{"evaluate", "search_packages"} {
+		args := json.RawMessage(`{}`)
+		if name == "search_packages" {
+			args = json.RawMessage(`{"query":"python"}`)
+		}
+		result := AssistantWorkspaceTools{Store: store}.Execute(t.Context(), workspace.Conversation, domain.AssistantToolCall{ID: "c", Name: name, Arguments: args})
+		if !strings.Contains(result, "not available") {
+			t.Fatal("C6 tool was unexpectedly implemented")
+		}
+	}
+	old := workspace.Conversation
+	old.CreatedAt = time.Now().Add(-31 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	data, _ := json.Marshal(old)
+	if err := assistantWriteState(workspace.root, "meta.json", data); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := store.CreateConversation(old.Repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	os.WriteFile(filepath.Join(outside, "preserve"), []byte("private"), 0600)
+	link := filepath.Join(store.Directory, "conversations", "12345678-1234-4234-8234-123456789abc")
+	if err = os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Cleanup(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = os.Stat(filepath.Join(store.Directory, "conversations", old.ID)); !os.IsNotExist(err) {
+		t.Fatal("expired chat kept")
+	}
+	if _, err = os.Stat(filepath.Join(store.Directory, "conversations", fresh.ID)); err != nil {
+		t.Fatal("fresh chat removed")
+	}
+	if data, err = os.ReadFile(filepath.Join(outside, "preserve")); err != nil || string(data) != "private" {
+		t.Fatal("cleanup followed link")
+	}
 }

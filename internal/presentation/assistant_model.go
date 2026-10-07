@@ -11,22 +11,26 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 // AssistantActions keeps service calls and private filesystem state in the
 // command/application layers. Presentation owns only the interaction state.
 type AssistantActions struct {
-	Version      string
-	ReadToken    func() (string, error)
-	WriteToken   func(string) error
-	DeleteToken  func() error
-	ReadConsent  func() (bool, error)
-	WriteConsent func() error
-	Activate     func(context.Context, string) (domain.AssistantActivation, error)
-	OpenTurn     func(context.Context, string) (domain.AssistantTurn, error)
-	Step         func(context.Context, string, string, domain.AssistantStepRequest, func(domain.AssistantEvent)) error
-	Cancel       func(context.Context, string, string) error
+	Version             string
+	ReadToken           func() (string, error)
+	WriteToken          func(string) error
+	DeleteToken         func() error
+	ReadConsent         func() (bool, error)
+	WriteConsent        func() error
+	Activate            func(context.Context, string) (domain.AssistantActivation, error)
+	OpenTurn            func(context.Context, string) (domain.AssistantTurn, error)
+	Step                func(context.Context, string, string, domain.AssistantStepRequest, func(domain.AssistantEvent)) error
+	Cancel              func(context.Context, string, string) error
+	Cleanup             func() error
+	PrepareConversation func(string) (domain.AssistantConversation, error)
+	Run                 func(context.Context, domain.AssistantConversation, string, func(domain.AssistantEvent)) (domain.AssistantTurnResult, error)
 }
 
 type assistantModel struct {
@@ -41,6 +45,7 @@ type assistantModel struct {
 	id                          uint64
 	cancel                      context.CancelFunc
 	events                      <-chan tea.Msg
+	conversation                domain.AssistantConversation
 }
 
 type assistantAccessMsg struct {
@@ -56,11 +61,15 @@ type assistantActivationMsg struct {
 	err     error
 }
 type assistantStreamMsg struct {
-	id    uint64
-	event domain.AssistantEvent
-	done  bool
-	err   error
+	id           uint64
+	event        domain.AssistantEvent
+	done         bool
+	err          error
+	result       *domain.AssistantTurnResult
+	conversation domain.AssistantConversation
 }
+
+type assistantCleanupMsg struct{ err error }
 
 func newAssistantModel() assistantModel {
 	input := textarea.New()
@@ -90,7 +99,11 @@ func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {
 	}
 	model.screen = dashboardAssistant
 	model.message = ""
-	return model, model.assistant.input.Focus()
+	commands := []tea.Cmd{model.assistant.input.Focus()}
+	if actions := model.actions.AssistantService; actions != nil && actions.Cleanup != nil {
+		commands = append(commands, func() tea.Msg { return assistantCleanupMsg{err: actions.Cleanup()} })
+	}
+	return model, tea.Batch(commands...)
 }
 
 func (model dashboardModel) assistantAccess(ctx context.Context, id uint64, accept bool) tea.Msg {
@@ -117,6 +130,9 @@ func (model dashboardModel) assistantAccess(ctx context.Context, id uint64, acce
 		result.consent, result.err = actions.ReadConsent()
 	}
 	if result.err != nil || !result.consent {
+		return result
+	}
+	if actions.Run != nil {
 		return result
 	}
 	if actions.OpenTurn == nil {
@@ -155,6 +171,9 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 		var serviceError *domain.AssistantError
 		if errors.As(message.err, &serviceError) {
 			switch serviceError.Code {
+			case "consent_required":
+				model.assistant.state = "consent"
+				model.message = ""
 			case "subscription_inactive":
 				model.assistant.state = "cta-inactive"
 			case "invalid_token":
@@ -182,6 +201,9 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 		return model, nil
 	}
 	model.assistant.token, model.assistant.turnID = message.token, message.turn.TurnID
+	if model.actions.AssistantService.Run != nil {
+		return model.startAssistantRunner()
+	}
 	model.assistant.activity = "Preparing a proposal"
 	model.assistant.streamed, model.assistant.summary = "", ""
 	prompt := strings.ReplaceAll(model.assistant.input.Value(), message.token, "[REDACTED]")
@@ -238,7 +260,17 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model.assistant.cancel = nil
 		}
 		model.assistant.state = "chat"
+		if message.conversation.ID != "" {
+			model.assistant.conversation = message.conversation
+		}
+		if message.result != nil {
+			model.assistant.messages = message.result.Messages
+			model.assistant.summary = message.result.Summary
+		}
 		if message.err != nil {
+			if model.actions.AssistantService.Run != nil {
+				return model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
+			}
 			model.message = assistantServiceNotice(message.err, model.actions.Assistant.SubscribeURL)
 			return model, model.cancelAssistantRemote()
 		}
@@ -275,6 +307,9 @@ func (model dashboardModel) cancelAssistantRemote() tea.Cmd {
 	actions := model.actions.AssistantService
 	token, turnID := model.assistant.token, model.assistant.turnID
 	if actions == nil || actions.Cancel == nil || token == "" || turnID == "" {
+		return nil
+	}
+	if actions.Run != nil {
 		return nil
 	}
 	return func() tea.Msg {
@@ -368,7 +403,9 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 	case "ctrl+s":
 		return model.sendAssistant(false)
 	case "ctrl+n":
+		id := model.assistant.id + 1
 		model.assistant = newAssistantModel()
+		model.assistant.id = id
 		model.message = ""
 		return model, model.assistant.input.Focus()
 	case "pgup":
@@ -424,6 +461,9 @@ func (model dashboardModel) assistantView() string {
 	input.SetStyles(textarea.DefaultStyles(model.isDark))
 	history := []string{}
 	for _, message := range model.assistant.messages {
+		if message.Role == "tool" {
+			continue
+		}
 		history = append(history, message.Role+": "+assistantDisplayText(message.Content))
 	}
 	if model.assistant.streamed != "" && model.assistant.state == "running" {
@@ -432,18 +472,81 @@ func (model dashboardModel) assistantView() string {
 	if model.assistant.summary != "" {
 		history = append(history, assistantDisplayText(model.assistant.summary))
 	}
-	lines := strings.Split(strings.Join(history, "\n"), "\n")
+	wrappedHistory := lipgloss.NewStyle().Width(max(20, min(106, model.width-10))).Render(strings.Join(history, "\n"))
+	lines := strings.Split(wrappedHistory, "\n")
 	end := max(0, len(lines)-model.assistant.historyScroll)
 	start := max(0, end-max(1, model.height-19))
-	body := assistantDisclosure + "\n\n" + strings.Join(lines[start:end], "\n") + "\n\n" + input.View()
+	body := strings.Join(lines[start:end], "\n")
+	fixedBody := assistantDisclosure + "\n\n" + input.View()
 	actions := []tuiAction{{key: "Ctrl+S", label: "Send"}, {key: "Enter", label: "New line"}, {key: "PgUp/PgDn", label: "History"}, {key: "Ctrl+N", label: "New chat"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	if model.assistant.state == "running" {
-		body = model.activitySpinner.View() + " " + assistantDisplayText(model.assistant.activity) + "\n\n" + body
+		fixedBody = model.activitySpinner.View() + " " + assistantDisplayText(model.assistant.activity) + "\n\n" + fixedBody
 		actions = []tuiAction{{key: "Esc", label: "Stop"}, {key: "F1", label: "Help"}}
 	}
 	notices := []tuiNotice{}
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: []string{"Assistant"}, body: body, notices: notices, actions: actions})
+	return model.renderShell(tuiShell{path: []string{"Assistant"}, body: body, fixedBody: fixedBody, notices: notices, actions: actions})
+}
+
+type assistantPreparedMsg struct {
+	id           uint64
+	conversation domain.AssistantConversation
+	ctx          context.Context
+	err          error
+}
+
+func (model dashboardModel) startAssistantRunner() (tea.Model, tea.Cmd) {
+	if model.assistant.cancel != nil {
+		model.assistant.cancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	model.assistant.cancel = cancel
+	id := model.assistant.id
+	actions := model.actions.AssistantService
+	conversationID := model.assistant.conversation.ID
+	model.assistant.streamed, model.assistant.summary = "", ""
+	model.assistant.activity = "Preparing a private configuration workspace"
+	return model, func() tea.Msg {
+		if actions.PrepareConversation == nil {
+			return assistantPreparedMsg{id: id, ctx: ctx, err: errors.New("Assistant workspace unavailable")}
+		}
+		conversation, err := actions.PrepareConversation(conversationID)
+		if err == nil {
+			err = ctx.Err()
+		}
+		return assistantPreparedMsg{id: id, conversation: conversation, ctx: ctx, err: err}
+	}
+}
+func (model dashboardModel) finishAssistantPrepared(message assistantPreparedMsg) (tea.Model, tea.Cmd) {
+	if message.id != model.assistant.id || model.screen != dashboardAssistant {
+		return model, nil
+	}
+	if message.err != nil {
+		return model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
+	}
+	model.assistant.conversation = message.conversation
+	events := make(chan tea.Msg, 32)
+	model.assistant.events = events
+	actions := model.actions.AssistantService
+	prompt := model.assistant.input.Value()
+	ctx := message.ctx
+	id := message.id
+	return model, func() tea.Msg {
+		go func() {
+			defer close(events)
+			result, err := actions.Run(ctx, message.conversation, prompt, func(event domain.AssistantEvent) {
+				select {
+				case events <- assistantStreamMsg{id: id, event: event}:
+				case <-ctx.Done():
+				}
+			})
+			select {
+			case events <- assistantStreamMsg{id: id, done: true, result: &result, conversation: message.conversation, err: err}:
+			case <-ctx.Done():
+			}
+		}()
+		return <-events
+	}
 }
