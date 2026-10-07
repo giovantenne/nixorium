@@ -96,6 +96,9 @@ func (store AssistantStateStore) root() (*os.File, error) {
 }
 
 func assistantReadState(root *os.File, name string) ([]byte, error) {
+	return assistantReadStateLimit(root, name, 4096)
+}
+func assistantReadStateLimit(root *os.File, name string, limit int) ([]byte, error) {
 	fd, err := unix.Openat(int(root.Fd()), name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
@@ -105,8 +108,8 @@ func assistantReadState(root *os.File, name string) ([]byte, error) {
 	if telemetrySafeFile(fd, unix.S_IFREG) != nil {
 		return nil, errors.New("unsafe Assistant state file")
 	}
-	data, err := io.ReadAll(io.LimitReader(file, 4097))
-	if len(data) > 4096 {
+	data, err := io.ReadAll(io.LimitReader(file, int64(limit)+1))
+	if len(data) > limit {
 		return nil, errors.New("Assistant state file is too large")
 	}
 	return data, err

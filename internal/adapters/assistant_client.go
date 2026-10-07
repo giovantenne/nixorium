@@ -359,9 +359,14 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 				return event, assistantProtocolError()
 			}
 			ids[call.ID] = true
-			switch call.Name {
-			case "list_files", "read_file", "search", "write_file", "delete_file", "search_packages", "evaluate":
-			default:
+			known := false
+			for _, tool := range domain.AssistantToolsV1() {
+				if tool.Name == call.Name {
+					known = true
+					break
+				}
+			}
+			if !known {
 				return event, assistantProtocolError()
 			}
 			if len(call.Arguments) == 0 {

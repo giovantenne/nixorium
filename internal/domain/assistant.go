@@ -84,3 +84,10 @@ type AssistantConsent struct {
 }
 
 const AssistantTextLimit = 128 * 1024
+
+type AssistantConversation struct {
+	ID         string `json:"id"`
+	Repository string `json:"repository"`
+	Base       string `json:"base"`
+	CreatedAt  string `json:"createdAt"`
+}

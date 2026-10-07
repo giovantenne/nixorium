@@ -19,6 +19,7 @@ buildGoModule {
       ../templates/site/software-presets.json
       ../templates/site/workspace-profile.example.json
       ../templates/site/workspace-profile.programming.example.json
+      ../docs/assistant-tools-v1.json
       ../tests/lab-settings-validation-cases.json
       ../tests/software-preset-validation-cases.json
       ../tests/workspace-validation-cases.json
