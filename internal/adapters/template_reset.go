@@ -54,7 +54,7 @@ func resetGit(ctx context.Context, repository string, input []byte, limit int, a
 }
 
 func resetNix(ctx context.Context, repository, expression string) ([]byte, error) {
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return nil, err
 	}

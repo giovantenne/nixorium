@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -10,105 +11,184 @@ import (
 )
 
 type backupModel struct {
-	field       int // 0 destination, 1 passphrase, 2 repeat
-	destination string
-	passphrase  []rune
-	repeat      []rune
-	result      domain.BackupReport
-	done        bool
+	field                               int
+	remote, branch, destination         string
+	passphrase, repeat                  []rune
+	confirmation                        string
+	plan                                domain.GitBackupPlan
+	reviewed, restore, standalone, done bool
+	result                              domain.BackupReport
+}
+type backupResultMsg struct{ report domain.BackupReport }
+type gitBackupPlanMsg struct {
+	plan domain.GitBackupPlan
+	err  error
 }
 
-type backupResultMsg struct{ report domain.BackupReport }
+func RunRestoreLab(actions DashboardActions) error {
+	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
+	model.screen = dashboardBackup
+	model.backup = backupModel{restore: true, standalone: true, branch: "main"}
+	_, err := tea.NewProgram(model).Run()
+	return err
+}
 
 func (model dashboardModel) openBackup() (tea.Model, tea.Cmd) {
 	model.screen = dashboardBackup
 	model.message = ""
-	model.backup = backupModel{}
-	if model.actions.BackupDestination != nil {
-		model.backup.destination = model.actions.BackupDestination()
+	model.backup = backupModel{branch: "main"}
+	if model.actions.GitBackupDestination != nil {
+		model.backup.remote, model.backup.branch = model.actions.GitBackupDestination()
 	}
 	return model, nil
+}
+func (model dashboardModel) openRestoreLab() (tea.Model, tea.Cmd) {
+	next, _ := model.openBackup()
+	model = next.(dashboardModel)
+	model.backup.restore = true
+	return model, nil
+}
+func (b *backupModel) clearSecrets() {
+	clear(b.passphrase)
+	clear(b.repeat)
+	b.passphrase = nil
+	b.repeat = nil
 }
 
 func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	b := &model.backup
-	if b.done {
-		switch key.String() {
-		case "enter", "esc":
-			model.screen = dashboardAdministration
-			model.backup = backupModel{}
+	if key.String() == "esc" || (b.done && key.String() == "enter") {
+		done := b.done
+		b.clearSecrets()
+		if b.standalone {
+			return model, tea.Quit
+		}
+		model.screen = dashboardAdministration
+		model.backup = backupModel{}
+		if done {
 			return model.refreshOverview()
 		}
 		return model, nil
 	}
-	switch key.String() {
-	case "esc":
-		model.screen = dashboardAdministration
-		model.backup = backupModel{}
-		model.message = "No backup was written."
+	if b.done {
 		return model, nil
+	}
+	fields := 2
+	if b.restore {
+		fields = 4
+	} else if b.reviewed {
+		fields = 3
+	}
+	switch key.String() {
 	case "tab", "down":
-		b.field = (b.field + 1) % 3
+		b.field = (b.field + 1) % fields
 	case "shift+tab", "up":
-		b.field = (b.field + 2) % 3
-	case "backspace":
-		switch b.field {
-		case 0:
-			if value := []rune(b.destination); len(value) > 0 {
-				b.destination = string(value[:len(value)-1])
-			}
-		case 1:
-			if len(b.passphrase) > 0 {
-				b.passphrase = b.passphrase[:len(b.passphrase)-1]
-			}
-		default:
-			if len(b.repeat) > 0 {
-				b.repeat = b.repeat[:len(b.repeat)-1]
-			}
-		}
+		b.field = (b.field + fields - 1) % fields
 	case "enter":
-		if b.field < 2 {
+		if b.field < fields-1 {
 			b.field++
 			return model, nil
 		}
-		switch {
-		case len(b.passphrase) < domain.BackupMinimumPassphrase:
-			model.message = fmt.Sprintf("Use a passphrase of at least %d characters.", domain.BackupMinimumPassphrase)
-			return model, nil
-		case string(b.passphrase) != string(b.repeat):
-			b.repeat = nil
-			model.message = "The two passphrases differ; type the second one again."
-			return model, nil
-		case strings.TrimSpace(b.destination) == "":
-			b.field = 0
-			model.message = "Choose a directory, ideally on a USB drive or network share."
-			return model, nil
-		case model.actions.CreateBackup == nil:
-			model.message = "Backups are not available in this session."
-			return model, nil
-		}
-		destination, passphrase, action := strings.TrimSpace(b.destination), []byte(string(b.passphrase)), model.actions.CreateBackup
-		b.passphrase, b.repeat = nil, nil
-		model.busy = "Writing the encrypted backup"
-		model.message = ""
-		return model, func() tea.Msg {
-			report := action(destination, passphrase)
-			for index := range passphrase {
-				passphrase[index] = 0
+		if !b.restore && !b.reviewed {
+			if model.actions.PlanGitBackup == nil {
+				model.message = "Backup is unavailable in this session."
+				return model, nil
 			}
-			return backupResultMsg{report: report}
+			remote, branch, action := strings.TrimSpace(b.remote), strings.TrimSpace(b.branch), model.actions.PlanGitBackup
+			model.busy = "Checking saved configuration and recovery keys"
+			return model.startRead(func(ctx context.Context) tea.Msg {
+				plan, err := action(ctx, remote, branch)
+				return gitBackupPlanMsg{plan, err}
+			})
 		}
-	default:
-		if key.Text == "" {
+		if b.restore && !b.reviewed {
+			if b.remote == "" || b.branch == "" || b.destination == "" || len(b.passphrase) == 0 {
+				model.message = "Enter the SSH repository URL, branch, new directory and passphrase."
+				return model, nil
+			}
+			b.reviewed = true
 			return model, nil
 		}
-		switch b.field {
-		case 0:
-			b.destination += key.Text
-		case 1:
-			b.passphrase = append(b.passphrase, []rune(key.Text)...)
-		default:
-			b.repeat = append(b.repeat, []rune(key.Text)...)
+		if !b.restore {
+			if len(b.passphrase) < domain.BackupMinimumPassphrase || string(b.passphrase) != string(b.repeat) {
+				model.message = "Use at least 12 characters and repeat the same passphrase."
+				return model, nil
+			}
+			if b.confirmation != "PUSH" {
+				model.message = "Confirm that this is your PRIVATE repository, then type PUSH."
+				return model, nil
+			}
+			if model.actions.PublishGitBackup == nil {
+				model.message = "Backup is unavailable in this session."
+				return model, nil
+			}
+		} else if model.actions.RestoreLab == nil {
+			model.message = "Restore is unavailable in this session."
+			return model, nil
+		}
+		passphrase := []byte(string(b.passphrase))
+		b.clearSecrets()
+		model.message = ""
+		if b.restore {
+			action, remote, branch, target := model.actions.RestoreLab, b.remote, b.branch, b.destination
+			model.busy = "Restoring the laboratory and verifying its original keys"
+			return model, func() tea.Msg {
+				defer clear(passphrase)
+				return backupResultMsg{action(remote, branch, target, passphrase)}
+			}
+		}
+		action, plan := model.actions.PublishGitBackup, b.plan
+		model.busy = "Saving encrypted keys, pushing and verifying the remote backup"
+		return model, func() tea.Msg { defer clear(passphrase); return backupResultMsg{action(plan, passphrase)} }
+	default:
+		if b.restore && b.reviewed {
+			return model, nil
+		}
+		var plain *string
+		var secret *[]rune
+		if b.restore {
+			switch b.field {
+			case 0:
+				plain = &b.remote
+			case 1:
+				plain = &b.branch
+			case 2:
+				plain = &b.destination
+			case 3:
+				secret = &b.passphrase
+			}
+		} else if b.reviewed {
+			switch b.field {
+			case 0:
+				secret = &b.passphrase
+			case 1:
+				secret = &b.repeat
+			case 2:
+				plain = &b.confirmation
+			}
+		} else if b.field == 0 {
+			plain = &b.remote
+		} else {
+			plain = &b.branch
+		}
+		if key.String() == "backspace" {
+			if plain != nil {
+				r := []rune(*plain)
+				if len(r) > 0 {
+					*plain = string(r[:len(r)-1])
+				}
+			}
+			if secret != nil && len(*secret) > 0 {
+				(*secret)[len(*secret)-1] = 0
+				*secret = (*secret)[:len(*secret)-1]
+			}
+		} else if key.Text != "" {
+			if plain != nil && len(*plain)+len(key.Text) <= 4096 {
+				*plain += key.Text
+			}
+			if secret != nil && len(*secret)+len([]rune(key.Text)) <= 1024 {
+				*secret = append(*secret, []rune(key.Text)...)
+			}
 		}
 	}
 	return model, nil
@@ -116,39 +196,59 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 
 func (model dashboardModel) backupView() string {
 	b := model.backup
-	shell := tuiShell{path: []string{"Maintenance", "Back up the controller"}}
+	title := "Back up lab"
+	if b.restore {
+		title = "Restore lab"
+	}
+	shell := tuiShell{path: []string{"Maintenance", title}}
+	if b.standalone {
+		shell.path = []string{title}
+	}
 	if model.busy != "" {
 		shell.body = model.busyView()
 		shell.actions = []tuiAction{{key: "F1", label: "Help"}}
 		return model.renderShell(shell)
 	}
-	lines := []string{tuiTitle("Back up the controller", model.isDark)}
+	lines := []string{tuiTitle(title, model.isDark)}
+	actions := []tuiAction{{key: "Tab", label: "Next field"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	if b.done {
-		lines = append(lines, "", tuiResult(b.result.Message, !b.result.HasErrors(), model.isDark), "")
+		lines = append(lines, "", tuiResult(b.result.Message, !b.result.HasErrors(), model.isDark))
 		if b.result.Path != "" {
-			lines = append(lines, "File:         "+b.result.Path, fmt.Sprintf("Size:         %s, %d entries", humanBytes(uint64(b.result.Bytes)), b.result.Files))
-			lines = append(lines, "Private keys: "+strings.Join(b.result.PrivateKeys, ", "))
+			lines = append(lines, "Location: "+b.result.Path)
 		}
-		shell.actions = []tuiAction{{key: "Enter", label: "Maintenance"}, {key: "F1", label: "Help"}}
+		if b.result.Revision != "" {
+			lines = append(lines, "Revision: "+shortRevision(b.result.Revision))
+		}
+		actions = []tuiAction{{key: "Enter", label: "Return"}, {key: "F1", label: "Help"}}
 	} else {
-		lines = append(lines,
-			tuiMuted("One encrypted file with the configuration and its history, the private keys and the trusted computer keys.", model.isDark),
-			tuiMuted("Then copy it away from this controller, for example to a USB drive. Without the passphrase nobody, including you, can read it.", model.isDark), "")
-		fields := []struct{ label, value string }{
-			{"Directory", b.destination},
-			{"Passphrase", strings.Repeat("•", len(b.passphrase))},
-			{"Repeat passphrase", strings.Repeat("•", len(b.repeat))},
+		type field struct{ label, value string }
+		fields := []field{}
+		if b.restore {
+			if b.reviewed {
+				lines = append(lines, "", "Repository: "+b.remote, "Branch: "+b.branch, "New folder: "+b.destination, "", "Restore original keys and trusted computers. Existing folders are never replaced.", "No system will be activated.")
+				actions = []tuiAction{{key: "Enter", label: "Restore lab"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+			} else {
+				lines = append(lines, "Restore into a new folder using independent SSH access.", "No password or Git token belongs in the repository URL.", "")
+				fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}, {"New folder", b.destination}, {"Passphrase", strings.Repeat("•", len(b.passphrase))}}
+			}
+		} else if b.reviewed {
+			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Confirm the repository is PRIVATE on GitHub/GitLab. Type PUSH below.", "")
+			fields = []field{{"Passphrase", strings.Repeat("•", len(b.passphrase))}, {"Repeat", strings.Repeat("•", len(b.repeat))}, {"Confirmation", b.confirmation}}
+			actions[1].label = "Encrypt and push"
+		} else {
+			lines = append(lines, "Save changes through Review Git changes first.", "Use a PRIVATE repository and independent SSH access; F1 explains setup.", "")
+			fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}}
 		}
-		for index, field := range fields {
-			value := field.value
-			if index == b.field {
+		for i, f := range fields {
+			value := f.value
+			if i == b.field {
 				value += "_"
 			}
-			lines = append(lines, tuiSelection(fmt.Sprintf("%-18s %s", field.label, value), index == b.field, model.isDark))
+			lines = append(lines, tuiSelection(fmt.Sprintf("%-16s %s", f.label, value), i == b.field, model.isDark))
 		}
-		shell.actions = []tuiAction{{key: "Tab", label: "Next field"}, {key: "Enter", label: "Write backup"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	}
 	shell.body = strings.Join(lines, "\n")
+	shell.actions = actions
 	if model.message != "" {
 		shell.notices = []tuiNotice{{kind: tuiStatusAttention, title: model.message}}
 	}

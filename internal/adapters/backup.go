@@ -446,7 +446,7 @@ func hasPrivateDeploymentKeys(repository string) bool {
 func backupKeysDigest(repository string) string {
 	digest := sha256.New()
 	for _, name := range privateDeploymentPaths {
-		content, _ := os.ReadFile(filepath.Join(repository, name))
+		content, _, _ := readRecoveryFile(filepath.Join(repository, name), maximumKeyMaterialBytes)
 		fmt.Fprintf(digest, "%s\x00%d\x00", name, len(content))
 		digest.Write(content)
 	}
@@ -508,16 +508,25 @@ func (local Local) BackupDue(repository string) (string, bool) {
 	if !hasPrivateDeploymentKeys(repository) {
 		return "", false
 	}
-	record, found := local.LastBackup()
-	switch {
-	case !found:
-		return "No backup of this controller is recorded. Without its private keys, a replaced controller cannot manage the installed computers.", true
-	case time.Since(record.CreatedAt) > domain.BackupReminderAge:
-		return fmt.Sprintf("The last backup is %d days old.", int(time.Since(record.CreatedAt).Hours()/24)), true
-	case record.KeysDigest != backupKeysDigest(repository):
-		return "The private keys changed since the last backup.", true
-	case record.SettingsHash != "" && record.SettingsHash != backupSettingsHash(repository):
-		return "The laboratory settings changed since the last backup.", true
+	if err := local.RemoteBackupRequired(repository); err != nil {
+		return err.Error(), true
+	}
+	record, found := readGitBackupRecord(repository)
+	if !found {
+		return "No verified remote backup is recorded.", true
+	}
+	if time.Since(record.CreatedAt) > domain.BackupReminderAge {
+		return "The last verified remote backup is over 30 days old.", true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	revision, err := local.GitRevision(ctx, repository)
+	if err != nil || revision != record.PublishedRevision {
+		return "The saved configuration changed since the last verified remote backup.", true
+	}
+	material, err := recoveryMaterial(repository)
+	if err != nil || recoveryDigest(material) != record.Plan.RecoveryDigest {
+		return "Trusted computer keys changed since the last verified remote backup.", true
 	}
 	return "", false
 }

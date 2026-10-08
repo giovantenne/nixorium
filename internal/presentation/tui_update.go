@@ -172,6 +172,16 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.recoveryReview.resetPlan = message.reset
 		}
 		return model, nil
+	case gitBackupPlanMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = message.err.Error()
+			return model, nil
+		}
+		model.backup.plan = message.plan
+		model.backup.reviewed = true
+		model.backup.field = 0
+		return model, nil
 	case backupResultMsg:
 		model.busy = ""
 		model.backup.result, model.backup.done = message.report, true
@@ -772,7 +782,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			if model.settings.current.Lab.PCCount == 0 {
 				model.settings.current.Lab.PCCount = 20
 			}
-			model.settings.collectPasswords = model.settings.current.Lab.AdminPassword == domain.DefaultPasswordHash || model.settings.current.Lab.TeacherPassword == domain.DefaultPasswordHash || model.settings.current.Lab.StudentPassword == domain.DefaultPasswordHash
+			model.settings.collectPasswords = !domain.CredentialsFromSettings(model.settings.current).Ready()
 			model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
 			model.settings.editor.width = model.width
 			model.settings.editor.height = model.height
@@ -1272,6 +1282,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	if exitKey {
+		model.backup.clearSecrets()
 		if model.hostTrust.cancel != nil {
 			model.hostTrust.cancel()
 			model.hostTrust.cancel = nil

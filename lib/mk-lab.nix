@@ -33,7 +33,10 @@ let
     else
       null;
   effectiveDeploymentRevision =
-    if deploymentRevision != null then deploymentRevision else inferredDeploymentRevision;
+    if deploymentRevision != null then deploymentRevision
+    else if builtins.pathExists (deploymentRoot + "/.nixorium-source-revision.json") then
+      builtins.fromJSON (builtins.readFile (deploymentRoot + "/.nixorium-source-revision.json"))
+    else inferredDeploymentRevision;
   version = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile (upstreamRoot + "/VERSION"));
   config = import ./eval-lab-config.nix { inherit lib; } labConfig;
 

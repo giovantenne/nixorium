@@ -37,7 +37,7 @@ func TestWorkspaceRealNixSave(t *testing.T) {
 	if plan.HasErrors() || plan.State != "ready" || plan.Inspection.Base != nil {
 		// Only this disposable fixture may print evaluator diagnostics; the
 		// production report must not expose arbitrary private deployment traces.
-		flake, _ := deploymentFlakeReference(repository)
+		flake, _ := deploymentFlakeReference(t.Context(), repository)
 		command := exec.CommandContext(t.Context(), "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--no-write-lock-file", "--no-update-lock-file", "--expr", workspaceCandidateExpression)
 		command.Env = append(workspaceEnvironment(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake, "NIXORIUM_WORKSPACE_CANDIDATE="+string(candidate))
 		output, _ := command.CombinedOutput()

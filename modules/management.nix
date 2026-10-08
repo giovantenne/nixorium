@@ -210,7 +210,7 @@ let
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
         || fail "deployment worktree must be clean before controller apply"
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
-          secret-key admin-ssh)" ]] \
+          secret-key admin-ssh lab-credentials.json)" ]] \
         || fail "private key files must not be tracked by Git"
 
       REVISION="$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" rev-parse HEAD)"
@@ -225,7 +225,6 @@ let
 
       # Pin the Git fetcher to the reviewed commit so ignored private keys are
       # excluded and a concurrent clean commit cannot change the build input.
-      FLAKE_URL="git+file://$REPOSITORY?rev=$REVISION"
       [[ -d /var/cache/nixorium/admin && ! -L /var/cache/nixorium/admin \
           && "$(stat -c '%U:%G:%a' /var/cache/nixorium/admin)" == admin:users:700 ]] \
         || fail "administrator Nix cache directory has unsafe ownership or permissions"
@@ -235,6 +234,8 @@ let
       as_admin() {
         runuser -u admin -- "$@"
       }
+
+      FLAKE_URL="$(as_admin nixorium config source --repo "$REPOSITORY" --revision "$REVISION")"
 
       as_admin nixorium config validate --repo "$REPOSITORY" --json \
         || fail "deployment configuration validation failed"
@@ -470,10 +471,9 @@ let
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" status --porcelain=v1 --untracked-files=normal)" ]] \
         || fail "deployment worktree must be clean before PXE preparation"
       [[ -z "$(git -c safe.directory="$REPOSITORY" -C "$REPOSITORY" ls-files -- \
-          secret-key admin-ssh)" ]] \
+          secret-key admin-ssh lab-credentials.json)" ]] \
         || fail "private key files must not be tracked by Git"
 
-      FLAKE_URL="git+file://$REPOSITORY"
       [[ -d /var/cache/nixorium/admin && ! -L /var/cache/nixorium/admin \
           && "$(stat -c '%U:%G:%a' /var/cache/nixorium/admin)" == admin:users:700 ]] \
         || fail "administrator Nix cache directory has unsafe ownership or permissions"
@@ -482,7 +482,7 @@ let
 
       REVISION="$(git -C "$REPOSITORY" rev-parse HEAD)" \
         || fail "could not resolve deployment revision"
-      FLAKE_URL="$FLAKE_URL?rev=$REVISION"
+      FLAKE_URL="$(nixorium config source --repo "$REPOSITORY" --revision "$REVISION")"
 
       nixorium config validate --repo "$REPOSITORY" --json >/dev/null \
         || fail "deployment configuration validation failed"

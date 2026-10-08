@@ -135,6 +135,7 @@ disk_has_mounted_filesystem() {
   lsblk -nrpo MOUNTPOINT "$CANDIDATE" | awk 'NF { found = 1 } END { exit(found ? 0 : 1) }'
 }
 
+EVALUATION_SOURCE=""
 TEMP_DISKO_LAYOUT=$(mktemp)
 TEMP_DISKO_FILE=$(mktemp)
 cleanup() {
@@ -150,6 +151,7 @@ cleanup() {
     sudo rm -f -- "$BOOTSTRAP_SWAP" >/dev/null 2>&1 || true
   fi
   rm -f "$TEMP_DISKO_LAYOUT" "$TEMP_DISKO_FILE"
+  if [[ -n "$EVALUATION_SOURCE" ]]; then rm -rf -- "$EVALUATION_SOURCE"; fi
 }
 trap cleanup EXIT
 
@@ -301,6 +303,27 @@ fi
 if [[ ! -f "${DEPLOYMENT_PATH}/flake.lock" ]]; then
   echo "Error: the private deployment lock was not created." >&2
   exit 1
+fi
+
+# Only tracked configuration enters this source; the one explicit addition is
+# account hashes. Private SSH/cache keys and other ignored files stay outside.
+if [[ -f "$DEPLOYMENT_PATH/lab-credentials.json" ]]; then
+  EVALUATION_SOURCE="$(mktemp -d)"
+  git -C "$DEPLOYMENT_PATH" checkout-index --all --prefix="$EVALUATION_SOURCE/"
+  cp -- "$DEPLOYMENT_PATH/flake.lock" "$EVALUATION_SOURCE/flake.lock"
+  NIXORIUM_BOOTSTRAP_SOURCE="$DEPLOYMENT_PATH" nix --extra-experimental-features "nix-command flakes" \
+    eval --impure --raw --expr '
+      let
+        root = builtins.getEnv "NIXORIUM_BOOTSTRAP_SOURCE";
+        settings = builtins.fromJSON (builtins.readFile (root + "/lab-settings.json"));
+        credentials = builtins.fromJSON (builtins.readFile (root + "/lab-credentials.json"));
+      in builtins.toJSON (settings // { lab = settings.lab // {
+        adminPassword = credentials.admin;
+        teacherPassword = credentials.teacher;
+        studentPassword = credentials.student;
+      }; })
+    ' > "$EVALUATION_SOURCE/lab-settings.json"
+  FLAKE_REF="path:$EVALUATION_SOURCE"
 fi
 
 CURRENT_STEP="downloading and installing the controller system"

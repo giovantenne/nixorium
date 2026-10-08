@@ -57,6 +57,8 @@ type options struct {
 	acknowledgeUnreachable bool
 	queueUnreachable       bool
 	backupTarget           string
+	backupRemote           string
+	backupBranch           string
 	backupFile             string
 	passphraseFile         string
 	remove                 bool
@@ -187,6 +189,9 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 	case "template-reset":
 		return runTemplateResetRecoveryCommand(ctx, repository, options, stdout, stderr)
 	case "backup":
+		if options.subcommand == "plan" || options.subcommand == "publish" || options.subcommand == "clone" {
+			return runGitBackupCommand(ctx, repository, options, stdout, stderr)
+		}
 		return runBackupCommand(ctx, repository, options, stdout, stderr)
 	case "controller":
 		return runControllerCommand(ctx, repository, options, stdout, stderr)
@@ -237,6 +242,9 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 			return 1
 		}
 	case "config":
+		if options.subcommand == "source" {
+			return runEvaluationSource(ctx, repository, options, stdout, stderr)
+		}
 		return runConfigCommand(ctx, repository, options, stdout, stderr)
 	case "setup":
 		return runSetupCommand(ctx, repository, options, stdout, stderr)
@@ -625,11 +633,17 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanResetRecovery: func(ctx context.Context) domain.TemplateResetRecoveryPlan {
 			return adapters.TemplateReset{}.PlanTemplateResetRecovery(ctx, repository)
 		},
-		CreateBackup: func(destination string, passphrase []byte) domain.BackupReport {
-			return local.CreateBackup(ctx, repository, destination, passphrase, nixoriumVersion)
+		PlanGitBackup: func(readCtx context.Context, remote, branch string) (domain.GitBackupPlan, error) {
+			return (adapters.GitBackup{}).Plan(readCtx, repository, remote, branch)
 		},
-		BackupDestination: defaultBackupDestination,
-		OpenClassroomView: classroomViewAction(),
+		PublishGitBackup: func(plan domain.GitBackupPlan, passphrase []byte) domain.BackupReport {
+			return (adapters.GitBackup{}).Publish(ctx, plan, passphrase)
+		},
+		RestoreLab: func(remote, branch, target string, passphrase []byte) domain.BackupReport {
+			return (adapters.GitBackup{}).Restore(ctx, remote, branch, target, passphrase)
+		},
+		GitBackupDestination: func() (string, string) { return (adapters.GitBackup{}).Destination(repository) },
+		OpenClassroomView:    classroomViewAction(),
 		ApplyResetRecovery: func(plan domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult {
 			result := adapters.TemplateReset{}.ApplyTemplateResetRecovery(ctx, plan)
 			result.Message = operationRecordMessage(result.Message, result)
@@ -697,10 +711,16 @@ func runWithManagedProgress[T any](action func() T, load func() (domain.Operatio
 }
 
 func commandRequiresRepository(options options) bool {
-	return options.command != "logs" && (options.command != "backup" || options.subcommand == "create") && (options.command != "pxe" || (options.subcommand != "stop" && options.subcommand != "recover"))
+	return options.command != "logs" && (options.command != "backup" || (options.subcommand == "create" || options.subcommand == "plan" || options.subcommand == "publish")) && (options.command != "pxe" || (options.subcommand != "stop" && options.subcommand != "recover"))
 }
 
 func parseArguments(arguments []string) (options, error) {
+	if len(arguments) >= 2 && arguments[0] == "config" && arguments[1] == "source" {
+		return parseEvaluationSourceArguments(arguments[2:])
+	}
+	if len(arguments) >= 2 && arguments[0] == "backup" && (arguments[1] == "plan" || arguments[1] == "publish" || arguments[1] == "clone") {
+		return parseGitBackupArguments(arguments[1:])
+	}
 	if len(arguments) > 0 && arguments[0] == "telemetry" {
 		return parseTelemetryArguments(arguments[1:])
 	}
@@ -1472,6 +1492,9 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       send apply --file <file-or-folder> --on <clients|@lab> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       classroom-view opens the classroom view page (teacher and administrator)")
 	fmt.Fprintln(writer, "       recovery status lists what blocks operations and the next step for each")
+	fmt.Fprintln(writer, "       backup plan --remote <ssh-url> --branch <branch> [--repo <deployment>]")
+	fmt.Fprintln(writer, "       backup publish --remote <ssh-url> --branch <branch> --expect <token> --yes [--passphrase-file <file>]")
+	fmt.Fprintln(writer, "       backup clone [--remote <ssh-url> --branch <branch> --to <new-directory> --yes] [--passphrase-file <file>]")
 	fmt.Fprintln(writer, "       backup create --to <directory> [--passphrase-file <file>]")
 	fmt.Fprintln(writer, "       backup verify <file> [--passphrase-file <file>]")
 	fmt.Fprintln(writer, "       backup restore <file> --to <empty-directory> [--passphrase-file <file>]")
@@ -1503,6 +1526,7 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       package-base plan [--target <nixos-YY.MM>] [--allow-unverified]")
 	fmt.Fprintln(writer, "       package-base apply [--target <nixos-YY.MM>] [--allow-unverified] --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       channel changes require --allow-unverified; apply saves files only, never activates machines")
+	fmt.Fprintln(writer, "       config source [--revision <git-revision>] prepares local Nix input with account hashes")
 	fmt.Fprintln(writer, "       config plan --file <candidate.json>")
 	fmt.Fprintln(writer, "       config apply --file <candidate.json> --expect <sha256:fingerprint>")
 	fmt.Fprintln(writer, "       setup keys --verify-only performs read-only correspondence checks")
@@ -1806,7 +1830,7 @@ func collectSetupCredentials(ctx context.Context, reader app.SecretReader, hashe
 	}
 	pending := 0
 	for _, credential := range credentials {
-		if *credential.value == domain.DefaultPasswordHash {
+		if *credential.value == "" || *credential.value == domain.DefaultPasswordHash {
 			pending++
 		}
 	}
@@ -1815,9 +1839,10 @@ func collectSetupCredentials(ctx context.Context, reader app.SecretReader, hashe
 	}
 	fmt.Fprintln(output, "Set account passwords. Each password must contain at least 8 bytes and must not use the public default.")
 	fmt.Fprintln(output, "A short or mismatched password can be retried without restarting configuration.")
+	candidate.Lab.CredentialsVersion++
 	completed := 0
 	for _, credential := range credentials {
-		if *credential.value != domain.DefaultPasswordHash {
+		if *credential.value != "" && *credential.value != domain.DefaultPasswordHash {
 			continue
 		}
 		for {
@@ -1865,6 +1890,7 @@ func collectSettingsPasswordWithReader(ctx context.Context, reader app.SecretRea
 		hash, err := app.CollectNamedPasswordHash(ctx, reader, hasher, label)
 		if err == nil {
 			*target = hash
+			settings.Lab.CredentialsVersion++
 			fmt.Fprintln(output, label+" accepted. Returning to settings review…")
 			return settings, nil
 		}

@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-var privateDeploymentPaths = []string{"secret-key", "admin-ssh"}
+var privateDeploymentPaths = []string{"secret-key", "admin-ssh", "lab-credentials.json"}
 
 // deploymentFlakeReference deliberately uses the Git fetcher rather than the
 // path fetcher. A private deployment contains ignored secret key files; the
 // Git fetcher limits the copied Nix source to version-controlled content and
 // therefore keeps those files out of the Nix store.
-func deploymentFlakeReference(repository string) (string, error) {
+func rawDeploymentFlakeReference(repository string) (string, error) {
 	absolute, err := filepath.Abs(repository)
 	if err != nil {
 		return "", fmt.Errorf("resolve deployment path: %w", err)
@@ -34,4 +34,8 @@ func ensurePrivateFilesUntracked(ctx context.Context, repository string) error {
 		return fmt.Errorf("refusing Nix evaluation because private key file is tracked by Git: %s", strings.Join(tracked, ", "))
 	}
 	return nil
+}
+
+func deploymentFlakeReference(ctx context.Context, repository string) (string, error) {
+	return (Local{}).EvaluationSource(ctx, repository, "")
 }

@@ -245,6 +245,23 @@ func (m SettingsManager) planCandidate(ctx context.Context, repository string, c
 	if len(candidateIssues) > 0 {
 		return report, baseData, candidate
 	}
+	// A public settings candidate omits secrets. Keep the locally loaded
+	// hashes unless the administrator explicitly supplied replacement hashes.
+	if candidate.Lab.AdminPassword == "" {
+		candidate.Lab.AdminPassword = base.Lab.AdminPassword
+	}
+	if candidate.Lab.TeacherPassword == "" {
+		candidate.Lab.TeacherPassword = base.Lab.TeacherPassword
+	}
+	if candidate.Lab.StudentPassword == "" {
+		candidate.Lab.StudentPassword = base.Lab.StudentPassword
+	}
+	normalized, err := domain.MarshalLabSettings(candidate)
+	if err != nil {
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "$candidate", Message: err.Error()})
+		return report, baseData, candidate
+	}
+	report.CandidateFingerprint = domain.SettingsFingerprint(normalized)
 	report.Changes = withRemovedFields(domain.DiffLabSettings(base, candidate), removed)
 	report.Issues = append(report.Issues, domain.SettingsTransitionIssues(base, candidate)...)
 	if len(report.Issues) > 0 {

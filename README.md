@@ -60,7 +60,7 @@ The guided menu groups everyday tasks into **Computers**, **Installation**,
 - **Updates when you choose.** Update Nixorium and the system separately, and
   go back to a previous system version if an update causes trouble.
 - **Guided recovery.** When something is interrupted, Nixorium lists it and
-  says what to do next. An encrypted controller backup lets a new controller
+  says what to do next. A private Git backup with encrypted recovery keys lets a new controller
   take over without reinstalling the PCs.
 - **Your lab stays yours.** Software choices, desktop defaults and local
   policy live in your own private repository, separate from this framework.
@@ -142,6 +142,10 @@ trial on virtual machines, follow the
    prepares the clients. Teacher and student account names are reused from
    first setup; change them under **Maintenance → Change settings → Accounts**.
 
+   Before installing the first client, use **Maintenance → Back up lab** to
+   verify a push to your private GitHub/GitLab repository. Recovery keys are
+   encrypted with a passphrase; keep it and independent Git access separately.
+
 3. **Install the first client.** With network boot, start the client from the
    network; the installer opens on its screen, asks which configured computer
    it is and erases the disk after you type `ERASE`. With USB over SSH, boot
@@ -152,8 +156,8 @@ trial on virtual machines, follow the
 
 4. **Check it, then expand.** Start the client from its disk, try the student
    session, a reboot and an update from **Computers → Update computers**. Make
-   the first backup from **Maintenance → Back up the controller** and keep it
-   away from the controller. Then install the other PCs.
+   another backup from **Maintenance → Back up lab** when prompted. Then install
+   the other PCs.
 
 ## Security
 
@@ -203,6 +207,12 @@ It does not permit arbitrary Nix/module edits or autonomous administration.
 Skills are instructions, not a sandbox: do not rely on them to constrain an
 agent with root access or unrestricted execution permissions. Existing
 deployments need a separate reviewed refresh of their copied instructions.
+
+Account password hashes are kept in an ignored `lab-credentials.json`, backed up
+with the private keys inside the passphrase-encrypted recovery file. Git stores
+configuration and a credentials version. Local preparation supplies the hashes
+to Nix; PXE and the installed systems keep their existing behavior. See
+[credential storage](docs/credential-storage.md) for the boundary and recovery.
 
 ## Development
 

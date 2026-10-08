@@ -102,6 +102,13 @@ func runDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, p
 	}
 	phaseContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	if _, err := os.Lstat(filepath.Join(plan.Repository, credentialsFile)); err == nil {
+		source, err := (Local{}).EvaluationSource(phaseContext, plan.Repository, plan.Revision)
+		if err != nil {
+			return err
+		}
+		arguments = append(arguments, "--config", source)
+	}
 	command := exec.CommandContext(phaseContext, "colmena", arguments...)
 	// Bound both process lifetime and inherited output pipes. Killing only
 	// Colmena can otherwise leave local ssh children holding the log pipe open.

@@ -69,3 +69,16 @@ Use [administrator instructions](README.md), [troubleshooting](TROUBLESHOOTING.m
 procedures, not authorize agent execution. Unsupported customization is a
 separate development task. Updating inputs does not automatically refresh copied
 agent instructions; that requires a separate reviewed operator change.
+
+The human administrator backs up through Maintenance → Back up lab and restores
+through Restore lab. The private Git repository contains readable configuration
+plus `nixorium-recovery.age`; private keys and account hashes remain
+ignored locally and encrypted in recovery. Do not read or decrypt recovery material or treat backup access as
+permission to expose the repository to an AI service. Template reset preserves
+the encrypted recovery file. The native application requires a verified remote
+backup of the current keys and account hashes before fleet distribution; local repair stays available.
+
+Account hashes live in ignored `lab-credentials.json` and encrypted recovery,
+not in tracked settings. Do not read, attach or commit that file, private keys,
+or a prepared Nix source. Normal Nixorium operations prepare their local input;
+raw clones do not contain usable account credentials.

@@ -168,9 +168,7 @@ func (m SetupManager) status(ctx context.Context, repository string, initial boo
 	}
 
 	facts.Credentials.Complete = !invalidJSON && !hasIssuePrefix(issues, "lab.teacherPassword", "lab.studentPassword", "lab.adminPassword") &&
-		settings.Lab.TeacherPassword != domain.DefaultPasswordHash &&
-		settings.Lab.StudentPassword != domain.DefaultPasswordHash &&
-		settings.Lab.AdminPassword != domain.DefaultPasswordHash
+		domain.CredentialsFromSettings(settings).Ready()
 	if facts.Credentials.Complete {
 		facts.Credentials.Detail = "all account password hashes differ from the public default"
 	} else {

@@ -74,8 +74,8 @@ var nextSteps = map[string]NextStep{
 		TUI: "Computers → Queued updates", Command: "nixorium deploy queue status",
 	},
 	"BACKUP-DUE": {
-		Code: "BACKUP-DUE", Action: "Create an encrypted backup of this controller and keep it, and its passphrase, away from it.",
-		TUI: "Maintenance → Back up the controller", Command: "nixorium backup create --to DIRECTORY",
+		Code: "BACKUP-DUE", Action: "Push the laboratory and its encrypted recovery keys to a private repository; keep the passphrase separately.",
+		TUI: "Maintenance → Back up lab", Command: "nixorium backup plan --remote git@github.com:OWNER/REPOSITORY.git --branch main",
 	},
 	"EVAL-FAILED": {
 		Code: "EVAL-FAILED", Action: "The configuration does not evaluate; run diagnostics and fix the first reported error. Do not retry other operations.",

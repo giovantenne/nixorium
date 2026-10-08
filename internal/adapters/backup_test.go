@@ -22,7 +22,7 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	if err := os.Symlink("/nix/store/0000-result", filepath.Join(repository, "result")); err != nil {
 		t.Fatal(err)
 	}
-	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No backup") {
+	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No verified remote backup") {
 		t.Fatalf("due = %q %v", reason, due)
 	}
 	destination := t.TempDir()
@@ -38,8 +38,8 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	if len(entries) != 1 || strings.HasPrefix(entries[0].Name(), ".") {
 		t.Fatalf("destination = %v", entries)
 	}
-	if _, due := local.BackupDue(repository); due {
-		t.Fatal("a fresh backup is still reported as due")
+	if _, due := local.BackupDue(repository); !due {
+		t.Fatal("an offline archive incorrectly satisfied the remote backup requirement")
 	}
 	if verify := local.VerifyBackup(report.Path, []byte("wrong passphrase!!")); verify.State == "completed" {
 		t.Fatal("a wrong passphrase was accepted")

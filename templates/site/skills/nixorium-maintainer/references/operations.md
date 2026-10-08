@@ -85,3 +85,20 @@ telemetry consent and classroom actions stay operator-only.
 Return safe evidence, uncertainty and the native next step, including required
 physical checks. Separate proposed, saved, built and verified-active states.
 Never claim success because evidence is unavailable.
+
+## Remote backups and restoration
+
+The human administrator uses Maintenance → Back up lab to review and push the
+saved deployment plus encrypted original recovery keys to a private SSH Git
+repository. Private keys and `lab-credentials.json` remain ignored locally and
+are encrypted in the recovery file. Configuration and Git history remain readable
+to repository members; the passphrase is never stored. A verified remote receipt
+for the current keys and account hashes is required before client
+installation or updates; local repair remains available offline.
+
+Maintenance → Restore lab (or `nixorium backup clone` without an existing lab)
+restores into a new directory, verifies original key pairs, and preserves trusted
+computer keys. It does not activate the restored configuration. See the
+administrator backup and replacement guide.
+These are human operations, not authorization for a proposal-only agent to push,
+read private keys/passphrases or perform restoration.

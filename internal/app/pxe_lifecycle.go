@@ -154,6 +154,9 @@ func (m PXELifecycle) Recover(ctx context.Context, repository string) domain.PXE
 
 func (m PXELifecycle) startPreflight(ctx context.Context, repository string) (domain.PXELifecycleReport, domain.LabMeta, []string) {
 	report := domain.PXELifecycleReport{SchemaVersion: domain.SchemaVersion, Operation: "pxe-start-plan", State: "ready"}
+	if err := requireRemoteBackup(m.source, repository); err != nil {
+		return failPXEReport(report, err.Error()), domain.LabMeta{}, nil
+	}
 	meta, err := m.source.LabMeta(ctx, repository)
 	if err != nil {
 		return failPXEReport(report, "evaluate lab metadata: "+err.Error()), meta, nil

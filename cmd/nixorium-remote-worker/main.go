@@ -718,6 +718,9 @@ func (source *workerInstallSource) LabMeta(ctx context.Context, repository strin
 }
 
 func (source *workerInstallSource) CurrentRevision(ctx context.Context, repository string) (string, error) {
+	if err := source.local.RemoteBackupRequired(repository); err != nil {
+		return "", err
+	}
 	state, err := source.local.GitState(ctx, repository)
 	if err != nil || state.Dirty {
 		return "", errors.New("deployment worktree is not clean")

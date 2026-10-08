@@ -334,8 +334,11 @@ grep -F '"consoleKeyMap": "it2"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 grep -F '"timeZone": "Europe/Rome"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
-grep -F '"adminPassword": "$6$testsalt$hash12"' \
-  "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
+grep -F '"admin":"$6$testsalt$hash12"' \
+  "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-credentials.json" >/dev/null
+! grep -F '$6$' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json"
+test "$(stat -c '%a' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-credentials.json")" = 600
+! git -C "${TARGET_ROOT}/home/admin/nixorium-deployment" ls-files | grep -Fx lab-credentials.json
 jq -e '
   .lab.deploymentMode == "controller" and
   .lab.pcCount == 0 and

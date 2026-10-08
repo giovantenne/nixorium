@@ -36,7 +36,8 @@ func (settings LabSettings) ClassroomViewOn() bool {
 }
 
 type LabSettings struct {
-	DeploymentMode string `json:"deploymentMode,omitempty"`
+	CredentialsVersion int    `json:"credentialsVersion"`
+	DeploymentMode     string `json:"deploymentMode,omitempty"`
 	// ClassroomView is on unless set to false; see ClassroomViewOn.
 	ClassroomView           *bool             `json:"classroomView,omitempty"`
 	MasterDHCPIP            string            `json:"masterDhcpIp"`
@@ -50,9 +51,9 @@ type LabSettings struct {
 	HostInterfaceNames      map[string]string `json:"hostIfaceNames,omitempty"`
 	TeacherUser             string            `json:"teacherUser"`
 	StudentUser             string            `json:"studentUser"`
-	TeacherPassword         string            `json:"teacherPassword"`
-	StudentPassword         string            `json:"studentPassword"`
-	AdminPassword           string            `json:"adminPassword"`
+	TeacherPassword         string            `json:"teacherPassword,omitempty"`
+	StudentPassword         string            `json:"studentPassword,omitempty"`
+	AdminPassword           string            `json:"adminPassword,omitempty"`
 	HomepageURL             string            `json:"homepageUrl"`
 	StudentGitName          string            `json:"studentGitName"`
 	StudentGitEmail         string            `json:"studentGitEmail"`
@@ -107,7 +108,7 @@ type ConfigValidationReport struct {
 // InstallationSettingsComplete describes saved form completeness only. Keys,
 // deployment hooks, controller state and PXE readiness still require preflight.
 func (s LabSettingsFile) InstallationSettingsComplete() bool {
-	return len(s.Validate()) == 0 && s.Lab.DeploymentMode != "controller" && s.Lab.PCCount > 0 && s.Lab.MasterDHCPIP != MasterDHCPPlaceholder && s.Lab.AdminPassword != DefaultPasswordHash && s.Lab.TeacherPassword != DefaultPasswordHash && s.Lab.StudentPassword != DefaultPasswordHash
+	return len(s.Validate()) == 0 && s.Lab.DeploymentMode != "controller" && s.Lab.PCCount > 0 && s.Lab.MasterDHCPIP != MasterDHCPPlaceholder && CredentialsFromSettings(s).Ready()
 }
 
 func (r ConfigValidationReport) HasErrors() bool {
@@ -137,6 +138,9 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 	}
 
 	lab := s.Lab
+	if lab.CredentialsVersion < 0 {
+		add("lab.credentialsVersion", "must not be negative")
+	}
 	if lab.MasterDHCPIP != MasterDHCPPlaceholder {
 		if address, err := netip.ParseAddr(lab.MasterDHCPIP); err != nil || !address.Is4() {
 			add("lab.masterDhcpIp", "must be an IPv4 address or MASTER_DHCP_IP")
@@ -208,7 +212,7 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 		{"lab.studentPassword", lab.StudentPassword},
 		{"lab.adminPassword", lab.AdminPassword},
 	} {
-		if !passwordHashPattern.MatchString(password.value) {
+		if password.value != "" && !passwordHashPattern.MatchString(password.value) {
 			add(password.field, "must be a SHA-512 crypt hash beginning with $6$")
 		}
 	}

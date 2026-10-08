@@ -20,7 +20,7 @@ func (Local) ReadSettings(repository string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", settingsFileName, err)
 	}
-	return content, nil
+	return hydrateCredentials(repository, content)
 }
 
 func (Local) WriteSettings(repository string, settings domain.LabSettingsFile) error {
@@ -32,7 +32,7 @@ func (Local) WriteSettingsIfUnchanged(repository string, expected []byte, settin
 }
 
 func writeSettings(repository string, expected []byte, settings domain.LabSettingsFile) error {
-	data, err := domain.MarshalLabSettings(settings)
+	data, err := domain.MarshalPublicLabSettings(settings)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func writeSettings(repository string, expected []byte, settings domain.LabSettin
 
 	target := filepath.Join(repository, settingsFileName)
 	if expected != nil {
-		current, _, readErr := readRegularFileNoFollowLimit(target, 1024*1024)
+		current, readErr := (Local{}).ReadSettings(repository)
 		if readErr != nil || !bytes.Equal(current, expected) {
 			return domain.ErrSettingsConflict
 		}
@@ -89,10 +89,13 @@ func writeSettings(repository string, expected []byte, settings domain.LabSettin
 		return fmt.Errorf("close settings draft: %w", err)
 	}
 	if expected != nil {
-		current, _, readErr := readRegularFileNoFollowLimit(target, 1024*1024)
+		current, readErr := (Local{}).ReadSettings(repository)
 		if readErr != nil || !bytes.Equal(current, expected) {
 			return domain.ErrSettingsConflict
 		}
+	}
+	if err := saveCredentials(repository, settings); err != nil {
+		return err
 	}
 	if err := os.Rename(temporaryPath, target); err != nil {
 		return fmt.Errorf("replace lab-settings.json: %w", err)

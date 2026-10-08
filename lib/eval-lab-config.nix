@@ -92,16 +92,24 @@ let
             type = lib.types.str;
             description = "Student account name";
           };
+          credentialsVersion = lib.mkOption {
+            type = lib.types.ints.unsigned;
+            default = 0;
+            description = "Public version of the local account credentials";
+          };
           teacherPassword = lib.mkOption {
             type = lib.types.str;
+            default = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
             description = "SHA-512 password hash for the teacher account";
           };
           studentPassword = lib.mkOption {
             type = lib.types.str;
+            default = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
             description = "SHA-512 password hash for the student account";
           };
           adminPassword = lib.mkOption {
             type = lib.types.str;
+            default = "$6$t.4PBRDwSMnGbuzA$fLuu1n700q.Mvj0ivauGLPQJcfT6XnFMkDh6T0GMWH/hzlSNuzxfh0bxh2iQR027y7PSdzuIvWoO3NgRbM/gV0";
             description = "SHA-512 password hash for the admin account";
           };
           homepageUrl = lib.mkOption {

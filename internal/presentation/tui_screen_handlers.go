@@ -88,6 +88,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		return model.openCleanup()
 	case "y":
 		return model.openBackup()
+	case "o":
+		return model.openRestoreLab()
 	case "t":
 		return model.openTemplateReset()
 	case "s":

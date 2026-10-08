@@ -78,7 +78,7 @@ type TemplateResetResult struct {
 var templateGitRevision = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 func TemplateResetPreserves(name string) bool {
-	return name == "lab-settings.json" || name == "flake.lock" ||
+	return name == "nixorium-recovery.age" || name == "lab-settings.json" || name == "flake.lock" ||
 		strings.HasPrefix(name, "keys/") || path.Base(name) == ".gitignore"
 }
 

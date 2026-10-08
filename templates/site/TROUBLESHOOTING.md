@@ -534,7 +534,8 @@ nixorium setup configure
 
 The setup wizard validates the complete candidate before an atomic write and
 shows a semantic, secret-redacted review. Use `config plan --file` only with a
-complete JSON candidate containing password hashes—not plaintext passwords—and
+complete public JSON candidate; omitted password hashes are loaded from the
+local credential file. Change passwords through the native password form, and
 apply only the exact returned fingerprint. Do not bypass the Go/schema checks
 by editing generated Nix expressions.
 
@@ -646,46 +647,106 @@ distributing it to the whole laboratory.
 
 ## Backups and restoration
 
-Create backups with **Maintenance → Back up the controller** or:
+Use **Maintenance → Back up lab** to push the saved deployment and its encrypted
+recovery keys to a **private** GitHub or GitLab repository (including self-hosted
+GitLab). Create the private repository on your provider first, and configure
+independent SSH access on the controller. Verify the Git server's host fingerprint
+through a trusted channel before using Nixorium; SSH host verification is never
+disabled. This workflow currently accepts SSH URLs, not HTTPS or tokens in URLs.
+Keep Git access separate from the lab's SSH key so a replacement controller can
+fetch the backup without first needing the keys inside it.
+
+Save configuration edits through **Maintenance → Review Git changes** first.
+Back up lab reviews the destination, branch and saved revision, then asks for a
+passphrase of at least 12 characters, its repetition and `PUSH`. Confirm on your
+provider that the destination is private: Git transport cannot establish repository
+visibility. Only `nixorium-recovery.age` is added by the backup operation. It uses
+age/scrypt and contains the original `secret-key`, `admin-ssh`,
+`lab-credentials.json` and trusted computer keys from `~/.ssh/nixorium-known-hosts`.
+Configuration, assets, public keys and Git history remain readable to repository
+members; account hashes are encrypted. Other
+ignored files, Git credentials, telemetry state and operation logs are excluded.
+Save required custom configuration in Git; do not commit plaintext credentials.
+Recognizable secrets and known private-key paths in reachable history block backup,
+but automated detection is not a guarantee for arbitrary custom credentials.
+
+The CLI exposes the same review and execution:
 
 ```sh
-nixorium backup create --to /run/media/admin/USB-DRIVE
-nixorium backup verify /run/media/admin/USB-DRIVE/nixorium-backup-20261001-180000.age
+nixorium backup plan --remote git@github.com:SCHOOL/LAB.git --branch main
+nixorium backup publish --remote git@github.com:SCHOOL/LAB.git --branch main --expect REVIEW-TOKEN --yes
 ```
 
-A backup is one file encrypted with a passphrase (age, scrypt). It contains
-the deployment repository with its `.git` history, the three ignored private
-key files and the trusted computer keys (`~/.ssh/nixorium-known-hosts`). Build
-results linked into the Nix store are not included. Keep the file and its
-passphrase away from the controller and from each other: without the
-passphrase the backup cannot be read, and anyone with both can manage the
-laboratory. Once the laboratory keys exist, the Overview and `nixorium doctor`
-remind you when no backup is recorded, the last one is older than 30 days, or
-the private keys or laboratory settings changed since it. `--passphrase-file` reads the passphrase
-from a private file for unattended use.
+`--yes` confirms the reviewed destination is private and authorizes publication.
+Keep the passphrase separately: Nixorium never saves it. `--passphrase-file FILE`
+reads it from a private file for unattended use. Changing the passphrase protects
+the new recovery file only; older ciphertext remains in Git history.
 
-To replace a failed controller: install the new controller from the NixOS
-Minimal ISO with the same controller number and laboratory network, sign in as
-`admin`, then
+Success requires the remote branch to report the exact pushed revision. A failed
+or uncertain push leaves the encrypted recovery commit locally and is **not** a
+verified backup. Fix SSH access or remote divergence and retry; Nixorium never
+force-pushes, merges or resolves remote conflicts automatically. If writing the
+recovery commit was interrupted, inspect and save `nixorium-recovery.age` through
+Review Git changes before retrying.
+
+A verified remote backup of the current private keys and account credentials is required before client
+installation or updates. Local configuration, diagnostics, controller repair and
+recovery remain available offline. Changed configuration or trusted computer keys,
+or a backup older than 30 days, produces an Overview reminder to push again; it
+does not prevent offline operation once the current keys and account credentials were backed up.
+
+To restore, open **Maintenance → Restore lab**, or start the restore screen without
+an existing deployment:
 
 ```sh
-nixorium backup restore BACKUP-FILE --to ~/restored
-mv ~/nixorium-deployment ~/nixorium-deployment.new-install
-mv ~/restored/deployment ~/nixorium-deployment
-cp -a ~/restored/ssh/nixorium-known-hosts/. ~/.ssh/nixorium-known-hosts/
-cd ~/nixorium-deployment
+nixorium backup clone
+```
+
+Enter the SSH repository URL, branch, a **new absolute directory** and passphrase,
+then review and confirm. The equivalent noninteractive command is:
+
+```sh
+nixorium backup clone --remote git@github.com:SCHOOL/LAB.git --branch main --to /home/admin/restored-lab --yes
+```
+
+Restore fetches into private staging, decrypts and verifies the original private/
+public key pairs, then publishes the new directory without overwriting an existing
+one. Private keys have mode `0600`. Trusted computer keys are restored only when
+the current store is empty or has only identical entries; conflicting trust blocks restoration.
+No fetched Nix is evaluated and no system is activated. Wrong passphrases or key
+mismatches leave no published target. A finalization failure explicitly reports a
+partial result and the retained directory; keep it and collect support evidence
+before activation instead of deleting it or blindly retrying.
+
+On a replacement controller, install NixOS with the same controller number and
+network, sign in as `admin`, restore to a new directory, then use the restored
+repository at the configured deployment path. Keep any newly created deployment
+aside until recovery is verified. Run these commands from the restored deployment:
+
+```sh
 nixorium setup keys --verify-only
 nixorium setup install-secrets
 nixorium controller plan
 ```
 
-Apply the reviewed controller plan, then prepare network installation again.
-The installed computers keep trusting the restored keys, so they are managed
-again without reinstallation. Restore refuses a non-empty target and checks
-every file against the backup manifest first.
+Apply the separately reviewed controller plan, then prepare network installation
+again. Clients retain trust in the restored original keys and do not need
+reinstallation. The passphrase decrypts existing keys; it never generates
+replacement keys. Repository access and the passphrase are both needed.
 
-A Git remote is still useful for the private tracked configuration, but
-private keys must never be pushed or committed.
+Optional offline archives remain available for an additional USB copy and for
+restoring older backups. They do not satisfy the remote-backup requirement:
+
+```sh
+nixorium backup create --to /run/media/admin/USB-DRIVE
+nixorium backup verify /run/media/admin/USB-DRIVE/nixorium-backup-20261001-180000.age
+nixorium backup restore BACKUP-FILE --to /home/admin/restored-archive
+```
+
+An offline archive encrypts the entire repository, including `.git`, ignored keys
+and trusted computer keys. It extracts into `deployment/` and `ssh/` within an
+empty target. Never commit or push plaintext private keys; only their encrypted
+recovery file belongs in Git.
 
 Operation logs and authenticated deployment history under the administrator's
 private XDG state are useful audit evidence but are not configuration authority.

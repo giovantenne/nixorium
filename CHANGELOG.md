@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Reviewed private Git backups with passphrase-encrypted recovery keys, verified
+  remote revisions and a Restore lab screen that works without an existing lab.
+  Client distribution requires a verified backup of current keys and credentials;
+  local repair and optional offline archives remain available.
+- Account hashes move to ignored `lab-credentials.json` and encrypted recovery.
+  Local Nix input receives the hashes without changing PXE or installed accounts.
+  New deployments use the updated template; no inline-hash migration is provided.
+
 - Restrict the laboratory maintainer skill to supported proposals and bounded
   diagnostics. Explicitly prohibit invasive module/overlay/script changes and
   agent-executed saves or live operations; the human operator uses native

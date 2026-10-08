@@ -245,9 +245,12 @@ func (model dashboardModel) helpView() string {
 		}
 		lines = append(lines, "Space select   a select/deselect all   n select those needing the update   r check computers   Enter review", "States come from the last check in this session, shown with its time; the review probes again.", "During deployment: l private output details; s review stopping local supervision; q cannot interrupt", "Stopping requires STOP WAITING; remote activation may continue and require recovery.", "After result: l logs   n new review when no recovery is required   Enter Computers")
 	case dashboardBackup:
-		lines = append(lines, "Tab next field   Enter write the backup   Esc cancel",
-			"The file is encrypted with the passphrase; keep both away from this controller.",
-			"Restore: nixorium backup restore FILE --to EMPTY-DIRECTORY, then follow the controller replacement steps in the troubleshooting guide.")
+		lines = append(lines, "Use the SSH URL of a PRIVATE GitHub/GitLab repository. Configure an independent SSH key/agent and verify the host fingerprint outside Nixorium first.",
+			"Back up lab reviews committed files, encrypts recovery keys, then requires PUSH. The remote branch is verified after sending; rejected or uncertain pushes are not backups.",
+			"Configuration, password hashes and Git history remain readable to repository members. Ignored files other than the laboratory keys are excluded. Review custom files for credentials before committing.",
+			"Keep the passphrase and Git access separately. Changing the passphrase does not re-encrypt older Git history.",
+			"Restore lab needs a NEW absolute directory and preserves original keys. Existing trusted keys must match; empty stores are filled. It never activates the restored configuration.",
+			"Without an existing deployment: nixorium backup clone opens this restore screen. Optional offline archives remain available through backup create/verify/restore.")
 	case dashboardCleanup:
 		lines = append(lines, "Space select   a select all   Enter review   Esc Maintenance",
 			fmt.Sprintf("Each computer keeps its newest %d system versions plus the running and booted ones; the review lists what goes.", domain.CleanupKeepGenerations),
@@ -507,6 +510,9 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 }
 
 func (model dashboardModel) textEntry() bool {
+	if model.screen == dashboardBackup {
+		return !model.backup.done
+	}
 	if model.screen == dashboardHostTrust {
 		return model.hostTrust.cancel == nil && !model.hostTrust.applying && model.hostTrust.result.Operation == "" && !model.hostTrust.plan.HasErrors()
 	}

@@ -71,7 +71,8 @@ support export ([contract](support-report.md)), deployment template reset
 ([ADR 0022](adr/0022-reviewed-generation-cleanup.md)), recovery of interrupted
 operations ([ADR 0023](adr/0023-reviewed-recovery-of-interrupted-operations.md)),
 encrypted controller backups
-([ADR 0024](adr/0024-encrypted-controller-backups.md)) and discard of mistaken
+([ADR 0024](adr/0024-encrypted-controller-backups.md), supplemented by
+[private Git recovery](adr/0025-private-git-lab-backups.md)) and discard of mistaken
 uncommitted Git changes.
 See the [administrator guide](../templates/site/README.md) for operator
 procedures and [hardware validation](hardware-validation.md) for manual evidence.
@@ -259,7 +260,7 @@ nixorium install usb        run a reviewed USB/SSH client installation
 nixorium host-key           review a client host-key rotation after reinstall
 nixorium git                review, commit, or discard selected deployment files
 nixorium cleanup            review removal of old system generations
-nixorium backup             create, verify, or restore an encrypted backup
+nixorium backup             plan/publish private Git backup; clone to restore; offline create/verify/restore
 nixorium recovery           list interrupted operations and their next steps
 nixorium template-reset     recover an interrupted deployment template reset
 nixorium support            preview or export a local support report
@@ -500,9 +501,10 @@ explicit conflicts.
 
 Plaintext passwords are read without terminal echo, sent to a local hashing
 process over standard input, retained in memory only as long as needed, and
-cleared where practical. Only salted SHA-512 password hashes enter the private
-configuration. Private Harmonia and SSH keys stay outside the Git
-worktree in root- or user-owned locations. Their public counterparts remain in
+cleared where practical. Salted SHA-512 password hashes live in ignored, mode-0600
+`lab-credentials.json`; only its version is saved in Git. Local preparation adds
+them to a tracked-only evaluation copy, preserving existing Nix store and PXE
+behavior. Private Harmonia and SSH keys stay outside Git and the Nix store. Their public counterparts remain in
 the deployment and may be committed.
 
 The credential backend implements this boundary with terminal-only confirmed

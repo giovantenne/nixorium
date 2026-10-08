@@ -414,6 +414,7 @@ configure_bootstrap_settings() {
           printf '    "deploymentMode": "controller",\n' >> "$OUTPUT_FILE"
         fi
         ;;
+      '    "credentialsVersion": '*) printf '    "credentialsVersion": 1,\n' >> "$OUTPUT_FILE" ;;
       '    "deploymentMode": '*) printf '    "deploymentMode": "controller",\n' >> "$OUTPUT_FILE" ;;
       '    "pcCount": '*) printf '    "pcCount": 0,\n' >> "$OUTPUT_FILE" ;;
       '    "teacherUser": '*) printf '    "teacherUser": "%s",\n' "$BOOTSTRAP_TEACHER_USER" >> "$OUTPUT_FILE" ;;
@@ -435,6 +436,10 @@ configure_bootstrap_settings() {
     esac
   done < "$SETTINGS_FILE"
   mv -- "$OUTPUT_FILE" "$SETTINGS_FILE"
+  if grep -q '"credentialsVersion"' "$SETTINGS_FILE"; then
+    (umask 077; printf '{"version":1,"admin":"%s","teacher":"%s","student":"%s"}\n' \
+      "$BOOTSTRAP_ADMIN_HASH" "$BOOTSTRAP_TEACHER_HASH" "$BOOTSTRAP_STUDENT_HASH" > "$(dirname "$SETTINGS_FILE")/lab-credentials.json")
+  fi
 }
 
 choose_release() {

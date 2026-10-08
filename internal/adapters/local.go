@@ -493,7 +493,7 @@ func (Local) ControllerBuild(ctx context.Context, repository, controllerName str
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return err
 	}
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return err
 	}
@@ -511,12 +511,21 @@ func nixJSONAt(ctx context.Context, repository, revision, attribute string, dest
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return err
 	}
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := rawDeploymentFlakeReference(repository)
+	if err == nil {
+		// Historical recovery inventory is public and must remain available after
+		// a password change. System/readiness evaluation still needs the hashes.
+		if attribute == "labMeta" && revision != "" {
+			if !validGitRevision(revision) {
+				return fmt.Errorf("invalid inventory revision")
+			}
+			flake += "?rev=" + revision
+		} else {
+			flake, err = (Local{}).EvaluationSource(ctx, repository, revision)
+		}
+	}
 	if err != nil {
 		return err
-	}
-	if revision != "" {
-		flake += "?rev=" + revision
 	}
 	reference := flake + "#" + attribute
 	output, err := runOutput(ctx, "nix", "--extra-experimental-features", "nix-command flakes", "eval", reference, "--json", "--no-write-lock-file")

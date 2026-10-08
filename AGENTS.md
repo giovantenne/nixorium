@@ -311,7 +311,7 @@ any shard must block publication.
   probes, and selectable follow-ups read-only until their ordinary review and
   confirmation. Low store space is shown in
   Maintenance beside Free disk space, not on the Overview. The backup reminder
-  starts only once laboratory private keys exist.
+  starts once local account credentials or laboratory private keys exist.
 - Inventory/package discovery must remain independent of host module evaluation.
   Keep workspace prerequisite guards on readiness, validators, configurations,
   Colmena and individual app/package entries; Nix probes package namespaces even
@@ -401,6 +401,15 @@ any shard must block publication.
   worker on every exit and retain its private runtime directory across stops.
   Never infer completion from a state label alone, clear the pending record,
   or apply this exception to active/failed/unknown disk work or client operations.
+- Remote lab backup requires an explicit private SSH destination/branch review,
+  encrypted original keys and verified remote revision. Keep plaintext private
+  keys ignored; only `nixorium-recovery.age` is committed by this workflow.
+  Ordinary reviewed commits remain local. Backup is required before fleet
+  distribution when current keys lack a verified receipt; local recovery remains
+  available offline. Restore fetches into a new private directory, disables Git
+  hooks/filters and never evaluates or applies the fetched configuration.
+  Preserve original key pairs, trusted hosts and the encrypted recovery file
+  across template reset. See docs/troubleshooting.md and ADR 0025.
 - Git review is read-only and typed: preserve the staged/unstaged/untracked
   distinction, managed-versus-unexpected classification, bounded patch output,
   password-hash redaction, no automatic untracked-file reads, and refusal before
@@ -751,7 +760,12 @@ set -euo pipefail
 
 ## Security
 
-- **Never commit** `secret-key` or `admin-ssh` (both in the deployment `.gitignore`)
+- **Never commit** `secret-key`, `admin-ssh` or `lab-credentials.json` (deployment `.gitignore`).
+- Local evaluation injects only the three account hashes into a tracked-only
+  source copy; never copy ignored private keys or evaluate the deployment through
+  an unfiltered `path:` URL. Preserve the original revision in prepared sources.
+  Use the shared EvaluationSource boundary and `config source` from fixed services.
+  Hashes remain in the Nix store/offline installer by design; see docs/credential-storage.md.
 - `nixorium git review` must refuse known private-key paths before reading any
   patch content; do not weaken this boundary when adding the optional commit
   workflow

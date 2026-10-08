@@ -45,7 +45,7 @@ func TestTemplateResetRealNixCandidate(t *testing.T) {
 	}
 	defer os.RemoveAll(candidate)
 	if err := validateResetCandidate(t.Context(), repo, candidate); err != nil {
-		flake, _ := deploymentFlakeReference(repo)
+		flake, _ := deploymentFlakeReference(t.Context(), repo)
 		command := exec.CommandContext(t.Context(), "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--no-write-lock-file", "--no-update-lock-file", "--expr", `let f = builtins.getFlake (builtins.getEnv "NIXORIUM_DEPLOYMENT_FLAKE"); in `+resetIdentityExpression)
 		command.Env = append(workspaceEnvironment(), "NIXORIUM_DEPLOYMENT_FLAKE="+flake)
 		output, _ := command.CombinedOutput()
@@ -97,3 +97,53 @@ const resetIntegrationFlake = `{
 }`
 const resetIntegrationHooks = `nixoriumValidateWorkspaceCandidate = raw: true;
     nixoriumResolveWorkspaceCandidate = raw: { declared = builtins.fromJSON raw; };`
+
+func TestTemplateResetRealNixKeepsExternalCredentials(t *testing.T) {
+	if os.Getenv("NIXORIUM_TEST_TEMPLATE_RESET_NIX") != "1" {
+		t.Skip("requires real Nix")
+	}
+	repo := workspaceRepository(t)
+	writeGitReviewFile(t, repo, ".gitignore", "secret-key\nadmin-ssh\nlab-credentials.json\n")
+	if err := (Local{}).WriteSettings(repo, adapterSettings()); err != nil {
+		t.Fatal(err)
+	}
+	writeGitReviewFile(t, repo, "lab-software.json", `{"schemaVersion":1,"packages":[]}`)
+	writeGitReviewFile(t, repo, "identity.nix", `{ disk = "/dev/vda"; publicKey = "public-fixture"; }`)
+	flake := strings.Replace(resetIntegrationFlake, "# WORKSPACE-HOOKS", resetIntegrationHooks, 1)
+	flake = strings.Replace(flake, `hashedPassword = "!"`, `hashedPassword = (builtins.fromJSON (builtins.readFile ./lab-settings.json)).lab.adminPassword`, 1)
+	writeGitReviewFile(t, repo, "flake.nix", flake)
+	workspaceTestGit(t, repo, "add", ".")
+	workspaceTestGit(t, repo, "commit", "-qm", "external credential fixture")
+	root, err := openWorkspaceRoot(repo, unix.LOCK_SH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	proposal, err := inspectResetRepository(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal.Original[domain.WorkspaceFileName] = domain.TemplateFile{Mode: "100644", Data: []byte(`{"schemaVersion":1}`)}
+	candidate, err := isolatedResetCandidate(t.Context(), proposal.Original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(candidate)
+	if err := validateResetCandidate(t.Context(), repo, candidate); err != nil {
+		source, sourceErr := (Local{}).EvaluationSource(t.Context(), repo, "")
+		t.Logf("disposable source: %s, error: %v", source, sourceErr)
+		if sourceErr == nil {
+			command := exec.CommandContext(t.Context(), "nix", "--extra-experimental-features", "nix-command flakes", "eval", "--impure", "--json", "--expr", "let f = builtins.getFlake "+workspaceUpdateNixString(source)+"; in "+resetIdentityExpression)
+			output, _ := command.CombinedOutput()
+			t.Logf("disposable fixture diagnostic: %s", output)
+		}
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(candidate, settingsFileName))
+	if err != nil || strings.Contains(string(data), "$6$") {
+		t.Fatal("reset proposal contains hashes")
+	}
+	if _, err := os.Lstat(filepath.Join(candidate, credentialsFile)); !os.IsNotExist(err) {
+		t.Fatal("reset left temporary credentials")
+	}
+}

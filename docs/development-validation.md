@@ -386,3 +386,16 @@ nix build --file tests/source-checks.nix onboarding-vm-tcg --no-link
 The normal KVM check belongs to the full gate's management shard. Unit tests
 cover update channel selection, persistent cache/dismissal, late replies and
 rendering at 80×24, 120×30 and 180×45.
+
+## Focused remote-backup integration
+
+`nix build --file tests/source-checks.nix git-backup-vm-tcg --no-link -L`
+exercises real SSH Git publication, original-key recovery, remote-backup gating
+and the standalone Restore lab terminal on a disposable NixOS machine. It uses
+CPU emulation when KVM is unavailable, without relaxing SSH host verification.
+The management VM also verifies that an offline archive does not satisfy the
+remote-backup requirement. Run it without KVM using
+`nix build --file tests/source-checks.nix management-vm-tcg --no-link -L`.
+The backup VM checks encrypted account recovery and the prepared local Nix
+source, including offline settings equivalence. No provider account or real
+laboratory is used.

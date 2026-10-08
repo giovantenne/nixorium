@@ -120,7 +120,12 @@ in
   network-shell = pkgs.mkShell {
     packages = [ pkgs.nftables pkgs.iproute2 pkgs.util-linux pkgs.python3 pkgs.nix ];
   };
+  git-backup-vm-tcg = import ./git-backup-vm.nix { inherit pkgs; useKVM = false; };
   onboarding-vm-tcg = import ./onboarding-vm.nix { inherit pkgs; useKVM = false; };
+  management-vm-tcg = pkgs.testers.runNixOSTest (import ./management-vm.nix {
+    inherit nixoriumPackage;
+    useKVM = false;
+  });
   internet-management-vm-tcg = pkgs.testers.runNixOSTest (import ./management-vm.nix {
     inherit nixoriumPackage;
     useKVM = false;

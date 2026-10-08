@@ -78,6 +78,7 @@ func DiffLabSettings(before, after LabSettingsFile) []SettingChange {
 	add("lab.hostIfaceNames", before.Lab.HostInterfaceNames, after.Lab.HostInterfaceNames)
 	add("lab.teacherUser", before.Lab.TeacherUser, after.Lab.TeacherUser)
 	add("lab.studentUser", before.Lab.StudentUser, after.Lab.StudentUser)
+	add("lab.credentialsVersion", before.Lab.CredentialsVersion, after.Lab.CredentialsVersion)
 	addSecret("lab.teacherPassword", before.Lab.TeacherPassword, after.Lab.TeacherPassword)
 	addSecret("lab.studentPassword", before.Lab.StudentPassword, after.Lab.StudentPassword)
 	addSecret("lab.adminPassword", before.Lab.AdminPassword, after.Lab.AdminPassword)
