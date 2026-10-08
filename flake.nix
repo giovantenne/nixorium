@@ -60,6 +60,10 @@
       };
       workspaceLab = mkWorkspaceLab {};
       workspaceRuntimeLab = mkWorkspaceLab {};
+      workspaceGroupLab = mkWorkspaceLab {
+        clientGroups.course = [ "pc01" "pc02" ];
+        groupModules.course = [ ./tests/fixtures/group-course.nix ];
+      };
       workspaceRuntimeControllerLab = mkWorkspaceLab {
         labConfig = (import ./lab-config.nix) // { deploymentMode = "controller"; pcCount = 0; };
         publicKeys = { cache = null; ssh = null; };
@@ -196,6 +200,7 @@
           touch "$out"
         '';
         workspace-offline = pkgs.runCommand "nixorium-workspace-offline-test" {} ''
+          test -e ${workspaceGroupLab.nixoriumOfflineCheck}
           test -e ${workspaceLab.nixoriumOfflineCheck}
           test -e ${workspaceRuntimeLab.nixoriumOfflineCheck}
           test -e ${workspaceRuntimeControllerLab.nixoriumOfflineCheck}

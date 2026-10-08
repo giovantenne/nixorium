@@ -198,6 +198,7 @@ let
   colmenaBaseGnomeRemoteDesktop = subnetLab.colmena.meta.nixpkgs.gnome-remote-desktop;
   clientGnomeRemoteDesktop = subnetLab.nixosConfigurations.pc01.pkgs.gnome-remote-desktop;
 in
+assert import ./group-modules.nix { inherit mkLab deploymentSelf labConfig lib; };
 assert hostClassLab.nixoriumHostClasses == [
   { representative = "pc01"; members = [ "pc01" "pc02" "pc03" ]; }
   { representative = "pc04"; members = [ "pc04" ]; }

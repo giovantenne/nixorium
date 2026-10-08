@@ -9,6 +9,7 @@ args@{
   controllerModules ? [],
   clientModules ? [],
   hostModules ? {},
+  groupModules ? {},
   updateValidationHosts ? [],
   labSoftware ? { schemaVersion = 1; packages = []; },
   softwareCatalog ? [],
@@ -187,7 +188,8 @@ let
     baseHostModules
     ++ sharedModules
     ++ lib.optionals isController ([ managedSoftwareModule ] ++ controllerModules)
-    ++ lib.optionals (!isController) ([ managedSoftwareModule ] ++ clientModules)
+    ++ lib.optionals (!isController) ([ managedSoftwareModule ] ++ clientModules
+      ++ lib.concatMap (group: groupModules.${group}) (moduleGroupsForHost name))
     ++ (hostModules.${name} or []);
 
   specialArgsForHost = name: hostIp: {
@@ -257,9 +259,9 @@ let
     else
       throw "mkLab files must be located inside the deployment or nixorium source tree: ${valueString}";
   renderPathList = values: "[ ${builtins.concatStringsSep " " (map renderPath values)} ]";
-  renderHostModules = "{\n${builtins.concatStringsSep "\n" (lib.mapAttrsToList
+  renderModuleMap = entries: "{\n${builtins.concatStringsSep "\n" (lib.mapAttrsToList
     (name: modules: "    ${builtins.toJSON name} = ${renderPathList modules};")
-    hostModules)}\n  }";
+    entries)}\n  }";
   labConfigJson = builtins.toFile "lab-config.json" (builtins.toJSON config);
   labSoftwareJson = builtins.toFile "lab-software.json" (builtins.toJSON labSoftwareConfig);
   softwareCatalogJson = builtins.toFile "software-catalog.json" (builtins.toJSON softwareCatalog);
@@ -273,7 +275,8 @@ let
     ++ controllerModules
     ++ clientModules
     ++ netbootModules
-    ++ lib.concatLists (lib.attrValues hostModules);
+    ++ lib.concatLists (lib.attrValues hostModules)
+    ++ lib.concatLists (lib.attrValues groupModules);
   isModulePath = module: builtins.isPath module || builtins.isString module;
   unknownPublicKeyNames = builtins.attrNames (builtins.removeAttrs publicKeys [ "cache" "ssh" ]);
   unknownAssetNames = builtins.attrNames (builtins.removeAttrs assets [ "logo" "backgrounds" "mimeApps" "vscodeSettings" ]);
@@ -295,7 +298,12 @@ let
   validClientNames = map (n: "pc${padNumber n}") pcNumbers;
   validHostNames = validClientNames ++ [ masterHostName ];
   unknownHostModuleNames = builtins.attrNames (builtins.removeAttrs hostModules validHostNames);
+  unknownModuleGroups = builtins.attrNames (builtins.removeAttrs groupModules (builtins.attrNames clientGroups));
+  moduleGroupsForHost = name: builtins.filter
+    (group: groupModules.${group} != [] && builtins.elem name clientGroups.${group})
+    (builtins.attrNames groupModules);
   updateClientVariants = lib.groupBy (name: builtins.toJSON {
+    moduleGroups = moduleGroupsForHost name;
     packages = lib.sort builtins.lessThan (lib.unique (map (entry: entry.package)
       (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages)));
     interface = ifaceForHost name;
@@ -426,16 +434,17 @@ let
         else { success = false; };
       in package.success && builtins.elem package.value installed
     ) workspacePackagePaths;
-  # Hosts that share their role, network interface and managed software
+  # Hosts that share their role, interface, managed software and module groups
   # evaluate the same modules, so their system packages agree; hostModules
   # make a host its own class. Resolving one representative per class keeps
   # validation memory independent of the number of computers. A shared module
   # that changes packages by host name alone is outside this contract and
-  # belongs in hostModules.
+  # requires an explicit hostModules or updateValidationHosts exception.
   workspaceHostClass = name:
-    if hostModules ? ${name} then "host ${name}"
+    if hostModules ? ${name} || builtins.elem name updateValidationHosts then "host ${name}"
     else builtins.toJSON {
       controller = name == masterHostName;
+      moduleGroups = moduleGroupsForHost name;
       interface = ifaceForHost name;
       software = lib.sort builtins.lessThan (map (entry: entry.package) (hostSoftwareEntries name));
     };
@@ -592,7 +601,8 @@ let
           sharedModules = ${renderPathList sharedModules};
           controllerModules = ${renderPathList controllerModules};
           clientModules = ${renderPathList clientModules};
-          hostModules = ${renderHostModules};
+          hostModules = ${renderModuleMap hostModules};
+          groupModules = ${renderModuleMap groupModules};
           updateValidationHosts = builtins.fromJSON ${builtins.toJSON (builtins.toJSON updateValidationHosts)};
           netbootModules = ${renderPathList netbootModules};
           installerSource = self;
@@ -678,6 +688,12 @@ let
     install -D -m 0644 ${bootstrapPkgs.ipxe}/snp.efi "$out/snponly.efi"
   '';
 in
+assert builtins.isAttrs groupModules && builtins.all builtins.isList (builtins.attrValues groupModules)
+  || throw "groupModules must be an attribute set of module lists";
+assert unknownModuleGroups == []
+  || throw "groupModules contains unknown client groups: ${builtins.concatStringsSep ", " unknownModuleGroups}";
+# Reuse the existing strict client-group validation, including controller exclusion.
+assert groupModules == {} || builtins.seq labSoftwareConfig true;
 assert builtins.all isModulePath extensionModules
   || throw "mkLab extension modules must be file paths so they can be included in the offline installer";
 assert unknownPublicKeyNames == []
@@ -782,7 +798,8 @@ builtins.mapAttrs (name: value:
     [ masterHostName ]
     ++ lib.optional (validClientNames != []) (builtins.head validClientNames)
     ++ builtins.attrNames hostModules
-    ++ map builtins.head (builtins.attrValues updateClientVariants)
+    # An exceptional first member must not hide the remaining group's graph.
+    ++ map (class: class.representative) hostClasses
     ++ updateValidationHosts
   );
 

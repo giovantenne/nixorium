@@ -82,7 +82,7 @@ activation, boot or safe behavior of arbitrary configuration code.
 and `members`, sorted by representative. Every configured host belongs to
 exactly one class. The controller is alone; each host in `hostModules` or
 `updateValidationHosts` is alone. Other clients share a class when their
-applicable software and network interface match. The first member in inventory
+applicable software, network interface and non-empty module groups match. The first member in inventory
 order represents that class.
 
 Assistant evaluates one representative per candidate class, comparing its
@@ -97,7 +97,16 @@ representative `pc01` and its system stay unchanged. If `pc01` leaves instead,
 system is unchanged. This deliberate conservative overestimate can report an
 extra computer rather than miss a potentially affected one.
 
-A private module that branches on `networking.hostName` must declare the
+For common behavior on selected clients, `groupModules.<group>` assigns module
+paths to an existing `clientGroups.<group>`. Prefer this explicit shared scope
+over repeating the same module in `hostModules`. Group membership is combined
+with software and interface differences; overlapping groups form distinct
+combinations. Empty module lists do not create extra classes. The controller
+cannot belong to a client group.
+
+Group modules declare common behavior within each class; this is a configuration
+contract, not automatic proof that arbitrary Nix code is equivalent. A private
+module that branches on `networking.hostName` must declare the
 exceptional hosts in `hostModules` or `updateValidationHosts`. Otherwise the
 representative cannot establish their individual behavior. Class/base results
 are cached only within the conversation; the candidate is evaluated afresh.

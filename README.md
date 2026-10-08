@@ -48,6 +48,9 @@ administrator menu. This subscription service prepares a candidate change;
 you review the files and evaluation before a local commit with a backup.
 Controller application and client updates remain separate reviewed actions.
 See [Assistant: activation, privacy and recovery](docs/assistant.md).
+Common customization for selected clients can use `groupModules` with existing
+`clientGroups`; individual exceptions remain separately validated. See the
+[mkLab extension points](docs/system-reference.md#libmklab-extension-points).
 
 ## For administrators
 

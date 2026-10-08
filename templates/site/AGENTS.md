@@ -79,3 +79,6 @@ its activation, consent, save or recovery confirmations. Host-specific private
 modules that branch on networking.hostName must declare their exceptional
 hosts in hostModules or updateValidationHosts for representative evaluation;
 identifying a missing declaration is a handoff, not permission to edit it.
+`groupModules` associates common modules with existing clientGroups and preserves
+software/interface distinctions; membership alone does not prove arbitrary Nix
+code equivalent. This hook does not expand this external agent's authority.

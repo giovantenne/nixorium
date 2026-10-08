@@ -208,7 +208,7 @@ any shard must block publication.
   see ADR 0015.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.
-- Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
+- Downstream calls pass `deploymentSelf = self`; extension points are `sharedModules`, `controllerModules`, `clientModules`, `groupModules`, `hostModules`, `netbootModules`, `assets`, and `publicKeys`.
 - Hosts pc01-pcNN are generated programmatically via `builtins.genList` + `mkHost`/`mkColmenaHost`, with the controller defined separately.
 - Hostname, static IP, and effective network interface are centralized in
   `lib/mk-lab.nix`. `ifaceName` is the compatibility fallback;
@@ -372,7 +372,10 @@ any shard must block publication.
   content and separation of the laboratory token. Seven fixed tools only:
   no shell, service control, builds, activation, logs or student-home access.
   Evaluate a temporary clone with IFD disabled and bounded time/output; compare
-  `nixoriumHostClasses` representatives. Host-name-dependent exceptions must
+  `nixoriumHostClasses` representatives. `groupModules` assigns common module
+  paths to existing clientGroups; compose overlaps deterministically, preserve
+  controller exclusion and offline serialization, and include applicable module
+  groups in Assistant/update/workspace class keys. Host-name-dependent exceptions must
   declare hostModules or updateValidationHosts. Only the native reviewed save
   can commit, after fresh evaluation/token checks, under the operation gate,
   with a durable backup and shared recovery journal. Keep startup free of Nix
@@ -480,8 +483,8 @@ any shard must block publication.
   default to an empty profile and catalog, and expose `nixoriumWorkspace` preparation metadata and a candidate hook.
   `mkLab` checks prerequisites against each generated host's actual declarative
   system packages, including downstream overrides, evaluating one representative
-  per class of hosts with the same role, interface and managed software; a host
-  with `hostModules` is its own class. Keep this memory bounded independently of
+  per class of hosts with the same role, interface, managed software and module groups; a host
+  with `hostModules` or `updateValidationHosts` is its own class. Keep this memory bounded independently of
   the inventory size. Serialize both inputs into
   the offline installer. `state = "prepared"` is not activation.
   The student home is always restored at boot from the workspace seed; there

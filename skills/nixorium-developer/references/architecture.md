@@ -13,7 +13,7 @@ the deployment.
 ## API and extension points
 
 `mkLab` accepts `deploymentSelf`, typed `labConfig`, public-key and asset
-paths, and shared/controller/client/host/netboot module lists. Filesystem
+paths, and shared/controller/client/group/host/netboot module lists. Filesystem
 references must remain inside the upstream or deployment source trees.
 
 Generated host names and addresses come from the validated IPv4 network,

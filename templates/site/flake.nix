@@ -67,6 +67,11 @@
           controllerModules = [ ./modules/controller.nix ];
           clientModules = [ ./modules/clients.nix ];
 
+          # Common behavior for named client groups; per-host exceptions stay below.
+          groupModules = {
+            # graphics = [ ./modules/graphics-course.nix ];
+          };
+
           hostModules = {
             # pc05 = [ ./modules/pc05.nix ];
           };

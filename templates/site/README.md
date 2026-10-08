@@ -236,6 +236,7 @@ and mouse blocked, until **Stop sharing** or until you close the page.
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
 - `modules/screensaver.nix`: Ghostty/TTE lab screensaver supplied by every built-in profile
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
+- `groupModules` in `flake.nix`: common modules for members of those client groups
 - `hostModules` in `flake.nix`: individual hosts
 - `updateValidationHosts` in `mkLab`: extra validation hosts when private shared
   modules branch on host identity (explicit host modules are already covered)
@@ -246,6 +247,21 @@ this private repository rather than Nixorium core, so package and policy changes
 can be reviewed and deployed on the lab's schedule. Profile modules receive
 `hostSoftwarePackages`; keep application policy conditional on the corresponding
 managed package so scope changes do not leave stale launchers or services.
+
+For common behavior on several clients, use the existing `clientGroups` and
+`groupModules` attributes, for example:
+
+```nix
+clientGroups.course = [ "pc01" "pc02" ];
+groupModules.course = [ ./modules/course.nix ];
+```
+
+Each group refers only to client PCs. Overlapping groups apply both sets of
+modules in group-name order. Group modules describe common behavior; keep
+individual exceptions in `hostModules` or declare `updateValidationHosts` when
+private modules branch by host name. Grouping preserves differences in managed
+software and network interfaces. An older pinned Nixorium must be updated before
+using this new argument; do not add it to a pin that does not support it.
 
 <details>
 <summary>Example: customize pc05 and add backgrounds</summary>

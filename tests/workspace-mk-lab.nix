@@ -146,6 +146,11 @@ in
     assert rejected { labSoftware = scope "all-clients"; };
     assert rejected { labSoftware = scope "controller"; };
     assert rejected { hostModules.pc02 = [ ./fixtures/workspace-remove-editor.nix ]; };
+    # A group-specific override must not borrow another class's prerequisites.
+    assert rejected {
+      clientGroups.restricted = [ "pc02" ];
+      groupModules.restricted = [ ./fixtures/workspace-remove-editor.nix ];
+    };
     # Clients with different managed software are separate classes, so a
     # client outside the editor's scope is still checked.
     assert rejected (clientEditor { kind = "clients"; clients = [ "pc01" ]; });
@@ -153,6 +158,10 @@ in
     assert !rejected (clientEditor { kind = "clients"; clients = [ "pc01" "pc02" ]; });
     # Identical clients are resolved once, whatever the size of the lab.
     assert !rejected { sharedModules = [ ./fixtures/workspace-forbid-second-client.nix ]; };
+    assert rejected {
+      sharedModules = [ ./fixtures/workspace-forbid-second-client.nix ];
+      updateValidationHosts = [ "pc02" ];
+    };
     assert !(builtins.tryEval (workspaceLab.nixoriumValidateControllerSoftwareCandidate (scope "all-clients"))).success;
     true;
 }

@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Add `mkLab.groupModules` for common modules on named client groups, with
+  consistent Assistant/update/workspace classes and offline serialization.
+  Host-specific exceptions remain separately checked.
+
 - Add optional subscription-based Assistant, visible in the administrator menu
   only with `lab.assistant` enabled on the controller. Separate activation and
   consent precede content sharing. Fixed tools prepare an isolated candidate;

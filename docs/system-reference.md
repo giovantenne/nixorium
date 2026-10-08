@@ -455,16 +455,36 @@ installer so client installation needs no second checkout.
 | `softwarePresets` | Optional versioned deployment-owned software-profile catalog; each profile has an ID, label, description, and package IDs |
 | `workspaceProfileJSON` | Raw JSON text of the student preferences; defaults to `{"schemaVersion":1}` |
 | `workspaceCatalog` | Deployment-owned baseline/application/extension catalog; defaults to an empty catalog; no implicit package installation |
-| `clientGroups` | Named sets of evaluated client identities available to software scopes |
+| `clientGroups` | Named sets of evaluated client identities for software scopes and group modules |
 | `publicKeys` | Harmonia and SSH public-key paths |
 | `assets` | Logo, wallpapers, MIME defaults, and editor settings |
 | `homeResetEphemeralPaths` | Deployment-owned relative cache/tool paths excluded before student snapshots |
 | `sharedModules` | NixOS modules applied to every generated host |
 | `controllerModules` | Modules applied only to the controller |
 | `clientModules` | Modules applied to all client PCs |
+| `groupModules` | Module-path lists keyed by existing client group names, applied only to their members |
 | `hostModules` | Attribute set of modules keyed by generated host name |
 | `updateValidationHosts` | Extra generated hosts with private host-conditional policy; included in base-update builds and offline equivalence |
 | `netbootModules` | Additional modules applied only to the PXE environment |
+
+`groupModules` defaults to `{}` and refers to existing `clientGroups`:
+
+```nix
+clientGroups.course = [ "pc01" "pc02" ];
+groupModules.course = [ ./modules/course.nix ];
+```
+
+Groups may overlap: their module lists are composed in group-name order, after
+`clientModules` and before `hostModules`. The controller is excluded. Unknown
+groups, invalid members and non-list/non-path module declarations are rejected.
+Module paths retain the existing deployment/upstream ownership rules and are
+serialized into the offline installer. Empty lists do not split host classes.
+
+A group module declares common behavior for its members with the same software
+and interface. It must not hide per-host differences: declare those exceptions
+through `hostModules` or `updateValidationHosts`. This contract is shared by
+Assistant, update targets and workspace prerequisite checks; it is not automatic
+analysis of Nix program equivalence.
 
 Unknown settings, host names, and asset names fail evaluation. Referenced
 filesystem paths must belong to either the upstream or private deployment
@@ -571,12 +591,12 @@ require `vscode`, desktop preferences require `gnome-shell`, and dock preference
 require `gnomeExtensions.dash-to-dock`. Broken, insecure, unsupported-platform
 or unresolved required packages fail preparation. No live hosts are contacted.
 
-Hosts that share their role, network interface and managed software, and have
-no `hostModules`, evaluate the same modules; the check evaluates one of them per
-such class and applies the result to the whole class, so its memory does not
-grow with the number of computers. A host with `hostModules` is always checked
-on its own. Express per-computer differences through `hostModules` or software
-scopes: a shared module that changes packages by host name alone is not seen
+Hosts that share their role, network interface, managed software and module groups,
+and have no `hostModules` or `updateValidationHosts` exception, evaluate the same
+modules; the check evaluates one of them per such class and applies the result to
+the whole class, so its memory does not grow with the number of computers. A host
+with either exception is always checked on its own. Express per-computer
+differences through `hostModules` or software scopes: a shared module that changes packages by host name alone is not seen
 for the other members of its class.
 
 `nixoriumValidateWorkspaceCandidate` accepts raw candidate JSON text and checks
@@ -673,7 +693,7 @@ subscription, consent, confined tools and reviewed local-save workflow.
 `nixoriumHostClasses` is a cheap `mkLab` output: sorted records with
 `representative` and `members`, covering every host exactly once. The controller,
 `hostModules` hosts and `updateValidationHosts` are singleton classes; remaining
-clients group by applicable software and interface. Private modules branching
+clients group by applicable software, interface and non-empty module groups. Private modules branching
 on `networking.hostName` must declare exceptional hosts through those inputs.
 Assistant evaluates representatives and conservatively includes hosts whose
 assigned representative changes, even when their own system is unchanged.
