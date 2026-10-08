@@ -101,6 +101,11 @@ A private module that branches on `networking.hostName` must declare the
 exceptional hosts in `hostModules` or `updateValidationHosts`. Otherwise the
 representative cannot establish their individual behavior. Class/base results
 are cached only within the conversation; the candidate is evaluated afresh.
+System derivations are evaluated in sequential batches of at most two
+representatives per Nix process, on both sides. This limits memory accumulation
+when many hosts require separate classes. All batches share the same five-minute
+deadline; a failed or canceled batch stops evaluation without a valid partial
+result.
 
 ## Review and save
 

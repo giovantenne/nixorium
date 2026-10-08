@@ -11,7 +11,8 @@ The project follows [Semantic Versioning](https://semver.org/).
   consent precede content sharing. Fixed tools prepare an isolated candidate;
   host-class evaluation and a full comparison precede an explicit local save
   with a recoverable Git backup. Applying systems remains separately reviewed.
-  Settings saves preserve the option.
+  Settings saves preserve the option. Evaluate host representatives in sequential
+  batches of at most two per process while retaining the overall time limit.
 
 - Restrict the laboratory maintainer skill to supported proposals and bounded
   diagnostics. Explicitly prohibit invasive module/overlay/script changes and

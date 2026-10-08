@@ -59,6 +59,27 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 		}
 		return json.Unmarshal([]byte(data), target)
 	}
+	// Keep each process small even when host-specific modules create many classes.
+	// Every batch shares the evaluation's original deadline and runs sequentially.
+	evaluatePaths := func(ref string, names []string, paths map[string]string) error {
+		for start := 0; start < len(names); start += 2 {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			batch := names[start:min(start+2, len(names))]
+			var values map[string]string
+			if err := evaluate(ref+"#nixosConfigurations", assistantDrvExpression(batch), &values); err != nil {
+				return err
+			}
+			for _, name := range batch {
+				if values[name] == "" {
+					return errors.New("Incomplete host evaluation.")
+				}
+				paths[name] = values[name]
+			}
+		}
+		return nil
+	}
 	baseRef := (&url.URL{Scheme: "git+file", Path: w.Conversation.Repository, RawQuery: "rev=" + w.Conversation.Base}).String()
 	var baseClasses []assistantHostClass
 	data, err := assistantReadStateLimit(w.root, "base-classes.json", 1024*1024)
@@ -134,7 +155,7 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 	}
 	if len(missing) > 0 {
 		paths := map[string]string{}
-		if err = evaluate(baseRef+"#nixosConfigurations", assistantDrvExpression(missing), &paths); err != nil {
+		if err = evaluatePaths(baseRef, missing, paths); err != nil {
 			return result, err
 		}
 		for _, name := range missing {
@@ -149,7 +170,7 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 		}
 	}
 	candidatePaths := map[string]string{}
-	if err = evaluate(candidateRef+"#nixosConfigurations", assistantDrvExpression(representatives), &candidatePaths); err != nil {
+	if err = evaluatePaths(candidateRef, representatives, candidatePaths); err != nil {
 		return result, err
 	}
 	changed := map[string]bool{}

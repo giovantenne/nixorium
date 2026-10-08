@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -85,6 +86,11 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 	before := assistantGitSnapshot(t, repo)
 	calls := []string{}
 	run := func(ctx context.Context, limit int, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "#nixosConfigurations") {
+			if count := strings.Count(args[len(args)-1], ".config.system.build.toplevel.drvPath"); count < 1 || count > 2 {
+				t.Fatalf("expected one or two representatives, got %d: %v", count, args)
+			}
+		}
 		calls = append(calls, strings.Join(args, " "))
 		return runBoundedNix(ctx, limit, args...)
 	}
@@ -105,11 +111,11 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 		}
 		return n
 	}
-	if baseCalls() != 2 {
+	if baseCalls() != 3 {
 		t.Fatal(calls)
 	}
 	evaluate([]string{})
-	if baseCalls() != 2 {
+	if baseCalls() != 3 {
 		t.Fatal("base cache was not reused", calls)
 	}
 	if err := w.Write("course.nix", "{ value = 4; }", false); err != nil {
@@ -124,7 +130,7 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 	evaluate([]string{"pc02"})
 	w.Write("classes.nix", `[ { representative = "pc99"; members = [ "pc99" ]; } { representative = "pc02"; members = [ "pc02" ]; } { representative = "pc03"; members = [ "pc01" "pc03" ]; } ]`, false)
 	evaluate([]string{"pc01", "pc02"})
-	if baseCalls() != 3 {
+	if baseCalls() != 4 {
 		t.Fatal("new base representative was not evaluated once", calls)
 	}
 	w.Write("classes.nix", assistantIntegrationClasses, false)
@@ -208,5 +214,57 @@ func TestAssistantHostClassesRejectUnsafeOrDuplicateMembers(t *testing.T) {
 	}
 	if message := assistantEvaluationError(strings.Repeat("ghp_secret\n", 10000)); len(message) > 8192 || strings.Contains(message, "ghp_secret") {
 		t.Fatal("unbounded or unredacted diagnostics")
+	}
+}
+
+func TestAssistantEvaluationStopsAfterFailedBatch(t *testing.T) {
+	for _, mode := range []string{"error", "incomplete", "cancel"} {
+		t.Run(mode, func(t *testing.T) {
+			w, store, repo := assistantEvaluationFixture(t, false)
+			before := assistantGitSnapshot(t, repo)
+			w.Write("flake.nix", strings.Replace(assistantIntegrationFlake, `pc03 = host "pc03" ./special.nix;`, `pc03 = host "pc03" ./special.nix; pc04 = host "pc04" ./special.nix;`, 1), false)
+			w.Write("classes.nix", `[ { representative = "pc99"; members = [ "pc99" ]; } { representative = "pc01"; members = [ "pc01" ]; } { representative = "pc02"; members = [ "pc02" ]; } { representative = "pc03"; members = [ "pc03" ]; } { representative = "pc04"; members = [ "pc04" ]; } ]`, false)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			candidateCalls := 0
+			var deadline time.Time
+			run := func(ctx context.Context, limit int, args ...string) (string, error) {
+				current, ok := ctx.Deadline()
+				if !ok || (!deadline.IsZero() && current != deadline) {
+					t.Fatal("batches must share one deadline")
+				}
+				deadline = current
+				call := strings.Join(args, " ")
+				if strings.Contains(call, "#nixosConfigurations") && !strings.Contains(call, "?rev=") {
+					candidateCalls++
+					if candidateCalls == 2 {
+						switch mode {
+						case "error":
+							return "", errors.New("synthetic batch failure")
+						case "incomplete":
+							return `{}`, nil
+						case "cancel":
+							data, err := runBoundedNix(ctx, limit, args...)
+							cancel()
+							return data, err
+						}
+					}
+				}
+				return runBoundedNix(ctx, limit, args...)
+			}
+			result, err := evaluateAssistantCandidate(ctx, w, run)
+			if err == nil || result.OK || len(result.ChangedHosts) != 0 || candidateCalls != 2 {
+				t.Fatalf("partial evaluation must fail closed: %+v, %v, calls=%d", result, err, candidateCalls)
+			}
+			if mode == "cancel" && !errors.Is(err, context.Canceled) {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(before, assistantGitSnapshot(t, repo)) {
+				t.Fatal("failed evaluation changed the deployment")
+			}
+			if matches, _ := filepath.Glob(filepath.Join(store.Directory, "conversations", w.Conversation.ID, "eval-*")); len(matches) != 0 {
+				t.Fatal("temporary evaluation remains", matches)
+			}
+		})
 	}
 }
