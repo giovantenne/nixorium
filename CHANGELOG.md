@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Assistant can consult the pinned Nixorium source through the service. The
+  client keeps verifiable references in the conversation and sends the
+  deployment context, including the pinned core revision, at every step.
+
 - Add `nixoriumComparisonConfigurations` so Assistant comparisons ignore the
   deployment revision.
 
