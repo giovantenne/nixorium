@@ -371,6 +371,9 @@ func (s *assistantFlowStore) WriteTranscript(_ domain.AssistantConversation, m [
 func (s *assistantFlowStore) VisibleFiles(domain.AssistantConversation) ([]string, error) {
 	return []string{}, nil
 }
+func (s *assistantFlowStore) CoreIdentity(domain.AssistantConversation) (*domain.AssistantCore, error) {
+	return nil, nil
+}
 func (s *assistantFlowStore) Execute(context.Context, domain.AssistantConversation, domain.AssistantToolCall) string {
 	panic("unexpected tool call in HTTP-only flow test")
 }

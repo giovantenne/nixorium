@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -91,6 +92,7 @@ func TestAssistantRunnerCreatesCandidateAndRetainsHistory(t *testing.T) {
 		}
 	})
 	before := runnerGit(t, repo, "rev-parse", "HEAD")
+	runner.CoreOverride = &domain.AssistantCore{Owner: "giovantenne", Repo: "nixorium", Rev: strings.Repeat("a", 40)}
 	activities := []string{}
 	result, err := runner.Run(t.Context(), conversation, "Prepare course", func(event domain.AssistantEvent) {
 		if event.Type == "activity" {
@@ -119,7 +121,7 @@ func TestAssistantRunnerCreatesCandidateAndRetainsHistory(t *testing.T) {
 	if err != nil || len(saved) != 4 || saved[2].Role != "tool" || saved[2].ToolCallID != "c1" {
 		t.Fatal(saved, err)
 	}
-	if requests[0].Context == nil || len(requests[0].Context.Files) != 1 || requests[1].Context != nil || requests[1].Messages[2].Content != `{"ok":true}` {
+	if requests[0].Context == nil || len(requests[0].Context.Files) != 1 || !reflect.DeepEqual(requests[0].Context, requests[1].Context) || !reflect.DeepEqual(requests[0].Context.Core, runner.CoreOverride) || requests[1].Messages[2].Content != `{"ok":true}` {
 		t.Fatal("context or tool result missing")
 	}
 	if !strings.Contains(strings.Join(activities, ";"), "Writing modules/course.nix") {
@@ -128,8 +130,8 @@ func TestAssistantRunnerCreatesCandidateAndRetainsHistory(t *testing.T) {
 	if _, err = runner.Run(t.Context(), conversation, "Another request", func(domain.AssistantEvent) {}); err != nil {
 		t.Fatal(err)
 	}
-	if requests[2].Context != nil || len(requests[2].Messages) != 5 {
-		t.Fatal("next turn lost history or resent context")
+	if requests[2].Context == nil || len(requests[2].Context.Files) != 2 || len(requests[2].Messages) != 5 {
+		t.Fatal("next turn lost history or did not refresh context")
 	}
 }
 func TestAssistantRunnerCancellationRetainsOverlayAndCallsCancel(t *testing.T) {

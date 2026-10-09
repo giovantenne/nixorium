@@ -22,6 +22,7 @@ type AssistantConversationStore interface {
 	ReadTranscript(domain.AssistantConversation) ([]domain.AssistantMessage, error)
 	WriteTranscript(domain.AssistantConversation, []domain.AssistantMessage) error
 	VisibleFiles(domain.AssistantConversation) ([]string, error)
+	CoreIdentity(domain.AssistantConversation) (*domain.AssistantCore, error)
 }
 type AssistantToolExecutor interface {
 	Execute(context.Context, domain.AssistantConversation, domain.AssistantToolCall) string
@@ -31,6 +32,8 @@ type AssistantTurnRunner struct {
 	Tools   AssistantToolExecutor
 	Store   AssistantConversationStore
 	Version string
+	// Qualification only; production leaves it nil.
+	CoreOverride *domain.AssistantCore
 }
 
 func assistantSafeText(text, token string) string {
@@ -92,7 +95,6 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			messages[i].ToolCalls[j].Arguments = []byte(strings.ReplaceAll(string(messages[i].ToolCalls[j].Arguments), token, "[REDACTED]"))
 		}
 	}
-	first := len(messages) == 0
 	messages = append(messages, domain.AssistantMessage{Role: "user", Content: assistantSafeText(prompt, token)})
 	result.Messages = messages
 	emit(domain.AssistantEvent{Type: "activity", Text: "Checking Assistant subscription"})
@@ -110,14 +112,18 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	}()
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(turn.Limits.Seconds)*time.Second)
 	defer cancel()
-	var contextData *domain.AssistantContext
-	if first {
-		files, err := runner.Store.VisibleFiles(conversation)
-		if err != nil {
-			return result, err
-		}
-		contextData = &domain.AssistantContext{Nixorium: runner.Version, Files: files}
+	files, err := runner.Store.VisibleFiles(conversation)
+	if err != nil {
+		return result, err
 	}
+	core := runner.CoreOverride
+	if core == nil {
+		core, err = runner.Store.CoreIdentity(conversation)
+		if err != nil {
+			core = nil
+		}
+	}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files}
 	textBytes := 0
 	for step := 0; step < turn.Limits.Steps; step++ {
 		if err = ctx.Err(); err != nil {
@@ -165,7 +171,6 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			}
 		})
 		flushText(true)
-		contextData = nil
 		if overflow {
 			err = &domain.AssistantError{Code: "protocol_error"}
 		}

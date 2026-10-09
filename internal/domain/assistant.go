@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"regexp"
 	"time"
 )
 
@@ -49,10 +50,24 @@ type AssistantMessage struct {
 	ToolCallID string              `json:"toolCallId,omitempty"`
 }
 
+type AssistantCore struct {
+	Owner string `json:"owner"`
+	Repo  string `json:"repo"`
+	Rev   string `json:"rev"`
+}
+
+var assistantCoreName = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}$`)
+var assistantCoreRevision = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+func ValidAssistantCore(core AssistantCore) bool {
+	return assistantCoreName.MatchString(core.Owner) && assistantCoreName.MatchString(core.Repo) && assistantCoreRevision.MatchString(core.Rev)
+}
+
 type AssistantContext struct {
-	Nixorium string   `json:"nixorium"`
-	Hosts    []string `json:"hosts,omitempty"`
-	Files    []string `json:"files"`
+	Nixorium string         `json:"nixorium"`
+	Core     *AssistantCore `json:"core,omitempty"`
+	Hosts    []string       `json:"hosts,omitempty"`
+	Files    []string       `json:"files"`
 }
 
 type AssistantStepRequest struct {
