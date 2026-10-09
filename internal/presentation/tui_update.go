@@ -186,6 +186,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.backup.result, model.backup.done = message.report, true
 		return model, nil
+	case backupSyncMsg:
+		return model.finishBackupSync(message)
 	case recoveryResultMsg:
 		model.busy = ""
 		model.recoveryReview.done = true

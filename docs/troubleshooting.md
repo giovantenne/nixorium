@@ -648,11 +648,12 @@ distributing it to the whole laboratory.
 ## Backups and restoration
 
 Backup is **optional**: installation and updates do not require it. In
-**Maintenance → Back up lab**, choose **File / USB** for a fully encrypted
-archive, or **Remote Git** for a private remote repository. An absent or stale
-backup produces an advisory Overview reminder only.
+**Maintenance → Back up lab**, choose **Encrypted file** for a fully encrypted
+archive in a folder or on a USB drive, or **Private Git repository** for a
+private remote repository that then stays up to date automatically. An absent
+or stale backup produces an advisory Overview reminder only.
 
-For **Remote Git**, push the saved deployment and its encrypted recovery keys
+For a **Private Git repository**, push the saved deployment and its encrypted recovery keys
 to a **private** GitHub or GitLab repository (including self-hosted GitLab). Create the private repository on your provider first, and configure
 independent SSH access on the controller. Verify the Git server's host fingerprint
 through a trusted channel before using Nixorium; SSH host verification is never
@@ -693,10 +694,21 @@ force-pushes, merges or resolves remote conflicts automatically. If writing the
 recovery commit was interrupted, inspect and save `nixorium-recovery.age` through
 Review Git changes before retrying.
 
-A current file/USB archive or verified remote backup clears the reminder.
-Changed configuration or recovery keys, or a backup older than 30 days, produces
-a reminder to back up again. No backup state blocks client installation,
-updates, local repair or offline operation.
+After the first verified Git backup, every newly saved configuration revision
+is pushed **automatically** while the administrator TUI is open: when it starts
+and whenever you return to the Overview. The push uses the same checks and
+remote verification, never forces, and needs no passphrase because the
+encrypted recovery file is unchanged. Unsaved edits are pushed after they are
+saved. When keys, account passwords or trusted computers change (for example
+after installing a computer), the Overview asks you to run Back up lab again
+with the passphrase. **Back up lab → Back up now** pushes immediately; a failed
+automatic push is reported once and retried after the next save.
+
+A configured Git backup therefore needs no periodic reminder: the Overview
+reports only a pending push or changes that need the passphrase. For encrypted
+files, a reminder appears when the configuration, keys or passwords changed
+since the last file or it is older than 30 days. No backup state blocks client
+installation, updates, local repair or offline operation.
 
 To restore, open **Maintenance → Restore lab**, or start the restore screen without
 an existing deployment:
@@ -705,8 +717,13 @@ an existing deployment:
 nixorium backup clone
 ```
 
-Enter the SSH repository URL, branch, a **new absolute directory** and passphrase,
-then review and confirm. The equivalent noninteractive command is:
+Choose **Backup file** or **Private Git repository**. For a file, enter its path
+(for example on the mounted USB drive), a **new absolute directory** and the
+passphrase. For Git, enter the SSH repository URL, branch, a new absolute
+directory and the passphrase. Review and confirm. Both restore the deployment
+with its private keys and account passwords into the new directory and fill the
+controller's trusted computer keys in the same way. The equivalent
+noninteractive Git command is:
 
 ```sh
 nixorium backup clone --remote git@github.com:SCHOOL/LAB.git --branch main --to /home/admin/restored-lab --yes
@@ -737,7 +754,7 @@ again. Clients retain trust in the restored original keys and do not need
 reinstallation. The passphrase decrypts existing keys; it never generates
 replacement keys. Repository access and the passphrase are both needed.
 
-For **File / USB**, mount the drive first, then enter an existing absolute folder
+For an **Encrypted file**, mount the drive first, then enter an existing absolute folder
 outside the deployment in the TUI. Enter and repeat a passphrase of at least
 12 characters, review the destination, then choose **Create backup**. No Git
 remote is needed and nothing is pushed. A detached USB need not stay mounted
@@ -750,8 +767,9 @@ nixorium backup restore BACKUP-FILE --to /home/admin/restored-archive
 ```
 
 An offline archive encrypts the entire repository, including `.git`, ignored keys
-and trusted computer keys. It extracts into `deployment/` and `ssh/` within an
-empty target. Never commit or push plaintext private keys; only their encrypted
+and trusted computer keys. Restore lab places it ready to use; `nixorium backup
+restore` only extracts it into `deployment/` and `ssh/` within an empty target,
+for inspection. Never commit or push plaintext private keys; only their encrypted
 recovery file belongs in Git.
 
 Operation logs and authenticated deployment history under the administrator's

@@ -404,8 +404,14 @@ any shard must block publication.
 - Remote lab backup requires an explicit private SSH destination/branch review,
   encrypted original keys and verified remote revision. Keep plaintext private
   keys ignored; only `nixorium-recovery.age` is committed by this workflow.
-  Ordinary reviewed commits remain local. Backup is optional: the TUI offers
-  an encrypted file/USB archive or a private Git remote. Missing or stale backups
+  After a verified Git backup, the administrator TUI pushes each newly saved
+  revision automatically (on start and on return to the Overview) through the
+  same checks and remote verification, only while recovery material and the
+  committed recovery file are unchanged; otherwise it asks for the reviewed,
+  passphrase-protected backup. Never force, merge or push unsaved work.
+  Without a Git backup, reviewed commits stay local. Backup is optional: the TUI offers
+  an encrypted file/USB archive or a private Git remote. Restore lab restores
+  either one into a new directory through the same key and trust checks. Missing or stale backups
   produce reminders only; never gate client installation or updates on backup.
   Restore fetches into a new private directory, disables Git hooks/filters and never evaluates or applies the fetched configuration.
   Preserve original key pairs, trusted hosts and the encrypted recovery file

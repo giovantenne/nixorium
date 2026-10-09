@@ -397,25 +397,8 @@ func (g GitBackup) Publish(ctx context.Context, plan domain.GitBackupPlan, passp
 			return fail(fmt.Errorf("encrypted file saved locally; inspect Git changes before retrying: %w", err))
 		}
 	}
-	bare, err := os.MkdirTemp("", "nixorium-backup-transport-")
-	if err != nil {
-		return fail(err)
-	}
-	defer os.RemoveAll(bare)
-	// No deployment config is copied; only objects and HEAD are imported.
-	if _, err := backupGit(ctx, bare, "clone", "--bare", "--no-local", "--", plan.Repository, filepath.Join(bare, "repo")); err != nil {
-		return fail(err)
-	}
-	transport := filepath.Join(bare, "repo")
-	if _, err := backupGit(ctx, transport, "config", "--remove-section", "remote.origin"); err != nil {
-		return fail(err)
-	}
-	if _, err := backupGit(ctx, transport, "push", "--porcelain", "--no-follow-tags", "--", plan.Remote, revision+":refs/heads/"+plan.Branch); err != nil {
+	if err := pushVerifiedRevision(ctx, plan, revision); err != nil {
 		return fail(fmt.Errorf("recovery commit %s is saved locally; remote backup is unconfirmed. %w", revision[:12], err))
-	}
-	remote, err := backupGit(ctx, transport, "ls-remote", "--refs", "--", plan.Remote, "refs/heads/"+plan.Branch)
-	if err != nil || strings.TrimSpace(remote) != revision+"\trefs/heads/"+plan.Branch {
-		return fail(errors.New("push completed but remote verification failed; retry Back up lab to verify it"))
 	}
 	now := time.Now().UTC()
 	current, err := recoveryMaterial(plan.Repository)
@@ -428,6 +411,111 @@ func (g GitBackup) Publish(ctx context.Context, plan domain.GitBackupPlan, passp
 		return fail(errors.New("remote revision verified, but its local receipt could not be saved; retry Back up lab"))
 	}
 	return domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-publish", State: "completed", Path: plan.Remote, Revision: revision, CreatedAt: now, Files: plan.Files, PrivateKeys: append([]string{}, privateDeploymentPaths...), Message: "Backup verified on the private remote. Keep its SSH access and recovery passphrase separately. No system was applied."}
+}
+
+// pushVerifiedRevision publishes one exact revision from a fresh bare copy, so
+// deployment Git configuration cannot redirect it, and confirms the remote ref.
+// It never forces: a diverged remote needs human reconciliation.
+func pushVerifiedRevision(ctx context.Context, plan domain.GitBackupPlan, revision string) error {
+	bare, err := os.MkdirTemp("", "nixorium-backup-transport-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(bare)
+	// No deployment config is copied; only objects and HEAD are imported.
+	if _, err := backupGit(ctx, bare, "clone", "--bare", "--no-local", "--", plan.Repository, filepath.Join(bare, "repo")); err != nil {
+		return err
+	}
+	transport := filepath.Join(bare, "repo")
+	if _, err := backupGit(ctx, transport, "config", "--remove-section", "remote.origin"); err != nil {
+		return err
+	}
+	if _, err := backupGit(ctx, transport, "push", "--porcelain", "--no-follow-tags", "--", plan.Remote, revision+":refs/heads/"+plan.Branch); err != nil {
+		return err
+	}
+	remote, err := backupGit(ctx, transport, "ls-remote", "--refs", "--", plan.Remote, "refs/heads/"+plan.Branch)
+	if err != nil || strings.TrimSpace(remote) != revision+"\trefs/heads/"+plan.Branch {
+		return errors.New("push completed but remote verification failed; retry Back up lab to verify it")
+	}
+	return nil
+}
+
+// Sync keeps a configured Git backup current without the passphrase. The
+// encrypted recovery file already in Git stays valid while keys, account
+// credentials and trusted computers are unchanged, so saved configuration can
+// be pushed as is. Any change to that material needs Back up lab, because only
+// the administrator can encrypt it again. skip names a revision whose push
+// already failed in this session, to avoid retrying it on every refresh.
+func (g GitBackup) Sync(ctx context.Context, repository, skip string) domain.BackupReport {
+	report := domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-sync", PrivateKeys: []string{}, Issues: []domain.ValidationIssue{}}
+	record, found := readGitBackupRecord(repository)
+	if !found {
+		report.State = "unconfigured"
+		return report
+	}
+	report.Path = record.Plan.Remote
+	stop := func(state, message string) domain.BackupReport {
+		report.State, report.Message = state, message
+		if state == "blocked" {
+			report.Issues = append(report.Issues, domain.ValidationIssue{Field: "backup", Message: message})
+		}
+		return report
+	}
+	needsPassphrase := "Keys, account passwords or trusted computers changed since the last Git backup. Open Maintenance → Back up lab and enter the recovery passphrase."
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	head, err := (Local{}).GitRevision(ctx, repository)
+	if err != nil {
+		return stop("blocked", "Cannot read the saved configuration revision.")
+	}
+	report.Revision = head
+	material, err := recoveryMaterial(repository)
+	if err != nil {
+		return stop("blocked", err.Error())
+	}
+	if recoveryDigest(material) != record.Plan.RecoveryDigest {
+		return stop("needs-passphrase", needsPassphrase)
+	}
+	if head == record.PublishedRevision {
+		return stop("current", "The Git backup is up to date.")
+	}
+	if head == skip {
+		return stop("skipped", "")
+	}
+	// Unsaved edits are pushed after they are saved, not reported as failures.
+	if status, err := backupGit(ctx, repository, "status", "--porcelain=v1", "--untracked-files=all"); err != nil || strings.TrimSpace(status) != "" {
+		return stop("waiting", "")
+	}
+	root, err := openWorkspaceRoot(repository, unix.LOCK_EX)
+	if err != nil {
+		return stop("blocked", err.Error())
+	}
+	defer root.Close()
+	plan, err := g.Plan(ctx, repository, record.Plan.Remote, record.Plan.Branch)
+	if err != nil {
+		return stop("blocked", err.Error())
+	}
+	if plan.Revision != head {
+		return stop("blocked", "The configuration changed while preparing the backup; it will be pushed next time.")
+	}
+	if plan.RecoveryDigest != record.Plan.RecoveryDigest {
+		return stop("needs-passphrase", needsPassphrase)
+	}
+	// The pushed tree must carry the same encrypted recovery file as the last
+	// verified backup; otherwise a restore could not decrypt matching keys.
+	current, currentErr := backupGit(ctx, repository, "rev-parse", "--verify", "--quiet", head+":"+gitRecoveryFile)
+	published, publishedErr := backupGit(ctx, repository, "rev-parse", "--verify", "--quiet", record.PublishedRevision+":"+gitRecoveryFile)
+	if currentErr != nil || publishedErr != nil || strings.TrimSpace(current) != strings.TrimSpace(published) {
+		return stop("needs-passphrase", "The encrypted recovery file changed since the last Git backup. Open Maintenance → Back up lab and enter the recovery passphrase.")
+	}
+	if err := pushVerifiedRevision(ctx, plan, head); err != nil {
+		return stop("blocked", "Automatic Git backup failed: "+err.Error())
+	}
+	if err := writeGitBackupRecord(repository, gitBackupRecord{Plan: plan, PublishedRevision: head, KeysDigest: backupKeysDigest(repository), CreatedAt: time.Now().UTC()}); err != nil {
+		return stop("blocked", "The remote backup was pushed, but its local receipt could not be saved.")
+	}
+	report.CreatedAt = time.Now().UTC()
+	return stop("completed", "Saved changes were backed up to "+record.Plan.Remote+".")
 }
 
 func writeRecoveryFile(repository string, data []byte) error {
@@ -547,74 +635,21 @@ func (g GitBackup) Restore(ctx context.Context, remote, branch, target string, p
 			return fail(err)
 		}
 	}
-	restored, err := (Local{}).ReadSettings(stage)
-	if err != nil {
-		return fail(err)
-	}
-	settings, issues := domain.DecodeLabSettings(restored)
-	if len(issues) != 0 || !domain.CredentialsFromSettings(settings).Ready() {
-		return fail(errors.New("restored credentials do not match the configuration"))
-	}
-	for _, spec := range keyMaterialSpecs {
-		if _, _, err := readRecoveryFile(filepath.Join(stage, spec.publicPath), maximumKeyMaterialBytes); err != nil {
-			return fail(errors.New("restored public keys must be regular deployment files"))
+	configureRemote := func() error {
+		for _, setting := range [][2]string{
+			{"remote.origin.url", remote},
+			{"remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"},
+			{"branch." + branch + ".remote", "origin"},
+			{"branch." + branch + ".merge", "refs/heads/" + branch},
+		} {
+			if _, err := backupGit(ctx, stage, "config", setting[0], setting[1]); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
-	for _, key := range (Local{}).KeyMaterial(ctx, stage) {
-		if !key.Verified || !key.Matches || !key.Safe {
-			return fail(fmt.Errorf("restored %s key does not match the repository's public key", key.Name))
-		}
-	}
-	// Ensure future routine Git operations cannot accidentally add clear keys.
-	exclude := filepath.Join(stage, ".git", "info", "exclude")
-	f, err := os.OpenFile(exclude, os.O_APPEND|os.O_WRONLY, 0600)
+	revision, publishErr, err := publishRestoredLab(ctx, stage, target, material.KnownHosts, configureRemote)
 	if err != nil {
-		return fail(err)
-	}
-	_, err = f.WriteString("\n/secret-key\n/admin-ssh\n/lab-credentials.json\n")
-	err = errors.Join(err, f.Close())
-	if err != nil {
-		return fail(err)
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fail(err)
-	}
-	trust := filepath.Join(home, ".ssh", "nixorium-known-hosts")
-	// Lock the same file used by client enrollment and reviewed trust rotation.
-	// An activated replacement controller normally already has an empty store.
-	if err := ensureRealDirectory(filepath.Join(home, ".ssh"), 0700, "SSH directory"); err != nil {
-		return fail(err)
-	}
-	if err := ensureRealDirectory(trust, 0700, "trusted computer keys"); err != nil {
-		return fail(err)
-	}
-	trustLock, err := lockRecoveryTrust(trust)
-	if err != nil {
-		return fail(err)
-	}
-	defer trustLock.Close()
-	current, err := recoveryMaterial(stage)
-	if err != nil || !compatibleTrustedKeys(current.KnownHosts, material.KnownHosts) {
-		return fail(errors.New("this controller already has different trusted computer keys; restore on a clean replacement controller"))
-	}
-	revision, err := (Local{}).GitRevision(ctx, stage)
-	if err != nil {
-		return fail(err)
-	}
-	if _, err := backupGit(ctx, stage, "config", "remote.origin.url", remote); err != nil {
-		return fail(err)
-	}
-	if _, err := backupGit(ctx, stage, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"); err != nil {
-		return fail(err)
-	}
-	if _, err := backupGit(ctx, stage, "config", "branch."+branch+".remote", "origin"); err != nil {
-		return fail(err)
-	}
-	if _, err := backupGit(ctx, stage, "config", "branch."+branch+".merge", "refs/heads/"+branch); err != nil {
-		return fail(err)
-	}
-	if err := unix.Renameat2(unix.AT_FDCWD, stage, unix.AT_FDCWD, target, unix.RENAME_NOREPLACE); err != nil {
 		return fail(err)
 	}
 	partial := func(err error) domain.BackupReport {
@@ -624,17 +659,103 @@ func (g GitBackup) Restore(ctx context.Context, remote, branch, target string, p
 		r.Message = "Deployment and private keys restored into " + target + ", but trust/receipt finalization failed. Keep this directory; do not activate yet. " + err.Error()
 		return r
 	}
-	if err := syncDirectory(filepath.Dir(target)); err != nil {
-		return partial(err)
-	}
-	if err := restoreTrustedKeys(trust, material.KnownHosts); err != nil {
-		return partial(err)
+	if publishErr != nil {
+		return partial(publishErr)
 	}
 	plan := domain.GitBackupPlan{Repository: target, Remote: remote, Branch: branch, Revision: revision, RecoveryDigest: recoveryDigest(material)}
 	if err := writeGitBackupRecord(target, gitBackupRecord{Plan: plan, PublishedRevision: revision, KeysDigest: backupKeysDigest(target), CreatedAt: time.Now().UTC()}); err != nil {
 		return partial(err)
 	}
 	return domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-clone", State: "completed", Path: target, Revision: revision, PrivateKeys: append([]string{}, privateDeploymentPaths...), Message: "Lab restored with its original keys and trusted computers. Open nixorium --repo " + target + "; follow the controller replacement guide before applying. No system was activated."}
+}
+
+// publishRestoredLab checks a staged deployment whose private keys are already
+// in place, then moves it to target without replacing anything and fills the
+// controller's trusted computer keys. It is shared by Git and file restores.
+// err means nothing was published; publishErr means target exists but trust
+// finalization failed and the directory must be kept for inspection.
+func publishRestoredLab(ctx context.Context, stage, target string, knownHosts map[string][]byte, beforePublish func() error) (revision string, publishErr, err error) {
+	for _, name := range []string{"flake.nix", "flake.lock", "lab-settings.json"} {
+		if _, _, err := readRecoveryFile(filepath.Join(stage, name), maxRecoveryBytes); err != nil {
+			return "", nil, fmt.Errorf("restore requires a safe %s file", name)
+		}
+	}
+	if err := ensurePrivateFilesUntracked(ctx, stage); err != nil {
+		return "", nil, err
+	}
+	restored, err := (Local{}).ReadSettings(stage)
+	if err != nil {
+		return "", nil, err
+	}
+	settings, issues := domain.DecodeLabSettings(restored)
+	if len(issues) != 0 || !domain.CredentialsFromSettings(settings).Ready() {
+		return "", nil, errors.New("restored credentials do not match the configuration")
+	}
+	for _, spec := range keyMaterialSpecs {
+		if _, _, err := readRecoveryFile(filepath.Join(stage, spec.publicPath), maximumKeyMaterialBytes); err != nil {
+			return "", nil, errors.New("restored public keys must be regular deployment files")
+		}
+	}
+	for _, key := range (Local{}).KeyMaterial(ctx, stage) {
+		if !key.Verified || !key.Matches || !key.Safe {
+			return "", nil, fmt.Errorf("restored %s key does not match the repository's public key", key.Name)
+		}
+	}
+	// Ensure future routine Git operations cannot accidentally add clear keys.
+	exclude := filepath.Join(stage, ".git", "info", "exclude")
+	if err := os.MkdirAll(filepath.Dir(exclude), 0700); err != nil {
+		return "", nil, err
+	}
+	f, err := os.OpenFile(exclude, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return "", nil, err
+	}
+	_, err = f.WriteString("\n/secret-key\n/admin-ssh\n/lab-credentials.json\n")
+	err = errors.Join(err, f.Close())
+	if err != nil {
+		return "", nil, err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", nil, err
+	}
+	trust := filepath.Join(home, ".ssh", "nixorium-known-hosts")
+	// Lock the same file used by client enrollment and reviewed trust rotation.
+	// An activated replacement controller normally already has an empty store.
+	if err := ensureRealDirectory(filepath.Join(home, ".ssh"), 0700, "SSH directory"); err != nil {
+		return "", nil, err
+	}
+	if err := ensureRealDirectory(trust, 0700, "trusted computer keys"); err != nil {
+		return "", nil, err
+	}
+	trustLock, err := lockRecoveryTrust(trust)
+	if err != nil {
+		return "", nil, err
+	}
+	defer trustLock.Close()
+	current, err := recoveryMaterial(stage)
+	if err != nil || !compatibleTrustedKeys(current.KnownHosts, knownHosts) {
+		return "", nil, errors.New("this controller already has different trusted computer keys; restore on a clean replacement controller")
+	}
+	revision, err = (Local{}).GitRevision(ctx, stage)
+	if err != nil {
+		return "", nil, err
+	}
+	if beforePublish != nil {
+		if err := beforePublish(); err != nil {
+			return "", nil, err
+		}
+	}
+	if err := unix.Renameat2(unix.AT_FDCWD, stage, unix.AT_FDCWD, target, unix.RENAME_NOREPLACE); err != nil {
+		return "", nil, err
+	}
+	if err := syncDirectory(filepath.Dir(target)); err != nil {
+		return revision, err, nil
+	}
+	if err := restoreTrustedKeys(trust, knownHosts); err != nil {
+		return revision, err, nil
+	}
+	return revision, nil, nil
 }
 
 // Missing entries and empty files are safe to populate. A different nonempty

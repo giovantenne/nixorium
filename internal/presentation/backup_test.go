@@ -1,6 +1,8 @@
 package presentation
 
 import (
+	"context"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 	"os"
@@ -138,7 +140,7 @@ func TestBackupChoiceAndArchiveReview(t *testing.T) {
 	}, false)
 	next, _ := m.openBackup()
 	m = next.(dashboardModel)
-	if view := m.View().Content; !strings.Contains(view, "File / USB") || !strings.Contains(view, "Remote Git") || !strings.Contains(view, "optional") {
+	if view := m.View().Content; !strings.Contains(view, "Encrypted file") || !strings.Contains(view, "USB drive") || !strings.Contains(view, "Private Git repository") || !strings.Contains(view, "optional") {
 		t.Fatal("backup choices missing")
 	}
 	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -204,4 +206,137 @@ func TestBackupChoiceCancellationClearsSecrets(t *testing.T) {
 	if cmd != nil || next.(dashboardModel).screen != dashboardAdministration {
 		t.Fatal("cannot leave backup without creating one")
 	}
+}
+
+func TestConfiguredGitBackupPushesWithoutPassphraseUnlessKeysChanged(t *testing.T) {
+	state := "completed"
+	syncs := 0
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		GitBackupDestination: func() (string, string) { return "git@example.invalid:school/lab.git", "main" },
+		SyncGitBackup: func(_ context.Context, skip string) domain.BackupReport {
+			syncs++
+			if skip != "" {
+				t.Fatal("manual backup skipped a failed revision")
+			}
+			return domain.BackupReport{State: state, Message: "Backed up", Path: "git@example.invalid:school/lab.git"}
+		},
+		PlanGitBackup: func(context.Context, string, string) (domain.GitBackupPlan, error) {
+			return domain.GitBackupPlan{}, nil
+		},
+	}, false)
+	next, _ := m.openBackup()
+	m = next.(dashboardModel)
+	view := m.View().Content
+	if !strings.Contains(view, "pushed automatically") || !strings.Contains(view, "Back up now to git@example.invalid:school/lab.git") || !strings.Contains(view, "different Git repository") {
+		t.Fatalf("configured Git backup not explained:\n%s", view)
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Text: "g", Code: 'g'})
+	m = next.(dashboardModel)
+	if cmd == nil {
+		t.Fatal("back up now did not start a push")
+	}
+	next, _ = m.Update(backupSyncMsg{report: domain.BackupReport{State: "completed", Message: "Backed up"}, manual: true})
+	m = next.(dashboardModel)
+	if !m.backup.done || m.backup.result.Message != "Backed up" {
+		t.Fatalf("push result not shown: %+v", m.backup)
+	}
+	// Changed keys continue into the reviewed, passphrase-protected backup.
+	next, _ = m.openBackup()
+	m = next.(dashboardModel)
+	next, _ = m.Update(tea.KeyPressMsg{Text: "g", Code: 'g'})
+	m = next.(dashboardModel)
+	next, _ = m.Update(backupSyncMsg{report: domain.BackupReport{State: "needs-passphrase", Message: "Keys changed"}, manual: true})
+	m = next.(dashboardModel)
+	if m.backup.done || m.backup.choosing || m.backup.archive || m.message != "Keys changed" {
+		t.Fatalf("passphrase flow not offered: %+v %q", m.backup, m.message)
+	}
+	if view := m.View().Content; !strings.Contains(view, "SSH repository") || !strings.Contains(view, "git@example.invalid:school/lab.git") {
+		t.Fatal("Git destination not prefilled")
+	}
+}
+
+func TestAutomaticGitBackupRunsOnOverviewAndRemembersFailures(t *testing.T) {
+	var skips []string
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		SyncGitBackup: func(_ context.Context, skip string) domain.BackupReport {
+			skips = append(skips, skip)
+			return domain.BackupReport{State: "blocked", Revision: "abc123", Message: "Automatic Git backup failed: offline"}
+		},
+	}, false)
+	m.screen = dashboardAdministration
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = next.(dashboardModel)
+	if m.screen != dashboardHome || cmd == nil || !m.backupSync.running {
+		t.Fatalf("returning to the overview did not start a push: screen=%v running=%v", m.screen, m.backupSync.running)
+	}
+	next, _ = m.Update(backupSyncMsg{report: domain.BackupReport{State: "blocked", Revision: "abc123", Message: "Automatic Git backup failed: offline"}})
+	m = next.(dashboardModel)
+	if m.backupSync.running || m.backupSync.failed != "abc123" || !strings.Contains(m.message, "offline") {
+		t.Fatalf("failure not remembered: %+v %q", m.backupSync, m.message)
+	}
+	m, cmd = m.withBackupSync(nil)
+	if cmd == nil {
+		t.Fatal("no follow-up push")
+	}
+	for _, message := range drainBackupSync(cmd) {
+		_ = message
+	}
+	if len(skips) == 0 || skips[len(skips)-1] != "abc123" {
+		t.Fatalf("failed revision retried automatically: %v", skips)
+	}
+}
+
+func TestRestoreLabFromBackupFileReview(t *testing.T) {
+	restores := 0
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		RestoreLabArchive: func(source, target string, pass []byte) domain.BackupReport {
+			restores++
+			if source != "/media/usb/nixorium-backup.age" || target != "/home/admin/lab" || string(pass) != "long passphrase" {
+				t.Fatalf("wrong restore input %q %q", source, target)
+			}
+			return domain.BackupReport{State: "completed", Message: "Lab restored"}
+		},
+	}, false)
+	next, _ := m.openRestoreLab()
+	m = next.(dashboardModel)
+	if view := m.View().Content; !strings.Contains(view, "Backup file") || !strings.Contains(view, "Private Git repository") {
+		t.Fatal("restore choices missing")
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Text: "f", Code: 'f'})
+	m = next.(dashboardModel)
+	for _, field := range []string{"/media/usb/nixorium-backup.age", "/home/admin/lab", "long passphrase"} {
+		next, _ = m.Update(tea.KeyPressMsg{Text: field})
+		m = next.(dashboardModel)
+		next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		m = next.(dashboardModel)
+	}
+	if !m.backup.reviewed || restores != 0 || strings.Contains(m.View().Content, "long passphrase") {
+		t.Fatal("restore skipped review or exposed the passphrase")
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(dashboardModel)
+	if cmd == nil {
+		t.Fatal("restore did not start")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if restores != 1 || !m.backup.done || m.backup.result.Message != "Lab restored" {
+		t.Fatalf("restore result = %+v", m.backup)
+	}
+}
+
+// drainBackupSync runs a batched command tree and returns its messages.
+func drainBackupSync(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	message := cmd()
+	if batch, ok := message.(tea.BatchMsg); ok {
+		var messages []tea.Msg
+		for _, inner := range batch {
+			messages = append(messages, drainBackupSync(inner)...)
+		}
+		return messages
+	}
+	return []tea.Msg{message}
 }

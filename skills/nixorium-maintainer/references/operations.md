@@ -88,18 +88,18 @@ Never claim success because evidence is unavailable.
 
 ## Remote backups and restoration
 
-The human administrator can use Maintenance → Back up lab and choose File / USB
-for a fully encrypted deployment archive, or Remote Git to review and push the
-saved deployment plus encrypted original recovery keys to a private SSH Git
-repository. Private keys and `lab-credentials.json` remain ignored locally and
+The human administrator can use Maintenance → Back up lab and choose an encrypted
+file (folder or USB drive) for a fully encrypted deployment archive, or a private
+Git repository to review and push the saved deployment plus encrypted original
+recovery keys over SSH. The administrator TUI then pushes later saved revisions
+to that repository automatically while recovery material is unchanged. Private keys and `lab-credentials.json` remain ignored locally and
 are encrypted in the recovery file. Configuration and Git history remain readable
 to repository members; the passphrase is never stored. Backup is optional; a missing or stale backup
 produces a reminder and never blocks client installation or updates. Either a
-current file/USB archive or verified remote backup clears the reminder. Restore
-archives with `nixorium backup restore BACKUP-FILE --to NEW-DIRECTORY`.
+current file/USB archive or verified remote backup clears the reminder.
 
 Maintenance → Restore lab (or `nixorium backup clone` without an existing lab)
-restores into a new directory, verifies original key pairs, and preserves trusted
+restores a backup file or Git backup into a new directory, verifies original key pairs, and preserves trusted
 computer keys. It does not activate the restored configuration. See the
 administrator backup and replacement guide.
 These are human operations, not authorization for a proposal-only agent to push,

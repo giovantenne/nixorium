@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
+// Back up lab and Restore lab share one screen. Both start by choosing where
+// the backup lives: an encrypted file (for example on a USB drive) or a private
+// Git repository. A configured Git backup is then kept current automatically.
 type backupModel struct {
 	choosing, archive                   bool
 	field                               int
-	remote, branch, destination         string
+	remote, branch, destination, source string
 	passphrase, repeat                  []rune
 	confirmation                        string
 	plan                                domain.GitBackupPlan
@@ -26,10 +30,23 @@ type gitBackupPlanMsg struct {
 	err  error
 }
 
+// backupSyncState tracks the background push of saved changes to a configured
+// Git backup. failed holds a revision whose push already failed, so a refresh
+// does not retry it until the configuration changes or the administrator asks.
+type backupSyncState struct {
+	running bool
+	failed  string
+}
+type backupSyncMsg struct {
+	report   domain.BackupReport
+	recovery domain.RecoveryReport
+	manual   bool
+}
+
 func RunRestoreLab(actions DashboardActions) error {
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
 	model.screen = dashboardBackup
-	model.backup = backupModel{restore: true, standalone: true, branch: "main"}
+	model.backup = backupModel{restore: true, choosing: true, standalone: true, branch: "main"}
 	_, err := tea.NewProgram(model).Run()
 	return err
 }
@@ -47,7 +64,6 @@ func (model dashboardModel) openRestoreLab() (tea.Model, tea.Cmd) {
 	next, _ := model.openBackup()
 	model = next.(dashboardModel)
 	model.backup.restore = true
-	model.backup.choosing = false
 	return model, nil
 }
 func (b *backupModel) clearSecrets() {
@@ -57,13 +73,95 @@ func (b *backupModel) clearSecrets() {
 	b.repeat = nil
 }
 
+// gitConfigured reports a Git backup that was published from this deployment.
+func (b backupModel) gitConfigured() bool { return !b.restore && b.remote != "" }
+
+func (b backupModel) choices() int {
+	if b.gitConfigured() {
+		return 3
+	}
+	return 2
+}
+
+// withBackupSync starts the background push when it is useful, keeping any
+// command already returned by the update.
+func (model dashboardModel) withBackupSync(command tea.Cmd) (dashboardModel, tea.Cmd) {
+	action := model.actions.SyncGitBackup
+	if action == nil || model.actions.ClassroomMode || model.backupSync.running {
+		return model, command
+	}
+	model.backupSync.running = true
+	skip, observe := model.backupSync.failed, model.observeRecovery
+	return model, tea.Batch(command, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+		defer cancel()
+		report := action(ctx, skip)
+		message := backupSyncMsg{report: report}
+		if report.State == "completed" {
+			message.recovery = observe(ctx)
+		}
+		return message
+	})
+}
+
+func (model dashboardModel) syncBackupNow() (tea.Model, tea.Cmd) {
+	action := model.actions.SyncGitBackup
+	model.busy = "Pushing saved changes to the Git backup"
+	return model.startBoundedRead(6*time.Minute, func(ctx context.Context) tea.Msg {
+		return backupSyncMsg{report: action(ctx, ""), manual: true}
+	})
+}
+
+func (model dashboardModel) finishBackupSync(message backupSyncMsg) (tea.Model, tea.Cmd) {
+	report := message.report
+	if message.manual {
+		model.busy = ""
+		b := &model.backup
+		switch report.State {
+		case "completed", "current":
+			model.backupSync.failed = ""
+			b.done, b.result = true, report
+		case "waiting":
+			model.message = "Save or discard the deployment changes first: Maintenance → Review Git changes."
+		case "needs-passphrase", "unconfigured":
+			// Fall through to the reviewed Git backup, which encrypts again.
+			b.choosing, b.archive, b.field = false, false, 0
+			model.message = report.Message
+		default:
+			model.backupSync.failed = report.Revision
+			b.done, b.result = true, report
+		}
+		return model, nil
+	}
+	model.backupSync.running = false
+	switch report.State {
+	case "completed":
+		model.backupSync.failed = ""
+		model.observeRecoveryController(message.recovery)
+		if model.message == "" && model.screen == dashboardHome {
+			model.message = report.Message
+		}
+	case "blocked":
+		model.backupSync.failed = report.Revision
+		if model.message == "" && model.screen == dashboardHome {
+			model.message = report.Message
+		}
+	}
+	return model, nil
+}
+
 func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	b := &model.backup
 	if key.String() == "esc" || (b.done && key.String() == "enter") {
 		done := b.done
 		b.clearSecrets()
-		if !done && !b.restore && !b.choosing {
-			return model.openBackup()
+		if !done && !b.choosing {
+			// Return to the first choice instead of leaving the screen.
+			restore, standalone := b.restore, b.standalone
+			next, _ := model.openBackup()
+			model = next.(dashboardModel)
+			model.backup.restore, model.backup.standalone = restore, standalone
+			return model, nil
 		}
 		if b.standalone {
 			return model, tea.Quit
@@ -79,25 +177,41 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 		return model, nil
 	}
 	if b.choosing {
+		choices := b.choices()
 		switch key.String() {
-		case "up", "down", "j", "k", "tab", "shift+tab":
-			b.field = 1 - b.field
-		case "f", "g", "enter":
-			if key.String() == "f" {
+		case "up", "k", "shift+tab":
+			b.field = (b.field + choices - 1) % choices
+		case "down", "j", "tab":
+			b.field = (b.field + 1) % choices
+		case "f", "g", "r", "enter":
+			switch key.String() {
+			case "f":
 				b.field = 0
-			}
-			if key.String() == "g" {
+			case "g":
 				b.field = 1
+			case "r":
+				if choices < 3 {
+					return model, nil
+				}
+				b.field = 2
 			}
-			b.archive = b.field == 0
+			choice := b.field
+			b.archive = choice == 0
 			b.choosing, b.field = false, 0
+			model.message = ""
+			if choice == 1 && b.gitConfigured() && model.actions.SyncGitBackup != nil {
+				return model.syncBackupNow()
+			}
 		}
 		return model, nil
 	}
 	fields := 2
-	if b.restore {
+	switch {
+	case b.restore && b.archive:
+		fields = 3
+	case b.restore:
 		fields = 4
-	} else if b.archive || b.reviewed {
+	case b.archive || b.reviewed:
 		fields = 3
 	}
 	switch key.String() {
@@ -129,11 +243,16 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			})
 		}
 		if b.restore && !b.reviewed {
-			if b.remote == "" || b.branch == "" || b.destination == "" || len(b.passphrase) == 0 {
-				model.message = "Enter the SSH repository URL, branch, new directory and passphrase."
+			if b.archive && (strings.TrimSpace(b.source) == "" || strings.TrimSpace(b.destination) == "" || len(b.passphrase) == 0) {
+				model.message = "Enter the backup file, a new folder and the passphrase."
+				return model, nil
+			}
+			if !b.archive && (b.remote == "" || b.branch == "" || b.destination == "" || len(b.passphrase) == 0) {
+				model.message = "Enter the SSH repository URL, branch, new folder and passphrase."
 				return model, nil
 			}
 			b.reviewed = true
+			model.message = ""
 			return model, nil
 		}
 		if !b.restore {
@@ -158,13 +277,21 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 				model.message = "Backup is unavailable in this session."
 				return model, nil
 			}
-		} else if model.actions.RestoreLab == nil {
+		} else if (b.archive && model.actions.RestoreLabArchive == nil) || (!b.archive && model.actions.RestoreLab == nil) {
 			model.message = "Restore is unavailable in this session."
 			return model, nil
 		}
 		passphrase := []byte(string(b.passphrase))
 		b.clearSecrets()
 		model.message = ""
+		if b.restore && b.archive {
+			action, source, target := model.actions.RestoreLabArchive, strings.TrimSpace(b.source), strings.TrimSpace(b.destination)
+			model.busy = "Restoring the laboratory from the backup file"
+			return model, func() tea.Msg {
+				defer clear(passphrase)
+				return backupResultMsg{action(source, target, passphrase)}
+			}
+		}
 		if b.restore {
 			action, remote, branch, target := model.actions.RestoreLab, b.remote, b.branch, b.destination
 			model.busy = "Restoring the laboratory and verifying its original keys"
@@ -190,7 +317,17 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 		}
 		var plain *string
 		var secret *[]rune
-		if b.restore {
+		switch {
+		case b.restore && b.archive:
+			switch b.field {
+			case 0:
+				plain = &b.source
+			case 1:
+				plain = &b.destination
+			case 2:
+				secret = &b.passphrase
+			}
+		case b.restore:
 			switch b.field {
 			case 0:
 				plain = &b.remote
@@ -201,7 +338,7 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			case 3:
 				secret = &b.passphrase
 			}
-		} else if b.archive {
+		case b.archive:
 			switch b.field {
 			case 0:
 				plain = &b.destination
@@ -210,7 +347,7 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			case 2:
 				secret = &b.repeat
 			}
-		} else if b.reviewed {
+		case b.reviewed:
 			switch b.field {
 			case 0:
 				secret = &b.passphrase
@@ -219,9 +356,9 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			case 2:
 				plain = &b.confirmation
 			}
-		} else if b.field == 0 {
+		case b.field == 0:
 			plain = &b.remote
-		} else {
+		default:
 			plain = &b.branch
 		}
 		if key.String() == "backspace" {
@@ -263,7 +400,7 @@ func (model dashboardModel) backupView() string {
 		return model.renderShell(shell)
 	}
 	lines := []string{tuiTitle(title, model.isDark)}
-	actions := []tuiAction{{key: "Tab", label: "Next field"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+	actions := []tuiAction{{key: "Tab", label: "Next field"}, {key: "Enter", label: "Review"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	if b.done {
 		lines = append(lines, "", tuiResult(b.result.Message, !b.result.HasErrors(), model.isDark))
 		if b.result.Path != "" {
@@ -273,40 +410,57 @@ func (model dashboardModel) backupView() string {
 			lines = append(lines, "Revision: "+shortRevision(b.result.Revision))
 		}
 		actions = []tuiAction{{key: "Enter", label: "Return"}, {key: "F1", label: "Help"}}
+	} else if b.choosing && b.restore {
+		lines = append(lines, "Restore into a new folder. Existing folders are never replaced and no system is activated.", "", "Where is the backup?", "",
+			tuiSelection("[f] Backup file — for example on a USB drive", b.field == 0, model.isDark),
+			tuiSelection("[g] Private Git repository", b.field == 1, model.isDark))
+		actions = []tuiAction{{key: "↑/↓", label: "Choose"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	} else if b.choosing {
-		lines = append(lines, "Backup is optional. Choose where to save it:", "",
-			tuiSelection("[f] File / USB — encrypted archive in a folder", b.field == 0, model.isDark),
-			tuiSelection("[g] Remote Git — private repository with encrypted secrets", b.field == 1, model.isDark))
+		lines = append(lines, "Backup is optional. It saves the configuration, private keys, account", "passwords and trusted computers, encrypted with your passphrase.", "")
+		git := "[g] Private Git repository — after the first backup, saved changes are pushed automatically"
+		if b.gitConfigured() {
+			lines = append(lines, "Git backup: "+b.remote+" ("+b.branch+"). Saved changes are pushed automatically", "while Nixorium is open.", "")
+			git = "[g] Back up now to " + b.remote
+		}
+		lines = append(lines, tuiSelection("[f] Encrypted file — in a folder or on a USB drive", b.field == 0, model.isDark),
+			tuiSelection(git, b.field == 1, model.isDark))
+		if b.gitConfigured() {
+			lines = append(lines, tuiSelection("[r] Use a different Git repository", b.field == 2, model.isDark))
+		}
 		actions = []tuiAction{{key: "↑/↓", label: "Choose"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	} else {
 		type field struct{ label, value string }
 		fields := []field{}
-		if b.restore {
-			if b.reviewed {
-				lines = append(lines, "", "Repository: "+b.remote, "Branch: "+b.branch, "New folder: "+b.destination, "", "Restore original keys and trusted computers. Existing folders are never replaced.", "No system will be activated.")
-				actions = []tuiAction{{key: "Enter", label: "Restore lab"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
-			} else {
-				lines = append(lines, "Restore into a new folder using independent SSH access.", "No password or Git token belongs in the repository URL.", "")
-				fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}, {"New folder", b.destination}, {"Passphrase", strings.Repeat("•", len(b.passphrase))}}
-			}
-		} else if b.archive {
-			if b.reviewed {
-				lines = append(lines, "", "Destination folder: "+b.destination,
-					"The entire deployment, Git history, private keys and account credentials",
-					"will be encrypted in one new .age file. Nothing will be pushed.",
-					"Keep the backup away from this controller and the passphrase separately.")
-				actions = []tuiAction{{key: "Enter", label: "Create backup"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
-			} else {
-				lines = append(lines, "Choose an existing folder outside the deployment.",
-					"For USB, mount the drive first and enter its folder here.",
-					"Use a passphrase of at least 12 characters. The whole archive is encrypted.", "")
-				fields = []field{{"Folder", b.destination}, {"Passphrase", strings.Repeat("•", len(b.passphrase))}, {"Repeat", strings.Repeat("•", len(b.repeat))}}
-			}
-		} else if b.reviewed {
-			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Confirm the repository is PRIVATE on GitHub/GitLab. Type PUSH below.", "")
-			fields = []field{{"Passphrase", strings.Repeat("•", len(b.passphrase))}, {"Repeat", strings.Repeat("•", len(b.repeat))}, {"Confirmation", b.confirmation}}
+		dots := func(r []rune) string { return strings.Repeat("•", len(r)) }
+		switch {
+		case b.restore && b.archive && b.reviewed:
+			lines = append(lines, "", "Backup file: "+b.source, "New folder: "+b.destination, "", "Restore the deployment with its private keys, account passwords and trusted computers.", "Existing folders are never replaced. No system will be activated.")
+			actions = []tuiAction{{key: "Enter", label: "Restore lab"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		case b.restore && b.archive:
+			lines = append(lines, "Enter the backup file (nixorium-backup-….age), a new folder for the", "deployment and the passphrase used when the backup was made.", "")
+			fields = []field{{"Backup file", b.source}, {"New folder", b.destination}, {"Passphrase", dots(b.passphrase)}}
+		case b.restore && b.reviewed:
+			lines = append(lines, "", "Repository: "+b.remote, "Branch: "+b.branch, "New folder: "+b.destination, "", "Restore original keys and trusted computers. Existing folders are never replaced.", "No system will be activated.")
+			actions = []tuiAction{{key: "Enter", label: "Restore lab"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		case b.restore:
+			lines = append(lines, "Restore into a new folder using independent SSH access.", "No password or Git token belongs in the repository URL.", "")
+			fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}, {"New folder", b.destination}, {"Passphrase", dots(b.passphrase)}}
+		case b.archive && b.reviewed:
+			lines = append(lines, "", "Destination folder: "+b.destination,
+				"The entire deployment, Git history, private keys, account passwords and",
+				"trusted computers will be encrypted in one new .age file. Nothing will be pushed.",
+				"Keep the backup away from this controller and the passphrase separately.")
+			actions = []tuiAction{{key: "Enter", label: "Create backup"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+		case b.archive:
+			lines = append(lines, "Choose an existing folder outside the deployment.",
+				"For USB, mount the drive first and enter its folder here.",
+				"Use a passphrase of at least 12 characters. The whole archive is encrypted.", "")
+			fields = []field{{"Folder", b.destination}, {"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}}
+		case b.reviewed:
+			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Later saved changes are pushed automatically. The passphrase is needed again only", "when keys, account passwords or trusted computers change.", "Confirm the repository is PRIVATE on GitHub/GitLab. Type PUSH below.", "")
+			fields = []field{{"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}, {"Confirmation", b.confirmation}}
 			actions[1].label = "Encrypt and push"
-		} else {
+		default:
 			lines = append(lines, "Save changes through Review Git changes first.", "Use a PRIVATE repository and independent SSH access; F1 explains setup.", "")
 			fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}}
 		}

@@ -142,9 +142,9 @@ trial on virtual machines, follow the
    prepares the clients. Teacher and student account names are reused from
    first setup; change them under **Maintenance → Change settings → Accounts**.
 
-   Optionally use **Maintenance → Back up lab** and choose **File / USB** for
-   an encrypted archive, or **Remote Git** for a private GitHub/GitLab repository
-   with encrypted recovery keys. Keep the passphrase separately. Backup is
+   Optionally use **Maintenance → Back up lab** and choose an **encrypted file**
+   (for example on a USB drive), or a **private GitHub/GitLab repository** that
+   then stays up to date automatically. Keep the passphrase separately. Backup is
    recommended but never blocks installation or updates.
 
 3. **Install the first client.** With network boot, start the client from the

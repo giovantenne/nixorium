@@ -24,7 +24,7 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	if err := os.Symlink("/nix/store/0000-result", filepath.Join(repository, "result")); err != nil {
 		t.Fatal(err)
 	}
-	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No current backup") {
+	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No backup is recorded") {
 		t.Fatalf("due = %q %v", reason, due)
 	}
 	destination := t.TempDir()
@@ -91,7 +91,7 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repository, "secret-key"), []byte("rotated"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "private keys") {
+	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "keys") {
 		t.Fatalf("key change not noticed: %q %v", reason, due)
 	}
 }

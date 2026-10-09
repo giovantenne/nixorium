@@ -14,6 +14,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   Backups are optional and never block installation or updates. The TUI offers
   File / USB (a fully encrypted archive) or Remote Git; either current backup
   clears the advisory reminder.
+- After the first verified Git backup, saved configuration is pushed
+  automatically while Nixorium is open, without the passphrase; Back up lab asks
+  for it again only when keys, account passwords or trusted computers change.
+  Restore lab also restores encrypted backup files, with the same key and
+  trusted-computer checks as a Git restore. Backup reminders now name the reason.
 - Account hashes move to ignored `lab-credentials.json` and encrypted recovery.
   Local Nix input receives the hashes without changing PXE or installed accounts.
   New deployments use the updated template; no inline-hash migration is provided.

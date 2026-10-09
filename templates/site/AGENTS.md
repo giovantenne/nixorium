@@ -71,8 +71,8 @@ separate development task. Updating inputs does not automatically refresh copied
 agent instructions; that requires a separate reviewed operator change.
 
 The human administrator can use Maintenance → Back up lab and choose a fully
-encrypted File / USB archive or Remote Git. Restore lab restores from Git;
-`nixorium backup restore` restores an archive. The private Git repository contains readable configuration
+encrypted file archive or a private Git repository, which the TUI then keeps up
+to date automatically. Restore lab restores either kind. The private Git repository contains readable configuration
 plus `nixorium-recovery.age`; private keys and account hashes remain
 ignored locally and encrypted in recovery. Do not read or decrypt recovery material or treat backup access as
 permission to expose the repository to an AI service. Template reset preserves

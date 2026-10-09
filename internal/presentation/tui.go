@@ -139,6 +139,8 @@ type DashboardActions struct {
 	PublishGitBackup        func(domain.GitBackupPlan, []byte) domain.BackupReport
 	RestoreLab              func(string, string, string, []byte) domain.BackupReport
 	GitBackupDestination    func() (string, string)
+	SyncGitBackup           func(context.Context, string) domain.BackupReport
+	RestoreLabArchive       func(string, string, []byte) domain.BackupReport
 	ApplyResetRecovery      func(domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult
 }
 
@@ -392,6 +394,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	backupSync             backupSyncState
 	controllerObservation  controllerOverviewObservation
 	jobs                   managedJobsModel
 	read                   readActivity
@@ -755,6 +758,16 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if next.screen != model.screen {
 		next.pageScroll = 0
+	}
+	if next.screen == dashboardHome && !next.initializing && !next.initialError {
+		switch message.(type) {
+		case dashboardInitialMsg, overviewRefreshMsg:
+			next, command = next.withBackupSync(command)
+		default:
+			if model.screen != dashboardHome {
+				next, command = next.withBackupSync(command)
+			}
+		}
 	}
 	if next.screen == dashboardHome {
 		next.returnAdmin = false

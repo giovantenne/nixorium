@@ -646,7 +646,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return (adapters.GitBackup{}).Restore(ctx, remote, branch, target, passphrase)
 		},
 		GitBackupDestination: func() (string, string) { return (adapters.GitBackup{}).Destination(repository) },
-		OpenClassroomView:    classroomViewAction(),
+		SyncGitBackup: func(syncCtx context.Context, skip string) domain.BackupReport {
+			return (adapters.GitBackup{}).Sync(syncCtx, repository, skip)
+		},
+		RestoreLabArchive: func(source, target string, passphrase []byte) domain.BackupReport {
+			return local.RestoreLab(ctx, source, passphrase, target)
+		},
+		OpenClassroomView: classroomViewAction(),
 		ApplyResetRecovery: func(plan domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult {
 			result := adapters.TemplateReset{}.ApplyTemplateResetRecovery(ctx, plan)
 			result.Message = operationRecordMessage(result.Message, result)

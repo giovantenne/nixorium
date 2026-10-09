@@ -202,3 +202,113 @@ func TestGitBackupRemoteValidationAndUnsafeRecovery(t *testing.T) {
 		t.Fatal("traversal accepted")
 	}
 }
+
+func TestGitBackupSyncPushesSavedChangesWithoutPassphrase(t *testing.T) {
+	g, repo, remote := gitBackupFixture(t)
+	if report := g.Sync(t.Context(), repo, ""); report.State != "unconfigured" {
+		t.Fatalf("sync before any backup: %+v", report)
+	}
+	trust := filepath.Join(os.Getenv("HOME"), ".ssh", "nixorium-known-hosts")
+	if err := os.MkdirAll(trust, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(trust, "known_hosts"), []byte("pc01 ssh-ed25519 trusted\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p, err := g.Plan(t.Context(), repo, remote, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result := g.Publish(t.Context(), p, []byte("correct horse battery")); result.HasErrors() {
+		t.Fatalf("publish: %+v", result)
+	}
+	if report := g.Sync(t.Context(), repo, ""); report.State != "current" {
+		t.Fatalf("sync after publish: %+v", report)
+	}
+	writeGitReviewFile(t, repo, "modules/course.nix", "{ }\n")
+	workspaceTestGit(t, repo, "add", "modules/course.nix")
+	workspaceTestGit(t, repo, "commit", "-m", "add course")
+	head := strings.TrimSpace(workspaceTestGit(t, repo, "rev-parse", "HEAD"))
+	writeGitReviewFile(t, repo, "notes.txt", "unsaved\n")
+	if report := g.Sync(t.Context(), repo, ""); report.State != "waiting" {
+		t.Fatalf("pushed while other changes were unsaved: %+v", report)
+	}
+	if err := os.Remove(filepath.Join(repo, "notes.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if reason, due := (Local{}).BackupDue(repo); !due || !strings.Contains(reason, "not yet in the Git backup") {
+		t.Fatalf("pending push reminder = %q %v", reason, due)
+	}
+	if report := g.Sync(t.Context(), repo, head); report.State != "skipped" {
+		t.Fatalf("failed revision retried: %+v", report)
+	}
+	if report := g.Sync(t.Context(), repo, ""); report.State != "completed" || report.Revision != head {
+		t.Fatalf("sync: %+v", report)
+	}
+	if published := strings.TrimSpace(workspaceTestGit(t, repo, "ls-remote", remote, "refs/heads/main")); !strings.HasPrefix(published, head+"\t") {
+		t.Fatalf("remote = %q, want %s", published, head)
+	}
+	if reason, due := (Local{}).BackupDue(repo); due {
+		t.Fatal(reason)
+	}
+	// New trusted computers must be encrypted again with the passphrase.
+	if err := os.WriteFile(filepath.Join(trust, "known_hosts"), []byte("pc01 ssh-ed25519 trusted\npc02 ssh-ed25519 new\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	writeGitReviewFile(t, repo, "modules/course.nix", "{ environment.etc.course.text = \"x\"; }\n")
+	workspaceTestGit(t, repo, "commit", "-qam", "change course")
+	if report := g.Sync(t.Context(), repo, ""); report.State != "needs-passphrase" {
+		t.Fatalf("changed trust pushed without passphrase: %+v", report)
+	}
+	if published := strings.TrimSpace(workspaceTestGit(t, repo, "ls-remote", remote, "refs/heads/main")); !strings.HasPrefix(published, head+"\t") {
+		t.Fatal("remote moved without the passphrase")
+	}
+	if reason, due := (Local{}).BackupDue(repo); !due || !strings.Contains(reason, "passphrase") {
+		t.Fatalf("passphrase reminder = %q %v", reason, due)
+	}
+}
+
+func TestRestoreLabFromBackupFile(t *testing.T) {
+	_, repo, _ := gitBackupFixture(t)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	trust := filepath.Join(os.Getenv("HOME"), ".ssh", "nixorium-known-hosts")
+	if err := os.MkdirAll(trust, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(trust, "known_hosts"), []byte("pc01 ssh-ed25519 trusted\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	pass := []byte("correct horse battery")
+	archive := (Local{}).CreateBackup(t.Context(), repo, t.TempDir(), pass, "test")
+	if archive.HasErrors() {
+		t.Fatalf("create: %+v", archive)
+	}
+	t.Setenv("HOME", t.TempDir())
+	target := filepath.Join(t.TempDir(), "restored")
+	if bad := (Local{}).RestoreLab(t.Context(), archive.Path, []byte("wrong passphrase"), target); !bad.HasErrors() {
+		t.Fatal("wrong passphrase accepted")
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatal("failed restore published directory")
+	}
+	restored := (Local{}).RestoreLab(t.Context(), archive.Path, pass, target)
+	if restored.State != "completed" {
+		t.Fatalf("restore: %+v", restored)
+	}
+	if status := workspaceTestGit(t, target, "status", "--porcelain"); strings.TrimSpace(status) != "" {
+		t.Fatal("restore exposed private files to Git", status)
+	}
+	for _, name := range privateDeploymentPaths {
+		a, _ := os.ReadFile(filepath.Join(repo, name))
+		b, _ := os.ReadFile(filepath.Join(target, name))
+		if !bytes.Equal(a, b) {
+			t.Fatalf("key %s changed", name)
+		}
+	}
+	if content, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".ssh", "nixorium-known-hosts", "known_hosts")); err != nil || !strings.Contains(string(content), "pc01") {
+		t.Fatal("trusted key not restored", err)
+	}
+	if second := (Local{}).RestoreLab(t.Context(), archive.Path, pass, target); !second.HasErrors() {
+		t.Fatal("existing deployment replaced")
+	}
+}

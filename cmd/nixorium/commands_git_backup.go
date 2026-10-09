@@ -77,6 +77,8 @@ func runGitBackupCommand(ctx context.Context, repository string, o options, stdo
 	if o.subcommand == "clone" && o.backupRemote == "" {
 		err := presentation.RunRestoreLab(presentation.DashboardActions{RestoreLab: func(remote, branch, target string, passphrase []byte) domain.BackupReport {
 			return g.Restore(ctx, remote, branch, target, passphrase)
+		}, RestoreLabArchive: func(source, target string, passphrase []byte) domain.BackupReport {
+			return adapters.Local{}.RestoreLab(ctx, source, passphrase, target)
 		}})
 		if err != nil {
 			fmt.Fprintln(stderr, err)

@@ -38,6 +38,17 @@ fully encrypted File / USB archive or Remote Git. Either current backup clears
 the reminder; missing or stale backups remain advisory. Git backup checks known
 private paths and recognizable secrets throughout reachable history before sending.
 
+Revised on 2026-10-09: after a verified Git backup, the administrator TUI pushes
+each newly saved revision automatically, through the same history checks and
+remote verification, when it starts and when the administrator returns to the
+Overview. It needs no passphrase because the committed recovery file and the
+recovery material it protects are unchanged; any change to keys, account hashes,
+trusted computers or that file stops automatic pushes and asks for Back up lab.
+Unsaved edits are never pushed, pushes never force, and a failed push is reported
+once per revision. A configured Git backup therefore has no age-based reminder.
+Restore lab also restores an encrypted file archive, with the same key, credential
+and trusted-computer checks and new-directory publication as a Git restore.
+
 Restore lab is available without an existing deployment. It fetches into private
 staging with hooks, filters and submodule recursion disabled, decrypts and checks
 original key pairs, then publishes into a new directory without replacement.

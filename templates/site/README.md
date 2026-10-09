@@ -798,14 +798,17 @@ Detailed Harmonia output uses `journalctl -u harmonia.service`.
 Backup is optional and never blocks client installation or updates. Open
 **Maintenance → Back up lab** and choose:
 
-- **File / USB**: mount the drive if needed and enter an existing folder outside
+- **Encrypted file**: mount the USB drive if needed and enter an existing folder outside
   the deployment. Enter and repeat a passphrase, review, then create the archive.
   The entire deployment, Git history, private keys and account hashes are encrypted.
-- **Remote Git**: save local edits first, choose your school's **private**
+- **Private Git repository**: save local edits first, choose your school's **private**
   GitHub/GitLab repository and branch, then confirm with a passphrase and `PUSH`.
   Configure independent SSH access and verify the Git server's fingerprint first.
   Private keys and account hashes are encrypted; configuration and history remain
   readable. A Git backup is complete only after the remote revision is verified.
+  Afterwards every saved change is pushed automatically while Nixorium is open;
+  the passphrase is asked again only when keys, account passwords or trusted
+  computers change.
 
 Use at least 12 characters for the passphrase and keep it separately, away from
 the controller. A current archive or verified Git backup clears the Overview
@@ -815,12 +818,11 @@ The original private keys and `lab-credentials.json` remain ignored locally.
 Nixorium inserts the hashes only into local evaluation/build input. PXE and
 installed systems still contain the hashes as before; no PXE passphrase is added.
 
-**Maintenance → Restore lab** restores from Git into a new directory, decrypts
-the original keys and checks them against the public keys. It never overwrites
-an existing lab or activates its configuration. Without an existing lab,
-`nixorium backup clone` opens the same restore screen. For a file/USB archive,
-use `nixorium backup verify BACKUP-FILE`, then
-`nixorium backup restore BACKUP-FILE --to NEW-DIRECTORY`.
+**Maintenance → Restore lab** restores a backup file or a private Git repository
+into a new directory, recovers the original keys and checks them against the
+public keys, and fills the controller's trusted computer keys. It never
+overwrites an existing lab or activates its configuration. Without an existing
+lab, `nixorium backup clone` opens the same restore screen.
 See [Backups and restoration](TROUBLESHOOTING.md#backups-and-restoration) for
 failure recovery and controller replacement steps.
 
