@@ -180,6 +180,10 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 			}
 			basePaths[name] = paths[name]
 		}
+		data, _ = json.Marshal(cache)
+		if err = assistantWriteState(w.root, "base-drv-v25.json", data); err != nil {
+			return result, err
+		}
 	}
 	candidatePaths := map[string]string{}
 	if err = evaluatePaths(candidateRef, representatives, candidatePaths); err != nil {

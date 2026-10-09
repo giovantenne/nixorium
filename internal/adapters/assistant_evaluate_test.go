@@ -260,6 +260,37 @@ func TestAssistantEvaluationIgnoresV2Cache(t *testing.T) {
 	}
 }
 
+func TestAssistantEvaluationCachesBaseBeforeCandidateFailure(t *testing.T) {
+	w, _, _ := assistantEvaluationFixture(t, false)
+	baseBatches := 0
+	failCandidate := true
+	run := func(ctx context.Context, limit int, args ...string) (string, error) {
+		call := strings.Join(args, " ")
+		if strings.Contains(call, "#nixoriumComparisonConfigurations") {
+			if strings.Contains(call, "?rev=") {
+				baseBatches++
+			} else if failCandidate {
+				return "", errors.New("synthetic candidate failure")
+			}
+		}
+		return runBoundedNix(ctx, limit, args...)
+	}
+	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	if err == nil || result.OK || baseBatches != 2 {
+		t.Fatal(result, err, baseBatches)
+	}
+	data, err := assistantReadStateLimit(w.root, "base-drv-v25.json", 1024*1024)
+	var cache assistantBaseEvaluationCache
+	if err != nil || assistantDecodeStrict(data, &cache) != nil || cache.Output != "nixoriumComparisonConfigurations" || len(cache.Paths) != 3 {
+		t.Fatal("successful base must remain cached after candidate failure", string(data), err)
+	}
+	failCandidate = false
+	result, err = evaluateAssistantCandidate(t.Context(), w, run)
+	if err != nil || !result.OK || baseBatches != 2 {
+		t.Fatal("retry must reuse base cache", result, err, baseBatches)
+	}
+}
+
 func TestAssistantEvaluationRejectsUnknownCacheOutput(t *testing.T) {
 	w, _, _ := assistantEvaluationFixture(t, false)
 	if err := assistantWriteState(w.root, "base-drv-v25.json", []byte(`{"output":"unknown","paths":{}}`)); err != nil {
