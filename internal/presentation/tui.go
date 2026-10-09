@@ -1975,7 +1975,13 @@ func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
 	if model.updates.prerelease {
 		releases = append(releases, model.updates.check.Prerelease...)
 	}
-	return releases
+	available := releases[:0]
+	for _, release := range releases {
+		if !release.Downgrade {
+			available = append(available, release)
+		}
+	}
+	return available
 }
 
 func (model dashboardModel) checkUpdates() (tea.Model, tea.Cmd) {

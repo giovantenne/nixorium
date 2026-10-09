@@ -1353,6 +1353,45 @@ func TestDashboardReviewsAndAppliesValidatedNixoriumUpdate(t *testing.T) {
 	}
 }
 
+func TestDashboardHidesNixoriumDowngrades(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready"), actions: DashboardActions{}}
+	report := domain.UpdateCheckReport{
+		State: "available", CurrentRef: "v3.2.0-beta.10", CurrentChannel: domain.UpdateChannelPrerelease,
+		Development: []domain.UpdateRelease{{Tag: "master", Channel: domain.UpdateChannelMoving}},
+		Stable:      []domain.UpdateRelease{{Tag: "v3.1.1", Channel: domain.UpdateChannelStable, Downgrade: true}},
+		Prerelease: []domain.UpdateRelease{
+			{Tag: "v3.2.0-beta.10", Channel: domain.UpdateChannelPrerelease},
+			{Tag: "v3.2.0-beta.2", Channel: domain.UpdateChannelPrerelease, Downgrade: true},
+		},
+	}
+	updated, _ := model.Update(dashboardUpdateCheckMsg{report: report})
+	model = updated.(dashboardModel)
+	releases := model.availableUpdateReleases()
+	if len(releases) != 2 || model.updates.cursor != 1 || releases[1].Tag != report.CurrentRef {
+		t.Fatalf("selectable releases = %+v, cursor = %d", releases, model.updates.cursor)
+	}
+	view := model.View().Content
+	if strings.Contains(view, "v3.1.1") || strings.Contains(view, "v3.2.0-beta.2") {
+		t.Fatalf("downgrades appear in the TUI:\n%s", view)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardUpdate {
+		t.Fatal("the current release started an update")
+	}
+}
+
+func TestDashboardRefusesNixoriumDowngradeBeforeReview(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready")}
+	updated, command := model.Update(dashboardUpdatePlanMsg{report: domain.UpdatePlanReport{
+		State: "ready", Target: "v3.1.1", Downgrade: true, Confirmation: "DOWNGRADE",
+	}})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardUpdate || !strings.Contains(model.message, "downgrades are not available") {
+		t.Fatalf("downgrade reached review: %+v", model)
+	}
+}
+
 func TestUpdatePlanningShowsRealCandidatePhasesAndBuildCount(t *testing.T) {
 	target := "v2.3.0"
 	model := dashboardModel{

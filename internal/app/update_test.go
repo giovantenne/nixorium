@@ -170,6 +170,34 @@ func TestUpdatePlanAcceptsReviewedMasterTarget(t *testing.T) {
 	}
 }
 
+func TestUpdateCheckMarksDowngradesUsingConfiguredSemanticVersion(t *testing.T) {
+	for _, test := range []struct {
+		current   string
+		target    string
+		downgrade bool
+	}{
+		{"v3.2.0", "v3.1.1", true},
+		{"v3.2.0", "v3.2.0-beta.1", true},
+		{"v3.2.0-beta.10", "v3.2.0-beta.2", true},
+		{"v3.2.0-beta.10", "v3.2.0", false},
+		{"v3.2.0", "v3.2.0", false},
+		{"v3.2.0", "v3.10.0", false},
+		{"master", "v3.2.0", false},
+	} {
+		t.Run(test.current+"/"+test.target, func(t *testing.T) {
+			source := &fakeUpdateSource{
+				snapshot: domain.UpdateInputSnapshot{SourcePrefix: "owner/repo", CurrentRef: test.current},
+				releases: []domain.UpdateReleaseRef{{Tag: test.target}},
+			}
+			report := NewUpdateManager(source).Check(context.Background(), ".")
+			releases := append(report.Stable, report.Prerelease...)
+			if report.HasErrors() || len(releases) != 1 || releases[0].Downgrade != test.downgrade {
+				t.Fatalf("check report = %+v, want downgrade %t", report, test.downgrade)
+			}
+		})
+	}
+}
+
 func TestUpdateCheckReportsDiscoveryFailureWithoutReleaseData(t *testing.T) {
 	source := &fakeUpdateSource{
 		snapshot:    domain.UpdateInputSnapshot{SourcePrefix: "owner/repo", CurrentRef: "master"},

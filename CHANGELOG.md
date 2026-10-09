@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Hide older Nixorium releases in the TUI using Semantic Version precedence
+  against the configured deployment tag, and refuse downgrade plans before
+  confirmation. Explicit CLI recovery with `--allow-downgrade` remains available.
 - Build Nixorium with Go 1.26.9 until the pinned package set provides it,
   fixing standard-library vulnerabilities in net/http, net/textproto and
   crypto/tls reported for Go 1.26.6.

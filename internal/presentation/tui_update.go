@@ -669,9 +669,21 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.updates.check = message.report
 		model.updates.cursor = 0
-		if len(message.report.Stable) > 0 {
-			model.updates.cursor = len(message.report.Development)
-		} else {
+		hasStable := false
+		stableIndex := 0
+		for _, release := range message.report.Development {
+			if !release.Downgrade {
+				stableIndex++
+			}
+		}
+		for _, release := range message.report.Stable {
+			if !release.Downgrade {
+				model.updates.cursor = stableIndex
+				hasStable = true
+				break
+			}
+		}
+		if !hasStable {
 			model.updates.prerelease = message.report.CurrentChannel == domain.UpdateChannelPrerelease
 			for index, release := range model.availableUpdateReleases() {
 				if release.Tag == message.report.CurrentRef {
@@ -708,6 +720,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.updates.planEvents = nil
 		model.busy = ""
 		model.updates.plan = message.report
+		if !model.updates.packageBase && message.report.Downgrade {
+			model.message = "Nixorium downgrades are not available in the TUI. Choose a current or newer release."
+			model.screen = dashboardUpdate
+			return model, nil
+		}
 		if message.report.HasErrors() {
 			model.message = operationLogIssues(message.report.Issues)
 			model.screen = dashboardUpdate

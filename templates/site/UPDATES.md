@@ -45,6 +45,10 @@ Open Maintenance:
 
 1. **Update Nixorium** discovers the configured upstream's releases. Select
    the release and validate it. This never refreshes the root nixpkgs pin.
+   Releases older than the configured release are hidden, including older
+   prereleases. The TUI never authorizes a downgrade; version comparisons use
+   the deployment's configured tag, not the running interface version. The
+   development branch has no Semantic Version ordering.
 2. **Update system and packages** shows the current channel and revision.
    Enter resolves/builds a newer revision in that same channel. It does not
    discover or silently select another NixOS release.
