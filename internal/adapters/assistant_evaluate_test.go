@@ -20,7 +20,8 @@ const assistantIntegrationFlake = `{
  outputs = { self }: let
   classes = import ./classes.nix;
   host = name: file: { config.system.build.toplevel.drvPath = "/nix/store/" + builtins.hashString "sha256" (name + builtins.toJSON (import file)) + ".drv"; };
- in {
+ in rec {
+  nixoriumComparisonConfigurations = nixosConfigurations;
   nixoriumHostClasses = classes;
   nixosConfigurations = {
    pc99 = host "pc99" ./controller.nix;
@@ -87,6 +88,9 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 	calls := []string{}
 	run := func(ctx context.Context, limit int, args ...string) (string, error) {
 		if strings.Contains(strings.Join(args, " "), "#nixosConfigurations") {
+			t.Fatal("expected comparison output", args)
+		}
+		if strings.Contains(strings.Join(args, " "), "#nixoriumComparisonConfigurations") {
 			if count := strings.Count(args[len(args)-1], ".config.system.build.toplevel.drvPath"); count < 1 || count > 2 {
 				t.Fatalf("expected one or two representatives, got %d: %v", count, args)
 			}
@@ -102,6 +106,11 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 		}
 	}
 	evaluate([]string{})
+	cacheData, err := assistantReadStateLimit(w.root, "base-drv-v25.json", 1024*1024)
+	var cache assistantBaseEvaluationCache
+	if err != nil || assistantDecodeStrict(cacheData, &cache) != nil || cache.Output != "nixoriumComparisonConfigurations" || len(cache.Paths) != 3 {
+		t.Fatal("invalid comparison cache", string(cacheData), err)
+	}
 	baseCalls := func() int {
 		n := 0
 		for _, call := range calls {
@@ -170,6 +179,101 @@ func TestAssistantEvaluationUsesClassesAndCachesBase(t *testing.T) {
 		t.Fatal(matches)
 	}
 }
+
+func TestAssistantEvaluationFallbackCache(t *testing.T) {
+	w, _, _ := assistantEvaluationFixture(t, false)
+	var calls []string
+	run := func(ctx context.Context, limit int, args ...string) (string, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		if strings.Contains(call, "#nixoriumComparisonConfigurations") {
+			return "", errors.New("does not provide attribute 'nixoriumComparisonConfigurations'")
+		}
+		return runBoundedNix(ctx, limit, args...)
+	}
+	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	if err != nil || !result.OK || len(result.ChangedHosts) != 0 {
+		t.Fatal(result, err)
+	}
+	comparison, base, candidate := 0, 0, 0
+	for _, call := range calls {
+		if strings.Contains(call, "#nixoriumComparisonConfigurations") {
+			comparison++
+		}
+		if strings.Contains(call, "#nixosConfigurations") {
+			if strings.Contains(call, "?rev=") {
+				base++
+			} else {
+				candidate++
+			}
+		}
+	}
+	if comparison != 1 || base != 2 || candidate != 2 {
+		t.Fatal("fallback must apply to base and candidate", calls)
+	}
+	data, err := assistantReadStateLimit(w.root, "base-drv-v25.json", 1024*1024)
+	var cache assistantBaseEvaluationCache
+	if err != nil || assistantDecodeStrict(data, &cache) != nil || cache.Output != "nixosConfigurations" || len(cache.Paths) != 3 {
+		t.Fatal("fallback output must be cached", string(data), err)
+	}
+	calls = nil
+	result, err = evaluateAssistantCandidate(t.Context(), w, run)
+	if err != nil || !result.OK {
+		t.Fatal(result, err)
+	}
+	if len(calls) != 3 {
+		t.Fatal("expected candidate classes and two candidate batches", calls)
+	}
+	for _, call := range calls {
+		if strings.Contains(call, "?rev=") || strings.Contains(call, "#nixoriumComparisonConfigurations") {
+			t.Fatal("cached fallback must not evaluate base or retry comparison", calls)
+		}
+	}
+}
+
+func TestAssistantEvaluationIgnoresV2Cache(t *testing.T) {
+	w, _, _ := assistantEvaluationFixture(t, false)
+	old := []byte(`{"pc01":"old","pc03":"old","pc99":"old"}`)
+	if err := assistantWriteState(w.root, "base-drv.json", old); err != nil {
+		t.Fatal(err)
+	}
+	baseBatches := 0
+	run := func(ctx context.Context, limit int, args ...string) (string, error) {
+		call := strings.Join(args, " ")
+		if strings.Contains(call, "?rev=") && strings.Contains(call, "#nixoriumComparisonConfigurations") {
+			baseBatches++
+		}
+		return runBoundedNix(ctx, limit, args...)
+	}
+	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	if err != nil || !result.OK || len(result.ChangedHosts) != 0 || baseBatches != 2 {
+		t.Fatal("v2 cache must be ignored", result, err, baseBatches)
+	}
+	data, err := assistantReadStateLimit(w.root, "base-drv.json", 1024*1024)
+	if err != nil || string(data) != string(old) {
+		t.Fatal("v2 cache must remain unchanged", string(data), err)
+	}
+	data, err = assistantReadStateLimit(w.root, "base-drv-v25.json", 1024*1024)
+	var cache assistantBaseEvaluationCache
+	if err != nil || assistantDecodeStrict(data, &cache) != nil || cache.Output != "nixoriumComparisonConfigurations" || len(cache.Paths) != 3 {
+		t.Fatal("v25 cache must be created", string(data), err)
+	}
+}
+
+func TestAssistantEvaluationRejectsUnknownCacheOutput(t *testing.T) {
+	w, _, _ := assistantEvaluationFixture(t, false)
+	if err := assistantWriteState(w.root, "base-drv-v25.json", []byte(`{"output":"unknown","paths":{}}`)); err != nil {
+		t.Fatal(err)
+	}
+	run := func(context.Context, int, ...string) (string, error) {
+		t.Fatal("invalid cache must be rejected before Nix calls")
+		return "", nil
+	}
+	result, err := evaluateAssistantCandidate(t.Context(), w, run)
+	if err == nil || result.OK || result.Error != "Invalid base evaluation cache." {
+		t.Fatal(result, err)
+	}
+}
 func TestAssistantEvaluationFailuresAndProtocol(t *testing.T) {
 	w, store, _ := assistantEvaluationFixture(t, false)
 	w.Write("course.nix", `throw "ghp_private Bearer private-token $6$salt$hash"`, false)
@@ -235,7 +339,7 @@ func TestAssistantEvaluationStopsAfterFailedBatch(t *testing.T) {
 				}
 				deadline = current
 				call := strings.Join(args, " ")
-				if strings.Contains(call, "#nixosConfigurations") && !strings.Contains(call, "?rev=") {
+				if strings.Contains(call, "#nixoriumComparisonConfigurations") && !strings.Contains(call, "?rev=") {
 					candidateCalls++
 					if candidateCalls == 2 {
 						switch mode {

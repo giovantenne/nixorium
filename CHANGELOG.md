@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Add `nixoriumComparisonConfigurations` so Assistant comparisons ignore the
+  deployment revision.
+
 - Add `mkLab.groupModules` for common modules on named client groups, with
   consistent Assistant/update/workspace classes and offline serialization.
   Host-specific exceptions remain separately checked.

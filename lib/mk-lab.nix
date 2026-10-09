@@ -26,6 +26,10 @@ args@{
 }:
 let
   lib = nixpkgs.lib;
+  # Same deployment with a constant revision: the Assistant compares host
+  # derivations without the Git revision that every candidate changes.
+  comparisonLab = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko; }
+    (args // { deploymentRevision = "nixorium-comparison"; });
   upstreamRoot = upstreamSelf.outPath;
   deploymentRoot = if builtins.isAttrs deploymentSelf then deploymentSelf.outPath else deploymentSelf;
   inferredDeploymentRevision =
@@ -735,6 +739,7 @@ builtins.mapAttrs (name: value:
     ) value
   else builtins.deepSeq workspaceResolution value
 ) (rec {
+  nixoriumComparisonConfigurations = comparisonLab.nixosConfigurations;
   nixosConfigurations = hostConfigurations // {
     netboot = nixpkgs.lib.nixosSystem {
       inherit system;

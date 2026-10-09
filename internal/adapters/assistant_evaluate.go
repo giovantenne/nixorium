@@ -25,6 +25,11 @@ type assistantHostClass struct {
 }
 type assistantNixRunner func(context.Context, int, ...string) (string, error)
 
+type assistantBaseEvaluationCache struct {
+	Output string            `json:"output"`
+	Paths  map[string]string `json:"paths"`
+}
+
 var assistantHostName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
 const assistantNeedsUpdate = "Update Nixorium in this deployment before using Assistant."
@@ -59,6 +64,21 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 		}
 		return json.Unmarshal([]byte(data), target)
 	}
+	var cache assistantBaseEvaluationCache
+	cacheData, cacheErr := assistantReadStateLimit(w.root, "base-drv-v25.json", 1024*1024)
+	confirmed := cacheErr == nil
+	if cacheErr == nil {
+		if err := assistantDecodeStrict(cacheData, &cache); err != nil {
+			return result, err
+		}
+	} else if !errors.Is(cacheErr, fs.ErrNotExist) {
+		return result, cacheErr
+	} else {
+		cache = assistantBaseEvaluationCache{Output: "nixoriumComparisonConfigurations", Paths: map[string]string{}}
+	}
+	if (cache.Output != "nixoriumComparisonConfigurations" && cache.Output != "nixosConfigurations") || cache.Paths == nil {
+		return result, errors.New("Invalid base evaluation cache.")
+	}
 	// Keep each process small even when host-specific modules create many classes.
 	// Every batch shares the evaluation's original deadline and runs sequentially.
 	evaluatePaths := func(ref string, names []string, paths map[string]string) error {
@@ -68,9 +88,15 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 			}
 			batch := names[start:min(start+2, len(names))]
 			var values map[string]string
-			if err := evaluate(ref+"#nixosConfigurations", assistantDrvExpression(batch), &values); err != nil {
+			err := evaluate(ref+"#"+cache.Output, assistantDrvExpression(batch), &values)
+			if err != nil && !confirmed && strings.Contains(err.Error(), "nixoriumComparisonConfigurations") && strings.Contains(err.Error(), "does not provide attribute") {
+				cache.Output = "nixosConfigurations"
+				err = evaluate(ref+"#"+cache.Output, assistantDrvExpression(batch), &values)
+			}
+			if err != nil {
 				return err
 			}
+			confirmed = true
 			for _, name := range batch {
 				if values[name] == "" {
 					return errors.New("Incomplete host evaluation.")
@@ -135,17 +161,7 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 	if err != nil {
 		return result, err
 	}
-	basePaths := map[string]string{}
-	data, err = assistantReadStateLimit(w.root, "base-drv.json", 1024*1024)
-	if err == nil {
-		err = assistantDecodeStrict(data, &basePaths)
-	}
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return result, err
-	}
-	if basePaths == nil {
-		return result, errors.New("Invalid base evaluation cache.")
-	}
+	basePaths := cache.Paths
 	representatives, missing := []string{}, []string{}
 	for _, class := range candidateClasses {
 		representatives = append(representatives, class.Representative)
@@ -164,13 +180,13 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 			}
 			basePaths[name] = paths[name]
 		}
-		data, _ = json.Marshal(basePaths)
-		if err = assistantWriteState(w.root, "base-drv.json", data); err != nil {
-			return result, err
-		}
 	}
 	candidatePaths := map[string]string{}
 	if err = evaluatePaths(candidateRef, representatives, candidatePaths); err != nil {
+		return result, err
+	}
+	data, _ = json.Marshal(cache)
+	if err = assistantWriteState(w.root, "base-drv-v25.json", data); err != nil {
 		return result, err
 	}
 	changed := map[string]bool{}
