@@ -38,7 +38,8 @@ build and readiness checks.
 ## What is preserved or replaced
 
 Preserved byte-for-byte: tracked `lab-settings.json`, `flake.lock`, files under
-`keys/`, and existing `.gitignore` files. All untracked and ignored files,
+`keys/`, `nixorium-recovery.age` (encrypted recovery keys), and existing
+`.gitignore` files. All untracked and ignored files,
 including private keys, remain in place and are not read into the candidate or
 backup. Git history, remotes and repository configuration remain in place.
 The candidate retains the current framework URL and NixOS channel declaration.

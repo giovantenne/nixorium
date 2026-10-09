@@ -92,12 +92,3 @@ func backupPassphrase(options options, stderr io.Writer) ([]byte, error) {
 	}
 	return passphrase, nil
 }
-
-// defaultBackupDestination suggests the administrator's home directory: it
-// is always writable, and the screen reminds to copy the file elsewhere.
-func defaultBackupDestination() string {
-	if home, err := os.UserHomeDir(); err == nil {
-		return home
-	}
-	return ""
-}

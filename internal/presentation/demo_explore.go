@@ -346,7 +346,7 @@ func demoExploreActions(revision string) DashboardActions {
 		LoadRemoteInstall: func(context.Context) (domain.RemoteInstallResponse, error) {
 			return domain.RemoteInstallResponse{State: "ready"}, nil
 		},
-		BackupDestination: func() string { return "/run/media/admin/USB" },
+		GitBackupDestination: func() (string, string) { return "git@github.com:school/lab.git", "main" },
 	}
 	reset := demoTemplateResetPlan()
 	actions.LoadTemplateReset = func(context.Context) domain.TemplateResetCatalog {

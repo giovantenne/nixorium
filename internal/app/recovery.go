@@ -99,7 +99,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	}
 	if backups, ok := inspector.source.(backupDueSource); ok {
 		if reason, due := backups.BackupDue(root); due {
-			add(domain.RecoveryBackupDue, "BACKUP-DUE", "A backup of this controller is due", reason, "", nil, nil)
+			add(domain.RecoveryBackupDue, "BACKUP-DUE", "A backup of this laboratory is due", reason, "", nil, nil)
 		}
 	}
 	if queued, ok := inspector.source.(deferredUpdatesSource); ok {

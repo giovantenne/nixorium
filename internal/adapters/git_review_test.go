@@ -135,6 +135,13 @@ func newGitReviewRepository(t *testing.T) string {
 	if _, err := run(context.Background(), "git", "-C", repository, "config", "user.email", "test@example.invalid"); err != nil {
 		t.Fatal(err)
 	}
+	// Detached automatic maintenance can still write objects while the test's
+	// temporary directory is removed, which fails the cleanup at random.
+	for _, setting := range [][2]string{{"gc.auto", "0"}, {"maintenance.auto", "false"}} {
+		if _, err := run(context.Background(), "git", "-C", repository, "config", setting[0], setting[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
 	writeGitReviewFile(t, repository, "lab-settings.json", "{\n  \"schemaVersion\": 1,\n  \"lab\": {\n    \"adminPassword\": \"$6$old$admin\",\n    \"teacherPassword\": \"$6$old$teacher\",\n    \"studentPassword\": \"$6$old$student\"\n  }\n}\n")
 	writeGitReviewFile(t, repository, "lab-software.json", "{\n  \"schemaVersion\": 1,\n  \"packages\": []\n}\n")
 	writeGitReviewFile(t, repository, "module.nix", "{ ... }: { services.openssh.enable = true; }\n")

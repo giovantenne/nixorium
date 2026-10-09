@@ -20,6 +20,7 @@ const (
 )
 
 var managedDeploymentPaths = map[string]bool{
+	gitRecoveryFile:          true,
 	domain.WorkspaceFileName: true,
 	"lab-settings.json":      true,
 	"lab-software.json":      true,

@@ -70,6 +70,20 @@ procedures, not authorize agent execution. Unsupported customization is a
 separate development task. Updating inputs does not automatically refresh copied
 agent instructions; that requires a separate reviewed operator change.
 
+The human administrator can use Maintenance → Back up lab and choose a fully
+encrypted file archive or a private Git repository, which the TUI then keeps up
+to date automatically. Restore lab restores either kind. The private Git repository contains readable configuration
+plus `nixorium-recovery.age`; private keys and account hashes remain
+ignored locally and encrypted in recovery. Do not read or decrypt recovery material or treat backup access as
+permission to expose the repository to an AI service. Template reset preserves
+the encrypted recovery file. Backup is optional: a missing or stale backup is an advisory reminder and never
+blocks client installation or updates.
+
+Account hashes live in ignored `lab-credentials.json` and encrypted recovery,
+not in tracked settings. Do not read, attach or commit that file, private keys,
+or a prepared Nix source. Normal Nixorium operations prepare their local input;
+raw clones do not contain usable account credentials.
+
 ## Native Assistant
 
 The optional subscription-based Assistant is a separate native operator

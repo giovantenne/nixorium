@@ -35,7 +35,7 @@ func TestUnstagedSettingsKeepSetupReviewIncomplete(t *testing.T) {
 		t.Fatal(err)
 	}
 	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
-	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	data = setupCredentialFixture(t, data)
 	path := filepath.Join(repository, "lab-settings.json")
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
@@ -155,7 +155,7 @@ func TestControllerBootstrapDefersClientNetworkAndOpensAtControllerReview(t *tes
 	}
 	data = bytes.Replace(data, []byte(`"masterDhcpIp": "MASTER_DHCP_IP",`), []byte(`"deploymentMode": "controller", "masterDhcpIp": "MASTER_DHCP_IP",`), 1)
 	data = bytes.Replace(data, []byte(`"pcCount": 20`), []byte(`"pcCount": 0`), 1)
-	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	data = setupCredentialFixture(t, data)
 	report := NewSetupManager(fakeSetupSource{data: data}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageApply {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageApply, report)
@@ -189,7 +189,7 @@ func TestSetupStatusAdvancesToReviewAfterConfiguredInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
-	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	data = setupCredentialFixture(t, data)
 	report := NewSetupManager(fakeSetupSource{data: data}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageApply {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageApply, report)
@@ -202,7 +202,7 @@ func TestSetupStatusStopsAtLocalSaveWhenManagedConfigurationIsDirty(t *testing.T
 		t.Fatal(err)
 	}
 	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
-	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	data = setupCredentialFixture(t, data)
 	report := NewSetupManager(fakeSetupSource{data: data, dirty: true}).Status(context.Background(), "/repo")
 	if report.CurrentStage != domain.SetupStageReview {
 		t.Fatalf("current stage = %q, want %q: %+v", report.CurrentStage, domain.SetupStageReview, report)
@@ -224,7 +224,7 @@ func TestSetupStatusCompletesWhenInstallationArtifactsArePrepared(t *testing.T) 
 		t.Fatal(err)
 	}
 	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
-	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	data = setupCredentialFixture(t, data)
 	report := NewSetupManager(fakeSetupSource{
 		data:        data,
 		applied:     true,
@@ -245,10 +245,25 @@ func TestRemoteInstallCapabilitiesDoNotRequirePXEArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
-	data = bytes.ReplaceAll(data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	data = setupCredentialFixture(t, data)
 	source := fakeSetupSource{data: data, applied: true, preparation: domain.PXEPreparationState{Ready: false, Detail: "PXE artifacts are absent"}}
 	capabilities := NewSetupManager(source).RemoteInstallCapabilities(context.Background(), "/deployment")
 	if !capabilities.Ready || len(capabilities.Issues) != 0 || capabilities.Method != domain.RemoteInstallUSBSSH {
 		t.Fatalf("capabilities = %+v", capabilities)
 	}
+}
+
+func setupCredentialFixture(t *testing.T, data []byte) []byte {
+	t.Helper()
+	settings, issues := domain.DecodeLabSettings(data)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	settings.Lab.CredentialsVersion = 1
+	settings.Lab.AdminPassword, settings.Lab.TeacherPassword, settings.Lab.StudentPassword = "$6$salt$changed", "$6$salt$changed", "$6$salt$changed"
+	result, err := domain.MarshalLabSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
 }

@@ -31,7 +31,7 @@ func (local Local) InspectController(ctx context.Context, repository string) (do
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return inspection, err
 	}
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return inspection, err
 	}
@@ -71,7 +71,7 @@ func (local Local) ControllerState(ctx context.Context, repository string) (bool
 	if err != nil {
 		return false, "", fmt.Errorf("cannot evaluate controller identity: %w", err)
 	}
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return false, "", fmt.Errorf("cannot resolve deployment flake: %w", err)
 	}

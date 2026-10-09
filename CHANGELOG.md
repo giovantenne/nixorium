@@ -18,6 +18,28 @@ The project follows [Semantic Versioning](https://semver.org/).
   Settings saves preserve the option. Evaluate host representatives in sequential
   batches of at most two per process while retaining the overall time limit.
 
+## [3.2.0] - 2026-10-09
+
+- Hide older Nixorium releases in the TUI using Semantic Version precedence
+  against the configured deployment tag, and refuse downgrade plans before
+  confirmation. Explicit CLI recovery with `--allow-downgrade` remains available.
+- Build Nixorium with Go 1.26.9 until the pinned package set provides it,
+  fixing standard-library vulnerabilities in net/http, net/textproto and
+  crypto/tls reported for Go 1.26.6.
+- Reviewed private Git backups with passphrase-encrypted recovery keys, verified
+  remote revisions and a Restore lab screen that works without an existing lab.
+  Backups are optional and never block installation or updates. The TUI offers
+  File / USB (a fully encrypted archive) or Remote Git; either current backup
+  clears the advisory reminder.
+- After the first verified Git backup, saved configuration is pushed
+  automatically while Nixorium is open, without the passphrase; Back up lab asks
+  for it again only when keys, account passwords or trusted computers change.
+  Restore lab also restores encrypted backup files, with the same key and
+  trusted-computer checks as a Git restore. Backup reminders now name the reason.
+- Account hashes move to ignored `lab-credentials.json` and encrypted recovery.
+  Local Nix input receives the hashes without changing PXE or installed accounts.
+  New deployments use the updated template; no inline-hash migration is provided.
+
 - Restrict the laboratory maintainer skill to supported proposals and bounded
   diagnostics. Explicitly prohibit invasive module/overlay/script changes and
   agent-executed saves or live operations; the human operator uses native
@@ -1620,7 +1642,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.1.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/giovantenne/nixorium/compare/v3.1.1...v3.2.0
 [3.1.1]: https://github.com/giovantenne/nixorium/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0-beta.1...v3.0.0

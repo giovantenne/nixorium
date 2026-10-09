@@ -1,10 +1,12 @@
 package adapters
 
 import (
+	"github.com/giovantenne/nixorium/internal/domain"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
@@ -22,7 +24,7 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	if err := os.Symlink("/nix/store/0000-result", filepath.Join(repository, "result")); err != nil {
 		t.Fatal(err)
 	}
-	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No backup") {
+	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "No backup is recorded") {
 		t.Fatalf("due = %q %v", reason, due)
 	}
 	destination := t.TempDir()
@@ -38,9 +40,27 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	if len(entries) != 1 || strings.HasPrefix(entries[0].Name(), ".") {
 		t.Fatalf("destination = %v", entries)
 	}
-	if _, due := local.BackupDue(repository); due {
-		t.Fatal("a fresh backup is still reported as due")
+	if reason, due := local.BackupDue(repository); due {
+		t.Fatalf("archive did not clear the reminder: %s", reason)
 	}
+	record, _ := local.LastBackup()
+	for _, change := range []struct {
+		name string
+		edit func(*domain.BackupRecord)
+	}{
+		{"another laboratory", func(r *domain.BackupRecord) { r.Repository = t.TempDir() }},
+		{"expired", func(r *domain.BackupRecord) { r.CreatedAt = time.Now().Add(-31 * 24 * time.Hour) }},
+		{"different revision", func(r *domain.BackupRecord) { r.Revision = "old" }},
+		{"different settings", func(r *domain.BackupRecord) { r.SettingsHash = "old" }},
+	} {
+		stale := record
+		change.edit(&stale)
+		recordBackup(stale)
+		if _, due := local.BackupDue(repository); !due {
+			t.Fatalf("%s archive hid reminder", change.name)
+		}
+	}
+	recordBackup(record)
 	if verify := local.VerifyBackup(report.Path, []byte("wrong passphrase!!")); verify.State == "completed" {
 		t.Fatal("a wrong passphrase was accepted")
 	}
@@ -71,7 +91,7 @@ func TestBackupRoundTripKeepsHistoryAndPrivateKeys(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repository, "secret-key"), []byte("rotated"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "private keys") {
+	if reason, due := local.BackupDue(repository); !due || !strings.Contains(reason, "keys") {
 		t.Fatalf("key change not noticed: %q %v", reason, due)
 	}
 }

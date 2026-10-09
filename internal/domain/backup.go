@@ -47,6 +47,7 @@ func (r BackupReport) HasErrors() bool {
 
 // BackupRecord is the administrator's private note of the last backup.
 type BackupRecord struct {
+	Repository   string    `json:"repository"`
 	CreatedAt    time.Time `json:"createdAt"`
 	Path         string    `json:"path"`
 	Revision     string    `json:"revision"`

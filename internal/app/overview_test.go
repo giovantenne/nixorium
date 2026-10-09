@@ -28,7 +28,7 @@ func TestInitialSetupDefersExpensiveChecksWithoutClaimingReadiness(t *testing.T)
 		t.Fatal(report)
 	}
 	source.data = bytes.ReplaceAll(data, []byte(domain.MasterDHCPPlaceholder), []byte("192.0.2.10"))
-	source.data = bytes.ReplaceAll(source.data, []byte(domain.DefaultPasswordHash), []byte("$6$salt$changed"))
+	source.data = setupCredentialFixture(t, source.data)
 	report := NewSetupManager(source).InitialStatus(context.Background(), "/repo")
 	if report.State != "unchecked" || report.CurrentStage != "" || len(report.Stages) != 0 || keys != 0 || meta != 0 {
 		t.Fatalf("unexpected startup checks or readiness: %+v keys=%d meta=%d", report, keys, meta)

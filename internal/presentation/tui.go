@@ -137,7 +137,13 @@ type DashboardActions struct {
 	ApplyDeploymentRecovery func(domain.DeploymentRecoveryPlan) domain.DeploymentRecoveryResult
 	PlanResetRecovery       func(context.Context) domain.TemplateResetRecoveryPlan
 	CreateBackup            func(string, []byte) domain.BackupReport
-	BackupDestination       func() string
+	PlanGitBackup           func(context.Context, string, string) (domain.GitBackupPlan, error)
+	PublishGitBackup        func(domain.GitBackupPlan, []byte) domain.BackupReport
+	RestoreLab              func(string, string, string, []byte) domain.BackupReport
+	GitBackupDestination    func() (string, string)
+	SyncGitBackup           func(context.Context, string) domain.BackupReport
+	BackupFileFolder        func() string
+	RestoreLabArchive       func(string, string, []byte) domain.BackupReport
 	ApplyResetRecovery      func(domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult
 }
 
@@ -393,6 +399,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	backupSync             backupSyncState
 	controllerObservation  controllerOverviewObservation
 	jobs                   managedJobsModel
 	read                   readActivity
@@ -758,6 +765,16 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if next.screen != model.screen {
 		next.pageScroll = 0
+	}
+	if next.screen == dashboardHome && !next.initializing && !next.initialError {
+		switch message.(type) {
+		case dashboardInitialMsg, overviewRefreshMsg:
+			next, command = next.withBackupSync(command)
+		default:
+			if model.screen != dashboardHome {
+				next, command = next.withBackupSync(command)
+			}
+		}
 	}
 	if next.screen == dashboardHome {
 		next.returnAdmin = false
@@ -1968,7 +1985,13 @@ func (model dashboardModel) availableUpdateReleases() []domain.UpdateRelease {
 	if model.updates.prerelease {
 		releases = append(releases, model.updates.check.Prerelease...)
 	}
-	return releases
+	available := releases[:0]
+	for _, release := range releases {
+		if !release.Downgrade {
+			available = append(available, release)
+		}
+	}
+	return available
 }
 
 func (model dashboardModel) checkUpdates() (tea.Model, tea.Cmd) {
@@ -2623,12 +2646,19 @@ func (model dashboardModel) pxeView() string {
 		tuiTitle(title, model.isDark),
 		"",
 	}
-	lines = append(lines, tuiFields(model.isDark,
-		[2]string{"Network installation", tuiStatus(pxeModeLabel(model.report.PXE.Mode), pxeStatusKind(model.report.PXE.Mode), model.isDark)},
-		[2]string{"Installation files", preparation},
-		[2]string{"Network interface", model.report.Meta.Network.Interface},
-		[2]string{"Controller address", model.report.Meta.Controller.DHCPIP},
-	)...)
+	fields := [][2]string{
+		{"Network installation", tuiStatus(pxeModeLabel(model.report.PXE.Mode), pxeStatusKind(model.report.PXE.Mode), model.isDark)},
+		{"Installation files", preparation},
+	}
+	// Interface and address come from the evaluated configuration, which is
+	// loaded on demand; omit them rather than show empty values.
+	if model.report.Meta.Network.Interface != "" {
+		fields = append(fields, [2]string{"Network interface", model.report.Meta.Network.Interface})
+	}
+	if model.report.Meta.Controller.DHCPIP != "" {
+		fields = append(fields, [2]string{"Controller address", model.report.Meta.Controller.DHCPIP})
+	}
+	lines = append(lines, tuiFields(model.isDark, fields...)...)
 	if model.installation.flow {
 		steps := []string{"Laboratory settings", "Save configuration", "Controller keys", "Activate controller", "Prepare clients", "Start PXE"}
 		lines = append(lines, "")

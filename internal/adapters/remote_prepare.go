@@ -147,7 +147,7 @@ func (preparer *RemoteInstallPreparer) PrepareArtifacts(ctx context.Context, ope
 			return result, errors.New("remote preparation revision is not canonical hexadecimal")
 		}
 	}
-	reference, err := deploymentFlakeReference(preparer.repository)
+	reference, err := deploymentFlakeReference(ctx, preparer.repository)
 	if err != nil {
 		return result, err
 	}
@@ -230,7 +230,7 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 	if err := preparer.validateArtifactRoots(artifacts); err != nil {
 		return result, err
 	}
-	reference, err := deploymentFlakeReference(preparer.repository)
+	reference, err := deploymentFlakeReference(ctx, preparer.repository)
 	if err != nil {
 		return result, err
 	}

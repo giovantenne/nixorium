@@ -14,8 +14,9 @@ for an agent to bypass its skill. Existing copied skills need a separate
 reviewed refresh; updating the Nixorium input alone does not replace them.
 
 > [!IMPORTANT]
-> Keep this repository private. It contains password hashes and internal
-> network details. Keep `secret-key` and `admin-ssh` outside Git.
+> Keep this repository private. It contains internal network details and an
+> encrypted recovery file. Keep `secret-key`, `admin-ssh` and
+> `lab-credentials.json` outside Git.
 
 ## Contents
 
@@ -825,22 +826,38 @@ The controller runs Harmonia as `nixorium-harmonia.service`; systemd loads its
 private signing key as an isolated credential outside Git and the Nix store.
 Detailed Harmonia output uses `journalctl -u harmonia.service`.
 
-### Back up the controller
+### Back up and restore the lab
 
-The installed computers trust this controller's private keys, which are never
-committed. Without a copy, a failed controller disk means reinstalling every
-computer. Open **Maintenance → Back up the controller**, choose a USB drive or
-network share and a passphrase of at least 12 characters, or run:
+Backup is optional and never blocks client installation or updates. Open
+**Maintenance → Back up lab** and choose:
 
-```sh
-nix run .#nixorium -- backup create --to /run/media/admin/USB-DRIVE
-```
+- **Encrypted file**: your home folder is proposed; for a USB drive, mount it and
+  enter its folder instead. Enter and repeat a passphrase, review, then create the archive.
+  The entire deployment, Git history, private keys and account hashes are encrypted.
+- **Private Git repository**: save local edits first, choose your school's **private**
+  GitHub/GitLab repository and branch, then confirm with a passphrase and `PUSH`.
+  Configure independent SSH access and verify the Git server's fingerprint first.
+  Private keys and account hashes are encrypted; configuration and history remain
+  readable. A Git backup is complete only after the remote revision is verified.
+  Afterwards every saved change is pushed automatically while Nixorium is open;
+  the passphrase is asked again only when keys, account passwords or trusted
+  computers change.
 
-The file is encrypted and contains the configuration with its history, the
-private keys and the trusted computer keys. Keep it, and separately its
-passphrase, away from the controller. The Overview reminds you when a backup
-is due. To replace a failed controller, follow
-[Backups and restoration](TROUBLESHOOTING.md#backups-and-restoration).
+Use at least 12 characters for the passphrase and keep it separately, away from
+the controller. A current archive or verified Git backup clears the Overview
+reminder. Missing or stale backups remain advisory.
+
+The original private keys and `lab-credentials.json` remain ignored locally.
+Nixorium inserts the hashes only into local evaluation/build input. PXE and
+installed systems still contain the hashes as before; no PXE passphrase is added.
+
+**Maintenance → Restore lab** restores a backup file or a private Git repository
+into a new directory, recovers the original keys and checks them against the
+public keys, and fills the controller's trusted computer keys. It never
+overwrites an existing lab or activates its configuration. Without an existing
+lab, `nixorium backup clone` opens the same restore screen.
+See [Backups and restoration](TROUBLESHOOTING.md#backups-and-restoration) for
+failure recovery and controller replacement steps.
 
 ### Free disk space
 

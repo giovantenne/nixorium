@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -215,7 +216,7 @@ func (Local) CreateBackup(ctx context.Context, repository, destination string, p
 	if len(report.PrivateKeys) < len(privateDeploymentPaths) {
 		report.Message += " Some private keys are missing from the deployment; a restore will need new keys for them."
 	}
-	recordBackup(domain.BackupRecord{CreatedAt: created, Path: final, Revision: revision, KeysDigest: backupKeysDigest(repository), SettingsHash: backupSettingsHash(repository)})
+	recordBackup(domain.BackupRecord{Repository: repository, CreatedAt: created, Path: final, Revision: revision, KeysDigest: backupKeysDigest(repository), SettingsHash: backupSettingsHash(repository)})
 	return report
 }
 
@@ -420,6 +421,87 @@ func (Local) RestoreBackup(name string, passphrase []byte, target string) domain
 	return report
 }
 
+// RestoreLab restores an encrypted backup file like Restore lab restores a Git
+// backup: the deployment goes to a new folder with its private keys, and the
+// controller receives the trusted computer keys. Nothing is replaced, no Nix
+// is evaluated and no system is activated.
+func (Local) RestoreLab(ctx context.Context, name string, passphrase []byte, target string) domain.BackupReport {
+	report := domain.BackupReport{SchemaVersion: domain.SchemaVersion, Operation: "backup-restore-lab", State: "blocked", Path: target, PrivateKeys: []string{}, Issues: []domain.ValidationIssue{}}
+	fail := func(err error) domain.BackupReport {
+		report.Message = err.Error()
+		report.Issues = append(report.Issues, domain.ValidationIssue{Field: "restore", Message: err.Error()})
+		return report
+	}
+	if !filepath.IsAbs(name) {
+		return fail(errors.New("enter the absolute path of the backup file"))
+	}
+	if !filepath.IsAbs(target) || filepath.Clean(target) != target || target == "/" {
+		return fail(errors.New("choose an absolute, new deployment directory"))
+	}
+	if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
+		return fail(errors.New("restore needs a new directory; existing directories are never replaced"))
+	}
+	parent, err := openWorkspaceRoot(filepath.Dir(target), unix.LOCK_EX)
+	if err != nil {
+		return fail(err)
+	}
+	defer parent.Close()
+	stage, err := os.MkdirTemp(filepath.Dir(target), ".nixorium-restore-*")
+	if err != nil {
+		return fail(err)
+	}
+	defer os.RemoveAll(stage)
+	extracted := filepath.Join(stage, "archive")
+	unpacked := (Local{}).RestoreBackup(name, passphrase, extracted)
+	if unpacked.State != "completed" {
+		return fail(errors.New(unpacked.Message))
+	}
+	deployment := filepath.Join(extracted, backupDeployment)
+	for _, key := range privateDeploymentPaths {
+		if _, mode, err := readRecoveryFile(filepath.Join(deployment, key), maximumKeyMaterialBytes); err != nil || mode&0077 != 0 {
+			return fail(fmt.Errorf("the backup file does not contain a usable %s", key))
+		}
+	}
+	knownHosts := map[string][]byte{}
+	trusted := filepath.Join(extracted, filepath.FromSlash(backupKnownHosts))
+	if _, err := os.Lstat(trusted); err == nil {
+		err = filepath.WalkDir(trusted, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || entry.Name() == ".nixorium-known-hosts.lock" {
+				return err
+			}
+			relative, err := filepath.Rel(trusted, path)
+			if err != nil {
+				return err
+			}
+			data, _, err := readRecoveryFile(path, maximumKeyMaterialBytes)
+			if err != nil {
+				return errors.New("the backup file contains an unsafe trusted computer key")
+			}
+			if len(bytes.TrimSpace(data)) > 0 {
+				knownHosts[filepath.ToSlash(relative)] = data
+			}
+			return nil
+		})
+		if err != nil {
+			return fail(err)
+		}
+	}
+	revision, publishErr, err := publishRestoredLab(ctx, deployment, target, knownHosts, nil)
+	if err != nil {
+		return fail(err)
+	}
+	report.Revision = revision
+	if publishErr != nil {
+		report.State = "partial"
+		report.Message = "Deployment and private keys restored into " + target + ", but trusted computer keys could not be finalized. Keep this directory; do not activate yet. " + publishErr.Error()
+		return report
+	}
+	report.State, report.CreatedAt, report.Files = "completed", unpacked.CreatedAt, unpacked.Files
+	report.PrivateKeys = append([]string{}, privateDeploymentPaths...)
+	report.Message = "Lab restored with its original keys and trusted computers. Open nixorium --repo " + target + "; follow the controller replacement guide before applying. No system was activated."
+	return report
+}
+
 func backupPrivateKeys(files []domain.BackupFile) []string {
 	present := map[string]bool{}
 	for _, file := range files {
@@ -446,7 +528,7 @@ func hasPrivateDeploymentKeys(repository string) bool {
 func backupKeysDigest(repository string) string {
 	digest := sha256.New()
 	for _, name := range privateDeploymentPaths {
-		content, _ := os.ReadFile(filepath.Join(repository, name))
+		content, _, _ := readRecoveryFile(filepath.Join(repository, name), maximumKeyMaterialBytes)
 		fmt.Fprintf(digest, "%s\x00%d\x00", name, len(content))
 		digest.Write(content)
 	}
@@ -503,21 +585,35 @@ func (Local) LastBackup() (domain.BackupRecord, bool) {
 
 // BackupDue explains why a new backup is advisable, if it is.
 func (local Local) BackupDue(repository string) (string, bool) {
-	// Before the laboratory keys exist there is nothing a replacement
-	// controller would miss: the next step is configuring the lab.
 	if !hasPrivateDeploymentKeys(repository) {
 		return "", false
 	}
-	record, found := local.LastBackup()
-	switch {
-	case !found:
-		return "No backup of this controller is recorded. Without its private keys, a replaced controller cannot manage the installed computers.", true
-	case time.Since(record.CreatedAt) > domain.BackupReminderAge:
-		return fmt.Sprintf("The last backup is %d days old.", int(time.Since(record.CreatedAt).Hours()/24)), true
-	case record.KeysDigest != backupKeysDigest(repository):
-		return "The private keys changed since the last backup.", true
-	case record.SettingsHash != "" && record.SettingsHash != backupSettingsHash(repository):
-		return "The laboratory settings changed since the last backup.", true
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	revision, err := local.GitRevision(ctx, repository)
+	// A configured Git backup is kept current automatically; only material that
+	// must be encrypted again with the passphrase, or a pending push, remains.
+	if remote, found := readGitBackupRecord(repository); found {
+		material, materialErr := recoveryMaterial(repository)
+		if materialErr != nil || recoveryDigest(material) != remote.Plan.RecoveryDigest {
+			return "Keys, account passwords or trusted computers changed since the last Git backup. Open Maintenance → Back up lab and enter the recovery passphrase.", true
+		}
+		if err == nil && remote.PublishedRevision == revision {
+			return "", false
+		}
+		return "Saved changes are not yet in the Git backup at " + remote.Plan.Remote + ". Nixorium pushes them automatically while it is open; if this persists, check SSH access in Maintenance → Back up lab.", true
 	}
-	return "", false
+	root, _ := filepath.Abs(repository)
+	// A detached USB drive need not remain mounted for its backup to count.
+	if archive, found := local.LastBackup(); found && archive.Repository == root {
+		when := archive.CreatedAt.Local().Format("2 Jan 2006")
+		switch {
+		case time.Since(archive.CreatedAt) > domain.BackupReminderAge:
+			return "The last backup file is over 30 days old (" + when + "). Create a new one in Maintenance → Back up lab.", true
+		case err != nil || archive.Revision != revision || archive.KeysDigest != backupKeysDigest(repository) || archive.SettingsHash != backupSettingsHash(repository):
+			return "The configuration, keys or passwords changed since the last backup file (" + when + "). Create a new one in Maintenance → Back up lab.", true
+		}
+		return "", false
+	}
+	return "No backup is recorded. Backup is optional: Maintenance → Back up lab saves an encrypted file (for example on a USB drive) or pushes to a private Git repository.", true
 }

@@ -9,7 +9,9 @@ modules; upstream supplies mechanisms through `nixorium.lib.mkLab`.
 Do not turn this ownership into permission to edit those files.
 
 Inspect only relevant non-secret fields. Do not load `lab-settings.json`
-wholesale: it can contain password hashes. For a requested settings diagnosis,
+wholesale. Current templates keep account hashes in ignored `lab-credentials.json`
+and encrypted recovery; never read those files or a prepared Nix source. Older
+pins may still keep hashes in settings. For a requested settings diagnosis,
 on a known trusted deployment and after checking installed help:
 
 ```sh

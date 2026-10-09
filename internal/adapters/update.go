@@ -225,7 +225,7 @@ func (Local) PrepareUpdateWithProgress(ctx context.Context, repository, target s
 		return domain.UpdateProposal{}, fmt.Errorf("initialize candidate lock path: %w", err)
 	}
 	defer os.Remove(lockPath)
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}

@@ -104,7 +104,7 @@ func nixSoftwareExpressionJSON(ctx context.Context, repository, expression, vari
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return err
 	}
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (Local) ValidateSoftwareCandidate(ctx context.Context, repository string, s
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return err
 	}
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := deploymentFlakeReference(ctx, repository)
 	if err != nil {
 		return err
 	}

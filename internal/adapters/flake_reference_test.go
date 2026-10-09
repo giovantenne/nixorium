@@ -9,12 +9,12 @@ import (
 )
 
 func TestDeploymentFlakeReferenceUsesAbsoluteEscapedGitURL(t *testing.T) {
-	reference, err := deploymentFlakeReference("/tmp/lab deployment")
+	reference, err := rawDeploymentFlakeReference("/tmp/lab deployment")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := "git+file:///tmp/lab%20deployment"; reference != want {
-		t.Fatalf("deploymentFlakeReference() = %q; want %q", reference, want)
+		t.Fatalf("deploymentFlakeReference(context.Background(), ) = %q; want %q", reference, want)
 	}
 }
 

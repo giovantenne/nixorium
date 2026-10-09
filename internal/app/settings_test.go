@@ -236,3 +236,38 @@ func TestSettingsAddressChangesRemainAvailableBeforeClientConfiguration(t *testi
 		t.Fatalf("initial save = %+v; written = %+v", applied, written)
 	}
 }
+
+func TestPublicSettingsCandidatePreservesLocalPasswords(t *testing.T) {
+	template, err := os.ReadFile("../../templates/site/lab-settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, _ := domain.DecodeLabSettings(template)
+	base.Lab.CredentialsVersion = 1
+	base.Lab.AdminPassword, base.Lab.TeacherPassword, base.Lab.StudentPassword = "$6$local$admin", "$6$local$teacher", "$6$local$student"
+	private, err := domain.MarshalLabSettings(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	public, err := domain.MarshalPublicLabSettings(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	written := domain.LabSettingsFile{}
+	manager := NewSettingsManager(fakeSettingsSource{data: private, written: &written})
+	plan := manager.Plan(t.Context(), "/repo", public)
+	if plan.HasErrors() || plan.State != "unchanged" {
+		t.Fatalf("public copy changed credentials: %+v", plan)
+	}
+	candidate, _ := domain.DecodeLabSettings(public)
+	candidate.Lab.HomepageURL = "https://changed.example.org"
+	public, _ = domain.MarshalPublicLabSettings(candidate)
+	plan = manager.Plan(t.Context(), "/repo", public)
+	if plan.HasErrors() || len(plan.Changes) != 1 || plan.Changes[0].Field != "lab.homepageUrl" {
+		t.Fatalf("unexpected review: %+v", plan)
+	}
+	applied := manager.Apply(t.Context(), "/repo", public, plan.BaseFingerprint)
+	if applied.HasErrors() || domain.CredentialsFromSettings(written) != domain.CredentialsFromSettings(base) {
+		t.Fatal("configuration-only edit lost credentials")
+	}
+}

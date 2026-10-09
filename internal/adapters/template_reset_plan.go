@@ -186,6 +186,19 @@ in {
 }`
 
 func validateResetCandidate(ctx context.Context, repository, candidate string) error {
+	// Keep hashes out of the proposed tree, while evaluating both sides with
+	// the same local credentials. The candidate is an isolated private checkout.
+	_, credentials, credentialErr := readCredentials(repository)
+	if credentialErr == nil {
+		path := filepath.Join(candidate, credentialsFile)
+		if err := writeRegularFileCreateNew(path, credentials, 0600); err != nil {
+			return err
+		}
+		defer os.Remove(path)
+	} else if !errors.Is(credentialErr, os.ErrNotExist) {
+		return credentialErr
+	}
+
 	before, err := resetNix(ctx, repository, resetIdentityExpression)
 	if err != nil {
 		return errors.New("cannot evaluate existing system identity safely; repair or migrate custom configuration manually")

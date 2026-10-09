@@ -120,16 +120,22 @@ in
   network-shell = pkgs.mkShell {
     packages = [ pkgs.nftables pkgs.iproute2 pkgs.util-linux pkgs.python3 pkgs.nix ];
   };
+  git-backup-vm-tcg = import ./git-backup-vm.nix { inherit pkgs; useKVM = false; };
   onboarding-vm-tcg = import ./onboarding-vm.nix { inherit pkgs; useKVM = false; };
+  management-vm-tcg = pkgs.testers.runNixOSTest (import ./management-vm.nix {
+    inherit nixoriumPackage;
+    useKVM = false;
+  });
   internet-management-vm-tcg = pkgs.testers.runNixOSTest (import ./management-vm.nix {
     inherit nixoriumPackage;
     useKVM = false;
     internetOnly = true;
   });
+  # Use the same patched toolchain as the shipped package, first on PATH.
   go-shell = pkgs.mkShell {
-    packages = [ pkgs.go pkgs.git ];
+    packages = [ nixoriumPackage.go pkgs.git ];
   };
   security-shell = pkgs.mkShell {
-    packages = [ pkgs.go pkgs.go-tools pkgs.govulncheck pkgs.actionlint ];
+    packages = [ nixoriumPackage.go pkgs.go-tools pkgs.govulncheck pkgs.actionlint ];
   };
 }

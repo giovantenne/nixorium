@@ -16,9 +16,10 @@ type UpdateReleaseRef struct {
 }
 
 type UpdateRelease struct {
-	Tag      string        `json:"tag"`
-	ObjectID string        `json:"objectId"`
-	Channel  UpdateChannel `json:"channel"`
+	Tag       string        `json:"tag"`
+	ObjectID  string        `json:"objectId"`
+	Channel   UpdateChannel `json:"channel"`
+	Downgrade bool          `json:"downgrade,omitempty"`
 }
 
 type UpdateCheckReport struct {

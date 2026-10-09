@@ -66,7 +66,8 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 	report.Upstream = "github:" + snapshot.SourcePrefix
 	report.CurrentRef = snapshot.CurrentRef
 	report.CurrentRev = snapshot.CurrentRev
-	if current, parseErr := parseUpdateRelease(snapshot.CurrentRef); parseErr == nil {
+	current, currentErr := parseUpdateRelease(snapshot.CurrentRef)
+	if currentErr == nil {
 		report.CurrentChannel = current.Channel()
 	} else {
 		report.CurrentChannel = domain.UpdateChannelMoving
@@ -85,6 +86,7 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 			continue
 		}
 		item := domain.UpdateRelease{Tag: ref.Tag, ObjectID: ref.ObjectID, Channel: release.Channel()}
+		item.Downgrade = currentErr == nil && compareUpdateReleases(release, current) < 0
 		if item.Channel == domain.UpdateChannelPrerelease {
 			report.Prerelease = append(report.Prerelease, item)
 		} else {

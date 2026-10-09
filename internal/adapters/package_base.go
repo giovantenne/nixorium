@@ -163,7 +163,7 @@ func (p PackageBase) PrepareUpdateWithProgress(ctx context.Context, repo, target
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}
-	flake, err := deploymentFlakeReference(repo)
+	flake, err := deploymentFlakeReference(ctx, repo)
 	if err != nil {
 		return domain.UpdateProposal{}, err
 	}

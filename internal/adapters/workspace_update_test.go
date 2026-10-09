@@ -132,7 +132,7 @@ func TestWorkspaceUpdateRealNixProjection(t *testing.T) {
 	writeGitReviewFile(t, repo, "flake.nix", declaration)
 	writeGitReviewFile(t, repo, "secret-key", "private-sentinel")
 	workspaceTestGit(t, repo, "add", "flake.nix", "metadata.json")
-	flake, err := deploymentFlakeReference(repo)
+	flake, err := deploymentFlakeReference(context.Background(), repo)
 	if err != nil {
 		t.Fatal(err)
 	}

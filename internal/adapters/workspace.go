@@ -310,7 +310,7 @@ func inspectWorkspaceSource(ctx context.Context, root *os.File, candidate []byte
 	if err != nil {
 		return snapshot, nil, nil, err
 	}
-	flake, err := deploymentFlakeReference(root.Name())
+	flake, err := deploymentFlakeReference(ctx, root.Name())
 	if err != nil {
 		return snapshot, nil, nil, err
 	}

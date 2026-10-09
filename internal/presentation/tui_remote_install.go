@@ -37,7 +37,19 @@ func (model dashboardModel) installationAreaView() string {
 	})
 }
 
+// The administrator TUI does not evaluate the configuration at startup, and
+// settings may have changed during the guided flow: load the evaluated
+// inventory each time before offering computers to install.
 func (model dashboardModel) openRemoteInstallHostSelection() (tea.Model, tea.Cmd) {
+	if model.actions.LoadInventory != nil {
+		return model.loadInventoryThen(func(ready dashboardModel) (tea.Model, tea.Cmd) {
+			return ready.showRemoteInstallHostSelection()
+		})
+	}
+	return model.showRemoteInstallHostSelection()
+}
+
+func (model dashboardModel) showRemoteInstallHostSelection() (tea.Model, tea.Cmd) {
 	model.busy = ""
 	model.message = ""
 	model.screen = dashboardUSBInstall

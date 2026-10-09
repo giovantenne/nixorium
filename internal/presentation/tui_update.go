@@ -191,10 +191,22 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			model.recoveryReview.resetPlan = message.reset
 		}
 		return model, nil
+	case gitBackupPlanMsg:
+		model.busy = ""
+		if message.err != nil {
+			model.message = message.err.Error()
+			return model, nil
+		}
+		model.backup.plan = message.plan
+		model.backup.reviewed = true
+		model.backup.field = 0
+		return model, nil
 	case backupResultMsg:
 		model.busy = ""
 		model.backup.result, model.backup.done = message.report, true
 		return model, nil
+	case backupSyncMsg:
+		return model.finishBackupSync(message)
 	case recoveryResultMsg:
 		model.busy = ""
 		model.recoveryReview.done = true
@@ -676,9 +688,21 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		model.updates.check = message.report
 		model.updates.cursor = 0
-		if len(message.report.Stable) > 0 {
-			model.updates.cursor = len(message.report.Development)
-		} else {
+		hasStable := false
+		stableIndex := 0
+		for _, release := range message.report.Development {
+			if !release.Downgrade {
+				stableIndex++
+			}
+		}
+		for _, release := range message.report.Stable {
+			if !release.Downgrade {
+				model.updates.cursor = stableIndex
+				hasStable = true
+				break
+			}
+		}
+		if !hasStable {
 			model.updates.prerelease = message.report.CurrentChannel == domain.UpdateChannelPrerelease
 			for index, release := range model.availableUpdateReleases() {
 				if release.Tag == message.report.CurrentRef {
@@ -715,6 +739,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.updates.planEvents = nil
 		model.busy = ""
 		model.updates.plan = message.report
+		if !model.updates.packageBase && message.report.Downgrade {
+			model.message = "Nixorium downgrades are not available in the TUI. Choose a current or newer release."
+			model.screen = dashboardUpdate
+			return model, nil
+		}
 		if message.report.HasErrors() {
 			model.message = operationLogIssues(message.report.Issues)
 			model.screen = dashboardUpdate
@@ -791,7 +820,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 			if model.settings.current.Lab.PCCount == 0 {
 				model.settings.current.Lab.PCCount = 20
 			}
-			model.settings.collectPasswords = model.settings.current.Lab.AdminPassword == domain.DefaultPasswordHash || model.settings.current.Lab.TeacherPassword == domain.DefaultPasswordHash || model.settings.current.Lab.StudentPassword == domain.DefaultPasswordHash
+			model.settings.collectPasswords = !domain.CredentialsFromSettings(model.settings.current).Ready()
 			model.settings.editor = newSettingsEditorModel(model.settings.current, installationSettingsFields, "Installation / Laboratory settings")
 			model.settings.editor.width = model.width
 			model.settings.editor.height = model.height
@@ -1302,6 +1331,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, nil
 	}
 	if exitKey {
+		model.backup.clearSecrets()
 		if model.hostTrust.cancel != nil {
 			model.hostTrust.cancel()
 			model.hostTrust.cancel = nil

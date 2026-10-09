@@ -8,10 +8,11 @@ import (
 
 func templateResetFixture() TemplateResetPlan {
 	files := map[string]TemplateFile{
-		"lab-settings.json":  {Mode: "100644", Data: []byte("private-settings")},
-		"flake.lock":         {Mode: "100644", Data: []byte("locked-inputs")},
-		"keys/admin-ssh.pub": {Mode: "100644", Data: []byte("public-key")},
-		".gitignore":         {Mode: "100644", Data: []byte("secret-key\n")},
+		"nixorium-recovery.age": {Mode: "100644", Data: []byte("encrypted-recovery")},
+		"lab-settings.json":     {Mode: "100644", Data: []byte("private-settings")},
+		"flake.lock":            {Mode: "100644", Data: []byte("locked-inputs")},
+		"keys/admin-ssh.pub":    {Mode: "100644", Data: []byte("public-key")},
+		".gitignore":            {Mode: "100644", Data: []byte("secret-key\n")},
 	}
 	candidate := map[string]TemplateFile{}
 	for name, file := range files {
@@ -45,7 +46,7 @@ func TestTemplateResetTokenBindsPrivateProposalAndReview(t *testing.T) {
 }
 
 func TestTemplateResetRejectsPreservationLossAndPrivateCollisions(t *testing.T) {
-	for _, name := range []string{"lab-settings.json", "flake.lock", "keys/admin-ssh.pub", ".gitignore"} {
+	for _, name := range []string{"nixorium-recovery.age", "lab-settings.json", "flake.lock", "keys/admin-ssh.pub", ".gitignore"} {
 		t.Run(name, func(t *testing.T) {
 			p := templateResetFixture()
 			delete(p.Proposal.Candidate, name)

@@ -20,7 +20,7 @@ func (Local) ValidateCandidate(ctx context.Context, repository string, settings 
 	if err := ensurePrivateFilesUntracked(ctx, repository); err != nil {
 		return err
 	}
-	flake, err := deploymentFlakeReference(repository)
+	flake, err := rawDeploymentFlakeReference(repository)
 	if err != nil {
 		return err
 	}
