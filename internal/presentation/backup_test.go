@@ -340,3 +340,16 @@ func drainBackupSync(cmd tea.Cmd) []tea.Msg {
 	}
 	return []tea.Msg{message}
 }
+
+func TestBackupFileProposesTheHomeFolder(t *testing.T) {
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		BackupFileFolder: func() string { return "/home/admin" },
+	}, false)
+	next, _ := m.openBackup()
+	m = next.(dashboardModel)
+	next, _ = m.Update(tea.KeyPressMsg{Text: "f", Code: 'f'})
+	m = next.(dashboardModel)
+	if m.backup.destination != "/home/admin" || !strings.Contains(m.View().Content, "/home/admin") {
+		t.Fatalf("home folder not proposed: %q", m.backup.destination)
+	}
+}

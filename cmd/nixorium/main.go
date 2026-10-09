@@ -646,6 +646,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			return (adapters.GitBackup{}).Restore(ctx, remote, branch, target, passphrase)
 		},
 		GitBackupDestination: func() (string, string) { return (adapters.GitBackup{}).Destination(repository) },
+		BackupFileFolder: func() string {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return ""
+			}
+			return home
+		},
 		SyncGitBackup: func(syncCtx context.Context, skip string) domain.BackupReport {
 			return (adapters.GitBackup{}).Sync(syncCtx, repository, skip)
 		},

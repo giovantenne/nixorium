@@ -798,8 +798,8 @@ Detailed Harmonia output uses `journalctl -u harmonia.service`.
 Backup is optional and never blocks client installation or updates. Open
 **Maintenance → Back up lab** and choose:
 
-- **Encrypted file**: mount the USB drive if needed and enter an existing folder outside
-  the deployment. Enter and repeat a passphrase, review, then create the archive.
+- **Encrypted file**: your home folder is proposed; for a USB drive, mount it and
+  enter its folder instead. Enter and repeat a passphrase, review, then create the archive.
   The entire deployment, Git history, private keys and account hashes are encrypted.
 - **Private Git repository**: save local edits first, choose your school's **private**
   GitHub/GitLab repository and branch, then confirm with a passphrase and `PUSH`.

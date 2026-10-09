@@ -140,6 +140,7 @@ type DashboardActions struct {
 	RestoreLab              func(string, string, string, []byte) domain.BackupReport
 	GitBackupDestination    func() (string, string)
 	SyncGitBackup           func(context.Context, string) domain.BackupReport
+	BackupFileFolder        func() string
 	RestoreLabArchive       func(string, string, []byte) domain.BackupReport
 	ApplyResetRecovery      func(domain.TemplateResetRecoveryPlan) domain.TemplateResetRecoveryResult
 }

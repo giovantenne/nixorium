@@ -199,6 +199,9 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 			b.archive = choice == 0
 			b.choosing, b.field = false, 0
 			model.message = ""
+			if b.archive && !b.restore && b.destination == "" && model.actions.BackupFileFolder != nil {
+				b.destination = model.actions.BackupFileFolder()
+			}
 			if choice == 1 && b.gitConfigured() && model.actions.SyncGitBackup != nil {
 				return model.syncBackupNow()
 			}
@@ -452,8 +455,8 @@ func (model dashboardModel) backupView() string {
 				"Keep the backup away from this controller and the passphrase separately.")
 			actions = []tuiAction{{key: "Enter", label: "Create backup"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 		case b.archive:
-			lines = append(lines, "Choose an existing folder outside the deployment.",
-				"For USB, mount the drive first and enter its folder here.",
+			lines = append(lines, "Choose an existing folder outside the deployment. Your home folder is proposed;",
+				"for a USB drive, mount it first and enter its folder instead.",
 				"Use a passphrase of at least 12 characters. The whole archive is encrypted.", "")
 			fields = []field{{"Folder", b.destination}, {"Passphrase", dots(b.passphrase)}, {"Repeat", dots(b.repeat)}}
 		case b.reviewed:

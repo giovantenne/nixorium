@@ -757,8 +757,9 @@ again. Clients retain trust in the restored original keys and do not need
 reinstallation. The passphrase decrypts existing keys; it never generates
 replacement keys. Repository access and the passphrase are both needed.
 
-For an **Encrypted file**, mount the drive first, then enter an existing absolute folder
-outside the deployment in the TUI. Enter and repeat a passphrase of at least
+For an **Encrypted file**, the TUI proposes your home folder; for a USB drive,
+mount it first and enter its folder instead (any existing absolute folder outside
+the deployment). Enter and repeat a passphrase of at least
 12 characters, review the destination, then choose **Create backup**. No Git
 remote is needed and nothing is pushed. A detached USB need not stay mounted
 for the recorded backup to count. The equivalent CLI and restoration commands are:
