@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_RELEASE="v3.1.1"
+DEFAULT_RELEASE="v3.2.0"
 RELEASE="${NIXORIUM_RELEASE:-}"
 INSTALL_DISK=""
 REPOSITORY="giovantenne/nixorium"

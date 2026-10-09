@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-10-09
+
 - Hide older Nixorium releases in the TUI using Semantic Version precedence
   against the configured deployment tag, and refuse downgrade plans before
   confirmation. Explicit CLI recovery with `--allow-downgrade` remains available.
@@ -1628,7 +1630,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.1.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/giovantenne/nixorium/compare/v3.1.1...v3.2.0
 [3.1.1]: https://github.com/giovantenne/nixorium/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0-beta.1...v3.0.0
