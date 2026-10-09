@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -173,5 +174,31 @@ func TestUSBInstallChecklistWaitsAndSizesAndIdentitiesAreReadable(t *testing.T) 
 	view = model.View().Content
 	if !strings.Contains(view, "pc28") || strings.Contains(view, "pc01 ") || !strings.Contains(view, "of 30 computers") {
 		t.Fatalf("identity list is not windowed around the selection:\n%s", view)
+	}
+}
+
+// A freshly opened TUI has no evaluated inventory; choosing USB installation
+// must load it instead of reporting that no computers are configured.
+func TestUSBHostSelectionLoadsInventoryInAFreshSession(t *testing.T) {
+	loads := 0
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		LoadInventory: func(context.Context) (domain.StatusReport, error) {
+			loads++
+			report := domain.StatusReport{}
+			report.Meta.Controller.Name = "pc99"
+			report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01", IP: "10.0.0.1"}, {Name: "pc02", IP: "10.0.0.2"}}
+			return report, nil
+		},
+	}, false)
+	next, cmd := m.openRemoteInstallHostSelection()
+	m = next.(dashboardModel)
+	if cmd == nil || m.busy == "" {
+		t.Fatal("inventory was not loaded before offering computers")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	view := m.View().Content
+	if loads != 1 || m.screen != dashboardUSBInstall || !strings.Contains(view, "pc01") || !strings.Contains(view, "pc02") || strings.Contains(view, "No client computers") {
+		t.Fatalf("loads=%d screen=%v view:\n%s", loads, m.screen, view)
 	}
 }
