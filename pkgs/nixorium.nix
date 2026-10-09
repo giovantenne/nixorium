@@ -1,9 +1,10 @@
-{ buildGoModule, git, lib, makeWrapper, openssh, openssl, whois }:
+{ buildGoModule, callPackage, git, lib, makeWrapper, openssh, openssl, whois }:
 
 let
+  go = callPackage ./go.nix { };
   version = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ../VERSION);
 in
-buildGoModule {
+(buildGoModule.override { inherit go; }) {
   pname = "nixorium";
   inherit version;
   src = lib.fileset.toSource {
@@ -47,6 +48,8 @@ buildGoModule {
   '';
 
   ldflags = [ "-s" "-w" "-X main.nixoriumVersion=${version}" "-X main.agentVersion=${version}" ];
+
+  passthru.go = go;
 
   meta = {
     description = "Terminal management interface for Nixorium laboratories";

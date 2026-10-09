@@ -131,10 +131,11 @@ in
     useKVM = false;
     internetOnly = true;
   });
+  # Use the same patched toolchain as the shipped package, first on PATH.
   go-shell = pkgs.mkShell {
-    packages = [ pkgs.go pkgs.git ];
+    packages = [ nixoriumPackage.go pkgs.git ];
   };
   security-shell = pkgs.mkShell {
-    packages = [ pkgs.go pkgs.go-tools pkgs.govulncheck pkgs.actionlint ];
+    packages = [ nixoriumPackage.go pkgs.go-tools pkgs.govulncheck pkgs.actionlint ];
   };
 }

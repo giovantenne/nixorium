@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Build Nixorium with Go 1.26.9 until the pinned package set provides it,
+  fixing standard-library vulnerabilities in net/http, net/textproto and
+  crypto/tls reported for Go 1.26.6.
 - Reviewed private Git backups with passphrase-encrypted recovery keys, verified
   remote revisions and a Restore lab screen that works without an existing lab.
   Backups are optional and never block installation or updates. The TUI offers
