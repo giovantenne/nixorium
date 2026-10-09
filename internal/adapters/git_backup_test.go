@@ -32,7 +32,7 @@ func gitBackupFixture(t *testing.T) (GitBackup, string, string) {
 	return GitBackup{allowLocal: true}, repo, remote
 }
 
-func TestGitBackupRoundTripAndMandatoryReceipt(t *testing.T) {
+func TestGitBackupRoundTripAndReminder(t *testing.T) {
 	g, repo, remote := gitBackupFixture(t)
 	// Restore must protect clear credentials even when the source repository
 	// relied on a local Git exclusion instead of its tracked ignore file.
@@ -40,7 +40,7 @@ func TestGitBackupRoundTripAndMandatoryReceipt(t *testing.T) {
 	writeGitReviewFile(t, repo, ".git/info/exclude", "lab-credentials.json\n")
 	workspaceTestGit(t, repo, "add", ".gitignore")
 	workspaceTestGit(t, repo, "commit", "-m", "use local credential exclusion")
-	if err := (Local{}).RemoteBackupRequired(repo); err == nil {
+	if _, due := (Local{}).BackupDue(repo); !due {
 		t.Fatal("missing backup accepted")
 	}
 	trust := filepath.Join(os.Getenv("HOME"), ".ssh", "nixorium-known-hosts")
@@ -59,8 +59,8 @@ func TestGitBackupRoundTripAndMandatoryReceipt(t *testing.T) {
 	if result.HasErrors() {
 		t.Fatalf("publish: %+v", result)
 	}
-	if err := (Local{}).RemoteBackupRequired(repo); err != nil {
-		t.Fatal(err)
+	if reason, due := (Local{}).BackupDue(repo); due {
+		t.Fatal(reason)
 	}
 	if status := workspaceTestGit(t, repo, "status", "--porcelain"); strings.TrimSpace(status) != "" {
 		t.Fatal(status)
@@ -133,7 +133,7 @@ func TestGitBackupRoundTripAndMandatoryReceipt(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "secret-key"), []byte("rotated"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := (Local{}).RemoteBackupRequired(repo); err == nil {
+	if _, due := (Local{}).BackupDue(repo); !due {
 		t.Fatal("rotation did not require backup")
 	}
 }
@@ -172,7 +172,7 @@ func TestGitBackupRemoteFailureDoesNotRecordSuccess(t *testing.T) {
 	if result := g.Publish(t.Context(), p, []byte("correct horse battery")); !result.HasErrors() {
 		t.Fatal("missing remote accepted")
 	}
-	if err := (Local{}).RemoteBackupRequired(repo); err == nil {
+	if _, due := (Local{}).BackupDue(repo); !due {
 		t.Fatal("failed push recorded")
 	}
 	if _, err := os.Stat(filepath.Join(repo, gitRecoveryFile)); err != nil {

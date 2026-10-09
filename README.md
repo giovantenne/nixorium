@@ -142,9 +142,10 @@ trial on virtual machines, follow the
    prepares the clients. Teacher and student account names are reused from
    first setup; change them under **Maintenance → Change settings → Accounts**.
 
-   Before installing the first client, use **Maintenance → Back up lab** to
-   verify a push to your private GitHub/GitLab repository. Recovery keys are
-   encrypted with a passphrase; keep it and independent Git access separately.
+   Optionally use **Maintenance → Back up lab** and choose **File / USB** for
+   an encrypted archive, or **Remote Git** for a private GitHub/GitLab repository
+   with encrypted recovery keys. Keep the passphrase separately. Backup is
+   recommended but never blocks installation or updates.
 
 3. **Install the first client.** With network boot, start the client from the
    network; the installer opens on its screen, asks which configured computer
@@ -156,7 +157,7 @@ trial on virtual machines, follow the
 
 4. **Check it, then expand.** Start the client from its disk, try the student
    session, a reboot and an update from **Computers → Update computers**. Make
-   another backup from **Maintenance → Back up lab** when prompted. Then install
+   another backup from **Maintenance → Back up lab** if desired. Then install
    the other PCs.
 
 ## Security

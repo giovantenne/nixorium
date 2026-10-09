@@ -486,17 +486,6 @@ func readGitBackupRecord(repository string) (gitBackupRecord, bool) {
 	return r, ok
 }
 
-func (Local) RemoteBackupRequired(repository string) error {
-	if !hasPrivateDeploymentKeys(repository) {
-		return nil
-	}
-	r, ok := readGitBackupRecord(repository)
-	if !ok || r.KeysDigest != backupKeysDigest(repository) {
-		return errors.New("No verified remote backup of the current private keys and account credentials exists. Back up the laboratory to a private Git repository before installing or updating clients: Maintenance → Back up lab (nixorium backup plan)")
-	}
-	return nil
-}
-
 func (g GitBackup) Destination(repository string) (string, string) {
 	if r, ok := readGitBackupRecord(repository); ok {
 		return r.Plan.Remote, r.Plan.Branch

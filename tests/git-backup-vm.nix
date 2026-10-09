@@ -33,9 +33,9 @@ pkgs.testers.runNixOSTest {
     controller.succeed("git -C /tmp/lab init -q; git -C /tmp/lab add .; git -C /tmp/lab -c user.name=Test -c user.email=test@example.invalid commit -qm fixture; git init --bare /tmp/backup.git")
     controller.succeed("ssh-keygen -q -t ed25519 -N \"\" -f /root/.ssh/id_ed25519; cp /root/.ssh/id_ed25519.pub /root/.ssh/authorized_keys; chmod 0600 /root/.ssh/authorized_keys; printf '127.0.0.1 %s\\n' \"$(cat /etc/ssh/ssh_host_ed25519_key.pub)\" > /root/.ssh/known_hosts")
     controller.succeed("install -d -m 0700 /root/.ssh/nixorium-known-hosts; printf 'pc01 trusted-computer-key\\n' > /root/.ssh/nixorium-known-hosts/known_hosts; chmod 0600 /root/.ssh/nixorium-known-hosts/known_hosts; printf 'correct horse battery\\n' >/tmp/passphrase; chmod 0600 /tmp/passphrase")
-    with subtest("unbacked keys block fleet distribution before evaluation"):
+    with subtest("unbacked keys do not block ordinary configuration checks"):
       controller.fail("nixorium deploy plan --repo /tmp/lab --on @lab --json > /tmp/blocked.json")
-      controller.succeed("jq -e 'any(.issues[]; .field == \"backup\")' /tmp/blocked.json")
+      controller.succeed("jq -e 'all(.issues[]; .field != \"backup\") and any(.issues[]; .field == \"configuration\")' /tmp/blocked.json")
     with subtest("reviewed SSH push and exact remote verification"):
       controller.succeed("nixorium backup plan --repo /tmp/lab --remote root@127.0.0.1:/tmp/backup.git --branch main --json > /tmp/plan.json; token=$(jq -r .reviewToken /tmp/plan.json); nixorium backup publish --repo /tmp/lab --remote root@127.0.0.1:/tmp/backup.git --branch main --expect $token --yes --passphrase-file /tmp/passphrase --json > /tmp/published.json || { cat /tmp/published.json; false; }; jq -e '.state == \"completed\"' /tmp/published.json")
       controller.succeed("test \"$(git --git-dir=/tmp/backup.git rev-parse main)\" = \"$(git -C /tmp/lab rev-parse HEAD)\"; test -z \"$(git -C /tmp/lab status --porcelain)\"; ! git --git-dir=/tmp/backup.git ls-tree -r --name-only main | grep -xE 'secret-key|admin-ssh|lab-credentials.json'")

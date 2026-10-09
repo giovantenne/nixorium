@@ -633,6 +633,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 		PlanResetRecovery: func(ctx context.Context) domain.TemplateResetRecoveryPlan {
 			return adapters.TemplateReset{}.PlanTemplateResetRecovery(ctx, repository)
 		},
+		CreateBackup: func(destination string, passphrase []byte) domain.BackupReport {
+			return local.CreateBackup(ctx, repository, destination, passphrase, nixoriumVersion)
+		},
 		PlanGitBackup: func(readCtx context.Context, remote, branch string) (domain.GitBackupPlan, error) {
 			return (adapters.GitBackup{}).Plan(readCtx, repository, remote, branch)
 		},

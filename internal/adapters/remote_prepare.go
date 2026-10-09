@@ -359,9 +359,6 @@ func ensurePrivateOwnedDirectory(path string) error {
 }
 
 func (preparer *RemoteInstallPreparer) validateRepository(ctx context.Context) error {
-	if err := (Local{}).RemoteBackupRequired(preparer.repository); err != nil {
-		return err
-	}
 	info, err := os.Lstat(preparer.repository)
 	if err != nil {
 		return fmt.Errorf("inspect fixed deployment repository: %w", err)

@@ -99,7 +99,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 	}
 	if backups, ok := inspector.source.(backupDueSource); ok {
 		if reason, due := backups.BackupDue(root); due {
-			add(domain.RecoveryBackupDue, "BACKUP-DUE", "A remote backup of this laboratory is due", reason, backupBlock(inspector.source, root), nil, nil)
+			add(domain.RecoveryBackupDue, "BACKUP-DUE", "A backup of this laboratory is due", reason, "", nil, nil)
 		}
 	}
 	if queued, ok := inspector.source.(deferredUpdatesSource); ok {
@@ -124,19 +124,4 @@ func shortRevision(revision string) string {
 		return revision[:12]
 	}
 	return revision
-}
-
-// An old configuration receipt is a reminder; missing or changed recovery keys
-// block fleet distribution while local repairs remain available offline.
-func backupBlock(source any, repository string) string {
-	if err := requireRemoteBackup(source, repository); err != nil {
-		return "Installing or updating client computers."
-	}
-	return ""
-}
-func requireRemoteBackup(source any, repository string) error {
-	if backups, ok := source.(interface{ RemoteBackupRequired(string) error }); ok {
-		return backups.RemoteBackupRequired(repository)
-	}
-	return nil
 }

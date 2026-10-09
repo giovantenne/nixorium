@@ -275,9 +275,6 @@ func (m *DeploymentManager) Plan(ctx context.Context, repository, requested stri
 		return deploymentIssue(report, "repository", fmt.Sprintf("resolve path: %v", err))
 	}
 	report.Repository = root
-	if err := requireRemoteBackup(m.source, root); err != nil {
-		return deploymentIssue(report, "backup", err.Error())
-	}
 	meta, err := m.source.LabMeta(ctx, root)
 	if err != nil {
 		return deploymentIssue(report, "configuration", fmt.Sprintf("evaluate labMeta: %v", err))

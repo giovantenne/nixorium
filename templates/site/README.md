@@ -795,28 +795,34 @@ Detailed Harmonia output uses `journalctl -u harmonia.service`.
 
 ### Back up and restore the lab
 
-Before installing clients, open **Maintenance → Back up lab**. Save local edits
-first, choose your school's **private** GitHub/GitLab repository and branch, and
-confirm the review with a passphrase and `PUSH`. Configure independent SSH access
-and verify the Git server's fingerprint first. Private keys and account password hashes are encrypted;
-configuration and Git history remain readable in the private repository.
+Backup is optional and never blocks client installation or updates. Open
+**Maintenance → Back up lab** and choose:
+
+- **File / USB**: mount the drive if needed and enter an existing folder outside
+  the deployment. Enter and repeat a passphrase, review, then create the archive.
+  The entire deployment, Git history, private keys and account hashes are encrypted.
+- **Remote Git**: save local edits first, choose your school's **private**
+  GitHub/GitLab repository and branch, then confirm with a passphrase and `PUSH`.
+  Configure independent SSH access and verify the Git server's fingerprint first.
+  Private keys and account hashes are encrypted; configuration and history remain
+  readable. A Git backup is complete only after the remote revision is verified.
+
+Use at least 12 characters for the passphrase and keep it separately, away from
+the controller. A current archive or verified Git backup clears the Overview
+reminder. Missing or stale backups remain advisory.
+
 The original private keys and `lab-credentials.json` remain ignored locally.
 Nixorium inserts the hashes only into local evaluation/build input. PXE and
 installed systems still contain the hashes as before; no PXE passphrase is added.
 
-A backup is complete only after the remote revision has been verified. Missing
-backups or changed private keys/passwords block client installation and updates; local
-repair and diagnostics remain available. Push again when the Overview reports
-changed configuration or an old backup. Keep the passphrase and Git access
-separately, away from the controller.
-
-**Maintenance → Restore lab** clones into a new directory, decrypts the original
-keys and checks them against the public keys. It never overwrites an existing
-lab or activates its configuration. On a replacement machine without a lab,
-`nixorium backup clone` opens the same restore screen. Optional encrypted USB
-archives remain available through `backup create`, `verify` and `restore`.
-See [Backups and restoration](TROUBLESHOOTING.md#backups-and-restoration) for the
-SSH setup, CLI review, failure recovery and controller replacement steps.
+**Maintenance → Restore lab** restores from Git into a new directory, decrypts
+the original keys and checks them against the public keys. It never overwrites
+an existing lab or activates its configuration. Without an existing lab,
+`nixorium backup clone` opens the same restore screen. For a file/USB archive,
+use `nixorium backup verify BACKUP-FILE`, then
+`nixorium backup restore BACKUP-FILE --to NEW-DIRECTORY`.
+See [Backups and restoration](TROUBLESHOOTING.md#backups-and-restoration) for
+failure recovery and controller replacement steps.
 
 ### Free disk space
 

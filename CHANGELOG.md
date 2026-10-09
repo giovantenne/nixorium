@@ -8,8 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 - Reviewed private Git backups with passphrase-encrypted recovery keys, verified
   remote revisions and a Restore lab screen that works without an existing lab.
-  Client distribution requires a verified backup of current keys and credentials;
-  local repair and optional offline archives remain available.
+  Backups are optional and never block installation or updates. The TUI offers
+  File / USB (a fully encrypted archive) or Remote Git; either current backup
+  clears the advisory reminder.
 - Account hashes move to ignored `lab-credentials.json` and encrypted recovery.
   Local Nix input receives the hashes without changing PXE or installed accounts.
   New deployments use the updated template; no inline-hash migration is provided.

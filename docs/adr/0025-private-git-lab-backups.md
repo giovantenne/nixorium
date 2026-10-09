@@ -32,11 +32,11 @@ arbitrary custom modules or authorize AI access. No existing-lab migration or
 history rewrite is included; inline hashes in backup history are refused.
 
 A local receipt is written only after the remote reports the pushed revision.
-The first client distribution and distribution after key or password changes require that
-receipt. Later configuration/trust changes and age over 30 days are reminders;
-local repairs remain possible offline. Existing offline archives remain usable
-but do not satisfy the remote receipt requirement. Backup checks known private
-paths and recognizable secrets throughout reachable history before sending.
+As revised on 2026-10-09, backup is optional and never blocks client distribution,
+including after key or password changes. Maintenance → Back up lab offers a
+fully encrypted File / USB archive or Remote Git. Either current backup clears
+the reminder; missing or stale backups remain advisory. Git backup checks known
+private paths and recognizable secrets throughout reachable history before sending.
 
 Restore lab is available without an existing deployment. It fetches into private
 staging with hooks, filters and submodule recursion disabled, decrypts and checks

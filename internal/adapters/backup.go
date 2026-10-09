@@ -215,7 +215,7 @@ func (Local) CreateBackup(ctx context.Context, repository, destination string, p
 	if len(report.PrivateKeys) < len(privateDeploymentPaths) {
 		report.Message += " Some private keys are missing from the deployment; a restore will need new keys for them."
 	}
-	recordBackup(domain.BackupRecord{CreatedAt: created, Path: final, Revision: revision, KeysDigest: backupKeysDigest(repository), SettingsHash: backupSettingsHash(repository)})
+	recordBackup(domain.BackupRecord{Repository: repository, CreatedAt: created, Path: final, Revision: revision, KeysDigest: backupKeysDigest(repository), SettingsHash: backupSettingsHash(repository)})
 	return report
 }
 
@@ -508,25 +508,25 @@ func (local Local) BackupDue(repository string) (string, bool) {
 	if !hasPrivateDeploymentKeys(repository) {
 		return "", false
 	}
-	if err := local.RemoteBackupRequired(repository); err != nil {
-		return err.Error(), true
-	}
-	record, found := readGitBackupRecord(repository)
-	if !found {
-		return "No verified remote backup is recorded.", true
-	}
-	if time.Since(record.CreatedAt) > domain.BackupReminderAge {
-		return "The last verified remote backup is over 30 days old.", true
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	revision, err := local.GitRevision(ctx, repository)
-	if err != nil || revision != record.PublishedRevision {
-		return "The saved configuration changed since the last verified remote backup.", true
+	keys := backupKeysDigest(repository)
+	root, _ := filepath.Abs(repository)
+	// A detached USB drive need not remain mounted for its backup to count.
+	if archive, found := local.LastBackup(); found && archive.Repository == root &&
+		time.Since(archive.CreatedAt) <= domain.BackupReminderAge &&
+		err == nil && archive.Revision == revision && archive.KeysDigest == keys &&
+		archive.SettingsHash == backupSettingsHash(repository) {
+		return "", false
 	}
-	material, err := recoveryMaterial(repository)
-	if err != nil || recoveryDigest(material) != record.Plan.RecoveryDigest {
-		return "Trusted computer keys changed since the last verified remote backup.", true
+	if remote, found := readGitBackupRecord(repository); found &&
+		time.Since(remote.CreatedAt) <= domain.BackupReminderAge &&
+		err == nil && remote.PublishedRevision == revision && remote.KeysDigest == keys {
+		material, materialErr := recoveryMaterial(repository)
+		if materialErr == nil && recoveryDigest(material) == remote.Plan.RecoveryDigest {
+			return "", false
+		}
 	}
-	return "", false
+	return "No current backup is recorded, or it is over 30 days old. Consider backing up the configuration, private keys and account credentials to a file/USB or private Git repository. Backup is optional.", true
 }

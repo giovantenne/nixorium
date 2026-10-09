@@ -134,6 +134,7 @@ type DashboardActions struct {
 	PlanDeploymentRecovery  func(context.Context, bool) domain.DeploymentRecoveryPlan
 	ApplyDeploymentRecovery func(domain.DeploymentRecoveryPlan) domain.DeploymentRecoveryResult
 	PlanResetRecovery       func(context.Context) domain.TemplateResetRecoveryPlan
+	CreateBackup            func(string, []byte) domain.BackupReport
 	PlanGitBackup           func(context.Context, string, string) (domain.GitBackupPlan, error)
 	PublishGitBackup        func(domain.GitBackupPlan, []byte) domain.BackupReport
 	RestoreLab              func(string, string, string, []byte) domain.BackupReport

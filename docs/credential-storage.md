@@ -5,9 +5,10 @@ The implementation has four boundaries:
 1. The password editor hashes input locally and saves `lab-credentials.json`
    with mode 0600. Git ignores this file. Tracked `lab-settings.json` contains
    names, privileges and `credentialsVersion`, never the three password hashes.
-2. Back up lab encrypts credentials together with the original private keys in
+2. Optional Git backups encrypt credentials with the original private keys in
    `nixorium-recovery.age`. Restore lab checks the version and recovers the local
-   file. A password change requires a fresh verified backup before distribution.
+   file. File/USB backups encrypt the entire deployment instead. Password changes
+   produce a backup reminder, never a backup requirement before distribution.
 3. Nixorium takes Git's tracked-only source, injects the three hashes into a
    temporary settings copy, and imports that copy into the local Nix store.
    All managed evaluation/build paths share this preparation. The original Git

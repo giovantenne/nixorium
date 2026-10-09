@@ -70,13 +70,14 @@ procedures, not authorize agent execution. Unsupported customization is a
 separate development task. Updating inputs does not automatically refresh copied
 agent instructions; that requires a separate reviewed operator change.
 
-The human administrator backs up through Maintenance → Back up lab and restores
-through Restore lab. The private Git repository contains readable configuration
+The human administrator can use Maintenance → Back up lab and choose a fully
+encrypted File / USB archive or Remote Git. Restore lab restores from Git;
+`nixorium backup restore` restores an archive. The private Git repository contains readable configuration
 plus `nixorium-recovery.age`; private keys and account hashes remain
 ignored locally and encrypted in recovery. Do not read or decrypt recovery material or treat backup access as
 permission to expose the repository to an AI service. Template reset preserves
-the encrypted recovery file. The native application requires a verified remote
-backup of the current keys and account hashes before fleet distribution; local repair stays available.
+the encrypted recovery file. Backup is optional: a missing or stale backup is an advisory reminder and never
+blocks client installation or updates.
 
 Account hashes live in ignored `lab-credentials.json` and encrypted recovery,
 not in tracked settings. Do not read, attach or commit that file, private keys,

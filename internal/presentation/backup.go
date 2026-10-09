@@ -11,6 +11,7 @@ import (
 )
 
 type backupModel struct {
+	choosing, archive                   bool
 	field                               int
 	remote, branch, destination         string
 	passphrase, repeat                  []rune
@@ -36,7 +37,7 @@ func RunRestoreLab(actions DashboardActions) error {
 func (model dashboardModel) openBackup() (tea.Model, tea.Cmd) {
 	model.screen = dashboardBackup
 	model.message = ""
-	model.backup = backupModel{branch: "main"}
+	model.backup = backupModel{choosing: true, branch: "main"}
 	if model.actions.GitBackupDestination != nil {
 		model.backup.remote, model.backup.branch = model.actions.GitBackupDestination()
 	}
@@ -46,6 +47,7 @@ func (model dashboardModel) openRestoreLab() (tea.Model, tea.Cmd) {
 	next, _ := model.openBackup()
 	model = next.(dashboardModel)
 	model.backup.restore = true
+	model.backup.choosing = false
 	return model, nil
 }
 func (b *backupModel) clearSecrets() {
@@ -60,6 +62,9 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 	if key.String() == "esc" || (b.done && key.String() == "enter") {
 		done := b.done
 		b.clearSecrets()
+		if !done && !b.restore && !b.choosing {
+			return model.openBackup()
+		}
 		if b.standalone {
 			return model, tea.Quit
 		}
@@ -73,23 +78,45 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 	if b.done {
 		return model, nil
 	}
+	if b.choosing {
+		switch key.String() {
+		case "up", "down", "j", "k", "tab", "shift+tab":
+			b.field = 1 - b.field
+		case "f", "g", "enter":
+			if key.String() == "f" {
+				b.field = 0
+			}
+			if key.String() == "g" {
+				b.field = 1
+			}
+			b.archive = b.field == 0
+			b.choosing, b.field = false, 0
+		}
+		return model, nil
+	}
 	fields := 2
 	if b.restore {
 		fields = 4
-	} else if b.reviewed {
+	} else if b.archive || b.reviewed {
 		fields = 3
 	}
 	switch key.String() {
 	case "tab", "down":
+		if (b.archive || b.restore) && b.reviewed {
+			return model, nil
+		}
 		b.field = (b.field + 1) % fields
 	case "shift+tab", "up":
+		if (b.archive || b.restore) && b.reviewed {
+			return model, nil
+		}
 		b.field = (b.field + fields - 1) % fields
 	case "enter":
 		if b.field < fields-1 {
 			b.field++
 			return model, nil
 		}
-		if !b.restore && !b.reviewed {
+		if !b.restore && !b.archive && !b.reviewed {
 			if model.actions.PlanGitBackup == nil {
 				model.message = "Backup is unavailable in this session."
 				return model, nil
@@ -114,11 +141,20 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 				model.message = "Use at least 12 characters and repeat the same passphrase."
 				return model, nil
 			}
-			if b.confirmation != "PUSH" {
+			if b.archive && !b.reviewed {
+				if strings.TrimSpace(b.destination) == "" {
+					model.message = "Enter an existing destination folder outside the deployment."
+					return model, nil
+				}
+				b.reviewed = true
+				model.message = ""
+				return model, nil
+			}
+			if !b.archive && b.confirmation != "PUSH" {
 				model.message = "Confirm that this is your PRIVATE repository, then type PUSH."
 				return model, nil
 			}
-			if model.actions.PublishGitBackup == nil {
+			if (b.archive && model.actions.CreateBackup == nil) || (!b.archive && model.actions.PublishGitBackup == nil) {
 				model.message = "Backup is unavailable in this session."
 				return model, nil
 			}
@@ -137,11 +173,19 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 				return backupResultMsg{action(remote, branch, target, passphrase)}
 			}
 		}
+		if b.archive {
+			action, destination := model.actions.CreateBackup, strings.TrimSpace(b.destination)
+			model.busy = "Creating an encrypted backup file"
+			return model, func() tea.Msg {
+				defer clear(passphrase)
+				return backupResultMsg{action(destination, passphrase)}
+			}
+		}
 		action, plan := model.actions.PublishGitBackup, b.plan
 		model.busy = "Saving encrypted keys, pushing and verifying the remote backup"
 		return model, func() tea.Msg { defer clear(passphrase); return backupResultMsg{action(plan, passphrase)} }
 	default:
-		if b.restore && b.reviewed {
+		if (b.restore || b.archive) && b.reviewed {
 			return model, nil
 		}
 		var plain *string
@@ -156,6 +200,15 @@ func (model dashboardModel) updateBackup(key tea.KeyPressMsg) (tea.Model, tea.Cm
 				plain = &b.destination
 			case 3:
 				secret = &b.passphrase
+			}
+		} else if b.archive {
+			switch b.field {
+			case 0:
+				plain = &b.destination
+			case 1:
+				secret = &b.passphrase
+			case 2:
+				secret = &b.repeat
 			}
 		} else if b.reviewed {
 			switch b.field {
@@ -220,6 +273,11 @@ func (model dashboardModel) backupView() string {
 			lines = append(lines, "Revision: "+shortRevision(b.result.Revision))
 		}
 		actions = []tuiAction{{key: "Enter", label: "Return"}, {key: "F1", label: "Help"}}
+	} else if b.choosing {
+		lines = append(lines, "Backup is optional. Choose where to save it:", "",
+			tuiSelection("[f] File / USB — encrypted archive in a folder", b.field == 0, model.isDark),
+			tuiSelection("[g] Remote Git — private repository with encrypted secrets", b.field == 1, model.isDark))
+		actions = []tuiAction{{key: "↑/↓", label: "Choose"}, {key: "Enter", label: "Continue"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	} else {
 		type field struct{ label, value string }
 		fields := []field{}
@@ -230,6 +288,19 @@ func (model dashboardModel) backupView() string {
 			} else {
 				lines = append(lines, "Restore into a new folder using independent SSH access.", "No password or Git token belongs in the repository URL.", "")
 				fields = []field{{"SSH repository", b.remote}, {"Branch", b.branch}, {"New folder", b.destination}, {"Passphrase", strings.Repeat("•", len(b.passphrase))}}
+			}
+		} else if b.archive {
+			if b.reviewed {
+				lines = append(lines, "", "Destination folder: "+b.destination,
+					"The entire deployment, Git history, private keys and account credentials",
+					"will be encrypted in one new .age file. Nothing will be pushed.",
+					"Keep the backup away from this controller and the passphrase separately.")
+				actions = []tuiAction{{key: "Enter", label: "Create backup"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
+			} else {
+				lines = append(lines, "Choose an existing folder outside the deployment.",
+					"For USB, mount the drive first and enter its folder here.",
+					"Use a passphrase of at least 12 characters. The whole archive is encrypted.", "")
+				fields = []field{{"Folder", b.destination}, {"Passphrase", strings.Repeat("•", len(b.passphrase))}, {"Repeat", strings.Repeat("•", len(b.repeat))}}
 			}
 		} else if b.reviewed {
 			lines = append(lines, "Repository: "+b.plan.Remote, "Branch: "+b.plan.Branch+" · revision "+shortRevision(b.plan.Revision), fmt.Sprintf("%d tracked files and Git history; ignored files excluded.", b.plan.Files), "Configuration stays readable; password hashes and private keys are encrypted.", "Confirm the repository is PRIVATE on GitHub/GitLab. Type PUSH below.", "")

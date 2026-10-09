@@ -647,9 +647,13 @@ distributing it to the whole laboratory.
 
 ## Backups and restoration
 
-Use **Maintenance → Back up lab** to push the saved deployment and its encrypted
-recovery keys to a **private** GitHub or GitLab repository (including self-hosted
-GitLab). Create the private repository on your provider first, and configure
+Backup is **optional**: installation and updates do not require it. In
+**Maintenance → Back up lab**, choose **File / USB** for a fully encrypted
+archive, or **Remote Git** for a private remote repository. An absent or stale
+backup produces an advisory Overview reminder only.
+
+For **Remote Git**, push the saved deployment and its encrypted recovery keys
+to a **private** GitHub or GitLab repository (including self-hosted GitLab). Create the private repository on your provider first, and configure
 independent SSH access on the controller. Verify the Git server's host fingerprint
 through a trusted channel before using Nixorium; SSH host verification is never
 disabled. This workflow currently accepts SSH URLs, not HTTPS or tokens in URLs.
@@ -689,11 +693,10 @@ force-pushes, merges or resolves remote conflicts automatically. If writing the
 recovery commit was interrupted, inspect and save `nixorium-recovery.age` through
 Review Git changes before retrying.
 
-A verified remote backup of the current private keys and account credentials is required before client
-installation or updates. Local configuration, diagnostics, controller repair and
-recovery remain available offline. Changed configuration or trusted computer keys,
-or a backup older than 30 days, produces an Overview reminder to push again; it
-does not prevent offline operation once the current keys and account credentials were backed up.
+A current file/USB archive or verified remote backup clears the reminder.
+Changed configuration or recovery keys, or a backup older than 30 days, produces
+a reminder to back up again. No backup state blocks client installation,
+updates, local repair or offline operation.
 
 To restore, open **Maintenance → Restore lab**, or start the restore screen without
 an existing deployment:
@@ -734,8 +737,11 @@ again. Clients retain trust in the restored original keys and do not need
 reinstallation. The passphrase decrypts existing keys; it never generates
 replacement keys. Repository access and the passphrase are both needed.
 
-Optional offline archives remain available for an additional USB copy and for
-restoring older backups. They do not satisfy the remote-backup requirement:
+For **File / USB**, mount the drive first, then enter an existing absolute folder
+outside the deployment in the TUI. Enter and repeat a passphrase of at least
+12 characters, review the destination, then choose **Create backup**. No Git
+remote is needed and nothing is pushed. A detached USB need not stay mounted
+for the recorded backup to count. The equivalent CLI and restoration commands are:
 
 ```sh
 nixorium backup create --to /run/media/admin/USB-DRIVE
