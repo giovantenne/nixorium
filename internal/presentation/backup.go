@@ -46,7 +46,7 @@ type backupSyncMsg struct {
 func RunRestoreLab(actions DashboardActions) error {
 	model := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, actions, false)
 	model.screen = dashboardBackup
-	model.backup = backupModel{restore: true, choosing: true, standalone: true, branch: "main"}
+	model.backup = backupModel{restore: true, choosing: true, standalone: true, branch: "master"}
 	_, err := tea.NewProgram(model).Run()
 	return err
 }
@@ -54,7 +54,7 @@ func RunRestoreLab(actions DashboardActions) error {
 func (model dashboardModel) openBackup() (tea.Model, tea.Cmd) {
 	model.screen = dashboardBackup
 	model.message = ""
-	model.backup = backupModel{choosing: true, branch: "main"}
+	model.backup = backupModel{choosing: true, branch: "master"}
 	if model.actions.GitBackupDestination != nil {
 		model.backup.remote, model.backup.branch = model.actions.GitBackupDestination()
 	}

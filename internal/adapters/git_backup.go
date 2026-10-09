@@ -574,12 +574,22 @@ func readGitBackupRecord(repository string) (gitBackupRecord, bool) {
 	return r, ok
 }
 
+// Destination returns the last verified Git backup, or proposes the deployment's
+// own branch (master for deployments created by the installer).
 func (g GitBackup) Destination(repository string) (string, string) {
 	if r, ok := readGitBackupRecord(repository); ok {
 		return r.Plan.Remote, r.Plan.Branch
 	}
-	return "", "main"
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if branch, err := backupGit(ctx, repository, "symbolic-ref", "--quiet", "--short", "HEAD"); err == nil && backupBranch.MatchString(strings.TrimSpace(branch)) {
+		return "", strings.TrimSpace(branch)
+	}
+	return "", DefaultBackupBranch
 }
+
+// DefaultBackupBranch is the branch the installer creates for new deployments.
+const DefaultBackupBranch = "master"
 
 // Restore uses a fresh private directory, disables hooks/filters and submodule
 // recursion, checks the original key pairs, then publishes without replacing

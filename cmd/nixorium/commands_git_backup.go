@@ -13,7 +13,7 @@ import (
 )
 
 func parseGitBackupArguments(args []string) (options, error) {
-	o := options{command: "backup", subcommand: args[0], backupBranch: "main"}
+	o := options{command: "backup", subcommand: args[0]}
 	for i := 1; i < len(args); i++ {
 		switch args[i] {
 		case "--yes":
@@ -89,6 +89,9 @@ func runGitBackupCommand(ctx context.Context, repository string, o options, stdo
 	var plan domain.GitBackupPlan
 	if o.subcommand != "clone" {
 		var err error
+		if o.backupBranch == "" {
+			_, o.backupBranch = g.Destination(repository)
+		}
 		plan, err = g.Plan(ctx, repository, o.backupRemote, o.backupBranch)
 		if err != nil {
 			fmt.Fprintln(stderr, "Error:", err)
@@ -127,7 +130,11 @@ func runGitBackupCommand(ctx context.Context, repository string, o options, stdo
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
-		report = g.Restore(ctx, o.backupRemote, o.backupBranch, target, passphrase)
+		branch := o.backupBranch
+		if branch == "" {
+			branch = adapters.DefaultBackupBranch
+		}
+		report = g.Restore(ctx, o.backupRemote, branch, target, passphrase)
 	}
 	if o.json {
 		_ = presentation.JSON(stdout, report)

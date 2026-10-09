@@ -678,9 +678,12 @@ but automated detection is not a guarantee for arbitrary custom credentials.
 The CLI exposes the same review and execution:
 
 ```sh
-nixorium backup plan --remote git@github.com:SCHOOL/LAB.git --branch main
-nixorium backup publish --remote git@github.com:SCHOOL/LAB.git --branch main --expect REVIEW-TOKEN --yes
+nixorium backup plan --remote git@github.com:SCHOOL/LAB.git
+nixorium backup publish --remote git@github.com:SCHOOL/LAB.git --expect REVIEW-TOKEN --yes
 ```
+
+The remote branch defaults to the deployment's own branch (`master` for
+deployments created by the installer); `--branch` chooses another one.
 
 `--yes` confirms the reviewed destination is private and authorizes publication.
 Keep the passphrase separately: Nixorium never saves it. `--passphrase-file FILE`
@@ -726,7 +729,7 @@ controller's trusted computer keys in the same way. The equivalent
 noninteractive Git command is:
 
 ```sh
-nixorium backup clone --remote git@github.com:SCHOOL/LAB.git --branch main --to /home/admin/restored-lab --yes
+nixorium backup clone --remote git@github.com:SCHOOL/LAB.git --branch master --to /home/admin/restored-lab --yes
 ```
 
 Restore fetches into private staging, decrypts and verifies the original private/

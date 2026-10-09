@@ -205,6 +205,10 @@ func TestGitBackupRemoteValidationAndUnsafeRecovery(t *testing.T) {
 
 func TestGitBackupSyncPushesSavedChangesWithoutPassphrase(t *testing.T) {
 	g, repo, remote := gitBackupFixture(t)
+	workspaceTestGit(t, repo, "branch", "-M", "master")
+	if destination, branch := g.Destination(repo); destination != "" || branch != "master" {
+		t.Fatalf("unconfigured backup proposed %q %q, want the deployment branch", destination, branch)
+	}
 	if report := g.Sync(t.Context(), repo, ""); report.State != "unconfigured" {
 		t.Fatalf("sync before any backup: %+v", report)
 	}
