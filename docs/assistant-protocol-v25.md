@@ -46,7 +46,7 @@ the matching `toolCallId`.
 Serialized call arguments must not exceed 4096 bytes. Each tool message's
 content must not exceed 1024 bytes and must be a JSON object with only the
 `coreRef` key. That object contains exactly `rev` (40 hexadecimal characters)
-and `sha256` (64 hexadecimal characters). An event contains at most 64 messages.
+and `sha256` (64 hexadecimal characters). An event contains at most 256 messages.
 
 The client adds these messages to history before the step's assistant message,
 which contains local tool calls or the final answer. If the step ends with an

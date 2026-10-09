@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -59,7 +60,7 @@ func TestValidAssistantServiceMessages(t *testing.T) {
 			m[1].Content = strings.Replace(m[1].Content, `{"rev":`, `{"rev":"bad","rev":`, 1)
 			return m
 		},
-		"too many messages": func(m []AssistantMessage) []AssistantMessage { return append(m, make([]AssistantMessage, 63)...) },
+		"too many messages": func(m []AssistantMessage) []AssistantMessage { return append(m, make([]AssistantMessage, 255)...) },
 	}
 	for name, mutate := range mutations {
 		t.Run(name, func(t *testing.T) {
@@ -67,5 +68,25 @@ func TestValidAssistantServiceMessages(t *testing.T) {
 				t.Fatal("invalid service messages accepted")
 			}
 		})
+	}
+}
+
+func TestAssistantServiceMessagesExpandedLimit(t *testing.T) {
+	messages := []AssistantMessage{}
+	for i := 0; i < 128; i++ {
+		block := serviceMessagesFixture()
+		id := "core" + strconv.Itoa(i)
+		block[0].ToolCalls[0].ID = id
+		block[1].ToolCallID = id
+		messages = append(messages, block...)
+		if i == 99 && !ValidAssistantServiceMessages(messages) {
+			t.Fatal("100 reads in 200 messages rejected")
+		}
+	}
+	if !ValidAssistantServiceMessages(messages) {
+		t.Fatal("256 messages rejected")
+	}
+	if ValidAssistantServiceMessages(append(messages, AssistantMessage{Role: "assistant"})) {
+		t.Fatal("257 messages accepted")
 	}
 }

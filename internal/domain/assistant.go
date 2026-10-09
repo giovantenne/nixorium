@@ -93,7 +93,7 @@ var AssistantServiceTools = []string{"read_core"}
 var assistantCoreHash = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func ValidAssistantServiceMessages(messages []AssistantMessage) bool {
-	if len(messages) == 0 || len(messages) > 64 {
+	if len(messages) == 0 || len(messages) > 256 {
 		return false
 	}
 	ids := map[string]bool{}
