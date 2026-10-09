@@ -239,3 +239,31 @@ func TestControllerOverviewCancelledReviewDoesNotAdvertiseOlderSuccess(t *testin
 		t.Fatal("an older activation was advertised after a newer save")
 	}
 }
+
+// A saved change can add or remove computers, so client selection must load
+// the inventory of the new revision instead of reusing the old one.
+func TestSavedChangeReloadsTheInventoryBeforeClientSelection(t *testing.T) {
+	loads := 0
+	m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{}, DashboardActions{
+		LoadInventory: func(context.Context) (domain.StatusReport, error) {
+			loads++
+			report := domain.StatusReport{}
+			report.Meta.Controller.Name = "pc99"
+			report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}, {Name: "pc03"}}
+			return report, nil
+		},
+	}, false)
+	m.report.Meta.Controller.Name = "pc99"
+	m.report.Meta.Clients.Hosts = []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}}
+	m.noteControllerSave("0123456789abcdef0123456789abcdef01234567")
+	next, cmd := m.openComputerTask("d")
+	m = next.(dashboardModel)
+	if cmd == nil {
+		t.Fatal("stale inventory reused after a saved change")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(dashboardModel)
+	if loads != 1 || len(m.report.Meta.Clients.Hosts) != 3 || m.screen != dashboardDeploy {
+		t.Fatalf("loads=%d hosts=%d screen=%v", loads, len(m.report.Meta.Clients.Hosts), m.screen)
+	}
+}

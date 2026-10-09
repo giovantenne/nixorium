@@ -2630,12 +2630,19 @@ func (model dashboardModel) pxeView() string {
 		tuiTitle(title, model.isDark),
 		"",
 	}
-	lines = append(lines, tuiFields(model.isDark,
-		[2]string{"Network installation", tuiStatus(pxeModeLabel(model.report.PXE.Mode), pxeStatusKind(model.report.PXE.Mode), model.isDark)},
-		[2]string{"Installation files", preparation},
-		[2]string{"Network interface", model.report.Meta.Network.Interface},
-		[2]string{"Controller address", model.report.Meta.Controller.DHCPIP},
-	)...)
+	fields := [][2]string{
+		{"Network installation", tuiStatus(pxeModeLabel(model.report.PXE.Mode), pxeStatusKind(model.report.PXE.Mode), model.isDark)},
+		{"Installation files", preparation},
+	}
+	// Interface and address come from the evaluated configuration, which is
+	// loaded on demand; omit them rather than show empty values.
+	if model.report.Meta.Network.Interface != "" {
+		fields = append(fields, [2]string{"Network interface", model.report.Meta.Network.Interface})
+	}
+	if model.report.Meta.Controller.DHCPIP != "" {
+		fields = append(fields, [2]string{"Controller address", model.report.Meta.Controller.DHCPIP})
+	}
+	lines = append(lines, tuiFields(model.isDark, fields...)...)
 	if model.installation.flow {
 		steps := []string{"Laboratory settings", "Save configuration", "Controller keys", "Activate controller", "Prepare clients", "Start PXE"}
 		lines = append(lines, "")

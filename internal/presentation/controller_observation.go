@@ -18,6 +18,9 @@ const (
 func (model *dashboardModel) noteControllerSave(revision string) {
 	if revision != "" {
 		model.controllerObservation = controllerOverviewPending
+		// A saved change can add or remove computers: the next client
+		// selection loads the inventory of the new revision again.
+		model.report.Meta = domain.LabMeta{}
 	}
 }
 
