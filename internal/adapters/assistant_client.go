@@ -213,6 +213,7 @@ func parseAssistantSSE(source io.Reader, emit func(domain.AssistantEvent)) error
 	name, data := "", ""
 	eventBytes, textBytes := 0, 0
 	terminal := false
+	serviceSeen := false
 	dispatch := func() error {
 		if name == "" && data == "" {
 			eventBytes = 0
@@ -221,9 +222,18 @@ func parseAssistantSSE(source io.Reader, emit func(domain.AssistantEvent)) error
 		if terminal || name == "" || data == "" {
 			return assistantProtocolError()
 		}
+		if serviceSeen && name != "tool_calls" && name != "final" && name != "error" {
+			return assistantProtocolError()
+		}
 		event, err := decodeAssistantEvent(name, []byte(strings.TrimSuffix(data, "\n")))
 		if err != nil {
 			return err
+		}
+		if name == "service_messages" {
+			if serviceSeen {
+				return assistantProtocolError()
+			}
+			serviceSeen = true
 		}
 		textBytes += len(event.Delta) + len(event.Summary)
 		if textBytes > domain.AssistantTextLimit {
@@ -294,6 +304,10 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 		target = &struct {
 			Calls []domain.AssistantToolCall `json:"calls"`
 		}{}
+	case "service_messages":
+		target = &struct {
+			Messages []domain.AssistantMessage `json:"messages"`
+		}{}
 	case "final":
 		target = &struct {
 			Summary string `json:"summary"`
@@ -321,6 +335,7 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 	required := map[string][]string{
 		"text": {"delta"}, "activity": {"text"}, "tool_calls": {"calls"}, "final": {"summary"},
 		"usage": {"inputTokens", "outputTokens"}, "error": {"code", "message"},
+		"service_messages": {"messages"},
 	}
 	for _, field := range required[name] {
 		value, exists := fields[field]
@@ -333,6 +348,7 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 		Delta        string
 		Text         string
 		Calls        []domain.AssistantToolCall
+		Messages     []domain.AssistantMessage
 		Summary      string
 		Code         string
 		Message      string
@@ -343,6 +359,7 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 		return event, assistantProtocolError()
 	}
 	event.Delta, event.Text, event.Calls, event.Summary, event.Code, event.Message, event.InputTokens, event.OutputTokens = payload.Delta, payload.Text, payload.Calls, payload.Summary, payload.Code, payload.Message, payload.InputTokens, payload.OutputTokens
+	event.Messages = payload.Messages
 	if name == "usage" && (event.InputTokens < 0 || event.OutputTokens < 0) {
 		return event, assistantProtocolError()
 	}

@@ -295,3 +295,84 @@ func TestAssistantRunnerInvalidArgumentsReturnToModel(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAssistantRunnerServiceMessages(t *testing.T) {
+	for _, mode := range []string{"local", "final", "invalid", "client-core", "error", "interrupted"} {
+		t.Run(mode, func(t *testing.T) {
+			service := []domain.AssistantMessage{
+				{Role: "assistant", ToolCalls: []domain.AssistantToolCall{{ID: "core1", Name: "read_core", Arguments: json.RawMessage(`{"path":"modules"}`)}}},
+				{Role: "tool", ToolCallID: "core1", Content: `{"coreRef":{"rev":"` + strings.Repeat("a", 40) + `","sha256":"` + strings.Repeat("b", 64) + `"}}`},
+			}
+			if mode == "invalid" {
+				service[1].ToolCallID = "wrong"
+			}
+			var steps atomic.Int32
+			var next domain.AssistantStepRequest
+			runner, conversation, store, _, _ := runnerFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v1/turns" {
+					runnerAdmit(w)
+					return
+				}
+				if strings.HasSuffix(r.URL.Path, "/cancel") {
+					w.WriteHeader(204)
+					return
+				}
+				w.Header().Set("Content-Type", "text/event-stream")
+				if steps.Add(1) == 2 {
+					if err := json.NewDecoder(r.Body).Decode(&next); err != nil {
+						t.Error(err)
+					}
+					fmt.Fprint(w, "event: final\ndata: {\"summary\":\"Ready\"}\n\n")
+					return
+				}
+				data, _ := json.Marshal(map[string]any{"messages": service})
+				fmt.Fprintf(w, "event: service_messages\ndata: %s\n\n", data)
+				switch mode {
+				case "local":
+					runnerTool(w)
+				case "error":
+					fmt.Fprint(w, "event: error\ndata: {\"code\":\"model_error\",\"message\":\"Synthetic error\"}\n\n")
+				case "interrupted":
+					return
+				case "client-core":
+					fmt.Fprint(w, "event: tool_calls\ndata: {\"calls\":[{\"id\":\"core2\",\"name\":\"read_core\",\"arguments\":{\"path\":\"\"}}]}\n\n")
+				default:
+					fmt.Fprint(w, "event: final\ndata: {\"summary\":\"Ready\"}\n\n")
+				}
+			})
+			result, err := runner.Run(t.Context(), conversation, "Synthetic request", func(domain.AssistantEvent) {})
+			if mode == "local" || mode == "final" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := 4
+				if mode == "local" {
+					expected = 6
+				}
+				if len(result.Messages) != expected || !reflect.DeepEqual(result.Messages[1:3], service) {
+					t.Fatal(result.Messages)
+				}
+				if mode == "local" && (len(next.Messages) != 5 || !reflect.DeepEqual(next.Messages[1:3], service) || next.Messages[3].ToolCalls[0].Name != "write_file" || next.Messages[4].Role != "tool") {
+					t.Fatal(next.Messages)
+				}
+				saved, saveErr := store.ReadTranscript(conversation)
+				if saveErr != nil || !reflect.DeepEqual(saved, result.Messages) {
+					t.Fatal(saved, saveErr)
+				}
+			} else {
+				var failure *domain.AssistantError
+				expected := "protocol_error"
+				if mode == "error" {
+					expected = "model_error"
+				}
+				if !errors.As(err, &failure) || failure.Code != expected || len(result.Messages) != 1 {
+					t.Fatal(result, err)
+				}
+				saved, saveErr := store.ReadTranscript(conversation)
+				if saveErr != nil || len(saved) != 1 {
+					t.Fatal("failed step retained service messages", saved, saveErr)
+				}
+			}
+		})
+	}
+}

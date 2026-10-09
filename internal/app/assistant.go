@@ -130,6 +130,8 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			return result, err
 		}
 		var terminal domain.AssistantEvent
+		var service []domain.AssistantMessage
+		invalidService := false
 		stepText := ""
 		pendingText := ""
 		flushText := func(final bool) {
@@ -166,12 +168,19 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 				flushText(false)
 			case "activity":
 				emit(event)
+			case "service_messages":
+				if !domain.ValidAssistantServiceMessages(event.Messages) {
+					invalidService = true
+					cancel()
+					return
+				}
+				service = event.Messages
 			case "tool_calls", "final", "error":
 				terminal = event
 			}
 		})
 		flushText(true)
-		if overflow {
+		if overflow || invalidService {
 			err = &domain.AssistantError{Code: "protocol_error"}
 		}
 		if err != nil {
@@ -186,6 +195,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 		}
 		switch terminal.Type {
 		case "final":
+			messages = append(messages, service...)
 			messages = append(messages, domain.AssistantMessage{Role: "assistant", Content: stepText})
 			result.Summary = terminal.Summary
 			result.Messages = messages
@@ -222,6 +232,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			for i := range terminal.Calls {
 				terminal.Calls[i].Arguments = []byte(strings.ReplaceAll(string(terminal.Calls[i].Arguments), token, "[REDACTED]"))
 			}
+			messages = append(messages, service...)
 			messages = append(messages, domain.AssistantMessage{Role: "assistant", Content: stepText, ToolCalls: terminal.Calls})
 			for _, call := range terminal.Calls {
 				emit(domain.AssistantEvent{Type: "activity", Text: assistantSafeText(assistantActivity(call), token)})

@@ -77,6 +77,7 @@ type AssistantStepRequest struct {
 
 type AssistantEvent struct {
 	Type         string
+	Messages     []AssistantMessage `json:"messages,omitempty"`
 	Delta        string
 	Text         string
 	Calls        []AssistantToolCall
@@ -85,6 +86,45 @@ type AssistantEvent struct {
 	Message      string
 	InputTokens  int
 	OutputTokens int
+}
+
+var AssistantServiceTools = []string{"read_core"}
+
+var assistantCoreHash = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+func ValidAssistantServiceMessages(messages []AssistantMessage) bool {
+	if len(messages) == 0 || len(messages) > 64 {
+		return false
+	}
+	ids := map[string]bool{}
+	for index := 0; index < len(messages); {
+		assistant := messages[index]
+		if assistant.Role != "assistant" || assistant.Content != "" || assistant.ToolCallID != "" || len(assistant.ToolCalls) == 0 {
+			return false
+		}
+		index++
+		for _, call := range assistant.ToolCalls {
+			args, err := json.Marshal(call.Arguments)
+			if call.Name != "read_core" || call.ID == "" || ids[call.ID] || err != nil || len(args) > 4096 || len(call.Arguments) == 0 || index >= len(messages) {
+				return false
+			}
+			ids[call.ID] = true
+			tool := messages[index]
+			if tool.Role != "tool" || tool.ToolCallID != call.ID || len(tool.ToolCalls) != 0 || ValidateStrictRemoteJSON([]byte(tool.Content), 1024) != nil {
+				return false
+			}
+			var fields map[string]json.RawMessage
+			if json.Unmarshal([]byte(tool.Content), &fields) != nil || len(fields) != 1 || fields["coreRef"] == nil {
+				return false
+			}
+			var reference map[string]string
+			if json.Unmarshal(fields["coreRef"], &reference) != nil || len(reference) != 2 || !assistantCoreRevision.MatchString(reference["rev"]) || !assistantCoreHash.MatchString(reference["sha256"]) {
+				return false
+			}
+			index++
+		}
+	}
+	return true
 }
 
 type AssistantError struct {

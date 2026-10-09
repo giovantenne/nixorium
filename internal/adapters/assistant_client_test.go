@@ -107,3 +107,17 @@ func TestAssistantSSEStrictSchemaAndLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAssistantSSEServiceMessageOrdering(t *testing.T) {
+	service := "event: service_messages\ndata: {\"messages\":[]}\n\n"
+	final := "event: final\ndata: {\"summary\":\"Ready\"}\n\n"
+	for _, stream := range []string{service + service + final, final + service, service + "event: text\ndata: {\"delta\":\"late\"}\n\n" + final} {
+		if err := parseAssistantSSE(strings.NewReader(stream), func(domain.AssistantEvent) {}); err == nil {
+			t.Fatal("invalid service event order accepted")
+		}
+	}
+	events := []domain.AssistantEvent{}
+	if err := parseAssistantSSE(strings.NewReader(service+final), func(event domain.AssistantEvent) { events = append(events, event) }); err != nil || len(events) != 2 || events[0].Type != "service_messages" || events[0].Messages == nil {
+		t.Fatal(events, err)
+	}
+}
