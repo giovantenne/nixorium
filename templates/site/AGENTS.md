@@ -87,8 +87,11 @@ raw clones do not contain usable account credentials.
 ## Native Assistant
 
 The optional subscription-based Assistant is a separate native operator
-workflow with a confined candidate and explicit review/save. Its availability
-does not expand this external agent's proposal-only authority. Do not drive
+workflow with a confined candidate and explicit review/save. It includes
+service-reported trial quota and purchase links, with conversion preserving
+controller activation. Annual quota exhaustion requires renewal or a manual
+agreement. Its availability does not expand this external agent's proposal-only
+authority. Do not drive
 its activation, consent, save or recovery confirmations. Host-specific private
 modules that branch on networking.hostName must declare their exceptional
 hosts in hostModules or updateValidationHosts for representative evaluation;

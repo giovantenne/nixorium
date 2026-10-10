@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	"charm.land/bubbles/v2/textarea"
@@ -26,6 +27,7 @@ type AssistantActions struct {
 	ReadConsent         func() (bool, error)
 	WriteConsent        func() error
 	Activate            func(context.Context, string) (domain.AssistantActivation, error)
+	Account             func(context.Context, string) (domain.AssistantAccount, error)
 	Cleanup             func() error
 	PrepareConversation func(string) (domain.AssistantConversation, error)
 	Run                 func(context.Context, domain.AssistantConversation, string, func(domain.AssistantEvent)) (domain.AssistantTurnResult, error)
@@ -46,12 +48,19 @@ type assistantModel struct {
 	cancel                      context.CancelFunc
 	events                      <-chan tea.Msg
 	conversation                domain.AssistantConversation
+	account                     domain.AssistantAccount
 }
 
 type assistantAccessMsg struct {
 	id      uint64
 	token   string
 	consent bool
+	err     error
+	account *domain.AssistantAccount
+}
+type assistantAccountMsg struct {
+	id      uint64
+	account *domain.AssistantAccount
 	err     error
 }
 type assistantActivationMsg struct {
@@ -99,7 +108,11 @@ func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {
 	}
 	model.screen = dashboardAssistant
 	model.message = ""
+	model.assistant.id++
 	commands := []tea.Cmd{model.assistant.input.Focus()}
+	if command := model.refreshAssistantAccount(); command != nil {
+		commands = append(commands, command)
+	}
 	if actions := model.actions.AssistantService; actions != nil && actions.Cleanup != nil {
 		commands = append(commands, func() tea.Msg { return assistantCleanupMsg{err: actions.Cleanup()} })
 	}
@@ -115,6 +128,22 @@ func (model dashboardModel) assistantAccess(ctx context.Context, id uint64, acce
 	result.token, result.err = actions.ReadToken()
 	if result.err != nil || result.token == "" {
 		return result
+	}
+	if actions.Account != nil {
+		account, err := actions.Account(ctx, result.token)
+		result.err = err
+		if err != nil {
+			return result
+		}
+		result.account = &account
+		if account.Status != "active" {
+			result.err = &domain.AssistantError{Code: "subscription_inactive", Status: 402}
+			return result
+		}
+		if account.TurnsRemaining <= 0 {
+			result.err = &domain.AssistantError{Code: "quota_exhausted", Status: 429}
+			return result
+		}
 	}
 	if accept {
 		if actions.WriteConsent == nil {
@@ -156,13 +185,16 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 	if message.id != model.assistant.id || model.screen != dashboardAssistant {
 		return model, nil
 	}
+	if message.account != nil {
+		model.assistant.account = *message.account
+	}
 	if message.err != nil {
 		if model.assistant.cancel != nil {
 			model.assistant.cancel()
 			model.assistant.cancel = nil
 		}
 		model.assistant.state = "chat"
-		model.message = assistantServiceNotice(message.err, model.actions.Assistant.SubscribeURL)
+		model.message = model.assistantNotice(message.err)
 		var serviceError *domain.AssistantError
 		if errors.As(message.err, &serviceError) {
 			switch serviceError.Code {
@@ -171,6 +203,14 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 				model.message = ""
 			case "subscription_inactive":
 				model.assistant.state = "cta-inactive"
+				model.message = ""
+			case "quota_exhausted":
+				if model.assistant.account.Plan == "trial" && model.assistant.account.Status != "" {
+					model.assistant.state = "cta-inactive"
+					if model.assistant.account.UpgradeURL != "" {
+						model.message = ""
+					}
+				}
 			case "invalid_token":
 				if actions := model.actions.AssistantService; actions != nil && actions.DeleteToken != nil {
 					if err := actions.DeleteToken(); err != nil {
@@ -179,6 +219,7 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 					}
 				}
 				model.assistant.token = ""
+				model.assistant.account = domain.AssistantAccount{}
 				model.assistant.state = "cta-none"
 			}
 		}
@@ -223,12 +264,14 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model.assistant.summary = message.result.Summary
 		}
 		if message.err != nil {
-			return model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
+			updated, _ := model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
+			model = updated.(dashboardModel)
+			return model, model.refreshAssistantAccount()
 		}
 		if model.assistant.changedFiles > 0 {
 			model.message = "Proposal ready: " + countNoun(model.assistant.changedFiles, "file") + " changed. Press Ctrl+R to review."
 		}
-		return model, nil
+		return model, model.refreshAssistantAccount()
 	}
 	event := message.event
 	event.Delta = strings.ReplaceAll(event.Delta, model.assistant.token, "[REDACTED]")
@@ -243,7 +286,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		model.assistant.summary = event.Summary
 		model.assistant.messages = append(model.assistant.messages, domain.AssistantMessage{Role: "assistant", Content: model.assistant.streamed})
 	case "error":
-		model.message = assistantServiceNotice(&domain.AssistantError{Code: event.Code}, model.actions.Assistant.SubscribeURL)
+		model.message = model.assistantNotice(&domain.AssistantError{Code: event.Code})
 	}
 	return model, model.waitAssistantStream()
 }
@@ -334,7 +377,9 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 		return model.sendAssistant(false)
 	case "ctrl+n":
 		id := model.assistant.id + 1
+		account := model.assistant.account
 		model.assistant = newAssistantModel()
+		model.assistant.account = account
 		model.assistant.id = id
 		model.message = ""
 		return model, model.assistant.input.Focus()
@@ -368,7 +413,45 @@ func (model dashboardModel) finishAssistantActivation(message assistantActivatio
 		return model, model.assistant.code.Focus()
 	}
 	model.assistant.state = "consent"
+	model.assistant.account = message.account
 	model.message = fmt.Sprintf("Assistant is active for %s.", assistantDisplayText(message.account.Name))
+	return model, model.refreshAssistantAccount()
+}
+
+func (model dashboardModel) refreshAssistantAccount() tea.Cmd {
+	actions := model.actions.AssistantService
+	if actions == nil || actions.Account == nil || actions.ReadToken == nil {
+		return nil
+	}
+	id := model.assistant.id
+	return func() tea.Msg {
+		result := assistantAccountMsg{id: id}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		token, err := actions.ReadToken()
+		result.err = err
+		if err != nil || token == "" {
+			return result
+		}
+		account, err := actions.Account(ctx, token)
+		result.err = err
+		if err == nil {
+			result.account = &account
+		}
+		return result
+	}
+}
+
+func (model dashboardModel) finishAssistantAccount(message assistantAccountMsg) (tea.Model, tea.Cmd) {
+	if message.id != model.assistant.id || model.screen != dashboardAssistant || model.assistant.state == "running" {
+		return model, nil
+	}
+	if message.account != nil {
+		model.assistant.account = *message.account
+	}
+	if message.err != nil && model.message == "" {
+		model.message = model.assistantNotice(message.err)
+	}
 	return model, nil
 }
 
@@ -408,6 +491,9 @@ func (model dashboardModel) assistantView() string {
 	start := max(0, end-max(1, model.height-19))
 	body := strings.Join(lines[start:end], "\n")
 	fixedBody := assistantDisclosure + "\n\n" + input.View()
+	if model.assistant.account.Plan == "trial" && model.assistant.account.Status != "" {
+		fixedBody = fmt.Sprintf("Free trial: %d of 5 requests left\n\n", model.assistant.account.TurnsRemaining) + fixedBody
+	}
 	actions := []tuiAction{{key: "Ctrl+S", label: "Send"}, {key: "Enter", label: "New line"}, {key: "PgUp/PgDn", label: "History"}, {key: "Ctrl+N", label: "New chat"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
 	if model.assistant.changedFiles > 0 {
 		actions = append([]tuiAction{{key: "Ctrl+R", label: "Review proposal"}}, actions...)

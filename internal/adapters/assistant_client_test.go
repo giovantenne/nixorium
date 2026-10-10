@@ -83,6 +83,39 @@ func TestAssistantClientRefusesRedirectsAndUnknownJSON(t *testing.T) {
 	}
 }
 
+func TestAssistantAccountUpgradeLink(t *testing.T) {
+	for _, test := range []struct {
+		name, plan, link string
+		invalid          bool
+	}{
+		{"trial", "trial", "/upgrade?account=" + assistantTestTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43), false},
+		{"annual", "annual", "/upgrade?account=" + assistantTestTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43), true},
+		{"foreign", "trial", "https://other.example/upgrade", true},
+		{"script", "trial", "javascript:alert(1)", true},
+		{"extra", "trial", "/upgrade?account=" + assistantTestTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43) + "&other=1", true},
+		{"duplicate", "trial", "/upgrade?account=" + assistantTestTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43) + "&sig=other", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				link := test.link
+				if strings.HasPrefix(link, "/") {
+					link = "http://" + r.Host + link
+				}
+				fmt.Fprintf(w, `{"account":{"name":"Synthetic","plan":%q,"status":"inactive","periodEnd":"2000-01-01","turnsRemaining":0,"upgradeUrl":%q}}`, test.plan, link)
+			}))
+			defer server.Close()
+			client := AssistantClient{Endpoint: server.URL + "/v1"}
+			account, err := client.Account(context.Background(), strings.Repeat("t", 43))
+			if (err != nil) != test.invalid {
+				t.Fatalf("invalid=%v err=%v", test.invalid, err)
+			}
+			if !test.invalid && (account.UpgradeURL == "" || account.Plan != "trial" || account.TurnsRemaining != 0) {
+				t.Fatal("lost trial account metadata")
+			}
+		})
+	}
+}
+
 func TestAssistantSSEStrictSchemaAndLimits(t *testing.T) {
 	for name, stream := range map[string]string{
 		"unknown event":      "event: secret\ndata: {}\n\n",

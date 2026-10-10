@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -22,6 +23,8 @@ type AssistantClient struct {
 
 var assistantTokenPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43,256}$`)
 var assistantTurnPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+var assistantUpgradeExpiryPattern = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
+var assistantUpgradeSignaturePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 
 func assistantProtocolError() error {
 	return &domain.AssistantError{Code: "protocol_error", Message: "The Assistant service returned an invalid response."}
@@ -138,7 +141,26 @@ func (client AssistantClient) Account(ctx context.Context, token string) (domain
 	if wire.Account.Status != "active" && wire.Account.Status != "inactive" {
 		return domain.AssistantAccount{}, assistantProtocolError()
 	}
+	if wire.Account.UpgradeURL != "" && (wire.Account.Plan != "trial" || !client.validUpgradeURL(wire.Account.UpgradeURL)) {
+		return domain.AssistantAccount{}, assistantProtocolError()
+	}
 	return wire.Account, nil
+}
+
+func (client AssistantClient) validUpgradeURL(value string) bool {
+	link, err := url.Parse(value)
+	base, baseErr := url.Parse(client.Endpoint)
+	if err != nil || baseErr != nil || len(value) > 2048 || link.User != nil || link.Fragment != "" || link.Opaque != "" ||
+		link.Scheme != base.Scheme || link.Host != base.Host || link.Path != "/upgrade" || link.RawPath != "" {
+		return false
+	}
+	if link.Scheme != "https" && !(link.Scheme == "http" && (link.Hostname() == "localhost" || link.Hostname() == "127.0.0.1")) {
+		return false
+	}
+	query, err := url.ParseQuery(link.RawQuery)
+	return err == nil && len(query) == 3 && len(query["account"]) == 1 && len(query["expires"]) == 1 && len(query["sig"]) == 1 &&
+		assistantTurnPattern.MatchString(query.Get("account")) && assistantUpgradeExpiryPattern.MatchString(query.Get("expires")) &&
+		assistantUpgradeSignaturePattern.MatchString(query.Get("sig"))
 }
 
 func (client AssistantClient) OpenTurn(ctx context.Context, token string) (domain.AssistantTurn, error) {

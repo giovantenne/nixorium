@@ -19,6 +19,7 @@ type AssistantAccount struct {
 	Status         string `json:"status,omitempty"`
 	PeriodEnd      string `json:"periodEnd"`
 	TurnsRemaining int    `json:"turnsRemaining,omitempty"`
+	UpgradeURL     string `json:"upgradeUrl,omitempty"`
 }
 
 type AssistantActivation struct {

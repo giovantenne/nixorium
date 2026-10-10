@@ -366,6 +366,9 @@ any shard must block publication.
 - `lab.assistant` is off by default and preserved by settings saves. Only an
   opted-in controller installs `/etc/nixorium/assistant.json` and its private
   state directory. Service and subscription URL overrides are for staging/tests.
+  Account checks send no draft or files. Trial quota and purchase links come
+  from the service; conversion preserves activation, and annual quota exhaustion
+  requires renewal or a manual agreement rather than a second subscription.
 - Assistant tools write only the private candidate, never the deployment.
   Preserve relative-path confinement, hidden credentials/untracked files and
   read-only settings/locks/instructions, plus redaction of all model-facing

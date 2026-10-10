@@ -308,6 +308,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			ReadToken: assistantStore.ReadToken, WriteToken: assistantStore.WriteToken,
 			DeleteToken: assistantStore.DeleteToken, ReadConsent: assistantStore.ReadConsent,
 			WriteConsent: assistantStore.WriteConsent, Activate: assistantClient.Activate,
+			Account: assistantClient.Account,
 			Cleanup: assistantWorkspace.Cleanup,
 			PrepareConversation: func(id string) (domain.AssistantConversation, error) {
 				return assistantWorkspace.PrepareConversation(repository, id)

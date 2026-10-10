@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Show Assistant free trial requests remaining and a signed purchase link when
+  the trial ends. Conversion keeps the controller activated; annual quota
+  exhaustion directs the administrator to support.
+
 - Assistant can consult the pinned Nixorium source through the service. The
   client keeps verifiable references in the conversation and sends the
   deployment context, including the pinned core revision, at every step.

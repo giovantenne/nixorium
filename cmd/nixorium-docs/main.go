@@ -121,6 +121,8 @@ func renderGallery() string {
 		{title: "Optional administrator Assistant", scenarioID: "assistant-menu", label: "Assistant appears only after controller opt-in"},
 		{title: "Assistant message disclosure", scenarioID: "assistant-menu", label: "Describe a customization before sending"},
 		{title: "Assistant subscription before sending", scenarioID: "assistant-menu", label: "A subscription is required before sending"},
+		{title: "Assistant free trial quota", scenarioID: "assistant-menu", label: "Check remaining free trial requests"},
+		{title: "Assistant trial conversion", scenarioID: "assistant-menu", label: "Convert a free trial without reactivating the controller"},
 		{title: "Separate Assistant consent", scenarioID: "assistant-menu", label: "Accept separate Assistant consent before sending"},
 		{title: "Assistant candidate ready", scenarioID: "assistant-menu", label: "A candidate is ready for native review"},
 		{title: "Assistant proposal review", scenarioID: "assistant-menu", label: "Review evaluated changes before saving"},

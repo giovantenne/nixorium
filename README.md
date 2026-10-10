@@ -47,6 +47,8 @@ Enable `lab.assistant` and apply the controller to add **Assistant** to the
 administrator menu. This subscription service prepares a candidate change;
 you review the files and evaluation before a local commit with a backup.
 Controller application and client updates remain separate reviewed actions.
+The free trial shows its remaining requests; subscribing keeps the controller
+activated. Each account enables one laboratory.
 See [Assistant: activation, privacy and recovery](docs/assistant.md).
 Common customization for selected clients can use `groupModules` with existing
 `clientGroups`; individual exceptions remain separately validated. See the

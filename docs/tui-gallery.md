@@ -252,6 +252,40 @@ enter the activation code shown after payment.
 a Enter activation code  ·  Esc Back to the message  ·  F1 Help
 ```
 
+## Assistant free trial quota
+
+```text
+Nixorium  /  Assistant
+
+
+Free trial: 3 of 5 requests left
+
+When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service.
+Do not enter passwords or student data.
+
+› Prepare Python with Jupyter on pc01–pc10
+›
+›
+
+Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat  ·  Esc Back  ·  F1 Help
+```
+
+## Assistant trial conversion
+
+```text
+Nixorium  /  Assistant
+
+Your free trial has ended
+
+Free trial: 0 of 5 requests left
+
+Your request was not sent. Subscribe at https://assistant.nixorium.org/upgrade?account=12345678-1234-4234-8234-
+123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+Your controller stays activated.
+
+Esc Back to the message  ·  F1 Help
+```
+
 ## Separate Assistant consent
 
 ```text

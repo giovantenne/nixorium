@@ -39,6 +39,23 @@ consent screen. Nothing from the chat is sent until you accept that consent.
 An inactive subscription returns to the renewal prompt without sending content;
 an invalid token is removed and requires activation again.
 
+The free trial includes five requests for thirty days, with one trial per email
+address. Register with your email, school name and privacy consent on the
+service's `/trial` page, then enter the code delivered by email. Before using
+the code, you can submit the form again to replace it if delivery failed.
+After activation, the screen shows **Free trial: N of 5 requests left**.
+The controller checks account metadata without sending your draft or files,
+and refreshes that count after a request.
+
+When the trial expires or its requests are used, Assistant shows a signed
+purchase link from the service. The link lasts seven days; reopening Assistant
+fetches a fresh link. Completing the subscription converts the same account
+and keeps the controller token active, so no new activation code is needed.
+An annual account has no trial purchase link: after using its included requests,
+wait for renewal or contact `hello@nixorium.org` for a manual agreement.
+Each account enables one laboratory; a replacement code for a reinstalled
+controller disables the previous token while preserving quota and period.
+
 Each admitted turn first opens through a request containing client version and
 tool version only. The subsequent steps send the conversation, visible file
 names, requested file contents and tool results to the Assistant service and

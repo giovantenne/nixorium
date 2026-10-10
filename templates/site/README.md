@@ -35,6 +35,9 @@ appears in the administrator menu. Activate it with the code shown after
 payment and accept its separate data-sharing consent. Review each proposal;
 saving creates a local commit and backup, with separate system-application
 and computer-update reviews afterwards.
+You can also activate the five-request, thirty-day free trial with its emailed
+code. Assistant shows the remaining requests and a purchase link when the trial
+ends; conversion keeps the controller activated. Each account enables one lab.
 
 Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
 for privacy, host classes, tool limits, local retention and interrupted-save
