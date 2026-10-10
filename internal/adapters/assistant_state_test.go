@@ -1,6 +1,8 @@
 package adapters
 
 import (
+	"encoding/json"
+	"github.com/giovantenne/nixorium/internal/domain"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,5 +97,59 @@ func TestAssistantStateRefusesSymlinksAndUnsafePermissions(t *testing.T) {
 	data, _ := os.ReadFile(outside)
 	if string(data) != strings.Repeat("t", 43) {
 		t.Fatal("outside file changed")
+	}
+}
+
+func TestAssistantSharingDefaultPersistenceAndConsentCompatibility(t *testing.T) {
+	store := AssistantStateStore{Directory: t.TempDir()}
+	os.Chmod(store.Directory, 0700)
+	if share, err := store.ReadSharing(); err != nil || share {
+		t.Fatal("sharing default is not false", err)
+	}
+	if err := store.WriteToken(strings.Repeat("t", 43)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteSharing(true); err == nil {
+		t.Fatal("sharing accepted without ordinary consent")
+	}
+	if err := store.WriteConsent(); err != nil {
+		t.Fatal(err)
+	}
+	original, _ := os.ReadFile(filepath.Join(store.Directory, "consent.json"))
+	for _, share := range []bool{true, false, true} {
+		if err := store.WriteSharing(share); err != nil {
+			t.Fatal(err)
+		}
+		reopened := AssistantStateStore{Directory: store.Directory}
+		if actual, err := reopened.ReadSharing(); err != nil || actual != share {
+			t.Fatal("sharing not persisted", err)
+		}
+		var before, after domain.AssistantConsent
+		json.Unmarshal(original, &before)
+		data, _ := os.ReadFile(filepath.Join(store.Directory, "consent.json"))
+		json.Unmarshal(data, &after)
+		if before.AcceptedAt != after.AcceptedAt || before.TextVersion != after.TextVersion {
+			t.Fatal("toggle changed ordinary consent")
+		}
+	}
+	// Old consent records without the optional setting remain valid and private.
+	os.WriteFile(filepath.Join(store.Directory, "consent.json"), []byte(`{"schemaVersion":1,"acceptedAt":"2026-10-10T00:00:00Z","textVersion":1}`), 0600)
+	if share, err := store.ReadSharing(); err != nil || share {
+		t.Fatal("legacy consent enabled sharing", err)
+	}
+	if accepted, err := store.ReadConsent(); err != nil || !accepted {
+		t.Fatal("legacy consent rejected", err)
+	}
+	if err := store.WriteConsentSharing(true); err != nil {
+		t.Fatal(err)
+	}
+	if share, err := store.ReadSharing(); err != nil || !share {
+		t.Fatal("checkbox choice lost", err)
+	}
+	if err := store.WriteToken(strings.Repeat("u", 43)); err != nil {
+		t.Fatal(err)
+	}
+	if share, err := store.ReadSharing(); err != nil || share {
+		t.Fatal("replacement activation inherited sharing", err)
 	}
 }

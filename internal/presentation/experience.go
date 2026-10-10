@@ -227,11 +227,17 @@ func (model dashboardModel) helpView() string {
 		case "activate":
 			lines = append(lines, "Enter Activate; Esc Cancel")
 		case "consent":
-			lines = append(lines, "Enter Accept and send; Esc Back without sending")
+			lines = append(lines, "Space Toggle sharing; Enter Accept and send; Esc Back without sending")
+		case "sharing":
+			lines = append(lines, "Enter Toggle conversation sharing; Esc Cancel")
+		case "report":
+			lines = append(lines, "Up/Down Helpful or Wrong; type an optional comment (500 characters); Enter Send report; Esc Cancel")
+		case "report-sending":
+			lines = append(lines, "Esc Cancel report submission")
 		case "running":
 			lines = append(lines, "Esc Stop; the deployment remains unchanged")
 		default:
-			lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back")
+			lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "Ctrl+P Conversation sharing; Ctrl+F Report this answer after a final response")
 		}
 		lines = append(lines, "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:

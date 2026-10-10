@@ -26,6 +26,10 @@ type AssistantActions struct {
 	DeleteToken         func() error
 	ReadConsent         func() (bool, error)
 	WriteConsent        func() error
+	WriteConsentSharing func(bool) error
+	ReadSharing         func() (bool, error)
+	WriteSharing        func(bool) error
+	Report              func(context.Context, domain.AssistantConversation, string, string) error
 	Activate            func(context.Context, string) (domain.AssistantActivation, error)
 	Account             func(context.Context, string) (domain.AssistantAccount, error)
 	Cleanup             func() error
@@ -34,6 +38,10 @@ type AssistantActions struct {
 }
 
 type assistantModel struct {
+	sharing                     bool
+	canReport                   bool
+	reportRating                int
+	reportComment               textinput.Model
 	initialized                 bool
 	changedFiles                int
 	review                      assistantReviewModel
@@ -55,12 +63,14 @@ type assistantAccessMsg struct {
 	id      uint64
 	token   string
 	consent bool
+	sharing bool
 	err     error
 	account *domain.AssistantAccount
 }
 type assistantAccountMsg struct {
 	id      uint64
 	account *domain.AssistantAccount
+	sharing *bool
 	err     error
 }
 type assistantActivationMsg struct {
@@ -96,7 +106,11 @@ func newAssistantModel() assistantModel {
 	code.CharLimit = 256
 	code.EchoMode = textinput.EchoPassword
 	code.SetWidth(60)
-	return assistantModel{initialized: true, state: "chat", input: input, code: code}
+	comment := textinput.New()
+	comment.Prompt = "› "
+	comment.Placeholder = "Optional comment"
+	comment.CharLimit = 500
+	return assistantModel{initialized: true, state: "chat", input: input, code: code, reportComment: comment}
 }
 
 func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {
@@ -146,17 +160,26 @@ func (model dashboardModel) assistantAccess(ctx context.Context, id uint64, acce
 		}
 	}
 	if accept {
-		if actions.WriteConsent == nil {
+		if actions.WriteConsent == nil && actions.WriteConsentSharing == nil {
 			result.err = errors.New("Assistant consent storage unavailable")
 			return result
 		}
-		result.err = actions.WriteConsent()
+		if actions.WriteConsentSharing != nil {
+			result.err = actions.WriteConsentSharing(model.assistant.sharing)
+		} else if !model.assistant.sharing {
+			result.err = actions.WriteConsent()
+		} else {
+			result.err = errors.New("Conversation sharing storage unavailable")
+		}
 		if result.err != nil {
 			return result
 		}
 	}
 	if actions.ReadConsent != nil {
 		result.consent, result.err = actions.ReadConsent()
+	}
+	if result.err == nil && actions.ReadSharing != nil {
+		result.sharing, result.err = actions.ReadSharing()
 	}
 	if result.err != nil || !result.consent {
 		return result
@@ -185,6 +208,7 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 	if message.id != model.assistant.id || model.screen != dashboardAssistant {
 		return model, nil
 	}
+	model.assistant.sharing = message.sharing
 	if message.account != nil {
 		model.assistant.account = *message.account
 	}
@@ -264,6 +288,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model.assistant.summary = message.result.Summary
 		}
 		if message.err != nil {
+			model.assistant.canReport = false
 			updated, _ := model.finishAssistantAccess(assistantAccessMsg{id: message.id, err: message.err})
 			model = updated.(dashboardModel)
 			return model, model.refreshAssistantAccount()
@@ -283,6 +308,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 	case "activity":
 		model.assistant.activity = event.Text
 	case "final":
+		model.assistant.canReport = true
 		model.assistant.summary = event.Summary
 		model.assistant.messages = append(model.assistant.messages, domain.AssistantMessage{Role: "assistant", Content: model.assistant.streamed})
 	case "error":
@@ -318,12 +344,17 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 			return model, model.assistant.code.Focus()
 		}
 		return model, nil
+	case "sharing", "report", "report-sending":
+		return model.updateAssistantSharingKey(key)
 	case "consent":
 		switch key.String() {
 		case "esc":
 			model.assistant.state = "chat"
 			model.message = ""
 			return model, model.assistant.input.Focus()
+		case "space":
+			model.assistant.sharing = !model.assistant.sharing
+			return model, nil
 		case "enter":
 			return model.sendAssistant(true)
 		}
@@ -371,6 +402,10 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 	case "esc":
 		model.screen = dashboardHome
 		return model, nil
+	case "ctrl+p":
+		return model.openAssistantSharing()
+	case "ctrl+f":
+		return model.openAssistantReport()
 	case "ctrl+r":
 		return model.openAssistantReview()
 	case "ctrl+s":
@@ -378,7 +413,9 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 	case "ctrl+n":
 		id := model.assistant.id + 1
 		account := model.assistant.account
+		sharing := model.assistant.sharing
 		model.assistant = newAssistantModel()
+		model.assistant.sharing = sharing
 		model.assistant.account = account
 		model.assistant.id = id
 		model.message = ""
@@ -413,6 +450,7 @@ func (model dashboardModel) finishAssistantActivation(message assistantActivatio
 		return model, model.assistant.code.Focus()
 	}
 	model.assistant.state = "consent"
+	model.assistant.sharing = false
 	model.assistant.account = message.account
 	model.message = fmt.Sprintf("Assistant is active for %s.", assistantDisplayText(message.account.Name))
 	return model, model.refreshAssistantAccount()
@@ -420,17 +458,28 @@ func (model dashboardModel) finishAssistantActivation(message assistantActivatio
 
 func (model dashboardModel) refreshAssistantAccount() tea.Cmd {
 	actions := model.actions.AssistantService
-	if actions == nil || actions.Account == nil || actions.ReadToken == nil {
+	if actions == nil || actions.ReadToken == nil {
 		return nil
 	}
 	id := model.assistant.id
 	return func() tea.Msg {
 		result := assistantAccountMsg{id: id}
+		if actions.ReadSharing != nil {
+			share, err := actions.ReadSharing()
+			if err != nil {
+				result.err = err
+				return result
+			}
+			result.sharing = &share
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		token, err := actions.ReadToken()
 		result.err = err
 		if err != nil || token == "" {
+			return result
+		}
+		if actions.Account == nil {
 			return result
 		}
 		account, err := actions.Account(ctx, token)
@@ -445,6 +494,9 @@ func (model dashboardModel) refreshAssistantAccount() tea.Cmd {
 func (model dashboardModel) finishAssistantAccount(message assistantAccountMsg) (tea.Model, tea.Cmd) {
 	if message.id != model.assistant.id || model.screen != dashboardAssistant || model.assistant.state == "running" {
 		return model, nil
+	}
+	if message.sharing != nil && model.assistant.state == "chat" {
+		model.assistant.sharing = *message.sharing
 	}
 	if message.account != nil {
 		model.assistant.account = *message.account
@@ -465,6 +517,9 @@ func assistantDisplayText(text string) string {
 }
 
 func (model dashboardModel) assistantView() string {
+	if model.assistant.state == "sharing" || model.assistant.state == "report" || model.assistant.state == "report-sending" {
+		return model.assistantSharingView()
+	}
 	if model.assistant.state == "cta-none" || model.assistant.state == "cta-inactive" || model.assistant.state == "consent" || model.assistant.state == "activate" {
 		return model.assistantGateView()
 	}
@@ -495,6 +550,10 @@ func (model dashboardModel) assistantView() string {
 		fixedBody = fmt.Sprintf("Free trial: %d of 5 requests left\n\n", model.assistant.account.TurnsRemaining) + fixedBody
 	}
 	actions := []tuiAction{{key: "Ctrl+S", label: "Send"}, {key: "Enter", label: "New line"}, {key: "PgUp/PgDn", label: "History"}, {key: "Ctrl+N", label: "New chat"}, {key: "Esc", label: "Back"}, {key: "F1", label: "Help"}}
+	actions = append([]tuiAction{{key: "Ctrl+P", label: "Conversation sharing"}}, actions...)
+	if model.assistant.canReport {
+		actions = append([]tuiAction{{key: "Ctrl+F", label: "Report answer"}}, actions...)
+	}
 	if model.assistant.changedFiles > 0 {
 		actions = append([]tuiAction{{key: "Ctrl+R", label: "Review proposal"}}, actions...)
 	}
@@ -525,6 +584,7 @@ func (model dashboardModel) startAssistantRunner() (tea.Model, tea.Cmd) {
 	id := model.assistant.id
 	actions := model.actions.AssistantService
 	conversationID := model.assistant.conversation.ID
+	model.assistant.canReport = false
 	model.assistant.streamed, model.assistant.summary = "", ""
 	model.assistant.activity = "Preparing a private configuration workspace"
 	return model, func() tea.Msg {

@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Add explicit Assistant answer reports and optional conversation sharing, off
+  by default, with redacted saved history and 90-day service retention.
+
 - Show Assistant free trial requests remaining and a signed purchase link when
   the trial ends. Conversion keeps the controller activated; annual quota
   exhaustion directs the administrator to support.

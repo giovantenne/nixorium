@@ -16,6 +16,12 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.capture("A subscription is required before sending", 2500)
 	r.model.assistant.state = "consent"
 	r.capture("Accept separate Assistant consent before sending", 2500)
+	r.model.assistant.state = "sharing"
+	r.capture("Review optional conversation sharing", 2500)
+	r.model.assistant.state = "report"
+	r.model.assistant.reportComment.SetValue("The package check was helpful.")
+	r.capture("Report an answer with whole-conversation consent", 2500)
+	r.model.assistant.reportComment.Reset()
 	r.model.assistant.state = "chat"
 	r.model.assistant.account = domain.AssistantAccount{Plan: "trial", Status: "active", TurnsRemaining: 3}
 	r.capture("Check remaining free trial requests", 2500)

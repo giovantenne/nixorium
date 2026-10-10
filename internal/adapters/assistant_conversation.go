@@ -183,3 +183,7 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 func (store AssistantWorkspaceStore) ReadConsent() (bool, error) {
 	return (AssistantStateStore{Directory: store.Directory}).ReadConsent()
 }
+
+func (store AssistantWorkspaceStore) ReadSharing() (bool, error) {
+	return AssistantStateStore(store).ReadSharing()
+}

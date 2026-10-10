@@ -28,6 +28,7 @@ type AssistantToolExecutor interface {
 	Execute(context.Context, domain.AssistantConversation, domain.AssistantToolCall) string
 }
 type AssistantTurnRunner struct {
+	Sharing *AssistantConversationReporter
 	Client  AssistantTurnClient
 	Tools   AssistantToolExecutor
 	Store   AssistantConversationStore
@@ -72,6 +73,13 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	}
 	if runner.Store == nil || runner.Client == nil || runner.Tools == nil {
 		return result, errors.New("Assistant is not configured.")
+	}
+	if runner.Sharing != nil {
+		defer func() {
+			if result.Outcome == "final" || result.Outcome == "error" {
+				runner.Sharing.ShareCompleted(conversation)
+			}
+		}()
 	}
 	token, err := runner.Store.ReadToken()
 	if err != nil {
@@ -204,6 +212,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			if err = runner.Store.WriteTranscript(conversation, messages); err != nil {
 				return result, err
 			}
+			result.Outcome = "final"
 			finished = true
 			emit(terminal)
 			return result, nil
@@ -215,6 +224,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			if err = runner.Store.WriteTranscript(conversation, messages); err != nil {
 				return result, err
 			}
+			result.Outcome = "error"
 			return result, &domain.AssistantError{Code: terminal.Code}
 		case "tool_calls":
 			if len(terminal.Calls) == 0 {

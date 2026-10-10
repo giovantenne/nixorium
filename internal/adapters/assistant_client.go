@@ -415,3 +415,30 @@ func decodeAssistantEvent(name string, data []byte) (domain.AssistantEvent, erro
 	}
 	return event, nil
 }
+
+func (client AssistantClient) ShareConversation(ctx context.Context, token, id string, payload domain.AssistantStepRequest) error {
+	if !assistantTurnPattern.MatchString(id) {
+		return assistantProtocolError()
+	}
+	response, err := client.request(ctx, "POST", "/conversations/"+id, token, payload, 15*time.Second)
+	if err != nil {
+		return err
+	}
+	return assistantResponse(response, 204, nil)
+}
+func (client AssistantClient) ReportConversation(ctx context.Context, token, id, rating, comment string, payload domain.AssistantStepRequest) error {
+	if !assistantTurnPattern.MatchString(id) || (rating != "helpful" && rating != "wrong") || len([]rune(comment)) > 500 {
+		return assistantProtocolError()
+	}
+	body := struct {
+		Conversation string `json:"conversation"`
+		Rating       string `json:"rating"`
+		Comment      string `json:"comment"`
+		domain.AssistantStepRequest
+	}{id, rating, comment, payload}
+	response, err := client.request(ctx, "POST", "/feedback", token, body, 15*time.Second)
+	if err != nil {
+		return err
+	}
+	return assistantResponse(response, 204, nil)
+}

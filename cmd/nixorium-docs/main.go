@@ -124,6 +124,8 @@ func renderGallery() string {
 		{title: "Assistant free trial quota", scenarioID: "assistant-menu", label: "Check remaining free trial requests"},
 		{title: "Assistant trial conversion", scenarioID: "assistant-menu", label: "Convert a free trial without reactivating the controller"},
 		{title: "Separate Assistant consent", scenarioID: "assistant-menu", label: "Accept separate Assistant consent before sending"},
+		{title: "Optional conversation sharing", scenarioID: "assistant-menu", label: "Review optional conversation sharing"},
+		{title: "Explicit answer report", scenarioID: "assistant-menu", label: "Report an answer with whole-conversation consent"},
 		{title: "Assistant candidate ready", scenarioID: "assistant-menu", label: "A candidate is ready for native review"},
 		{title: "Assistant proposal review", scenarioID: "assistant-menu", label: "Review evaluated changes before saving"},
 		{title: "Assistant evaluation failure", scenarioID: "assistant-menu", label: "A failed evaluation prevents saving"},

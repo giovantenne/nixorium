@@ -20,6 +20,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case assistantSaveResultMsg:
 		return model.finishAssistantSave(message)
+	case assistantReportMsg:
+		return model.finishAssistantReport(message)
 	case assistantCleanupMsg:
 		if message.err != nil && model.screen == dashboardAssistant {
 			model.message = "Could not clean expired Assistant chats. Apply the controller configuration and try again."

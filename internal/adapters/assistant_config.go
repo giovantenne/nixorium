@@ -229,12 +229,64 @@ func (store AssistantStateStore) ReadConsent() (bool, error) {
 }
 
 func (store AssistantStateStore) WriteConsent() error {
+	return store.WriteConsentSharing(false)
+}
+
+func (store AssistantStateStore) WriteConsentSharing(share bool) error {
 	root, err := store.root()
 	if err != nil {
 		return err
 	}
 	defer root.Close()
-	data, err := json.Marshal(domain.AssistantConsent{SchemaVersion: 1, AcceptedAt: time.Now().UTC().Format(time.RFC3339), TextVersion: 1})
+	data, err := json.Marshal(domain.AssistantConsent{SchemaVersion: 1, AcceptedAt: time.Now().UTC().Format(time.RFC3339), TextVersion: 1, ShareConversations: share})
+	if err != nil {
+		return err
+	}
+	return assistantWriteState(root, "consent.json", append(data, '\n'))
+}
+
+func (store AssistantStateStore) ReadSharing() (bool, error) {
+	consent, err := store.sharingConsent()
+	return consent.ShareConversations, err
+}
+func (store AssistantStateStore) sharingConsent() (domain.AssistantConsent, error) {
+	var consent domain.AssistantConsent
+	accepted, err := store.ReadConsent()
+	if err != nil || !accepted {
+		return consent, err
+	}
+	root, err := store.root()
+	if err != nil {
+		return consent, err
+	}
+	defer root.Close()
+	data, err := assistantReadState(root, "consent.json")
+	if err != nil {
+		return consent, err
+	}
+	if assistantDecodeStrict(data, &consent) != nil {
+		return domain.AssistantConsent{}, errors.New("invalid Assistant consent")
+	}
+	if _, err := time.Parse(time.RFC3339, consent.AcceptedAt); err != nil || consent.SchemaVersion != 1 || consent.TextVersion != 1 {
+		return domain.AssistantConsent{}, nil
+	}
+	return consent, nil
+}
+func (store AssistantStateStore) WriteSharing(share bool) error {
+	consent, err := store.sharingConsent()
+	if err != nil {
+		return err
+	}
+	if consent.AcceptedAt == "" {
+		return errors.New("Accept Assistant consent before changing conversation sharing.")
+	}
+	consent.ShareConversations = share
+	root, err := store.root()
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	data, err := json.Marshal(consent)
 	if err != nil {
 		return err
 	}

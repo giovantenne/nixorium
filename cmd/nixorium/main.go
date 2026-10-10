@@ -301,13 +301,15 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	assistantClient := adapters.AssistantClient{Endpoint: assistantConfig.Endpoint, Version: nixoriumVersion}
 	assistantStore := adapters.AssistantStateStore{Directory: "/var/lib/nixorium/assistant"}
 	assistantWorkspace := adapters.AssistantWorkspaceStore{Directory: assistantStore.Directory}
-	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace}, Store: assistantWorkspace, Version: nixoriumVersion}
+	assistantReporter := app.AssistantConversationReporter{Client: assistantClient, Store: assistantWorkspace, Version: nixoriumVersion}
+	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
 	actions := presentation.DashboardActions{
 		Assistant: assistantConfig,
 		AssistantService: &presentation.AssistantActions{
 			ReadToken: assistantStore.ReadToken, WriteToken: assistantStore.WriteToken,
 			DeleteToken: assistantStore.DeleteToken, ReadConsent: assistantStore.ReadConsent,
-			WriteConsent: assistantStore.WriteConsent, Activate: assistantClient.Activate,
+			WriteConsent: assistantStore.WriteConsent, WriteConsentSharing: assistantStore.WriteConsentSharing,
+			ReadSharing: assistantStore.ReadSharing, WriteSharing: assistantStore.WriteSharing, Report: assistantReporter.Report, Activate: assistantClient.Activate,
 			Account: assistantClient.Account,
 			Cleanup: assistantWorkspace.Cleanup,
 			PrepareConversation: func(id string) (domain.AssistantConversation, error) {

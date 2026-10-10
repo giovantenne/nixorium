@@ -38,6 +38,9 @@ and computer-update reviews afterwards.
 You can also activate the five-request, thirty-day free trial with its emailed
 code. Assistant shows the remaining requests and a purchase link when the trial
 ends; conversion keeps the controller activated. Each account enables one lab.
+Conversation sharing is off by default. In the chat, Ctrl+P changes it and
+Ctrl+F reports a final answer with your explicit consent. Reports and shared
+conversations are kept for 90 days.
 
 Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
 for privacy, host classes, tool limits, local retention and interrupted-save

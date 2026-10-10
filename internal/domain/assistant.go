@@ -137,9 +137,10 @@ type AssistantError struct {
 func (err *AssistantError) Error() string { return "Assistant service: " + err.Code }
 
 type AssistantConsent struct {
-	SchemaVersion int    `json:"schemaVersion"`
-	AcceptedAt    string `json:"acceptedAt"`
-	TextVersion   int    `json:"textVersion"`
+	ShareConversations bool   `json:"shareConversations"`
+	SchemaVersion      int    `json:"schemaVersion"`
+	AcceptedAt         string `json:"acceptedAt"`
+	TextVersion        int    `json:"textVersion"`
 }
 
 const AssistantTextLimit = 128 * 1024
@@ -152,6 +153,7 @@ type AssistantConversation struct {
 }
 
 type AssistantTurnResult struct {
+	Outcome  string
 	Summary  string
 	Messages []AssistantMessage
 }

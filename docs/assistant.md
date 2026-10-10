@@ -59,8 +59,8 @@ controller disables the previous token while preserving quota and period.
 Each admitted turn first opens through a request containing client version and
 tool version only. The subsequent steps send the conversation, visible file
 names, requested file contents and tool results to the Assistant service and
-its AI provider. The service does not retain prompt, file or tool-result
-content. Do not enter passwords or student data in a request.
+its AI provider. The service retains conversation content for 90 days only when you explicitly
+report an answer or enable conversation sharing. Sharing is off by default. Do not enter passwords or student data in a request.
 
 The model sees tracked files from the chat's base commit plus its own candidate
 files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
@@ -70,6 +70,23 @@ settings fields are withheld; known token formats, password hashes and private
 key material are redacted from model-facing output. The laboratory token is
 kept separate from the transcript. Logs, student homes and arbitrary files
 outside the workspace are not tool inputs.
+
+## Reports and conversation sharing
+
+The first-send consent offers **Share my conversations with Nixorium for 90 days
+to improve Assistant** (off by default; Space toggles it). In the chat,
+**Ctrl+P** opens **Conversation sharing**; Enter changes the saved setting and
+Esc cancels. Sharing uploads the complete redacted saved conversation after
+final and error responses, replacing the previous version. Upload failures
+never block a response or change its result.
+
+After a final response, **Ctrl+F** opens **Report this answer**. Choose
+**Helpful** or **Wrong** with Up/Down and optionally type up to 500 characters.
+The screen explains that sending includes the whole conversation: your
+messages, configuration contents read and check results, with passwords
+removed. Enter sends; Esc cancels. A report is retained for 90 days even when
+ongoing sharing is off. Successful submission shows **Report sent. Thank you.**
+The laboratory token authenticates requests and is kept out of their bodies.
 
 ## Tools and limits
 

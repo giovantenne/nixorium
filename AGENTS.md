@@ -366,7 +366,12 @@ any shard must block publication.
 - `lab.assistant` is off by default and preserved by settings saves. Only an
   opted-in controller installs `/etc/nixorium/assistant.json` and its private
   state directory. Service and subscription URL overrides are for staging/tests.
-  Account checks send no draft or files. Trial quota and purchase links come
+  Account checks send no draft or files. Conversation sharing defaults to false
+  and requires explicit saved consent; reports require their own whole-chat
+  disclosure and confirmation. Upload only redacted saved transcripts through
+  typed callbacks, never the laboratory token; sharing failures stay silent and
+  never block a turn. Report/share contents are kept by the service for 90 days.
+  Trial quota and purchase links come
   from the service; conversion preserves activation, and annual quota exhaustion
   requires renewal or a manual agreement rather than a second subscription.
 - Assistant tools write only the private candidate, never the deployment.

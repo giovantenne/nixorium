@@ -236,7 +236,8 @@ Do not enter passwords or student data.
 ›
 ›
 
-Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat  ·  Esc Back  ·  F1 Help
+Ctrl+P Conversation sharing  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat
+Esc Back  ·  F1 Help
 ```
 
 ## Assistant subscription before sending
@@ -267,7 +268,8 @@ Do not enter passwords or student data.
 ›
 ›
 
-Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat  ·  Esc Back  ·  F1 Help
+Ctrl+P Conversation sharing  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat
+Esc Back  ·  F1 Help
 ```
 
 ## Assistant trial conversion
@@ -295,10 +297,44 @@ Before you send
 
 Your messages, and the configuration files the assistant reads, are sent to
 the Nixorium Assistant service and to its AI provider to prepare a proposal.
-The service does not keep their content. Passwords and private keys in your
-deployment are never sent. Logs and student files are never read.
+The service keeps their content only if you report an answer or turn on
+sharing below. Passwords and private keys in your deployment are never sent.
+Logs and student files are never read.
 
-Enter Accept and send  ·  Esc Back
+[ ] Share my conversations with Nixorium for 90 days to improve Assistant
+
+Space Toggle sharing  ·  Enter Accept and send  ·  Esc Back
+```
+
+## Optional conversation sharing
+
+```text
+Nixorium  /  Assistant
+
+Conversation sharing
+
+[ ] Share my conversations with Nixorium for 90 days to improve Assistant
+
+Enter Toggle sharing  ·  Esc Cancel  ·  F1 Help
+```
+
+## Explicit answer report
+
+```text
+Nixorium  /  Assistant
+
+Report this answer
+
+This sends this whole conversation (your messages, the configuration contents Assistant read and its check
+results, with passwords removed) to Nixorium. It is kept for 90 days.
+
+› Helpful
+  Wrong
+
+Comment (optional, max 500 characters)
+› The package check was helpful.
+
+↑/↓ Rating  ·  Enter Send  ·  Esc Cancel  ·  F1 Help
 ```
 
 ## Assistant candidate ready
@@ -317,8 +353,8 @@ Do not enter passwords or student data.
 
 ○ Proposal ready: 1 file changed. Press Ctrl+R to review.
 
-Ctrl+R Review proposal  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat  ·  Esc Back
-F1 Help
+Ctrl+R Review proposal  ·  Ctrl+P Conversation sharing  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History
+Ctrl+N New chat  ·  Esc Back  ·  F1 Help
 ```
 
 ## Assistant proposal review

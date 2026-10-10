@@ -10,7 +10,7 @@ import (
 
 const assistantDisclosure = "When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service. Do not enter passwords or student data."
 const assistantNetworkNotice = "The Assistant service could not be reached. Check the controller's Internet connection and try again."
-const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service does not keep their content. Passwords and private keys in your\ndeployment are never sent. Logs and student files are never read."
+const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service keeps their content only if you report an answer or turn on\nsharing below. Passwords and private keys in your deployment are never sent.\nLogs and student files are never read."
 
 func assistantServiceNotice(err error, subscribeURL string) string {
 	if err != nil {
@@ -60,8 +60,8 @@ func (model dashboardModel) assistantGateView() string {
 			actions = []tuiAction{{key: "Esc", label: "Back to the message"}, {key: "F1", label: "Help"}}
 		}
 	case "consent":
-		title, body = "Before you send", assistantConsentText
-		actions = []tuiAction{{key: "Enter", label: "Accept and send"}, {key: "Esc", label: "Back"}}
+		title, body = "Before you send", assistantConsentText+"\n\n"+model.assistantSharingCheckbox()
+		actions = []tuiAction{{key: "Space", label: "Toggle sharing"}, {key: "Enter", label: "Accept and send"}, {key: "Esc", label: "Back"}}
 	case "activate":
 		title = "Activate Assistant"
 		code := model.assistant.code
