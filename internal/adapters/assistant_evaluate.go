@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/giovantenne/nixorium/internal/domain"
+	"golang.org/x/sys/unix"
 )
 
 type assistantHostClass struct {
@@ -28,6 +30,41 @@ type assistantNixRunner func(context.Context, int, ...string) (string, error)
 type assistantBaseEvaluationCache struct {
 	Output string            `json:"output"`
 	Paths  map[string]string `json:"paths"`
+}
+type assistantCandidateEvaluationCache struct {
+	Digest string            `json:"digest"`
+	Output string            `json:"output"`
+	Paths  map[string]string `json:"paths"`
+}
+
+func assistantOverlayDigest(w *AssistantWorkspace) (string, error) {
+	paths := make([]string, 0, len(w.modes)+len(w.deleted))
+	for path := range w.modes {
+		if !w.deleted[path] {
+			paths = append(paths, path)
+		}
+	}
+	for path := range w.deleted {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	digest := sha256.New()
+	for _, path := range paths {
+		if w.deleted[path] {
+			fmt.Fprintf(digest, "%s\x00deleted\n", path)
+			continue
+		}
+		data, err := w.raw(path)
+		if err != nil {
+			return "", err
+		}
+		mode := "0644"
+		if w.modes[path] {
+			mode = "0755"
+		}
+		fmt.Fprintf(digest, "%s\x00%s\x00%x\n", path, mode, sha256.Sum256(data))
+	}
+	return fmt.Sprintf("%x", digest.Sum(nil)), nil
 }
 
 var assistantHostName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
@@ -46,6 +83,9 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 			err = ctx.Err()
 		}
 		if err != nil {
+			if removeErr := unix.Unlinkat(int(w.root.Fd()), "candidate-drv-v25.json", 0); removeErr != nil && !errors.Is(removeErr, unix.ENOENT) {
+				err = errors.Join(err, removeErr)
+			}
 			result.OK = false
 			result.Error = assistantEvaluationError(err.Error())
 		}
@@ -220,6 +260,17 @@ func evaluateAssistantCandidate(ctx context.Context, w *AssistantWorkspace, run 
 		result.ChangedHosts = append(result.ChangedHosts, host)
 	}
 	sort.Strings(result.ChangedHosts)
+	digest, err := assistantOverlayDigest(w)
+	if err != nil {
+		return result, err
+	}
+	data, err = json.Marshal(assistantCandidateEvaluationCache{Digest: digest, Output: cache.Output, Paths: candidatePaths})
+	if err != nil {
+		return result, err
+	}
+	if err = assistantWriteState(w.root, "candidate-drv-v25.json", data); err != nil {
+		return result, err
+	}
 	result.OK = true
 	return result, nil
 }
