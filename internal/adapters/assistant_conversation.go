@@ -169,6 +169,8 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 		} else {
 			result = assistantToolResult(map[string]any{"ok": true, "changedHosts": evaluation.ChangedHosts})
 		}
+	case "build":
+		result = BuildAssistantCandidate(ctx, workspace, runBoundedCommand)
 	default:
 		result = AssistantFileTools{}.Execute(ctx, workspace, call)
 	}

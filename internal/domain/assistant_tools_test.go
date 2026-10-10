@@ -35,6 +35,7 @@ func TestAssistantToolArguments(t *testing.T) {
 		{"read_file", `{"path":"flake.nix"}`, true}, {"read_file", `{"path":"flake.nix","limit":65536}`, true}, {"read_file", `{"path":"flake.nix","offset":-1}`, false}, {"read_file", `{"path":"flake.nix","limit":65537}`, false},
 		{"write_file", `{"path":"x","content":""}`, true}, {"write_file", `{"path":"x","content":"x","executable":"true"}`, false}, {"list_files", `{}`, true}, {"evaluate", `{}`, true}, {"evaluate", `{"command":"bash"}`, false}, {"bash", `{}`, false},
 		{"read_file", `{"path":"a","path":"b"}`, false}, {"read_file", `{"path":"a","\u0070ath":"b"}`, false}, {"read_file", `{"path":null}`, false}, {"read_file", `{"path":"x","offset":1.5}`, false},
+		{"build", `{}`, true}, {"build", `{"command":"bash"}`, false},
 	} {
 		if got := ValidateAssistantArguments(test.name, []byte(test.args)); got != test.valid {
 			t.Fatalf("%s %s: %v", test.name, test.args, got)

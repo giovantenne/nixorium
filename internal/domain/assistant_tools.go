@@ -27,6 +27,7 @@ func AssistantToolsV1() []AssistantToolDefinition {
 		definition("delete_file", map[string]any{"path": str}, []string{"path"}),
 		definition("search_packages", map[string]any{"query": str}, []string{"query"}),
 		definition("evaluate", map[string]any{}, []string{}),
+		definition("build", map[string]any{}, []string{}),
 	}
 }
 func ValidateAssistantArguments(name string, data []byte) bool {

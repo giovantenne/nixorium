@@ -114,5 +114,14 @@
       "required": [],
       "type": "object"
     }
+  },
+  {
+    "name": "build",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "required": [],
+      "type": "object"
+    }
   }
 ]
