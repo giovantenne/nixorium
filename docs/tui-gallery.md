@@ -345,6 +345,8 @@ Saving is not available: the proposal does not evaluate. Return to the chat and 
 Nixorium  /  Assistant  /  Proposal
 
 Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Nothing was built or activated.
+Try it on one computer first: Computers → Update computers, select a single computer, check it, then update the
+others.
 
 Enter Apply to this controller  ·  Esc Chat  ·  F1 Help
 ```

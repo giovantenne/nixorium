@@ -219,6 +219,7 @@ func (model dashboardModel) helpView() string {
 		}
 	case dashboardAssistantReview:
 		lines = append(lines, "Arrows, PgUp/PgDn and Home/End scroll the full comparison.", "Type SAVE and Enter only after a successful Nix evaluation; Esc returns to the chat.", "Saving records a local commit and a backup. Controller application and computer updates require separate reviews.")
+		lines = append(lines, "After saving, update one computer first and check it before the others.")
 	case dashboardAssistant:
 		switch model.assistant.state {
 		case "cta-none", "cta-inactive":

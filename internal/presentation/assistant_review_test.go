@@ -94,6 +94,16 @@ func TestAssistantReviewSaveAndFollowup(t *testing.T) {
 	if !strings.Contains(m.View().Content, "Apply to this controller") || !strings.Contains(m.View().Content, "Backup:") {
 		t.Fatal(m.View().Content)
 	}
+	view := strings.Join(strings.Fields(demoANSI.ReplaceAllString(m.View().Content, "")), " ")
+	for _, want := range []string{"Nothing was built or activated.", "Try it on one computer first: Computers → Update computers, select a single computer, check it, then update the others."} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("saved proposal lacks field verification guidance %q: %s", want, view)
+		}
+	}
+	help := strings.Join(strings.Fields(demoANSI.ReplaceAllString(m.helpView(), "")), " ")
+	if !strings.Contains(help, "After saving, update one computer first and check it before the others.") {
+		t.Fatal("proposal help lacks field verification guidance", help)
+	}
 	updated, cmd = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
 	if cmd == nil || !m.controller.fromSave || m.controller.saveOrigin != dashboardAssistantReview {

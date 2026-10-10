@@ -138,7 +138,7 @@ func (model dashboardModel) assistantReviewView() string {
 	case r.result.State != "":
 		body = r.result.Message
 		if r.result.State == "saved" && !r.result.RecoveryRequired {
-			body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". Nothing was built or activated."
+			body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". Nothing was built or activated.\nTry it on one computer first: Computers → Update computers, select a single computer, check it, then update the others."
 		} else if r.result.BackupRef != "" {
 			body += "\nBackup: " + r.result.BackupRef
 		}

@@ -119,6 +119,7 @@
               send("SAVE\r")
               wait("Saved in a local commit. Backup:")
               wait("Nothing was built or activated.")
+              wait("Try it on one computer first:")
               send("\x1b")
               time.sleep(0.3)
               send("\x1b")
