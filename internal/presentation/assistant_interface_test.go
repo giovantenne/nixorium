@@ -94,6 +94,7 @@ func TestAssistantInputCommandsExamplesAndPaste(t *testing.T) {
 			t.Fatal("retired shortcut active")
 		}
 	}
+	assistantEnableCommands(&m)
 	m.assistant.input.SetValue("/")
 	updated, _ = m.Update(keyPress("down"))
 	m = updated.(dashboardModel)
@@ -104,6 +105,7 @@ func TestAssistantInputCommandsExamplesAndPaste(t *testing.T) {
 	if m.assistant.input.Value() != "" || m.assistant.state != "chat" {
 		t.Fatal("Enter should run the command chosen with the arrows")
 	}
+	assistantEnableCommands(&m)
 	m.assistant.input.SetValue("/")
 	updated, _ = m.Update(keyPress("down"))
 	m = updated.(dashboardModel)
@@ -305,6 +307,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					required = append(required, "Free trial ended", "Your free trial has ended", "Keep this draft", "/code")
 				case "commands":
 					m.assistant.state = "chat"
+					assistantEnableCommands(&m)
 					m.assistant.input.SetValue("/")
 					required = append(required, "/share", "/report", "/code")
 				case "chat":
@@ -392,5 +395,16 @@ func TestAssistantInlineAccountAndNetworkWarningsKeepDraft(t *testing.T) {
 	m = updated.(dashboardModel)
 	if token, _ := store.ReadToken(); token != "" || m.assistant.state != "welcome" || m.assistant.input.Value() != "Synthetic private request" {
 		t.Fatal("invalid activation not removed")
+	}
+}
+
+// assistantEnableCommands puts the chat in a state where every command applies.
+func assistantEnableCommands(m *dashboardModel) {
+	m.assistant.changedFiles = 1
+	m.assistant.canReport = true
+	m.assistant.token = flowToken
+	m.assistant.account.Plan = "annual"
+	if len(m.assistant.entries) == 0 {
+		m.assistant.entries = []assistantEntry{{role: "user", text: "Question"}}
 	}
 }

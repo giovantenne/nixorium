@@ -32,6 +32,7 @@ func TestAssistantBillingCommandShowsLinkOrTrialNoticeWithoutRequest(t *testing.
 				return link, nil
 			}
 			m.assistant.account.TurnsRemaining = 5
+			m.assistant.account.Plan, m.assistant.token = "annual", flowToken
 			m.assistant.messages = []domain.AssistantMessage{{Role: "user", Content: "Previous question"}}
 			m.assistant.entries = []assistantEntry{{role: "user", text: "Previous question"}}
 			m.assistant.input.SetValue("/billing")

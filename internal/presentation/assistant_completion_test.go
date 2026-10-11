@@ -58,6 +58,7 @@ func TestAssistantCompleteHelpAndScrolling(t *testing.T) {
 
 func TestAssistantExplanations(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("render sent HTTP") })
+	assistantEnableCommands(&m)
 	m.assistant.input.SetValue("/")
 	view := ansi.Strip(m.View().Content)
 	for _, want := range []string{"/review  Review the current proposal and save it.", "/save  Same as /review: opens the review to save the proposal.", "/new  Start a new chat.", "/report  Tell us one answer was helpful or wrong.", "/share  Turn automatic sharing on or off (off by default).", "/code  Enter an activation code (for example after subscribing).", "/help  Show this help."} {

@@ -14,7 +14,7 @@ var assistantExamples = []string{
 	"Block the Internet on pc01–pc06 every Tuesday 10–12",
 	"pc03 still shows the old wallpaper: what is wrong?",
 }
-var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/code", "/help"}
+var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/code"}
 
 type assistantOfferMsg struct {
 	id    uint64
@@ -82,6 +82,36 @@ func (model dashboardModel) finishAssistantConsent(message assistantConsentMsg) 
 	model.message = ""
 	return model, model.assistant.input.Focus()
 }
+
+// commandAvailable says whether a command applies to the chat right now and,
+// when it does not, why. Unknown commands are reported as available so the
+// caller keeps its own "Unknown command" text.
+func (model assistantModel) commandAvailable(command string) (bool, string) {
+	switch command {
+	case "/review", "/save":
+		if model.changedFiles <= 0 {
+			return false, "No proposal to review yet. Ask Assistant for a change first."
+		}
+	case "/report":
+		if !model.canReport {
+			return false, "/report becomes available after Assistant answers."
+		}
+	case "/new":
+		if len(model.entries) == 0 && len(model.messages) == 0 {
+			return false, "This chat is already empty."
+		}
+	case "/billing":
+		if model.token == "" || model.account.Plan == "" || model.account.Plan == "trial" {
+			return false, "/billing becomes available after subscribing."
+		}
+	}
+	return true, ""
+}
+
+func (model dashboardModel) assistantCommandAvailable(command string) (bool, string) {
+	return model.assistant.commandAvailable(command)
+}
+
 func (model assistantModel) commandChoices() []string {
 	draft := model.input.Value()
 	if !strings.HasPrefix(draft, "/") || strings.ContainsAny(draft, " \n\t") {
@@ -89,7 +119,7 @@ func (model assistantModel) commandChoices() []string {
 	}
 	choices := []string{}
 	for _, command := range assistantCommands {
-		if strings.HasPrefix(command, draft) {
+		if ok, _ := model.commandAvailable(command); ok && strings.HasPrefix(command, draft) {
 			choices = append(choices, command)
 		}
 	}
@@ -108,6 +138,11 @@ func (model dashboardModel) newAssistantChat() (tea.Model, tea.Cmd) {
 	return model, model.assistant.input.Focus()
 }
 func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd) {
+	if ok, why := model.assistantCommandAvailable(command); !ok {
+		model.assistant.input.Reset()
+		model.message = why
+		return model, nil
+	}
 	switch command {
 	case "/review", "/save":
 		model.assistant.input.Reset()
@@ -292,6 +327,10 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 		model.screen = dashboardHome
 		return model, nil
 	case "ctrl+r":
+		if ok, why := model.assistantCommandAvailable("/review"); !ok {
+			model.message = why
+			return model, nil
+		}
 		return model.openAssistantReview()
 	case "ctrl+n":
 		return model.newAssistantChat()
