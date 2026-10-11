@@ -88,7 +88,7 @@ A full disk clone that also preserves machine-id needs `disable` followed by
 an explicit `enable` on the independent controller. Do not enable telemetry on
 cloned test systems unless you intend to include them in the adoption counts.
 
-The collection is operated by Claudio Benvenuti, the Nixorium maintainer.
+The collection is operated by HardyPress SRL, the company of the Nixorium maintainer.
 For privacy requests, contact [hello@nixorium.org](mailto:hello@nixorium.org).
 Its purpose is to understand adoption and lab sizes and prioritize development.
 
