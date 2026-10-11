@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -89,5 +90,24 @@ func TestAssistantActiveAnnualAccountNeverTicks(t *testing.T) {
 	}
 	if updated.(dashboardModel).message != "unrelated" {
 		t.Fatal("unrelated message changed")
+	}
+}
+
+func TestAssistantActiveTrialWithRequestsNeverTicks(t *testing.T) {
+	account := domain.AssistantAccount{Plan: "trial", Status: "active", TurnsRemaining: 3}
+	m := tickFixture(t, &account)
+	if _, command := m.finishAssistantAccount(assistantAccountMsg{id: m.assistant.id, token: flowToken, account: &account}); command != nil {
+		t.Fatal("active trial with requests left scheduled a tick")
+	}
+}
+
+func TestAssistantSubscriptionNoticeRendersAsSuccess(t *testing.T) {
+	account := domain.AssistantAccount{Plan: "annual", Status: "active", TurnsRemaining: 1000}
+	m := tickFixture(t, &account)
+	m.width, m.height = 120, 30
+	m.message = "Subscription active · 1000 requests per year."
+	view := m.View().Content
+	if !strings.Contains(view, "✓ Subscription active · 1000 requests per year.") || strings.Contains(view, "! Subscription active") {
+		t.Fatal("subscription notice not rendered as success")
 	}
 }

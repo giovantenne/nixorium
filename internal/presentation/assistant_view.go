@@ -447,7 +447,11 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 		}
 	}
 	if model.message != "" {
-		lines = append(lines, model.assistantBox("! "+model.message, width, tuiStatusAttention))
+		if strings.HasPrefix(model.message, "Subscription active · ") {
+			lines = append(lines, model.assistantBox("✓ "+model.message, width, tuiStatusSuccess))
+		} else {
+			lines = append(lines, model.assistantBox("! "+model.message, width, tuiStatusAttention))
+		}
 	}
 	body := lipgloss.NewStyle().Width(width).Render(assistantLinkify(strings.Join(lines, "\n")))
 	bodyLines = strings.Split(body, "\n")

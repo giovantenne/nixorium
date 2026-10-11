@@ -524,7 +524,7 @@ func (model *dashboardModel) scheduleAssistantAccountTick() tea.Cmd {
 	if model.screen != dashboardAssistant || model.assistant.state != "chat" || model.assistant.token == "" {
 		return nil
 	}
-	if account.Plan != "trial" && account.Status == "active" && account.TurnsRemaining > 0 {
+	if account.Status == "active" && account.TurnsRemaining > 0 {
 		return nil
 	}
 	model.assistant.accountTickID++
