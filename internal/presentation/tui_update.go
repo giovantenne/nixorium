@@ -1188,6 +1188,14 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			model.assistant.input, command = model.assistant.input.Update(message)
 			return model, command
 		}
+		// Activation codes are usually pasted from the email: accept the paste,
+		// without surrounding spaces or line breaks.
+		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardAssistant &&
+			!model.helpOpen && model.assistant.state == "activate" {
+			var command tea.Cmd
+			model.assistant.code, command = model.assistant.code.Update(tea.PasteMsg{Content: strings.TrimSpace(paste.Content)})
+			return model, command
+		}
 		if model.busy != "" {
 			if _, pasted := message.(tea.PasteMsg); pasted {
 				model.message = "Text cannot be changed while work is running. Use the available actions below."

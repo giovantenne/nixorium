@@ -177,7 +177,12 @@ func TestAssistantWelcomeOfferActivationConsentAndReopen(t *testing.T) {
 	m.actions.AssistantService.Activate = func(context.Context, string) (domain.AssistantActivation, error) {
 		return domain.AssistantActivation{Token: flowToken, Account: domain.AssistantAccount{Name: "Synthetic lab", Plan: "trial", Status: "active", TurnsRemaining: 5, PeriodEnd: "2099-01-01"}}, nil
 	}
-	m.assistant.code.SetValue("synthetic")
+	// The code arrives by email: a terminal paste fills the field, trimmed.
+	updated, _ = m.Update(tea.PasteMsg{Content: "  synthetic\n"})
+	m = updated.(dashboardModel)
+	if got := m.assistant.code.Value(); got != "synthetic" {
+		t.Fatalf("pasted activation code = %q", got)
+	}
 	updated, cmd := m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(cmd())
