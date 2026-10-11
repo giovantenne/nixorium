@@ -29,7 +29,7 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.model.assistant.account = domain.AssistantAccount{Name: "Example laboratory", Plan: "trial", Status: "active", TurnsRemaining: 3}
 	r.capture("Check remaining free trial requests", 2500)
 	r.model.assistant.account.TurnsRemaining = 0
-	r.model.assistant.account.UpgradeURL = "https://assistant.nixorium.org/upgrade?account=12345678-1234-4234-8234-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	r.model.assistant.account.UpgradeURL = "https://assistant.nixorium.org/u/EjRWeJASNEjRWeJASNEjRWeJASNEjRWeJASNEjRW"
 	r.model.assistant.state = "chat"
 	r.model.message = r.model.assistantNotice(&domain.AssistantError{Code: "quota_exhausted"})
 	r.capture("Convert a free trial without reactivating the controller", 2500)

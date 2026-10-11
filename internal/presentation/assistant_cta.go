@@ -48,10 +48,10 @@ func (model dashboardModel) assistantNotice(err error) string {
 		switch serviceError.Code {
 		case "subscription_inactive", "quota_exhausted":
 			if account.Plan == "trial" {
-				return "Your free trial has ended. Subscribe to continue: " + account.UpgradeURL + ". This controller stays activated. Type /code to enter a new activation code."
+				return "Your free trial has ended. Subscribe to continue:\n" + account.UpgradeURL + "\nThis controller stays activated. Type /code to enter a new activation code."
 			}
 			if serviceError.Code == "subscription_inactive" {
-				return "Your subscription is not active. Renew at " + model.actions.Assistant.SubscribeURL + ", or type /code to enter a new activation code."
+				return "Your subscription is not active. Renew at:\n" + model.actions.Assistant.SubscribeURL + "\nOr type /code to enter a new activation code."
 			}
 			return "All requests for this year are used. They renew on " + assistantDisplayText(account.PeriodEnd) + ". Questions: hello@nixorium.org"
 		}

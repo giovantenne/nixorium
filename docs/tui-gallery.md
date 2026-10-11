@@ -302,9 +302,9 @@ Try asking, for example:
   Block the Internet on pc01–pc06 every Tuesday 10–12
   pc03 still shows the old wallpaper: what is wrong?
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ! Your free trial has ended. Subscribe to continue: https://assistant.nixorium.org/upgrade?account=12345678-     │
-│ 1234-4234-8234-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA. This controller  │
-│ stays activated. Type /code to enter a new activation code.                                                      │
+│ ! Your free trial has ended. Subscribe to continue:                                                              │
+│ https://assistant.nixorium.org/u/EjRWeJASNEjRWeJASNEjRWeJASNEjRWeJASNEjRW                                        │
+│ This controller stays activated. Type /code to enter a new activation code.                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 

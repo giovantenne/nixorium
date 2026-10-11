@@ -95,7 +95,7 @@ func TestAssistantTrialAccountAndPurchaseGate(t *testing.T) {
 }
 
 func TestAssistantTrialLayoutsAndStaleAccount(t *testing.T) {
-	link := "https://assistant.nixorium.org/upgrade?account=" + flowTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43)
+	link := "https://assistant.nixorium.org/u/" + strings.Repeat("A", 40)
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
 		for _, dark := range []bool{false, true} {
 			m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("render made HTTP request") })
@@ -142,5 +142,22 @@ func TestAssistantAccountRefreshAfterTurnAndConversion(t *testing.T) {
 	m = updated.(dashboardModel)
 	if strings.Contains(m.View().Content, "Free trial ·") {
 		t.Fatal("converted account still shows trial")
+	}
+}
+
+func TestAssistantTrialEndedLinkStaysOnOneLine(t *testing.T) {
+	link := "https://assistant.nixorium.org/u/" + strings.Repeat("A", 40)
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("render made HTTP request") })
+	m.assistant.account = domain.AssistantAccount{Plan: "trial", Status: "inactive", UpgradeURL: link}
+	notice := m.assistantNotice(&domain.AssistantError{Code: "quota_exhausted"})
+	rendered := ansi.Strip(m.assistantBox("! "+notice, 80, tuiStatusAttention))
+	found := false
+	for _, line := range strings.Split(rendered, "\n") {
+		if strings.Contains(line, link) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("upgrade link broken across lines:\n%s", rendered)
 	}
 }
