@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -66,6 +67,7 @@ type assistantModel struct {
 	token                        string
 	historyScroll                int
 	id                           uint64
+	accountTickID                uint64
 	cancel                       context.CancelFunc
 	events                       <-chan tea.Msg
 	conversation                 domain.AssistantConversation
@@ -95,6 +97,10 @@ type assistantAccountMsg struct {
 	sharing *bool
 	err     error
 }
+type assistantAccountTickMsg struct{ id uint64 }
+
+const assistantAccountTickInterval = 15 * time.Second
+
 type assistantActivationMsg struct {
 	sharing bool
 	id      uint64
@@ -469,6 +475,17 @@ func (model dashboardModel) finishAssistantAccount(message assistantAccountMsg) 
 		model.assistant.token = message.token
 	}
 	if message.account != nil {
+		next := *message.account
+		if next.Status == "active" && next.TurnsRemaining > 0 {
+			previous := model.assistant.account
+			held := model.message == model.assistantNotice(&domain.AssistantError{Code: "quota_exhausted"}) ||
+				model.message == model.assistantNotice(&domain.AssistantError{Code: "subscription_inactive"})
+			if previous.Plan == "trial" && next.Plan != "trial" {
+				model.message = "Subscription active · " + strconv.Itoa(next.TurnsRemaining) + " requests per year."
+			} else if held {
+				model.message = ""
+			}
+		}
 		if model.assistant.accessError != "" && message.account.Status == "active" && message.account.TurnsRemaining > 0 {
 			model.message = ""
 		}
@@ -498,7 +515,28 @@ func (model dashboardModel) finishAssistantAccount(message assistantAccountMsg) 
 	if message.err != nil && model.message == "" {
 		model.message = model.assistantNotice(message.err)
 	}
-	return model, nil
+	cmd := model.scheduleAssistantAccountTick()
+	return model, cmd
+}
+
+func (model *dashboardModel) scheduleAssistantAccountTick() tea.Cmd {
+	account := model.assistant.account
+	if model.screen != dashboardAssistant || model.assistant.state != "chat" || model.assistant.token == "" {
+		return nil
+	}
+	if account.Plan != "trial" && account.Status == "active" && account.TurnsRemaining > 0 {
+		return nil
+	}
+	model.assistant.accountTickID++
+	id := model.assistant.accountTickID
+	return tea.Tick(assistantAccountTickInterval, func(time.Time) tea.Msg { return assistantAccountTickMsg{id: id} })
+}
+
+func (model dashboardModel) finishAssistantAccountTick(message assistantAccountTickMsg) (tea.Model, tea.Cmd) {
+	if message.id != model.assistant.accountTickID || model.screen != dashboardAssistant || model.assistant.state == "running" {
+		return model, nil
+	}
+	return model, model.refreshAssistantAccount()
 }
 
 func assistantDisplayText(text string) string {

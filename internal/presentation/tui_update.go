@@ -51,6 +51,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.finishAssistantAccess(message)
 	case assistantAccountMsg:
 		return model.finishAssistantAccount(message)
+	case assistantAccountTickMsg:
+		return model.finishAssistantAccountTick(message)
 	case assistantActivationMsg:
 		return model.finishAssistantActivation(message)
 	case assistantStreamMsg:
