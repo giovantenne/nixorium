@@ -5,7 +5,7 @@ from pathlib import Path
 
 TOKEN = "synthetic_assistant_vm_token_" + "x" * 32
 TURN = "00000000-0000-4000-8000-000000000001"
-ACCOUNT = {"name": "VM laboratory", "plan": "test", "periodEnd": "2099-12-31"}
+ACCOUNT = {"name": "VM laboratory", "plan": "trial", "status": "active", "turnsRemaining": 5, "periodEnd": "2099-12-31"}
 LOG = Path("/tmp/fake-requests.log")
 
 
@@ -37,9 +37,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self.record({})
+        if self.path == "/v1/offer":
+            self.respond(200, {"priceText": "360 € + VAT per lab / year", "trialRequests": 5, "trialUrl": "https://example.invalid/trial", "subscribeUrl": "https://example.invalid/assistant/"})
+            return
         if self.authenticated():
             if self.path == "/v1/account":
-                self.respond(200, {"account": ACCOUNT | {"status": "active", "turnsRemaining": 42}})
+                self.respond(200, {"account": ACCOUNT})
             else:
                 self.error(404, "turn_not_found")
 

@@ -311,6 +311,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			WriteConsent: assistantStore.WriteConsent, WriteConsentSharing: assistantStore.WriteConsentSharing,
 			ReadSharing: assistantStore.ReadSharing, WriteSharing: assistantStore.WriteSharing, Report: assistantReporter.Report, Activate: assistantClient.Activate,
 			Account: assistantClient.Account,
+			Offer:   assistantClient.Offer,
 			Cleanup: assistantWorkspace.Cleanup,
 			PrepareConversation: func(id string) (domain.AssistantConversation, error) {
 				return assistantWorkspace.PrepareConversation(repository, id)

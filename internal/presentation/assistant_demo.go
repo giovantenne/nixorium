@@ -10,12 +10,14 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Assistant appears only after controller opt-in", 1200)
 	r.pressAndCapture(demoText(assistantTask.shortcut), "Open Assistant", 1200)
-	r.model.assistant.input.SetValue("Prepare Python with Jupyter on pc01–pc10")
-	r.capture("Describe a customization before sending", 2500)
-	r.model.assistant.state = "cta-none"
-	r.capture("A subscription is required before sending", 2500)
+	r.model.assistant.offer = domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 5, TrialURL: "https://assistant.nixorium.org/trial", SubscribeURL: "https://nixorium.org/assistant/"}
+	r.model.assistant.state = "welcome"
+	r.capture("Choose a free trial, activation code or subscription", 2500)
+	r.model.assistant.state = "activate"
+	r.model.assistant.activationLink = r.model.assistant.offer.TrialURL
+	r.capture("Register for a free trial and enter its emailed code", 2500)
 	r.model.assistant.state = "consent"
-	r.capture("Accept separate Assistant consent before sending", 2500)
+	r.capture("Continue after separate Assistant consent", 2500)
 	r.model.assistant.state = "sharing"
 	r.capture("Review optional conversation sharing", 2500)
 	r.model.assistant.state = "report"
@@ -23,17 +25,20 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.capture("Report an answer with whole-conversation consent", 2500)
 	r.model.assistant.reportComment.Reset()
 	r.model.assistant.state = "chat"
-	r.model.assistant.account = domain.AssistantAccount{Plan: "trial", Status: "active", TurnsRemaining: 3}
+	r.model.assistant.input.Reset()
+	r.model.assistant.account = domain.AssistantAccount{Name: "Example laboratory", Plan: "trial", Status: "active", TurnsRemaining: 3}
 	r.capture("Check remaining free trial requests", 2500)
 	r.model.assistant.account.TurnsRemaining = 0
 	r.model.assistant.account.UpgradeURL = "https://assistant.nixorium.org/upgrade?account=12345678-1234-4234-8234-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-	r.model.assistant.state = "cta-inactive"
+	r.model.assistant.state = "chat"
+	r.model.message = r.model.assistantNotice(&domain.AssistantError{Code: "quota_exhausted"})
 	r.capture("Convert a free trial without reactivating the controller", 2500)
 	r.model.assistant.account = domain.AssistantAccount{}
 	r.model.assistant.state = "chat"
+	r.model.assistant.entries = []assistantEntry{{role: "user", text: "Prepare the course for pc01."}, {role: "activity", text: "● Reading modules/course.nix"}, {role: "activity", text: "● Writing modules/course.nix"}, {role: "activity", text: "✓ Evaluation passed · changes pc01"}, {role: "assistant", text: "**Prepared** the course for pc01."}}
 	r.model.assistant.summary = "Prepared the course for pc01."
 	r.model.assistant.changedFiles = 1
-	r.model.message = "Proposal ready: 1 file changed. Press Ctrl+R to review."
+	r.model.message = ""
 	r.capture("A candidate is ready for native review", 2500)
 	r.model.message = ""
 	r.model.screen = dashboardAssistantReview

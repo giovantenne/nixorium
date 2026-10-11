@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-const assistantDisclosure = "When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service. Do not enter passwords or student data."
+const assistantDisclosure = "When you press Enter, your message and the files the assistant reads are sent to the Nixorium Assistant service. Do not enter passwords or student data."
 const assistantNetworkNotice = "The Assistant service could not be reached. Check the controller's Internet connection and try again."
 const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service keeps their content only if you report an answer or turn on\nsharing below. Passwords and private keys in your deployment are never sent.\nLogs and student files are never read."
 
@@ -41,40 +43,63 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 
 func (model dashboardModel) assistantNotice(err error) string {
 	var serviceError *domain.AssistantError
-	if errors.As(err, &serviceError) && serviceError.Code == "quota_exhausted" && model.assistant.account.Plan == "trial" && model.assistant.account.UpgradeURL != "" {
-		return "All Assistant requests included in your plan for this period are used. Subscribe at " + model.assistant.account.UpgradeURL
+	if errors.As(err, &serviceError) {
+		account := model.assistant.account
+		switch serviceError.Code {
+		case "subscription_inactive", "quota_exhausted":
+			if account.Plan == "trial" {
+				return "Your free trial has ended. Subscribe to continue: " + account.UpgradeURL + ". This controller stays activated. Type /code to enter a new activation code."
+			}
+			if serviceError.Code == "subscription_inactive" {
+				return "Your subscription is not active. Renew at " + model.actions.Assistant.SubscribeURL + ", or type /code to enter a new activation code."
+			}
+			return "All requests for this year are used. They renew on " + assistantDisplayText(account.PeriodEnd) + ". Questions: hello@nixorium.org"
+		}
 	}
 	return assistantServiceNotice(err, model.actions.Assistant.SubscribeURL)
 }
 
 func (model dashboardModel) assistantGateView() string {
-	title, body := "Assistant needs an active subscription", "Your request was not sent. Subscribe at "+model.actions.Assistant.SubscribeURL+", then press a and\nenter the activation code shown after payment."
-	actions := []tuiAction{{key: "a", label: "Enter activation code"}, {key: "Esc", label: "Back to the message"}, {key: "F1", label: "Help"}}
+	width := max(20, model.width-4)
+	if model.width == 0 {
+		width = 100
+	}
+	offer := model.assistant.offer
+	if offer.TrialRequests == 0 {
+		offer = model.fallbackAssistantOffer()
+	}
+	title, body, hint := "Welcome to Assistant", "", "↑↓ choose · Enter confirm · Esc back"
 	switch model.assistant.state {
-	case "cta-inactive":
-		title = "Your Assistant subscription is not active"
-		body = "Your request was not sent. Renew at " + model.actions.Assistant.SubscribeURL + ", or press a to enter a\nnew activation code."
-		if model.assistant.account.Plan == "trial" && model.assistant.account.UpgradeURL != "" {
-			title = "Your free trial has ended"
-			body = "Your request was not sent. Subscribe at " + model.assistant.account.UpgradeURL + ".\nYour controller stays activated."
-			actions = []tuiAction{{key: "Esc", label: "Back to the message"}, {key: "F1", label: "Help"}}
+	case "welcome":
+		body = assistantWelcomeText + "\n\n" + strings.Join(assistantExamples, "\n") + "\n\n"
+		subscribe := "Subscribe"
+		if offer.PriceText != "" {
+			subscribe += " · " + offer.PriceText
+		}
+		for i, choice := range []string{fmt.Sprintf("Start a free trial · %d requests, no payment", offer.TrialRequests), "I have an activation code", subscribe} {
+			body += tuiSelection(choice, i == model.assistant.welcomeCursor, model.isDark) + "\n"
 		}
 	case "consent":
-		title, body = "Before you send", assistantConsentText+"\n\n"+model.assistantSharingCheckbox()
-		actions = []tuiAction{{key: "Space", label: "Toggle sharing"}, {key: "Enter", label: "Accept and send"}, {key: "Esc", label: "Back"}}
+		title = "Before you send"
+		body = assistantConsentText + "\n\n" + model.assistantSharingCheckbox()
+		hint = "Space toggle sharing · Enter continue · Esc back"
 	case "activate":
 		title = "Activate Assistant"
 		code := model.assistant.code
-		code.SetWidth(max(20, min(80, model.width-12)))
-		body = "Activation code\n" + code.View()
-		actions = []tuiAction{{key: "Enter", label: "Activate"}, {key: "Esc", label: "Cancel"}}
+		code.SetWidth(width - 2)
+		if model.assistant.activationLink != "" {
+			link := assistantDisplayText(model.assistant.activationLink)
+			body = "\x1b]8;;" + link + "\x1b\\" + link + "\x1b]8;;\x1b\\\nRegister with your email, then enter the code you receive.\n\n"
+		}
+		body += "Activation code\n" + code.View()
+		hint = "Enter activate · Esc back"
 	}
-	if model.assistant.account.Plan == "trial" && model.assistant.account.Status != "" {
-		body = fmt.Sprintf("Free trial: %d of 5 requests left\n\n", model.assistant.account.TurnsRemaining) + body
-	}
-	notices := []tuiNotice{}
 	if model.message != "" {
-		notices = append(notices, tuiNotice{kind: tuiStatusNeutral, title: strings.TrimSpace(model.message)})
+		body += "\n" + tuiError(assistantDisplayText(model.message), model.isDark)
 	}
-	return model.renderShell(tuiShell{path: []string{"Assistant"}, body: tuiTitle(title, model.isDark) + "\n\n" + body, notices: notices, actions: actions})
+	body = lipgloss.NewStyle().Width(width).Render(body)
+	header := model.assistantHeader(width) + "\n\n" + tuiTitle(title, model.isDark) + "\n\n"
+	capacity := max(1, model.height-2-lipgloss.Height(header)-2)
+	body = lipgloss.NewStyle().MaxHeight(capacity).Render(body)
+	return lipgloss.NewStyle().Padding(1, 2).Render(header + body + "\n" + tuiMuted(hint, model.isDark))
 }

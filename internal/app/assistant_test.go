@@ -376,3 +376,48 @@ func TestAssistantRunnerServiceMessages(t *testing.T) {
 		})
 	}
 }
+
+// These UI-only events reuse the actual tool result; they do not alter the
+// tool transcript or the service protocol.
+type assistantResultTools struct{}
+
+func (assistantResultTools) Execute(_ context.Context, _ domain.AssistantConversation, call domain.AssistantToolCall) string {
+	if call.Name == "evaluate" {
+		return `{"ok":true,"changedHosts":["pc01"]}`
+	}
+	return `{"ok":false,"error":"evaluate_first"}`
+}
+func TestAssistantRunnerEmitsActualCheckResults(t *testing.T) {
+	steps := 0
+	runner, conversation, store, _, _ := runnerFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/turns" {
+			runnerAdmit(w)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/steps") {
+			w.Header().Set("Content-Type", "text/event-stream")
+			steps++
+			if steps == 1 {
+				fmt.Fprint(w, "event: tool_calls\ndata: {\"calls\":[{\"id\":\"e\",\"name\":\"evaluate\",\"arguments\":{}},{\"id\":\"b\",\"name\":\"build\",\"arguments\":{}}]}\n\n")
+			} else {
+				fmt.Fprint(w, "event: final\ndata: {\"summary\":\"Checked\"}\n\n")
+			}
+			return
+		}
+		t.Error("unexpected route")
+	})
+	runner.Tools = assistantResultTools{}
+	events := []domain.AssistantEvent{}
+	_, err := runner.Run(t.Context(), conversation, "Check the proposal", func(event domain.AssistantEvent) {
+		if event.Type == "tool_result" {
+			events = append(events, event)
+		}
+	})
+	if err != nil || len(events) != 2 || events[0].ToolName != "evaluate" || events[0].ToolResult != `{"ok":true,"changedHosts":["pc01"]}` || events[1].ToolName != "build" || events[1].ToolResult != `{"ok":false,"error":"evaluate_first"}` {
+		t.Fatal(events, err)
+	}
+	transcript, err := store.ReadTranscript(conversation)
+	if err != nil || transcript[2].Content != events[0].ToolResult || transcript[3].Content != events[1].ToolResult {
+		t.Fatal("tool transcript changed", err)
+	}
+}

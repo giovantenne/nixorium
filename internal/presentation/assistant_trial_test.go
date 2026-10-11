@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
@@ -50,10 +51,10 @@ func TestAssistantTrialAccountAndPurchaseGate(t *testing.T) {
 			}
 			updated, _ := m.Update(m.refreshAssistantAccount()())
 			m = updated.(dashboardModel)
-			if test.plan == "trial" && !strings.Contains(m.View().Content, fmt.Sprintf("Free trial: %d of 5 requests left", test.remaining)) {
+			if test.plan == "trial" && !strings.Contains(m.View().Content, fmt.Sprintf("Free trial · %d of 5 left", test.remaining)) {
 				t.Fatal("trial quota not visible")
 			}
-			updated, command := m.Update(keyPress("ctrl+s"))
+			updated, command := m.Update(keyPress("enter"))
 			m = assistantWork(t, updated.(dashboardModel), command)
 			if test.name == "active" {
 				if runs != 1 {
@@ -66,14 +67,14 @@ func TestAssistantTrialAccountAndPurchaseGate(t *testing.T) {
 			}
 			if test.plan == "trial" {
 				view := m.View().Content
-				if m.assistant.state != "cta-inactive" || !strings.Contains(view, "Your free trial has ended") || strings.Contains(view, m.actions.Assistant.SubscribeURL) {
+				if m.assistant.state != "chat" || !strings.Contains(view, "Your free trial has ended") || strings.Contains(view, m.actions.Assistant.SubscribeURL) {
 					t.Fatal("trial did not use purchase gate")
 				}
 				// The shell wraps long links, so compare without rendered whitespace.
-				if !strings.Contains(strings.Join(strings.Fields(view), ""), strings.Join(strings.Fields(link), "")) {
+				if !strings.Contains(strings.Join(strings.Fields(strings.ReplaceAll(ansi.Strip(view), "│", "")), ""), strings.Join(strings.Fields(link), "")) {
 					t.Fatal("signed purchase link missing")
 				}
-			} else if !strings.Contains(m.message, "Contact hello@nixorium.org") || strings.Contains(m.message, "/upgrade") {
+			} else if !strings.Contains(m.message, "Questions: hello@nixorium.org") || strings.Contains(m.message, "/upgrade") {
 				t.Fatal("annual quota offers an upgrade")
 			}
 			if requests != 2 {
@@ -93,13 +94,14 @@ func TestAssistantTrialLayoutsAndStaleAccount(t *testing.T) {
 			m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("render made HTTP request") })
 			m.width, m.height, m.isDark = size[0], size[1], dark
 			m.assistant.account = domain.AssistantAccount{Plan: "trial", Status: "inactive", TurnsRemaining: 0, UpgradeURL: link}
-			for _, state := range []string{"chat", "running", "cta-inactive"} {
+			for _, state := range []string{"chat", "running"} {
 				m.assistant.state = state
+				m.message = m.assistantNotice(&domain.AssistantError{Code: "subscription_inactive"})
 				view := m.View().Content
 				if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 					t.Fatalf("%s exceeds %dx%d", state, size[0], size[1])
 				}
-				if state == "cta-inactive" && (!strings.Contains(view, "Subscribe at") || !strings.Contains(view, "Back")) {
+				if !strings.Contains(view, "Subscribe to continue:") || !strings.Contains(view, "Esc back") {
 					t.Fatal("purchase action or cancellation hidden")
 				}
 			}
@@ -125,13 +127,13 @@ func TestAssistantAccountRefreshAfterTurnAndConversion(t *testing.T) {
 	}
 	updated, _ = m.Update(command())
 	m = updated.(dashboardModel)
-	if !strings.Contains(m.View().Content, "Free trial: 4 of 5 requests left") {
+	if !strings.Contains(m.View().Content, "Free trial · 4 of 5 left") {
 		t.Fatal("post-turn count not refreshed")
 	}
 	account = domain.AssistantAccount{Plan: "annual", Status: "active", TurnsRemaining: 1000}
 	updated, _ = m.Update(m.refreshAssistantAccount()())
 	m = updated.(dashboardModel)
-	if strings.Contains(m.View().Content, "Free trial:") {
+	if strings.Contains(m.View().Content, "Free trial ·") {
 		t.Fatal("converted account still shows trial")
 	}
 }

@@ -78,11 +78,11 @@
           text = log.read_text(errors="replace") if log.exists() else ""
           return re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text).replace("\r", "")
 
-      def wait(text):
+      def wait(text, after=0):
           deadline = time.monotonic() + 90
           while time.monotonic() < deadline:
               # Terminal wrapping must not change the asserted wording.
-              if " ".join(text.split()) in " ".join(output().split()):
+              if " ".join(text.split()) in " ".join(output()[after:].split()):
                   return
               if process.poll() is not None:
                   break
@@ -99,20 +99,40 @@
               send("\r")
               wait("Assistant")
               send("m")
-              wait("Describe what you want")
-              send("Prepare the course for pc01.")
-              send("\x13")
-              wait("Assistant needs an active subscription")
-              assert not pathlib.Path("/tmp/fake-requests.log").read_text()
-              send("a")
+              wait("Welcome to Assistant")
+              wait("Start a free trial · 5 requests, no payment")
+              # Offer loading updates only the suffix in a differential redraw.
+              wait("Subscribe")
+              wait("360 € + VAT per lab / year")
+              assert not any(json.loads(line)["method"] == "POST" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
+              send("\r")
+              wait("https://example.invalid/trial")
+              wait("Register with your email, then enter the code you receive.")
               wait("Activation code")
               send("TEST-CODE-0001\r")
               wait("Before you send")
               requests = [json.loads(line) for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines()]
-              assert [r["path"] for r in requests] == ["/v1/activate"]
+              assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate"]
               assert not any(r["userText"] for r in requests)
+              # The same chat footer appeared during activation. Wait for a
+              # fresh redraw after consent before typing into the chat.
+              after_consent = len(output())
               send("\r")
-              wait("Proposal ready: 1 file changed. Press Ctrl+R to review.")
+              wait("Enter send · Alt+Enter new line", after=after_consent)
+              assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
+              send("/unknown\r")
+              wait("Unknown command. Type / to see the commands.")
+              send("\x0e")
+              time.sleep(0.3)
+              send("\r")
+              wait("Install GIMP and Inkscape on all student PCs")
+              assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
+              send("\x0e")
+              time.sleep(0.3)
+              send("Prepare the course for pc01.\r")
+              wait("Proposal ready · 1 files changed")
+              wait("Ctrl+R to review")
+              wait("✓ Evaluation passed · changes pc01")
               send("\x12")
               wait("Computers whose system changes: pc01")
               wait("Nix evaluation: passed")
@@ -162,8 +182,9 @@
       assert controller.succeed("su - admin -c 'git -C deployment status --porcelain'").strip() == ""
       assert controller.succeed("cat /home/admin/deployment/modules/course.nix").strip() == "{ course = 2; }"
       requests = [json.loads(line) for line in controller.succeed("cat /tmp/fake-requests.log").splitlines()]
-      assert [r["path"] for r in requests] == ["/v1/activate", "/v1/turns"] + ["/v1/turns/00000000-0000-4000-8000-000000000001/steps"] * 3
-      assert [r["userText"] for r in requests] == [False, False, True, True, True]
+      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/turns"] + ["/v1/turns/00000000-0000-4000-8000-000000000001/steps"] * 3
+      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True]
+      assert all(not r["userText"] for r in requests if r["method"] == "GET")
       assert controller.succeed("systemctl list-units 'nixorium-apply*' --state=active --no-legend --no-pager").strip() == ""
     with subtest("Assistant is absent without the controller option"):
       controller.succeed("rm /etc/nixorium/assistant.json; python3 /etc/assistant-test/terminal.py disabled", timeout=120)

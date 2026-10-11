@@ -34,7 +34,7 @@ func TestAssistantNetworkFailuresPreserveDraft(t *testing.T) {
 			if err := store.WriteConsent(); err != nil {
 				t.Fatal(err)
 			}
-			key := "ctrl+s"
+			key := "enter"
 			if activation {
 				m.assistant.state = "activate"
 				m.assistant.code.SetValue("synthetic-code")
@@ -53,7 +53,7 @@ func TestAssistantAllGateLayoutsFit(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 30}, {160, 40}} {
 		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("layout made HTTP request") })
 		m.width, m.height = size[0], size[1]
-		for _, state := range []string{"chat", "cta-none", "cta-inactive", "activate", "consent", "running"} {
+		for _, state := range []string{"chat", "welcome", "activate", "consent", "running"} {
 			m.assistant.state = state
 			m.assistant.streamed = strings.Repeat("Synthetic streaming text ", 100)
 			view := m.View().Content
@@ -108,13 +108,14 @@ func assistantFlowFixture(t *testing.T, handler http.HandlerFunc) (dashboardMode
 	m.width, m.height = 120, 30
 	opened, _ := m.openAssistant()
 	m = opened.(dashboardModel)
+	m.assistant.state = "chat"
 	m.assistant.input.SetValue("Synthetic private request")
 	return m, store
 }
 
 func assistantWork(t *testing.T, m dashboardModel, command tea.Cmd) dashboardModel {
 	t.Helper()
-	for index := 0; command != nil && m.assistant.state == "running"; index++ {
+	for index := 0; command != nil && (m.assistant.state == "running" || m.assistant.state == "consent"); index++ {
 		if index > 20 {
 			t.Fatal("Assistant command loop did not finish")
 		}
@@ -128,17 +129,17 @@ func assistantWork(t *testing.T, m dashboardModel, command tea.Cmd) dashboardMod
 func TestAssistantNoTokenSendsNoHTTPAndPreservesDraft(t *testing.T) {
 	var requests atomic.Int32
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { requests.Add(1) })
-	updated, command := m.Update(keyPress("ctrl+s"))
+	updated, command := m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
-	if requests.Load() != 0 || m.assistant.state != "cta-none" || m.assistant.input.Value() != "Synthetic private request" {
+	if requests.Load() != 0 || m.assistant.state != "welcome" || m.assistant.input.Value() != "Synthetic private request" {
 		t.Fatal("no-token CTA sent or lost content")
 	}
-	if !strings.Contains(m.View().Content, "Assistant needs an active subscription") {
+	if !strings.Contains(m.View().Content, "Welcome to Assistant") {
 		t.Fatal("missing CTA")
 	}
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)
-	if m.assistant.state != "chat" || m.assistant.input.Value() == "" {
+	if m.screen != dashboardHome || m.assistant.input.Value() == "" {
 		t.Fatal("Esc lost draft")
 	}
 }
@@ -148,7 +149,7 @@ func TestAssistantSubscriptionErrorsPreserveDraftAndSendNoContent(t *testing.T) 
 		status      int
 		code, state string
 	}{
-		{402, "subscription_inactive", "cta-inactive"}, {401, "invalid_token", "cta-none"},
+		{402, "subscription_inactive", "chat"}, {401, "invalid_token", "welcome"},
 		{409, "turn_active", "chat"}, {429, "quota_exhausted", "chat"}, {426, "client_upgrade_required", "chat"},
 	} {
 		t.Run(test.code, func(t *testing.T) {
@@ -171,7 +172,7 @@ func TestAssistantSubscriptionErrorsPreserveDraftAndSendNoContent(t *testing.T) 
 			if err := store.WriteConsent(); err != nil {
 				t.Fatal(err)
 			}
-			updated, command := m.Update(keyPress("ctrl+s"))
+			updated, command := m.Update(keyPress("enter"))
 			m = assistantWork(t, updated.(dashboardModel), command)
 			if requests.Load() != 1 || m.assistant.state != test.state || m.assistant.input.Value() != "Synthetic private request" {
 				t.Fatalf("refusal state=%s, requests=%d", m.assistant.state, requests.Load())
@@ -214,9 +215,11 @@ func TestAssistantActivationConsentAndStreaming(t *testing.T) {
 			t.Errorf("unexpected route %s", r.URL.Path)
 		}
 	})
-	updated, command := m.Update(keyPress("ctrl+s"))
+	updated, command := m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
-	updated, _ = m.Update(keyPress("a"))
+	updated, _ = m.Update(keyPress("down"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
 	m.assistant.code.SetValue("invalid")
 	updated, command = m.Update(keyPress("enter"))
@@ -227,7 +230,7 @@ func TestAssistantActivationConsentAndStreaming(t *testing.T) {
 	m.assistant.code.SetValue("synthetic-code")
 	updated, command = m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
-	if m.assistant.state != "consent" || m.message != "Assistant is active for Synthetic account." || contentRequests.Load() != 0 {
+	if m.assistant.state != "consent" || m.message != "" || contentRequests.Load() != 0 {
 		t.Fatal("activation bypassed consent")
 	}
 	if accepted, _ := store.ReadConsent(); accepted {
@@ -235,10 +238,15 @@ func TestAssistantActivationConsentAndStreaming(t *testing.T) {
 	}
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)
-	updated, command = m.Update(keyPress("ctrl+s"))
+	updated, command = m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
 	if m.assistant.state != "consent" || contentRequests.Load() != 0 {
 		t.Fatal("missing first-send consent")
+	}
+	updated, command = m.Update(keyPress("enter"))
+	m = assistantWork(t, updated.(dashboardModel), command)
+	if contentRequests.Load() != 0 || m.assistant.state != "chat" {
+		t.Fatal("consent sent a prompt")
 	}
 	updated, command = m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
@@ -251,7 +259,7 @@ func TestAssistantActivationConsentAndStreaming(t *testing.T) {
 	if m.assistant.input.Value() != "Synthetic private request" {
 		t.Fatal("successful request lost input")
 	}
-	updated, command = m.Update(keyPress("ctrl+s"))
+	updated, command = m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
 	if contentRequests.Load() != 2 || m.assistant.state != "chat" {
 		t.Fatal("consent asked again")
@@ -277,7 +285,7 @@ func TestAssistantEscCancelsContextAndRemoteTurn(t *testing.T) {
 	})
 	store.WriteToken(flowToken)
 	store.WriteConsent()
-	updated, command := m.Update(keyPress("ctrl+s"))
+	updated, command := m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
 	for i := 0; m.assistant.streamed != "Working"; i++ {
 		if i > 10 || command == nil {
@@ -307,20 +315,20 @@ func TestAssistantEscCancelsContextAndRemoteTurn(t *testing.T) {
 func TestAssistantNewChatAndInputKeys(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("input key made HTTP request") })
 	m.assistant.input.SetValue("q?")
-	updated, _ := m.Update(keyPress("enter"))
+	updated, _ := m.Update(keyPress("alt+enter"))
 	m = updated.(dashboardModel)
 	if !strings.Contains(m.assistant.input.Value(), "\n") {
-		t.Fatal("Enter is not newline")
+		t.Fatal("Alt+Enter is not newline")
 	}
 	updated, _ = m.Update(keyPress("ctrl+n"))
 	m = updated.(dashboardModel)
 	if m.assistant.input.Value() != "" || !m.assistant.input.Focused() {
 		t.Fatal("new chat not empty and focused")
 	}
-	updated, command := m.Update(keyPress("ctrl+s"))
+	updated, _ = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
-	if command != nil || m.assistant.state != "chat" {
-		t.Fatal("empty prompt sent")
+	if m.assistant.input.Value() != assistantExamples[0] || m.assistant.state != "chat" {
+		t.Fatal("example was not copied")
 	}
 }
 
@@ -339,7 +347,7 @@ func TestAssistantRunnerFlowAndStaleChatResults(t *testing.T) {
 		emit(domain.AssistantEvent{Type: "final", Summary: "Ready"})
 		return domain.AssistantTurnResult{Summary: "Ready", Messages: []domain.AssistantMessage{{Role: "user", Content: prompt}, {Role: "assistant", Content: "Prepared"}}}, nil
 	}
-	updated, command := m.Update(keyPress("ctrl+s"))
+	updated, command := m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
 	if calls != 1 || m.assistant.conversation.ID != flowTurnID || m.assistant.summary != "Ready" || len(m.assistant.messages) != 2 {
 		t.Fatal("runner flow missing")
@@ -389,8 +397,8 @@ func TestAssistantProposalReadyUsesActualChangeCount(t *testing.T) {
 				t.Fatal("empty workspace advertised")
 			}
 		} else {
-			want := "Proposal ready: " + countNoun(count, "file") + " changed. Press Ctrl+R to review."
-			if m.message != want || !strings.Contains(m.View().Content, "Review proposal") {
+			want := fmt.Sprintf("Proposal ready · %d files changed", count)
+			if !strings.Contains(m.View().Content, want) || !strings.Contains(m.View().Content, "Ctrl+R to review") {
 				t.Fatal(m.View().Content)
 			}
 		}

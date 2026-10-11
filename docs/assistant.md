@@ -28,22 +28,32 @@ pinned Nixorium lacks the host-class output must update before using evaluation.
 
 ## Subscription, activation and consent
 
-Write a request, then press **Ctrl+S** to send. **Enter** inserts a new line;
-**Ctrl+N** starts a new chat. **Esc** stops a running turn without changing the
-active deployment. A stopped chat may retain candidate edits for later review.
+An unactivated laboratory opens a welcome screen with a free trial, an activation
+code and subscription choices. The public offer supplies the price and links;
+if it is unavailable, the installed links remain usable without a price.
+Register with your email, then enter the code you receive. Activation saves the
+laboratory token locally and opens a separate consent screen. Enter accepts
+that consent and continues to an empty chat; it does not send a request.
 
-Without a saved token, no HTTP request is made: the screen points to the
-subscription page. After payment, press **a** and enter the activation code
-shown there. Activation saves the laboratory token locally and opens a separate
-consent screen. Nothing from the chat is sent until you accept that consent.
-An inactive subscription returns to the renewal prompt without sending content;
-an invalid token is removed and requires activation again.
+Select a suggested example with the arrows and press Enter to copy it into the
+input. Write a request, then press **Enter** to send. **Alt+Enter** and **Ctrl+J**
+insert a new line, and multiline paste is supported. **Ctrl+N** starts a new chat.
+**PgUp/PgDn** scroll the conversation. Type `/` for the command menu:
+`/review`, `/new`, `/report`, `/share`, `/help` and `/code`. Enter or Tab completes
+a choice; Enter on a complete command runs it. Unknown commands stay local.
+**F1** opens help. **Esc** stops a running turn without changing the active
+deployment; otherwise it returns to the previous area. A stopped chat may retain
+candidate edits for later review.
+
+Subscription, quota, network and deployment-conflict notices appear inside the
+conversation and preserve the draft. An invalid token is removed and requires
+activation again. `/code` opens activation for a replacement code.
 
 The free trial includes five requests for thirty days, with one trial per email
 address. Register with your email, school name and privacy consent on the
 service's `/trial` page, then enter the code delivered by email. Before using
 the code, you can submit the form again to replace it if delivery failed.
-After activation, the screen shows **Free trial: N of 5 requests left**.
+After activation, the screen shows **Free trial · N of 5 left**.
 The controller checks account metadata without sending your draft or files,
 and refreshes that count after a request.
 
@@ -73,14 +83,14 @@ outside the workspace are not tool inputs.
 
 ## Reports and conversation sharing
 
-The first-send consent offers **Share my conversations with Nixorium for 90 days
+The activation consent offers **Share my conversations with Nixorium for 90 days
 to improve Assistant** (off by default; Space toggles it). In the chat,
-**Ctrl+P** opens **Conversation sharing**; Enter changes the saved setting and
+**/share** opens **Conversation sharing**; Enter changes the saved setting and
 Esc cancels. Sharing uploads the complete redacted saved conversation after
 final and error responses, replacing the previous version. Upload failures
 never block a response or change its result.
 
-After a final response, **Ctrl+F** opens **Report this answer**. Choose
+After a final response, **/report** opens **Report this answer**. Choose
 **Helpful** or **Wrong** with Up/Down and optionally type up to 500 characters.
 The screen explains that sending includes the whole conversation: your
 messages, configuration contents read and check results, with passwords

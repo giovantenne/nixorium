@@ -223,75 +223,110 @@ Inventory, updating computers, Internet access and power
 ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```
 
-## Assistant message disclosure
+## Assistant welcome and offer
 
 ```text
-Nixorium  /  Assistant
+Assistant
 
+Welcome to Assistant
 
-When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service.
-Do not enter passwords or student data.
+Describe what your lab should do. Assistant prepares the change, checks it with Nix, and you review it before
+anything is saved or installed.
 
-› Prepare Python with Jupyter on pc01–pc10
-›
-›
+Install GIMP and Inkscape on all student PCs
+Block the Internet on pc01–pc06 every Tuesday 10–12
+pc03 still shows the old wallpaper: what is wrong?
 
-Ctrl+P Conversation sharing  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat
-Esc Back  ·  F1 Help
+› Start a free trial · 5 requests, no payment
+  I have an activation code
+  Subscribe · 360 € + VAT per lab / year
+
+↑↓ choose · Enter confirm · Esc back
 ```
 
-## Assistant subscription before sending
+## Assistant trial registration
 
 ```text
-Nixorium  /  Assistant
+Assistant
 
-Assistant needs an active subscription
+Activate Assistant
 
-Your request was not sent. Subscribe at https://nixorium.org/assistant/, then press a and
-enter the activation code shown after payment.
 
-a Enter activation code  ·  Esc Back to the message  ·  F1 Help
+Register with your email, then enter the code you receive.
+
+Activation code
+› Activation code
+Enter activate · Esc back
 ```
 
 ## Assistant free trial quota
 
 ```text
-Nixorium  /  Assistant
+Assistant · Example laboratory                                                              Free trial · 3 of 5 left
+
+› Install GIMP and Inkscape on all student PCs
+  Block the Internet on pc01–pc06 every Tuesday 10–12
+  pc03 still shows the old wallpaper: what is wrong?
 
 
-Free trial: 3 of 5 requests left
 
-When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service.
-Do not enter passwords or student data.
 
-› Prepare Python with Jupyter on pc01–pc10
-›
-›
 
-Ctrl+P Conversation sharing  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History  ·  Ctrl+N New chat
-Esc Back  ·  F1 Help
+
+
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│> Describe what your lab should do                                                                                │
+│>                                                                                                                 │
+│>                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
 
 ## Assistant trial conversion
 
 ```text
-Nixorium  /  Assistant
+Assistant · Example laboratory                                                              Free trial · 0 of 5 left
 
-Your free trial has ended
+› Install GIMP and Inkscape on all student PCs
+  Block the Internet on pc01–pc06 every Tuesday 10–12
+  pc03 still shows the old wallpaper: what is wrong?
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│! Your free trial has ended. Subscribe to continue: https://assistant.nixorium.org/upgrade?account=12345678-1234- │
+│4234-8234-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA. This controller stays  │
+│activated. Type /code to enter a new activation code.                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-Free trial: 0 of 5 requests left
 
-Your request was not sent. Subscribe at https://assistant.nixorium.org/upgrade?account=12345678-1234-4234-8234-
-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
-Your controller stays activated.
 
-Esc Back to the message  ·  F1 Help
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│> Describe what your lab should do                                                                                │
+│>                                                                                                                 │
+│>                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
 
 ## Separate Assistant consent
 
 ```text
-Nixorium  /  Assistant
+Assistant
 
 Before you send
 
@@ -302,8 +337,7 @@ sharing below. Passwords and private keys in your deployment are never sent.
 Logs and student files are never read.
 
 [ ] Share my conversations with Nixorium for 90 days to improve Assistant
-
-Space Toggle sharing  ·  Enter Accept and send  ·  Esc Back
+Space toggle sharing · Enter continue · Esc back
 ```
 
 ## Optional conversation sharing
@@ -340,21 +374,33 @@ Comment (optional, max 500 characters)
 ## Assistant candidate ready
 
 ```text
-Nixorium  /  Assistant
+Assistant
 
+› You
+Prepare the course for pc01.
+
+● Reading modules/course.nix
+● Writing modules/course.nix
+✓ Evaluation passed · changes pc01
+Assistant
 Prepared the course for pc01.
 
-When you press Ctrl+S, your message and the files the assistant reads are sent to the Nixorium Assistant service.
-Do not enter passwords or student data.
 
-› Prepare Python with Jupyter on pc01–pc10
-›
-›
 
-○ Proposal ready: 1 file changed. Press Ctrl+R to review.
 
-Ctrl+R Review proposal  ·  Ctrl+P Conversation sharing  ·  Ctrl+S Send  ·  Enter New line  ·  PgUp/PgDn History
-Ctrl+N New chat  ·  Esc Back  ·  F1 Help
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│Proposal ready · 1 files changed                                                                  Ctrl+R to review│
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│> Describe what your lab should do                                                                                │
+│>                                                                                                                 │
+│>                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
 
 ## Assistant proposal review

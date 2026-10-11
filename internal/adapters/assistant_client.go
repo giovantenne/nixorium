@@ -127,6 +127,26 @@ func (client AssistantClient) Activate(ctx context.Context, code string) (domain
 	return result, nil
 }
 
+func (client AssistantClient) Offer(ctx context.Context) (domain.AssistantOffer, error) {
+	var offer domain.AssistantOffer
+	response, err := client.request(ctx, "GET", "/offer", "", nil, 15*time.Second)
+	if err != nil {
+		return offer, err
+	}
+	if err = assistantResponse(response, 200, &offer); err != nil {
+		return domain.AssistantOffer{}, err
+	}
+	validLink := func(value string) bool {
+		link, err := url.Parse(value)
+		return err == nil && link.Host != "" && link.User == nil && link.Fragment == "" && link.Opaque == "" &&
+			(link.Scheme == "https" || (link.Scheme == "http" && (link.Hostname() == "localhost" || link.Hostname() == "127.0.0.1")))
+	}
+	if offer.TrialRequests != 5 || !validLink(offer.TrialURL) || !validLink(offer.SubscribeURL) {
+		return domain.AssistantOffer{}, assistantProtocolError()
+	}
+	return offer, nil
+}
+
 func (client AssistantClient) Account(ctx context.Context, token string) (domain.AssistantAccount, error) {
 	var wire struct {
 		Account domain.AssistantAccount `json:"account"`

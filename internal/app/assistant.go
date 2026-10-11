@@ -249,6 +249,9 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			for _, call := range terminal.Calls {
 				emit(domain.AssistantEvent{Type: "activity", Text: assistantSafeText(assistantActivity(call), token)})
 				output := runner.Tools.Execute(ctx, conversation, call)
+				if call.Name == "evaluate" || call.Name == "build" {
+					emit(domain.AssistantEvent{Type: "tool_result", ToolName: call.Name, ToolResult: assistantSafeText(output, token)})
+				}
 				messages = append(messages, domain.AssistantMessage{Role: "tool", ToolCallID: call.ID, Content: assistantSafeText(output, token)})
 			}
 			result.Messages = messages

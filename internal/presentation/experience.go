@@ -222,12 +222,12 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "After saving, update one computer first and check it before the others.")
 	case dashboardAssistant:
 		switch model.assistant.state {
-		case "cta-none", "cta-inactive":
-			lines = append(lines, "a Enter activation code; Esc Back to the message")
+		case "welcome":
+			lines = append(lines, "Up/Down Choose free trial, activation code or subscription; Enter Confirm; Esc Back")
 		case "activate":
 			lines = append(lines, "Enter Activate; Esc Cancel")
 		case "consent":
-			lines = append(lines, "Space Toggle sharing; Enter Accept and send; Esc Back without sending")
+			lines = append(lines, "Space Toggle sharing; Enter Continue without sending; Esc Back")
 		case "sharing":
 			lines = append(lines, "Enter Toggle conversation sharing; Esc Cancel")
 		case "report":
@@ -237,7 +237,7 @@ func (model dashboardModel) helpView() string {
 		case "running":
 			lines = append(lines, "Esc Stop; the deployment remains unchanged")
 		default:
-			lines = append(lines, "Ctrl+S Send; Enter New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "Ctrl+P Conversation sharing; Ctrl+F Report this answer after a final response")
+			lines = append(lines, "Enter Send; Alt+Enter or Ctrl+J New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "/review Review proposal; /new New chat; /report Report this answer", "/share Conversation sharing; /help Help; /code Activation code")
 		}
 		lines = append(lines, "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:

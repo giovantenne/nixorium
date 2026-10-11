@@ -22,6 +22,13 @@ type AssistantAccount struct {
 	UpgradeURL     string `json:"upgradeUrl,omitempty"`
 }
 
+type AssistantOffer struct {
+	PriceText     string `json:"priceText"`
+	TrialRequests int    `json:"trialRequests"`
+	TrialURL      string `json:"trialUrl"`
+	SubscribeURL  string `json:"subscribeUrl"`
+}
+
 type AssistantActivation struct {
 	Token   string           `json:"token"`
 	Account AssistantAccount `json:"account"`
@@ -78,6 +85,8 @@ type AssistantStepRequest struct {
 
 type AssistantEvent struct {
 	Type         string
+	ToolName     string
+	ToolResult   string
 	Messages     []AssistantMessage `json:"messages,omitempty"`
 	Delta        string
 	Text         string

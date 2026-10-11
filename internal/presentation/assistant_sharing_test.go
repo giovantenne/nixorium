@@ -35,7 +35,7 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	if saved, _ := store.ReadSharing(); saved {
 		t.Fatal("cancel persisted checkbox")
 	}
-	updated, _ = m.Update(keyPress("ctrl+p"))
+	updated, _ = m.openAssistantSharing()
 	m = updated.(dashboardModel)
 	if m.assistant.state != "sharing" || m.assistant.sharing || !strings.Contains(m.View().Content, "Conversation sharing") {
 		t.Fatal("settings did not load saved state")
@@ -50,7 +50,7 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	if !m.assistant.sharing {
 		t.Fatal("new chat lost sharing setting")
 	}
-	updated, _ = m.Update(keyPress("ctrl+p"))
+	updated, _ = m.openAssistantSharing()
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)
@@ -59,14 +59,14 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	}
 	m.helpOpen = true
 	view := m.View().Content
-	if !strings.Contains(view, "Ctrl+P") || !strings.Contains(view, "Ctrl+F") {
+	if !strings.Contains(view, "/share") || !strings.Contains(view, "/report") {
 		t.Fatal("missing help")
 	}
 }
 func TestAssistantReportConsentRatingCommentCancellationAndResult(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Error("unexpected network") })
 	m.assistant.conversation = domain.AssistantConversation{ID: flowTurnID}
-	updated, _ := m.Update(keyPress("ctrl+f"))
+	updated, _ := m.openAssistantReport()
 	m = updated.(dashboardModel)
 	if m.assistant.state != "chat" {
 		t.Fatal("report offered before final answer")
@@ -80,7 +80,7 @@ func TestAssistantReportConsentRatingCommentCancellationAndResult(t *testing.T) 
 		}
 		return nil
 	}
-	updated, _ = m.Update(keyPress("ctrl+f"))
+	updated, _ = m.openAssistantReport()
 	m = updated.(dashboardModel)
 	if !strings.Contains(m.View().Content, "Report this answer") || assistantReportText != "This sends this whole conversation (your messages, the configuration contents Assistant read and its check results, with passwords removed) to Nixorium. It is kept for 90 days." {
 		t.Fatal("report text")
@@ -90,7 +90,7 @@ func TestAssistantReportConsentRatingCommentCancellationAndResult(t *testing.T) 
 	if called != 0 {
 		t.Fatal("Esc submitted report")
 	}
-	updated, _ = m.Update(keyPress("ctrl+f"))
+	updated, _ = m.openAssistantReport()
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(keyPress("down"))
 	m = updated.(dashboardModel)
@@ -108,7 +108,7 @@ func TestAssistantReportConsentRatingCommentCancellationAndResult(t *testing.T) 
 	m.actions.AssistantService.Report = func(context.Context, domain.AssistantConversation, string, string) error {
 		return errors.New("Synthetic reporting failure")
 	}
-	updated, _ = m.Update(keyPress("ctrl+f"))
+	updated, _ = m.openAssistantReport()
 	m = updated.(dashboardModel)
 	m.assistant.reportComment.SetValue(strings.Repeat("😀", 501))
 	if len([]rune(m.assistant.reportComment.Value())) != 500 {
@@ -124,7 +124,7 @@ func TestAssistantReportConsentRatingCommentCancellationAndResult(t *testing.T) 
 	if m.message != "" || m.assistant.state != "chat" {
 		t.Fatal("late report result replaced cancellation")
 	}
-	updated, _ = m.Update(keyPress("ctrl+f"))
+	updated, _ = m.openAssistantReport()
 	m = updated.(dashboardModel)
 	updated, cmd = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
