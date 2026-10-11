@@ -121,6 +121,10 @@
               send("\r")
               wait("Enter send · Alt+Enter new line", after=after_consent)
               assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
+              billing_start = len(output())
+              send("/billing\r")
+              wait("Available after subscribing.", after=billing_start)
+              assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
               send("/unknown\r")
               wait("Unknown command. Type / to see the commands.")
               send("\x0e")
@@ -164,6 +168,13 @@
               assert re.search(r"\x1b\]8;[^;]*;https://example.invalid/help(?:\x07|\x1b\\)", raw)
               assert not any(sequence in raw for sequence in ["\x1b[?1000h", "\x1b[?1002h", "\x1b[?1003h", "\x1b[?1006h"])
               assert "The deployment changed since this chat started" not in output()[after_saved:]
+              # Simulate an account acquiring a Stripe customer; no external call.
+              pathlib.Path("/tmp/fake-billing-customer").touch()
+              billing_start = len(output())
+              send("/billing\r")
+              wait("This link works for a few minutes.", after=billing_start)
+              wait("Official electronic invoices are delivered through SDI.", after=billing_start)
+              assert re.search(r"\x1b\]8;[^;]*;https://billing\.stripe\.com/p/session\?secret=test_synthetic_vm(?:\x07|\x1b\\)", log.read_text())
               resume_start = len(output())
               send("/resume\r")
               wait("Enter open · Esc back", after=resume_start)
@@ -238,8 +249,8 @@
       assert controller.succeed("cat /home/admin/deployment/modules/course.nix").strip() == "{ course = 2; }"
       requests = [json.loads(line) for line in controller.succeed("cat /tmp/fake-requests.log").splitlines()]
       step = "/v1/turns/00000000-0000-4000-8000-000000000001/steps"
-      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/turns"] + [step] * 3 + ["/v1/turns", step]
-      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True, False, True]
+      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/billing-portal", "/v1/turns"] + [step] * 3 + ["/v1/turns", step, "/v1/billing-portal"]
+      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, False, True, True, True, False, True, False]
       assert all(not r["userText"] for r in requests if r["method"] == "GET")
       assert controller.succeed("systemctl list-units 'nixorium-apply*' --state=active --no-legend --no-pager").strip() == ""
     with subtest("Assistant is absent without the controller option"):

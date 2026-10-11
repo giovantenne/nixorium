@@ -343,6 +343,9 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	if model.assistant.saved {
 		fixed = append(fixed, model.assistantBox(assistantSavedChatText, width, tuiStatusSuccess))
 	}
+	if model.assistant.state == "billing-loading" {
+		fixed = append(fixed, model.activitySpinner.View()+" Opening Stripe… · Esc to cancel")
+	}
 	if model.assistant.state == "running" {
 		seconds := 0
 		if !model.assistant.started.IsZero() {

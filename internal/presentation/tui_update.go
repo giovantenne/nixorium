@@ -14,6 +14,8 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case assistantBillingMsg:
+		return model.finishAssistantBilling(message)
 	case assistantResumeMsg:
 		return model.finishAssistantResume(message)
 	case tea.MouseWheelMsg:

@@ -183,6 +183,25 @@ func (client AssistantClient) validUpgradeURL(value string) bool {
 		assistantUpgradeSignaturePattern.MatchString(query.Get("sig"))
 }
 
+// BillingPortal creates a temporary Stripe session without opening an Assistant turn.
+func (client AssistantClient) BillingPortal(ctx context.Context, token string) (string, error) {
+	var wire struct {
+		URL string `json:"url"`
+	}
+	response, err := client.request(ctx, "POST", "/billing-portal", token, nil, 15*time.Second)
+	if err != nil {
+		return "", err
+	}
+	if err = assistantResponse(response, 200, &wire); err != nil {
+		return "", err
+	}
+	link, err := url.Parse(wire.URL)
+	if err != nil || link.Scheme != "https" || link.Host != "billing.stripe.com" || link.User != nil || link.Fragment != "" || link.Opaque != "" {
+		return "", assistantProtocolError()
+	}
+	return wire.URL, nil
+}
+
 func (client AssistantClient) OpenTurn(ctx context.Context, token string) (domain.AssistantTurn, error) {
 	var result domain.AssistantTurn
 	body := struct {

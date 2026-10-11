@@ -47,7 +47,8 @@ The input grows from one to six rows, then scrolls while keeping the draft.
 Terminals with alternate scroll send arrows for the mouse wheel, without
 capturing mouse selection. New content preserves a scrolled position;
 **End** or sending a message returns to the bottom. Type `/` for the command menu:
-`/review`, `/new`, `/report`, `/share`, `/help` and `/code`. Enter or Tab completes
+`/review`, `/save`, `/new`, `/resume`, `/billing`, `/report`, `/share`, `/help`
+and `/code`. Enter or Tab completes
 a choice; Enter on a complete command runs it. Unknown commands stay local.
 **F1** opens help. **Esc** stops a running turn without changing the active
 deployment; otherwise it returns to the previous area. A stopped chat may retain
@@ -89,6 +90,16 @@ settings fields are withheld; known token formats, password hashes and private
 key material are redacted from model-facing output. The laboratory token is
 kept separate from the transcript. Logs, student homes and arbitrary files
 outside the workspace are not tool inputs.
+
+## Subscription and payments
+
+`/billing` shows a clickable temporary Stripe Customer Portal link in the chat.
+It does not use an Assistant request or send conversation contents. Open the link
+within a few minutes to manage your subscription and see payments. Trial accounts
+without a Stripe customer see **Available after subscribing.** The link stays out
+of the transcript and model messages. The portal return page lets you close the
+tab and return to Nixorium. The displayed invoice notice is **Official electronic
+invoices are delivered through SDI.**
 
 ## Reports and conversation sharing
 

@@ -311,9 +311,10 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			DeleteToken: assistantStore.DeleteToken, ReadConsent: assistantStore.ReadConsent,
 			WriteConsent: assistantStore.WriteConsent, WriteConsentSharing: assistantStore.WriteConsentSharing,
 			ReadSharing: assistantStore.ReadSharing, WriteSharing: assistantStore.WriteSharing, Report: assistantReporter.Report, Activate: assistantClient.Activate,
-			Account: assistantClient.Account,
-			Offer:   assistantClient.Offer,
-			Cleanup: func(current string) error { return assistantWorkspace.Cleanup(current) },
+			Account:       assistantClient.Account,
+			BillingPortal: assistantClient.BillingPortal,
+			Offer:         assistantClient.Offer,
+			Cleanup:       func(current string) error { return assistantWorkspace.Cleanup(current) },
 			ListConversations: func(ctx context.Context, current string) ([]domain.AssistantConversationHistory, error) {
 				return assistantWorkspace.ListConversations(ctx, repository, current)
 			},

@@ -58,7 +58,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self.authenticated():
             return
-        if self.path == "/v1/turns":
+        if self.path == "/v1/billing-portal":
+            if Path("/tmp/fake-billing-customer").exists():
+                self.respond(200, {"url": "https://billing.stripe.com/p/session?secret=test_synthetic_vm"})
+            else:
+                self.respond(409, {"error": {"code": "no_subscription", "message": "Available after subscribing."}})
+        elif self.path == "/v1/turns":
             self.respond(201, {"turnId": TURN, "limits": {"steps": 24, "seconds": 900, "maxRequestBytes": 2000000}})
         elif self.path == f"/v1/turns/{TURN}/cancel":
             self.respond(204, "")

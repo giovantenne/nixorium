@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Add `/billing` to open a temporary Stripe Customer Portal link from Assistant
+  without using a request.
+
 - Add `/resume` to reopen current Assistant conversations or read saved and
   outdated chats without using a request; keep 90 days of activity and up to
   30 local conversations, protecting the current chat.

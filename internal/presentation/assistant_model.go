@@ -17,6 +17,7 @@ import (
 // AssistantActions keeps service calls and private filesystem state in the
 // command/application layers. Presentation owns only the interaction state.
 type AssistantActions struct {
+	BillingPortal       func(context.Context, string) (string, error)
 	ListConversations   func(context.Context, string) ([]domain.AssistantConversationHistory, error)
 	ConversationHistory func(context.Context, string) (domain.AssistantConversationHistory, error)
 	ChangedFiles        func(string) (int, error)
