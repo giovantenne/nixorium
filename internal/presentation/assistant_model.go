@@ -37,32 +37,32 @@ type AssistantActions struct {
 }
 
 type assistantModel struct {
-	sharing                                     bool
-	canReport                                   bool
-	reportRating                                int
-	reportComment                               textinput.Model
-	initialized                                 bool
-	changedFiles                                int
-	review                                      assistantReviewModel
-	state                                       string
-	input                                       textarea.Model
-	code                                        textinput.Model
-	messages                                    []domain.AssistantMessage
-	streamed, summary, activity                 string
-	token                                       string
-	historyScroll                               int
-	id                                          uint64
-	cancel                                      context.CancelFunc
-	events                                      <-chan tea.Msg
-	conversation                                domain.AssistantConversation
-	account                                     domain.AssistantAccount
-	accessError                                 string
-	offer                                       domain.AssistantOffer
-	entries                                     []assistantEntry
-	started                                     time.Time
-	welcomeCursor, exampleCursor, commandCursor int
-	activationLink                              string
-	onboarding                                  bool
+	sharing                      bool
+	canReport                    bool
+	reportRating                 int
+	reportComment                textinput.Model
+	initialized                  bool
+	changedFiles                 int
+	review                       assistantReviewModel
+	state                        string
+	input                        textarea.Model
+	code                         textinput.Model
+	messages                     []domain.AssistantMessage
+	streamed, summary, activity  string
+	token                        string
+	historyScroll                int
+	id                           uint64
+	cancel                       context.CancelFunc
+	events                       <-chan tea.Msg
+	conversation                 domain.AssistantConversation
+	account                      domain.AssistantAccount
+	accessError                  string
+	offer                        domain.AssistantOffer
+	entries                      []assistantEntry
+	started                      time.Time
+	welcomeCursor, commandCursor int
+	activationLink               string
+	onboarding                   bool
 }
 
 type assistantAccessMsg struct {
@@ -226,6 +226,7 @@ func (model dashboardModel) sendAssistant(accept bool) (tea.Model, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	model.assistant.cancel = cancel
 	model.assistant.state = "running"
+	model.assistant.historyScroll = 0
 	model.assistant.started = time.Now()
 	model.assistant.activity = "Checking Assistant subscription"
 	model.message = ""
@@ -308,7 +309,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		}
 		if message.result != nil {
 			if model.assistant.summary == "" && message.result.Summary != "" {
-				model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "assistant", text: message.result.Summary})
+				model.assistant.appendSummary(message.result.Summary)
 			}
 			model.assistant.changedFiles = message.changedFiles
 			model.assistant.messages = message.result.Messages
@@ -330,20 +331,22 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		event.ToolResult = strings.ReplaceAll(event.ToolResult, model.assistant.token, "[REDACTED]")
 	}
 	switch event.Type {
+	case "turn_started":
+		model.assistant.input.Reset()
 	case "text":
 		model.assistant.streamed += event.Delta
 		model.assistant.appendText(event.Delta)
 	case "activity":
 		model.assistant.activity = event.Text
-		model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "activity", text: assistantActivityLine(event.Text)})
+		if event.Text != "Preparing a proposal" {
+			model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "activity", text: assistantActivityLine(event.Text)})
+		}
 	case "tool_result":
 		model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "activity", text: assistantToolResultLine(event.ToolName, event.ToolResult, model.report.Meta.Controller.Name)})
 	case "final":
 		model.assistant.canReport = true
 		model.assistant.summary = event.Summary
-		if strings.TrimSpace(event.Summary) != "" && strings.TrimSpace(event.Summary) != strings.TrimSpace(model.assistant.streamed) {
-			model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "assistant", text: event.Summary})
-		}
+		model.assistant.appendSummary(event.Summary)
 		model.assistant.messages = append(model.assistant.messages, domain.AssistantMessage{Role: "assistant", Content: model.assistant.streamed})
 	case "error":
 		model.assistant.noteAccessError(event.Code)

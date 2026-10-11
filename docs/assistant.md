@@ -35,11 +35,14 @@ Register with your email, then enter the code you receive. Activation saves the
 laboratory token locally and opens a separate consent screen. Enter accepts
 that consent and continues to an empty chat; it does not send a request.
 
-Select a suggested example with the arrows and press Enter to copy it into the
-input. Write a request, then press **Enter** to send. **Alt+Enter** and **Ctrl+J**
+Examples are hints and cannot be selected. Write a request, then press **Enter**
+to send. The input clears once the service starts the turn; a failure before
+that point preserves the draft. **Alt+Enter** and **Ctrl+J**
 insert a new line, and multiline paste is supported. **Ctrl+N** starts a new chat.
 The input grows from one to six rows, then scrolls while keeping the draft.
-**PgUp/PgDn** scroll the conversation. Type `/` for the command menu:
+**PgUp/PgDn**, arrows when the input is empty, and the mouse wheel scroll the
+conversation. New content preserves a scrolled position; **End** or sending a
+message returns to the bottom. Type `/` for the command menu:
 `/review`, `/new`, `/report`, `/share`, `/help` and `/code`. Enter or Tab completes
 a choice; Enter on a complete command runs it. Unknown commands stay local.
 **F1** opens help. **Esc** stops a running turn without changing the active

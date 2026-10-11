@@ -256,9 +256,10 @@ func TestAssistantActivationConsentAndStreaming(t *testing.T) {
 	if accepted, _ := store.ReadConsent(); !accepted {
 		t.Fatal("consent not saved")
 	}
-	if m.assistant.input.Value() != "Synthetic private request" {
-		t.Fatal("successful request lost input")
+	if m.assistant.input.Value() != "" {
+		t.Fatal("successful request did not clear input")
 	}
+	m.assistant.input.SetValue("Another synthetic request")
 	updated, command = m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
 	if contentRequests.Load() != 2 || m.assistant.state != "chat" {
@@ -307,7 +308,7 @@ func TestAssistantEscCancelsContextAndRemoteTurn(t *testing.T) {
 	for cancelled.Load() == 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	if cancelled.Load() != 1 || m.message != "Stopped. Your deployment is unchanged." || m.assistant.input.Value() == "" {
+	if cancelled.Load() != 1 || m.message != "Stopped. Your deployment is unchanged." || m.assistant.input.Value() != "" {
 		t.Fatal("Esc did not cancel safely")
 	}
 }
@@ -327,8 +328,8 @@ func TestAssistantNewChatAndInputKeys(t *testing.T) {
 	}
 	updated, _ = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
-	if m.assistant.input.Value() != assistantExamples[0] || m.assistant.state != "chat" {
-		t.Fatal("example was not copied")
+	if m.assistant.input.Value() != "" || m.assistant.state != "chat" {
+		t.Fatal("example was selected")
 	}
 }
 

@@ -14,6 +14,16 @@ import (
 func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 	model.ensureActivitySpinner()
 	switch message := message.(type) {
+	case tea.MouseWheelMsg:
+		if model.screen == dashboardAssistant && !model.helpOpen && (model.assistant.state == "chat" || model.assistant.state == "running") {
+			switch message.Button {
+			case tea.MouseWheelUp:
+				return model.scrollAssistantHistory(4), nil
+			case tea.MouseWheelDown:
+				return model.scrollAssistantHistory(-4), nil
+			}
+		}
+		return model, nil
 	case assistantOfferMsg:
 		return model.finishAssistantOffer(message)
 	case assistantConsentMsg:

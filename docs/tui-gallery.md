@@ -264,10 +264,10 @@ Enter activate · Esc back
 ```text
 Assistant · Example laboratory                                                              Free trial · 3 of 5 left
 
-› Install GIMP and Inkscape on all student PCs
+Try asking, for example:
+  Install GIMP and Inkscape on all student PCs
   Block the Internet on pc01–pc06 every Tuesday 10–12
   pc03 still shows the old wallpaper: what is wrong?
-
 
 
 
@@ -296,7 +296,8 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```text
 Assistant · Example laboratory                                                                      Free trial ended
 
-› Install GIMP and Inkscape on all student PCs
+Try asking, for example:
+  Install GIMP and Inkscape on all student PCs
   Block the Internet on pc01–pc06 every Tuesday 10–12
   pc03 still shows the old wallpaper: what is wrong?
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
@@ -304,7 +305,6 @@ Assistant · Example laboratory                                                 
 │ 1234-4234-8234-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA. This controller  │
 │ stays activated. Type /code to enter a new activation code.                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
 
 
 

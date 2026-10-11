@@ -31,6 +31,30 @@ func (model *assistantModel) appendText(text string) {
 	}
 	model.entries = append(model.entries, assistantEntry{role: "assistant", text: text})
 }
+
+// Only the current turn is considered: a later turn may repeat an answer.
+func assistantSummaryShown(entries []assistantEntry, summary string) bool {
+	summary = strings.TrimSpace(summary)
+	if summary == "" {
+		return true
+	}
+	text := ""
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].role == "user" {
+			break
+		}
+		if entries[i].role == "assistant" {
+			text = entries[i].text + text
+		}
+	}
+	return strings.Contains(text, summary)
+}
+func (model *assistantModel) appendSummary(summary string) {
+	if !assistantSummaryShown(model.entries, summary) {
+		model.entries = append(model.entries, assistantEntry{role: "assistant", text: summary})
+	}
+}
+
 func assistantActivityLine(text string) string {
 	text = assistantDisplayText(text)
 	if strings.HasPrefix(text, "Searching") {
@@ -248,7 +272,11 @@ func (model dashboardModel) assistantView() string {
 	if model.assistant.state == "welcome" || model.assistant.state == "consent" || model.assistant.state == "activate" {
 		return model.assistantGateView()
 	}
-	width := max(20, model.width-4)
+	return model.assistantChatView()
+}
+
+func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText string, width, capacity int) {
+	width = max(20, model.width-4)
 	if model.width == 0 {
 		width = 100
 	}
@@ -284,7 +312,7 @@ func (model dashboardModel) assistantView() string {
 				entries = append(entries, assistantEntry{message.Role, message.Content})
 			}
 		}
-		if model.assistant.summary != "" {
+		if model.assistant.summary != "" && !assistantSummaryShown(entries, model.assistant.summary) {
 			entries = append(entries, assistantEntry{"assistant", model.assistant.summary})
 		}
 	}
@@ -306,8 +334,9 @@ func (model dashboardModel) assistantView() string {
 		}
 	}
 	if len(entries) == 0 {
-		for i, example := range assistantExamples {
-			lines = append(lines, tuiSelection(example, i == model.assistant.exampleCursor, model.isDark))
+		lines = append(lines, tuiMuted("Try asking, for example:", model.isDark))
+		for _, example := range assistantExamples {
+			lines = append(lines, tuiMuted("  "+example, model.isDark))
 		}
 	}
 	if choices := model.assistant.commandChoices(); len(choices) > 0 {
@@ -319,15 +348,26 @@ func (model dashboardModel) assistantView() string {
 		lines = append(lines, model.assistantBox("! "+model.message, width, tuiStatusAttention))
 	}
 	body := lipgloss.NewStyle().Width(width).Render(strings.Join(lines, "\n"))
-	bodyLines := strings.Split(body, "\n")
-	fixedText := strings.Join(fixed, "\n")
-	capacity := max(1, model.height-2-1-2-lipgloss.Height(fixedText)-1)
+	bodyLines = strings.Split(body, "\n")
+	fixedText = strings.Join(fixed, "\n")
+	capacity = max(1, model.height-2-1-2-lipgloss.Height(fixedText)-1)
 	if model.height == 0 {
 		capacity = len(bodyLines)
 	}
+	return
+}
+
+func (model dashboardModel) scrollAssistantHistory(delta int) dashboardModel {
+	lines, _, _, capacity := model.assistantChatLayout()
+	model.assistant.historyScroll = min(max(0, len(lines)-capacity), max(0, model.assistant.historyScroll+delta))
+	return model
+}
+
+func (model dashboardModel) assistantChatView() string {
+	bodyLines, fixedText, width, capacity := model.assistantChatLayout()
 	end := max(1, len(bodyLines)-min(model.assistant.historyScroll, max(0, len(bodyLines)-capacity)))
 	start := max(0, end-capacity)
-	body = strings.Join(bodyLines[start:end], "\n")
+	body := strings.Join(bodyLines[start:end], "\n")
 	body = lipgloss.NewStyle().Height(capacity).Render(body)
 	return lipgloss.NewStyle().Padding(1, 2).Render(model.assistantHeader(width) + "\n\n" + body + "\n" + fixedText + "\n" + tuiMuted(assistantInputHint, model.isDark))
 }

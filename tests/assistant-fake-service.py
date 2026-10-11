@@ -71,7 +71,11 @@ class Handler(BaseHTTPRequestHandler):
                 event, payload = "tool_calls", {"calls": [{"id": "evaluate-course", "name": "evaluate", "arguments": {}}]}
             else:
                 assert results["evaluate-course"] == {"ok": True, "changedHosts": ["pc01"]}
-                event, payload = "final", {"summary": "Prepared the course for pc01."}
+                summary = "Prepared the course for pc01."
+                self.respond(200, f'event: activity\ndata: {json.dumps({"text": "Preparing a proposal"})}\n\n'
+                             f'event: text\ndata: {json.dumps({"delta": summary})}\n\n'
+                             f'event: final\ndata: {json.dumps({"summary": summary})}\n\n', "text/event-stream")
+                return
             self.respond(200, f"event: {event}\ndata: {json.dumps(payload)}\n\n", "text/event-stream")
         else:
             self.error(404, "turn_not_found")

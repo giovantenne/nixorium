@@ -112,6 +112,8 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	if err != nil {
 		return result, err
 	}
+	// Local UI acknowledgement; emitted only after the service admits the turn.
+	emit(domain.AssistantEvent{Type: "turn_started"})
 	finished := false
 	defer func() {
 		if !finished {

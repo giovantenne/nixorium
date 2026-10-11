@@ -125,7 +125,7 @@
               send("\x0e")
               time.sleep(0.3)
               send("\r")
-              wait("Install GIMP and Inkscape on all student PCs")
+              wait("Try asking, for example:")
               assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
               send("\x0e")
               time.sleep(0.3)

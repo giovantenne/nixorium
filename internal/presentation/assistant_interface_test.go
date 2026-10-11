@@ -70,8 +70,8 @@ func TestAssistantInputCommandsExamplesAndPaste(t *testing.T) {
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
-	if m.assistant.input.Value() != assistantExamples[1] || m.assistant.state != "chat" {
-		t.Fatal("example sent or lost")
+	if m.assistant.input.Value() != "" || m.assistant.state != "chat" {
+		t.Fatal("example selected or sent")
 	}
 	for _, key := range []string{"alt+enter", "ctrl+j"} {
 		m.assistant.input.SetValue("one")

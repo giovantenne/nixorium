@@ -749,8 +749,20 @@ func (model dashboardModel) Init() tea.Cmd {
 }
 
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	assistantTop := 0
+	if model.screen == dashboardAssistant && model.assistant.historyScroll > 0 {
+		before, _, _, capacity := model.assistantChatLayout()
+		assistantTop = max(0, len(before)-capacity-model.assistant.historyScroll)
+	}
 	updated, command := model.updateState(message)
 	next := updated.(dashboardModel)
+	if model.screen == dashboardAssistant && next.screen == dashboardAssistant &&
+		model.assistant.historyScroll > 0 && next.assistant.historyScroll == model.assistant.historyScroll &&
+		next.assistant.id == model.assistant.id {
+		// Keep the same first visible line while content arrives or the input shrinks.
+		after, _, _, newCapacity := next.assistantChatLayout()
+		next.assistant.historyScroll = max(0, len(after)-newCapacity-assistantTop)
+	}
 	if next.read.cancel != nil && next.read.id != model.read.id {
 		next.read.returnScreen = model.screen
 	}
@@ -1239,6 +1251,9 @@ func (model dashboardModel) View() tea.View {
 	}
 	view := tea.NewView(content)
 	view.AltScreen = true
+	if model.screen == dashboardAssistant && (model.assistant.state == "chat" || model.assistant.state == "running") {
+		view.MouseMode = tea.MouseModeCellMotion
+	}
 	return view
 }
 

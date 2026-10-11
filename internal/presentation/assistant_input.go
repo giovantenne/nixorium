@@ -137,13 +137,28 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 	return model, nil
 }
 func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.assistant.state == "chat" || model.assistant.state == "running" {
+		switch key.String() {
+		case "pgup":
+			return model.scrollAssistantHistory(4), nil
+		case "pgdown":
+			return model.scrollAssistantHistory(-4), nil
+		case "end":
+			model.assistant.historyScroll = 0
+			return model, nil
+		case "up", "down":
+			if model.assistant.input.Value() == "" {
+				delta := 1
+				if key.String() == "down" {
+					delta = -1
+				}
+				return model.scrollAssistantHistory(delta), nil
+			}
+		}
+	}
 	switch model.assistant.state {
 	case "running":
 		switch key.String() {
-		case "pgup":
-			model.assistant.historyScroll += 4
-		case "pgdown":
-			model.assistant.historyScroll = max(0, model.assistant.historyScroll-4)
 		case "esc", "ctrl+c":
 			if model.assistant.cancel != nil {
 				model.assistant.cancel()
@@ -263,20 +278,7 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 			return model, nil
 		}
 	}
-	if len(model.assistant.messages) == 0 && len(model.assistant.entries) == 0 && model.assistant.input.Value() == "" {
-		switch key.String() {
-		case "up":
-			model.assistant.exampleCursor = (model.assistant.exampleCursor + 2) % 3
-			return model, nil
-		case "down":
-			model.assistant.exampleCursor = (model.assistant.exampleCursor + 1) % 3
-			return model, nil
-		case "enter":
-			model.assistant.input.SetValue(assistantExamples[model.assistant.exampleCursor])
-			model.assistant.input.CursorEnd()
-			return model, nil
-		}
-	}
+
 	switch key.String() {
 	case "esc":
 		model.screen = dashboardHome
@@ -296,12 +298,6 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 		var command tea.Cmd
 		model.assistant.input, command = model.assistant.input.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		return model, command
-	case "pgup":
-		model.assistant.historyScroll += 4
-		return model, nil
-	case "pgdown":
-		model.assistant.historyScroll = max(0, model.assistant.historyScroll-4)
-		return model, nil
 	}
 	var command tea.Cmd
 	model.assistant.commandCursor = 0
