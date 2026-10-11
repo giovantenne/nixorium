@@ -108,6 +108,7 @@
               send("\r")
               wait("https://example.invalid/trial")
               wait("Register with your email, then enter the code you receive.")
+              assert re.search(r"\x1b\]8;[^;]*;https://example.invalid/trial(?:\x07|\x1b\\)", log.read_text())
               wait("Activation code")
               send("TEST-CODE-0001\r")
               wait("Before you send")
@@ -149,6 +150,10 @@
               send("Confirm the saved course.\r")
               wait("New chat", after=after_saved)
               wait("Saved configuration confirmed.", after=after_saved)
+              wait("https://example.invalid/help", after=after_saved)
+              raw = log.read_text()
+              assert re.search(r"\x1b\]8;[^;]*;https://example.invalid/help(?:\x07|\x1b\\)", raw)
+              assert not any(sequence in raw for sequence in ["\x1b[?1000h", "\x1b[?1002h", "\x1b[?1003h", "\x1b[?1006h"])
               assert "The deployment changed since this chat started" not in output()[after_saved:]
               send("\x1b")
               time.sleep(0.3)

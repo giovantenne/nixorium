@@ -229,8 +229,8 @@ func TestAssistantScrollKeepsPositionDuringStreaming(t *testing.T) {
 			if m.assistant.historyScroll != 0 {
 				t.Fatal("cannot reach bottom")
 			}
-			if m.View().MouseMode != tea.MouseModeCellMotion {
-				t.Fatal("wheel not enabled")
+			if m.View().MouseMode != tea.MouseModeNone {
+				t.Fatal("terminal mouse selection intercepted")
 			}
 		})
 	}

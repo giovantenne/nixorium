@@ -39,7 +39,7 @@ type DemoBundle struct {
 	Scenarios     []DemoScenario `json:"scenarios"`
 }
 
-var demoANSI = regexp.MustCompile(`(?:\x1b\][^\x07]*(?:\x07|\x1b\\))|(?:\x1b\[[0-?]*[ -/]*[@-~])`)
+var demoANSI = regexp.MustCompile(`(?:\x1b\][^\x07\x1b]*(?:\x07|\x1b\\))|(?:\x1b\[[0-?]*[ -/]*[@-~])`)
 
 const demoServiceAddress = "192.168.1.123"
 

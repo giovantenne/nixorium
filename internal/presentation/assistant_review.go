@@ -205,7 +205,7 @@ func (model dashboardModel) assistantReviewLines() []string {
 		evaluation = "failed\n" + p.Evaluation.Error
 	}
 	content := fmt.Sprintf("Summary from the assistant\n%s\n\nChecked by Nixorium\nFiles: %d added, %d changed, %d removed\nComputers whose system changes: %s\nNix evaluation: %s\n\nFull comparison\n%s", assistantDisplayText(model.assistant.summary), len(p.Added), len(p.Changed), len(p.Removed), hosts, evaluation, p.Diff)
-	return strings.Split(lipgloss.NewStyle().Width(max(20, min(106, model.width-10))).Render(assistantDisplayText(content)), "\n")
+	return strings.Split(lipgloss.NewStyle().Width(max(20, min(106, model.width-10))).Render(assistantLinkify(assistantDisplayText(content))), "\n")
 }
 func (model dashboardModel) assistantReviewView() string {
 	r := model.assistant.review

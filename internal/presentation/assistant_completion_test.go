@@ -30,7 +30,7 @@ func TestAssistantCompleteHelpAndScrolling(t *testing.T) {
 		"/report   Tell us one answer was helpful or wrong. Sends this conversation\n            to Nixorium once, so we can fix mistakes. Kept for 90 days.",
 		"/share    Turn automatic sharing on or off (off by default). When on, every\n            conversation of this lab is sent to Nixorium to improve Assistant.\n            Kept for 90 days.",
 		"/code     Enter an activation code (for example after subscribing).", "/help     Show this help.",
-		"Keys\n  Enter        Send the message\n  Alt+Enter    New line (Ctrl+J also works)\n  Ctrl+R       Review the proposal\n  Ctrl+N       New chat\n  PgUp/PgDn    Scroll the conversation\n  Esc          Stop Assistant while it works, or go back",
+		"Keys\n  Enter        Send the message\n  Alt+Enter    New line (Ctrl+J also works)\n  Ctrl+R       Review the proposal\n  Ctrl+N       New chat\n  PgUp/PgDn    Scroll the conversation\n  Select text      Drag with the mouse (or Shift+drag in some terminals)\n  Esc          Stop Assistant while it works, or go back",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("help omits %q", want)

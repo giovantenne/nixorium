@@ -229,7 +229,7 @@ func assistantMarkdown(text string, dark bool) string {
 		}
 		content = append(content, rendered)
 	}
-	return strings.Join(content, "\n")
+	return assistantLinkify(strings.Join(content, "\n"))
 }
 func (model dashboardModel) assistantHeader(width int) string {
 	name := strings.ReplaceAll(assistantDisplayText(model.assistant.account.Name), "\n", " ")
@@ -272,7 +272,7 @@ func (model dashboardModel) assistantBox(text string, width int, kind tuiStatusK
 	case tuiStatusFailure:
 		tone = theme.failure
 	}
-	return lipgloss.NewStyle().Width(width).Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(tone).Render(assistantDisplayText(text))
+	return lipgloss.NewStyle().Width(width).Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(tone).Render(assistantLinkify(assistantDisplayText(text)))
 }
 func (model dashboardModel) assistantView() string {
 	if model.assistant.state == "sharing" || model.assistant.state == "report" || model.assistant.state == "report-sending" {
@@ -374,7 +374,7 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	if model.message != "" {
 		lines = append(lines, model.assistantBox("! "+model.message, width, tuiStatusAttention))
 	}
-	body := lipgloss.NewStyle().Width(width).Render(strings.Join(lines, "\n"))
+	body := lipgloss.NewStyle().Width(width).Render(assistantLinkify(strings.Join(lines, "\n")))
 	bodyLines = strings.Split(body, "\n")
 	fixedText = strings.Join(fixed, "\n")
 	capacity = max(1, model.height-2-1-2-lipgloss.Height(fixedText)-1)

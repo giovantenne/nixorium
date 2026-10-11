@@ -93,7 +93,7 @@ func (model dashboardModel) assistantGateView() string {
 		code.SetWidth(width - 2)
 		if model.assistant.activationLink != "" {
 			link := assistantDisplayText(model.assistant.activationLink)
-			body = "\x1b]8;;" + link + "\x1b\\" + link + "\x1b]8;;\x1b\\\nRegister with your email, then enter the code you receive.\n\n"
+			body = assistantLinkify(link) + "\nRegister with your email, then enter the code you receive.\n\n"
 		}
 		body += "Activation code\n" + code.View()
 		hint = "Enter activate · Esc back"
@@ -101,7 +101,7 @@ func (model dashboardModel) assistantGateView() string {
 	if model.message != "" {
 		body += "\n" + tuiError(assistantDisplayText(model.message), model.isDark)
 	}
-	body = lipgloss.NewStyle().Width(width).Render(body)
+	body = lipgloss.NewStyle().Width(width).Render(assistantLinkify(body))
 	header := model.assistantHeader(width) + "\n\n" + tuiTitle(title, model.isDark) + "\n\n"
 	capacity := max(1, model.height-2-lipgloss.Height(header)-2)
 	body = lipgloss.NewStyle().MaxHeight(capacity).Render(body)

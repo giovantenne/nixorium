@@ -252,7 +252,7 @@ Assistant
 
 Activate Assistant
 
-
+https://assistant.nixorium.org/trial
 Register with your email, then enter the code you receive.
 
 Activation code

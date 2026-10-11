@@ -420,6 +420,9 @@ func (model dashboardModel) diagnosticsView() string {
 // frame bounds plain content such as contextual help. Routine screens use
 // renderShell so their body, notices, confirmations, and actions stay distinct.
 func (model dashboardModel) frame(content string) string {
+	if model.screen == dashboardAssistant || model.screen == dashboardAssistantReview {
+		content = assistantLinkify(content)
+	}
 	width := min(116, max(20, model.width-6))
 	if model.width == 0 {
 		width = 100
@@ -493,6 +496,9 @@ func (model dashboardModel) renderShell(shell tuiShell) string {
 	wrappedLines := func(content string) []string {
 		if content == "" {
 			return nil
+		}
+		if model.screen == dashboardAssistant || model.screen == dashboardAssistantReview {
+			content = assistantLinkify(content)
 		}
 		rendered := lipgloss.NewStyle().Width(width).Render(content)
 		return strings.Split(strings.TrimRight(rendered, "\n"), "\n")

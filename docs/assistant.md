@@ -35,14 +35,18 @@ Register with your email, then enter the code you receive. Activation saves the
 laboratory token locally and opens a separate consent screen. Enter accepts
 that consent and continues to an empty chat; it does not send a request.
 
+You can select text by dragging with the mouse (Shift+drag in some terminals).
+HTTP and HTTPS URLs remain visible and clickable through terminal OSC 8 links.
+
 Examples are hints and cannot be selected. Write a request, then press **Enter**
 to send. The input clears once the service starts the turn; a failure before
 that point preserves the draft. **Alt+Enter** and **Ctrl+J**
 insert a new line, and multiline paste is supported. **Ctrl+N** starts a new chat.
 The input grows from one to six rows, then scrolls while keeping the draft.
-**PgUp/PgDn**, arrows when the input is empty, and the mouse wheel scroll the
-conversation. New content preserves a scrolled position; **End** or sending a
-message returns to the bottom. Type `/` for the command menu:
+**PgUp/PgDn** and arrows when the input is empty scroll the conversation.
+Terminals with alternate scroll send arrows for the mouse wheel, without
+capturing mouse selection. New content preserves a scrolled position;
+**End** or sending a message returns to the bottom. Type `/` for the command menu:
 `/review`, `/new`, `/report`, `/share`, `/help` and `/code`. Enter or Tab completes
 a choice; Enter on a complete command runs it. Unknown commands stay local.
 **F1** opens help. **Esc** stops a running turn without changing the active

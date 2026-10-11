@@ -1251,9 +1251,6 @@ func (model dashboardModel) View() tea.View {
 	}
 	view := tea.NewView(content)
 	view.AltScreen = true
-	if model.screen == dashboardAssistant && (model.assistant.state == "chat" || model.assistant.state == "running") {
-		view.MouseMode = tea.MouseModeCellMotion
-	}
 	return view
 }
 

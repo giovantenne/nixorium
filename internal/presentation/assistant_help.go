@@ -23,6 +23,7 @@ Keys
   Ctrl+R       Review the proposal
   Ctrl+N       New chat
   PgUp/PgDn    Scroll the conversation
+  Select text      Drag with the mouse (or Shift+drag in some terminals)
   Esc          Stop Assistant while it works, or go back`
 
 var assistantCommandDescriptions = map[string]string{
