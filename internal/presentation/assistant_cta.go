@@ -14,7 +14,7 @@ const assistantDisclosure = "When you press Enter, your message and the files th
 const assistantNetworkNotice = "The Assistant service could not be reached. Check the controller's Internet connection and try again."
 const assistantProviderBusyNotice = "The AI provider is busy right now. Your request was not completed; try again in a minute."
 const assistantFailedNotice = "The Assistant could not complete this request. Try again in a minute."
-const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service keeps their content only if you report an answer or turn on\nsharing below. Passwords and private keys in your deployment are never sent.\nLogs and student files are never read.\nNixorium keeps the text of your messages and Assistant's answers for 30 days to detect abuse, then deletes it.\nEach message you send uses one request."
+const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service does not keep your configuration files. It keeps the text of\nyour messages and Assistant's answers for 30 days to detect abuse, then\ndeletes it. Whole conversations, including the files Assistant read, are kept\nfor 90 days only if you report an answer or turn on sharing below.\nPasswords and private keys in your deployment are never sent.\nLogs and student files are never read.\nEach message you send uses one request."
 
 func assistantServiceNotice(err error, subscribeURL string) string {
 	if err != nil {

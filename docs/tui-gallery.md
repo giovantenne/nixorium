@@ -333,10 +333,12 @@ Before you send
 
 Your messages, and the configuration files the assistant reads, are sent to
 the Nixorium Assistant service and to its AI provider to prepare a proposal.
-The service keeps their content only if you report an answer or turn on
-sharing below. Passwords and private keys in your deployment are never sent.
+The service does not keep your configuration files. It keeps the text of
+your messages and Assistant's answers for 30 days to detect abuse, then
+deletes it. Whole conversations, including the files Assistant read, are kept
+for 90 days only if you report an answer or turn on sharing below.
+Passwords and private keys in your deployment are never sent.
 Logs and student files are never read.
-Nixorium keeps the text of your messages and Assistant's answers for 30 days to detect abuse, then deletes it.
 Each message you send uses one request.
 
 [ ] Share my conversations with Nixorium for 90 days to improve Assistant

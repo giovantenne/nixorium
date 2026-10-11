@@ -79,8 +79,10 @@ controller disables the previous token while preserving quota and period.
 Each admitted turn first opens through a request containing client version and
 tool version only. The subsequent steps send the conversation, visible file
 names, requested file contents and tool results to the Assistant service and
-its AI provider. The service retains conversation content for 90 days only when you explicitly
-report an answer or enable conversation sharing. Nixorium keeps the text of your messages and Assistant's answers for 30 days to detect abuse, then deletes it. Sharing is off by default. Do not enter passwords or student data in a request.
+its AI provider. The service does not keep your configuration files. It keeps the text of your
+messages and Assistant's answers for 30 days to detect abuse, then deletes it.
+Whole conversations, including the files Assistant read, are kept for 90 days
+only if you report an answer or turn on sharing. Sharing is off by default. Do not enter passwords or student data in a request.
 
 The model sees tracked files from the chat's base commit plus its own candidate
 files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
