@@ -123,5 +123,14 @@
       "required": [],
       "type": "object"
     }
+  },
+  {
+    "name": "lab_status",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {},
+      "required": [],
+      "type": "object"
+    }
   }
 ]

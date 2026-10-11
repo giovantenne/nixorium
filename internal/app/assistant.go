@@ -64,6 +64,8 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		return "Evaluating the configuration"
 	case "build":
 		return "Building new parts of the proposal"
+	case "lab_status":
+		return "Checking the laboratory state"
 	}
 	return "Checking Assistant tool request"
 }

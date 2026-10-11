@@ -28,6 +28,7 @@ func AssistantToolsV1() []AssistantToolDefinition {
 		definition("search_packages", map[string]any{"query": str}, []string{"query"}),
 		definition("evaluate", map[string]any{}, []string{}),
 		definition("build", map[string]any{}, []string{}),
+		definition("lab_status", map[string]any{}, []string{}),
 	}
 }
 func ValidateAssistantArguments(name string, data []byte) bool {

@@ -125,7 +125,10 @@ func (store AssistantWorkspaceStore) Cleanup() error {
 	return nil
 }
 
-type AssistantWorkspaceTools struct{ Store AssistantWorkspaceStore }
+type AssistantWorkspaceTools struct {
+	Store     AssistantWorkspaceStore
+	LabStatus func(context.Context, string) string
+}
 
 func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation domain.AssistantConversation, call domain.AssistantToolCall) string {
 	if !domain.ValidateAssistantArguments(call.Name, call.Arguments) {
@@ -133,11 +136,17 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	}
 	workspace, err := tools.Store.Open(conversation.ID)
 	if err != nil {
+		if call.Name == "lab_status" {
+			return `{"ok":false,"error":"status_unavailable"}`
+		}
 		return assistantToolFailure(err)
 	}
 	defer workspace.Close()
 	token, err := tools.Store.ReadToken()
 	if err != nil {
+		if call.Name == "lab_status" {
+			return `{"ok":false,"error":"status_unavailable"}`
+		}
 		return assistantToolFailure(err)
 	}
 	if token != "" {
@@ -145,6 +154,12 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	}
 	result := ""
 	switch call.Name {
+	case "lab_status":
+		if tools.LabStatus == nil {
+			result = `{"ok":false,"error":"status_unavailable"}`
+		} else {
+			result = tools.LabStatus(ctx, workspace.Conversation.Repository)
+		}
 	case "search_packages":
 		var args struct{ Query string }
 		json.Unmarshal(call.Arguments, &args)
