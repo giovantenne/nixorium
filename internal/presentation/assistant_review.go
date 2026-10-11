@@ -11,17 +11,16 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-const assistantSavePrompt = "Save? A local commit and a backup are created. Nothing is installed."
 const assistantEvaluationFailed = "Saving is not available: the proposal does not evaluate. Return to the chat and ask the assistant to fix it."
 
 type assistantReviewModel struct {
-	plan       domain.AssistantSavePlan
-	result     domain.TemplateResetResult
-	confirming bool
-	details    bool
-	cursor     int
-	scroll     int
-	saving     bool
+	plan     domain.AssistantSavePlan
+	result   domain.TemplateResetResult
+	details  bool
+	saveOnly bool
+	cursor   int
+	scroll   int
+	saving   bool
 }
 type assistantSavePlanMsg struct{ plan domain.AssistantSavePlan }
 type assistantSaveResultMsg struct{ result domain.TemplateResetResult }
@@ -57,7 +56,27 @@ func (model dashboardModel) finishAssistantSave(msg assistantSaveResultMsg) (tea
 	}
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.deployment.plan = domain.DeploymentPlanReport{}
+	if !model.assistant.review.saveOnly && msg.result.State == "saved" && !msg.result.RecoveryRequired {
+		// One Enter saved; now update the controller and then offer the
+		// computers. Every stop falls back to the saved result screen.
+		return model.continueSaved(true)
+	}
 	return model, nil
+}
+
+func (model dashboardModel) assistantBackToChat() (tea.Model, tea.Cmd) {
+	model.screen = dashboardAssistant
+	model.message = ""
+	model.pageScroll = 0
+	return model, model.assistant.input.Focus()
+}
+
+func (model dashboardModel) startAssistantSave(saveOnly bool) (tea.Model, tea.Cmd) {
+	r := &model.assistant.review
+	r.saving, r.saveOnly = true, saveOnly
+	model.busy, model.message = "Creating the backup and saving the reviewed proposal", ""
+	plan, action := r.plan, model.actions.AssistantService.Save
+	return model, func() tea.Msg { return assistantSaveResultMsg{action(context.Background(), plan)} }
 }
 func (model dashboardModel) updateAssistantReviewKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	r := &model.assistant.review
@@ -65,49 +84,40 @@ func (model dashboardModel) updateAssistantReviewKey(key tea.KeyPressMsg) (tea.M
 		return model, nil
 	}
 	if key.String() == "esc" {
-		if r.details || r.confirming {
-			r.details, r.confirming = false, false
+		if r.details {
+			r.details = false
 			model.message, model.pageScroll = "", 0
 			return model, nil
 		}
-		model.screen = dashboardAssistant
-		model.message = ""
-		model.pageScroll = 0
-		return model, model.assistant.input.Focus()
+		return model.assistantBackToChat()
 	}
 	if r.result.State != "" {
 		if key.String() == "r" && r.result.RecoveryRequired {
 			return model.openResetRecovery()
 		}
 		if key.String() == "enter" {
+			if saved, _ := model.saveFollowupState(); saved && r.saveOnly {
+				return model.assistantBackToChat()
+			}
 			return model.continueSavedConfiguration()
 		}
 		return model, nil
 	}
-	if r.confirming {
-		if key.String() != "enter" || r.plan.State != "ready" || !r.plan.Evaluation.OK {
-			return model, nil
-		}
-		r.saving, r.confirming = true, false
-		model.busy, model.message = "Creating the backup and saving the reviewed proposal", ""
-		plan, action := r.plan, model.actions.AssistantService.Save
-		return model, func() tea.Msg { return assistantSaveResultMsg{action(context.Background(), plan)} }
-	}
 	if !r.details {
 		switch key.String() {
 		case "up":
-			r.cursor = (r.cursor + 2) % 3
+			r.cursor = (r.cursor + 3) % 4
 		case "down":
-			r.cursor = (r.cursor + 1) % 3
+			r.cursor = (r.cursor + 1) % 4
 		case "enter":
 			switch r.cursor {
-			case 0:
+			case 0, 1:
 				if r.plan.State == "ready" && r.plan.Evaluation.OK {
-					r.confirming = true
+					return model.startAssistantSave(r.cursor == 1)
 				}
-			case 1:
-				r.details, r.scroll = true, 0
 			case 2:
+				r.details, r.scroll = true, 0
+			case 3:
 				model.screen = dashboardAssistant
 				return model, model.assistant.input.Focus()
 			}
@@ -220,20 +230,26 @@ func (model dashboardModel) assistantReviewView() string {
 	case r.result.State != "":
 		body = r.result.Message
 		if r.result.State == "saved" && !r.result.RecoveryRequired {
-			body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". Nothing was built or activated.\nTry it on one computer first: Computers → Update computers, select a single computer, check it, then update the others."
+			switch {
+			case r.saveOnly:
+				body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". Computers were not updated.\nYou can update them later from Computers → Update computers: try one computer first, check it, then update the others."
+			case controllerVerifiedForSave(r.result.Revision, model.controller.result):
+				body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". The controller is up to date.\nUpdate the computers from Computers → Update computers: try one computer first, check it, then update the others."
+			default:
+				body = "Saved in a local commit. Backup: " + r.result.BackupRef + ". The controller was not updated.\nTry it on one computer first: Computers → Update computers, select a single computer, check it, then update the others."
+			}
 		} else if r.result.BackupRef != "" {
 			body += "\nBackup: " + r.result.BackupRef
 		}
 		actions = model.saveFollowupActions("Chat")
+		if saved, _ := model.saveFollowupState(); saved && r.saveOnly {
+			actions = []tuiAction{{key: "Enter", label: "Chat"}, {key: "F1", label: "Help"}}
+		}
 		if r.result.RecoveryRequired {
 			actions = append([]tuiAction{{key: "r", label: "Recover"}}, actions...)
 		}
 	case r.plan.State == "blocked":
 		body = r.plan.Message
-	case r.confirming:
-		body = assistantSavePrompt
-		fixed = tuiMuted("Enter Save · Esc Cancel", model.isDark)
-		actions = nil
 	case r.details:
 		lines := model.assistantReviewLines()
 		start := max(0, min(r.scroll, len(lines)-model.assistantReviewHeight()))
@@ -254,15 +270,15 @@ func (model dashboardModel) assistantReviewView() string {
 		if !r.plan.Evaluation.OK {
 			fixed = "✗ The configuration is not valid"
 		}
-		fixed += "\nNothing is installed yet. After saving, update one computer first to try it.\n"
-		for i, label := range []string{"Save this proposal", "Show technical details", "Back to the chat"} {
+		fixed += "\nSaving creates a local commit and a backup. Enter on the first choice also updates this controller; you then choose the computers.\n"
+		for i, label := range []string{"Save and update the controller", "Save only — update computers later", "Technical details", "Back"} {
 			row := tuiSelection(label, r.cursor == i, model.isDark)
-			if i == 0 && !r.plan.Evaluation.OK {
+			if i < 2 && !r.plan.Evaluation.OK {
 				row = tuiMuted(row, model.isDark)
 			}
 			fixed += row + "\n"
 		}
-		fixed += tuiMuted("↑↓ choose · Enter confirm · Esc back", model.isDark)
+		fixed += tuiMuted("↑↓ choose · Enter confirm · Esc back to the chat", model.isDark)
 		actions = nil
 	}
 	notices := []tuiNotice{}

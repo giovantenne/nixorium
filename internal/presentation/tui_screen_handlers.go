@@ -11,7 +11,7 @@ import (
 )
 
 func (model dashboardModel) openControllerReview() (tea.Model, tea.Cmd) {
-	model.controller.fromSave = false
+	model.controller.fromSave, model.controller.autoApply = false, false
 	if reason := model.managedJobConflict(); reason != "" {
 		model.message = reason
 		return model, nil
@@ -1174,7 +1174,7 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 			case "enter":
 				if model.updates.result.Updated && !model.updates.result.HasErrors() && !model.updates.result.RecoveryRequired {
 					if controllerVerifiedForSave(model.updates.result.Revision, model.controller.result) {
-						return model.openSavedDeployment()
+						return model.openSavedDeployment(false)
 					}
 					return model.startUpdateControllerApply()
 				}
@@ -1488,4 +1488,27 @@ func (model dashboardModel) openClassroomView() (tea.Model, tea.Cmd) {
 		text, err := open(ctx)
 		return dashboardClassroomViewMsg{text: text, err: err}
 	}
+}
+
+// startReviewedControllerApply applies the controller plan already held in the
+// model, exactly as Enter on the controller review does.
+func (model dashboardModel) startReviewedControllerApply() (tea.Model, tea.Cmd) {
+	model.busy = "Building and activating the reviewed controller revision"
+	model.controller.applying = true
+	model.controller.progress = domain.OperationProgress{}
+	model.controller.started = time.Now().UTC()
+	model.controller.progressID++
+	model.message = ""
+	plan := model.controller.plan
+	operation := func() tea.Msg {
+		report := model.actions.ApplyController(plan)
+		if model.actions.Refresh == nil {
+			return dashboardControllerResultMsg{report: report}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
+		defer cancel()
+		status, err := model.actions.Refresh(ctx)
+		return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
+	}
+	return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
 }

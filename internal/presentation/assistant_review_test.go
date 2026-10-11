@@ -37,7 +37,7 @@ func TestAssistantReviewLayoutsAndScroll(t *testing.T) {
 				return ansi.Strip(output.String())
 			}
 			view := captureView()
-			for _, want := range []string{"Review the proposal", "What changes", "course.nix changed", "Computers affected", "pc01", "✓ Checked by Nixorium: the configuration is valid", "Save this proposal", "Show technical details", "Back to the chat", "↑↓ choose · Enter confirm · Esc back"} {
+			for _, want := range []string{"Review the proposal", "What changes", "course.nix changed", "Computers affected", "pc01", "✓ Checked by Nixorium: the configuration is valid", "Save and update the controller", "Save only — update computers later", "Technical details", "Back", "↑↓ choose · Enter confirm · Esc back to the chat"} {
 				if !strings.Contains(view, want) {
 					t.Fatalf("%v missing %s: %s", size, want, view)
 				}
@@ -54,6 +54,8 @@ func TestAssistantReviewLayoutsAndScroll(t *testing.T) {
 				}
 			}
 			updated, _ := m.Update(keyPress("down"))
+			m = updated.(dashboardModel)
+			updated, _ = m.Update(keyPress("down"))
 			m = updated.(dashboardModel)
 			updated, _ = m.Update(keyPress("enter"))
 			m = updated.(dashboardModel)
@@ -155,77 +157,193 @@ func TestAssistantSaveWordsOpenLocalReview(t *testing.T) {
 		}
 	}
 }
-func TestAssistantReviewSaveAndFollowup(t *testing.T) {
+
+type assistantChain struct {
+	saves, plans, applies, deploys, inventories int
+	planReport                                  domain.ControllerRebuildPlanReport
+	applyReport                                 domain.ControllerRebuildExecutionReport
+	clients                                     []domain.HostMeta
+}
+
+func assistantChainFixture(c *assistantChain) dashboardModel {
 	m := assistantReviewFixture()
-	saves := 0
+	revision := strings.Repeat("b", 40)
+	c.planReport = domain.ControllerRebuildPlanReport{State: "ready", Revision: revision}
+	c.applyReport = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", State: "completed", Revision: revision, Applied: true, Verified: true}
+	c.clients = []domain.HostMeta{{Name: "pc01"}, {Name: "pc02"}}
 	m.actions.AssistantService = &AssistantActions{Save: func(context.Context, domain.AssistantSavePlan) domain.TemplateResetResult {
-		saves++
-		return domain.TemplateResetResult{State: "saved", Revision: "new", BackupRef: "refs/nixorium/assistant-backups/example"}
+		c.saves++
+		return domain.TemplateResetResult{State: "saved", Revision: revision, BackupRef: "refs/nixorium/assistant-backups/example"}
 	}}
+	m.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport { c.plans++; return c.planReport }
+	m.actions.ApplyController = func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+		c.applies++
+		return c.applyReport
+	}
+	m.actions.LoadInventory = func(context.Context) (domain.StatusReport, error) {
+		c.inventories++
+		report := domain.StatusReport{}
+		report.Meta.Controller.Name = "pc99"
+		report.Meta.Clients.Hosts = c.clients
+		return report, nil
+	}
+	m.actions.PlanDeployment = func(_ context.Context, requested string) domain.DeploymentPlanReport {
+		c.deploys++
+		return domain.DeploymentPlanReport{State: "ready", Requested: requested, Targets: []domain.DeploymentTarget{{Name: "pc01"}, {Name: "pc02"}}}
+	}
+	return m
+}
+
+// runChain presses Enter once and then only delivers the commands' messages.
+func runChain(t *testing.T, m dashboardModel) dashboardModel {
+	t.Helper()
 	updated, cmd := m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
-	if cmd != nil || saves != 0 || !m.assistant.review.confirming || !strings.Contains(ansi.Strip(m.View().Content), assistantSavePrompt) {
-		t.Fatal("confirmation did not open")
+	for steps := 0; cmd != nil; steps++ {
+		if steps > 30 {
+			t.Fatal("chain does not settle")
+		}
+		msg := cmd()
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			msg = batch[0]()
+		}
+		updated, cmd = m.Update(msg)
+		m = updated.(dashboardModel)
+	}
+	return m
+}
+
+func TestAssistantReviewOptionsAndNoConfirmationStep(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(c)
+	m.width, m.height = 100, 40
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"Save and update the controller", "Save only — update computers later", "Technical details", "Back"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q: %s", want, view)
+		}
+	}
+	m.assistant.review.plan.Evaluation.OK = false
+	updated, cmd := m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	if cmd != nil || c.saves != 0 || m.assistant.review.saving {
+		t.Fatal("failed evaluation saved")
+	}
+}
+
+func TestAssistantSaveAndUpdateControllerWithOneEnter(t *testing.T) {
+	c := &assistantChain{}
+	m := runChain(t, assistantChainFixture(c))
+	if c.saves != 1 || c.plans != 1 || c.applies != 1 || c.inventories != 1 || c.deploys != 1 {
+		t.Fatalf("calls: %+v", *c)
+	}
+	if m.screen != dashboardDeployReview || len(m.deployment.chosen) != 2 || !m.deployment.chosen["pc01"] || !m.deployment.chosen["pc02"] {
+		t.Fatalf("screen=%v chosen=%v message=%s", m.screen, m.deployment.chosen, m.message)
+	}
+	if !m.assistant.saved || m.assistant.changedFiles != 0 || m.controller.autoApply || m.controller.fromSave {
+		t.Fatal("assistant or controller flags not settled")
+	}
+}
+
+func TestAssistantChainSkipsCurrentController(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(c)
+	m.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
+		c.plans++
+		return domain.ControllerRebuildPlanReport{State: "current", Current: true, Revision: strings.Repeat("b", 40)}
+	}
+	m = runChain(t, m)
+	if c.plans != 1 || c.applies != 0 || c.deploys != 1 || m.screen != dashboardDeployReview {
+		t.Fatalf("calls: %+v screen=%v", *c, m.screen)
+	}
+	// A controller already verified for the saved revision skips the review.
+	c2 := &assistantChain{}
+	m = assistantChainFixture(c2)
+	m.controller.result = domain.ControllerRebuildExecutionReport{Operation: "controller-apply", Revision: strings.Repeat("b", 40), Applied: true, Verified: true}
+	m = runChain(t, m)
+	if c2.plans != 0 || c2.applies != 0 || c2.deploys != 1 || m.screen != dashboardDeployReview {
+		t.Fatalf("verified controller: %+v screen=%v", *c2, m.screen)
+	}
+}
+
+func TestAssistantChainStopsOnControllerPlanIssues(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(c)
+	m.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
+		c.plans++
+		return domain.ControllerRebuildPlanReport{State: "blocked", Issues: []domain.ValidationIssue{{Message: "dirty"}}}
+	}
+	m = runChain(t, m)
+	if c.plans != 1 || c.applies != 0 || c.deploys != 0 || m.screen != dashboardAssistantReview || m.controller.autoApply || m.assistant.review.result.State != "saved" {
+		t.Fatalf("calls: %+v screen=%v", *c, m.screen)
+	}
+}
+
+func TestAssistantChainStopsOnControllerApplyFailure(t *testing.T) {
+	for _, report := range []domain.ControllerRebuildExecutionReport{
+		{Operation: "controller-apply", State: "failed", Revision: strings.Repeat("b", 40), Issues: []domain.ValidationIssue{{Message: "boom"}}},
+		{Operation: "controller-apply", State: "recovery", Revision: strings.Repeat("b", 40), Applied: true},
+	} {
+		c := &assistantChain{}
+		m := assistantChainFixture(c)
+		m.actions.ApplyController = func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
+			c.applies++
+			return report
+		}
+		m = runChain(t, m)
+		if c.applies != 1 || c.inventories != 0 || c.deploys != 0 || m.screen != dashboardController || m.controller.autoApply || m.controller.fromSave {
+			t.Fatalf("calls: %+v screen=%v", *c, m.screen)
+		}
+	}
+}
+
+func TestAssistantChainWithoutClientsShowsSavedResult(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(c)
+	c.clients = nil
+	m = runChain(t, m)
+	if c.applies != 1 || c.deploys != 0 || m.screen != dashboardAssistantReview || m.message != "No client computers are configured." {
+		t.Fatalf("calls: %+v screen=%v message=%q", *c, m.screen, m.message)
+	}
+}
+
+func TestAssistantChainEscapeDuringControllerReviewReturnsToResult(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(c)
+	updated, cmd := m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(cmd()) // save result starts the controller review read
+	m = updated.(dashboardModel)
+	if m.read.cancel == nil || !m.controller.autoApply {
+		t.Fatal("controller review did not start")
 	}
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)
-	if m.assistant.review.confirming || m.screen != dashboardAssistantReview {
-		t.Fatal("confirmation cancellation failed")
-	}
-	m.assistant.review.plan.Evaluation.OK = false
-	updated, cmd = m.Update(keyPress("enter"))
-	m = updated.(dashboardModel)
-	if cmd != nil || saves != 0 || m.assistant.review.confirming {
-		t.Fatal("failed evaluation saved")
-	}
-	m.assistant.review.plan.Evaluation.OK = true
-	updated, cmd = m.Update(keyPress("enter"))
-	m = updated.(dashboardModel)
-	if cmd != nil || !m.assistant.review.confirming {
-		t.Fatal("confirmation missing")
-	}
-	updated, cmd = m.Update(keyPress("enter"))
-	m = updated.(dashboardModel)
-	if cmd == nil || !m.assistant.review.saving {
-		t.Fatal("Enter did not start save")
-	}
-	updated, _ = m.Update(cmd())
-	m = updated.(dashboardModel)
-	if saves != 1 || m.assistant.review.result.State != "saved" || m.assistant.review.saving {
-		t.Fatal("save result missing")
-	}
-	planned, applied := 0, 0
-	m.actions.PlanController = func(context.Context) domain.ControllerRebuildPlanReport {
-		planned++
-		return domain.ControllerRebuildPlanReport{}
-	}
-	m.actions.ApplyController = func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport {
-		applied++
-		return domain.ControllerRebuildExecutionReport{}
-	}
-	if !strings.Contains(m.View().Content, "Apply to this controller") || !strings.Contains(m.View().Content, "Backup:") {
-		t.Fatal(m.View().Content)
-	}
-	view := strings.Join(strings.Fields(demoANSI.ReplaceAllString(m.View().Content, "")), " ")
-	for _, want := range []string{"Nothing was built or activated.", "Try it on one computer first: Computers → Update computers, select a single computer, check it, then update the others."} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("saved proposal lacks field verification guidance %q: %s", want, view)
-		}
-	}
-	help := strings.Join(strings.Fields(demoANSI.ReplaceAllString(m.helpView(), "")), " ")
-	if !strings.Contains(help, "After saving, update one computer first and check it before the others.") {
-		t.Fatal("proposal help lacks field verification guidance", help)
-	}
-	updated, cmd = m.Update(keyPress("enter"))
-	m = updated.(dashboardModel)
-	if cmd == nil || !m.controller.fromSave || m.controller.saveOrigin != dashboardAssistantReview {
-		t.Fatal("followup did not review controller")
-	}
-	cmd()
-	if planned != 1 || applied != 0 {
-		t.Fatal("followup applied without review")
+	if m.screen != dashboardAssistantReview || m.controller.autoApply || m.controller.fromSave || c.applies != 0 {
+		t.Fatalf("cancel: screen=%v auto=%v", m.screen, m.controller.autoApply)
 	}
 }
+
+func TestAssistantSaveOnlyReturnsToChat(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(c)
+	updated, _ := m.Update(keyPress("down"))
+	m = updated.(dashboardModel)
+	m = runChain(t, m)
+	if c.saves != 1 || c.plans+c.applies+c.deploys+c.inventories != 0 || m.screen != dashboardAssistantReview {
+		t.Fatalf("calls: %+v screen=%v", *c, m.screen)
+	}
+	view := strings.Join(strings.Fields(ansi.Strip(m.View().Content)), " ")
+	if !strings.Contains(view, "Computers were not updated") || !strings.Contains(view, "Computers → Update computers") {
+		t.Fatal(view)
+	}
+	updated, _ = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	if m.screen != dashboardAssistant || !m.assistant.saved || m.assistant.changedFiles != 0 || c.plans != 0 {
+		t.Fatalf("Enter did not return to the chat: %v", m.screen)
+	}
+}
+
 func TestAssistantReviewOnlyForChangesAndCancellation(t *testing.T) {
 	m := assistantReviewFixture()
 	m.screen = dashboardAssistant

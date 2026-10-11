@@ -421,11 +421,13 @@ Computers affected
 pc01
 
 ✓ Checked by Nixorium: the configuration is valid
-Nothing is installed yet. After saving, update one computer first to try it.
-› Save this proposal
-  Show technical details
-  Back to the chat
-↑↓ choose · Enter confirm · Esc back
+Saving creates a local commit and a backup. Enter on the first choice also updates this controller; you then
+choose the computers.
+› Save and update the controller
+  Save only — update computers later
+  Technical details
+  Back
+↑↓ choose · Enter confirm · Esc back to the chat
 ```
 
 ## Assistant evaluation failure
@@ -440,11 +442,13 @@ Computers affected
 pc01
 
 ✗ The configuration is not valid
-Nothing is installed yet. After saving, update one computer first to try it.
-› Save this proposal
-  Show technical details
-  Back to the chat
-↑↓ choose · Enter confirm · Esc back
+Saving creates a local commit and a backup. Enter on the first choice also updates this controller; you then
+choose the computers.
+› Save and update the controller
+  Save only — update computers later
+  Technical details
+  Back
+↑↓ choose · Enter confirm · Esc back to the chat
 ```
 
 ## Assistant saved configuration
@@ -452,7 +456,7 @@ Nothing is installed yet. After saving, update one computer first to try it.
 ```text
 Nixorium  /  Assistant  /  Review the proposal
 
-Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Nothing was built or activated.
+Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. The controller was not updated.
 Try it on one computer first: Computers → Update computers, select a single computer, check it, then update the
 others.
 

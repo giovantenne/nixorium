@@ -249,6 +249,7 @@ func deploymentOffComputers(plan domain.DeploymentPlanReport) []string {
 // cannot be mistaken for the current activation.
 type controllerModel struct {
 	fromSave            bool
+	autoApply           bool
 	saveOrigin          dashboardScreen
 	plan                domain.ControllerRebuildPlanReport
 	result              domain.ControllerRebuildExecutionReport

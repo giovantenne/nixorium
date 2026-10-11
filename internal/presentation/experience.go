@@ -221,7 +221,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "v  View existing managed work without starting or resuming it")
 		}
 	case dashboardAssistantReview:
-		lines = append(lines, "Choose Show technical details to scroll the full comparison.", "Choose Save this proposal in the review (Ctrl+R), then Enter to confirm; Esc goes back.", "Saving records a local commit and a backup. Controller application and computer updates require separate reviews.")
+		lines = append(lines, "Choose Technical details to scroll the full comparison.", "Save and update the controller (Ctrl+R, then Enter) saves a local commit and a backup, updates this controller, then lets you choose the computers.", "Save only keeps the change; update computers later from Computers → Update computers. Esc goes back.")
 		lines = append(lines, "After saving, update one computer first and check it before the others.")
 	case dashboardAssistant:
 		switch model.assistant.state {

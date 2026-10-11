@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -75,12 +76,19 @@ func (model dashboardModel) saveFollowupActions(back string) []tuiAction {
 }
 
 func (model dashboardModel) continueSavedConfiguration() (tea.Model, tea.Cmd) {
+	return model.continueSaved(false)
+}
+
+// continueSaved reviews the controller for the saved revision. With auto, only
+// the Assistant path, a clean review applies it and a verified controller
+// opens the deployment review without further key presses.
+func (model dashboardModel) continueSaved(auto bool) (tea.Model, tea.Cmd) {
 	saved, revision := model.saveFollowupState()
 	if !saved {
 		return model, nil
 	}
 	if controllerVerifiedForSave(revision, model.controller.result) {
-		return model.openSavedDeployment()
+		return model.openSavedDeployment(auto)
 	}
 	if model.actions.PlanController == nil || model.actions.ApplyController == nil {
 		model.message = "Controller application is unavailable in this session; the configuration remains saved."
@@ -91,19 +99,21 @@ func (model dashboardModel) continueSavedConfiguration() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	model.controller.fromSave, model.controller.saveOrigin = true, model.screen
+	model.controller.autoApply = auto
 	model.installation.flow = false
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.controller.result = domain.ControllerRebuildExecutionReport{}
 	model.confirmation, model.message = "", ""
 	model.busy = "Reviewing the saved configuration for this controller"
-	// Keep the result visible and return there on cancellation. This read never
-	// chains an apply: the ordinary controller review still requires Enter.
+	// Keep the result visible and return there on cancellation. Only the
+	// Assistant path (autoApply) chains an apply; the ordinary controller
+	// review still requires Enter.
 	return model.startRead(func(ctx context.Context) tea.Msg {
 		return dashboardControllerPlanMsg{report: model.actions.PlanController(ctx)}
 	})
 }
 
-func (model dashboardModel) openSavedDeployment() (tea.Model, tea.Cmd) {
+func (model dashboardModel) openSavedDeployment(auto bool) (tea.Model, tea.Cmd) {
 	if model.actions.LoadInventory == nil || model.actions.PlanDeployment == nil {
 		model.message = "Computer deployment is unavailable in this session."
 		return model, nil
@@ -116,6 +126,19 @@ func (model dashboardModel) openSavedDeployment() (tea.Model, tea.Cmd) {
 		ready.screen = dashboardDeploy
 		ready.deployment = deploymentModel{chosen: map[string]bool{}, context: "Saved configuration: select computers, review again and confirm. Student-home and keyboard changes may require the next computer start."}
 		ready.confirmation, ready.message, ready.pageScroll = "", "", 0
-		return ready, nil
+		if !auto {
+			return ready, nil
+		}
+		// Every configured computer starts selected, as on the deployment review.
+		names := make([]string, 0, len(ready.report.Meta.Clients.Hosts))
+		for _, host := range ready.report.Meta.Clients.Hosts {
+			ready.deployment.chosen[host.Name] = true
+			names = append(names, host.Name)
+		}
+		requested := strings.Join(names, ",")
+		if ready.actions.LoadRemoteInstall != nil {
+			return ready.checkDeploymentUSB(requested, false)
+		}
+		return ready.planSelectedDeployment(requested)
 	})
 }

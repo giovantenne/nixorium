@@ -588,6 +588,23 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
 		}
+		if model.controller.autoApply {
+			// Assistant path: a clean, applicable review is applied without
+			// another key press. Anything else stops on the ordinary screens.
+			if message.report.HasErrors() || !model.controller.fromSave {
+				model.controller.autoApply = false
+			} else if controllerPlanCurrent(message.report) {
+				model.controller.autoApply, model.controller.fromSave = false, false
+				model.screen = model.controller.saveOrigin
+				return model.openSavedDeployment(true)
+			} else if message.report.State == "ready" {
+				model.message = ""
+				model.screen = dashboardControllerReview
+				return model.startReviewedControllerApply()
+			} else {
+				model.controller.autoApply = false
+			}
+		}
 		if message.report.HasErrors() {
 			model.message = controllerPlanIssues(message.report)
 			model.screen = dashboardController
@@ -628,9 +645,22 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		model.screen = dashboardController
 		if model.controller.fromSave {
-			model.screen = model.controller.saveOrigin
-			model.controller.fromSave = false
+			if model.controller.autoApply {
+				origin := model.controller.saveOrigin
+				model.controller.autoApply, model.controller.fromSave = false, false
+				model.screen = origin
+				if saved, revision := model.saveFollowupState(); saved && controllerVerifiedForSave(revision, message.report) {
+					return model.openSavedDeployment(true)
+				}
+				// Not verified: stay on the controller result with its
+				// recovery actions and never continue to the clients.
+				model.screen = dashboardController
+			} else {
+				model.screen = model.controller.saveOrigin
+				model.controller.fromSave = false
+			}
 		}
+		model.controller.autoApply = false
 		if model.actions.LoadControllerProgress != nil {
 			return model, model.loadControllerProgress(model.controller.progressID)
 		}
