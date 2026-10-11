@@ -811,24 +811,7 @@ func (model dashboardModel) updateOperationScreenKey(key tea.KeyPressMsg) (tea.M
 				model.message = "This controller is already up to date; nothing was started."
 				return model, nil
 			}
-			model.busy = "Building and activating the reviewed controller revision"
-			model.controller.applying = true
-			model.controller.progress = domain.OperationProgress{}
-			model.controller.started = time.Now().UTC()
-			model.controller.progressID++
-			model.message = ""
-			plan := model.controller.plan
-			operation := func() tea.Msg {
-				report := model.actions.ApplyController(plan)
-				if model.actions.Refresh == nil {
-					return dashboardControllerResultMsg{report: report}
-				}
-				ctx, cancel := context.WithTimeout(context.Background(), dashboardReadTimeout)
-				defer cancel()
-				status, err := model.actions.Refresh(ctx)
-				return dashboardControllerResultMsg{report: report, status: status, statusErr: err}
-			}
-			return model, tea.Batch(operation, scheduleControllerProgressTick(model.controller.progressID))
+			return model.startReviewedControllerApply()
 		}
 	case dashboardServices:
 		if model.maintenance.serviceResult.Operation != "" {
