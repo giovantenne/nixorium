@@ -99,6 +99,16 @@ func TestAssistantInputCommandsExamplesAndPaste(t *testing.T) {
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(keyPress("down"))
 	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	if m.assistant.input.Value() != "" || m.assistant.state != "chat" {
+		t.Fatal("Enter should run the command chosen with the arrows")
+	}
+	m.assistant.input.SetValue("/")
+	updated, _ = m.Update(keyPress("down"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("down"))
+	m = updated.(dashboardModel)
 	updated, _ = m.Update(keyPress("tab"))
 	m = updated.(dashboardModel)
 	if m.assistant.input.Value() != "/new" {
@@ -118,13 +128,8 @@ func TestAssistantInputCommandsExamplesAndPaste(t *testing.T) {
 	m.assistant.input.SetValue("/he")
 	updated, _ = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
-	if m.assistant.input.Value() != "/help" || m.helpOpen {
-		t.Fatal("Enter should complete prefix")
-	}
-	updated, _ = m.Update(keyPress("enter"))
-	m = updated.(dashboardModel)
-	if !m.helpOpen {
-		t.Fatal("help command")
+	if m.assistant.input.Value() != "" || !m.helpOpen {
+		t.Fatal("Enter should run the highlighted command")
 	}
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)

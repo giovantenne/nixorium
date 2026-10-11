@@ -277,14 +277,10 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 		case "down":
 			model.assistant.commandCursor = (model.assistant.commandCursor + 1) % len(choices)
 			return model, nil
-		case "tab", "enter":
-			if key.String() == "enter" {
-				for _, command := range assistantCommands {
-					if model.assistant.input.Value() == command {
-						return model.assistantCommand(command)
-					}
-				}
-			}
+		case "enter":
+			// Like modern agents: Enter runs the highlighted command, Tab only completes it.
+			return model.assistantCommand(choices[model.assistant.commandCursor%len(choices)])
+		case "tab":
 			model.assistant.input.SetValue(choices[model.assistant.commandCursor%len(choices)])
 			model.assistant.input.CursorEnd()
 			return model, nil
