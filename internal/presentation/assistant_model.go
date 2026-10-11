@@ -56,6 +56,7 @@ type assistantModel struct {
 	events                                      <-chan tea.Msg
 	conversation                                domain.AssistantConversation
 	account                                     domain.AssistantAccount
+	accessError                                 string
 	offer                                       domain.AssistantOffer
 	entries                                     []assistantEntry
 	started                                     time.Time
@@ -103,11 +104,21 @@ type assistantCleanupMsg struct{ err error }
 func newAssistantModel() assistantModel {
 	input := textarea.New()
 	input.Prompt = "> "
+	input.SetPromptFunc(2, func(info textarea.PromptInfo) string {
+		if info.LineNumber == 0 {
+			return "> "
+		}
+		return "  "
+	})
 	input.Placeholder = "Describe what your lab should do"
 	input.ShowLineNumbers = false
 	input.CharLimit = domain.AssistantTextLimit
-	input.MaxHeight = 0
-	input.SetHeight(3)
+	input.DynamicHeight = true
+	input.MinHeight = 1
+	input.MaxHeight = 6
+	// Keep the content bound independent of the six-row visible viewport.
+	input.MaxContentHeight = domain.AssistantTextLimit
+	input.SetHeight(1)
 	input.SetWidth(68)
 	input.Focus()
 	code := textinput.New()
@@ -228,6 +239,7 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 	model.assistant.sharing = message.sharing
 	if message.account != nil {
 		model.assistant.account = *message.account
+		model.assistant.accessError = ""
 	}
 	if message.err != nil {
 		if model.assistant.cancel != nil {
@@ -238,6 +250,7 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 		model.message = model.assistantNotice(message.err)
 		var serviceError *domain.AssistantError
 		if errors.As(message.err, &serviceError) {
+			model.assistant.noteAccessError(serviceError.Code)
 			switch serviceError.Code {
 			case "consent_required":
 				model.assistant.state = "consent"
@@ -333,6 +346,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		}
 		model.assistant.messages = append(model.assistant.messages, domain.AssistantMessage{Role: "assistant", Content: model.assistant.streamed})
 	case "error":
+		model.assistant.noteAccessError(event.Code)
 		model.message = model.assistantNotice(&domain.AssistantError{Code: event.Code})
 	}
 	return model, model.waitAssistantStream()
@@ -361,6 +375,7 @@ func (model dashboardModel) finishAssistantActivation(message assistantActivatio
 	}
 	model.assistant.sharing = message.sharing
 	model.assistant.account = message.account
+	model.assistant.accessError = ""
 	model.assistant.token = message.token
 	model.assistant.onboarding = false
 	model.assistant.activationLink = ""
@@ -430,7 +445,14 @@ func (model dashboardModel) finishAssistantAccount(message assistantAccountMsg) 
 		model.assistant.token = message.token
 	}
 	if message.account != nil {
+		if model.assistant.accessError != "" && message.account.Status == "active" && message.account.TurnsRemaining > 0 {
+			model.message = ""
+		}
 		model.assistant.account = *message.account
+		model.assistant.accessError = ""
+	}
+	if errors.As(message.err, &serviceError) {
+		model.assistant.noteAccessError(serviceError.Code)
 	}
 	if model.assistant.state == "welcome" && message.token != "" {
 		model.assistant.onboarding = false

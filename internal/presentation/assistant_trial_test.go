@@ -51,7 +51,14 @@ func TestAssistantTrialAccountAndPurchaseGate(t *testing.T) {
 			}
 			updated, _ := m.Update(m.refreshAssistantAccount()())
 			m = updated.(dashboardModel)
-			if test.plan == "trial" && !strings.Contains(m.View().Content, fmt.Sprintf("Free trial · %d of 5 left", test.remaining)) {
+			quota := "No requests left"
+			if test.plan == "trial" {
+				quota = "Free trial ended"
+				if test.status == "active" && test.remaining > 0 {
+					quota = fmt.Sprintf("Free trial · %d of 5 left", test.remaining)
+				}
+			}
+			if !strings.Contains(m.View().Content, quota) {
 				t.Fatal("trial quota not visible")
 			}
 			updated, command := m.Update(keyPress("enter"))

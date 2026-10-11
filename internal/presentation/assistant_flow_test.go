@@ -397,7 +397,7 @@ func TestAssistantProposalReadyUsesActualChangeCount(t *testing.T) {
 				t.Fatal("empty workspace advertised")
 			}
 		} else {
-			want := fmt.Sprintf("Proposal ready · %d files changed", count)
+			want := "Proposal ready · " + countNoun(count, "file") + " changed"
 			if !strings.Contains(m.View().Content, want) || !strings.Contains(m.View().Content, "Ctrl+R to review") {
 				t.Fatal(m.View().Content)
 			}

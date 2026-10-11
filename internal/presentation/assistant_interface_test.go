@@ -265,7 +265,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 				switch state {
 				case "welcome":
 					m.assistant.account = domain.AssistantAccount{}
-					required = append(required, "Start a free trial", "I have an activation code", "Subscribe ·", "Enter confirm")
+					required = append(required, "e.g. Install GIMP", "Start a free trial", "I have an activation code", "Subscribe ·", "Enter confirm")
 				case "activate":
 					m.assistant.account = domain.AssistantAccount{}
 					m.assistant.activationLink = m.assistant.offer.TrialURL
@@ -280,7 +280,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					m.assistant.state = "chat"
 					m.assistant.entries = []assistantEntry{{"user", assistantExamples[0]}, {"assistant", "# Proposal\n**Ready**\n- Install `gimp`\n```nix\n{ course = 2; }\n```"}}
 					m.assistant.changedFiles = 1
-					required = append(required, "Proposal ready · 1 files changed", "Ctrl+R to review")
+					required = append(required, "Proposal ready · 1 file changed", "Ctrl+R to review")
 					if size[0] >= 120 {
 						required = append(required, "› You")
 					}
@@ -288,8 +288,9 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					m.assistant.state = "chat"
 					m.assistant.input.SetValue("Keep this draft")
 					m.assistant.account.UpgradeURL = "https://assistant.example/upgrade?account=synthetic"
+					m.assistant.account.Status = "inactive"
 					m.message = m.assistantNotice(&domain.AssistantError{Code: "quota_exhausted"})
-					required = append(required, "Your free trial has ended", "Keep this draft", "/code")
+					required = append(required, "Free trial ended", "Your free trial has ended", "Keep this draft", "/code")
 				case "commands":
 					m.assistant.state = "chat"
 					m.assistant.input.SetValue("/")

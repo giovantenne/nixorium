@@ -233,9 +233,9 @@ Welcome to Assistant
 Describe what your lab should do. Assistant prepares the change, checks it with Nix, and you review it before
 anything is saved or installed.
 
-Install GIMP and Inkscape on all student PCs
-Block the Internet on pc01–pc06 every Tuesday 10–12
-pc03 still shows the old wallpaper: what is wrong?
+  e.g. Install GIMP and Inkscape on all student PCs
+       Block the Internet on pc01–pc06 every Tuesday 10–12
+       pc03 still shows the old wallpaper: what is wrong?
 
 › Start a free trial · 5 requests, no payment
   I have an activation code
@@ -283,10 +283,10 @@ Assistant · Example laboratory                                                 
 
 
 
+
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │
-│>                                                                                                                 │
-│>                                                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
@@ -294,16 +294,18 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ## Assistant trial conversion
 
 ```text
-Assistant · Example laboratory                                                              Free trial · 0 of 5 left
+Assistant · Example laboratory                                                                      Free trial ended
 
 › Install GIMP and Inkscape on all student PCs
   Block the Internet on pc01–pc06 every Tuesday 10–12
   pc03 still shows the old wallpaper: what is wrong?
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│! Your free trial has ended. Subscribe to continue: https://assistant.nixorium.org/upgrade?account=12345678-1234- │
-│4234-8234-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA. This controller stays  │
-│activated. Type /code to enter a new activation code.                                                             │
+│ ! Your free trial has ended. Subscribe to continue: https://assistant.nixorium.org/upgrade?account=12345678-     │
+│ 1234-4234-8234-123456789abc&expires=2000000000&sig=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA. This controller  │
+│ stays activated. Type /code to enter a new activation code.                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
 
 
 
@@ -317,8 +319,6 @@ Assistant · Example laboratory                                                 
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │
-│>                                                                                                                 │
-│>                                                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
@@ -392,13 +392,13 @@ Prepared the course for pc01.
 
 
 
+
+
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│Proposal ready · 1 files changed                                                                  Ctrl+R to review│
+│ Proposal ready · 1 file changed                                                                 Ctrl+R to review │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │
-│>                                                                                                                 │
-│>                                                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```

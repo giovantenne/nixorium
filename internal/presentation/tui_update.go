@@ -1121,7 +1121,6 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.height = message.Height
 		if model.assistant.initialized {
 			model.assistant.input.SetWidth(max(20, model.width-6))
-			model.assistant.input.SetHeight(3)
 		}
 		model.ensureHomeMenu()
 		model.homeMenu.setSize(model.width, model.height)

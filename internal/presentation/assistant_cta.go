@@ -71,7 +71,11 @@ func (model dashboardModel) assistantGateView() string {
 	title, body, hint := "Welcome to Assistant", "", "↑↓ choose · Enter confirm · Esc back"
 	switch model.assistant.state {
 	case "welcome":
-		body = assistantWelcomeText + "\n\n" + strings.Join(assistantExamples, "\n") + "\n\n"
+		examples := []string{"  e.g. " + assistantExamples[0]}
+		for _, example := range assistantExamples[1:] {
+			examples = append(examples, "       "+example)
+		}
+		body = assistantWelcomeText + "\n\n" + tuiMuted(strings.Join(examples, "\n"), model.isDark) + "\n\n"
 		subscribe := "Subscribe"
 		if offer.PriceText != "" {
 			subscribe += " · " + offer.PriceText

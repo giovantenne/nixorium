@@ -38,6 +38,7 @@ that consent and continues to an empty chat; it does not send a request.
 Select a suggested example with the arrows and press Enter to copy it into the
 input. Write a request, then press **Enter** to send. **Alt+Enter** and **Ctrl+J**
 insert a new line, and multiline paste is supported. **Ctrl+N** starts a new chat.
+The input grows from one to six rows, then scrolls while keeping the draft.
 **PgUp/PgDn** scroll the conversation. Type `/` for the command menu:
 `/review`, `/new`, `/report`, `/share`, `/help` and `/code`. Enter or Tab completes
 a choice; Enter on a complete command runs it. Unknown commands stay local.
@@ -53,7 +54,8 @@ The free trial includes five requests for thirty days, with one trial per email
 address. Register with your email, school name and privacy consent on the
 service's `/trial` page, then enter the code delivered by email. Before using
 the code, you can submit the form again to replace it if delivery failed.
-After activation, the screen shows **Free trial · N of 5 left**.
+After activation, the screen shows **Free trial · N of 5 left**. An ended trial
+shows **Free trial ended**; exhausted annual quota shows **No requests left**.
 The controller checks account metadata without sending your draft or files,
 and refreshes that count after a request.
 

@@ -130,7 +130,7 @@
               send("\x0e")
               time.sleep(0.3)
               send("Prepare the course for pc01.\r")
-              wait("Proposal ready · 1 files changed")
+              wait("Proposal ready · 1 file changed")
               wait("Ctrl+R to review")
               wait("✓ Evaluation passed · changes pc01")
               send("\x12")

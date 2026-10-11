@@ -18,6 +18,12 @@ const assistantWelcomeText = "Describe what your lab should do. Assistant prepar
 
 type assistantEntry struct{ role, text string }
 
+func (model *assistantModel) noteAccessError(code string) {
+	if code == "subscription_inactive" || code == "quota_exhausted" {
+		model.accessError = code
+	}
+}
+
 func (model *assistantModel) appendText(text string) {
 	if len(model.entries) > 0 && model.entries[len(model.entries)-1].role == "assistant" {
 		model.entries[len(model.entries)-1].text += text
@@ -146,22 +152,22 @@ func assistantToolResultLine(name, data, controller string) string {
 func assistantMarkdown(text string, dark bool) string {
 	text = assistantDisplayText(text)
 	lines := strings.Split(text, "\n")
+	content := make([]string, 0, len(lines))
 	fenced := false
 	bold := lipgloss.NewStyle().Bold(true)
 	muted := lipgloss.NewStyle().Foreground(newTUITheme(dark).muted)
-	for i, line := range lines {
+	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "```") {
 			fenced = !fenced
-			lines[i] = muted.Render(line)
 			continue
 		}
 		if fenced {
-			lines[i] = muted.Render(line)
+			content = append(content, muted.Render("  "+line))
 			continue
 		}
 		if strings.HasPrefix(trimmed, "#") {
-			lines[i] = bold.Render(strings.TrimSpace(strings.TrimLeft(trimmed, "#")))
+			content = append(content, bold.Render(strings.TrimSpace(strings.TrimLeft(trimmed, "#"))))
 			continue
 		}
 		rendered := ""
@@ -188,9 +194,9 @@ func assistantMarkdown(text string, dark bool) string {
 			rendered += line[:start] + style.Render(tail[:end])
 			line = tail[end+len(marker):]
 		}
-		lines[i] = rendered
+		content = append(content, rendered)
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(content, "\n")
 }
 func (model dashboardModel) assistantHeader(width int) string {
 	name := strings.ReplaceAll(assistantDisplayText(model.assistant.account.Name), "\n", " ")
@@ -207,6 +213,11 @@ func (model dashboardModel) assistantHeader(width int) string {
 		if account.Plan == "trial" {
 			right = fmt.Sprintf("Free trial · %d of 5 left", account.TurnsRemaining)
 			warn = account.TurnsRemaining <= 1
+			if account.Status == "inactive" || account.TurnsRemaining <= 0 || model.assistant.accessError == "subscription_inactive" || model.assistant.accessError == "quota_exhausted" {
+				right, warn = "Free trial ended", true
+			}
+		} else if account.TurnsRemaining <= 0 || model.assistant.accessError == "quota_exhausted" {
+			right, warn = "No requests left", true
 		}
 	}
 	theme := newTUITheme(model.isDark)
@@ -228,7 +239,7 @@ func (model dashboardModel) assistantBox(text string, width int, kind tuiStatusK
 	case tuiStatusFailure:
 		tone = theme.failure
 	}
-	return lipgloss.NewStyle().Width(width).Border(lipgloss.RoundedBorder()).BorderForeground(tone).Render(assistantDisplayText(text))
+	return lipgloss.NewStyle().Width(width).Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(tone).Render(assistantDisplayText(text))
 }
 func (model dashboardModel) assistantView() string {
 	if model.assistant.state == "sharing" || model.assistant.state == "report" || model.assistant.state == "report-sending" {
@@ -243,7 +254,6 @@ func (model dashboardModel) assistantView() string {
 	}
 	input := model.assistant.input
 	input.SetWidth(width - 2)
-	input.SetHeight(3)
 	styles := textarea.DefaultStyles(model.isDark)
 	styles.Focused.CursorLine = styles.Focused.CursorLine.UnsetBackground()
 	for _, state := range []*textarea.StyleState{&styles.Focused, &styles.Blurred} {
@@ -261,9 +271,9 @@ func (model dashboardModel) assistantView() string {
 		fixed = append(fixed, model.activitySpinner.View()+fmt.Sprintf(" Working… %ds · Esc to stop", seconds))
 	}
 	if model.assistant.changedFiles > 0 {
-		left := fmt.Sprintf("Proposal ready · %d files changed", model.assistant.changedFiles)
+		left := "Proposal ready · " + countNoun(model.assistant.changedFiles, "file") + " changed"
 		right := "Ctrl+R to review"
-		fixed = append(fixed, model.assistantBox(left+strings.Repeat(" ", max(1, width-2-lipgloss.Width(left)-len(right)))+right, width, tuiStatusSuccess))
+		fixed = append(fixed, model.assistantBox(left+strings.Repeat(" ", max(1, width-4-lipgloss.Width(left)-len(right)))+right, width, tuiStatusSuccess))
 	}
 	fixed = append(fixed, inputBox)
 	lines := []string{}

@@ -100,6 +100,7 @@ func (model dashboardModel) newAssistantChat() (tea.Model, tea.Cmd) {
 	model.assistant = newAssistantModel()
 	model.assistant.id = old.id + 1
 	model.assistant.account = old.account
+	model.assistant.accessError = old.accessError
 	model.assistant.token = old.token
 	model.assistant.offer = old.offer
 	model.assistant.sharing = old.sharing
