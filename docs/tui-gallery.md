@@ -406,59 +406,45 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ## Assistant proposal review
 
 ```text
-Nixorium  /  Assistant  /  Proposal
+Nixorium  /  Assistant  /  Review the proposal
 
-Summary from the assistant
-Prepared the course for pc01.
+What changes
+• modules/course.nix changed
 
-Checked by Nixorium
-Files: 0 added, 1 changed, 0 removed
-Computers whose system changes: pc01
-Nix evaluation: passed
+Computers affected
+pc01
 
-Full comparison
---- a/modules/course.nix
-+++ b/modules/course.nix
--{ course = 1; }
-+{ course = 2; }
-
-Lines 1–13 / 13
-Type SAVE to record this proposal in a local commit with a backup. Nothing is built or activated.
-›
-
-↑/↓ PgUp/PgDn Home/End Scroll  ·  Enter Save  ·  Esc Chat  ·  F1 Help
+✓ Checked by Nixorium: the configuration is valid
+Nothing is installed yet. After saving, update one computer first to try it.
+› Save this proposal
+  Show technical details
+  Back to the chat
+↑↓ choose · Enter confirm · Esc back
 ```
 
 ## Assistant evaluation failure
 
 ```text
-Nixorium  /  Assistant  /  Proposal
+Nixorium  /  Assistant  /  Review the proposal
 
-Summary from the assistant
-Prepared the course for pc01.
+What changes
+• modules/course.nix changed
 
-Checked by Nixorium
-Files: 0 added, 1 changed, 0 removed
-Computers whose system changes: pc01
-Nix evaluation: failed
-The candidate module does not evaluate.
+Computers affected
+pc01
 
-Full comparison
---- a/modules/course.nix
-+++ b/modules/course.nix
--{ course = 1; }
-+{ course = 2; }
-
-Lines 1–14 / 14
-Saving is not available: the proposal does not evaluate. Return to the chat and ask the assistant to fix it.
-
-↑/↓ PgUp/PgDn Home/End Scroll  ·  Esc Chat  ·  F1 Help
+✗ The configuration is not valid
+Nothing is installed yet. After saving, update one computer first to try it.
+› Save this proposal
+  Show technical details
+  Back to the chat
+↑↓ choose · Enter confirm · Esc back
 ```
 
 ## Assistant saved configuration
 
 ```text
-Nixorium  /  Assistant  /  Proposal
+Nixorium  /  Assistant  /  Review the proposal
 
 Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Nothing was built or activated.
 Try it on one computer first: Computers → Update computers, select a single computer, check it, then update the

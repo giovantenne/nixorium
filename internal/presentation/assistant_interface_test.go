@@ -97,6 +97,8 @@ func TestAssistantInputCommandsExamplesAndPaste(t *testing.T) {
 	m.assistant.input.SetValue("/")
 	updated, _ = m.Update(keyPress("down"))
 	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("down"))
+	m = updated.(dashboardModel)
 	updated, _ = m.Update(keyPress("tab"))
 	m = updated.(dashboardModel)
 	if m.assistant.input.Value() != "/new" {
@@ -323,8 +325,9 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 }
 
 func TestAssistantSlashOpensExistingReviewSharingAndReport(t *testing.T) {
-	for _, command := range []string{"/review", "/share", "/report"} {
+	for _, command := range []string{"/review", "/save", "/share", "/report"} {
 		m, store := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("slash command sent HTTP") })
+		m.report.Meta.Controller.Name = "pc99"
 		m.actions.AssistantService.ReadSharing = store.ReadSharing
 		m.actions.AssistantService.WriteSharing = store.WriteSharing
 		m.actions.AssistantService.PlanSave = func(context.Context, string) domain.AssistantSavePlan {
@@ -341,7 +344,7 @@ func TestAssistantSlashOpensExistingReviewSharingAndReport(t *testing.T) {
 		updated, _ := m.Update(keyPress("enter"))
 		m = updated.(dashboardModel)
 		switch command {
-		case "/review":
+		case "/review", "/save":
 			if m.screen != dashboardAssistantReview || m.read.cancel == nil {
 				t.Fatal("review not opened")
 			}

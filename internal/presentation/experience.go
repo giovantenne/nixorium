@@ -218,7 +218,7 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "v  View existing managed work without starting or resuming it")
 		}
 	case dashboardAssistantReview:
-		lines = append(lines, "Arrows, PgUp/PgDn and Home/End scroll the full comparison.", "Type SAVE and Enter only after a successful Nix evaluation; Esc returns to the chat.", "Saving records a local commit and a backup. Controller application and computer updates require separate reviews.")
+		lines = append(lines, "Choose Show technical details to scroll the full comparison.", "Choose Save this proposal in the review (Ctrl+R), then Enter to confirm; Esc goes back.", "Saving records a local commit and a backup. Controller application and computer updates require separate reviews.")
 		lines = append(lines, "After saving, update one computer first and check it before the others.")
 	case dashboardAssistant:
 		switch model.assistant.state {
@@ -540,7 +540,7 @@ func (model dashboardModel) textEntry() bool {
 		return !model.backup.done
 	}
 	if model.screen == dashboardAssistantReview {
-		return model.assistant.review.result.State == "" && model.assistant.review.plan.State == "ready"
+		return false
 	}
 	if model.screen == dashboardAssistant {
 		return model.assistant.state == "chat" || model.assistant.state == "activate"

@@ -14,7 +14,7 @@ var assistantExamples = []string{
 	"Block the Internet on pc01–pc06 every Tuesday 10–12",
 	"pc03 still shows the old wallpaper: what is wrong?",
 }
-var assistantCommands = []string{"/review", "/new", "/report", "/share", "/help", "/code"}
+var assistantCommands = []string{"/review", "/save", "/new", "/report", "/share", "/help", "/code"}
 
 type assistantOfferMsg struct {
 	id    uint64
@@ -109,7 +109,7 @@ func (model dashboardModel) newAssistantChat() (tea.Model, tea.Cmd) {
 }
 func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd) {
 	switch command {
-	case "/review":
+	case "/review", "/save":
 		model.assistant.input.Reset()
 		return model.openAssistantReview()
 	case "/new":
@@ -290,6 +290,13 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 	case "ctrl+s", "ctrl+p", "ctrl+f":
 		return model, nil
 	case "enter":
+		if model.assistant.changedFiles > 0 {
+			switch strings.ToLower(model.assistant.input.Value()) {
+			case "save", "salva", "/save":
+				model.assistant.input.Reset()
+				return model.openAssistantReview()
+			}
+		}
 		if strings.HasPrefix(model.assistant.input.Value(), "/") {
 			return model.assistantCommand(strings.TrimSpace(model.assistant.input.Value()))
 		}
