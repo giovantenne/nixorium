@@ -75,8 +75,8 @@ func TestAssistantLinksInResponsesNoticesAndScreens(t *testing.T) {
 				t.Fatal("notice URL not linked intact", box)
 			}
 		}
-		m.assistant.entries = []assistantEntry{{"assistant", "Read " + url}}
-		m.assistant.archivedEntries = []assistantEntry{{"assistant", "Previous " + url}}
+		m.assistant.entries = []assistantEntry{{role: "assistant", text: "Read " + url}}
+		m.assistant.archivedEntries = []assistantEntry{{role: "assistant", text: "Previous " + url}}
 		if strings.Count(m.View().Content, opening) != 2 {
 			t.Fatal("current or archived answer not linked")
 		}

@@ -23,8 +23,8 @@ func TestAssistantSpeakerRendering(t *testing.T) {
 					m = updated.(dashboardModel)
 					m.assistant.state = "chat"
 					m.assistant.input.Reset()
-					user := assistantEntry{"user", strings.Repeat("Course materials ", 10) + "\nKeep this second line."}
-					reply := assistantEntry{"assistant", "**Prepared** " + strings.Repeat("course materials ", 10) + "\nReturn to Nixorium."}
+					user := assistantEntry{role: "user", text: strings.Repeat("Course materials ", 10) + "\nKeep this second line."}
+					reply := assistantEntry{role: "assistant", text: "**Prepared** " + strings.Repeat("course materials ", 10) + "\nReturn to Nixorium."}
 					renderedUser := assistantMessage(user, size[0]-4, dark, m.assistantNoColors)
 					renderedReply := assistantMessage(reply, size[0]-4, dark, m.assistantNoColors)
 					if lipgloss.Width(renderedUser) != size[0]-4 && profile > colorprofile.ASCII {
@@ -55,7 +55,7 @@ func TestAssistantSpeakerRendering(t *testing.T) {
 							t.Fatal("message overflows")
 						}
 					}
-					m.assistant.entries = []assistantEntry{{"user", "Prepare the course."}, {"activity", "● Reading modules/course.nix"}, {"activity", "✓ Evaluation passed"}, {"assistant", "Prepared the course."}}
+					m.assistant.entries = []assistantEntry{{role: "user", text: "Prepare the course."}, {role: "activity", text: "● Reading modules/course.nix"}, {role: "activity", text: "✓ Evaluation passed"}, {role: "assistant", text: "Prepared the course."}}
 					lines, _, _, _ := m.assistantChatLayout()
 					for i := range lines {
 						lines[i] = strings.TrimRight(ansi.Strip(lines[i]), " ")
@@ -71,7 +71,7 @@ func TestAssistantSpeakerRendering(t *testing.T) {
 					if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
 						t.Fatal("screen overflows")
 					}
-					m.assistant.archivedEntries = []assistantEntry{{"user", "Previous request."}, {"assistant", "Previous answer."}}
+					m.assistant.archivedEntries = []assistantEntry{{role: "user", text: "Previous request."}, {role: "assistant", text: "Previous answer."}}
 					lines, _, _, _ = m.assistantChatLayout()
 					body = ansi.Strip(strings.Join(lines, "\n"))
 					if strings.Contains(body, "› You") || !strings.Contains(body, "● Previous answer.") {

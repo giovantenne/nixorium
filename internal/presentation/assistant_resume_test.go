@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -171,5 +172,48 @@ func TestAssistantResumeEscDiscardsLateResults(t *testing.T) {
 	m = updated.(dashboardModel)
 	if m.assistant.state != "chat" || m.assistant.resumeLoading {
 		t.Fatal("late history opened")
+	}
+}
+
+func TestAssistantResumeCarriesUnsavedProposal(t *testing.T) {
+	for _, carried := range []bool{true, false} {
+		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("resume called service") })
+		m.assistant.state = "history"
+		m.assistant.readOnlyHistory = domain.AssistantConversationHistory{State: "outdated", Conversation: domain.AssistantConversation{ID: "old", Title: "LazyVim"}}
+		m.actions.AssistantService.PrepareConversation = func(string) (domain.AssistantConversation, error) {
+			return domain.AssistantConversation{ID: "fresh"}, nil
+		}
+		m.actions.AssistantService.CarryOverProposal = func(from, to string) (int, error) {
+			if from != "old" || to != "fresh" {
+				t.Fatal(from, to)
+			}
+			if !carried {
+				return 0, errors.New("conflict")
+			}
+			return 2, nil
+		}
+		updated, cmd := m.Update(keyPress("enter"))
+		m = finishResumeCommand(t, updated.(dashboardModel), cmd)
+		if carried {
+			if m.assistant.changedFiles != 2 || m.message != assistantCarriedText || !strings.Contains(m.assistant.input.Value(), "Its unsaved proposal was carried over into this chat.") {
+				t.Fatal("carried proposal", m.message, m.assistant.input.Value())
+			}
+		} else if m.assistant.changedFiles != 0 || m.message != assistantNotCarriedText || strings.Contains(m.assistant.input.Value(), "carried over") {
+			t.Fatal("conflict notice", m.message)
+		}
+	}
+}
+
+func TestAssistantRepeatedActivityCollapses(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("render sent HTTP") })
+	m.width, m.height = 100, 30
+	for range 24 {
+		m.assistant.appendActivity(assistantActivityLine("Searching lazyvim"))
+	}
+	m.assistant.appendActivity(assistantActivityLine("Reading modules/shared.nix"))
+	m.assistant.appendActivity(assistantActivityLine("Searching neovim"))
+	view := ansi.Strip(m.View().Content)
+	if strings.Count(view, "Searching the configuration") != 2 || !strings.Contains(view, "● Searching the configuration (24×)") {
+		t.Fatal("activity not collapsed", view)
 	}
 }

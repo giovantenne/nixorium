@@ -126,7 +126,7 @@ func TestAssistantOwnSaveStartsFreshChatAndExternalChangeStillWarns(t *testing.T
 			}
 			m.assistant.conversation = old
 			m.assistant.messages = previous
-			m.assistant.entries = []assistantEntry{{"user", "Previous question"}, {"assistant", "Previous answer"}}
+			m.assistant.entries = []assistantEntry{{role: "user", text: "Previous question"}, {role: "assistant", text: "Previous answer"}}
 			if err = os.WriteFile(filepath.Join(repo, "course.nix"), []byte("{}\n"), 0644); err != nil {
 				t.Fatal(err)
 			}

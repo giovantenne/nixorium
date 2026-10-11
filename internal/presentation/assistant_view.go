@@ -19,7 +19,10 @@ const assistantWelcomeText = "Describe what your lab should do. Assistant prepar
 const assistantSavedChatText = "Saved. Your next message starts a new chat on the saved configuration."
 const assistantLongChatText = "This chat is getting long. /new starts a fresh one, and answers will be faster."
 
-type assistantEntry struct{ role, text string }
+type assistantEntry struct {
+	role, text string
+	repeat     int // consecutive identical activity lines collapsed into this one
+}
 
 func (model *assistantModel) noteTranscriptSize(bytes int) {
 	if !model.longChatShown && model.maxRequestBytes > 0 && bytes > model.maxRequestBytes/2 {
@@ -76,10 +79,20 @@ func (model *assistantModel) appendSummary(summary string) {
 	}
 }
 
+// appendActivity collapses consecutive identical activity lines, so a long
+// series of searches shows as one line with a count.
+func (model *assistantModel) appendActivity(line string) {
+	if last := len(model.entries) - 1; last >= 0 && model.entries[last].role == "activity" && model.entries[last].text == line {
+		model.entries[last].repeat = max(model.entries[last].repeat, 1) + 1
+		return
+	}
+	model.entries = append(model.entries, assistantEntry{role: "activity", text: line})
+}
+
 func assistantActivityLine(text string) string {
 	text = assistantDisplayText(text)
 	if strings.HasPrefix(text, "Searching") {
-		return "● Searching …"
+		return "● Searching the configuration"
 	}
 	if strings.HasPrefix(text, "Reading Nixorium") {
 		return "● Reading Nixorium source"
@@ -391,11 +404,11 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	if len(entries) == 0 && model.assistant.state != "history" {
 		for _, message := range model.assistant.messages {
 			if message.Role == "user" || (message.Role == "assistant" && message.Content != "") {
-				entries = append(entries, assistantEntry{message.Role, message.Content})
+				entries = append(entries, assistantEntry{role: message.Role, text: message.Content})
 			}
 		}
 		if model.assistant.summary != "" && !assistantSummaryShown(entries, model.assistant.summary) {
-			entries = append(entries, assistantEntry{"assistant", model.assistant.summary})
+			entries = append(entries, assistantEntry{role: "assistant", text: model.assistant.summary})
 		}
 	}
 	for _, entry := range entries {
@@ -415,7 +428,11 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 			if strings.HasPrefix(entry.text, "✗") {
 				tone = newTUITheme(model.isDark).failure
 			}
-			lines = append(lines, lipgloss.NewStyle().Foreground(tone).Render(assistantDisplayText(entry.text)))
+			text := assistantDisplayText(entry.text)
+			if entry.repeat > 1 {
+				text += fmt.Sprintf(" (%d×)", entry.repeat)
+			}
+			lines = append(lines, lipgloss.NewStyle().Foreground(tone).Render(text))
 		}
 	}
 	if len(entries) == 0 && model.assistant.state != "history" {

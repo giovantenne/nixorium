@@ -324,8 +324,9 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			PrepareConversation: func(id string) (domain.AssistantConversation, error) {
 				return assistantWorkspace.PrepareConversation(repository, id)
 			},
-			Run:          assistantRunner.Run,
-			ChangedFiles: assistantWorkspace.ChangedFiles,
+			CarryOverProposal: assistantWorkspace.CarryOverProposal,
+			Run:               assistantRunner.Run,
+			ChangedFiles:      assistantWorkspace.ChangedFiles,
 			PlanSave: func(ctx context.Context, id string) domain.AssistantSavePlan {
 				return adapters.PlanAssistantSave(ctx, assistantWorkspace, id)
 			},

@@ -37,6 +37,7 @@ type AssistantActions struct {
 	Offer               func(context.Context) (domain.AssistantOffer, error)
 	Cleanup             func(string) error
 	PrepareConversation func(string) (domain.AssistantConversation, error)
+	CarryOverProposal   func(from, to string) (int, error)
 	Run                 func(context.Context, domain.AssistantConversation, string, func(domain.AssistantEvent)) (domain.AssistantTurnResult, error)
 }
 
@@ -359,7 +360,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 	case "activity":
 		model.assistant.activity = event.Text
 		if event.Text != "Preparing a proposal" {
-			model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "activity", text: assistantActivityLine(event.Text)})
+			model.assistant.appendActivity(assistantActivityLine(event.Text))
 		}
 	case "tool_result":
 		model.assistant.entries = append(model.assistant.entries, assistantEntry{role: "activity", text: assistantToolResultLine(event.ToolName, event.ToolResult, model.report.Meta.Controller.Name)})
@@ -522,7 +523,7 @@ func (model dashboardModel) startAssistantRunner() (tea.Model, tea.Cmd) {
 		if len(previous) == 0 {
 			for _, message := range model.assistant.messages {
 				if message.Role == "user" || message.Role == "assistant" && message.Content != "" {
-					previous = append(previous, assistantEntry{message.Role, message.Content})
+					previous = append(previous, assistantEntry{role: message.Role, text: message.Content})
 				}
 			}
 		}

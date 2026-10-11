@@ -125,7 +125,7 @@ func TestAssistantFinalDoesNotRepeatEarlierStreaming(t *testing.T) {
 		m.assistant.input.Reset()
 		m.assistant.state = "running"
 		m.assistant.events = make(chan tea.Msg)
-		m.assistant.entries = []assistantEntry{{"user", "Request"}}
+		m.assistant.entries = []assistantEntry{{role: "user", text: "Request"}}
 		for _, event := range []domain.AssistantEvent{
 			{Type: "text", Delta: "Investigating the configuration"},
 			{Type: "activity", Text: "Reading modules/course.nix"},
@@ -144,7 +144,7 @@ func TestAssistantFinalDoesNotRepeatEarlierStreaming(t *testing.T) {
 	}
 	// The done fallback also deduplicates when there was no final notification.
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
-	m.assistant.entries = []assistantEntry{{"user", "Request"}, {"assistant", "Final answer"}}
+	m.assistant.entries = []assistantEntry{{role: "user", text: "Request"}, {role: "assistant", text: "Final answer"}}
 	updated, _ := m.Update(assistantStreamMsg{id: m.assistant.id, done: true, result: &domain.AssistantTurnResult{Summary: "Final answer"}})
 	if len(updated.(dashboardModel).assistant.entries) != 2 {
 		t.Fatal("done repeated text")
@@ -182,7 +182,7 @@ func TestAssistantScrollKeepsPositionDuringStreaming(t *testing.T) {
 			}
 			m.assistant.events = make(chan tea.Msg)
 			for i := 0; i < 50; i++ {
-				m.assistant.entries = append(m.assistant.entries, assistantEntry{"assistant", fmt.Sprintf("message %02d", i)})
+				m.assistant.entries = append(m.assistant.entries, assistantEntry{role: "assistant", text: fmt.Sprintf("message %02d", i)})
 			}
 			for _, test := range []struct {
 				msg    tea.Msg
@@ -236,7 +236,7 @@ func TestAssistantScrollKeepsPositionDuringStreaming(t *testing.T) {
 	}
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
 	for i := 0; i < 30; i++ {
-		m.assistant.entries = append(m.assistant.entries, assistantEntry{"assistant", "older message"})
+		m.assistant.entries = append(m.assistant.entries, assistantEntry{role: "assistant", text: "older message"})
 	}
 	m.assistant.historyScroll = 4
 	// With a draft, arrows edit the text; Enter starts submission and returns to bottom.

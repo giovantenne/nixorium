@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/giovantenne/nixorium/internal/domain"
+	"golang.org/x/sys/unix"
 )
 
 func (store AssistantWorkspaceStore) ReadToken() (string, error) {
@@ -228,4 +229,95 @@ func (store AssistantWorkspaceStore) ReadConsent() (bool, error) {
 
 func (store AssistantWorkspaceStore) ReadSharing() (bool, error) {
 	return AssistantStateStore(store).ReadSharing()
+}
+
+// ErrAssistantProposalConflict reports that files of an unsaved proposal
+// changed in the deployment after that chat started.
+var ErrAssistantProposalConflict = errors.New("assistant proposal conflicts with the current configuration")
+
+// CarryOverProposal copies the unsaved proposal of an outdated chat into a new
+// chat on the current configuration. It copies only when none of the proposal's
+// files changed between the two bases, so nothing is merged or overwritten.
+func (store AssistantWorkspaceStore) CarryOverProposal(from, to string) (int, error) {
+	root, old, err := store.historyRoot(from)
+	if err != nil {
+		return 0, err
+	}
+	defer root.Close()
+	if old.SavedAt != "" {
+		return 0, nil
+	}
+	modes := map[string]bool{}
+	data, err := assistantReadStateLimit(root, "modes.json", 128*1024)
+	if err != nil && !errors.Is(err, unix.ENOENT) {
+		return 0, err
+	}
+	if err == nil && (json.Unmarshal(data, &modes) != nil || len(modes) > 200) {
+		return 0, errors.New("invalid Assistant modes")
+	}
+	var deleted []string
+	data, err = assistantReadStateLimit(root, "deleted.json", 128*1024)
+	if err != nil || json.Unmarshal(data, &deleted) != nil || len(deleted) > 200 {
+		return 0, errors.New("invalid Assistant deleted files")
+	}
+	paths := append([]string{}, deleted...)
+	for path := range modes {
+		paths = append(paths, path)
+	}
+	if len(paths) == 0 {
+		return 0, nil
+	}
+	for _, path := range paths {
+		if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || domain.AssistantReadOnlyPath(path) {
+			return 0, errors.New("invalid Assistant proposal path")
+		}
+	}
+	target, err := store.Open(to)
+	if err != nil {
+		return 0, err
+	}
+	defer target.Close()
+	if target.Conversation.Repository != old.Repository {
+		return 0, errors.New("invalid Assistant conversation repository")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	changed, err := resetGit(ctx, old.Repository, nil, 1024*1024, append([]string{"diff", "--name-only", old.Base, target.Conversation.Base, "--"}, paths...)...)
+	if err != nil || strings.TrimSpace(changed) != "" {
+		return 0, ErrAssistantProposalConflict
+	}
+	overlay, err := assistantDirectory(root, "overlay", false)
+	if err != nil {
+		return 0, err
+	}
+	defer overlay.Close()
+	removed := map[string]bool{}
+	for _, path := range deleted {
+		removed[path] = true
+	}
+	for path, executable := range modes {
+		if removed[path] {
+			continue
+		}
+		parent, name, err := assistantParent(overlay, path, false)
+		if err != nil {
+			return 0, err
+		}
+		content, err := assistantReadStateLimit(parent, name, 512*1024)
+		parent.Close()
+		if err != nil {
+			return 0, err
+		}
+		if err = target.Write(path, string(content), executable); err != nil {
+			return 0, err
+		}
+	}
+	for _, path := range deleted {
+		if _, exists := target.base[path]; exists {
+			if err = target.Delete(path); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return store.ChangedFiles(to)
 }

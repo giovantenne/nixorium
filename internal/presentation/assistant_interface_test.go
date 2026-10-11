@@ -248,7 +248,7 @@ func TestAssistantEventHistoryAndScroll(t *testing.T) {
 		}
 	}
 	for i := 0; i < 50; i++ {
-		m.assistant.entries = append(m.assistant.entries, assistantEntry{"assistant", fmt.Sprintf("message %02d", i)})
+		m.assistant.entries = append(m.assistant.entries, assistantEntry{role: "assistant", text: fmt.Sprintf("message %02d", i)})
 	}
 	latest := m.View().Content
 	updated, _ := m.Update(keyPress("pgup"))
@@ -286,11 +286,11 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					required = append(required, "Share my conversations", "Enter continue")
 				case "running":
 					m.assistant.started = time.Now()
-					m.assistant.entries = []assistantEntry{{"activity", "● Reading modules/course.nix"}, {"activity", "✗ Evaluation failed"}}
+					m.assistant.entries = []assistantEntry{{role: "activity", text: "● Reading modules/course.nix"}, {role: "activity", text: "✗ Evaluation failed"}}
 					required = append(required, "● Reading", "✗ Evaluation failed", "Working…")
 				case "proposal":
 					m.assistant.state = "chat"
-					m.assistant.entries = []assistantEntry{{"user", assistantExamples[0]}, {"assistant", "# Proposal\n**Ready**\n- Install `gimp`\n```nix\n{ course = 2; }\n```"}}
+					m.assistant.entries = []assistantEntry{{role: "user", text: assistantExamples[0]}, {role: "assistant", text: "# Proposal\n**Ready**\n- Install `gimp`\n```nix\n{ course = 2; }\n```"}}
 					m.assistant.changedFiles = 1
 					required = append(required, "Proposal ready · 1 file changed", "Ctrl+R to review")
 					if size[0] >= 120 {

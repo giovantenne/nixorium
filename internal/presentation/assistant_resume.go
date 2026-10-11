@@ -13,6 +13,8 @@ import (
 )
 
 const assistantReadOnlyText = "This conversation is based on an older configuration. You can read it, or continue in a new chat."
+const assistantCarriedText = "The unsaved proposal of that chat was carried over. Press Ctrl+R to review it."
+const assistantNotCarriedText = "The unsaved proposal of that chat could not be carried over, because the same files changed since. Ask Assistant to prepare it again."
 
 type assistantResumeMsg struct {
 	id           uint64
@@ -20,6 +22,8 @@ type assistantResumeMsg struct {
 	history      *domain.AssistantConversationHistory
 	conversation domain.AssistantConversation
 	prefill      string
+	carried      int
+	carryErr     error
 	err          error
 }
 
@@ -66,6 +70,13 @@ func (model dashboardModel) finishAssistantResume(msg assistantResumeMsg) (tea.M
 		updated, command := model.newAssistantChat()
 		model = updated.(dashboardModel)
 		model.assistant.conversation = msg.conversation
+		model.assistant.changedFiles = msg.carried
+		switch {
+		case msg.carried > 0:
+			model.message = assistantCarriedText
+		case msg.carryErr != nil:
+			model.message = assistantNotCarriedText
+		}
 		model.assistant.input.SetValue(msg.prefill)
 		model.assistant.input.CursorEnd()
 		return model, command
@@ -141,13 +152,21 @@ func (model dashboardModel) updateAssistantResumeKey(key tea.KeyPressMsg) (tea.M
 			if actions == nil || actions.PrepareConversation == nil {
 				return model, nil
 			}
-			prefill := assistantResumePrefill(model.assistant.readOnlyHistory.Conversation)
+			previous := model.assistant.readOnlyHistory
+			prefill := assistantResumePrefill(previous.Conversation)
 			model.assistant.id++
 			id := model.assistant.id
 			model.assistant.resumeLoading = true
 			return model, func() tea.Msg {
 				conversation, err := actions.PrepareConversation("")
-				return assistantResumeMsg{id: id, conversation: conversation, prefill: prefill, err: err}
+				msg := assistantResumeMsg{id: id, conversation: conversation, prefill: prefill, err: err}
+				if err == nil && previous.State == "outdated" && actions.CarryOverProposal != nil {
+					msg.carried, msg.carryErr = actions.CarryOverProposal(previous.Conversation.ID, conversation.ID)
+				}
+				if msg.carried > 0 {
+					msg.prefill = strings.TrimSuffix(prefill, "\n\n") + " Its unsaved proposal was carried over into this chat.\n\n"
+				}
+				return msg
 			}
 		}
 		return model, nil
