@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -152,5 +153,27 @@ func TestAssistantSSEServiceMessageOrdering(t *testing.T) {
 	events := []domain.AssistantEvent{}
 	if err := parseAssistantSSE(strings.NewReader(service+final), func(event domain.AssistantEvent) { events = append(events, event) }); err != nil || len(events) != 2 || events[0].Type != "service_messages" || events[0].Messages == nil {
 		t.Fatal(events, err)
+	}
+}
+
+func TestAssistantClientKeepsServiceErrorCodesDistinctFromTransportFailures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+		_, _ = w.Write([]byte(`{"error":{"code":"model_unavailable","message":"The AI provider is unavailable."}}`))
+	}))
+	_, err := AssistantClient{Endpoint: server.URL}.Activate(context.Background(), "code")
+	var serviceError *domain.AssistantError
+	if !errors.As(err, &serviceError) || serviceError.Code != "model_unavailable" || serviceError.Status != 503 {
+		t.Fatal("service error code lost", err)
+	}
+	server.Close()
+	_, err = AssistantClient{Endpoint: server.URL}.Activate(context.Background(), "code")
+	if err == nil || errors.As(err, &serviceError) {
+		t.Fatal("connection failure must not carry a service code", err)
+	}
+	var terminal domain.AssistantEvent
+	stream := "event: error\ndata: {\"code\":\"model_unavailable\",\"message\":\"The AI provider is unavailable.\"}\n\n"
+	if err := parseAssistantSSE(strings.NewReader(stream), func(event domain.AssistantEvent) { terminal = event }); err != nil || terminal.Code != "model_unavailable" {
+		t.Fatal("error event", err, terminal)
 	}
 }

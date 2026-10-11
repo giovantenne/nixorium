@@ -12,6 +12,8 @@ import (
 
 const assistantDisclosure = "When you press Enter, your message and the files the assistant reads are sent to the Nixorium Assistant service. Do not enter passwords or student data."
 const assistantNetworkNotice = "The Assistant service could not be reached. Check the controller's Internet connection and try again."
+const assistantProviderBusyNotice = "The AI provider is busy right now. Your request was not completed; try again in a minute."
+const assistantFailedNotice = "The Assistant could not complete this request. Try again in a minute."
 const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service keeps their content only if you report an answer or turn on\nsharing below. Passwords and private keys in your deployment are never sent.\nLogs and student files are never read.\nEach message you send uses one request."
 
 func assistantServiceNotice(err error, subscribeURL string) string {
@@ -36,6 +38,11 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 			return "This Assistant request reached its limit. Start a new request."
 		case "protocol_error":
 			return "The Assistant service returned an invalid response. Try again after updating Nixorium."
+		case "model_unavailable":
+			return assistantProviderBusyNotice
+		default:
+			// The service answered with a code: the controller was online.
+			return assistantFailedNotice
 		}
 	}
 	return assistantNetworkNotice

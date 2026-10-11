@@ -379,7 +379,8 @@ func TestAssistantInlineAccountAndNetworkWarningsKeepDraft(t *testing.T) {
 		{"trial", "quota_exhausted", "Your free trial has ended. Subscribe to continue:"},
 		{"annual", "subscription_inactive", "Your subscription is not active. Renew at"},
 		{"annual", "quota_exhausted", "All requests for this year are used. They renew on 2099-01-01. Questions: hello@nixorium.org"},
-		{"annual", "model_error", assistantNetworkNotice},
+		{"annual", "model_error", assistantFailedNotice},
+		{"annual", "model_unavailable", "The AI provider is busy right now. Your request was not completed; try again in a minute."},
 	} {
 		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
 		m.assistant.account = domain.AssistantAccount{Plan: test.plan, Status: "inactive", PeriodEnd: "2099-01-01", UpgradeURL: "https://assistant.example/upgrade"}
@@ -406,5 +407,25 @@ func assistantEnableCommands(m *dashboardModel) {
 	m.assistant.account.Plan = "annual"
 	if len(m.assistant.entries) == 0 {
 		m.assistant.entries = []assistantEntry{{role: "user", text: "Question"}}
+	}
+}
+
+func TestAssistantNoticeSeparatesProviderOutageFromConnectionFailure(t *testing.T) {
+	if got := assistantServiceNotice(&domain.AssistantError{Status: 503, Code: "model_unavailable"}, ""); got != "The AI provider is busy right now. Your request was not completed; try again in a minute." {
+		t.Fatal(got)
+	}
+	for _, code := range []string{"model_error", "some_future_code", "service_unavailable"} {
+		if got := assistantServiceNotice(&domain.AssistantError{Status: 500, Code: code}, ""); got == assistantNetworkNotice || strings.Contains(got, "Internet") {
+			t.Fatal("service response reported as connection failure", code)
+		}
+	}
+	wrapped := fmt.Errorf("stream: %w", &domain.AssistantError{Code: "model_unavailable"})
+	if assistantServiceNotice(wrapped, "") != assistantProviderBusyNotice {
+		t.Fatal("wrapped error")
+	}
+	for _, err := range []error{errors.New("dial tcp: lookup assistant: no such host"), context.DeadlineExceeded, nil} {
+		if assistantServiceNotice(err, "") != assistantNetworkNotice {
+			t.Fatal("connection failure lost its notice", err)
+		}
 	}
 }
