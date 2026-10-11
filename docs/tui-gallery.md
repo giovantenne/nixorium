@@ -382,14 +382,14 @@ Comment (optional, max 500 characters)
 ```text
 Assistant
 
-› You
-Prepare the course for pc01.
+ Prepare the course for pc01.
 
 ● Reading modules/course.nix
 ● Writing modules/course.nix
 ✓ Evaluation passed · changes pc01
-Assistant
-Prepared the course for pc01.
+
+● Prepared the course for pc01.
+
 
 
 

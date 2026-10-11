@@ -284,6 +284,31 @@ func (model dashboardModel) assistantView() string {
 	return model.assistantChatView()
 }
 
+// assistantMessage keeps speaker identity visible with and without terminal colors.
+func assistantMessage(entry assistantEntry, width int, dark, noColors bool) string {
+	text := assistantDisplayText(entry.text)
+	if entry.role == "user" && !noColors {
+		// The opposite theme's normal text is the existing light/dark grey token.
+		return lipgloss.NewStyle().Width(width).Padding(0, 1).
+			Foreground(newTUITheme(dark).text).Background(newTUITheme(!dark).text).
+			Render(assistantLinkify(text))
+	}
+	prefix := "> "
+	if entry.role == "assistant" {
+		text = assistantMarkdown(entry.text, dark)
+		prefix = lipgloss.NewStyle().Foreground(tuiAccent(dark)).Render("●") + " "
+	}
+	wrapped := strings.Split(ansi.Wrap(assistantLinkify(text), max(1, width-2), ""), "\n")
+	for i := range wrapped {
+		if i == 0 {
+			wrapped[i] = prefix + wrapped[i]
+		} else {
+			wrapped[i] = "  " + wrapped[i]
+		}
+	}
+	return strings.Join(wrapped, "\n")
+}
+
 func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText string, width, capacity int) {
 	width = max(20, model.width-4)
 	if model.width == 0 {
@@ -319,13 +344,11 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	lines := []string{}
 	for _, entry := range model.assistant.archivedEntries {
 		text := assistantDisplayText(entry.text)
-		if entry.role == "user" {
-			text = "› You\n" + text
+		if entry.role == "user" || entry.role == "assistant" {
+			lines = append(lines, assistantMessage(entry, width, model.isDark, model.assistantNoColors), "")
+		} else {
+			lines = append(lines, tuiMuted(text, model.isDark), "")
 		}
-		if entry.role == "assistant" {
-			text = "Assistant\n" + ansi.Strip(assistantMarkdown(entry.text, model.isDark))
-		}
-		lines = append(lines, tuiMuted(text, model.isDark), "")
 	}
 	if len(model.assistant.archivedEntries) > 0 {
 		lines = append(lines, tuiMuted("New chat", model.isDark), "")
@@ -343,10 +366,11 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	}
 	for _, entry := range entries {
 		switch entry.role {
-		case "user":
-			lines = append(lines, lipgloss.NewStyle().Foreground(tuiAccent(model.isDark)).Bold(true).Render("› You"), assistantDisplayText(entry.text), "")
-		case "assistant":
-			lines = append(lines, tuiSection("Assistant", model.isDark), assistantMarkdown(entry.text, model.isDark), "")
+		case "user", "assistant":
+			if entry.role == "assistant" && len(lines) > 0 && lines[len(lines)-1] != "" {
+				lines = append(lines, "")
+			}
+			lines = append(lines, assistantMessage(entry, width, model.isDark, model.assistantNoColors), "")
 		case "notice":
 			lines = append(lines, tuiMuted(assistantDisplayText(entry.text), model.isDark))
 		case "activity":

@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -399,6 +400,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	assistantNoColors      bool
 	backupSync             backupSyncState
 	controllerObservation  controllerOverviewObservation
 	jobs                   managedJobsModel
@@ -749,6 +751,9 @@ func (model dashboardModel) Init() tea.Cmd {
 }
 
 func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
+	if profile, ok := message.(tea.ColorProfileMsg); ok {
+		model.assistantNoColors = profile.Profile <= colorprofile.ASCII
+	}
 	assistantTop := 0
 	if model.screen == dashboardAssistant && model.assistant.historyScroll > 0 {
 		before, _, _, capacity := model.assistantChatLayout()

@@ -284,7 +284,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					m.assistant.changedFiles = 1
 					required = append(required, "Proposal ready · 1 file changed", "Ctrl+R to review")
 					if size[0] >= 120 {
-						required = append(required, "› You")
+						required = append(required, "● Proposal")
 					}
 				case "warning":
 					m.assistant.state = "chat"
@@ -309,7 +309,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					writer := colorprofile.Writer{Forward: &output, Profile: profile}
 					writer.Write([]byte(view))
 					for _, want := range required {
-						if !strings.Contains(output.String(), want) {
+						if !strings.Contains(ansi.Strip(output.String()), want) {
 							t.Fatalf("%s %dx%d %v missing %q\n%s", state, size[0], size[1], profile, want, output.String())
 						}
 					}
