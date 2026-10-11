@@ -58,7 +58,7 @@ Subscription, quota, network and deployment-conflict notices appear inside the
 conversation and preserve the draft. An invalid token is removed and requires
 activation again. `/code` opens activation for a replacement code.
 
-The free trial includes five requests for thirty days, with one trial per email
+The free trial includes ten requests for thirty days, with one trial per email
 address. Register with your email, school name and privacy consent on the
 service's `/trial` page, then enter the code delivered by email. Before using
 the code, you can submit the form again to replace it if delivery failed.

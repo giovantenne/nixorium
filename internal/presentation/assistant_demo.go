@@ -10,7 +10,7 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Assistant appears only after controller opt-in", 1200)
 	r.pressAndCapture(demoText(assistantTask.shortcut), "Open Assistant", 1200)
-	r.model.assistant.offer = domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 5, TrialURL: "https://assistant.nixorium.org/trial", SubscribeURL: "https://nixorium.org/assistant/"}
+	r.model.assistant.offer = domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 10, TrialURL: "https://assistant.nixorium.org/trial", SubscribeURL: "https://nixorium.org/assistant/"}
 	r.model.assistant.state = "welcome"
 	r.capture("Choose a free trial, activation code or subscription", 2500)
 	r.model.assistant.state = "activate"

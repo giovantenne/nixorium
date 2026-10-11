@@ -238,7 +238,7 @@ Each message you send uses one request.
        Block the Internet on pc01–pc06 every Tuesday 10–12
        pc03 still shows the old wallpaper: what is wrong?
 
-› Start a free trial · 5 requests, no payment
+› Start a free trial · 10 requests, no payment
   I have an activation code
   Subscribe · 360 € + VAT per lab / year
 

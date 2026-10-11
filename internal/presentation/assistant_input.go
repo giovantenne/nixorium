@@ -27,7 +27,7 @@ type assistantConsentMsg struct {
 }
 
 func (model dashboardModel) fallbackAssistantOffer() domain.AssistantOffer {
-	return domain.AssistantOffer{TrialRequests: 5, SubscribeURL: model.actions.Assistant.SubscribeURL,
+	return domain.AssistantOffer{TrialRequests: 10, SubscribeURL: model.actions.Assistant.SubscribeURL,
 		TrialURL: strings.TrimSuffix(strings.TrimRight(model.actions.Assistant.Endpoint, "/"), "/v1") + "/trial"}
 }
 func (model dashboardModel) loadAssistantOffer() tea.Cmd {
