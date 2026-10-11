@@ -134,6 +134,15 @@
               wait("Proposal ready · 1 file changed")
               wait("Ctrl+R to review")
               wait("✓ Evaluation passed · changes pc01")
+              # Reopen the unsaved proposal without admitting another turn.
+              send("\x0e")
+              time.sleep(0.3)
+              resume_start = len(output())
+              send("/resume\r")
+              wait("Enter open · Esc back", after=resume_start)
+              wait("proposal not saved", after=resume_start)
+              send("\r")
+              time.sleep(0.3)
               send("\x12")
               wait("Review the proposal")
               wait("✓ Checked by Nixorium: the configuration is valid")
@@ -155,6 +164,39 @@
               assert re.search(r"\x1b\]8;[^;]*;https://example.invalid/help(?:\x07|\x1b\\)", raw)
               assert not any(sequence in raw for sequence in ["\x1b[?1000h", "\x1b[?1002h", "\x1b[?1003h", "\x1b[?1006h"])
               assert "The deployment changed since this chat started" not in output()[after_saved:]
+              resume_start = len(output())
+              send("/resume\r")
+              wait("Enter open · Esc back", after=resume_start)
+              wait("Prepare the course for pc01.", after=resume_start)
+              # The current summary-only conversation is excluded.
+              assert "Confirm the saved course." not in output()[resume_start:]
+              send("\r")
+              wait("This conversation is based on an older configuration.", after=resume_start)
+              wait("Continue in a new chat", after=resume_start)
+              send("\x1b[B\r")
+              time.sleep(0.3)
+              reopen_start = len(output())
+              send("\r")
+              wait("This conversation is based on an older configuration.", after=reopen_start)
+              continue_start = len(output())
+              send("\r")
+              wait('Continuing a previous chat: "Prepare the course for pc01.".', after=continue_start)
+              wait("Last answer: Prepared the course for pc01.", after=continue_start)
+              # The draft must not be submitted: the existing two turns remain.
+              requests = [json.loads(line) for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines()]
+              assert len([r for r in requests if r["method"] == "POST" and r["path"] == "/v1/turns"]) == 2
+              states = [json.loads(p.read_text()) for p in pathlib.Path("/var/lib/nixorium/assistant/conversations").glob("*/meta.json")]
+              saved = next(c for c in states if c.get("savedAt"))
+              assert saved["title"] == "Prepare the course for pc01."
+              assert saved["lastAnswer"] == "Prepared the course for pc01."
+              confirmation = next(c for c in states if c.get("title") == "Confirm the saved course.")
+              assert confirmation["lastAnswer"] == "Saved configuration confirmed. Visit https://example.invalid/help."
+              transcript = json.loads((pathlib.Path("/var/lib/nixorium/assistant/conversations") / confirmation["id"] / "transcript.json").read_text())
+              assert transcript[-1]["content"] == confirmation["lastAnswer"]
+              assert all(c.get("lastActivityAt") for c in states)
+              fresh = next(c for c in states if not c.get("title"))
+              assert fresh["base"] == subprocess.check_output(["su", "-", "admin", "-c", "git -C /home/admin/deployment rev-parse HEAD"], text=True).strip()
+              assert json.loads((pathlib.Path("/var/lib/nixorium/assistant/conversations") / fresh["id"] / "transcript.json").read_text()) == []
               send("\x1b")
               time.sleep(0.3)
               send("q")

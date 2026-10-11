@@ -14,7 +14,7 @@ var assistantExamples = []string{
 	"Block the Internet on pc01–pc06 every Tuesday 10–12",
 	"pc03 still shows the old wallpaper: what is wrong?",
 }
-var assistantCommands = []string{"/review", "/save", "/new", "/report", "/share", "/code", "/help"}
+var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/report", "/share", "/code", "/help"}
 
 type assistantOfferMsg struct {
 	id    uint64
@@ -114,6 +114,9 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 		return model.openAssistantReview()
 	case "/new":
 		return model.newAssistantChat()
+	case "/resume":
+		model.assistant.input.Reset()
+		return model.openAssistantResume()
 	case "/report":
 		model.assistant.input.Reset()
 		return model.openAssistantReport()
@@ -137,6 +140,9 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 	return model, nil
 }
 func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if model.assistant.state == "resume" || model.assistant.state == "history" {
+		return model.updateAssistantResumeKey(key)
+	}
 	if model.assistant.state == "chat" || model.assistant.state == "running" {
 		switch key.String() {
 		case "pgup":

@@ -212,13 +212,34 @@ bypass it. Recovery never applies the system.
 
 `/var/lib/nixorium/assistant/` is owned by `admin` with mode 0700. It contains
 the token (0600), `consent.json`, and `conversations/<uuid>/`. Conversations
-hold metadata with the base commit and creation date, a private transcript,
+hold metadata with the base commit, creation and last activity dates, title,
+save date and last final answer (up to 2,000 characters), a private transcript,
 `overlay/`, `deleted.json`, `modes.json`, `base-classes.json` and `base-drv.json`.
 Temporary evaluation clones live inside the conversation and are removed when
 evaluation finishes. Local transcripts and candidates may contain private
 configuration; they are separate from the deployment and its Git history.
 
-Opening Assistant removes conversations created more than 30 days ago. This
+Opening Assistant or `/resume` removes conversations inactive for more than
+90 days and keeps at most 30 conversations, ordered by last activity. The current
+chat is protected. Older metadata uses the creation date for last activity. This
 cleanup does not revoke the subscription token, remove consent, or delete Git
 backup refs. Starting a new chat also leaves the previous local conversation
 until that cleanup. Disabling the controller option does not erase this data.
+
+
+## Resume a conversation
+
+`/resume` opens a list of previous conversations, most recently active first.
+The current chat is excluded. Use the cursor and **Enter** to open a chat, or
+**Esc** to return. Opening a conversation does not use a request. The list shows
+the first line of the first user message as its title, the activity date, and
+`saved`, `proposal not saved`, or `outdated` where applicable.
+
+A conversation based on the current configuration continues normally; use
+**Ctrl+R** to review its unsaved proposal. Saved conversations and those based
+on an older configuration open as read-only history. Choose **Continue in a
+new chat** to prepare a new chat on the current configuration, or **Back** to
+return to the list. Continuing fills the input with the previous title and up
+to 600 characters of the last final answer, leaving a blank line for your
+request. It does not send the text. Older conversations use the last nonempty
+assistant message without tool calls; when absent, only the title is filled.

@@ -164,7 +164,13 @@ func SaveAssistant(ctx context.Context, store AssistantWorkspaceStore, plan doma
 		return fail(err.Error())
 	}
 	defer root.Close()
-	return commitConfigurationTree(ctx, root, current.Proposal, current.ReviewToken, assistantCommit, nil)
+	result := commitConfigurationTree(ctx, root, current.Proposal, current.ReviewToken, assistantCommit, nil)
+	if result.State == "saved" && !result.RecoveryRequired {
+		if err := store.markConversationSaved(plan.ConversationID); err != nil {
+			result.Message += " Could not record the saved conversation."
+		}
+	}
+	return result
 }
 func assistantSaveDiff(ctx context.Context, proposal domain.TemplateResetProposal, changes []domain.TemplateResetChange) (string, error) {
 	directory, err := os.MkdirTemp("", "nixorium-assistant-diff-*")

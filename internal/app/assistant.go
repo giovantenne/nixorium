@@ -21,6 +21,7 @@ type AssistantConversationStore interface {
 	ReadConsent() (bool, error)
 	ReadTranscript(domain.AssistantConversation) ([]domain.AssistantMessage, error)
 	WriteTranscript(domain.AssistantConversation, []domain.AssistantMessage) error
+	CompleteTurn(domain.AssistantConversation, []domain.AssistantMessage, *string) error
 	VisibleFiles(domain.AssistantConversation) ([]string, error)
 	CoreIdentity(domain.AssistantConversation) (*domain.AssistantCore, error)
 }
@@ -115,6 +116,16 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 		return result, err
 	}
 	// Local UI acknowledgement; emitted only after the service admits the turn.
+	defer func() {
+		var answer *string
+		if result.Outcome == "final" {
+			text := result.Messages[len(result.Messages)-1].Content
+			answer = &text
+		}
+		if err := runner.Store.CompleteTurn(conversation, result.Messages, answer); err != nil && runErr == nil {
+			runErr = err
+		}
+	}()
 	emit(domain.AssistantEvent{Type: "turn_started"})
 	emitTranscriptSize := func() {
 		if data, err := json.Marshal(messages); err == nil {
@@ -216,7 +227,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 		switch terminal.Type {
 		case "final":
 			messages = append(messages, service...)
-			messages = append(messages, domain.AssistantMessage{Role: "assistant", Content: stepText})
+			messages = append(messages, domain.AssistantMessage{Role: "assistant", Content: domain.AssistantFinalAnswer(stepText, terminal.Summary)})
 			result.Summary = terminal.Summary
 			result.Messages = messages
 			if err = runner.Store.WriteTranscript(conversation, messages); err != nil {
@@ -225,6 +236,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			result.Outcome = "final"
 			finished = true
 			emitTranscriptSize()
+			terminal.Text = stepText // Local view data; the service protocol is unchanged.
 			emit(terminal)
 			return result, nil
 		case "error":

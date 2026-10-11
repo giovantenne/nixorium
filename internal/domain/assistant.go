@@ -158,10 +158,21 @@ type AssistantConsent struct {
 const AssistantTextLimit = 128 * 1024
 
 type AssistantConversation struct {
-	ID         string `json:"id"`
-	Repository string `json:"repository"`
-	Base       string `json:"base"`
-	CreatedAt  string `json:"createdAt"`
+	ID             string  `json:"id"`
+	Repository     string  `json:"repository"`
+	Base           string  `json:"base"`
+	CreatedAt      string  `json:"createdAt"`
+	LastActivityAt string  `json:"lastActivityAt,omitempty"`
+	Title          string  `json:"title,omitempty"`
+	SavedAt        string  `json:"savedAt,omitempty"`
+	LastAnswer     *string `json:"lastAnswer,omitempty"`
+}
+
+type AssistantConversationHistory struct {
+	Conversation AssistantConversation
+	Messages     []AssistantMessage
+	ChangedFiles int
+	State        string
 }
 
 type AssistantTurnResult struct {

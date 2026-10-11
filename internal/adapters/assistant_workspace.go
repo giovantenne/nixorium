@@ -89,6 +89,9 @@ func (store AssistantWorkspaceStore) CreateConversation(repository string) (doma
 	id := hex.EncodeToString(random[:])
 	id = id[:8] + "-" + id[8:12] + "-" + id[12:16] + "-" + id[16:20] + "-" + id[20:]
 	conversation = domain.AssistantConversation{ID: id, Repository: repository, Base: strings.TrimSpace(base), CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	conversation.LastActivityAt = conversation.CreatedAt
+	answer := ""
+	conversation.LastAnswer = &answer
 	parent, err := store.conversations(true)
 	if err != nil {
 		return domain.AssistantConversation{}, err
@@ -138,18 +141,12 @@ func (store AssistantWorkspaceStore) Open(id string) (*AssistantWorkspace, error
 			root.Close()
 		}
 	}()
-	data, err := assistantReadState(root, "meta.json")
+	data, err := assistantReadStateLimit(root, "meta.json", assistantMetadataLimit)
 	if err != nil {
 		return nil, err
 	}
-	var conversation domain.AssistantConversation
-	if assistantDecodeStrict(data, &conversation) != nil || conversation.ID != id || !filepath.IsAbs(conversation.Repository) {
-		return nil, errors.New("invalid Assistant conversation metadata")
-	}
-	if len(conversation.Base) != 40 && len(conversation.Base) != 64 {
-		return nil, errors.New("invalid Assistant base revision")
-	}
-	if _, err = hex.DecodeString(conversation.Base); err != nil {
+	conversation, err := assistantHistoryMetadata(root, id, data)
+	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

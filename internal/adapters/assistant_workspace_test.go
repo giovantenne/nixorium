@@ -261,7 +261,8 @@ func TestAssistantRejectsDirtyRepositoryAndChangedHead(t *testing.T) {
 func TestAssistantConversationCleanup(t *testing.T) {
 	workspace, store, _ := assistantWorkspaceFixture(t)
 	old := workspace.Conversation
-	old.CreatedAt = time.Now().Add(-31 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	old.CreatedAt = time.Now().Add(-91 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	old.LastActivityAt = ""
 	data, _ := json.Marshal(old)
 	if err := assistantWriteState(workspace.root, "meta.json", data); err != nil {
 		t.Fatal(err)

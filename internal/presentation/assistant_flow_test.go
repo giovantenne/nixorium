@@ -377,6 +377,9 @@ func (s *assistantFlowStore) WriteTranscript(_ domain.AssistantConversation, m [
 	s.messages = m
 	return nil
 }
+func (s *assistantFlowStore) CompleteTurn(domain.AssistantConversation, []domain.AssistantMessage, *string) error {
+	return nil
+}
 func (s *assistantFlowStore) VisibleFiles(domain.AssistantConversation) ([]string, error) {
 	return []string{}, nil
 }

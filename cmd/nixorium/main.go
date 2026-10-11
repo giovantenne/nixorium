@@ -313,7 +313,13 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 			ReadSharing: assistantStore.ReadSharing, WriteSharing: assistantStore.WriteSharing, Report: assistantReporter.Report, Activate: assistantClient.Activate,
 			Account: assistantClient.Account,
 			Offer:   assistantClient.Offer,
-			Cleanup: assistantWorkspace.Cleanup,
+			Cleanup: func(current string) error { return assistantWorkspace.Cleanup(current) },
+			ListConversations: func(ctx context.Context, current string) ([]domain.AssistantConversationHistory, error) {
+				return assistantWorkspace.ListConversations(ctx, repository, current)
+			},
+			ConversationHistory: func(ctx context.Context, id string) (domain.AssistantConversationHistory, error) {
+				return assistantWorkspace.ConversationHistory(ctx, repository, id)
+			},
 			PrepareConversation: func(id string) (domain.AssistantConversation, error) {
 				return assistantWorkspace.PrepareConversation(repository, id)
 			},

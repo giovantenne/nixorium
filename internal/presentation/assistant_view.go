@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 const assistantInputHint = "Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back"
@@ -56,7 +57,18 @@ func assistantSummaryShown(entries []assistantEntry, summary string) bool {
 			text = entries[i].text + text
 		}
 	}
-	return strings.Contains(text, summary)
+	return domain.AssistantFinalAnswer(text, summary) == text
+}
+func (model *assistantModel) appendFinal(text, summary string) {
+	answer := domain.AssistantFinalAnswer(text, summary)
+	if len(model.entries) > 0 && model.entries[len(model.entries)-1].role == "assistant" && model.entries[len(model.entries)-1].text == answer {
+		return
+	}
+	if text != "" && len(model.entries) > 0 && model.entries[len(model.entries)-1].role == "assistant" && model.entries[len(model.entries)-1].text == text {
+		model.entries[len(model.entries)-1].text = answer
+	} else if answer != "" {
+		model.entries = append(model.entries, assistantEntry{role: "assistant", text: answer})
+	}
 }
 func (model *assistantModel) appendSummary(summary string) {
 	if !assistantSummaryShown(model.entries, summary) {
@@ -275,6 +287,9 @@ func (model dashboardModel) assistantBox(text string, width int, kind tuiStatusK
 	return lipgloss.NewStyle().Width(width).Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(tone).Render(assistantLinkify(assistantDisplayText(text)))
 }
 func (model dashboardModel) assistantView() string {
+	if model.assistant.state == "resume" {
+		return model.assistantResumeView()
+	}
 	if model.assistant.state == "sharing" || model.assistant.state == "report" || model.assistant.state == "report-sending" {
 		return model.assistantSharingView()
 	}
@@ -341,6 +356,13 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 		fixed = append(fixed, model.assistantBox(left+strings.Repeat(" ", max(1, width-4-lipgloss.Width(left)-len(right)))+right, width, tuiStatusSuccess))
 	}
 	fixed = append(fixed, inputBox)
+	if model.assistant.state == "history" {
+		choices := []string{"Continue in a new chat", "Back"}
+		fixed = []string{model.assistantBox(assistantReadOnlyText, width, tuiStatusAttention)}
+		for i, choice := range choices {
+			fixed = append(fixed, tuiSelection(choice, i == model.assistant.readOnlyCursor, model.isDark))
+		}
+	}
 	lines := []string{}
 	for _, entry := range model.assistant.archivedEntries {
 		text := assistantDisplayText(entry.text)
@@ -354,7 +376,16 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 		lines = append(lines, tuiMuted("New chat", model.isDark), "")
 	}
 	entries := model.assistant.entries
-	if len(entries) == 0 {
+	if model.assistant.state == "history" {
+		entries = nil
+		lines = nil
+		for _, message := range model.assistant.readOnlyHistory.Messages {
+			if message.Role == "user" || message.Role == "assistant" && message.Content != "" {
+				entries = append(entries, assistantEntry{role: message.Role, text: message.Content})
+			}
+		}
+	}
+	if len(entries) == 0 && model.assistant.state != "history" {
 		for _, message := range model.assistant.messages {
 			if message.Role == "user" || (message.Role == "assistant" && message.Content != "") {
 				entries = append(entries, assistantEntry{message.Role, message.Content})
@@ -384,13 +415,13 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 			lines = append(lines, lipgloss.NewStyle().Foreground(tone).Render(assistantDisplayText(entry.text)))
 		}
 	}
-	if len(entries) == 0 {
+	if len(entries) == 0 && model.assistant.state != "history" {
 		lines = append(lines, tuiMuted("Try asking, for example:", model.isDark))
 		for _, example := range assistantExamples {
 			lines = append(lines, tuiMuted("  "+example, model.isDark))
 		}
 	}
-	if choices := model.assistant.commandChoices(); len(choices) > 0 {
+	if choices := model.assistant.commandChoices(); len(choices) > 0 && model.assistant.state != "history" {
 		for i, command := range choices {
 			lines = append(lines, tuiSelection(command, i == model.assistant.commandCursor%len(choices), model.isDark)+"  "+tuiMuted(assistantCommandDescriptions[command], model.isDark))
 		}
@@ -420,5 +451,9 @@ func (model dashboardModel) assistantChatView() string {
 	start := max(0, end-capacity)
 	body := strings.Join(bodyLines[start:end], "\n")
 	body = lipgloss.NewStyle().Height(capacity).Render(body)
-	return lipgloss.NewStyle().Padding(1, 2).Render(model.assistantHeader(width) + "\n\n" + body + "\n" + fixedText + "\n" + tuiMuted(assistantInputHint, model.isDark))
+	hint := assistantInputHint
+	if model.assistant.state == "history" {
+		hint = "Enter select · Esc back · PgUp/PgDn scroll"
+	}
+	return lipgloss.NewStyle().Padding(1, 2).Render(model.assistantHeader(width) + "\n\n" + body + "\n" + fixedText + "\n" + tuiMuted(hint, model.isDark))
 }

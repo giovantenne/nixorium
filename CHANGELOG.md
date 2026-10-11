@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Add `/resume` to reopen current Assistant conversations or read saved and
+  outdated chats without using a request; keep 90 days of activity and up to
+  30 local conversations, protecting the current chat.
+
 - Add explicit Assistant answer reports and optional conversation sharing, off
   by default, with redacted saved history and 90-day service retention.
 

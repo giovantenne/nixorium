@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -81,8 +82,8 @@ func (store AssistantWorkspaceStore) PrepareConversation(repository, id string) 
 	return workspace.Conversation, nil
 }
 
-// Cleanup removes only expired, correctly identified private conversations.
-func (store AssistantWorkspaceStore) Cleanup() error {
+// Cleanup protects the current chat while expiring inactive and excess history.
+func (store AssistantWorkspaceStore) Cleanup(current ...string) error {
 	parent, err := store.conversations(false)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -95,6 +96,7 @@ func (store AssistantWorkspaceStore) Cleanup() error {
 	if err != nil {
 		return err
 	}
+	items := []domain.AssistantConversation{}
 	for _, entry := range entries {
 		if !entry.IsDir() || !assistantTurnPattern.MatchString(entry.Name()) {
 			continue
@@ -103,23 +105,48 @@ func (store AssistantWorkspaceStore) Cleanup() error {
 		if err != nil {
 			return err
 		}
-		data, err := assistantReadState(root, "meta.json")
+		data, err := assistantReadStateLimit(root, "meta.json", assistantMetadataLimit)
+		var metadata domain.AssistantConversation
+		if err == nil {
+			metadata, err = assistantHistoryMetadata(root, entry.Name(), data)
+		}
 		root.Close()
 		if err != nil {
 			return err
 		}
-		var metadata domain.AssistantConversation
-		if assistantDecodeStrict(data, &metadata) != nil || metadata.ID != entry.Name() {
-			return errors.New("invalid Assistant conversation metadata")
+		items = append(items, metadata)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		a, _ := time.Parse(time.RFC3339, items[i].LastActivityAt)
+		b, _ := time.Parse(time.RFC3339, items[j].LastActivityAt)
+		if a.Equal(b) {
+			return items[i].ID < items[j].ID
 		}
-		created, err := time.Parse(time.RFC3339, metadata.CreatedAt)
-		if err != nil {
-			return err
+		return a.After(b)
+	})
+	cutoff := time.Now().Add(-90 * 24 * time.Hour)
+	protected := ""
+	if len(current) > 0 {
+		protected = current[0]
+	}
+	kept := 0
+	for _, item := range items {
+		if item.ID == protected {
+			kept = 1
+			break
 		}
-		if created.Before(time.Now().Add(-30 * 24 * time.Hour)) {
-			if err = os.RemoveAll(filepath.Join(store.Directory, "conversations", entry.Name())); err != nil {
+	}
+	for _, item := range items {
+		if item.ID == protected {
+			continue
+		}
+		active, _ := time.Parse(time.RFC3339, item.LastActivityAt)
+		if kept >= 30 || active.Before(cutoff) {
+			if err := os.RemoveAll(filepath.Join(store.Directory, "conversations", item.ID)); err != nil {
 				return err
 			}
+		} else {
+			kept++
 		}
 	}
 	return nil

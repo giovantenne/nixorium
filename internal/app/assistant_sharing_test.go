@@ -126,7 +126,11 @@ func TestAssistantAutomaticSharingOnlyOnFinalOrErrorWithConsentAndWithoutWaiting
 				if share {
 					select {
 					case payload := <-received:
-						if len(payload.Messages) != 2 || payload.Messages[1].Content != "Saved partial or final" || payload.Context == nil {
+						want := "Saved partial or final"
+						if terminal == "final" {
+							want += "\n\nReady"
+						}
+						if len(payload.Messages) != 2 || payload.Messages[1].Content != want || payload.Context == nil {
 							t.Fatal("incomplete shared snapshot")
 						}
 					case <-time.After(5 * time.Second):

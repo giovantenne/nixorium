@@ -17,6 +17,8 @@ import (
 // AssistantActions keeps service calls and private filesystem state in the
 // command/application layers. Presentation owns only the interaction state.
 type AssistantActions struct {
+	ListConversations   func(context.Context, string) ([]domain.AssistantConversationHistory, error)
+	ConversationHistory func(context.Context, string) (domain.AssistantConversationHistory, error)
 	ChangedFiles        func(string) (int, error)
 	PlanSave            func(context.Context, string) domain.AssistantSavePlan
 	Save                func(context.Context, domain.AssistantSavePlan) domain.TemplateResetResult
@@ -32,12 +34,17 @@ type AssistantActions struct {
 	Activate            func(context.Context, string) (domain.AssistantActivation, error)
 	Account             func(context.Context, string) (domain.AssistantAccount, error)
 	Offer               func(context.Context) (domain.AssistantOffer, error)
-	Cleanup             func() error
+	Cleanup             func(string) error
 	PrepareConversation func(string) (domain.AssistantConversation, error)
 	Run                 func(context.Context, domain.AssistantConversation, string, func(domain.AssistantEvent)) (domain.AssistantTurnResult, error)
 }
 
 type assistantModel struct {
+	resumeItems                  []domain.AssistantConversationHistory
+	resumeCursor                 int
+	resumeLoading                bool
+	readOnlyHistory              domain.AssistantConversationHistory
+	readOnlyCursor               int
 	sharing                      bool
 	saved                        bool
 	longChatShown                bool
@@ -160,7 +167,8 @@ func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {
 		commands = append(commands, command)
 	}
 	if actions := model.actions.AssistantService; actions != nil && actions.Cleanup != nil {
-		commands = append(commands, func() tea.Msg { return assistantCleanupMsg{err: actions.Cleanup()} })
+		current := model.assistant.conversation.ID
+		commands = append(commands, func() tea.Msg { return assistantCleanupMsg{err: actions.Cleanup(current)} })
 	}
 	return model, tea.Batch(commands...)
 }
@@ -357,7 +365,7 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 	case "final":
 		model.assistant.canReport = true
 		model.assistant.summary = event.Summary
-		model.assistant.appendSummary(event.Summary)
+		model.assistant.appendFinal(event.Text, event.Summary)
 		model.assistant.messages = append(model.assistant.messages, domain.AssistantMessage{Role: "assistant", Content: model.assistant.streamed})
 	case "error":
 		model.assistant.noteAccessError(event.Code)
