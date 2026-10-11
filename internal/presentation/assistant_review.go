@@ -53,6 +53,7 @@ func (model dashboardModel) finishAssistantSave(msg assistantSaveResultMsg) (tea
 	if msg.result.State == "saved" && !msg.result.RecoveryRequired {
 		model.noteControllerSave(msg.result.Revision)
 		model.assistant.changedFiles = 0
+		model.assistant.saved = true
 	}
 	model.controller.plan = domain.ControllerRebuildPlanReport{}
 	model.deployment.plan = domain.DeploymentPlanReport{}

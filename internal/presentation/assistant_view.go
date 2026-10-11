@@ -15,8 +15,17 @@ import (
 
 const assistantInputHint = "Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back"
 const assistantWelcomeText = "Describe what your lab should do. Assistant prepares the change, checks it with Nix, and you review it before anything is saved or installed."
+const assistantSavedChatText = "Saved. Your next message starts a new chat on the saved configuration."
+const assistantLongChatText = "This chat is getting long. /new starts a fresh one, and answers will be faster."
 
 type assistantEntry struct{ role, text string }
+
+func (model *assistantModel) noteTranscriptSize(bytes int) {
+	if !model.longChatShown && model.maxRequestBytes > 0 && bytes > model.maxRequestBytes/2 {
+		model.longChatShown = true
+		model.entries = append(model.entries, assistantEntry{role: "notice", text: assistantLongChatText})
+	}
+}
 
 func (model *assistantModel) noteAccessError(code string) {
 	if code == "subscription_inactive" || code == "quota_exhausted" {
@@ -291,6 +300,9 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	input.SetStyles(styles)
 	inputBox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(tuiAccent(model.isDark)).Render(input.View())
 	fixed := []string{}
+	if model.assistant.saved {
+		fixed = append(fixed, model.assistantBox(assistantSavedChatText, width, tuiStatusSuccess))
+	}
 	if model.assistant.state == "running" {
 		seconds := 0
 		if !model.assistant.started.IsZero() {
@@ -305,6 +317,19 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	}
 	fixed = append(fixed, inputBox)
 	lines := []string{}
+	for _, entry := range model.assistant.archivedEntries {
+		text := assistantDisplayText(entry.text)
+		if entry.role == "user" {
+			text = "› You\n" + text
+		}
+		if entry.role == "assistant" {
+			text = "Assistant\n" + ansi.Strip(assistantMarkdown(entry.text, model.isDark))
+		}
+		lines = append(lines, tuiMuted(text, model.isDark), "")
+	}
+	if len(model.assistant.archivedEntries) > 0 {
+		lines = append(lines, tuiMuted("New chat", model.isDark), "")
+	}
 	entries := model.assistant.entries
 	if len(entries) == 0 {
 		for _, message := range model.assistant.messages {
@@ -322,6 +347,8 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 			lines = append(lines, lipgloss.NewStyle().Foreground(tuiAccent(model.isDark)).Bold(true).Render("› You"), assistantDisplayText(entry.text), "")
 		case "assistant":
 			lines = append(lines, tuiSection("Assistant", model.isDark), assistantMarkdown(entry.text, model.isDark), "")
+		case "notice":
+			lines = append(lines, tuiMuted(assistantDisplayText(entry.text), model.isDark))
 		case "activity":
 			tone := newTUITheme(model.isDark).muted
 			if strings.HasPrefix(entry.text, "✓") {
@@ -341,7 +368,7 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 	}
 	if choices := model.assistant.commandChoices(); len(choices) > 0 {
 		for i, command := range choices {
-			lines = append(lines, tuiSelection(command, i == model.assistant.commandCursor%len(choices), model.isDark))
+			lines = append(lines, tuiSelection(command, i == model.assistant.commandCursor%len(choices), model.isDark)+"  "+tuiMuted(assistantCommandDescriptions[command], model.isDark))
 		}
 	}
 	if model.message != "" {

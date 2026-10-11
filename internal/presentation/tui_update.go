@@ -1217,6 +1217,22 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		return model, command
 	}
 	if model.helpOpen {
+		if model.screen == dashboardAssistant && (model.assistant.state == "chat" || model.assistant.state == "running") {
+			switch key.String() {
+			case "down":
+				model.pageScroll++
+			case "up":
+				model.pageScroll = max(0, model.pageScroll-1)
+			case "pgdown":
+				model.pageScroll += max(1, model.height-5)
+			case "pgup":
+				model.pageScroll = max(0, model.pageScroll-max(1, model.height-5))
+			case "home":
+				model.pageScroll = 0
+			case "end":
+				model.pageScroll = len(strings.Split(assistantHelpText, "\n"))
+			}
+		}
 		if key.String() == "?" || key.String() == "f1" || key.String() == "esc" {
 			model.helpOpen = false
 			model.pageScroll = 0

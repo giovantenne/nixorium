@@ -14,7 +14,7 @@ var assistantExamples = []string{
 	"Block the Internet on pc01–pc06 every Tuesday 10–12",
 	"pc03 still shows the old wallpaper: what is wrong?",
 }
-var assistantCommands = []string{"/review", "/save", "/new", "/report", "/share", "/help", "/code"}
+var assistantCommands = []string{"/review", "/save", "/new", "/report", "/share", "/code", "/help"}
 
 type assistantOfferMsg struct {
 	id    uint64

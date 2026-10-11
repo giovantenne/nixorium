@@ -63,6 +63,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == f"/v1/turns/{TURN}/cancel":
             self.respond(204, "")
         elif self.path == f"/v1/turns/{TURN}/steps":
+            if any(m.get("role") == "user" and m.get("content") == "Confirm the saved course." for m in body["messages"]):
+                assert len(body["messages"]) == 1, "A new chat must not send the saved conversation."
+                self.respond(200, 'event: final\ndata: {"summary":"Saved configuration confirmed."}\n\n', "text/event-stream")
+                return
             results = {m["toolCallId"]: json.loads(m["content"]) for m in body["messages"] if m["role"] == "tool"}
             if "write-course" not in results:
                 event, payload = "tool_calls", {"calls": [{"id": "write-course", "name": "write_file", "arguments": {"path": "modules/course.nix", "content": "{ course = 2; }\n", "executable": False}}]}

@@ -116,6 +116,11 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	}
 	// Local UI acknowledgement; emitted only after the service admits the turn.
 	emit(domain.AssistantEvent{Type: "turn_started"})
+	emitTranscriptSize := func() {
+		if data, err := json.Marshal(messages); err == nil {
+			emit(domain.AssistantEvent{Type: "transcript_size", TranscriptBytes: len(data), MaxRequestBytes: turn.Limits.MaxRequestBytes})
+		}
+	}
 	finished := false
 	defer func() {
 		if !finished {
@@ -140,6 +145,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files}
 	textBytes := 0
 	for step := 0; step < turn.Limits.Steps; step++ {
+		emitTranscriptSize()
 		if err = ctx.Err(); err != nil {
 			return result, err
 		}
@@ -218,6 +224,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			}
 			result.Outcome = "final"
 			finished = true
+			emitTranscriptSize()
 			emit(terminal)
 			return result, nil
 		case "error":

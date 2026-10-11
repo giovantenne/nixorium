@@ -126,7 +126,7 @@ func (model dashboardModel) finishAssistantReport(message assistantReportMsg) (t
 	return model, model.assistant.input.Focus()
 }
 func (model dashboardModel) assistantSharingView() string {
-	title, body := "Conversation sharing", model.assistantSharingCheckbox()
+	title, body := "Conversation sharing", "Applies to all future conversations of this lab until you turn it off.\n\n"+model.assistantSharingCheckbox()
 	actions := []tuiAction{{key: "Enter", label: "Toggle sharing"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 	if model.assistant.state != "sharing" {
 		title = "Report this answer"
@@ -136,7 +136,7 @@ func (model dashboardModel) assistantSharingView() string {
 		}
 		comment := model.assistant.reportComment
 		comment.SetWidth(max(20, min(90, model.width-12)))
-		body = assistantReportText + "\n\n" + rating + "\n\nComment (optional, max 500 characters)\n" + comment.View()
+		body = "Sends only this conversation, once.\n\n" + assistantReportText + "\n\n" + rating + "\n\nComment (optional, max 500 characters)\n" + comment.View()
 		actions = []tuiAction{{key: "↑/↓", label: "Rating"}, {key: "Enter", label: "Send"}, {key: "Esc", label: "Cancel"}, {key: "F1", label: "Help"}}
 		if model.assistant.state == "report-sending" {
 			body += "\n\nSending report…"

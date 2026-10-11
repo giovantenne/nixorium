@@ -84,18 +84,21 @@ type AssistantStepRequest struct {
 }
 
 type AssistantEvent struct {
-	Type         string
-	ToolName     string
-	ToolResult   string
-	Messages     []AssistantMessage `json:"messages,omitempty"`
-	Delta        string
-	Text         string
-	Calls        []AssistantToolCall
-	Summary      string
-	Code         string
-	Message      string
-	InputTokens  int
-	OutputTokens int
+	// Local transcript metrics are never part of the service event protocol.
+	TranscriptBytes int `json:"-"`
+	MaxRequestBytes int `json:"-"`
+	Type            string
+	ToolName        string
+	ToolResult      string
+	Messages        []AssistantMessage `json:"messages,omitempty"`
+	Delta           string
+	Text            string
+	Calls           []AssistantToolCall
+	Summary         string
+	Code            string
+	Message         string
+	InputTokens     int
+	OutputTokens    int
 }
 
 var AssistantServiceTools = []string{"read_core"}

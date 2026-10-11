@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -38,6 +39,10 @@ type AssistantActions struct {
 
 type assistantModel struct {
 	sharing                      bool
+	saved                        bool
+	longChatShown                bool
+	maxRequestBytes              int
+	archivedEntries              []assistantEntry
 	canReport                    bool
 	reportRating                 int
 	reportComment                textinput.Model
@@ -314,6 +319,9 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 			model.assistant.changedFiles = message.changedFiles
 			model.assistant.messages = message.result.Messages
 			model.assistant.summary = message.result.Summary
+			if data, err := json.Marshal(message.result.Messages); err == nil {
+				model.assistant.noteTranscriptSize(len(data))
+			}
 		}
 		if message.err != nil {
 			model.assistant.canReport = false
@@ -333,6 +341,9 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 	switch event.Type {
 	case "turn_started":
 		model.assistant.input.Reset()
+	case "transcript_size":
+		model.assistant.maxRequestBytes = event.MaxRequestBytes
+		model.assistant.noteTranscriptSize(event.TranscriptBytes)
 	case "text":
 		model.assistant.streamed += event.Delta
 		model.assistant.appendText(event.Delta)
@@ -497,6 +508,26 @@ type assistantPreparedMsg struct {
 }
 
 func (model dashboardModel) startAssistantRunner() (tea.Model, tea.Cmd) {
+	if model.assistant.saved {
+		previous := model.assistant.entries
+		if len(previous) == 0 {
+			for _, message := range model.assistant.messages {
+				if message.Role == "user" || message.Role == "assistant" && message.Content != "" {
+					previous = append(previous, assistantEntry{message.Role, message.Content})
+				}
+			}
+		}
+		if len(model.assistant.archivedEntries) > 0 {
+			model.assistant.archivedEntries = append(model.assistant.archivedEntries, assistantEntry{role: "separator", text: "New chat"})
+		}
+		model.assistant.archivedEntries = append(model.assistant.archivedEntries, previous...)
+		model.assistant.entries = nil
+		model.assistant.messages = nil
+		model.assistant.conversation = domain.AssistantConversation{}
+		model.assistant.review = assistantReviewModel{}
+		model.assistant.saved, model.assistant.longChatShown = false, false
+		model.assistant.maxRequestBytes = 0
+	}
 	if model.assistant.cancel != nil {
 		model.assistant.cancel()
 	}

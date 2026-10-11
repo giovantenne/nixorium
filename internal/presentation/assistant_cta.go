@@ -12,7 +12,7 @@ import (
 
 const assistantDisclosure = "When you press Enter, your message and the files the assistant reads are sent to the Nixorium Assistant service. Do not enter passwords or student data."
 const assistantNetworkNotice = "The Assistant service could not be reached. Check the controller's Internet connection and try again."
-const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service keeps their content only if you report an answer or turn on\nsharing below. Passwords and private keys in your deployment are never sent.\nLogs and student files are never read."
+const assistantConsentText = "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service keeps their content only if you report an answer or turn on\nsharing below. Passwords and private keys in your deployment are never sent.\nLogs and student files are never read.\nEach message you send uses one request."
 
 func assistantServiceNotice(err error, subscribeURL string) string {
 	if err != nil {
@@ -75,7 +75,7 @@ func (model dashboardModel) assistantGateView() string {
 		for _, example := range assistantExamples[1:] {
 			examples = append(examples, "       "+example)
 		}
-		body = assistantWelcomeText + "\n\n" + tuiMuted(strings.Join(examples, "\n"), model.isDark) + "\n\n"
+		body = assistantWelcomeText + "\nEach message you send uses one request.\n\n" + tuiMuted(strings.Join(examples, "\n"), model.isDark) + "\n\n"
 		subscribe := "Subscribe"
 		if offer.PriceText != "" {
 			subscribe += " · " + offer.PriceText

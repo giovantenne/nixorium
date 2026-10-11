@@ -232,6 +232,7 @@ Welcome to Assistant
 
 Describe what your lab should do. Assistant prepares the change, checks it with Nix, and you review it before
 anything is saved or installed.
+Each message you send uses one request.
 
   e.g. Install GIMP and Inkscape on all student PCs
        Block the Internet on pc01–pc06 every Tuesday 10–12
@@ -335,6 +336,7 @@ the Nixorium Assistant service and to its AI provider to prepare a proposal.
 The service keeps their content only if you report an answer or turn on
 sharing below. Passwords and private keys in your deployment are never sent.
 Logs and student files are never read.
+Each message you send uses one request.
 
 [ ] Share my conversations with Nixorium for 90 days to improve Assistant
 Space toggle sharing · Enter continue · Esc back
@@ -347,6 +349,8 @@ Nixorium  /  Assistant
 
 Conversation sharing
 
+Applies to all future conversations of this lab until you turn it off.
+
 [ ] Share my conversations with Nixorium for 90 days to improve Assistant
 
 Enter Toggle sharing  ·  Esc Cancel  ·  F1 Help
@@ -358,6 +362,8 @@ Enter Toggle sharing  ·  Esc Cancel  ·  F1 Help
 Nixorium  /  Assistant
 
 Report this answer
+
+Sends only this conversation, once.
 
 This sends this whole conversation (your messages, the configuration contents Assistant read and its check
 results, with passwords removed) to Nixorium. It is kept for 90 days.

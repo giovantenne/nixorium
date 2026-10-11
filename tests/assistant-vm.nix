@@ -144,6 +144,12 @@
               wait("Try it on one computer first:")
               send("\x1b")
               time.sleep(0.3)
+              wait("Saved. Your next message starts a new chat on the saved configuration.")
+              after_saved = len(output())
+              send("Confirm the saved course.\r")
+              wait("New chat", after=after_saved)
+              wait("Saved configuration confirmed.", after=after_saved)
+              assert "The deployment changed since this chat started" not in output()[after_saved:]
               send("\x1b")
               time.sleep(0.3)
               send("q")
@@ -184,8 +190,9 @@
       assert controller.succeed("su - admin -c 'git -C deployment status --porcelain'").strip() == ""
       assert controller.succeed("cat /home/admin/deployment/modules/course.nix").strip() == "{ course = 2; }"
       requests = [json.loads(line) for line in controller.succeed("cat /tmp/fake-requests.log").splitlines()]
-      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/turns"] + ["/v1/turns/00000000-0000-4000-8000-000000000001/steps"] * 3
-      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True]
+      step = "/v1/turns/00000000-0000-4000-8000-000000000001/steps"
+      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/turns"] + [step] * 3 + ["/v1/turns", step]
+      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True, False, True]
       assert all(not r["userText"] for r in requests if r["method"] == "GET")
       assert controller.succeed("systemctl list-units 'nixorium-apply*' --state=active --no-legend --no-pager").strip() == ""
     with subtest("Assistant is absent without the controller option"):

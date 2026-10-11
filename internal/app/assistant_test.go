@@ -64,6 +64,38 @@ func runnerAdmit(w http.ResponseWriter) {
 	w.WriteHeader(201)
 	fmt.Fprintf(w, `{"turnId":%q,"limits":{"steps":24,"seconds":900,"maxRequestBytes":2000000}}`, runnerTurnID)
 }
+
+func TestAssistantTranscriptMetricsUseGrantedLimitAndSerializedBytes(t *testing.T) {
+	runner, conversation, _, _, _ := runnerFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/turns" {
+			runnerAdmit(w)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/steps") {
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, "event: text\ndata: {\"delta\":\"Answer\"}\n\nevent: final\ndata: {\"summary\":\"Answer\"}\n\n")
+			return
+		}
+		t.Error("unexpected route")
+	})
+	var metrics []domain.AssistantEvent
+	result, err := runner.Run(t.Context(), conversation, "UTF-8 è and \"quoted\" text\n", func(e domain.AssistantEvent) {
+		if e.Type == "transcript_size" {
+			metrics = append(metrics, e)
+		}
+	})
+	if err != nil || len(metrics) != 2 {
+		t.Fatal(err, metrics)
+	}
+	data, _ := json.Marshal(result.Messages)
+	if metrics[1].TranscriptBytes != len(data) || metrics[1].MaxRequestBytes != 2000000 || metrics[1].TranscriptBytes <= metrics[0].TranscriptBytes {
+		t.Fatal("wrong local transcript metrics", metrics)
+	}
+	wire, _ := json.Marshal(metrics[1])
+	if strings.Contains(string(wire), "TranscriptBytes") || strings.Contains(string(wire), "MaxRequestBytes") {
+		t.Fatal("local metrics entered event protocol")
+	}
+}
 func runnerTool(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	fmt.Fprint(w, "event: tool_calls\ndata: {\"calls\":[{\"id\":\"c1\",\"name\":\"write_file\",\"arguments\":{\"path\":\"modules/course.nix\",\"content\":\"{ programs.course.enable = true; }\\n\"}}]}\n\n")

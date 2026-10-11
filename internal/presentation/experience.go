@@ -203,6 +203,9 @@ func (model dashboardModel) administrationView() string {
 }
 
 func (model dashboardModel) helpView() string {
+	if model.screen == dashboardAssistant && (model.assistant.state == "chat" || model.assistant.state == "running") {
+		return assistantHelpText
+	}
 	lines := []string{tuiTitle("Keyboard help", model.isDark), "", "↑ ↓ / j k   Move through lists", "Enter       Open, review, or confirm the exact phrase", "Esc         Back / cancel / clear search", "/           Search Computers or a settings list", "?           Open or close help (F1 also works in text fields)", "q           Quit outside text entry", "Shift ↑/↓   Scroll a page that exceeds the terminal", "", tuiSection("In this view", model.isDark)}
 	switch model.screen {
 	case dashboardManagedJobs:
