@@ -4,12 +4,28 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
 type recoveryMsg struct{ report domain.RecoveryReport }
+
+// recoveryObservedMsg refreshes the overview conditions without touching the
+// recovery screen or the busy indicator.
+type recoveryObservedMsg struct{ report domain.RecoveryReport }
+
+func (model dashboardModel) observeRecoveryInBackground() tea.Cmd {
+	if model.actions.ClassroomMode || model.actions.LoadRecovery == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		return recoveryObservedMsg{report: model.observeRecovery(ctx)}
+	}
+}
 
 func (model dashboardModel) observeRecovery(ctx context.Context) domain.RecoveryReport {
 	if model.actions.ClassroomMode || model.actions.LoadRecovery == nil {

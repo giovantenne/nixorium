@@ -539,6 +539,11 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 				return model.checkDeploymentUSB(strings.Join(names, ","), true)
 			}
 		}
+		// Updates queued for switched-off computers appear on the overview now,
+		// not only after reopening Nixorium.
+		return model, model.observeRecoveryInBackground()
+	case recoveryObservedMsg:
+		model.observeRecoveryController(message.report)
 		return model, nil
 	case dashboardDeploymentProgressMsg:
 		if !model.deployment.applying || model.deployment.events == nil {
