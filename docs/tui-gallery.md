@@ -336,6 +336,7 @@ the Nixorium Assistant service and to its AI provider to prepare a proposal.
 The service keeps their content only if you report an answer or turn on
 sharing below. Passwords and private keys in your deployment are never sent.
 Logs and student files are never read.
+Nixorium keeps the text of your messages and Assistant's answers for 30 days to detect abuse, then deletes it.
 Each message you send uses one request.
 
 [ ] Share my conversations with Nixorium for 90 days to improve Assistant
