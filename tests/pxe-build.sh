@@ -41,10 +41,10 @@ case "$1" in
       def client($i): {name: $names[$i]}
         + (if ($names[$i][2:] | tonumber) % 2 == 1 then first else second end);
       if $part == "artifacts" then {artifacts: [first, first, first, first]}
-      else {clients: [range(0; $names | length) as $i | client($i)]
+      else {clients: ([range(0; $names | length) as $i | client($i)]
         | if $mode == "invalid" then .[0].storePath = "/tmp" else . end
         | if $mode == "invalid-derivation" then .[0].drvPath = "/tmp/build.drv" else . end
-        | if $mode == "identity" then .[0].name = "pc99" else . end} end
+        | if $mode == "identity" then .[0].name = "pc99" else . end)} end
     '
     ;;
   build)
