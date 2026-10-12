@@ -20,17 +20,17 @@ func TestAssistantMenuListsOnlyAvailableCommands(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("HTTP") })
 	m.assistant.entries, m.assistant.messages, m.assistant.changedFiles, m.assistant.canReport = nil, nil, 0, false
 	m.assistant.token, m.assistant.account.Plan = flowToken, "trial"
-	if got := assistantMenu(t, m); !reflect.DeepEqual(got, []string{"/resume", "/share", "/help", "/code"}) {
+	if got := assistantMenu(t, m); !reflect.DeepEqual(got, []string{"/resume", "/share", "/help", "/name", "/code"}) {
 		t.Fatalf("fresh chat: %v", got)
 	}
 	m.assistant.entries = []assistantEntry{{role: "user", text: "Q"}, {role: "assistant", text: "A"}}
 	m.assistant.canReport, m.assistant.changedFiles = true, 1
-	want := []string{"/review", "/save", "/new", "/resume", "/report", "/share", "/help", "/code"}
+	want := []string{"/review", "/save", "/new", "/resume", "/report", "/share", "/help", "/name", "/code"}
 	if got := assistantMenu(t, m); !reflect.DeepEqual(got, want) {
 		t.Fatalf("after proposal: %v", got)
 	}
 	m.assistant.account.Plan = "annual"
-	want = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/code"}
+	want = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/name", "/code"}
 	if got := assistantMenu(t, m); !reflect.DeepEqual(got, want) {
 		t.Fatalf("annual: %v", got)
 	}

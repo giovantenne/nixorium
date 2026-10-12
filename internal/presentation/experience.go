@@ -231,6 +231,8 @@ func (model dashboardModel) helpView() string {
 			lines = append(lines, "Enter Activate; Esc Cancel")
 		case "consent":
 			lines = append(lines, "Space Toggle sharing; Enter Continue without sending; Esc Back")
+		case "name", "name-saving":
+			lines = append(lines, "Type the laboratory name (60 characters); Enter Save; an empty name removes it; Esc Cancel")
 		case "sharing":
 			lines = append(lines, "Enter Toggle conversation sharing; Esc Cancel")
 		case "report":
@@ -240,7 +242,7 @@ func (model dashboardModel) helpView() string {
 		case "running":
 			lines = append(lines, "Esc Stop; the deployment remains unchanged")
 		default:
-			lines = append(lines, "Enter Send; Alt+Enter or Ctrl+J New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "/review Review proposal; /new New chat; /report Report this answer", "/share Conversation sharing; /help Help; /code Activation code")
+			lines = append(lines, "Enter Send; Alt+Enter or Ctrl+J New line; PgUp/PgDn History", "Ctrl+N New chat; Ctrl+R Review changed files; Esc Back", "/review Review proposal; /new New chat; /report Report this answer", "/share Conversation sharing; /name Laboratory name; /help Help; /code Activation code")
 		}
 		lines = append(lines, "Messages and files leave the controller only after subscription and consent checks.")
 	case dashboardComputersArea:
@@ -552,7 +554,7 @@ func (model dashboardModel) textEntry() bool {
 		return false
 	}
 	if model.screen == dashboardAssistant {
-		return model.assistant.state == "chat" || model.assistant.state == "activate"
+		return model.assistant.state == "chat" || model.assistant.state == "activate" || model.assistant.state == "name"
 	}
 	if model.screen == dashboardHostTrust {
 		return model.hostTrust.cancel == nil && !model.hostTrust.applying && model.hostTrust.result.Operation == "" && !model.hostTrust.plan.HasErrors()

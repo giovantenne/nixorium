@@ -15,6 +15,7 @@ type AssistantConfig struct {
 
 type AssistantAccount struct {
 	Name           string `json:"name"`
+	LabName        string `json:"labName,omitempty"`
 	Plan           string `json:"plan"`
 	Status         string `json:"status,omitempty"`
 	PeriodEnd      string `json:"periodEnd"`

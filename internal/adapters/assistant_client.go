@@ -158,13 +158,35 @@ func (client AssistantClient) Account(ctx context.Context, token string) (domain
 	if err = assistantResponse(response, 200, &wire); err != nil {
 		return domain.AssistantAccount{}, err
 	}
-	if wire.Account.Status != "active" && wire.Account.Status != "inactive" {
+	return client.checkedAccount(wire.Account)
+}
+
+func (client AssistantClient) checkedAccount(account domain.AssistantAccount) (domain.AssistantAccount, error) {
+	if account.Status != "active" && account.Status != "inactive" {
 		return domain.AssistantAccount{}, assistantProtocolError()
 	}
-	if wire.Account.UpgradeURL != "" && (wire.Account.Plan != "trial" || !client.validUpgradeURL(wire.Account.UpgradeURL)) {
+	if account.UpgradeURL != "" && (account.Plan != "trial" || !client.validUpgradeURL(account.UpgradeURL)) {
 		return domain.AssistantAccount{}, assistantProtocolError()
 	}
-	return wire.Account, nil
+	return account, nil
+}
+
+// SetLabName names this laboratory (an empty name clears it) and returns the
+// refreshed account. The service trims and validates the text.
+func (client AssistantClient) SetLabName(ctx context.Context, token, name string) (domain.AssistantAccount, error) {
+	var wire struct {
+		Account domain.AssistantAccount `json:"account"`
+	}
+	response, err := client.request(ctx, "PATCH", "/account", token, struct {
+		LabName string `json:"labName"`
+	}{name}, 15*time.Second)
+	if err != nil {
+		return domain.AssistantAccount{}, err
+	}
+	if err = assistantResponse(response, 200, &wire); err != nil {
+		return domain.AssistantAccount{}, err
+	}
+	return client.checkedAccount(wire.Account)
 }
 
 func (client AssistantClient) validUpgradeURL(value string) bool {

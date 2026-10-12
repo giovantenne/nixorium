@@ -35,6 +35,7 @@ type AssistantActions struct {
 	Report              func(context.Context, domain.AssistantConversation, string, string) error
 	Activate            func(context.Context, string) (domain.AssistantActivation, error)
 	Account             func(context.Context, string) (domain.AssistantAccount, error)
+	SetLabName          func(context.Context, string, string) (domain.AssistantAccount, error)
 	Offer               func(context.Context) (domain.AssistantOffer, error)
 	Cleanup             func(string) error
 	PrepareConversation func(string) (domain.AssistantConversation, error)
@@ -56,6 +57,7 @@ type assistantModel struct {
 	canReport                    bool
 	reportRating                 int
 	reportComment                textinput.Model
+	labName                      textinput.Model
 	initialized                  bool
 	changedFiles                 int
 	review                       assistantReviewModel
@@ -151,7 +153,11 @@ func newAssistantModel() assistantModel {
 	comment.Prompt = "› "
 	comment.Placeholder = "Optional comment"
 	comment.CharLimit = 500
-	return assistantModel{initialized: true, state: "chat", input: input, code: code, reportComment: comment}
+	labName := textinput.New()
+	labName.Prompt = "› "
+	labName.Placeholder = "For example Lab 2 – Informatica"
+	labName.CharLimit = assistantLabNameLimit
+	return assistantModel{initialized: true, state: "chat", input: input, code: code, reportComment: comment, labName: labName}
 }
 
 func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {

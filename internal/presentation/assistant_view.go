@@ -256,12 +256,7 @@ func assistantMarkdown(text string, dark bool) string {
 	}
 	return assistantLinkify(strings.Join(content, "\n"))
 }
-func (model dashboardModel) assistantHeader(width int) string {
-	name := strings.ReplaceAll(assistantDisplayText(model.assistant.account.Name), "\n", " ")
-	left := "Assistant"
-	if name != "" {
-		left += " · " + name
-	}
+func (model dashboardModel) assistantQuotaText() (string, bool) {
 	right := ""
 	account := model.assistant.account
 	warn := false
@@ -278,6 +273,27 @@ func (model dashboardModel) assistantHeader(width int) string {
 			right, warn = "No requests left", true
 		}
 	}
+	return right, warn
+}
+func assistantHeaderRight(model dashboardModel) string {
+	right, _ := model.assistantQuotaText()
+	return right
+}
+func (model dashboardModel) assistantHeader(width int) string {
+	name := strings.ReplaceAll(assistantDisplayText(model.assistant.account.Name), "\n", " ")
+	lab := strings.TrimSpace(strings.ReplaceAll(assistantDisplayText(model.assistant.account.LabName), "\n", " "))
+	left := "Assistant"
+	if name != "" {
+		left += " · " + name
+		if lab != "" {
+			// The school stays readable: the laboratory name gives way first.
+			room := max(1, width-lipgloss.Width(assistantHeaderRight(model))-1) - lipgloss.Width(left) - lipgloss.Width(" · ")
+			if room >= 4 {
+				left += " · " + ansi.Truncate(lab, room, "…")
+			}
+		}
+	}
+	right, warn := model.assistantQuotaText()
 	theme := newTUITheme(model.isDark)
 	tone := theme.muted
 	if warn {
@@ -305,6 +321,9 @@ func (model dashboardModel) assistantView() string {
 	}
 	if model.assistant.state == "sharing" || model.assistant.state == "report" || model.assistant.state == "report-sending" {
 		return model.assistantSharingView()
+	}
+	if model.assistant.state == "name" || model.assistant.state == "name-saving" {
+		return model.assistantNameView()
 	}
 	if model.assistant.state == "welcome" || model.assistant.state == "consent" || model.assistant.state == "activate" {
 		return model.assistantGateView()
@@ -440,6 +459,9 @@ func (model dashboardModel) assistantChatLayout() (bodyLines []string, fixedText
 		for _, example := range assistantExamples {
 			lines = append(lines, tuiMuted("  "+example, model.isDark))
 		}
+	}
+	if model.assistant.state == "chat" && model.assistant.token != "" && model.assistant.account.Plan != "" && model.assistant.account.LabName == "" {
+		lines = append(lines, "", tuiMuted(assistantNameHint, model.isDark))
 	}
 	if choices := model.assistant.commandChoices(); len(choices) > 0 && model.assistant.state != "history" {
 		for i, command := range choices {

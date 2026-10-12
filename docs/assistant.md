@@ -47,8 +47,8 @@ The input grows from one to six rows, then scrolls while keeping the draft.
 Terminals with alternate scroll send arrows for the mouse wheel, without
 capturing mouse selection. New content preserves a scrolled position;
 **End** or sending a message returns to the bottom. Type `/` for the command menu:
-`/review`, `/save`, `/new`, `/resume`, `/billing`, `/report`, `/share`, `/help`
-and `/code`. Enter or Tab completes
+`/review`, `/save`, `/new`, `/resume`, `/billing`, `/report`, `/share`, `/help`,
+`/name` and `/code`. Enter or Tab completes
 a choice; Enter on a complete command runs it. Unknown commands stay local.
 **F1** opens help. **Esc** stops a running turn without changing the active
 deployment; otherwise it returns to the previous area. A stopped chat may retain
@@ -57,6 +57,9 @@ candidate edits for later review.
 Subscription, quota, network and deployment-conflict notices appear inside the
 conversation and preserve the draft. An invalid token is removed and requires
 activation again. `/code` opens activation for a replacement code.
+`/name` gives this laboratory a name (up to 60 characters), shown after the
+school name in the header, on invoices and emails and in support, so several
+laboratories of one school can be told apart; an empty name removes it.
 
 The free trial includes ten requests for thirty days, with one trial per email
 address. Register with your email, school name and privacy consent on the

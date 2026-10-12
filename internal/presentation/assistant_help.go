@@ -16,6 +16,8 @@ Commands
   /share    Turn automatic sharing on or off (off by default). When on, every
             conversation of this lab is sent to Nixorium to improve Assistant.
             Kept for 90 days.
+  /name     Set this laboratory's name, shown on invoices emails and in support
+            (for example 'Lab 2 – Informatica').
   /code     Enter an activation code (for example after subscribing).
   /help     Show this help.
 
@@ -36,6 +38,7 @@ var assistantCommandDescriptions = map[string]string{
 	"/billing": "Manage your subscription and see payments (opens Stripe).",
 	"/report":  "Tell us one answer was helpful or wrong.",
 	"/share":   "Turn automatic sharing on or off (off by default).",
+	"/name":    "Set this laboratory's name, shown on invoices emails and in support (for example 'Lab 2 – Informatica').",
 	"/code":    "Enter an activation code (for example after subscribing).",
 	"/help":    "Show this help.",
 }

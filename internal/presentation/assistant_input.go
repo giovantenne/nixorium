@@ -14,7 +14,7 @@ var assistantExamples = []string{
 	"Block the Internet on pc01–pc06 every Tuesday 10–12",
 	"pc03 still shows the old wallpaper: what is wrong?",
 }
-var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/code"}
+var assistantCommands = []string{"/review", "/save", "/new", "/resume", "/billing", "/report", "/share", "/help", "/name", "/code"}
 
 type assistantOfferMsg struct {
 	id    uint64
@@ -166,6 +166,9 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 		model.helpOpen = true
 		model.pageScroll = 0
 		return model, nil
+	case "/name":
+		model.assistant.input.Reset()
+		return model.openAssistantName()
 	case "/code":
 		model.assistant.input.Reset()
 		model.assistant.state = "activate"
@@ -238,6 +241,8 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 			return model, model.assistant.code.Focus()
 		}
 		return model, nil
+	case "name", "name-saving":
+		return model.updateAssistantNameKey(key)
 	case "sharing", "report", "report-sending":
 		return model.updateAssistantSharingKey(key)
 	case "consent":

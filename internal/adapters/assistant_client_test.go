@@ -177,3 +177,34 @@ func TestAssistantClientKeepsServiceErrorCodesDistinctFromTransportFailures(t *t
 		t.Fatal("error event", err, terminal)
 	}
 }
+
+func TestAssistantClientSetLabName(t *testing.T) {
+	token := strings.Repeat("t", 43)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]string
+		if r.Method != "PATCH" || r.URL.Path != "/v1/account" || r.Header.Get("Authorization") != "Bearer "+token ||
+			json.NewDecoder(r.Body).Decode(&body) != nil || len(body) != 1 {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if body["labName"] == "bad" {
+			w.WriteHeader(400)
+			fmt.Fprint(w, `{"error":{"code":"invalid_request","message":"The laboratory name must be plain text."}}`)
+			return
+		}
+		fmt.Fprintf(w, `{"account":{"name":"Synthetic","labName":%q,"plan":"test","status":"active","periodEnd":"2099-01-01","turnsRemaining":42}}`, body["labName"])
+	}))
+	defer server.Close()
+	client := AssistantClient{Endpoint: server.URL + "/v1", Version: "3.2.0"}
+	account, err := client.SetLabName(context.Background(), token, "Lab 2")
+	if err != nil || account.LabName != "Lab 2" || account.Name != "Synthetic" {
+		t.Fatalf("%+v %v", account, err)
+	}
+	var serviceError *domain.AssistantError
+	if _, err = client.SetLabName(context.Background(), token, "bad"); !errors.As(err, &serviceError) || serviceError.Code != "invalid_request" || serviceError.Message == "" {
+		t.Fatalf("validation error lost: %v", err)
+	}
+	if _, err = client.SetLabName(context.Background(), "short", "x"); err == nil {
+		t.Fatal("invalid token accepted")
+	}
+}

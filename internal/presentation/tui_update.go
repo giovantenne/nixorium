@@ -38,6 +38,8 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model, nil
 	case assistantSaveResultMsg:
 		return model.finishAssistantSave(message)
+	case assistantNameMsg:
+		return model.finishAssistantName(message)
 	case assistantReportMsg:
 		return model.finishAssistantReport(message)
 	case assistantCleanupMsg:
@@ -1223,6 +1225,12 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		if model.screen == dashboardAssistant && !model.helpOpen && model.assistant.state == "chat" {
 			var command tea.Cmd
 			model.assistant.input, command = model.assistant.input.Update(message)
+			return model, command
+		}
+		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardAssistant &&
+			!model.helpOpen && model.assistant.state == "name" {
+			var command tea.Cmd
+			model.assistant.labName, command = model.assistant.labName.Update(tea.PasteMsg{Content: strings.Join(strings.Fields(paste.Content), " ")})
 			return model, command
 		}
 		// Activation codes are usually pasted from the email: accept the paste,
