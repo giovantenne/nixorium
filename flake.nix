@@ -111,6 +111,9 @@
           };
         } pkgs;
       });
+      clientNetworkUpgradeVmTest = pkgs.testers.runNixOSTest (import ./tests/client-network-upgrade-vm.nix {
+        networkingModule = ./modules/networking.nix;
+      });
       remoteInstallerDeploymentRevision = "0123456789abcdef0123456789abcdef01234567";
       remoteInstallerTestLab = mkLab {
         deploymentSelf = self;
@@ -230,6 +233,7 @@
         '';
         client-installer-vm = clientInstallerVmTest;
         remote-client-installer-vm = remoteClientInstallerVmTest;
+        client-network-upgrade-vm = clientNetworkUpgradeVmTest;
         management-vm = managementVmTest;
         assistant-vm = assistantVmTest;
       };

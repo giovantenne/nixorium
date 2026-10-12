@@ -17,6 +17,6 @@
   checks-editor = [ "workspace-editor-vm" "programming-profile-vm" ];
   checks-management = [ "management-vm" "assistant-vm" "telemetry-vm" "onboarding-vm" ];
   checks-session = [ "session-state-vm" "clean-generations-vm" "classroom-view-vm" ];
-  checks-installer = [ "client-installer" "client-installer-vm" ];
+  checks-installer = [ "client-installer" "client-installer-vm" "client-network-upgrade-vm" ];
   checks-remote-installer = [ "remote-client-installer-vm" ];
 }
