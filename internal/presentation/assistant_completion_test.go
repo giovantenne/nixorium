@@ -111,7 +111,7 @@ func TestAssistantOwnSaveStartsFreshChatAndExternalChangeStillWarns(t *testing.T
 			}
 			assistantCompletionGit(t, repo, "add", "flake.nix")
 			assistantCompletionGit(t, repo, "commit", "-qm", "synthetic base")
-			store := adapters.AssistantWorkspaceStore{Directory: auth.Directory}
+			store := adapters.AssistantWorkspaceStore(auth)
 			old, err := store.CreateConversation(repo)
 			if err != nil {
 				t.Fatal(err)

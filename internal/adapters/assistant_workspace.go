@@ -54,7 +54,7 @@ func assistantDirectory(parent *os.File, name string, create bool) (*os.File, er
 	return os.NewFile(uintptr(fd), name), nil
 }
 func (store AssistantWorkspaceStore) conversations(create bool) (*os.File, error) {
-	root, err := (AssistantStateStore{Directory: store.Directory}).root()
+	root, err := (AssistantStateStore(store)).root()
 	if err != nil {
 		return nil, err
 	}

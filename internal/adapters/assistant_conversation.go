@@ -15,7 +15,7 @@ import (
 )
 
 func (store AssistantWorkspaceStore) ReadToken() (string, error) {
-	return (AssistantStateStore{Directory: store.Directory}).ReadToken()
+	return (AssistantStateStore(store)).ReadToken()
 }
 func (store AssistantWorkspaceStore) ReadTranscript(conversation domain.AssistantConversation) ([]domain.AssistantMessage, error) {
 	workspace, err := store.Open(conversation.ID)
@@ -224,7 +224,7 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 }
 
 func (store AssistantWorkspaceStore) ReadConsent() (bool, error) {
-	return (AssistantStateStore{Directory: store.Directory}).ReadConsent()
+	return (AssistantStateStore(store)).ReadConsent()
 }
 
 func (store AssistantWorkspaceStore) ReadSharing() (bool, error) {

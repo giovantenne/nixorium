@@ -10,7 +10,6 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-const assistantDisclosure = "When you press Enter, your message and the files the assistant reads are sent to the Nixorium Assistant service. Do not enter passwords or student data."
 const assistantNetworkNotice = "The Assistant service could not be reached. Check the controller's Internet connection and try again."
 const assistantProviderBusyNotice = "The AI provider is busy right now. Your request was not completed; try again in a minute."
 const assistantFailedNotice = "The Assistant could not complete this request. Try again in a minute."

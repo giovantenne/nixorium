@@ -300,7 +300,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	assistantConfig, _ := adapters.LoadAssistantConfig("/etc/nixorium/assistant.json")
 	assistantClient := adapters.AssistantClient{Endpoint: assistantConfig.Endpoint, Version: nixoriumVersion}
 	assistantStore := adapters.AssistantStateStore{Directory: "/var/lib/nixorium/assistant"}
-	assistantWorkspace := adapters.AssistantWorkspaceStore{Directory: assistantStore.Directory}
+	assistantWorkspace := adapters.AssistantWorkspaceStore(assistantStore)
 	assistantReporter := app.AssistantConversationReporter{Client: assistantClient, Store: assistantWorkspace, Version: nixoriumVersion}
 	assistantLabStatus := app.AssistantLabStatus{Inspector: inspector, DeferredUpdates: newDeferredUpdateManager()}
 	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}

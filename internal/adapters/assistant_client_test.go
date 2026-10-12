@@ -71,7 +71,7 @@ func TestAssistantClientRefusesRedirectsAndUnknownJSON(t *testing.T) {
 	requests := 0
 	destination := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requests++ }))
 	defer destination.Close()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, destination.URL, 307) }))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, destination.URL, http.StatusTemporaryRedirect) }))
 	defer server.Close()
 	client := AssistantClient{Endpoint: server.URL}
 	if _, err := client.Activate(context.Background(), "code"); err == nil || requests != 0 {

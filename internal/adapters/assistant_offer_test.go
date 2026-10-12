@@ -22,7 +22,7 @@ func TestAssistantPublicOfferAndFailures(t *testing.T) {
 					fmt.Fprint(w, `{"error":{"code":"service_unavailable","message":"Offline"}}`)
 					return
 				case "redirect":
-					http.Redirect(w, r, "https://example.invalid", 307)
+					http.Redirect(w, r, "https://example.invalid", http.StatusTemporaryRedirect)
 					return
 				}
 				body := map[string]any{"priceText": "360 € + VAT per lab / year", "trialRequests": 10, "trialUrl": "https://assistant.example/trial", "subscribeUrl": "https://example.org/assistant/"}
