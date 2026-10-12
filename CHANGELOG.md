@@ -23,6 +23,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   `clientIfaceName`. Explicit names and the controller keep today's
   behaviour; a PC with several wired cards needs a `hostIfaceNames` entry.
 
+### Documentation
+
+- Add dual-boot requirements to the administrator guide: other systems on other
+  disks appear in the boot menu after the next update or installation, which
+  needs Fast Boot and Windows Fast Startup disabled and Secure Boot off.
+
 ## [3.2.2] - 2026-10-12
 
 - Add `/resume` to reopen current Assistant conversations or read saved and
