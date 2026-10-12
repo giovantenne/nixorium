@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-10-12
+
 ### Added
 
 Nixorium Assistant (optional, subscription). An administrator can ask for
@@ -1698,7 +1700,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.3...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/giovantenne/nixorium/compare/v3.2.3...v3.3.0
 [3.2.3]: https://github.com/giovantenne/nixorium/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/giovantenne/nixorium/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/giovantenne/nixorium/compare/v3.2.0...v3.2.1
