@@ -162,6 +162,9 @@
               time.sleep(0.3)
               wait("Saved. Your next message starts a new chat on the saved configuration.")
               after_saved = len(output())
+              # Simulate an account acquiring a Stripe customer; no external call.
+              # The next turn refreshes the account, which then reports a paid plan.
+              pathlib.Path("/tmp/fake-billing-customer").touch()
               send("Confirm the saved course.\r")
               wait("New chat", after=after_saved)
               wait("Saved configuration confirmed.", after=after_saved)
@@ -170,8 +173,6 @@
               assert re.search(r"\x1b\]8;[^;]*;https://example.invalid/help(?:\x07|\x1b\\)", raw)
               assert not any(sequence in raw for sequence in ["\x1b[?1000h", "\x1b[?1002h", "\x1b[?1003h", "\x1b[?1006h"])
               assert "The deployment changed since this chat started" not in output()[after_saved:]
-              # Simulate an account acquiring a Stripe customer; no external call.
-              pathlib.Path("/tmp/fake-billing-customer").touch()
               billing_start = len(output())
               send("/billing\r")
               wait("This link works for a few minutes.", after=billing_start)

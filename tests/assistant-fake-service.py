@@ -42,7 +42,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.authenticated():
             if self.path == "/v1/account":
-                self.respond(200, {"account": ACCOUNT})
+                account = dict(ACCOUNT, plan="annual") if Path("/tmp/fake-billing-customer").exists() else ACCOUNT
+                self.respond(200, {"account": account})
             else:
                 self.error(404, "turn_not_found")
 
