@@ -108,6 +108,9 @@
               send("/unknown\r")
               wait("Unknown command. Type / to see the commands.")
               assert not pathlib.Path("/tmp/fake-requests.log").exists() or not any(json.loads(line)["method"] == "POST" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
+              # An unknown command stays in the input; Ctrl+N clears it.
+              send("\x0e")
+              time.sleep(0.3)
               # Sending asks to activate and keeps the request until then.
               send("Prepare the course for pc01.\r")
               wait("Activate Assistant to send your request.")
