@@ -169,6 +169,11 @@
               wait("New chat", after=after_saved)
               wait("Saved configuration confirmed.", after=after_saved)
               wait("https://example.invalid/help", after=after_saved)
+              # The answer is visible before the turn ends. Keys sent while the
+              # turn is still running are discarded, so a partly dropped
+              # "/billing" would be submitted as a message. The name tip is
+              # drawn only once the chat is idle again.
+              wait("Tip: type /name to give this laboratory a name.", after=output().rindex("Saved configuration confirmed."))
               raw = log.read_text()
               assert re.search(r"\x1b\]8;[^;]*;https://example.invalid/help(?:\x07|\x1b\\)", raw)
               assert not any(sequence in raw for sequence in ["\x1b[?1000h", "\x1b[?1002h", "\x1b[?1003h", "\x1b[?1006h"])
