@@ -200,6 +200,74 @@ func TestAssistantPendingPromptIsSentOnceAfterActivationAndConsent(t *testing.T)
 	}
 }
 
+func TestAssistantTrialActivationConsentAndAccountRefresh(t *testing.T) {
+	var requests atomic.Int32
+	shortPath := "/u/" + strings.Repeat("Ab0_-", 8)
+	m, store := assistantFlowFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/activate":
+			if r.Method != http.MethodPost {
+				t.Errorf("unexpected activation method %s", r.Method)
+			}
+			fmt.Fprintf(w, `{"token":%q,"account":{"name":"Synthetic School","labName":"Lab 1","plan":"trial","periodEnd":"2099-01-01"}}`, flowToken)
+		case "/v1/account":
+			if r.Method != http.MethodGet || r.Header.Get("Authorization") != "Bearer "+flowToken {
+				t.Error("unexpected account request")
+			}
+			fmt.Fprintf(w, `{"account":{"name":"Synthetic School","labName":"Lab 1","plan":"trial","status":"active","periodEnd":"2099-01-01","turnsRemaining":10,"upgradeUrl":%q}}`, "http://"+r.Host+shortPath)
+		default:
+			t.Errorf("activation/account lifecycle reached content route %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	client := adapters.AssistantClient{Endpoint: m.actions.Assistant.Endpoint}
+	m.actions.AssistantService.Account = client.Account
+	m.assistant.state, m.assistant.codeStep = "activate", true
+	m.assistant.code.SetValue("synthetic-code")
+	updated, command := m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(command())
+	m = updated.(dashboardModel)
+	if m.assistant.state != "consent" || m.assistant.account.Plan != "trial" || requests.Load() != 1 {
+		t.Fatal("partial activation did not reach consent")
+	}
+	if token, err := store.ReadToken(); err != nil || token != flowToken {
+		t.Fatal("activation token was not saved", err)
+	}
+	if consent, err := store.ReadConsent(); err != nil || consent {
+		t.Fatal("activation bypassed consent", err)
+	}
+	updated, command = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(command())
+	m = updated.(dashboardModel)
+	if consent, err := store.ReadConsent(); err != nil || !consent || m.assistant.state != "chat" || requests.Load() != 1 {
+		t.Fatal("consent did not return to chat without sending content", err)
+	}
+	// Reopening refreshes the partial activation response through the real client.
+	updated, _ = m.openAssistant()
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(m.refreshAssistantAccount()())
+	m = updated.(dashboardModel)
+	view := ansi.Strip(m.View().Content)
+	if m.assistant.account.Status != "active" || m.assistant.account.TurnsRemaining != 10 || m.assistant.account.LabName != "Lab 1" ||
+		!strings.Contains(view, "Free trial · 10 of 10 left") || strings.Contains(view, "Free trial ended") || m.message != "" {
+		t.Fatalf("fresh trial displayed as ended: account=%+v notice=%q view=%s", m.assistant.account, m.message, view)
+	}
+	// Check send access, stopping before the synthetic runner or any turn is opened.
+	updated, command = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	access, ok := command().(assistantAccessMsg)
+	if !ok || access.err != nil || !access.consent || access.account == nil || access.account.TurnsRemaining != 10 || requests.Load() != 3 {
+		t.Fatalf("fresh trial was denied send access: %+v", access)
+	}
+	if m.assistant.cancel != nil {
+		m.assistant.cancel()
+	}
+}
+
 func TestAssistantCancelledActivationKeepsDraft(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected HTTP") })
 	updated, _ := m.Update(keyPress("enter"))

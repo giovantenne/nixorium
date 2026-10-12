@@ -25,6 +25,7 @@ var assistantTokenPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43,256}$`)
 var assistantTurnPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 var assistantUpgradeExpiryPattern = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
 var assistantUpgradeSignaturePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+var assistantShortUpgradePathPattern = regexp.MustCompile(`^/u/[A-Za-z0-9_-]{40}$`)
 
 func assistantProtocolError() error {
 	return &domain.AssistantError{Code: "protocol_error", Message: "The Assistant service returned an invalid response."}
@@ -193,10 +194,16 @@ func (client AssistantClient) validUpgradeURL(value string) bool {
 	link, err := url.Parse(value)
 	base, baseErr := url.Parse(client.Endpoint)
 	if err != nil || baseErr != nil || len(value) > 2048 || link.User != nil || link.Fragment != "" || link.Opaque != "" ||
-		link.Scheme != base.Scheme || link.Host != base.Host || link.Path != "/upgrade" || link.RawPath != "" {
+		link.Scheme != base.Scheme || link.Host != base.Host || link.RawPath != "" {
 		return false
 	}
 	if link.Scheme != "https" && !(link.Scheme == "http" && (link.Hostname() == "localhost" || link.Hostname() == "127.0.0.1")) {
+		return false
+	}
+	if assistantShortUpgradePathPattern.MatchString(link.Path) {
+		return link.RawQuery == "" && !link.ForceQuery
+	}
+	if link.Path != "/upgrade" {
 		return false
 	}
 	query, err := url.ParseQuery(link.RawQuery)

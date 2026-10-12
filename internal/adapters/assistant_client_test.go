@@ -71,7 +71,9 @@ func TestAssistantClientRefusesRedirectsAndUnknownJSON(t *testing.T) {
 	requests := 0
 	destination := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requests++ }))
 	defer destination.Close()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, destination.URL, http.StatusTemporaryRedirect) }))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, destination.URL, http.StatusTemporaryRedirect)
+	}))
 	defer server.Close()
 	client := AssistantClient{Endpoint: server.URL}
 	if _, err := client.Activate(context.Background(), "code"); err == nil || requests != 0 {
@@ -91,6 +93,7 @@ func TestAssistantAccountUpgradeLink(t *testing.T) {
 	}{
 		{"trial", "trial", "/upgrade?account=" + assistantTestTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43), false},
 		{"annual", "annual", "/upgrade?account=" + assistantTestTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43), true},
+		{"annual short", "annual", "/u/" + strings.Repeat("Ab0_-", 8), true},
 		{"foreign", "trial", "https://other.example/upgrade", true},
 		{"script", "trial", "javascript:alert(1)", true},
 		{"extra", "trial", "/upgrade?account=" + assistantTestTurnID + "&expires=2000000000&sig=" + strings.Repeat("A", 43) + "&other=1", true},
@@ -112,6 +115,85 @@ func TestAssistantAccountUpgradeLink(t *testing.T) {
 			}
 			if !test.invalid && (account.UpgradeURL == "" || account.Plan != "trial" || account.TurnsRemaining != 0) {
 				t.Fatal("lost trial account metadata")
+			}
+		})
+	}
+}
+
+func TestAssistantClientActiveTrialAccountWithShortUpgradeLink(t *testing.T) {
+	token := strings.Repeat("t", 43)
+	shortPath := "/u/" + strings.Repeat("Ab0_-", 8)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/account" || r.Header.Get("Authorization") != "Bearer "+token {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		labName := "Lab 1"
+		if r.Method == http.MethodPatch {
+			var body struct {
+				LabName string `json:"labName"`
+			}
+			if json.NewDecoder(r.Body).Decode(&body) != nil {
+				t.Error("invalid laboratory name request")
+			}
+			labName = body.LabName
+		} else if r.Method != http.MethodGet {
+			t.Errorf("unexpected method %s", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"account":{"name":"Synthetic School","labName":%q,"plan":"trial","status":"active","periodEnd":"2099-01-01","turnsRemaining":10,"upgradeUrl":%q}}`, labName, "http://"+r.Host+shortPath)
+	}))
+	defer server.Close()
+	client := AssistantClient{Endpoint: server.URL + "/v1"}
+	for _, method := range []string{http.MethodGet, http.MethodPatch} {
+		t.Run(method, func(t *testing.T) {
+			var account domain.AssistantAccount
+			var err error
+			if method == http.MethodGet {
+				account, err = client.Account(t.Context(), token)
+			} else {
+				account, err = client.SetLabName(t.Context(), token, "Lab 2")
+			}
+			wantName := "Lab 1"
+			if method == http.MethodPatch {
+				wantName = "Lab 2"
+			}
+			if err != nil || account.Name != "Synthetic School" || account.LabName != wantName || account.Plan != "trial" ||
+				account.Status != "active" || account.TurnsRemaining != 10 || account.PeriodEnd != "2099-01-01" || account.UpgradeURL != server.URL+shortPath {
+				t.Fatalf("lost active trial account metadata: %+v, %v", account, err)
+			}
+		})
+	}
+}
+
+func TestAssistantShortUpgradeURLValidation(t *testing.T) {
+	client := AssistantClient{Endpoint: "https://assistant.example/v1"}
+	shortPath := "/u/" + strings.Repeat("Ab0_-", 8)
+	valid := "https://assistant.example" + shortPath
+	for _, test := range []struct {
+		name, link string
+		valid      bool
+	}{
+		{"current", valid, true},
+		{"foreign host", "https://other.example" + shortPath, false},
+		{"foreign port", "https://assistant.example:444" + shortPath, false},
+		{"insecure scheme", "http://assistant.example" + shortPath, false},
+		{"relative", shortPath, false},
+		{"userinfo", "https://user@assistant.example" + shortPath, false},
+		{"fragment", valid + "#fragment", false},
+		{"query", valid + "?other=1", false},
+		{"empty query", valid + "?", false},
+		{"escaped path", strings.Replace(valid, "/u/", "/%75/", 1), false},
+		{"short token", valid[:len(valid)-1], false},
+		{"long token", valid + "A", false},
+		{"padded token", valid[:len(valid)-1] + "=", false},
+		{"invalid token character", valid[:len(valid)-1] + "+", false},
+		{"extra segment", valid + "/extra", false},
+		{"trailing slash", valid + "/", false},
+		{"wrong route", strings.Replace(valid, "/u/", "/v1/u/", 1), false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := client.validUpgradeURL(test.link); got != test.valid {
+				t.Fatalf("validUpgradeURL(%q) = %v, want %v", test.link, got, test.valid)
 			}
 		})
 	}
