@@ -18,7 +18,6 @@ func Render(m Manifest) (string, string) {
 	bins := []string{}
 	keys := []string{}
 	destinations := []string{}
-	packages := []string{}
 	packageCopies := []string{}
 	binCopies := []string{}
 	parents := []string{"bin", "lib", "lib/node_modules"}
@@ -37,7 +36,6 @@ func Render(m Manifest) (string, string) {
 		}
 		p := strings.TrimPrefix(dep.Path, "node_modules/")
 		if !strings.Contains(p, "/node_modules/") {
-			packages = append(packages, p)
 			packageCopies = append(packageCopies, `        ${pkgs.coreutils}/bin/cp -R --no-preserve=ownership "${baseline}/lib/node_modules/`+p+`" "$PREFIX/lib/node_modules/`+p+`"`+"\n"+`        ${pkgs.coreutils}/bin/chmod -R u+w "$PREFIX/lib/node_modules/`+p+`"`)
 			destinations = append(destinations, "lib/node_modules/"+p)
 			if strings.HasPrefix(p, "@") {

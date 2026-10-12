@@ -43,7 +43,7 @@ func RunResolver(node, name, version string) error {
 		}
 		response, err := client.Do(upstream)
 		if err != nil {
-			http.Error(w, "unavailable", 502)
+			http.Error(w, "unavailable", http.StatusBadGateway)
 			return
 		}
 		defer response.Body.Close()

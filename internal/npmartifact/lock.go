@@ -178,7 +178,9 @@ func (budget *ArchiveBudget) Inspect(data []byte, dep Dependency, selected bool)
 			}
 		}
 		p = path.Clean(p)
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA && header.Typeflag != tar.TypeDir {
+		// Legacy tar regular files may use a zero type byte; avoid the deprecated
+		// TypeRegA alias while keeping those archives supported.
+		if header.Typeflag != tar.TypeReg && header.Typeflag != 0 && header.Typeflag != tar.TypeDir {
 			return nil, errors.New("unsafe_archive")
 		}
 		if header.Mode&06000 != 0 {
