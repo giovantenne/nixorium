@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Fix client preparation running out of memory on large laboratories. Shared
+  artifacts and client systems are now evaluated in separate bounded batches
+  (four clients per evaluator by default) instead of one evaluator for every
+  client, and a failing batch names its hosts.
+
 ## [3.2.0] - 2026-10-09
 
 - Hide older Nixorium releases in the TUI using Semantic Version precedence

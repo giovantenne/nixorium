@@ -541,7 +541,7 @@ let
 
       mapfile -t CLIENT_NAMES < <(jq -er '.clients.hosts[].name' <<<"$META")
       publish_progress running clients \
-        "Building four shared artifacts and all client systems together" 0 "''${#CLIENT_NAMES[@]}"
+        "Evaluating shared artifacts and client systems in bounded batches" 0 "''${#CLIENT_NAMES[@]}"
       build_pxe_outputs "$FLAKE_URL" "''${CLIENT_NAMES[@]}"
       [[ -f "$KERNEL_PATH/bzImage" ]] || fail "prepared kernel output lacks bzImage"
       [[ -f "$INITRD_PATH/initrd" ]] || fail "prepared initrd output lacks initrd"

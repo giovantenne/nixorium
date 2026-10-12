@@ -1161,8 +1161,9 @@ editable target and does not offer downgrades. During validation it shows the
 candidate-lock, evaluation, representative-build, review, and final verification
 phases, including the required output count and elapsed time. Required outputs
 share one Nix build and the exact candidate lock; all must succeed. PXE
-preparation evaluates all client systems and shared artifacts together, then builds
-their resolved derivations without repeating the deployment evaluation. Controller
+preparation evaluates shared artifacts and then client systems in bounded
+batches (`NIXORIUM_PXE_EVAL_BATCH`, default 4) to limit controller memory, then
+builds their resolved derivations without repeating the deployment evaluation. Controller
 preflight also shares one fresh evaluation while preserving the separate checks
 before activation and after completion. After validation, review
 the scrollable two-file patch (`F4` expands candidate checks), then press Enter.
