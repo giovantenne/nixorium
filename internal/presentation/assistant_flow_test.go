@@ -14,6 +14,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
@@ -131,16 +132,97 @@ func TestAssistantNoTokenSendsNoHTTPAndPreservesDraft(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { requests.Add(1) })
 	updated, command := m.Update(keyPress("enter"))
 	m = assistantWork(t, updated.(dashboardModel), command)
-	if requests.Load() != 0 || m.assistant.state != "welcome" || m.assistant.input.Value() != "Synthetic private request" {
+	if requests.Load() != 0 || command != nil || m.assistant.state != "welcome" || m.assistant.input.Value() != "Synthetic private request" || !m.assistant.pendingSend {
 		t.Fatal("no-token CTA sent or lost content")
 	}
-	if !strings.Contains(m.View().Content, "Welcome to Assistant") {
+	if !strings.Contains(m.View().Content, "Activate Assistant to send your request.") {
 		t.Fatal("missing CTA")
 	}
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)
-	if m.screen != dashboardHome || m.assistant.input.Value() == "" {
+	if m.screen != dashboardAssistant || m.assistant.state != "chat" || m.assistant.input.Value() != "Synthetic private request" || m.assistant.pendingSend {
 		t.Fatal("Esc lost draft")
+	}
+}
+
+func TestAssistantOpensChatWithoutToken(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("open sent HTTP") })
+	m.assistant = newAssistantModel()
+	m.assistant.initialized = false
+	opened, _ := m.openAssistant()
+	m = opened.(dashboardModel)
+	view := ansi.Strip(m.View().Content)
+	if m.assistant.state != "chat" || !strings.Contains(view, "Not activated") || !strings.Contains(view, assistantExamples[0]) || strings.Contains(view, "requests left") {
+		t.Fatal("first access is not the plain chat", view)
+	}
+}
+
+func TestAssistantPendingPromptIsSentOnceAfterActivationAndConsent(t *testing.T) {
+	var turns atomic.Int32
+	m, store := assistantFlowFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/turns" {
+			turns.Add(1)
+		}
+		w.WriteHeader(500)
+	})
+	m.actions.AssistantService.WriteConsentSharing = store.WriteConsentSharing
+	m.actions.AssistantService.ReadSharing = store.ReadSharing
+	m.actions.AssistantService.Activate = func(context.Context, string) (domain.AssistantActivation, error) {
+		return domain.AssistantActivation{Token: flowToken, Account: domain.AssistantAccount{Plan: "trial", Status: "active", TurnsRemaining: 5}}, nil
+	}
+	updated, _ := m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("down"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	if m.assistant.state != "activate" {
+		t.Fatal("gate did not open activation")
+	}
+	updated, _ = m.Update(tea.PasteMsg{Content: "synthetic"})
+	m = updated.(dashboardModel)
+	updated, command := m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(command())
+	m = updated.(dashboardModel)
+	if m.assistant.state != "consent" || !m.assistant.pendingSend || turns.Load() != 0 {
+		t.Fatal("activation skipped consent")
+	}
+	updated, command = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, command = m.Update(command())
+	m = updated.(dashboardModel)
+	if m.assistant.state != "running" || m.assistant.pendingSend || command == nil {
+		t.Fatalf("pending prompt not sent after consent: %s", m.assistant.state)
+	}
+	if m.assistant.cancel != nil {
+		m.assistant.cancel()
+	}
+}
+
+func TestAssistantCancelledActivationKeepsDraft(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected HTTP") })
+	updated, _ := m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("down"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
+	updated, _ = m.Update(keyPress("esc"))
+	m = updated.(dashboardModel)
+	if m.assistant.state != "welcome" || !m.assistant.pendingSend {
+		t.Fatal("Esc from activation should return to the gate")
+	}
+	updated, _ = m.Update(keyPress("esc"))
+	m = updated.(dashboardModel)
+	if m.assistant.state != "chat" || m.assistant.pendingSend || m.assistant.input.Value() != "Synthetic private request" {
+		t.Fatal("cancel lost the draft")
+	}
+	m.assistant.state, m.assistant.pendingSend = "consent", true
+	updated, _ = m.Update(keyPress("esc"))
+	m = updated.(dashboardModel)
+	if m.assistant.state != "chat" || m.assistant.pendingSend || m.assistant.input.Value() != "Synthetic private request" {
+		t.Fatal("consent cancel lost the draft")
 	}
 }
 
@@ -149,7 +231,7 @@ func TestAssistantSubscriptionErrorsPreserveDraftAndSendNoContent(t *testing.T) 
 		status      int
 		code, state string
 	}{
-		{402, "subscription_inactive", "chat"}, {401, "invalid_token", "welcome"},
+		{402, "subscription_inactive", "chat"}, {401, "invalid_token", "chat"},
 		{409, "turn_active", "chat"}, {429, "quota_exhausted", "chat"}, {426, "client_upgrade_required", "chat"},
 	} {
 		t.Run(test.code, func(t *testing.T) {
@@ -183,6 +265,11 @@ func TestAssistantSubscriptionErrorsPreserveDraftAndSendNoContent(t *testing.T) 
 				}
 				if m.message != assistantActivationInvalidNotice || strings.Contains(m.message, "could not complete") {
 					t.Fatalf("invalid token message = %q", m.message)
+				}
+				updated, command := m.Update(keyPress("enter"))
+				m = assistantWork(t, updated.(dashboardModel), command)
+				if requests.Load() != 1 || m.assistant.state != "welcome" || m.assistant.input.Value() != "Synthetic private request" {
+					t.Fatal("next send after invalid token did not open the gate")
 				}
 			}
 		})

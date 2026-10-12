@@ -1,6 +1,9 @@
 package presentation
 
-import "github.com/giovantenne/nixorium/internal/domain"
+import (
+	tea "charm.land/bubbletea/v2"
+	"github.com/giovantenne/nixorium/internal/domain"
+)
 
 // RenderAssistantMenuDemo uses the real opt-in navigation with no service calls.
 func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
@@ -9,7 +12,9 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.capture("Assistant appears only after controller opt-in", 1200)
 	r.pressAndCapture(demoText(assistantTask.shortcut), "Open Assistant", 1200)
 	r.model.assistant.offer = demoAssistantOffer()
-	r.model.assistant.state = "welcome"
+	r.capture("The chat opens first, even before activation", 2500)
+	r.model.assistant.input.SetValue("Install GIMP on every computer.")
+	r.pressAndCapture(tea.KeyPressMsg{Code: tea.KeyEnter}, "Sending asks to activate; the request waits", 2500)
 	r.capture("Choose a free trial, activation code or subscription", 2500)
 	r.model.assistant.state = "activate"
 	r.model.assistant.activationLink = r.model.assistant.offer.TrialURL

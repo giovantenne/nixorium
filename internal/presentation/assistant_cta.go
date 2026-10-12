@@ -3,7 +3,6 @@ package presentation
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"charm.land/lipgloss/v2"
 
@@ -79,11 +78,7 @@ func (model dashboardModel) assistantGateView() string {
 	title, body, hint := "Welcome to Assistant", "", "↑↓ choose · Enter confirm · Esc back"
 	switch model.assistant.state {
 	case "welcome":
-		examples := []string{"  e.g. " + assistantExamples[0]}
-		for _, example := range assistantExamples[1:] {
-			examples = append(examples, "       "+example)
-		}
-		body = assistantWelcomeText + "\nEach message you send uses one request.\n\n" + tuiMuted(strings.Join(examples, "\n"), model.isDark) + "\n\n"
+		body = "Activate Assistant to send your request.\n\n"
 		subscribe := "Subscribe"
 		if offer.PriceText != "" {
 			subscribe += " · " + offer.PriceText
@@ -106,9 +101,7 @@ func (model dashboardModel) assistantGateView() string {
 		body += "Activation code\n" + code.View()
 		hint = "Enter activate · Esc back"
 	}
-	if model.message == assistantActivationInvalidNotice {
-		body += "\n" + tuiNoticeText(model.message, tuiStatusNeutral, model.isDark)
-	} else if model.message != "" {
+	if model.message != "" {
 		body += "\n" + tuiError(assistantDisplayText(model.message), model.isDark)
 	}
 	body = lipgloss.NewStyle().Width(width).Render(assistantLinkify(body))

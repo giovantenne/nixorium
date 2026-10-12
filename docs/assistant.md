@@ -29,12 +29,18 @@ pinned Nixorium lacks the host-class output must update before using evaluation.
 
 ## Subscription, activation and consent
 
-An unactivated laboratory opens a welcome screen with a free trial, an activation
-code and subscription choices. The public offer supplies the price and links;
-if it is unavailable, the installed links remain usable without a price.
-Register with your email, then enter the code you receive. Activation saves the
-laboratory token locally and opens a separate consent screen. Enter accepts
-that consent and continues to an empty chat; it does not send a request.
+Assistant always opens the chat, even before activation; the header reads
+"Not activated". Slash commands that need no service (`/help`, `/code`,
+`/resume`, `/share`, `/name` where available) work as usual. Pressing Enter to
+send a request without an activation sends nothing: your text stays in the
+input and Assistant offers a free trial, an activation code or a subscription.
+The public offer supplies the price and links; if it is unavailable, the
+installed links remain usable without a price. Register with your email, then
+enter the code you receive. Esc returns to the chat with the draft intact.
+Activation saves the laboratory token locally and opens a separate consent
+screen. Once you accept it, the waiting request is sent automatically, exactly
+once. If you cancel activation or consent, nothing is sent and the draft stays
+in the input.
 
 You can select text by dragging with the mouse (Shift+drag in some terminals).
 HTTP and HTTPS URLs remain visible and clickable through terminal OSC 8 links.
@@ -56,8 +62,8 @@ deployment; otherwise it returns to the previous area. A stopped chat may retain
 candidate edits for later review.
 
 Subscription, quota, network and deployment-conflict notices appear inside the
-conversation and preserve the draft. An invalid token is removed and requires
-activation again. `/code` opens activation for a replacement code.
+conversation and preserve the draft. An invalid token is removed, the chat explains that the activation is no
+longer valid, and the next send asks to activate again. `/code` opens activation for a replacement code.
 `/name` gives this laboratory a name (up to 60 characters), shown after the
 school name in the header, on invoices and emails and in support, so several
 laboratories of one school can be told apart; an empty name removes it.

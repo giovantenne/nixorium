@@ -15,7 +15,6 @@ import (
 )
 
 const assistantInputHint = "Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back"
-const assistantWelcomeText = "Describe what your lab should do. Assistant prepares the change, checks it with Nix, and you review it before anything is saved or installed."
 const assistantSavedChatText = "Saved. Your next message starts a new chat on the saved configuration."
 const assistantLongChatText = "This chat is getting long. /new starts a fresh one, and answers will be faster."
 
@@ -260,6 +259,9 @@ func (model dashboardModel) assistantQuotaText() (string, bool) {
 	right := ""
 	account := model.assistant.account
 	warn := false
+	if model.assistant.token == "" && account.Plan == "" {
+		right = "Not activated"
+	}
 	if account.Plan != "" {
 		right = fmt.Sprintf("%d requests left", account.TurnsRemaining)
 		warn = account.TurnsRemaining <= 50

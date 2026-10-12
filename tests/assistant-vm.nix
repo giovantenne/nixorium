@@ -99,7 +99,18 @@
               send("\r")
               wait("Assistant")
               send("m")
-              wait("Welcome to Assistant")
+              # First access opens the chat itself: no gate, no service call.
+              wait("Not activated")
+              wait("Try asking, for example:")
+              billing_start = len(output())
+              send("/billing\r")
+              wait("/billing becomes available after subscribing.", after=billing_start)
+              send("/unknown\r")
+              wait("Unknown command. Type / to see the commands.")
+              assert not pathlib.Path("/tmp/fake-requests.log").exists() or not any(json.loads(line)["method"] == "POST" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
+              # Sending asks to activate and keeps the request until then.
+              send("Prepare the course for pc01.\r")
+              wait("Activate Assistant to send your request.")
               wait("Start a free trial · 10 requests, no payment")
               # Offer loading updates only the suffix in a differential redraw.
               wait("Subscribe")
@@ -115,26 +126,8 @@
               requests = [json.loads(line) for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines()]
               assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate"]
               assert not any(r["userText"] for r in requests)
-              # The same chat footer appeared during activation. Wait for a
-              # fresh redraw after consent before typing into the chat.
-              after_consent = len(output())
+              # Accepting consent sends the waiting request exactly once.
               send("\r")
-              wait("Enter send · Alt+Enter new line", after=after_consent)
-              assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
-              billing_start = len(output())
-              send("/billing\r")
-              wait("/billing becomes available after subscribing.", after=billing_start)
-              assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
-              send("/unknown\r")
-              wait("Unknown command. Type / to see the commands.")
-              send("\x0e")
-              time.sleep(0.3)
-              send("\r")
-              wait("Try asking, for example:")
-              assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
-              send("\x0e")
-              time.sleep(0.3)
-              send("Prepare the course for pc01.\r")
               wait("Proposal ready · 1 file changed")
               wait("Ctrl+R to review")
               wait("✓ Evaluation passed · changes pc01")

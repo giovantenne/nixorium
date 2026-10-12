@@ -241,6 +241,7 @@ func TestAssistantScrollKeepsPositionDuringStreaming(t *testing.T) {
 	m.assistant.historyScroll = 4
 	// With a draft, arrows edit the text; Enter starts submission and returns to bottom.
 	m.assistant.input.SetValue("one\ntwo")
+	m.assistant.token = flowToken
 	updated, _ := m.Update(keyPress("up"))
 	m = updated.(dashboardModel)
 	if m.assistant.historyScroll != 4 {

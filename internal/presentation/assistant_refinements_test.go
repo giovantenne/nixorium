@@ -137,7 +137,7 @@ func TestAssistantQuotaHeaderUsesServiceStateAndRecovers(t *testing.T) {
 	}
 }
 
-func TestAssistantWelcomeExamplesAreSeparateFromChoices(t *testing.T) {
+func TestAssistantGateIntroIsOneLine(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("render sent HTTP") })
 	m.assistant.state = "welcome"
 	m.assistant.account = domain.AssistantAccount{}
@@ -147,7 +147,7 @@ func TestAssistantWelcomeExamplesAreSeparateFromChoices(t *testing.T) {
 		lines[i] = strings.TrimRight(lines[i], " ")
 	}
 	view = strings.Join(lines, "\n")
-	if !strings.Contains(view, "    e.g. "+assistantExamples[0]) || !strings.Contains(view, "\n\n  › Start a free trial") {
-		t.Fatal("welcome examples are not indented and separate from choices", view)
+	if !strings.Contains(view, "Activate Assistant to send your request.\n\n  › Start a free trial") {
+		t.Fatal("gate intro is not a single line above the choices", view)
 	}
 }

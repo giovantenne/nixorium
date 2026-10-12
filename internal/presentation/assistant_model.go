@@ -81,6 +81,7 @@ type assistantModel struct {
 	welcomeCursor, commandCursor int
 	activationLink               string
 	onboarding                   bool
+	pendingSend                  bool // an unsent request waits for activation and consent
 }
 
 type assistantAccessMsg struct {
@@ -166,8 +167,6 @@ func (model dashboardModel) openAssistant() (tea.Model, tea.Cmd) {
 	}
 	if !model.assistant.initialized {
 		model.assistant = newAssistantModel()
-		model.assistant.state = "welcome"
-		model.assistant.onboarding = true
 		model.assistant.offer = model.fallbackAssistantOffer()
 	}
 	model.screen = dashboardAssistant
@@ -293,8 +292,9 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 				}
 				model.assistant.token = ""
 				model.assistant.account = domain.AssistantAccount{}
-				model.assistant.state = "welcome"
-				model.assistant.onboarding = true
+				model.assistant.state = "chat"
+				model.assistant.onboarding = false
+				model.assistant.pendingSend = false
 			}
 		}
 		return model, nil
@@ -306,6 +306,7 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 		}
 		model.assistant.state = "welcome"
 		model.assistant.onboarding = true
+		model.assistant.pendingSend = message.token == "" && strings.TrimSpace(model.assistant.input.Value()) != ""
 		if message.token != "" {
 			model.assistant.onboarding = false
 			model.assistant.token = message.token
@@ -417,6 +418,13 @@ func (model dashboardModel) finishAssistantActivation(message assistantActivatio
 	model.assistant.onboarding = false
 	model.assistant.activationLink = ""
 	model.message = ""
+	if model.assistant.state == "chat" && model.assistant.pendingSend {
+		model.assistant.pendingSend = false
+		if strings.TrimSpace(model.assistant.input.Value()) != "" {
+			updated, command := model.sendAssistant(false)
+			return updated, command
+		}
+	}
 	return model, model.assistant.input.Focus()
 }
 
@@ -475,8 +483,6 @@ func (model dashboardModel) finishAssistantAccount(message assistantAccountMsg) 
 	if message.token == "" && message.account == nil && message.err == nil && (model.assistant.state == "chat" || model.assistant.state == "welcome") {
 		model.assistant.token = ""
 		model.assistant.account = domain.AssistantAccount{}
-		model.assistant.state = "welcome"
-		model.assistant.onboarding = true
 	}
 	if message.token != "" {
 		model.assistant.token = message.token

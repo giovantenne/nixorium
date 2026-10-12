@@ -167,8 +167,14 @@ func TestAssistantWelcomeOfferActivationConsentAndReopen(t *testing.T) {
 	}
 	updated, _ := m.openAssistant()
 	m = updated.(dashboardModel)
+	if m.assistant.state != "chat" || !strings.Contains(m.View().Content, "Not activated") {
+		t.Fatal("unactivated lab did not open the chat")
+	}
+	m.assistant.input.SetValue("Synthetic private request")
+	updated, _ = m.Update(keyPress("enter"))
+	m = updated.(dashboardModel)
 	if m.assistant.state != "welcome" {
-		t.Fatal("unactivated lab opened chat")
+		t.Fatal("sending without activation did not open the gate")
 	}
 	updated, _ = m.Update(m.loadAssistantOffer()())
 	m = updated.(dashboardModel)
@@ -202,6 +208,7 @@ func TestAssistantWelcomeOfferActivationConsentAndReopen(t *testing.T) {
 	}
 	updated, _ = m.Update(keyPress("space"))
 	m = updated.(dashboardModel)
+	m.assistant.input.Reset() // this test checks consent alone, not the pending prompt
 	updated, cmd = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
 	updated, _ = m.Update(cmd())
@@ -279,7 +286,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 				switch state {
 				case "welcome":
 					m.assistant.account = domain.AssistantAccount{}
-					required = append(required, "e.g. Install GIMP", "Start a free trial", "I have an activation code", "Subscribe ·", "Enter confirm")
+					required = append(required, "Activate Assistant to send your request.", "Start a free trial", "I have an activation code", "Subscribe ·", "Enter confirm")
 				case "activate":
 					m.assistant.account = domain.AssistantAccount{}
 					m.assistant.activationLink = m.assistant.offer.TrialURL
@@ -394,7 +401,7 @@ func TestAssistantInlineAccountAndNetworkWarningsKeepDraft(t *testing.T) {
 	store.WriteToken(flowToken)
 	updated, _ := m.finishAssistantAccount(assistantAccountMsg{id: m.assistant.id, token: flowToken, err: &domain.AssistantError{Code: "invalid_token"}})
 	m = updated.(dashboardModel)
-	if token, _ := store.ReadToken(); token != "" || m.assistant.state != "welcome" || m.assistant.input.Value() != "Synthetic private request" {
+	if token, _ := store.ReadToken(); token != "" || m.assistant.state != "chat" || m.assistant.input.Value() != "Synthetic private request" {
 		t.Fatal("invalid activation not removed")
 	}
 	view := m.View().Content

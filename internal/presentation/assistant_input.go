@@ -78,8 +78,15 @@ func (model dashboardModel) finishAssistantConsent(message assistantConsentMsg) 
 		model.message = model.assistantNotice(message.err)
 		return model, nil
 	}
-	model.assistant.state = "chat"
 	model.message = ""
+	model.assistant.state = "chat"
+	if model.assistant.pendingSend {
+		model.assistant.pendingSend = false
+		if strings.TrimSpace(model.assistant.input.Value()) != "" {
+			updated, command := model.sendAssistant(false)
+			return updated, command
+		}
+	}
 	return model, model.assistant.input.Focus()
 }
 
@@ -124,6 +131,16 @@ func (model assistantModel) commandChoices() []string {
 		}
 	}
 	return choices
+}
+
+// openAssistantGate keeps the unsent request and offers the ways to activate.
+func (model dashboardModel) openAssistantGate() dashboardModel {
+	model.assistant.state = "welcome"
+	model.assistant.onboarding = true
+	model.assistant.pendingSend = true
+	model.assistant.welcomeCursor = 0
+	model.message = ""
+	return model
 }
 func (model dashboardModel) newAssistantChat() (tea.Model, tea.Cmd) {
 	old := model.assistant
@@ -172,6 +189,8 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 	case "/code":
 		model.assistant.input.Reset()
 		model.assistant.state = "activate"
+		model.assistant.onboarding = false
+		model.assistant.pendingSend = false
 		model.assistant.activationLink = ""
 		model.assistant.code.Reset()
 		model.message = ""
@@ -216,13 +235,18 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 			}
 			model.assistant.id++
 			model.assistant.state = "chat"
+			model.assistant.pendingSend = false
 			model.message = "Stopped. Your deployment is unchanged."
 		}
 		return model, nil
 	case "welcome":
 		switch key.String() {
 		case "esc":
-			model.screen = dashboardHome
+			model.assistant.state = "chat"
+			model.assistant.onboarding = false
+			model.assistant.pendingSend = false
+			model.message = ""
+			return model, model.assistant.input.Focus()
 		case "up":
 			model.assistant.welcomeCursor = (model.assistant.welcomeCursor + 2) % 3
 		case "down":
@@ -249,6 +273,7 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 		switch key.String() {
 		case "esc":
 			model.assistant.state = "chat"
+			model.assistant.pendingSend = false
 			model.message = ""
 			return model, model.assistant.input.Focus()
 		case "space":
@@ -265,6 +290,8 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 			model.assistant.state = "chat"
 			if model.assistant.onboarding {
 				model.assistant.state = "welcome"
+			} else {
+				model.assistant.pendingSend = false
 			}
 			return model, model.assistant.input.Focus()
 		case "enter":
@@ -351,6 +378,17 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 		}
 		if strings.HasPrefix(model.assistant.input.Value(), "/") {
 			return model.assistantCommand(strings.TrimSpace(model.assistant.input.Value()))
+		}
+		if model.assistant.token == "" {
+			if actions := model.actions.AssistantService; actions != nil && actions.ReadToken != nil {
+				model.assistant.token, _ = actions.ReadToken()
+			}
+		}
+		if model.assistant.token == "" {
+			if strings.TrimSpace(model.assistant.input.Value()) == "" {
+				return model, nil
+			}
+			return model.openAssistantGate(), nil
 		}
 		return model.sendAssistant(false)
 	case "alt+enter", "ctrl+j":

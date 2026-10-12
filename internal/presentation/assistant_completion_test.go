@@ -66,7 +66,7 @@ func TestAssistantExplanations(t *testing.T) {
 			t.Fatal("missing command explanation", want, view)
 		}
 	}
-	for _, state := range []string{"welcome", "consent"} {
+	for _, state := range []string{"consent"} {
 		m.assistant.state = state
 		if !strings.Contains(ansi.Strip(m.View().Content), "Each message you send uses one request.") {
 			t.Fatal(state, "missing request explanation")
