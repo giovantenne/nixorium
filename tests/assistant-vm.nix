@@ -121,9 +121,9 @@
               assert not any(json.loads(line)["method"] == "POST" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
               send("\r")
               wait("https://example.invalid/trial")
-              wait("Open the free trial page in your browser, then press Enter to enter the code.")
+              wait("the free trial page in your browser")
               assert re.search(r"\x1b\]8;[^;]*;https://example.invalid/trial(?:\x07|\x1b\\)", log.read_text())
-              # No graphical session over SSH: Enter only reveals the input.
+              # Enter opens the page when a desktop is present, then reveals the input.
               send("\r")
               wait("Activation code")
               wait("Paste the code you receive by email.")
