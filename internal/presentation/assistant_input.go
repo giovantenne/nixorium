@@ -192,6 +192,8 @@ func (model dashboardModel) assistantCommand(command string) (tea.Model, tea.Cmd
 		model.assistant.onboarding = false
 		model.assistant.pendingSend = false
 		model.assistant.activationLink = ""
+		model.assistant.activationNotice = ""
+		model.assistant.codeStep = true
 		model.assistant.code.Reset()
 		model.message = ""
 		return model, model.assistant.code.Focus()
@@ -256,11 +258,19 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 			model.message = ""
 			model.assistant.code.Reset()
 			model.assistant.activationLink = ""
+			model.assistant.activationKind = ""
+			model.assistant.activationNotice = ""
 			if model.assistant.welcomeCursor == 0 {
 				model.assistant.activationLink = model.assistant.offer.TrialURL
+				model.assistant.activationKind = "free trial"
 			}
 			if model.assistant.welcomeCursor == 2 {
 				model.assistant.activationLink = model.assistant.offer.SubscribeURL
+				model.assistant.activationKind = "subscription"
+			}
+			model.assistant.codeStep = model.assistant.activationLink == ""
+			if !model.assistant.codeStep {
+				return model, nil
 			}
 			return model, model.assistant.code.Focus()
 		}
@@ -283,9 +293,39 @@ func (model dashboardModel) updateAssistantKey(key tea.KeyPressMsg) (tea.Model, 
 		}
 		return model, nil
 	case "activate":
+		if !model.assistant.codeStep {
+			switch key.String() {
+			case "enter":
+				model.assistant.activationNotice = ""
+				if open := model.actions.OpenURL; open != nil {
+					if err := open(model.assistant.activationLink); err != nil {
+						model.assistant.activationNotice = "Could not open the browser; open the link above."
+					}
+				}
+				model.assistant.codeStep = true
+				model.message = ""
+				return model, model.assistant.code.Focus()
+			case "esc":
+				model.message = ""
+				model.assistant.state = "chat"
+				if model.assistant.onboarding {
+					model.assistant.state = "welcome"
+				} else {
+					model.assistant.pendingSend = false
+				}
+				return model, model.assistant.input.Focus()
+			}
+			return model, nil
+		}
 		switch key.String() {
 		case "esc":
 			model.assistant.code.Reset()
+			if model.assistant.activationLink != "" {
+				model.assistant.codeStep = false
+				model.assistant.activationNotice = ""
+				model.message = ""
+				return model, nil
+			}
 			model.message = ""
 			model.assistant.state = "chat"
 			if model.assistant.onboarding {

@@ -21,6 +21,9 @@ import (
 // stop action, not the read-only Esc path. PreparePXE is systemd-owned;
 // ApplyController waits for a managed job while the foreground UI stays protected.
 type DashboardActions struct {
+	// OpenURL starts the desktop browser without waiting for it. It is nil
+	// when no graphical session is available (for example over SSH).
+	OpenURL                   func(string) error
 	LoadClientSetup           func(context.Context) (bool, error)
 	LoadDisclaimer            func(context.Context) (bool, error)
 	AcceptDisclaimer          func() error

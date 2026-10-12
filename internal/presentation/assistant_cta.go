@@ -94,12 +94,25 @@ func (model dashboardModel) assistantGateView() string {
 		title = "Activate Assistant"
 		code := model.assistant.code
 		code.SetWidth(width - 2)
-		if model.assistant.activationLink != "" {
-			link := assistantDisplayText(model.assistant.activationLink)
-			body = assistantLinkify(link) + "\nRegister with your email, then enter the code you receive.\n\n"
+		link := assistantDisplayText(model.assistant.activationLink)
+		if !model.assistant.codeStep {
+			if model.actions.OpenURL != nil {
+				body = "Press Enter to open the " + model.assistant.activationKind + " page in your browser.\n\n"
+			} else {
+				body = "Open the " + model.assistant.activationKind + " page in your browser, then press Enter to enter the code.\n\n"
+			}
+			body += assistantLinkify(link)
+			hint = "Enter continue · Esc back"
+		} else {
+			if link != "" {
+				body = assistantLinkify(link) + "\n\n"
+			}
+			body += "Activation code\n" + code.View() + "\n" + tuiMuted("Paste the code you receive by email.", model.isDark)
+			if model.assistant.activationNotice != "" {
+				body += "\n" + tuiMuted(model.assistant.activationNotice, model.isDark)
+			}
+			hint = "Enter activate · Esc back"
 		}
-		body += "Activation code\n" + code.View()
-		hint = "Enter activate · Esc back"
 	}
 	if model.message != "" {
 		body += "\n" + tuiError(assistantDisplayText(model.message), model.isDark)

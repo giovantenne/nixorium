@@ -1238,8 +1238,10 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		if paste, pasted := message.(tea.PasteMsg); pasted && model.screen == dashboardAssistant &&
 			!model.helpOpen && model.assistant.state == "activate" {
 			var command tea.Cmd
+			model.assistant.codeStep = true
+			focus := model.assistant.code.Focus()
 			model.assistant.code, command = model.assistant.code.Update(tea.PasteMsg{Content: strings.TrimSpace(paste.Content)})
-			return model, command
+			return model, tea.Batch(focus, command)
 		}
 		if model.busy != "" {
 			if _, pasted := message.(tea.PasteMsg); pasted {

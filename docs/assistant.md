@@ -35,8 +35,12 @@ Assistant always opens the chat, even before activation; the header reads
 send a request without an activation sends nothing: your text stays in the
 input and Assistant offers a free trial, an activation code or a subscription.
 The public offer supplies the price and links; if it is unavailable, the
-installed links remain usable without a price. Register with your email, then
-enter the code you receive. Esc returns to the chat with the draft intact.
+installed links remain usable without a price. For the trial and the
+subscription, the next step shows the page address and the instruction to open
+it; Enter opens it in your browser when a graphical session is available (over
+SSH, copy or click the link instead), then asks for the activation code you
+receive by email, which you can paste. Esc goes back one step, and finally to the
+chat with the draft intact.
 Activation saves the laboratory token locally and opens a separate consent
 screen. Once you accept it, the waiting request is sent automatically, exactly
 once. If you cancel activation or consent, nothing is sent and the draft stays

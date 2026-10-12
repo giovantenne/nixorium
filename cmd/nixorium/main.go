@@ -305,6 +305,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	assistantLabStatus := app.AssistantLabStatus{Inspector: inspector, DeferredUpdates: newDeferredUpdateManager()}
 	assistantRunner := app.AssistantTurnRunner{Client: assistantClient, Tools: adapters.AssistantWorkspaceTools{Store: assistantWorkspace, LabStatus: assistantLabStatus.Execute}, Store: assistantWorkspace, Version: nixoriumVersion, Sharing: &assistantReporter}
 	actions := presentation.DashboardActions{
+		OpenURL:   desktopOpener(),
 		Assistant: assistantConfig,
 		AssistantService: &presentation.AssistantActions{
 			ReadToken: assistantStore.ReadToken, WriteToken: assistantStore.WriteToken,

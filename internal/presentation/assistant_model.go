@@ -81,7 +81,10 @@ type assistantModel struct {
 	welcomeCursor, commandCursor int
 	activationLink               string
 	onboarding                   bool
-	pendingSend                  bool // an unsent request waits for activation and consent
+	codeStep                     bool   // the activation code input is shown (no link, or the page was opened)
+	activationKind               string // "free trial" or "subscription" for the instruction step
+	activationNotice             string // muted note below the activation step
+	pendingSend                  bool   // an unsent request waits for activation and consent
 }
 
 type assistantAccessMsg struct {

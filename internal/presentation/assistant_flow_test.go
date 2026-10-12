@@ -37,7 +37,7 @@ func TestAssistantNetworkFailuresPreserveDraft(t *testing.T) {
 			}
 			key := "enter"
 			if activation {
-				m.assistant.state = "activate"
+				m.assistant.state, m.assistant.codeStep = "activate", true
 				m.assistant.code.SetValue("synthetic-code")
 				key = "enter"
 			}

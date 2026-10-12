@@ -18,7 +18,10 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.capture("Choose a free trial, activation code or subscription", 2500)
 	r.model.assistant.state = "activate"
 	r.model.assistant.activationLink = r.model.assistant.offer.TrialURL
-	r.capture("Register for a free trial and enter its emailed code", 2500)
+	r.model.assistant.activationKind = "free trial"
+	r.capture("Open the free trial page to register with your email", 2500)
+	r.model.assistant.codeStep = true
+	r.capture("Paste the code you receive by email", 2500)
 	r.model.assistant.state = "consent"
 	r.capture("Continue after separate Assistant consent", 2500)
 	r.model.assistant.state = "sharing"

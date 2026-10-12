@@ -184,7 +184,7 @@ func TestAssistantWelcomeOfferActivationConsentAndReopen(t *testing.T) {
 	updated, _ = m.Update(keyPress("enter"))
 	m = updated.(dashboardModel)
 	view := m.View().Content
-	if m.assistant.state != "activate" || !strings.Contains(view, "https://assistant.example/trial") || !strings.Contains(view, "Register with your email, then enter the code you receive.") {
+	if m.assistant.state != "activate" || !strings.Contains(view, "https://assistant.example/trial") || strings.Contains(view, "Activation code") {
 		t.Fatal("trial flow")
 	}
 	m.actions.AssistantService.Activate = func(context.Context, string) (domain.AssistantActivation, error) {
@@ -290,7 +290,8 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 				case "activate":
 					m.assistant.account = domain.AssistantAccount{}
 					m.assistant.activationLink = m.assistant.offer.TrialURL
-					required = append(required, "Register with your email", "Activation code")
+					m.assistant.activationKind, m.assistant.codeStep = "free trial", true
+					required = append(required, "Paste the code you receive by email.", "Activation code")
 				case "consent":
 					required = append(required, "Share my conversations", "Enter continue")
 				case "running":
