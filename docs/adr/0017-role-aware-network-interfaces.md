@@ -43,9 +43,42 @@ validation and reviewed atomic write remain mandatory.
 
 The contract relies on predictable NixOS interface names; it does not infer a
 client's hardware identity remotely. A heterogeneous client can use a per-host
-override. Client installation must still verify that the configured interface
-exists after reboot, and the future guided client-network flow must explain
-role defaults without exposing unnecessary fields during controller bootstrap.
+override. Client installation verifies an explicitly configured interface before
+erasing; the addendum below covers clients without one.
+
+## Addendum: clients without an explicit name
+
+Detecting the controller's card cannot name the clients' cards, and the
+template fallback `enp0s3` is VirtualBox's. On real laboratories the PXE client
+installer stopped with "network interface not found", and an installed client
+would have put its lab address on a card that does not exist.
+
+A client is now configured by name only when the administrator chose one: a
+`hostIfaceNames` entry or `clientIfaceName`. The controller always uses its
+configured name. `mkLab` records this as `ifaceExplicit` (per host in
+`labMeta.clients.hosts`, and in the host's `labSettings`), and the first-setup
+form no longer copies the controller's card into `clientIfaceName`.
+
+For other clients:
+
+- `modules/networking.nix` declares one NetworkManager profile for any wired
+  Ethernet device with DHCP plus the static lab address. NetworkManager already
+  manages clients, so no second backend is added; wireless, bridge, veth and
+  other virtual devices are different NetworkManager types and never match. The
+  address is applied at once and kept without a DHCP server. Automatic DHCP-only
+  profiles are disabled so nothing competes. A profile without an interface
+  name is active on one device at a time: with several wired cards the first to
+  come up carries it, which is not deterministic across boots, so such PCs need
+  `hostIfaceNames`.
+- The temporary Internet block and the client SSH source rule match addresses
+  only (`ip daddr <lab network>`, `ip saddr <controller>`), keeping their
+  semantics without `oifname`/`iifname`.
+- The PXE installer and the USB/SSH preparation skip the name check and use the
+  card that carries the live address.
+
+Explicit names keep today's behaviour everywhere. Existing deployments that
+saved a client name are unaffected; deployments that relied on the fallback now
+get the name-independent behaviour.
 
 ## Verification
 

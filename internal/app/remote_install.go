@@ -114,7 +114,7 @@ func (m *RemoteInstallManager) plan(ctx context.Context, preparation domain.Remo
 		return remotePlanIssue(report, "configuration", fmt.Sprintf("evaluate client inventory: %v", err))
 	}
 	configured, found := remoteConfiguredHost(meta, preparation.Host.Name)
-	if !found || configured.IP != preparation.Host.StaticIP || configured.Interface != preparation.Host.Interface {
+	if !found || configured.IP != preparation.Host.StaticIP || (configured.InterfaceNameRequired() && configured.Interface != preparation.Host.Interface) {
 		return remotePlanIssue(report, "host", "prepared host identity, address, or interface differs from deployment inventory")
 	}
 	if preparation.Host.LiveIP == meta.Controller.StaticIP || preparation.Host.LiveIP == meta.Controller.DHCPIP {
@@ -221,7 +221,7 @@ func (m *RemoteInstallManager) apply(ctx context.Context, plan domain.RemoteInst
 		return remoteExecutionIssue(report, "configuration", "client inventory could not be rechecked")
 	}
 	configured, found := remoteConfiguredHost(meta, plan.Host.Name)
-	if !found || configured.IP != plan.Host.StaticIP || configured.Interface != plan.Host.Interface {
+	if !found || configured.IP != plan.Host.StaticIP || (configured.InterfaceNameRequired() && configured.Interface != plan.Host.Interface) {
 		return remoteExecutionIssue(report, "host", "client inventory changed after review")
 	}
 	if reachable, probeErr := m.source.RemoteIdentityReachable(ctx, plan.Host.StaticIP); probeErr != nil || reachable {

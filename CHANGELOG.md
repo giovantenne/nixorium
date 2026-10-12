@@ -9,6 +9,22 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Add `/billing` to open a temporary Stripe Customer Portal link from Assistant
   without using a request.
 
+### Fixed
+
+- Client computers now configure DHCP and their static lab address on the wired
+  Ethernet card whatever its name, unless `clientIfaceName` or a
+  `hostIfaceNames` entry is set. Previously every client inherited the
+  template default `enp0s3`, so real PCs (with names such as `eno1` or
+  `enp3s0`) were stopped by the PXE installer with a missing interface and an
+  installed client would have configured a card that does not exist. The
+  temporary Internet block and the client SSH rule no longer depend on the
+  name, the PXE and USB/SSH installers skip the name check for such clients,
+  and first setup no longer copies the controller's card into
+  `clientIfaceName`. Explicit names and the controller keep today's
+  behaviour; a PC with several wired cards needs a `hostIfaceNames` entry.
+
+## [3.2.2] - 2026-10-12
+
 - Add `/resume` to reopen current Assistant conversations or read saved and
   outdated chats without using a request; keep 90 days of activity and up to
   30 local conversations, protecting the current chat.

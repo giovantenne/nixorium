@@ -41,6 +41,17 @@ type HostMeta struct {
 	Name      string `json:"name"`
 	IP        string `json:"ip"`
 	Interface string `json:"ifaceName,omitempty"`
+	// InterfaceExplicit is false when no client or per-computer interface name
+	// is configured: the installed system then uses the wired card whatever
+	// its name, and Interface is only the template fallback. Metadata that
+	// predates the field omits it, which means the name is required.
+	InterfaceExplicit *bool `json:"ifaceExplicit,omitempty"`
+}
+
+// InterfaceNameRequired reports whether the installed computer is configured
+// by the interface name in Interface (ADR 0017).
+func (host HostMeta) InterfaceNameRequired() bool {
+	return host.InterfaceExplicit == nil || *host.InterfaceExplicit
 }
 
 type Reachability string

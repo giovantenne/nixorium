@@ -1,6 +1,8 @@
+# byType selects the rules for clients configured without an interface name.
+{ byType ? false }:
 let
   rules = import ../lib/client-firewall-rules.nix {
-    interface = "lab0";
+    interface = if byType then null else "lab0";
     masterIp = "10.77.0.99";
   };
 in

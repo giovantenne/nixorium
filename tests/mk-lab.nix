@@ -46,6 +46,9 @@ let
       hostIfaceNames.pc02 = "enp3s0";
     };
   });
+  hostOnlyInterfaceLab = mkLab (baseArgs // {
+    labConfig = labConfig // { hostIfaceNames.pc02 = "enp3s0"; };
+  });
   plainLab = mkLab baseArgs;
   keyboardLab = mkLab (baseArgs // {
     labConfig = labConfig // {
@@ -189,9 +192,10 @@ let
   clientFirewall = subnetLab.nixosConfigurations.pc01.config.networking.firewall;
   controllerTCP = controllerFirewall.interfaces.enp0s3.allowedTCPPorts;
   controllerUDP = controllerFirewall.interfaces.enp0s3.allowedUDPPorts;
-  clientTCP = clientFirewall.interfaces.enp0s3.allowedTCPPorts;
+  allInterfaceTCP = firewall: lib.concatMap (iface: iface.allowedTCPPorts) (lib.attrValues firewall.interfaces);
+  clientTCP = allInterfaceTCP clientFirewall;
   nativeClient = plainLab.nixosConfigurations.pc01.config;
-  nativeClientTCP = plainLab.nixosConfigurations.pc01.config.networking.firewall.interfaces.enp0s3.allowedTCPPorts;
+  nativeClientTCP = allInterfaceTCP plainLab.nixosConfigurations.pc01.config.networking.firewall;
   clientUsers = subnetLab.nixosConfigurations.pc01.config.users.users;
   clientPolkit = subnetLab.nixosConfigurations.pc01.config.security.polkit;
   clientHomeOwnership = subnetLab.nixosConfigurations.pc01.config.system.activationScripts.nixoriumUserHomeOwnership;
@@ -240,7 +244,7 @@ assert subnetLab.labMeta.deploymentMode == "laboratory";
 assert subnetLab.deploymentStatus.controller.ready == subnetLab.deploymentStatus.ready;
 assert subnetLab.deploymentStatus.controller.requiresKeys;
 assert subnetLab.labMeta.network.prefixLength == 25;
-assert map (host: builtins.removeAttrs host [ "ifaceName" ]) subnetLab.labMeta.clients.hosts == [
+assert map (host: builtins.removeAttrs host [ "ifaceName" "ifaceExplicit" ]) subnetLab.labMeta.clients.hosts == [
   { name = "pc01"; ip = "10.23.4.129"; }
   { name = "pc02"; ip = "10.23.4.130"; }
   { name = "pc03"; ip = "10.23.4.131"; }
@@ -274,6 +278,38 @@ assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 1).ifaceName == "
 assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.interfaces ? eno1;
 assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces ? enp2s0;
 assert roleInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
+# Clients are configured by name only when an administrator chose one (ADR 0017);
+# the template fallback name never reaches a client's network configuration.
+assert !(builtins.elemAt subnetLab.labMeta.clients.hosts 0).ifaceExplicit;
+assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 0).ifaceExplicit;
+assert (builtins.elemAt roleInterfaceLab.labMeta.clients.hosts 1).ifaceExplicit;
+assert !(builtins.elemAt hostOnlyInterfaceLab.labMeta.clients.hosts 0).ifaceExplicit;
+assert (builtins.elemAt hostOnlyInterfaceLab.labMeta.clients.hosts 1).ifaceExplicit;
+assert subnetLab.nixosConfigurations.pc01.config.networking.interfaces == {};
+assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.ipv4.address1 == "10.23.4.129/25";
+assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection.type == "ethernet";
+assert !(subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles.nixorium-lab.connection ? interface-name);
+assert subnetLab.nixosConfigurations.pc01.config.networking.networkmanager.settings.main.no-auto-default == "*";
+assert !(lib.hasInfix "iifname \"enp" subnetLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules);
+assert !(lib.hasInfix "iifname \"enp" subnetLab.nixosConfigurations.pc01.config.networking.nftables.tables.nixorium-client-access.content);
+assert lib.hasInfix "ip saddr 10.23.4.227 tcp dport 22 accept" subnetLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
+# The controller always keeps its configured name and has no by-type profile.
+assert subnetLab.nixosConfigurations.pc99.config.networking.interfaces ? enp0s3;
+assert subnetLab.nixosConfigurations.pc99.config.networking.networkmanager.ensureProfiles.profiles == {};
+assert roleInterfaceLab.nixosConfigurations.pc99.config.networking.networkmanager.ensureProfiles.profiles == {};
+# An explicit client name keeps the name-based behaviour everywhere.
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles == {};
+assert lib.hasInfix "iifname \"enp2s0\"" roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
+assert roleInterfaceLab.nixosConfigurations.pc01.config.networking.firewall.interfaces ? enp2s0;
+assert hostOnlyInterfaceLab.nixosConfigurations.pc02.config.networking.interfaces ? enp3s0;
+assert hostOnlyInterfaceLab.nixosConfigurations.pc02.config.networking.networkmanager.ensureProfiles.profiles == {};
+assert hostOnlyInterfaceLab.nixosConfigurations.pc01.config.networking.interfaces == {};
+assert hostOnlyInterfaceLab.nixosConfigurations.pc01.config.networking.networkmanager.ensureProfiles.profiles ? nixorium-lab;
+assert hostOnlyInterfaceLab.nixosConfigurations.pc99.config.networking.interfaces ? enp0s3;
+# Temporary Internet block rules: name-based only for explicit names.
+assert builtins.length (lib.splitString "oifname" (import ../lib/client-internet-rules.nix { interface = null; networkCidr = "10.0.0.0/24"; })) == 2;
+assert lib.hasInfix "oifname \"enp2s0\" ip daddr 10.0.0.0/24 accept" (import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; });
+assert lib.hasInfix "ip daddr 10.0.0.0/24 accept" (import ../lib/client-internet-rules.nix { interface = null; networkCidr = "10.0.0.0/24"; });
 assert keyboardLab.nixosConfigurations.pc99.config.console.keyMap == "it2";
 assert keyboardLab.nixosConfigurations.netboot.config.console.keyMap == "it2";
 # The netboot console starts the guided installer once; it stays interactive.
@@ -432,7 +468,7 @@ assert clientFirewall.enable;
 assert clientFirewall.allowedTCPPorts == [];
 assert clientFirewall.allowedUDPPorts == [];
 assert clientTCP == [];
-assert clientFirewall.interfaces.enp0s3.allowedUDPPorts == [];
+assert !(clientFirewall.interfaces ? enp0s3);
 assert nativeClientTCP == [];
 assert !(controllerOnly.systemd.services ? nixorium-internet-block);
 assert !(subnetLab.nixosConfigurations.pc99.config.systemd.services ? nixorium-internet-block);

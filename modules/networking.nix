@@ -2,21 +2,61 @@
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   isController = hostName == labSettings.masterHostName;
+  # mkLab sets `ifaceExplicit` for every host. The controller and any client
+  # with a clientIfaceName or hostIfaceNames entry use their configured name.
+  # Other clients ignore the template fallback name and configure the wired
+  # NIC by type, because real PCs rarely share VirtualBox's enp0s3 (ADR 0017).
+  # Callers that do not provide the flag keep the name-based behaviour.
+  ifaceExplicit = labSettings.ifaceExplicit or true;
+  byType = laboratoryEnabled && !isController && !ifaceExplicit;
+  prefixLength = labSettings.networkPrefixLength;
 in
 {
   networking.hostName = hostName;
   # Controller-only bootstrap uses NetworkManager, without a speculative lab IP.
-  networking.interfaces = lib.mkIf laboratoryEnabled {
+  networking.interfaces = lib.mkIf (laboratoryEnabled && !byType) {
     ${labSettings.ifaceName} = {
       useDHCP = lib.mkDefault true;
       ipv4.addresses = [
         {
           address = hostIp;
-          prefixLength = labSettings.networkPrefixLength;
+          prefixLength = prefixLength;
         }
       ];
     };
   };
+
+  # Name-independent client network. NetworkManager already runs on every
+  # host, so one declarative profile for any wired Ethernet device (wireless,
+  # bridges, veth and other virtual devices are different NetworkManager
+  # types) avoids a second network backend. It keeps DHCP for addresses, the
+  # default route and DNS, and adds the static lab address, which is applied
+  # at once and stays even when no DHCP server answers (infinite DHCP timeout).
+  # A profile without an interface name is active on one device at a time, so
+  # with several wired NICs the first one to come up carries it; automatic
+  # DHCP-only profiles for the other NICs are disabled so that nothing else
+  # competes. Such PCs should use hostIfaceNames.
+  networking.networkmanager.settings.main."no-auto-default" = lib.mkIf byType "*";
+  networking.networkmanager.ensureProfiles.profiles.nixorium-lab = lib.mkIf byType {
+    connection = {
+      id = "nixorium-lab";
+      uuid = "5c0e2a3e-8f3b-4d57-9f0f-3b1e0d6a9c11";
+      type = "ethernet";
+      autoconnect = "true";
+      autoconnect-retries = "0";
+    };
+    ethernet = { };
+    ipv4 = {
+      method = "auto";
+      address1 = "${hostIp}/${toString prefixLength}";
+      dhcp-timeout = "2147483647";
+      may-fail = "false";
+    };
+    ipv6.method = "auto";
+  };
+  # Re-run the profile writer when its content changes during activation.
+  systemd.services.NetworkManager-ensure-profiles.serviceConfig.RemainAfterExit =
+    lib.mkIf byType true;
 
   # The interface already exists when a controller-only installation switches
   # live to laboratory mode, so no new udev event starts this generated unit.

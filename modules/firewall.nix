@@ -3,8 +3,10 @@ let
   isController = hostName == labSettings.masterHostName;
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   isClient = laboratoryEnabled && !isController;
+  # Clients without an explicit interface name are configured by type (ADR 0017).
+  ifaceExplicit = labSettings.ifaceExplicit or true;
   clientRules = import ../lib/client-firewall-rules.nix {
-    interface = labSettings.ifaceName;
+    interface = if ifaceExplicit then labSettings.ifaceName else null;
     masterIp = labSettings.masterIp;
   };
 in
@@ -14,7 +16,7 @@ in
   networking.nftables.flushRuleset = false;
   networking.firewall = {
     enable = true;
-    interfaces = lib.mkIf laboratoryEnabled {
+    interfaces = lib.mkIf (laboratoryEnabled && ifaceExplicit) {
       ${labSettings.ifaceName} = {
         allowedTCPPorts = lib.optionals isController [
           22 labSettings.cachePort labSettings.pxeHttpPort

@@ -132,6 +132,24 @@ func TestRemoteInstallPlanBindsVerifiedPreparation(t *testing.T) {
 	}
 }
 
+func TestRemoteInstallPlanAcceptsObservedCardWithoutExplicitName(t *testing.T) {
+	preparation, source := remoteTestPreparation()
+	notExplicit := false
+	// The template fallback name differs from the card the PC booted with.
+	source.meta.Clients.Hosts[0].Interface = "enp0s3"
+	source.meta.Clients.Hosts[0].InterfaceExplicit = &notExplicit
+	manager := NewRemoteInstallManager(source)
+	manager.now = func() time.Time { return time.Unix(2000, 0).UTC() }
+	if report := manager.Plan(context.Background(), preparation, "/dev/sda"); report.HasErrors() {
+		t.Fatalf("observed card rejected without an explicit name: %#v", report)
+	}
+	explicit := true
+	source.meta.Clients.Hosts[0].InterfaceExplicit = &explicit
+	if report := manager.Plan(context.Background(), preparation, "/dev/sda"); !report.HasErrors() {
+		t.Fatal("a differing explicit interface name was accepted")
+	}
+}
+
 func TestRemoteInstallReservedPlanAndApplyReuseWorkerReservation(t *testing.T) {
 	preparation, source := remoteTestPreparation()
 	source.active = true

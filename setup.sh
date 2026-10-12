@@ -235,7 +235,21 @@ connected_interface() {
 }
 
 require_client_interface() {
-  local CONFIGURED_INTERFACE INTERFACE
+  local CONFIGURED_INTERFACE INTERFACE EXPLICIT
+  # Without an explicit client interface name the installed system configures
+  # its wired NIC by type, so there is no name to verify (ADR 0017). Metadata
+  # that predates the flag is treated as explicit.
+  EXPLICIT=$(jq -er --arg name "$SELECTED_HOST" '
+    [.[] | select(.name == $name)]
+    | if length == 1 then (.[0] | if has("ifaceExplicit") then .ifaceExplicit else true end | tostring) else empty end
+  ' <<< "$LAB_CLIENT_HOSTS_JSON") || {
+    echo "Error: installer metadata has no valid network interface for ${SELECTED_HOST}." >&2
+    return 1
+  }
+  if [[ "$EXPLICIT" == false ]]; then
+    echo "Client network interface: detected automatically (no interface name is configured for ${SELECTED_HOST})"
+    return 0
+  fi
   CONFIGURED_INTERFACE=$(jq -er --arg name "$SELECTED_HOST" --arg fallback "$LAB_IFACE_NAME" '
     [.[] | select(.name == $name)]
     | if length == 1 then (.[0].ifaceName // $fallback) else empty end

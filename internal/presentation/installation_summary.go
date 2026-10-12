@@ -11,7 +11,7 @@ func (model dashboardModel) installationSummaryView() string {
 	lab := model.settings.current.Lab
 	clientInterface := lab.ClientInterfaceName
 	if clientInterface == "" {
-		clientInterface = lab.InterfaceName
+		clientInterface = "automatic (wired network card)"
 	}
 	lines := []string{
 		tuiTitle("Use the saved installation settings?", model.isDark), "",

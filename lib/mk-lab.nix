@@ -117,6 +117,13 @@ let
       if name == masterHostName then
         if controllerIfaceName == null then ifaceName else controllerIfaceName
       else if clientIfaceName == null then ifaceName else clientIfaceName);
+  # The controller always keeps its configured name. A client is configured by
+  # name only when the administrator chose one for it (hostIfaceNames or
+  # clientIfaceName); the template fallback `ifaceName` is a VirtualBox-era
+  # default that real hardware rarely shares, so unnamed clients match the
+  # wired NIC by type instead (ADR 0017).
+  ifaceExplicitForHost = name:
+    name == masterHostName || hostIfaceNames ? ${name} || clientIfaceName != null;
   cachePort = 5000;
   pxeHttpPort = 8080;
   system = "x86_64-linux";
@@ -200,7 +207,10 @@ let
     ++ (hostModules.${name} or []);
 
   specialArgsForHost = name: hostIp: {
-    labSettings = labSettings // { ifaceName = ifaceForHost name; };
+    labSettings = labSettings // {
+      ifaceName = ifaceForHost name;
+      ifaceExplicit = ifaceExplicitForHost name;
+    };
     inherit labAssets;
     inherit homeResetEphemeralPaths;
     inherit workspaceSeed;
@@ -228,6 +238,7 @@ let
         name = "pc${padNumber n}";
         ip = mkHostIp n;
         ifaceName = ifaceForHost "pc${padNumber n}";
+        ifaceExplicit = ifaceExplicitForHost "pc${padNumber n}";
       }) clientNumbers;
       groups = clientGroups;
     };
@@ -314,6 +325,7 @@ let
     packages = lib.sort builtins.lessThan (lib.unique (map (entry: entry.package)
       (builtins.filter (entry: softwareAppliesTo name entry.scope) labSoftwareConfig.packages)));
     interface = ifaceForHost name;
+    interfaceExplicit = ifaceExplicitForHost name;
   }) validClientNames;
   singleClassHosts = lib.unique ([ masterHostName ] ++ builtins.attrNames hostModules ++ updateValidationHosts);
   hostClasses = lib.sort (a: b: a.representative < b.representative) (
@@ -453,6 +465,7 @@ let
       controller = name == masterHostName;
       moduleGroups = moduleGroupsForHost name;
       interface = ifaceForHost name;
+      interfaceExplicit = ifaceExplicitForHost name;
       software = lib.sort builtins.lessThan (map (entry: entry.package) (hostSoftwareEntries name));
     };
   # The first host of each class, in inventory order, represents it.
@@ -744,7 +757,10 @@ builtins.mapAttrs (name: value:
     netboot = nixpkgs.lib.nixosSystem {
       inherit system;
       specialArgs = {
-        labSettings = labSettings // { ifaceName = ifaceForHost masterHostName; };
+        labSettings = labSettings // {
+          ifaceName = ifaceForHost masterHostName;
+          ifaceExplicit = true;
+        };
         inherit labAssets;
         hostName = "netboot";
         hostIp = masterDhcpIp;
