@@ -41,6 +41,9 @@ ends; conversion keeps the controller activated. Each account enables one lab.
 Conversation sharing is off by default. In the chat, Ctrl+P changes it and
 Ctrl+F reports a final answer with your explicit consent. Reports and shared
 conversations are kept for 90 days.
+Capable controllers can prepare a public npm CLI package/tag into an offline
+baseline restored after the normal student-home reset; review its exact version,
+scope and reported optional-feature limitations before saving.
 
 Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
 for privacy, host classes, tool limits, local retention and interrupted-save

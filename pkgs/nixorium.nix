@@ -1,4 +1,4 @@
-{ buildGoModule, callPackage, git, lib, makeWrapper, openssh, openssl, whois }:
+{ buildGoModule, bubblewrap, callPackage, git, lib, makeWrapper, openssh, openssl, whois }:
 
 let
   go = callPackage ./go.nix { };
@@ -29,7 +29,7 @@ in
   };
 
   vendorHash = "sha256-QSzcOVyA8bAvpE3EQvfSGOCggwPrHg5dOJdShAeW8jU=";
-  subPackages = [ "cmd/nixorium" "cmd/nixorium-classroom-agent" "cmd/nixorium-classroom-worker" "cmd/nixorium-home-reset" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
+  subPackages = [ "cmd/nixorium" "cmd/nixorium-classroom-agent" "cmd/nixorium-classroom-worker" "cmd/nixorium-home-reset" "cmd/nixorium-npm-resolver" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
 
   nativeBuildInputs = [ makeWrapper ];
   nativeCheckInputs = [ git ];
@@ -44,6 +44,8 @@ in
 
   postFixup = ''
     wrapProgram "$out/bin/nixorium" \
+      --set NIXORIUM_NPM_BWRAP ${bubblewrap}/bin/bwrap \
+      --set NIXORIUM_NPM_RESOLVER "$out/bin/nixorium-npm-resolver" \
       --prefix PATH : ${lib.makeBinPath [ openssh openssl whois ]} \
       --suffix PATH : ${lib.makeBinPath [ git ]}
   '';

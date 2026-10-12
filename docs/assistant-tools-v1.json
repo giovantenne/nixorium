@@ -132,5 +132,27 @@
       "required": [],
       "type": "object"
     }
+  },
+  {
+    "name": "prepare_npm",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "package",
+        "id"
+      ],
+      "type": "object"
+    }
   }
 ]

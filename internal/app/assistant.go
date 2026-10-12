@@ -46,6 +46,7 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		Path    string
 		Pattern string
 		Query   string
+		Package string
 	}
 	_ = json.Unmarshal(call.Arguments, &args)
 	switch call.Name {
@@ -67,6 +68,8 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		return "Building new parts of the proposal"
 	case "lab_status":
 		return "Checking the laboratory state"
+	case "prepare_npm":
+		return "Preparing offline npm package " + args.Package
 	}
 	return "Checking Assistant tool request"
 }
@@ -153,7 +156,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			core = nil
 		}
 	}
-	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1"}}
 	textBytes := 0
 	for step := 0; step < turn.Limits.Steps; step++ {
 		emitTranscriptSize()

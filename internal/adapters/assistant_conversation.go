@@ -150,7 +150,7 @@ func (store AssistantWorkspaceStore) Cleanup(current ...string) error {
 			kept++
 		}
 	}
-	return nil
+	return store.cleanupNpmArtifacts()
 }
 
 type AssistantWorkspaceTools struct {
@@ -182,6 +182,8 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	}
 	result := ""
 	switch call.Name {
+	case "prepare_npm":
+		result = prepareAssistantNpm(ctx, tools.Store, workspace, call)
 	case "lab_status":
 		if tools.LabStatus == nil {
 			result = `{"ok":false,"error":"status_unavailable"}`

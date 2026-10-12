@@ -700,6 +700,10 @@ and reverting the declared profile are distinct operations.
 
 ## Optional Assistant
 
+Capable controllers offer bounded public npm CLI preparation. Its generated
+deployment module restores a reviewed offline baseline after home reset, without
+boot/login downloads; see the [tool limits](assistant.md#prepared-npm-baselines).
+
 `lab.assistant` enables the administrator Assistant menu only on the controller,
 after applying its configuration. See [Assistant](assistant.md) for the
 subscription, consent, confined tools and reviewed local-save workflow.

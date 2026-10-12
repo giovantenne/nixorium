@@ -69,7 +69,7 @@ func (reporter AssistantConversationReporter) snapshot(conversation domain.Assis
 		return "", payload, err
 	}
 	core, _ := reporter.Store.CoreIdentity(conversation)
-	payload.Context = &domain.AssistantContext{Nixorium: reporter.Version, Core: core, Files: files}
+	payload.Context = &domain.AssistantContext{Nixorium: reporter.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1"}}
 	payload.Messages = messages
 	return token, payload, nil
 }

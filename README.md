@@ -51,6 +51,8 @@ The free trial shows its remaining requests; subscribing keeps the controller
 activated. Each account enables one laboratory. Conversation sharing is off by
 default; Ctrl+P changes it and Ctrl+F explicitly reports a final answer. Shared
 conversations and reports are retained for 90 days.
+Capable controllers can prepare public npm CLI packages as verified offline
+baselines, with explicit host scope and the same evaluation/save review.
 See [Assistant: activation, privacy and recovery](docs/assistant.md).
 Common customization for selected clients can use `groupModules` with existing
 `clientGroups`; individual exceptions remain separately validated. See the

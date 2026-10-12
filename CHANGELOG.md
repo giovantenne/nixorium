@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Assistant can prepare public npm CLI packages with exact dependency locks,
+  verified sources and an offline artifact tested in isolated namespaces.
+  Explicitly scoped student baselines restore after normal home reset, with
+  review/save preserved and no installation at boot or login.
+
 ### Fixed
 
 - Assistant subscription progress appears once per chat; inactive annual

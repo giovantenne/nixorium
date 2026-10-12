@@ -73,10 +73,11 @@ func ValidAssistantCore(core AssistantCore) bool {
 }
 
 type AssistantContext struct {
-	Nixorium string         `json:"nixorium"`
-	Core     *AssistantCore `json:"core,omitempty"`
-	Hosts    []string       `json:"hosts,omitempty"`
-	Files    []string       `json:"files"`
+	Nixorium     string         `json:"nixorium"`
+	Core         *AssistantCore `json:"core,omitempty"`
+	Hosts        []string       `json:"hosts,omitempty"`
+	Files        []string       `json:"files"`
+	Capabilities []string       `json:"capabilities,omitempty"`
 }
 
 type AssistantStepRequest struct {

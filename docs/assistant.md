@@ -137,7 +137,7 @@ The laboratory token authenticates requests and is kept out of their bodies.
 
 ## Tools and limits
 
-The model has seven fixed tools, with no shell or system-operation tool:
+The model has fixed tools, with no shell or system-operation tool:
 
 | Tool | Scope and limit |
 |---|---|
@@ -148,14 +148,63 @@ The model has seven fixed tools, with no shell or system-operation tool:
 | `delete_file` | Existing, unprotected candidate files only |
 | `search_packages` | Deployment's pinned package search; at most 50 results, 60-second timeout |
 | `evaluate` | Isolated temporary Git clone; five minutes, bounded output, no import-from-derivation |
+| `build` | New non-cached candidate derivations after evaluation; bounded build logs, no activation |
+| `lab_status` | Read-only controller observations of the lab computers |
+| `prepare_npm` | Capable controllers only: prepare a public npm CLI package/tag and its tested offline dependency artifact |
 
 Paths must be relative, with no traversal, backslashes or control characters;
 the limit is 12 components and 512 bytes. A file cannot replace a directory
-that still contains visible files. Tools cannot build or activate a system,
+that still contains visible files. Tools cannot activate a system,
 manage services, deploy computers, or save a proposal into the deployment.
 Evaluation errors are redacted and limited to 8 KiB. Passing evaluation proves
 that Nix can evaluate the candidate; it does not prove a successful build,
 activation, boot or safe behavior of arbitrary configuration code.
+
+### Prepared npm baselines
+
+`prepare_npm` accepts `package`, `id`, and an optional exact `version` or tag
+(default `latest`). It resolves the tag once using the deployment's pinned
+Node/npm, and writes five bounded text files under `npm/<id>/`: package and
+lock declarations, a manifest, a Nix package, and a deployment-owned module.
+Import the module explicitly for the requested hosts before ordinary evaluation,
+build and SAVE review. Preparing alone changes no system or home. To update a
+baseline, prepare a new `id`, replace the scoped import, and remove the old
+generated files in the reviewed proposal.
+
+The resolver has an empty home and no external network: a fixed Unix broker
+supplies sanitized metadata from `registry.npmjs.org`. Git, file, alias and
+foreign-URL dependencies, redirects, bundled dependencies and native addons
+are refused. Every required tarball has SHA-512 integrity and confined archive
+validation. Install hooks and CLI version/help tests run in separate Bubblewrap
+namespaces with no controller home, credentials or external network. Hooks
+requiring downloads or unavailable build tools fail. Optional dependencies are
+omitted and listed, which can remove features such as Pi's native clipboard
+support. CLI smoke tests do not certify every feature or package safety; additional
+runtime programs may be needed. Pi's normal file tools need pinned `fd` and
+`ripgrep` in the same host scope, so they do not try to download binaries.
+
+Preparation allows 512 lock entries, 512 KiB of lock text, 8 MiB of metadata per
+package/64 MiB total, 128 MiB per tarball/512 MiB total, and 50,000 archive
+entries/1 GiB expanded data. The operation takes at most ten minutes;
+installation and smoke tests have wall, CPU, process, file and per-process
+virtual/data limits. There is no aggregate resident-memory guarantee. Missing
+namespace support fails closed. Changing the recorded Node runtime requires
+preparing again.
+
+The artifact retains verified tarballs and Node in its Nix closure, distributed
+to offline clients by the normal controller cache. Up to 32 artifacts and 4 GiB
+of conservatively counted closures are rooted in private Assistant state.
+Cleanup retains artifacts referenced by the current deployment commit or a
+retained chat, including after SAVE. It removes unused roots and never
+garbage-collects the shared Nix store. Committed locks/hashes can refetch identical
+sources on the controller after old artifacts are removed.
+
+One baseline module may apply to a host. Its student service runs after the
+normal boot-time home reset and before login. It copies only its package/bin
+entries into writable `~/.local/npm`, refuses collisions, and performs no
+network or installation at boot. A switch does not reset or seed a live home.
+Student updates disappear at the next reset; npm and credential snapshot
+exclusions remain intact.
 
 ## How affected computers are calculated
 

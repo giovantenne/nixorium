@@ -300,6 +300,11 @@ any shard must block publication.
   Student npm globals and Pi/OpenCode state/credentials are ephemeral and
   excluded from pre-reset snapshots; never seed credentials into the shared
   home template.
+  Capability-gated `prepare_npm` resolves public CLI tags only during controller
+  preparation, with confined metadata resolution and offline sandboxed install
+  hooks/smoke tests. Keep lock/hash declarations reviewable and artifacts rooted
+  across SAVE/resume; boot-time baseline restoration must remain unprivileged,
+  after home-reset and before login, with no online install or collision overwrite.
 - Administrative TUI startup must not evaluate Nix outputs, including labMeta:
   older pins can make even metadata evaluate every host. Observe
   local setup/Git/service state only, without claiming readiness. Load evaluated
