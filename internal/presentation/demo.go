@@ -993,3 +993,8 @@ func demoAssistantConfig() domain.AssistantConfig {
 	return domain.AssistantConfig{Enabled: true,
 		Endpoint: "https://assistant.nixorium.org/v1", SubscribeURL: "https://nixorium.org/pricing/"}
 }
+
+func demoAssistantOffer() domain.AssistantOffer {
+	return domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 10,
+		TrialURL: "https://assistant.nixorium.org/trial", SubscribeURL: "https://nixorium.org/pricing/"}
+}

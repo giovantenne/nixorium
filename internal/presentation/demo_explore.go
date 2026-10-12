@@ -75,7 +75,7 @@ func demoGraphKeys() []demoGraphKey {
 		{name: "f1", press: demoCode(tea.KeyF1)},
 	}
 	// j and k repeat the arrow keys and q quits; they add no new screens.
-	for _, letter := range "abcdefghilnprstuvwxy/" {
+	for _, letter := range "abcdefghilmnprstuvwxy/" {
 		keys = append(keys, demoGraphKey{name: string(letter), press: tea.KeyPressMsg{Code: letter, Text: string(letter)}, letter: true})
 	}
 	return keys
@@ -246,10 +246,14 @@ func demoExploreActions(revision string) DashboardActions {
 	sessions := map[string]domain.ShutdownSessionState{"pc01": domain.ShutdownSessionIdle, "pc02": domain.ShutdownSessionActive, "pc03": domain.ShutdownSessionIdle}
 	actions := DashboardActions{
 		RunningVersion: "demo",
-		LoadInventory:  func(context.Context) (domain.StatusReport, error) { return status, nil },
-		Refresh:        func(context.Context) (domain.StatusReport, error) { return status, nil },
-		LoadHosts:      func(context.Context) (domain.HostsReport, error) { return hosts, nil },
-		LoadSetup:      func(context.Context) domain.SetupReport { return demoSetupReady() },
+		Assistant:      demoAssistantConfig(),
+		// Static answer only: the explorer keeps Assistant a leaf, so no other
+		// service callback can ever be reached.
+		AssistantService: &AssistantActions{Offer: func(context.Context) (domain.AssistantOffer, error) { return demoAssistantOffer(), nil }},
+		LoadInventory:    func(context.Context) (domain.StatusReport, error) { return status, nil },
+		Refresh:          func(context.Context) (domain.StatusReport, error) { return status, nil },
+		LoadHosts:        func(context.Context) (domain.HostsReport, error) { return hosts, nil },
+		LoadSetup:        func(context.Context) domain.SetupReport { return demoSetupReady() },
 		LoadRecovery: func(context.Context) domain.RecoveryReport {
 			return domain.RecoveryReport{SchemaVersion: domain.SchemaVersion, Operation: "recovery", GeneratedAt: demoObservedAt, State: "clear"}
 		},
@@ -536,6 +540,11 @@ func (e *demoExplorer) replay(path []int) (model dashboardModel, ok bool) {
 	}()
 	model = e.start()
 	for _, index := range path {
+		// Assistant is a leaf of the explorer: only Esc leaves its welcome
+		// screen, which keeps the graph bounded.
+		if model.screen == dashboardAssistant && e.keys[index].name != "esc" {
+			continue
+		}
 		command := demoUpdate(&model, e.keys[index].press)
 		if model, ok = demoSettle(model, command); !ok {
 			return model, false
