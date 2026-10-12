@@ -8,6 +8,10 @@ every student PC over the local network, without direct Internet access on the
 students' side. Each PC then starts from its own disk, runs its applications
 locally and returns to a clean desktop at every boot.
 
+The **Community Edition** is free and open source. **Assistant** is an optional
+paid add-on integrated into the administrator menu, helping you prepare lab
+customizations in plain language and review them before saving.
+
 [Website](https://nixorium.org/) ·
 [Documentation](#documentation) ·
 [Contributing](CONTRIBUTING.md) ·
@@ -43,8 +47,8 @@ Nixorium bridges that gap with a local-first workflow:
 
 ## Optional Assistant
 
-Enable `lab.assistant` and apply the controller to add **Assistant** to the
-administrator menu. This subscription service prepares a candidate change;
+Enable `lab.assistant` and apply the controller to add **Assistant** as the fifth
+administrator menu entry. This optional paid subscription prepares a candidate change;
 you review the files and evaluation before a local commit with a backup.
 Controller application and client updates remain separate reviewed actions.
 The free trial shows its remaining requests; subscribing keeps the controller
@@ -63,9 +67,9 @@ Common customization for selected clients can use `groupModules` with existing
 **One configuration for the whole room.** On the controller, sign in as
 `admin` and open **Nixorium** from the dock, or run `nixorium` in a terminal.
 The guided menu groups everyday tasks into **Computers**, **Installation**,
-**Software** and **Maintenance**.
+**Software** and **Maintenance**, with **Assistant** as a fifth area when enabled.
 
-![The Nixorium administrator menu, with the Computers, Installation, Software and Maintenance areas](docs/images/nixorium-tui.png)
+![The Nixorium administrator menu, with Computers, Installation, Software, Maintenance and the optional Assistant area enabled](docs/images/nixorium-tui.png)
 
 - **One description, every PC.** Add software or change the student desktop
   once, then update one PC, a group or the whole room. Every change is
@@ -81,13 +85,15 @@ The guided menu groups everyday tasks into **Computers**, **Installation**,
   take over without reinstalling the PCs.
 - **Your lab stays yours.** Software choices, desktop defaults and local
   policy live in your own private repository, separate from this framework.
+- **Describe a customization.** With the optional Assistant subscription,
+  ask for a change in plain language, review its files and Nix evaluation,
+  then save it locally. Applying the controller and updating clients each
+  require a separate review.
 
 Under the hood: NixOS builds every PC from the same description, Colmena
 deploys it, Harmonia serves the cache and Disko lays out the disks.
 
 [Administrator guide](templates/site/README.md) · [Menu tour](docs/tui-gallery.md)
-
-The optional Assistant subscription service is off by default; set `lab.assistant` to `true` in `lab-settings.json` and apply the controller to enable its administrator menu entry.
 
 ## For teachers
 
