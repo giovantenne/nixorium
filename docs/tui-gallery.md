@@ -263,7 +263,7 @@ Enter activate · Esc back
 ## Assistant free trial quota
 
 ```text
-Assistant · Example laboratory                                                              Free trial · 3 of 5 left
+Assistant · Example laboratory                                                             Free trial · 3 of 10 left
 
 Try asking, for example:
   Install GIMP and Inkscape on all student PCs
