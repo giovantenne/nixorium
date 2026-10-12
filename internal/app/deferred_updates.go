@@ -210,3 +210,10 @@ func countLabel(count int, noun string) string {
 	}
 	return fmt.Sprintf("%d %ss", count, noun)
 }
+
+func attentionLabel(count int) string {
+	if count == 1 {
+		return "1 computer needs attention"
+	}
+	return fmt.Sprintf("%d computers need attention", count)
+}

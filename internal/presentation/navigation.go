@@ -18,17 +18,9 @@ func (model dashboardModel) taskMenu(tasks []dashboardTask, cursor int) string {
 		return ""
 	}
 	cursor = min(max(0, cursor), len(tasks)-1)
-	rows := max(1, model.height-15)
-	if model.height == 0 {
-		rows = len(tasks)
-	}
-	if model.height > 0 {
-		for _, task := range tasks {
-			if strings.HasPrefix(task.id, "pending-") {
-				rows = max(1, rows/2)
-				break
-			}
-		}
+	rows := len(tasks)
+	if model.menuRows > 0 {
+		rows = min(rows, model.menuRows)
 	}
 	start, end := listWindow(len(tasks), cursor, rows)
 	lines := []string{}
@@ -78,4 +70,25 @@ func taskHelp(tasks []dashboardTask) []string {
 		lines = append(lines, task.shortcut+"  "+task.title)
 	}
 	return lines
+}
+
+// fitMenu renders a screen whose task menu shows as many rows as the shell
+// really has room for: it tries the whole menu first and shrinks the window
+// until renderShell no longer needs its scroll hint. Everything around the
+// menu (breadcrumb, notices, the wrapped description, footer) is therefore
+// counted by the same code that lays it out.
+func (model dashboardModel) fitMenu(count int, render func(dashboardModel) string) string {
+	if model.height == 0 || count == 0 {
+		model.menuRows = count
+		return render(model)
+	}
+	out := ""
+	for rows := count; rows >= 1; rows-- {
+		model.menuRows = rows
+		out = render(model)
+		if !strings.Contains(out, "scroll · ? help") {
+			break
+		}
+	}
+	return out
 }

@@ -107,7 +107,7 @@ func (inspector *RecoveryInspector) Observe(ctx context.Context, repository stri
 			title := fmt.Sprintf("%s will update when switched on", countLabel(waiting, "computer"))
 			detail := "The controller updates each of them as soon as it answers."
 			if attention > 0 {
-				title = fmt.Sprintf("Queued updates: %s need attention", countLabel(attention, "computer"))
+				title = fmt.Sprintf("Queued updates: %s", attentionLabel(attention))
 				detail = "Their configuration changed after queueing, or the last attempt failed; open the queue to review them."
 			}
 			add(domain.RecoveryDeferredUpdates, "UPDATES-QUEUED", title, detail, "", nil, nil)

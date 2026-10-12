@@ -23,7 +23,7 @@ func TestRenderingPreservesMeaningWithLimitedColor(t *testing.T) {
 			t.Fatal(err)
 		}
 		text := output.String()
-		if !strings.Contains(text, "Nixorium") || !strings.Contains(text, "Overview") || !strings.Contains(text, "Computers") || !strings.Contains(text, "Installation") || !strings.Contains(text, "Software") || !strings.Contains(text, "Maintenance") {
+		if !strings.Contains(text, "Nixorium") || !strings.Contains(text, "Overview") || !strings.Contains(text, "Laboratory overview") || !strings.Contains(text, "Computers") || !strings.Contains(text, "Installation") || !strings.Contains(text, "Software") || !strings.Contains(text, "Maintenance") {
 			t.Fatalf("meaning lost with %v", profile)
 		}
 		if strings.Contains(text, "38;2;") {
@@ -38,7 +38,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 		m.width = size[0]
 		m.height = size[1]
 		view := m.View().Content
-		for _, expected := range []string{"Nixorium", "Overview", "Enter", "Open", "Help"} {
+		for _, expected := range []string{"Nixorium", "Overview", "Laboratory overview", "Enter", "Open", "Help"} {
 			if !strings.Contains(demoANSI.ReplaceAllString(view, ""), expected) {
 				t.Fatalf("overview %dx%d lacks %q:\n%s", size[0], size[1], expected, view)
 			}
@@ -778,7 +778,7 @@ func TestTypedConfirmationReviewsRejectWrongInputAndCancel(t *testing.T) {
 
 func TestExperienceStatesAndDisclosure(t *testing.T) {
 	m := experienceFixture(24)
-	if !strings.Contains(m.View().Content, "Computers") || strings.Contains(m.View().Content, "24 computers") {
+	if !strings.Contains(m.View().Content, "Laboratory overview") || !strings.Contains(m.View().Content, "Computers") || strings.Contains(m.View().Content, "24 computers") {
 		t.Fatal("entry is not intervention-oriented")
 	}
 	m.busy = "Checking laboratory and computers"

@@ -921,7 +921,7 @@ func TestDashboardLoadsAndRefreshesComputerInventory(t *testing.T) {
 func TestDashboardOffersPXEWorkflowFromReconciledState(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	view := model.View().Content
-	if !strings.Contains(view, "Installation") {
+	if !strings.Contains(view, "Installation") || !strings.Contains(view, "Laboratory overview") {
 		t.Fatalf("dashboard omits PXE workflow:\n%s", view)
 	}
 

@@ -16,6 +16,9 @@ import (
 )
 
 func (model dashboardModel) installationAreaView() string {
+	if model.menuRows == 0 {
+		return model.fitMenu(len(installationAreaTasks), func(fitted dashboardModel) string { return fitted.installationAreaView() })
+	}
 	lines := []string{
 		tuiTitle("Install client computers", model.isDark),
 		"Choose how to start the client PC. Both methods erase its chosen disk.",

@@ -181,6 +181,9 @@ func (model dashboardModel) computersView() string {
 }
 
 func (model dashboardModel) administrationView() string {
+	if model.menuRows == 0 {
+		return model.fitMenu(len(administrationTasks), func(fitted dashboardModel) string { return fitted.administrationView() })
+	}
 	lines := []string{
 		tuiTitle("Choose a maintenance task", model.isDark),
 		tuiMuted("Configuration, controller operations and technical evidence", model.isDark),

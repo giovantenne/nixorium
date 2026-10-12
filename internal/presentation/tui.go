@@ -401,6 +401,7 @@ type computersModel struct {
 }
 
 type dashboardModel struct {
+	menuRows               int // set while fitting the task menu to the terminal; 0 means not yet fitted
 	assistantNoColors      bool
 	backupSync             backupSyncState
 	controllerObservation  controllerOverviewObservation

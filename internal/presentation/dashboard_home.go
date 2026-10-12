@@ -183,7 +183,14 @@ func (model dashboardModel) homeView() string {
 			actions: []tuiAction{{key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
 		})
 	}
-	lines := []string{}
+	if model.menuRows == 0 {
+		return model.fitMenu(len(model.overviewTasks()), func(fitted dashboardModel) string { return fitted.homeView() })
+	}
+	subtitle := "Choose an area with the arrows or its letter."
+	if len(model.pendingTasks()) > 0 {
+		subtitle = "Items in yellow need your attention; press their number to open them."
+	}
+	lines := []string{tuiTitle("Laboratory overview", model.isDark), tuiMuted(subtitle, model.isDark), ""}
 	notices := []tuiNotice{}
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
@@ -237,6 +244,11 @@ func setupOverviewNotice(setup domain.SetupReport) (tuiNotice, bool) {
 }
 
 func (model dashboardModel) areaView(path, title, description string, tasks []dashboardTask, cursor int) string {
+	if model.menuRows == 0 {
+		return model.fitMenu(len(tasks), func(fitted dashboardModel) string {
+			return fitted.areaView(path, title, description, tasks, cursor)
+		})
+	}
 	lines := []string{tuiTitle(title, model.isDark), tuiMuted(description, model.isDark), ""}
 	lines = append(lines, model.taskMenu(tasks, cursor))
 	notices := []tuiNotice{}
