@@ -113,6 +113,7 @@ func TestAssistantQuotaHeaderUsesServiceStateAndRecovers(t *testing.T) {
 	for _, test := range []struct{ plan, code, want string }{
 		{"trial", "subscription_inactive", "Free trial ended"},
 		{"trial", "quota_exhausted", "Free trial ended"},
+		{"annual", "subscription_inactive", "Subscription inactive"},
 		{"annual", "quota_exhausted", "No requests left"},
 	} {
 		m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("state update sent HTTP") })

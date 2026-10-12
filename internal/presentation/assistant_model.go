@@ -51,6 +51,7 @@ type assistantModel struct {
 	readOnlyCursor               int
 	sharing                      bool
 	saved                        bool
+	subscriptionCheckShown       bool
 	longChatShown                bool
 	maxRequestBytes              int
 	archivedEntries              []assistantEntry
@@ -376,7 +377,12 @@ func (model dashboardModel) finishAssistantStream(message assistantStreamMsg) (t
 		model.assistant.appendText(event.Delta)
 	case "activity":
 		model.assistant.activity = event.Text
-		if event.Text != "Preparing a proposal" {
+		if event.Text == "Checking Assistant subscription" {
+			if !model.assistant.subscriptionCheckShown {
+				model.assistant.appendActivity(assistantActivityLine(event.Text))
+				model.assistant.subscriptionCheckShown = true
+			}
+		} else if event.Text != "Preparing a proposal" {
 			model.assistant.appendActivity(assistantActivityLine(event.Text))
 		}
 	case "tool_result":
@@ -590,6 +596,7 @@ func (model dashboardModel) startAssistantRunner() (tea.Model, tea.Cmd) {
 		model.assistant.conversation = domain.AssistantConversation{}
 		model.assistant.review = assistantReviewModel{}
 		model.assistant.saved, model.assistant.longChatShown = false, false
+		model.assistant.subscriptionCheckShown = false
 		model.assistant.maxRequestBytes = 0
 	}
 	if model.assistant.cancel != nil {

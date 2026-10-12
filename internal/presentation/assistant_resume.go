@@ -97,6 +97,7 @@ func (model dashboardModel) finishAssistantResume(msg assistantResumeMsg) (tea.M
 	model = updated.(dashboardModel)
 	model.assistant.conversation = h.Conversation
 	model.assistant.messages = h.Messages
+	model.assistant.subscriptionCheckShown = len(h.Messages) > 0
 	model.assistant.changedFiles = h.ChangedFiles
 	if h.Conversation.LastAnswer != nil {
 		model.assistant.summary = *h.Conversation.LastAnswer

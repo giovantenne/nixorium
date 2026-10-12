@@ -271,6 +271,8 @@ func (model dashboardModel) assistantQuotaText() (string, bool) {
 			if account.Status == "inactive" || account.TurnsRemaining <= 0 || model.assistant.accessError == "subscription_inactive" || model.assistant.accessError == "quota_exhausted" {
 				right, warn = "Free trial ended", true
 			}
+		} else if account.Status != "" && account.Status != "active" || model.assistant.accessError == "subscription_inactive" {
+			right, warn = "Subscription inactive", true
 		} else if account.TurnsRemaining <= 0 || model.assistant.accessError == "quota_exhausted" {
 			right, warn = "No requests left", true
 		}

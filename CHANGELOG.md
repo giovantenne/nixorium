@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Assistant subscription progress appears once per chat; inactive annual
+  subscriptions show their status instead of an available request count.
+
 ## [3.3.0] - 2026-10-12
 
 ### Added
