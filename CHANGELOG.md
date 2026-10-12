@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-10-12
+
+- Publish the client preparation memory fix from 3.2.1, whose GitHub release
+  was withheld because a regression test needed a newer `jq` than the
+  validation runners provide. Client preparation evaluates client systems in
+  bounded batches and no longer runs out of memory on large laboratories.
+
 ## [3.2.1] - 2026-10-12
 
 - Fix client preparation running out of memory on large laboratories. Shared
@@ -1637,7 +1644,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.2...HEAD
+[3.2.2]: https://github.com/giovantenne/nixorium/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/giovantenne/nixorium/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/giovantenne/nixorium/compare/v3.1.1...v3.2.0
 [3.1.1]: https://github.com/giovantenne/nixorium/compare/v3.1.0...v3.1.1
