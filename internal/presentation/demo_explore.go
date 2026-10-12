@@ -231,6 +231,8 @@ func demoExploreModel(revision string, width, height int, classroom bool) dashbo
 	model.computers.hosts = demoExploreHosts(revision)
 	if classroom {
 		model.screen = dashboardComputersArea
+	} else {
+		demoAssistantChat(&model)
 	}
 	return model
 }
@@ -247,13 +249,10 @@ func demoExploreActions(revision string) DashboardActions {
 	actions := DashboardActions{
 		RunningVersion: "demo",
 		Assistant:      demoAssistantConfig(),
-		// Static answer only: the explorer keeps Assistant a leaf, so no other
-		// service callback can ever be reached.
-		AssistantService: &AssistantActions{Offer: func(context.Context) (domain.AssistantOffer, error) { return demoAssistantOffer(), nil }},
-		LoadInventory:    func(context.Context) (domain.StatusReport, error) { return status, nil },
-		Refresh:          func(context.Context) (domain.StatusReport, error) { return status, nil },
-		LoadHosts:        func(context.Context) (domain.HostsReport, error) { return hosts, nil },
-		LoadSetup:        func(context.Context) domain.SetupReport { return demoSetupReady() },
+		LoadInventory:  func(context.Context) (domain.StatusReport, error) { return status, nil },
+		Refresh:        func(context.Context) (domain.StatusReport, error) { return status, nil },
+		LoadHosts:      func(context.Context) (domain.HostsReport, error) { return hosts, nil },
+		LoadSetup:      func(context.Context) domain.SetupReport { return demoSetupReady() },
 		LoadRecovery: func(context.Context) domain.RecoveryReport {
 			return domain.RecoveryReport{SchemaVersion: domain.SchemaVersion, Operation: "recovery", GeneratedAt: demoObservedAt, State: "clear"}
 		},
