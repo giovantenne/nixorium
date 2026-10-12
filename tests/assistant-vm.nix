@@ -252,8 +252,8 @@
       assert controller.succeed("cat /home/admin/deployment/modules/course.nix").strip() == "{ course = 2; }"
       requests = [json.loads(line) for line in controller.succeed("cat /tmp/fake-requests.log").splitlines()]
       step = "/v1/turns/00000000-0000-4000-8000-000000000001/steps"
-      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/billing-portal", "/v1/turns"] + [step] * 3 + ["/v1/turns", step, "/v1/billing-portal"]
-      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, False, True, True, True, False, True, False]
+      assert [r["path"] for r in requests if r["method"] == "POST"] == ["/v1/activate", "/v1/turns"] + [step] * 3 + ["/v1/turns", step, "/v1/billing-portal"]
+      assert [r["userText"] for r in requests if r["method"] == "POST"] == [False, False, True, True, True, False, True, False]
       assert all(not r["userText"] for r in requests if r["method"] == "GET")
       assert controller.succeed("systemctl list-units 'nixorium-apply*' --state=active --no-legend --no-pager").strip() == ""
     with subtest("Assistant is absent without the controller option"):
