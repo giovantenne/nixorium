@@ -102,7 +102,8 @@ outside the workspace are not tool inputs.
 `/billing` shows a clickable temporary Stripe Customer Portal link in the chat.
 It does not use an Assistant request or send conversation contents. Open the link
 within a few minutes to manage your subscription and see payments. Trial accounts
-without a Stripe customer see **Available after subscribing.** The link stays out
+without a subscription are told that `/billing` becomes available after
+subscribing. The link stays out
 of the transcript and model messages. The portal return page lets you close the
 tab and return to Nixorium. The displayed invoice notice is **Official electronic
 invoices are delivered through SDI.**
