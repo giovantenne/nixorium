@@ -22,8 +22,9 @@ on clients and from the teacher's classroom dashboard. Setting the option to
 false and applying the controller removes the menu entry.
 
 The controller installs `/etc/nixorium/assistant.json` and creates the private
-state directory for `admin`. Service URL overrides are for staging and tests;
-ordinary deployments use the installed defaults. Existing deployments whose
+state directory for `admin`. The service defaults to `https://assistant.nixorium.org/v1` and the
+subscription page to `https://nixorium.org/pricing/`; overrides are for
+staging and tests only. Existing deployments whose
 pinned Nixorium lacks the host-class output must update before using evaluation.
 
 ## Subscription, activation and consent

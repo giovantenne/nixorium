@@ -4,12 +4,12 @@
     endpoint = lib.mkOption {
       type = lib.types.str;
       default = "https://assistant.nixorium.org/v1";
-      description = "Assistant service endpoint for staging and local tests";
+      description = "Assistant service endpoint (override only for staging or tests)";
     };
     subscribeUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://nixorium.org/assistant/";
-      description = "Assistant subscription page for staging and local tests";
+      default = "https://nixorium.org/pricing/";
+      description = "Assistant subscription page (override only for staging or tests)";
     };
   };
 

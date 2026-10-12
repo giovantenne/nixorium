@@ -389,7 +389,7 @@ assert builtins.fromJSON assistantLab.nixosConfigurations.pc99.config.environmen
   schemaVersion = 1;
   enabled = true;
   endpoint = "https://assistant.nixorium.org/v1";
-  subscribeUrl = "https://nixorium.org/assistant/";
+  subscribeUrl = "https://nixorium.org/pricing/";
 };
 assert builtins.fromJSON assistantTestLab.nixosConfigurations.pc99.config.environment.etc."nixorium/assistant.json".text == {
   schemaVersion = 1;
