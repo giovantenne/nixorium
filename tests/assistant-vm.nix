@@ -123,7 +123,7 @@
               assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
               billing_start = len(output())
               send("/billing\r")
-              wait("Available after subscribing.", after=billing_start)
+              wait("/billing becomes available after subscribing.", after=billing_start)
               assert not any(json.loads(line)["path"] == "/v1/turns" for line in pathlib.Path("/tmp/fake-requests.log").read_text().splitlines())
               send("/unknown\r")
               wait("Unknown command. Type / to see the commands.")
