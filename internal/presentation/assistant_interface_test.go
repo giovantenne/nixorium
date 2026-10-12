@@ -397,6 +397,10 @@ func TestAssistantInlineAccountAndNetworkWarningsKeepDraft(t *testing.T) {
 	if token, _ := store.ReadToken(); token != "" || m.assistant.state != "welcome" || m.assistant.input.Value() != "Synthetic private request" {
 		t.Fatal("invalid activation not removed")
 	}
+	view := m.View().Content
+	if m.message != assistantActivationInvalidNotice || !strings.Contains(view, "Assistant activation is no longer valid") || strings.Contains(view, "could not complete") {
+		t.Fatalf("invalid activation is not explained: %q\n%s", m.message, view)
+	}
 }
 
 // assistantEnableCommands puts the chat in a state where every command applies.

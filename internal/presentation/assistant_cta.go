@@ -47,6 +47,8 @@ func assistantServiceNotice(err error, subscribeURL string) string {
 	return assistantNetworkNotice
 }
 
+const assistantActivationInvalidNotice = "This controller's Assistant activation is no longer valid. Activate it again to send your request."
+
 func (model dashboardModel) assistantNotice(err error) string {
 	var serviceError *domain.AssistantError
 	if errors.As(err, &serviceError) {
@@ -104,7 +106,9 @@ func (model dashboardModel) assistantGateView() string {
 		body += "Activation code\n" + code.View()
 		hint = "Enter activate · Esc back"
 	}
-	if model.message != "" {
+	if model.message == assistantActivationInvalidNotice {
+		body += "\n" + tuiNoticeText(model.message, tuiStatusNeutral, model.isDark)
+	} else if model.message != "" {
 		body += "\n" + tuiError(assistantDisplayText(model.message), model.isDark)
 	}
 	body = lipgloss.NewStyle().Width(width).Render(assistantLinkify(body))

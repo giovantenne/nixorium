@@ -284,6 +284,7 @@ func (model dashboardModel) finishAssistantAccess(message assistantAccessMsg) (t
 				model.assistant.state = "consent"
 				model.message = ""
 			case "invalid_token":
+				model.message = assistantActivationInvalidNotice
 				if actions := model.actions.AssistantService; actions != nil && actions.DeleteToken != nil {
 					if err := actions.DeleteToken(); err != nil {
 						model.message = "Could not remove the invalid Assistant token. Apply the controller configuration and try again."

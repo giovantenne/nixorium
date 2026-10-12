@@ -181,6 +181,9 @@ func TestAssistantSubscriptionErrorsPreserveDraftAndSendNoContent(t *testing.T) 
 				if token, _ := store.ReadToken(); token != "" {
 					t.Fatal("invalid token retained")
 				}
+				if m.message != assistantActivationInvalidNotice || strings.Contains(m.message, "could not complete") {
+					t.Fatalf("invalid token message = %q", m.message)
+				}
 			}
 		})
 	}
