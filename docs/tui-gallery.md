@@ -169,9 +169,6 @@ n Configure clients  ·  ↑/↓ Select  ·  Enter Open  ·  Esc Overview  ·  F
 ```text
 Nixorium  /  Overview
 
-Laboratory overview
-Choose an area. Observed state is loaded only when the selected task needs it.
-
 › [c] Computers
   [n] Installation
   [w] Software
@@ -191,9 +188,6 @@ q Quit
 ```text
 Nixorium  /  Overview
 
-Laboratory overview
-Choose an area. Observed state is loaded only when the selected task needs it.
-
 › [c] Computers
   [n] Installation
   [w] Software
@@ -209,9 +203,6 @@ Inventory, updating computers, Internet access and power
 
 ```text
 Nixorium  /  Overview
-
-Laboratory overview
-Choose an area. Observed state is loaded only when the selected task needs it.
 
 › [c] Computers
   [n] Installation
@@ -1183,11 +1174,6 @@ Enter Computer details  ·  Esc Back  ·  F1 Help
 
 ```text
 Nixorium  /  Overview
-
-Laboratory overview
-Choose an area. Observed state is loaded only when the selected task needs it.
-
-Needs attention — press the number to open it
 
   [1] Controller configuration — running
 

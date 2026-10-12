@@ -183,16 +183,8 @@ func (model dashboardModel) homeView() string {
 			actions: []tuiAction{{key: "q", label: "Quit"}, {key: "F1", label: "Help"}},
 		})
 	}
-	lines := []string{
-		tuiTitle("Laboratory overview", model.isDark),
-		tuiMuted("Choose an area. Observed state is loaded only when the selected task needs it.", model.isDark),
-		"",
-	}
+	lines := []string{}
 	notices := []tuiNotice{}
-	// Rows appear only when something needs action; an empty list says nothing.
-	if len(model.pendingTasks()) > 0 {
-		lines = append(lines, "Needs attention — press the number to open it", "")
-	}
 	if model.busy != "" {
 		lines = append(lines, model.busyView(), "")
 	}

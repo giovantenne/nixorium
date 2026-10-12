@@ -15,7 +15,7 @@ def launch():
 
 
 def quit_at_menu(child):
-    child.expect("Laboratory overview")
+    child.expect("Maintenance")
     child.send("q")
     child.expect(pexpect.EOF)
     child.close()
@@ -50,7 +50,7 @@ quit_at_menu(child)
 state = json.loads(Path("/var/lib/nixorium/telemetry/state.json").read_text())
 assert state["consent"] == "disabled" and "secret" not in state
 child = launch()
-child.expect("Laboratory overview")
+child.expect("Maintenance")
 assert "Share statistics" not in child.before
 child.send("c")
 child.expect("Client computers have not been configured yet")

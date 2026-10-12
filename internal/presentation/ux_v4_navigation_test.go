@@ -709,7 +709,7 @@ func TestLoadingDashboardRendersBeforeInspectionAndThenRoutes(t *testing.T) {
 	}, false)
 	model.initializing = true
 	model.busy = "Opening the laboratory and checking setup progress"
-	if view := model.View().Content; !strings.Contains(view, model.busy) || strings.Contains(view, "Restore computers") || strings.Contains(view, "Laboratory overview") {
+	if view := model.View().Content; !strings.Contains(view, model.busy) || strings.Contains(view, "Restore computers") || strings.Contains(view, "Maintenance") {
 		t.Fatalf("startup activity is not visible before inspection:\n%s", view)
 	}
 
