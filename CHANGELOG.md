@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-10-13
+
 ### Added
 
 - Assistant can prepare public npm CLI packages with exact dependency locks,
@@ -13,10 +15,26 @@ The project follows [Semantic Versioning](https://semver.org/).
   Explicitly scoped student baselines restore after normal home reset, with
   review/save preserved and no installation at boot or login.
 
+### Changed
+
+- Assistant opens the chat before activation and opens the activation page,
+  then asks for the code, when sending the first request.
+- The administrator Overview focuses on its menu and shows all entries when
+  the terminal has room.
+
 ### Fixed
 
 - Assistant subscription progress appears once per chat; inactive annual
   subscriptions show their status instead of an available request count.
+- Accept short trial upgrade links and explain how to recover an activation
+  that is no longer valid.
+- New Assistant clients remain compatible with services that do not yet offer
+  npm preparation.
+
+### Documentation
+
+- Clarify that Community Edition is free and Assistant is an optional paid
+  add-on; refresh the administrator menu image with Assistant enabled.
 
 ## [3.3.0] - 2026-10-12
 
@@ -1712,7 +1730,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/giovantenne/nixorium/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/giovantenne/nixorium/compare/v3.2.3...v3.3.0
 [3.2.3]: https://github.com/giovantenne/nixorium/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/giovantenne/nixorium/compare/v3.2.1...v3.2.2
