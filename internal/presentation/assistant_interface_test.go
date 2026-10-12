@@ -163,7 +163,7 @@ func TestAssistantWelcomeOfferActivationConsentAndReopen(t *testing.T) {
 	calls := 0
 	m.actions.AssistantService.Offer = func(context.Context) (domain.AssistantOffer, error) {
 		calls++
-		return domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 5, TrialURL: "https://assistant.example/trial", SubscribeURL: "https://example.org/assistant/"}, nil
+		return domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 10, TrialURL: "https://assistant.example/trial", SubscribeURL: "https://example.org/assistant/"}, nil
 	}
 	updated, _ := m.openAssistant()
 	m = updated.(dashboardModel)
@@ -272,7 +272,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 				m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("render sent HTTP") })
 				m.width, m.height, m.isDark = size[0], size[1], dark
 				m.assistant.state = state
-				m.assistant.offer = domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 5, TrialURL: "https://assistant.example/trial", SubscribeURL: "https://example.org/assistant/"}
+				m.assistant.offer = domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 10, TrialURL: "https://assistant.example/trial", SubscribeURL: "https://example.org/assistant/"}
 				m.assistant.account = domain.AssistantAccount{Name: "Synthetic laboratory", Plan: "trial", Status: "active", TurnsRemaining: 1}
 				m.assistant.input.Reset()
 				required := []string{"Assistant", "Esc"}
@@ -311,7 +311,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					m.assistant.input.SetValue("/")
 					required = append(required, "/share", "/report", "/code")
 				case "chat":
-					required = append(required, assistantExamples[0], "Free trial · 1 of 5 left", assistantInputHint)
+					required = append(required, assistantExamples[0], "Free trial · 1 of 10 left", assistantInputHint)
 				}
 				view := m.View().Content
 				if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {

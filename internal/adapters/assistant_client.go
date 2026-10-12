@@ -141,7 +141,7 @@ func (client AssistantClient) Offer(ctx context.Context) (domain.AssistantOffer,
 		return err == nil && link.Host != "" && link.User == nil && link.Fragment == "" && link.Opaque == "" &&
 			(link.Scheme == "https" || (link.Scheme == "http" && (link.Hostname() == "localhost" || link.Hostname() == "127.0.0.1")))
 	}
-	if offer.TrialRequests != 5 || !validLink(offer.TrialURL) || !validLink(offer.SubscribeURL) {
+	if offer.TrialRequests != 10 || !validLink(offer.TrialURL) || !validLink(offer.SubscribeURL) {
 		return domain.AssistantOffer{}, assistantProtocolError()
 	}
 	return offer, nil

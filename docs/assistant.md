@@ -66,7 +66,7 @@ The free trial includes ten requests for thirty days, with one trial per email
 address. Register with your email, school name and privacy consent on the
 service's `/trial` page, then enter the code delivered by email. Before using
 the code, you can submit the form again to replace it if delivery failed.
-After activation, the screen shows **Free trial · N of 5 left**. An ended trial
+After activation, the screen shows **Free trial · N of 10 left**. An ended trial
 shows **Free trial ended**; exhausted annual quota shows **No requests left**.
 The controller checks account metadata without sending your draft or files,
 and refreshes that count after a request.

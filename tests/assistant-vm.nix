@@ -100,7 +100,7 @@
               wait("Assistant")
               send("m")
               wait("Welcome to Assistant")
-              wait("Start a free trial · 5 requests, no payment")
+              wait("Start a free trial · 10 requests, no payment")
               # Offer loading updates only the suffix in a differential redraw.
               wait("Subscribe")
               wait("360 € + VAT per lab / year")

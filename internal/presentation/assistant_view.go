@@ -264,7 +264,7 @@ func (model dashboardModel) assistantQuotaText() (string, bool) {
 		right = fmt.Sprintf("%d requests left", account.TurnsRemaining)
 		warn = account.TurnsRemaining <= 50
 		if account.Plan == "trial" {
-			right = fmt.Sprintf("Free trial · %d of 5 left", account.TurnsRemaining)
+			right = fmt.Sprintf("Free trial · %d of 10 left", account.TurnsRemaining)
 			warn = account.TurnsRemaining <= 1
 			if account.Status == "inactive" || account.TurnsRemaining <= 0 || model.assistant.accessError == "subscription_inactive" || model.assistant.accessError == "quota_exhausted" {
 				right, warn = "Free trial ended", true

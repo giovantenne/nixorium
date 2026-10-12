@@ -25,7 +25,7 @@ func TestAssistantPublicOfferAndFailures(t *testing.T) {
 					http.Redirect(w, r, "https://example.invalid", 307)
 					return
 				}
-				body := map[string]any{"priceText": "360 € + VAT per lab / year", "trialRequests": 5, "trialUrl": "https://assistant.example/trial", "subscribeUrl": "https://example.org/assistant/"}
+				body := map[string]any{"priceText": "360 € + VAT per lab / year", "trialRequests": 10, "trialUrl": "https://assistant.example/trial", "subscribeUrl": "https://example.org/assistant/"}
 				if mode == "unknown" {
 					body["extra"] = true
 				}
@@ -40,7 +40,7 @@ func TestAssistantPublicOfferAndFailures(t *testing.T) {
 			defer server.Close()
 			offer, err := (AssistantClient{Endpoint: server.URL + "/v1"}).Offer(t.Context())
 			if mode == "valid" {
-				if err != nil || offer.TrialRequests != 5 || !strings.Contains(offer.PriceText, "360 €") {
+				if err != nil || offer.TrialRequests != 10 || !strings.Contains(offer.PriceText, "360 €") {
 					t.Fatal(offer, err)
 				}
 			} else if err == nil {

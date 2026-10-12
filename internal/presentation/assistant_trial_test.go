@@ -55,7 +55,7 @@ func TestAssistantTrialAccountAndPurchaseGate(t *testing.T) {
 			if test.plan == "trial" {
 				quota = "Free trial ended"
 				if test.status == "active" && test.remaining > 0 {
-					quota = fmt.Sprintf("Free trial · %d of 5 left", test.remaining)
+					quota = fmt.Sprintf("Free trial · %d of 10 left", test.remaining)
 				}
 			}
 			if !strings.Contains(m.View().Content, quota) {
@@ -134,7 +134,7 @@ func TestAssistantAccountRefreshAfterTurnAndConversion(t *testing.T) {
 	}
 	updated, _ = m.Update(command())
 	m = updated.(dashboardModel)
-	if !strings.Contains(m.View().Content, "Free trial · 4 of 5 left") {
+	if !strings.Contains(m.View().Content, "Free trial · 4 of 10 left") {
 		t.Fatal("post-turn count not refreshed")
 	}
 	account = domain.AssistantAccount{Plan: "annual", Status: "active", TurnsRemaining: 1000}
