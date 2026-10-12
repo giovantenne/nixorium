@@ -155,12 +155,26 @@ estimate.
 
 ## Network interfaces
 
-`lab.ifaceName` is the compatibility fallback for every host. Deployments may
+`lab.ifaceName` is the compatibility fallback. Deployments may
 set `controllerIfaceName` and `clientIfaceName` as role defaults and use
 `hostIfaceNames.<hostname>` for exceptional hardware. Resolution order is host
 override, role override, then fallback. `labMeta.network.ifaceName` remains the
 effective controller interface for older management consumers; controller and
 client records also expose their effective interface explicitly.
+
+A host is configured by name only when it is the controller or has a
+`hostIfaceNames` entry or a `clientIfaceName`. `labMeta.clients.hosts[].ifaceExplicit`
+and `labSettings.ifaceExplicit` (passed to every module; absent means `true`)
+state this. Other clients ignore the fallback name: `modules/networking.nix`
+declares a NetworkManager profile `nixorium-lab` for any wired Ethernet device
+(DHCP plus the static lab address, no interface name), disables NetworkManager's
+automatic default profiles on those clients, and `modules/client-internet.nix`
+and `modules/firewall.nix` omit `iifname`/`oifname` from their rules
+(`lib/client-internet-rules.nix` and `lib/client-firewall-rules.nix` take
+`interface = null`). With several wired cards, only the first to come up carries
+the profile; use `hostIfaceNames` for such computers. The installer and the
+USB/SSH preparation skip the name check for these clients and use the card that
+carries the live address. See ADR 0017.
 
 ## USB/SSH client installation boundary
 

@@ -42,6 +42,7 @@ in
 
     target = {
       virtualisation = {
+        vlans = [ ];
         diskImage = "./empty0.qcow2";
         memorySize = 4096;
         useBootLoader = true;
@@ -179,6 +180,11 @@ in
     target.wait_for_unit("multi-user.target")
     target.succeed("test \"$(systemctl show virtualbox.service --property=LoadState --value)\" = not-found")
     target.succeed("test \"$(hostname)\" = pc01")
+    # The live card (eth1) and the installed card (eno7) differ from each other
+    # and from the template fallback; the installed system still gets its lab
+    # address on its only wired NIC, found by type.
+    target.succeed("test -d /sys/class/net/eno7; test ! -e /sys/class/net/enp0s3")
+    target.wait_until_succeeds("ip -4 -o address show dev eno7 | grep -F ' 10.0.0.1/24 '", timeout=120)
     target.succeed("test \"$(readlink -f /run/current-system)\" = ${clientSystem}")
     target.succeed("test \"$(nixos-version --configuration-revision)\" = ${deploymentRevision}")
   '';

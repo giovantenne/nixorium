@@ -455,7 +455,7 @@ Use the saved installation settings?
 
 Laboratory network  10.42.0.0/24
 Controller DHCP     192.168.1.123
-Client interface    enp1s0
+Client interface    automatic (wired network card)
 Client computers    5
 Accounts            admin / teacher / student
 

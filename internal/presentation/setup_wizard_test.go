@@ -176,7 +176,7 @@ func TestConfigReviewNeverRendersPasswordHash(t *testing.T) {
 	}
 }
 
-func TestClientInterfaceProposesTheControllerCardOnlyBeforeClientsExist(t *testing.T) {
+func TestClientInterfaceIsNeverCopiedFromTheControllerCard(t *testing.T) {
 	draft := func(settings domain.LabSettingsFile) string {
 		model := newSettingsEditorModel(settings, installationSettingsFields, "Install computers")
 		for index, field := range model.fields {
@@ -191,8 +191,10 @@ func TestClientInterfaceProposesTheControllerCardOnlyBeforeClientsExist(t *testi
 	settings.Lab.DeploymentMode = "controller"
 	settings.Lab.InterfaceName = "enp1s0"
 	settings.Lab.ControllerInterfaceName = "eno1"
-	if got := draft(settings); got != "eno1" {
-		t.Fatalf("first laboratory setup proposed %q, want the controller card eno1", got)
+	// Clients are matched by their wired card unless a name is saved; the
+	// controller's card name must not become every client's explicit name.
+	if got := draft(settings); got != "" {
+		t.Fatalf("first laboratory setup proposed %q, want automatic detection", got)
 	}
 	settings.Lab.DeploymentMode = "laboratory"
 	settings.Lab.PCCount = 5

@@ -876,11 +876,23 @@ ordinary TUI flow creates missing keys
 automatically; import of existing private keys is available only from
 **Maintenance → Change settings → Controller keys**.
 
-`lab.ifaceName` remains the backward-compatible fallback. Optional
-`controllerIfaceName` and `clientIfaceName` select role defaults, while
-`hostIfaceNames` can override a configured host. Precedence is host, role, then
-fallback. This permits different predictable interface names on controller and
-client hardware without changing existing deployments.
+`lab.ifaceName` remains the backward-compatible fallback for the controller.
+Optional `controllerIfaceName` and `clientIfaceName` select role defaults,
+while `hostIfaceNames` can override a configured host. Precedence is host, role,
+then fallback.
+
+The controller always uses its configured name. Client computers do not: unless
+`clientIfaceName` or a `hostIfaceNames` entry is set for them, they ignore the
+fallback name (the template's `enp0s3` is VirtualBox's) and apply DHCP and their
+static lab address to the wired Ethernet card **whatever its name**, so PCs of
+different models work without any interface setting. The temporary Internet
+block and the SSH rule from the controller are likewise independent of the name.
+Wireless cards, bridges and virtual devices are never selected. A computer with
+more than one wired card gets the lab address on only one of them (the first to
+come up, which can differ between boots) and no automatic DHCP on the others;
+give such a PC a `hostIfaceNames` entry. Set `clientIfaceName` only when every
+client really has the same card name; an explicit name keeps the name-based
+behaviour for that computer.
 The controller DHCP address must be outside the static lab prefix. Both
 validators block overlap; choose a distinct static subnet before configuring
 clients. With clients already configured, keep the current addressing and plan
@@ -888,10 +900,12 @@ recovery with the administrator rather than bypassing the managed settings block
 Field help explains each value and the
 editor previews the first/last client and controller addresses from the draft.
 The installation form asks for the client computers' interface and shows the
-controller interface separately. Before any client exists it proposes the
-controller's interface, since client PCs are often the same model; an
-installed laboratory keeps its saved value. On each PXE client, the installer checks the
-selected host's effective interface before the erase review. If it is absent,
+controller interface separately. Leave the client field empty (the default) so
+that each PC uses its wired card whatever its name; the controller's card name
+is never copied to the clients. On each PXE client whose interface name is explicit (client role or host
+override), the installer checks that interface before the erase review. Clients
+without an explicit name need no check: the installed system finds its wired
+card by type. If a configured name is absent,
 correct the client or host override on the controller, save, and prepare fresh
 installation files; the installer never changes the configuration itself. It
 names the interface the PC started from the network through, which is the
@@ -1012,7 +1026,9 @@ state by itself (a read-only status request) and names the current step and
 elapsed time; the result then says in one sentence what happened and what to
 do next, with the raw fields behind `d`.
 
-The declared client interface must carry the reviewed live address. When the
+A computer without an explicit interface name is accepted on whichever card
+carries the reviewed live address. When an explicit client or host name is set,
+that interface must carry the reviewed live address. When the
 PC is connected through a differently named card, the TUI shows both names
 before disk selection and offers to save the observed card for that computer
 only (a `hostIfaceNames` override, through the ordinary reviewed settings save).

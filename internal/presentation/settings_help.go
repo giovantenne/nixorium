@@ -11,8 +11,8 @@ type settingHelp struct{ description, example string }
 
 var settingsHelp = map[string]settingHelp{
 	"lab.controllerIfaceName": {"Network device on this controller; empty uses the shared fallback.", "enp1s0"},
-	"lab.clientIfaceName":     {"Network device used to connect client computers to the laboratory.", "enp1s0"},
-	"lab.ifaceName":           {"Device used when no controller, client or host override is set.", "enp1s0"},
+	"lab.clientIfaceName":     {"Leave empty (recommended) to use each client computer's wired network card whatever its name. Set a name only when every client has the same card name; use a per-computer override for other hardware.", "enp1s0"},
+	"lab.ifaceName":           {"Device used by the controller when no controller override is set; clients ignore it unless a client or computer name is set.", "enp1s0"},
 	"lab.masterDhcpIp":        {"PXE address hint only; changing it does not change the DHCP lease or static addresses.", "192.168.1.20"},
 	"lab.networkBase":         {"Static lab network; must not contain the controller DHCP address.", "10.0.0.0"},
 	"lab.networkPrefixLength": {"Network size in CIDR bits; /24 contains 254 usable host addresses.", "24"},

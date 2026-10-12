@@ -74,7 +74,7 @@
       });
       installerTestLab = mkLab {
         deploymentSelf = self;
-        labConfig = (import ./lab-config.nix) // { clientIfaceName = "eth1"; };
+        labConfig = import ./lab-config.nix;
         homeResetEphemeralPaths = [
           ".cache/opencode"
           ".config/opencode"
@@ -88,7 +88,10 @@
           cache = ./public-key;
           ssh = ./id_ed25519.pub;
         };
-        hostModules.pc01 = [ ./tests/client-installer-instrumentation.nix ];
+        hostModules.pc01 = [
+          ./tests/client-installer-instrumentation.nix
+          ./tests/client-installer-nic-rename.nix
+        ];
       };
       clientInstallerVmTest = pkgs.testers.runNixOSTest (import ./tests/client-installer-vm.nix {
         installerBundle = installerTestLab.packages.${system}.installerBundle;
@@ -110,7 +113,10 @@
           cache = ./tests/fixtures/remote-vm-cache-public-key;
           ssh = ./tests/fixtures/remote-vm-admin.pub;
         };
-        hostModules.pc01 = [ ./tests/client-installer-instrumentation.nix ];
+        hostModules.pc01 = [
+          ./tests/client-installer-instrumentation.nix
+          ./tests/client-installer-nic-rename.nix
+        ];
       };
       remoteClientInstallerVmTest = pkgs.testers.runNixOSTest (import ./tests/remote-client-installer-vm.nix {
         remoteInstallerBundle = remoteInstallerTestLab.packages.${system}.remoteInstallerBundle;

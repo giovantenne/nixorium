@@ -124,12 +124,9 @@ func newSettingsEditorModel(settings domain.LabSettingsFile, fields []settingsFi
 	drafts := make([]string, len(fields))
 	for index, field := range fields {
 		drafts[index] = settingFieldValue(settings, field.id)
-		// Before any client exists, client PCs are usually the same model as
-		// the controller: propose its network card. Installed laboratories
-		// keep their saved value, which their clients already use.
-		if field.id == "lab.clientIfaceName" && drafts[index] == "" && (settings.Lab.DeploymentMode == "controller" || settings.Lab.PCCount == 0) {
-			drafts[index] = settings.Lab.ControllerInterface()
-		}
+		// Client PCs are matched by their wired network card, whatever its
+		// name, unless an administrator saves a name here (ADR 0017). Never
+		// copy the controller's card name: clients often have other hardware.
 	}
 	model := settingsWizardModel{settings: settings, fields: fields, title: title, drafts: drafts, replace: true, width: 80, height: 24}
 	model.prepareCurrentField()

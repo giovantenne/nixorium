@@ -75,7 +75,7 @@ test_client_interface_mismatch_stops_before_erase() (
   trap 'rm -rf "$FIXTURE_DIR"' EXIT
   load_test_installer
   load_lab_meta
-  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","ifaceName":"enp9s0"}]'
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","ifaceName":"enp9s0","ifaceExplicit":true}]'
   load_lab_meta() { return 0; }
   connected_interface() { echo eth0; }
   if OUTPUT=$(main pc01 /dev/vda 2>&1); then
@@ -100,6 +100,25 @@ test_client_interface_uses_host_override() (
   SELECTED_HOST=pc01
   OUTPUT=$(require_client_interface)
   grep -F 'enp2s0 (present)' <<< "$OUTPUT" >/dev/null
+)
+
+test_client_interface_without_explicit_name_is_not_required() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  load_lab_meta
+  # The template fallback name is absent here, as on most real PCs.
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","ifaceName":"enp0s3","ifaceExplicit":false}]'
+  SELECTED_HOST=pc01
+  test ! -e "${NETWORK_INTERFACES_DIR}/enp0s3"
+  OUTPUT=$(require_client_interface)
+  grep -F 'detected automatically' <<< "$OUTPUT" >/dev/null
+  # Metadata without the flag keeps requiring the configured name.
+  LAB_CLIENT_HOSTS_JSON='[{"name":"pc01","ip":"10.0.0.1","ifaceName":"enp0s3"}]'
+  if require_client_interface >/dev/null 2>&1; then
+    echo "installer ignored a configured interface name" >&2
+    exit 1
+  fi
 )
 
 test_guided_success_and_reboot() (
@@ -352,6 +371,7 @@ test_guided_success_and_reboot
 test_reachable_identity_is_refused
 test_client_interface_mismatch_stops_before_erase
 test_client_interface_uses_host_override
+test_client_interface_without_explicit_name_is_not_required
 test_inexact_confirmation_changes_nothing
 test_mistyped_answers_are_asked_again
 test_empty_confirmation_cancels

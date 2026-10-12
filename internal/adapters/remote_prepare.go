@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -281,7 +282,15 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 	if err != nil {
 		return result, fmt.Errorf("run final remote inventory probe: %w", err)
 	}
-	if facts.BootID != session.Facts.BootID || !remoteFactsHaveAddress(facts, host.Interface, session.Address) {
+	// A computer without an explicit interface name is configured by its wired
+	// card whatever the name: use the card that carries the live address.
+	hostInterface := host.Interface
+	if !host.InterfaceNameRequired() {
+		if live := remoteFactsInterfaceWithAddress(facts, session.Address); live != "" {
+			hostInterface = live
+		}
+	}
+	if facts.BootID != session.Facts.BootID || !remoteFactsHaveAddress(facts, hostInterface, session.Address) {
 		return result, errors.New("live boot identity, declared NIC, or DHCP address changed during preparation")
 	}
 	if artifacts.BundleClosureBytes > ^uint64(0)/2 {
@@ -296,7 +305,7 @@ func (preparer *RemoteInstallPreparer) finalize(ctx context.Context, artifacts d
 		OperationID: artifacts.OperationID, Repository: artifacts.Repository, DeploymentRevision: artifacts.DeploymentRevision,
 		BundlePath: artifacts.BundlePath, BundleClosureBytes: artifacts.BundleClosureBytes,
 		SystemPath: artifacts.SystemPath, SystemClosureBytes: artifacts.SystemClosureBytes,
-		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: host.Interface, LiveIP: session.Address, StaticIP: host.IP},
+		Host:  domain.RemoteInstallHost{Name: host.Name, Interface: hostInterface, LiveIP: session.Address, StaticIP: host.IP},
 		Cache: cache, AdminPublicKey: artifacts.AdminPublicKey, HostKeyPublic: session.HostPublicKey,
 		HostFingerprint: session.HostFingerprint, KnownHostConflict: knownHostConflict,
 		Facts: facts, PreparedAt: preparer.now().UTC(), Issues: []domain.ValidationIssue{},
@@ -554,6 +563,22 @@ func remotePreparationHost(meta domain.LabMeta, name string) (domain.HostMeta, b
 		}
 	}
 	return domain.HostMeta{}, false
+}
+
+// remoteFactsInterfaceWithAddress names the single interface that carries the
+// address, or "" when none or several do.
+func remoteFactsInterfaceWithAddress(facts domain.RemoteMachineFacts, address string) string {
+	found := ""
+	for _, networkInterface := range facts.Interfaces {
+		if !slices.Contains(networkInterface.Addresses, address) {
+			continue
+		}
+		if found != "" {
+			return ""
+		}
+		found = networkInterface.Name
+	}
+	return found
 }
 
 func remoteFactsHaveAddress(facts domain.RemoteMachineFacts, interfaceName, address string) bool {

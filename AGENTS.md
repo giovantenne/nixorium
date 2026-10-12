@@ -217,6 +217,12 @@ any shard must block publication.
   is a full IPv4 network address and `networkPrefixLength` its CIDR prefix;
   host numbers are validated offsets. Each PC gets DHCP plus its static address
   on its resolved interface.
+  The controller always uses its resolved name. A client uses it only when
+  `clientIfaceName` or a `hostIfaceNames` entry is set (`ifaceExplicit`);
+  otherwise it gets DHCP plus the static address on the wired Ethernet card by
+  type (a NetworkManager profile), its Internet-block and SSH nftables rules
+  omit interface names, and installers skip the name check. Keep these paths
+  consistent (ADR 0017).
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
 - USB/SSH installation supports the official NixOS 26.05 Minimal ISO on
   `x86_64-linux`, UEFI, and reachable Ethernet or Wi-Fi networking. Bind the

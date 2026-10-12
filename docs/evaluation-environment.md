@@ -179,11 +179,12 @@ settings:
 | Number of client computers | `1` |
 | Controller host number | `99` |
 
-Both VMs use their first adapter for the lab, so the shared interface name fits
-both. If actual interface names differ, use the documented controller/client
-interface overrides under **Maintenance → Change settings → Network** before
-preparing clients. Do not continue with a guessed name or an override pointing
-at the controller uplink.
+The controller uses the configured name (normally `enp0s3`, detected during
+first setup). Client VMs without an explicit client or host interface name find
+their wired adapter by type, so they need no interface setting. If the
+controller's name differs, set the controller override under **Maintenance →
+Change settings → Network** before preparing clients. Do not continue with a
+guessed name or an override pointing at the controller uplink.
 
 These two subnets share the internal virtual segment: DHCP for installation,
 static `10.77.0.99` (controller) and `10.77.0.1` (`pc01`) for routine management.

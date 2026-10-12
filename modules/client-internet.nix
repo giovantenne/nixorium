@@ -3,7 +3,7 @@ let
   isClient = (labSettings.deploymentMode or "laboratory") == "laboratory"
     && hostName != labSettings.masterHostName;
   rules = pkgs.writeText "nixorium-internet-block.nft" (import ../lib/client-internet-rules.nix {
-    interface = labSettings.ifaceName;
+    interface = if labSettings.ifaceExplicit or true then labSettings.ifaceName else null;
     networkCidr = "${labSettings.networkBase}/${toString labSettings.networkPrefixLength}";
   });
   helper = pkgs.writeShellApplication {
