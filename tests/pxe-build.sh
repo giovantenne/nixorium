@@ -117,7 +117,7 @@ done
 ERROR_OUTPUT="$( (export NIXORIUM_TEST_MODE=batch-failure NIXORIUM_PXE_EVAL_BATCH=2
   build_pxe_outputs 'git+file:///deployment' "${NAMES[@]}") 2>&1 || true)"
 [[ "$ERROR_OUTPUT" == *'could not evaluate client systems pc03–pc04'* ]]
-! grep -q '^BUILD' "$NIXORIUM_TEST_LOG.evals"
+if grep -q '^BUILD' "$NIXORIUM_TEST_LOG.evals"; then exit 1; fi
 ERROR_OUTPUT="$( (export NIXORIUM_TEST_MODE=batch-failure NIXORIUM_PXE_EVAL_BATCH=1
   build_pxe_outputs 'git+file:///deployment' "${NAMES[@]}") 2>&1 || true)"
 [[ "$ERROR_OUTPUT" == *'could not evaluate client systems pc03'* && "$ERROR_OUTPUT" != *'pc03–'* ]]
