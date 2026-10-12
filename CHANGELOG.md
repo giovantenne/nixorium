@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.2.3] - 2026-10-12
+
 ### Fixed
 
 - Client computers now configure DHCP and their static lab address on the wired
@@ -1664,7 +1666,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.2...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.3...HEAD
+[3.2.3]: https://github.com/giovantenne/nixorium/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/giovantenne/nixorium/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/giovantenne/nixorium/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/giovantenne/nixorium/compare/v3.1.1...v3.2.0
