@@ -169,6 +169,9 @@ n Configure clients  ·  ↑/↓ Select  ·  Enter Open  ·  Esc Overview  ·  F
 ```text
 Nixorium  /  Overview
 
+Laboratory overview
+Choose an area with the arrows or its letter.
+
 › [c] Computers
   [n] Installation
   [w] Software
@@ -188,6 +191,9 @@ q Quit
 ```text
 Nixorium  /  Overview
 
+Laboratory overview
+Choose an area with the arrows or its letter.
+
 › [c] Computers
   [n] Installation
   [w] Software
@@ -204,6 +210,9 @@ Inventory, updating computers, Internet access and power
 ```text
 Nixorium  /  Overview
 
+Laboratory overview
+Choose an area with the arrows or its letter.
+
 › [c] Computers
   [n] Installation
   [w] Software
@@ -215,20 +224,46 @@ Inventory, updating computers, Internet access and power
 ↑/↓ Select  ·  Enter Open  ·  r Refresh local state  ·  F1 Help  ·  q Quit
 ```
 
-## Assistant welcome and offer
+## Assistant chat before activation
 
 ```text
-Assistant
+Assistant                                                                                              Not activated
+
+Try asking, for example:
+  Install GIMP and Inkscape on all student PCs
+  Block the Internet on pc01–pc06 every Tuesday 10–12
+  pc03 still shows the old wallpaper: what is wrong?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│> Describe what your lab should do                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
+```
+
+## Assistant activation offer
+
+```text
+Assistant                                                                                              Not activated
 
 Welcome to Assistant
 
-Describe what your lab should do. Assistant prepares the change, checks it with Nix, and you review it before
-anything is saved or installed.
-Each message you send uses one request.
-
-  e.g. Install GIMP and Inkscape on all student PCs
-       Block the Internet on pc01–pc06 every Tuesday 10–12
-       pc03 still shows the old wallpaper: what is wrong?
+Activate Assistant to send your request.
 
 › Start a free trial · 10 requests, no payment
   I have an activation code
@@ -237,18 +272,31 @@ Each message you send uses one request.
 ↑↓ choose · Enter confirm · Esc back
 ```
 
-## Assistant trial registration
+## Assistant trial page
 
 ```text
-Assistant
+Assistant                                                                                              Not activated
+
+Activate Assistant
+
+Open the free trial page in your browser, then press Enter to enter the code.
+
+https://assistant.nixorium.org/trial
+Enter continue · Esc back
+```
+
+## Assistant activation code
+
+```text
+Assistant                                                                                              Not activated
 
 Activate Assistant
 
 https://assistant.nixorium.org/trial
-Register with your email, then enter the code you receive.
 
 Activation code
 › Activation code
+Paste the code you receive by email.
 Enter activate · Esc back
 ```
 
@@ -319,7 +367,7 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ## Separate Assistant consent
 
 ```text
-Assistant
+Assistant                                                                                              Not activated
 
 Before you send
 
@@ -375,7 +423,7 @@ Comment (optional, max 500 characters)
 ## Assistant candidate ready
 
 ```text
-Assistant
+Assistant                                                                                              Not activated
 
  Prepare the course for pc01.
 
@@ -1174,6 +1222,9 @@ Enter Computer details  ·  Esc Back  ·  F1 Help
 
 ```text
 Nixorium  /  Overview
+
+Laboratory overview
+Items in yellow need your attention; press their number to open them.
 
   [1] Controller configuration — running
 
