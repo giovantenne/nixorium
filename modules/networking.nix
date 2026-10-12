@@ -1,4 +1,4 @@
-{ hostIp, hostName, labSettings, lib, ... }:
+{ hostIp, hostName, labSettings, lib, pkgs, ... }:
 let
   laboratoryEnabled = (labSettings.deploymentMode or "laboratory") == "laboratory";
   isController = hostName == labSettings.masterHostName;
@@ -55,8 +55,24 @@ in
     ipv6.method = "auto";
   };
   # Re-run the profile writer when its content changes during activation.
-  systemd.services.NetworkManager-ensure-profiles.serviceConfig.RemainAfterExit =
-    lib.mkIf byType true;
+  systemd.services.NetworkManager-ensure-profiles = lib.mkIf byType {
+    serviceConfig.RemainAfterExit = true;
+    path = [ pkgs.networkmanager pkgs.gawk pkgs.gnugrep ];
+    # Upgrading a running client (Colmena switch) replaces the scripted lab
+    # address with this profile: the old address is removed and the restarted
+    # NetworkManager adopts the card as "connected (externally)", which blocks
+    # autoconnect. Activate the profile explicitly, without waiting, unless it
+    # is already active or activating (normal boot).
+    postStart = ''
+      if ! nmcli -t -f NAME connection show --active | grep -Fxq nixorium-lab; then
+        device=$(nmcli -t -f DEVICE,TYPE,STATE device \
+          | awk -F: '$2 == "ethernet" && $3 != "unmanaged" { print $1; exit }')
+        if [ -n "$device" ]; then
+          nmcli -w 0 connection up nixorium-lab ifname "$device" || true
+        fi
+      fi
+    '';
+  };
 
   # The interface already exists when a controller-only installation switches
   # live to laboratory mode, so no new udev event starts this generated unit.
