@@ -6,8 +6,39 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- Add `/billing` to open a temporary Stripe Customer Portal link from Assistant
-  without using a request.
+### Added
+
+Nixorium Assistant (optional, subscription). An administrator can ask for
+help with the lab configuration from the Nixorium menu; it appears only when
+`lab.assistant` is enabled on the controller and connects to the Nixorium
+service at `assistant.nixorium.org`.
+
+- Separate activation and consent precede any content sharing. Fixed tools
+  prepare an isolated candidate; host-class evaluation and a full comparison
+  precede an explicit local save with a recoverable Git backup. Applying
+  systems remains a separately reviewed step, and settings saves preserve the
+  option.
+- Assistant can consult the pinned Nixorium source through the service. The
+  client keeps verifiable references in the conversation and sends the
+  deployment context, including the pinned core revision, at every step.
+- `/resume` reopens current conversations or reads saved and outdated chats
+  without using a request; 90 days of activity and up to 30 local
+  conversations are kept, protecting the current chat.
+- `/billing` opens a temporary Stripe Customer Portal link without using a
+  request.
+- Free trial requests remaining are shown, with a signed purchase link when the
+  trial ends. Annual quota exhaustion directs the administrator to support.
+- Answer reports and conversation sharing are explicit and off by default;
+  saved history is redacted and the service keeps it for 90 days.
+- `mkLab.groupModules` adds common modules for named client groups, with
+  consistent Assistant, update and workspace classes and offline
+  serialization. Host-specific exceptions remain separately checked.
+- `nixoriumComparisonConfigurations` makes Assistant comparisons ignore the
+  deployment revision.
+- Host representatives are evaluated in sequential batches of at most two per
+  process, within the overall time limit.
+
+## [3.2.3] - 2026-10-12
 
 ### Fixed
 
@@ -31,35 +62,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [3.2.2] - 2026-10-12
 
-- Add `/resume` to reopen current Assistant conversations or read saved and
-  outdated chats without using a request; keep 90 days of activity and up to
-  30 local conversations, protecting the current chat.
+- Publish the client preparation memory fix from 3.2.1, whose GitHub release
+  was withheld because a regression test needed a newer `jq` than the
+  validation runners provide. Client preparation evaluates client systems in
+  bounded batches and no longer runs out of memory on large laboratories.
 
-- Add explicit Assistant answer reports and optional conversation sharing, off
-  by default, with redacted saved history and 90-day service retention.
-
-- Show Assistant free trial requests remaining and a signed purchase link when
-  the trial ends. Conversion keeps the controller activated; annual quota
-  exhaustion directs the administrator to support.
-
-- Assistant can consult the pinned Nixorium source through the service. The
-  client keeps verifiable references in the conversation and sends the
-  deployment context, including the pinned core revision, at every step.
-
-- Add `nixoriumComparisonConfigurations` so Assistant comparisons ignore the
-  deployment revision.
-
-- Add `mkLab.groupModules` for common modules on named client groups, with
-  consistent Assistant/update/workspace classes and offline serialization.
-  Host-specific exceptions remain separately checked.
-
-- Add optional subscription-based Assistant, visible in the administrator menu
-  only with `lab.assistant` enabled on the controller. Separate activation and
-  consent precede content sharing. Fixed tools prepare an isolated candidate;
-  host-class evaluation and a full comparison precede an explicit local save
-  with a recoverable Git backup. Applying systems remains separately reviewed.
-  Settings saves preserve the option. Evaluate host representatives in sequential
-  batches of at most two per process while retaining the overall time limit.
+## [3.2.1] - 2026-10-12
 
 - Fix client preparation running out of memory on large laboratories. Shared
   artifacts and client systems are now evaluated in separate bounded batches
@@ -1690,7 +1698,10 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.2.3...HEAD
+[3.2.3]: https://github.com/giovantenne/nixorium/compare/v3.2.2...v3.2.3
+[3.2.2]: https://github.com/giovantenne/nixorium/compare/v3.2.1...v3.2.2
+[3.2.1]: https://github.com/giovantenne/nixorium/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/giovantenne/nixorium/compare/v3.1.1...v3.2.0
 [3.1.1]: https://github.com/giovantenne/nixorium/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/giovantenne/nixorium/compare/v3.0.0...v3.1.0
