@@ -64,8 +64,11 @@ build_pxe_outputs() {
   local START END TOTAL ARTIFACTS CLIENTS
   local BUILD_TARGETS=() OUTPUTS=()
 
-  [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] && ((10#$BATCH_SIZE >= 1 && 10#$BATCH_SIZE <= 64)) \
-    || fail "NIXORIUM_PXE_EVAL_BATCH must be an integer from 1 to 64"
+  if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]]; then
+    fail "NIXORIUM_PXE_EVAL_BATCH must be an integer from 1 to 64"
+  elif ((10#$BATCH_SIZE < 1 || 10#$BATCH_SIZE > 64)); then
+    fail "NIXORIUM_PXE_EVAL_BATCH must be an integer from 1 to 64"
+  fi
   BATCH_SIZE=$((10#$BATCH_SIZE))
   ((${#CLIENT_NAMES[@]} > 0)) || fail "labMeta contains no client hosts"
   for NAME in "${CLIENT_NAMES[@]}"; do
