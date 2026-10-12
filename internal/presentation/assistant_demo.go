@@ -5,8 +5,6 @@ import "github.com/giovantenne/nixorium/internal/domain"
 // RenderAssistantMenuDemo uses the real opt-in navigation with no service calls.
 func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
-	actions.Assistant = domain.AssistantConfig{Enabled: true,
-		Endpoint: "https://assistant.nixorium.org/v1", SubscribeURL: "https://nixorium.org/pricing/"}
 	r := newDemoRecorder(actions, revision, width, height)
 	r.capture("Assistant appears only after controller opt-in", 1200)
 	r.pressAndCapture(demoText(assistantTask.shortcut), "Open Assistant", 1200)

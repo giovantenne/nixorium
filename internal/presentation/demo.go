@@ -761,6 +761,7 @@ func demoActions() DashboardActions {
 	fail := func(name string) { panic("demo callback invoked without a synthetic implementation: " + name) }
 	return DashboardActions{
 		RunningVersion: "demo",
+		Assistant:      demoAssistantConfig(),
 		LoadInitial: func(ctx context.Context) (domain.StatusReport, domain.SetupReport, error) {
 			fail("LoadInitial")
 			return domain.StatusReport{}, domain.SetupReport{}, nil
@@ -984,4 +985,11 @@ func demoSettings() domain.LabSettingsFile {
 		AdminGitName: "Lab Administrator", AdminGitEmail: "admin@example.invalid", TimeZone: "Europe/Rome", DefaultLocale: "en_US.UTF-8", ExtraLocale: "it_IT.UTF-8",
 		KeyboardLayout: "it", ConsoleKeyMap: "it2",
 	}}
+}
+
+// demoAssistantConfig mirrors an opted-in controller; demos never set
+// AssistantService, so no scenario can reach the network.
+func demoAssistantConfig() domain.AssistantConfig {
+	return domain.AssistantConfig{Enabled: true,
+		Endpoint: "https://assistant.nixorium.org/v1", SubscribeURL: "https://nixorium.org/pricing/"}
 }
