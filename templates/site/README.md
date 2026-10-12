@@ -1136,6 +1136,26 @@ nix run .#nixorium -- pxe recover
 
 </details>
 
+### Dual boot
+
+The boot menu offers other operating systems found on the computer.
+GRUB's `os-prober` is enabled by default, so a system installed on **another**
+disk, such as Windows, is added to the menu of a Nixorium computer and students
+can start it from there. Installation always erases the whole disk chosen for
+Nixorium, including a Windows installation on that same disk.
+
+For the other system to be detected:
+
+- disable the firmware's **Fast Boot**, which may skip initializing the other
+  disks so that they are invisible during the scan;
+- disable Windows **Fast Startup** (hibernation) and shut Windows down fully,
+  because a hibernated NTFS volume cannot be read safely;
+- turn **Secure Boot** off in the firmware.
+
+The entry appears after the next update or installation of that computer, which
+regenerates its boot menu; it is not added immediately. Restart the computer
+and choose the other system in the menu.
+
 ## Updating nixorium
 
 ### Guided update
