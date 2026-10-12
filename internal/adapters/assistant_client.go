@@ -63,6 +63,14 @@ func (client AssistantClient) request(ctx context.Context, method, path, token s
 	request.Header.Set("Accept", "application/json")
 	if strings.HasSuffix(path, "/steps") {
 		request.Header.Set("Accept", "text/event-stream")
+		if step, ok := body.(domain.AssistantStepRequest); ok && step.Context != nil {
+			for _, capability := range step.Context.Capabilities {
+				if capability == "prepare_npm_v1" {
+					request.Header.Set("X-Nixorium-Capabilities", "prepare_npm_v1")
+					break
+				}
+			}
+		}
 	}
 	if token != "" {
 		if !assistantTokenPattern.MatchString(token) {

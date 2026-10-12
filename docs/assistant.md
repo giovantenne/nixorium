@@ -170,6 +170,10 @@ Import the module explicitly for the requested hosts before ordinary evaluation,
 build and SAVE review. Preparing alone changes no system or home. To update a
 baseline, prepare a new `id`, replace the scoped import, and remove the old
 generated files in the reviewed proposal.
+Controllers advertise support through the optional `X-Nixorium-Capabilities`
+HTTP header. Request/share JSON keeps its original schema: older services ignore
+the header and continue ordinary chats; newer services offer this tool only to
+capable controllers.
 
 The resolver has an empty home and no external network: a fixed Unix broker
 supplies sanitized metadata from `registry.npmjs.org`. Git, file, alias and

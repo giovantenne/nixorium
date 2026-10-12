@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,65 @@ import (
 )
 
 const assistantTestTurnID = "12345678-1234-4234-8234-123456789abc"
+
+func TestAssistantCapabilitiesHeaderPreservesLegacyStepAndSharingBodies(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]json.RawMessage
+		if json.Unmarshal(data, &body) != nil {
+			t.Fatal(string(data))
+		}
+		var context map[string]json.RawMessage
+		if json.Unmarshal(body["context"], &context) != nil {
+			t.Fatal(string(data))
+		}
+		// Model an old service's strict context validator. The optional transport
+		// header is ignored, so one ordinary step succeeds without any replay.
+		for key := range context {
+			if key != "nixorium" && key != "core" && key != "hosts" && key != "files" {
+				t.Errorf("legacy service rejected context field %q", key)
+				w.WriteHeader(400)
+				return
+			}
+		}
+		if strings.Contains(string(data), "capabilities") {
+			t.Error("capabilities leaked into shared/request JSON")
+		}
+		if strings.HasSuffix(r.URL.Path, "/steps") {
+			if r.Header.Get("X-Nixorium-Capabilities") != "prepare_npm_v1" {
+				t.Error("missing fixed header")
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, "event: final\ndata: {\"summary\":\"Ready\"}\n\n")
+		} else {
+			if r.Header.Get("X-Nixorium-Capabilities") != "" {
+				t.Error("capability header on sharing route")
+			}
+			w.WriteHeader(204)
+		}
+	}))
+	defer server.Close()
+	client := AssistantClient{Endpoint: server.URL + "/v1", Version: "3.3.0"}
+	payload := domain.AssistantStepRequest{Context: &domain.AssistantContext{Nixorium: "3.3.0", Files: []string{"flake.nix"}, Capabilities: []string{"prepare_npm_v1"}}, Messages: []domain.AssistantMessage{{Role: "user", Content: "Synthetic"}}}
+	token := strings.Repeat("t", 43)
+	if err := client.Step(t.Context(), token, assistantTestTurnID, payload, func(domain.AssistantEvent) {}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ShareConversation(t.Context(), token, assistantTestTurnID, payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ReportConversation(t.Context(), token, assistantTestTurnID, "helpful", "Synthetic", payload); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 3 {
+		t.Fatal("unexpected request replay", requests)
+	}
+}
 
 func TestAssistantClientProtocolAndContentFreeAdmission(t *testing.T) {
 	token := strings.Repeat("t", 43)
