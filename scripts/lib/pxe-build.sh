@@ -3,10 +3,20 @@
 # keeps BUILD_DIRECTORY until permanent GC roots have been installed.
 set -euo pipefail
 
-build_pxe_outputs() {
-  local FLAKE_REFERENCE="$1"
-  shift
-  local CLIENT_NAMES=("$@")
+# Every NixOS evaluation costs roughly 0.5-1.5 GB, so one evaluator covering a
+# large laboratory can exhaust controller memory. Evaluate the shared artifacts
+# and then the clients in separate, sequential `nix eval` processes of at most
+# NIXORIUM_PXE_EVAL_BATCH names (default 4). Each process exits before the next
+# starts, so peak evaluation memory is that of one batch, not of the laboratory.
+# The later `nix build` receives only resolved derivations and does not evaluate
+# NixOS configurations, so a single build process stays small and keeps the
+# existing shared scheduling of common dependencies.
+PXE_EVAL_BATCH_DEFAULT=4
+
+# Describe the selected part of the deployment as JSON. Part "artifacts" needs
+# no client names; part "clients" describes exactly the names in the JSON array.
+pxe_eval_description() {
+  local FLAKE_REFERENCE="$1" PART="$2" NAMES_JSON="$3"
   # shellcheck disable=SC2016
   local EXPRESSION='
     let
@@ -17,29 +27,72 @@ build_pxe_outputs() {
       };
       names = builtins.fromJSON (builtins.getEnv "NIXORIUM_PXE_BUILD_CLIENTS");
       boot = deployment.nixosConfigurations.netboot.config.system.build;
-    in {
-      artifacts = [
-        (describe boot.kernel)
-        (describe boot.netbootRamdisk)
-        (describe boot.netbootIpxeScript)
-        (describe deployment.packages.x86_64-linux.pxeFirmware)
-      ];
-      clients = map (name: { inherit name; } //
-        describe deployment.nixosConfigurations.${name}.config.system.build.toplevel) names;
-    }
+    in
+      if builtins.getEnv "NIXORIUM_PXE_BUILD_PART" == "artifacts" then {
+        artifacts = [
+          (describe boot.kernel)
+          (describe boot.netbootRamdisk)
+          (describe boot.netbootIpxeScript)
+          (describe deployment.packages.x86_64-linux.pxeFirmware)
+        ];
+      } else {
+        clients = map (name: { inherit name; } //
+          describe deployment.nixosConfigurations.${name}.config.system.build.toplevel) names;
+      }
   '
-  local NAME DESCRIPTION DECLARED_NAMES STORE_PATH
+  NIXORIUM_PXE_BUILD_FLAKE="$FLAKE_REFERENCE" \
+    NIXORIUM_PXE_BUILD_PART="$PART" \
+    NIXORIUM_PXE_BUILD_CLIENTS="$NAMES_JSON" \
+    nix eval --impure --json --expr "$EXPRESSION" --no-write-lock-file --no-update-lock-file
+}
+
+# Name a batch for messages: "pc05" or "pc05–pc08".
+pxe_batch_label() {
+  if (($# == 1)); then
+    printf '%s' "$1"
+  else
+    printf '%s–%s' "$1" "${*: -1}"
+  fi
+}
+
+build_pxe_outputs() {
+  local FLAKE_REFERENCE="$1"
+  shift
+  local CLIENT_NAMES=("$@")
+  local BATCH_SIZE="${NIXORIUM_PXE_EVAL_BATCH-$PXE_EVAL_BATCH_DEFAULT}"
+  local NAME DESCRIPTION DECLARED_NAMES STORE_PATH BATCH_NAMES BATCH_JSON BATCH_DESCRIPTION
+  local START END TOTAL ARTIFACTS CLIENTS
   local BUILD_TARGETS=() OUTPUTS=()
 
+  [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] && ((10#$BATCH_SIZE >= 1 && 10#$BATCH_SIZE <= 64)) \
+    || fail "NIXORIUM_PXE_EVAL_BATCH must be an integer from 1 to 64"
+  BATCH_SIZE=$((10#$BATCH_SIZE))
   ((${#CLIENT_NAMES[@]} > 0)) || fail "labMeta contains no client hosts"
   for NAME in "${CLIENT_NAMES[@]}"; do
     [[ "$NAME" =~ ^pc[0-9]+$ ]] || fail "labMeta contains invalid client name"
   done
   DECLARED_NAMES="$(printf '%s\n' "${CLIENT_NAMES[@]}" | jq -Rn '[inputs]')"
-  DESCRIPTION="$(NIXORIUM_PXE_BUILD_FLAKE="$FLAKE_REFERENCE" \
-    NIXORIUM_PXE_BUILD_CLIENTS="$DECLARED_NAMES" \
-    nix eval --impure --json --expr "$EXPRESSION" --no-write-lock-file --no-update-lock-file)" \
-    || fail "could not evaluate the required PXE artifacts and client systems"
+  TOTAL=${#CLIENT_NAMES[@]}
+
+  ARTIFACTS="$(pxe_eval_description "$FLAKE_REFERENCE" artifacts '[]')" \
+    || fail "could not evaluate the required PXE artifacts"
+  CLIENTS='[]'
+  for ((START = 0; START < TOTAL; START += BATCH_SIZE)); do
+    BATCH_NAMES=("${CLIENT_NAMES[@]:START:BATCH_SIZE}")
+    END=$((START + ${#BATCH_NAMES[@]}))
+    if declare -F publish_progress >/dev/null; then
+      publish_progress running clients \
+        "Evaluating clients $((START + 1))–$END of $TOTAL" "$START" "$TOTAL"
+    fi
+    BATCH_JSON="$(printf '%s\n' "${BATCH_NAMES[@]}" | jq -Rn '[inputs]')"
+    BATCH_DESCRIPTION="$(pxe_eval_description "$FLAKE_REFERENCE" clients "$BATCH_JSON")" \
+      || fail "could not evaluate client systems $(pxe_batch_label "${BATCH_NAMES[@]}")"
+    CLIENTS="$(jq -c --argjson more "$BATCH_DESCRIPTION" '. + ($more.clients // [])' <<<"$CLIENTS")" \
+      || fail "Nix returned an invalid PXE build description"
+  done
+  DESCRIPTION="$(jq -n --argjson artifacts "$ARTIFACTS" --argjson clients "$CLIENTS" \
+    '{artifacts: $artifacts.artifacts, clients: $clients}')" \
+    || fail "Nix returned an invalid PXE build description"
   jq -e --argjson names "$DECLARED_NAMES" '
     (.artifacts | length) == 4 and (.clients | map(.name)) == $names and
     ([.artifacts[], .clients[]] | all(
@@ -51,7 +104,7 @@ build_pxe_outputs() {
   mapfile -t OUTPUTS < <(jq -r '.artifacts[].storePath, .clients[].storePath' <<<"$DESCRIPTION")
 
   BUILD_DIRECTORY="$(mktemp -d "$STATE_DIRECTORY/.build.XXXXXX")"
-  # Build already evaluated derivations, so this second process never evaluates
+  # Build already evaluated derivations, so this final process never evaluates
   # the deployment again. Legacy literal store paths need no Flake evaluation
   # either. Temporary result roots retain all unique outputs.
   nix build "${BUILD_TARGETS[@]}" --out-link "$BUILD_DIRECTORY/result" \

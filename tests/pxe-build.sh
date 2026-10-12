@@ -26,21 +26,32 @@ case "$1" in
   eval)
     [[ "$*" == *'--no-write-lock-file --no-update-lock-file' ]]
     [[ "$NIXORIUM_PXE_BUILD_FLAKE" == git+file:///deployment* ]]
+    printf 'EVAL %s %s\n' "$NIXORIUM_PXE_BUILD_PART" "$(jq -c . <<<"$NIXORIUM_PXE_BUILD_CLIENTS")" >>"$NIXORIUM_TEST_LOG.evals"
+    if [[ "$NIXORIUM_PXE_BUILD_PART" == clients && "${NIXORIUM_TEST_MODE:-}" == batch-failure ]] \
+      && jq -e 'index("pc03")' <<<"$NIXORIUM_PXE_BUILD_CLIENTS" >/dev/null; then
+      exit 9
+    fi
     jq -n --arg first "$NIXORIUM_TEST_STORE_PATH" --arg second "$NIXORIUM_TEST_SECOND_STORE_PATH" \
-      --arg mode "${NIXORIUM_TEST_MODE:-}" --argjson names "$NIXORIUM_PXE_BUILD_CLIENTS" '
+      --arg mode "${NIXORIUM_TEST_MODE:-}" --arg part "$NIXORIUM_PXE_BUILD_PART" \
+      --argjson names "$NIXORIUM_PXE_BUILD_CLIENTS" '
       def first: {drvPath: "/nix/store/00000000000000000000000000000000-first.drv", storePath: $first};
       def second: {drvPath: "/nix/store/11111111111111111111111111111111-second.drv", storePath: $second};
-      {artifacts: [first, first, first, first],
-       clients: [({name: $names[0]} + first), ({name: $names[1]} + second)]}
-      | if $mode == "invalid" then .clients[0].storePath = "/tmp" else . end
-      | if $mode == "invalid-derivation" then .clients[0].drvPath = "/tmp/build.drv" else . end
-      | if $mode == "identity" then .clients[0].name = "pc99" else . end
+      # Odd client numbers use the first fixture output, even ones the second,
+      # independent of how the names are split into evaluation batches.
+      def client($i): {name: $names[$i]}
+        + (if ($names[$i][2:] | tonumber) % 2 == 1 then first else second end);
+      if $part == "artifacts" then {artifacts: [first, first, first, first]}
+      else {clients: [range(0; $names | length) as $i | client($i)]
+        | if $mode == "invalid" then .[0].storePath = "/tmp" else . end
+        | if $mode == "invalid-derivation" then .[0].drvPath = "/tmp/build.drv" else . end
+        | if $mode == "identity" then .[0].name = "pc99" else . end} end
     '
     ;;
   build)
     [[ "$2" == /nix/store/00000000000000000000000000000000-first.drv^out ]]
     [[ "$3" == /nix/store/11111111111111111111111111111111-second.drv^out ]]
     [[ "$4" == --out-link && "$#" -eq 5 ]]
+    printf 'BUILD\n' >>"$NIXORIUM_TEST_LOG.evals"
     [[ "${NIXORIUM_TEST_MODE:-}" != failure ]] || exit 7
     LINK="$5"
     # Reverse completion order; mapping must come from evaluated identities.
@@ -58,16 +69,59 @@ source "$REPO_ROOT/scripts/lib/pxe-build.sh"
 fail() { echo "Error: $*" >&2; exit 1; }
 
 build_pxe_outputs 'git+file:///deployment?rev=reviewed' pc02 pc01
-[[ "$(wc -l <"$NIXORIUM_TEST_LOG")" -eq 2 ]]
-[[ "${#CLIENT_PATHS[@]}" -eq 2 && "${CLIENT_PATHS[0]}" == "$NIXORIUM_TEST_STORE_PATH" ]]
-[[ "${CLIENT_PATHS[1]}" == "$NIXORIUM_TEST_SECOND_STORE_PATH" ]]
+[[ "$(wc -l <"$NIXORIUM_TEST_LOG")" -eq 3 ]]
+[[ "${#CLIENT_PATHS[@]}" -eq 2 && "${CLIENT_PATHS[0]}" == "$NIXORIUM_TEST_SECOND_STORE_PATH" ]]
+[[ "${CLIENT_PATHS[1]}" == "$NIXORIUM_TEST_STORE_PATH" ]]
 [[ "$KERNEL_PATH" == "$NIXORIUM_TEST_STORE_PATH" && -L "$BUILD_DIRECTORY/result-1" ]]
+# Default batch size 4 keeps two clients in one evaluator after the artifacts.
+[[ "$(tr '\n' '|' <"$NIXORIUM_TEST_LOG.evals")" == 'EVAL artifacts []|EVAL clients ["pc02","pc01"]|BUILD|' ]]
 for MODE in failure missing invalid invalid-derivation identity extra; do
   if (export NIXORIUM_TEST_MODE="$MODE"; build_pxe_outputs 'git+file:///deployment' pc02 pc01) >/dev/null 2>&1; then
     echo "Error: accepted $MODE build output" >&2
     exit 1
   fi
 done
+
+# Bounded batches: ceil(n/batch) client evaluations after one artifacts evaluation.
+NAMES=(pc01 pc02 pc03 pc04 pc05 pc06 pc07 pc08 pc09 pc10)
+for BATCH in 1 3 4 10 64; do
+  : >"$NIXORIUM_TEST_LOG.evals"
+  NIXORIUM_PXE_EVAL_BATCH="$BATCH" build_pxe_outputs 'git+file:///deployment' "${NAMES[@]}"
+  [[ "$(grep -c '^EVAL artifacts' "$NIXORIUM_TEST_LOG.evals")" -eq 1 ]]
+  [[ "$(grep -c '^EVAL clients' "$NIXORIUM_TEST_LOG.evals")" -eq $(((${#NAMES[@]} + BATCH - 1) / BATCH)) ]]
+  [[ "$(grep -c '^BUILD' "$NIXORIUM_TEST_LOG.evals")" -eq 1 && "$(tail -n1 "$NIXORIUM_TEST_LOG.evals")" == BUILD ]]
+  # No evaluator receives more than the batch size, and every name appears once in order.
+  grep '^EVAL clients' "$NIXORIUM_TEST_LOG.evals" | while read -r _ _ JSON; do
+    jq -e --argjson max "$BATCH" 'length >= 1 and length <= $max' <<<"$JSON" >/dev/null
+  done
+  [[ "$(grep '^EVAL clients' "$NIXORIUM_TEST_LOG.evals" | cut -d' ' -f3 | jq -sc 'add')" == "$(printf '%s\n' "${NAMES[@]}" | jq -Rnc '[inputs]')" ]]
+  # Artifacts first, then clients in declared order, as before batching.
+  [[ "$KERNEL_PATH" == "$NIXORIUM_TEST_STORE_PATH" && "$FIRMWARE_PATH" == "$NIXORIUM_TEST_STORE_PATH" ]]
+  [[ "${#CLIENT_PATHS[@]}" -eq 10 ]]
+  for INDEX in "${!NAMES[@]}"; do
+    EXPECTED="$NIXORIUM_TEST_STORE_PATH"
+    ((INDEX % 2 == 0)) || EXPECTED="$NIXORIUM_TEST_SECOND_STORE_PATH"
+    [[ "${CLIENT_PATHS[$INDEX]}" == "$EXPECTED" ]]
+  done
+done
+for BAD in 0 65 -1 abc '' 4.5; do
+  : >"$NIXORIUM_TEST_LOG.evals"
+  if (export NIXORIUM_PXE_EVAL_BATCH="$BAD"; build_pxe_outputs 'git+file:///deployment' pc01) >/dev/null 2>&1; then
+    echo "Error: accepted NIXORIUM_PXE_EVAL_BATCH=$BAD" >&2
+    exit 1
+  fi
+  [[ ! -s "$NIXORIUM_TEST_LOG.evals" ]]
+done
+# A failing batch names its hosts and stops before building.
+: >"$NIXORIUM_TEST_LOG.evals"
+ERROR_OUTPUT="$( (export NIXORIUM_TEST_MODE=batch-failure NIXORIUM_PXE_EVAL_BATCH=2
+  build_pxe_outputs 'git+file:///deployment' "${NAMES[@]}") 2>&1 || true)"
+[[ "$ERROR_OUTPUT" == *'could not evaluate client systems pc03–pc04'* ]]
+! grep -q '^BUILD' "$NIXORIUM_TEST_LOG.evals"
+ERROR_OUTPUT="$( (export NIXORIUM_TEST_MODE=batch-failure NIXORIUM_PXE_EVAL_BATCH=1
+  build_pxe_outputs 'git+file:///deployment' "${NAMES[@]}") 2>&1 || true)"
+[[ "$ERROR_OUTPUT" == *'could not evaluate client systems pc03'* && "$ERROR_OUTPUT" != *'pc03–'* ]]
+
 BEFORE="$(wc -l <"$NIXORIUM_TEST_LOG")"
 if (build_pxe_outputs 'git+file:///deployment' pc01 '../outside') >/dev/null 2>&1; then
   echo 'Error: accepted invalid client identity' >&2
@@ -118,4 +172,4 @@ EOF
   [[ "${CLIENT_PATHS[1]}" == "$KERNEL_PATH" ]]
 fi
 
-echo 'PXE grouped build regression checks completed successfully.'
+echo 'PXE batched evaluation and grouped build regression checks completed successfully.'
