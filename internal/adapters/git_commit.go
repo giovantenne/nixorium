@@ -3,6 +3,7 @@ package adapters
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -56,16 +57,85 @@ func (local Local) GitCommitProposal(ctx context.Context, repository string, pat
 	if truncated || !fullGitObjectIDPattern.MatchString(strings.TrimSpace(tree)) {
 		return domain.GitCommitProposal{}, errors.New("proposed Git tree ID is invalid")
 	}
+	rawArguments := append([]string{"diff", "--cached", "--raw", "-z", "--no-abbrev", "--no-renames", "--no-ext-diff", "--no-textconv", "HEAD", "--"}, paths...)
+	raw, rawTruncated, err := runBoundedGitEnvironment(ctx, repository, environment, maximumGitStatusBytes, rawArguments...)
+	if err != nil || rawTruncated {
+		return domain.GitCommitProposal{}, errors.New("cannot inspect proposed commit metadata")
+	}
+	type opaqueChange struct{ OldMode, NewMode, OldObject, NewObject, Status string }
+	changed := map[string]opaqueChange{}
+	records := strings.Split(raw, "\x00")
+	for index := 0; index < len(records); index += 2 {
+		if records[index] == "" {
+			continue
+		}
+		if index+1 >= len(records) {
+			return domain.GitCommitProposal{}, errors.New("incomplete proposed commit metadata")
+		}
+		fields := strings.Fields(strings.TrimPrefix(records[index], ":"))
+		if len(fields) != 5 {
+			return domain.GitCommitProposal{}, errors.New("invalid proposed commit metadata")
+		}
+		changed[records[index+1]] = opaqueChange{fields[0], fields[1], fields[2], fields[3], fields[4]}
+	}
+	if len(changed) == 0 {
+		return domain.GitCommitProposal{}, errors.New("selected paths do not differ from HEAD")
+	}
 	diffArguments := []string{"diff", "--cached", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3", "HEAD", "--"}
-	diffArguments = append(diffArguments, paths...)
-	diff, diffTruncated, err := runBoundedGitEnvironment(ctx, repository, environment, maximumGitDiffBytes, diffArguments...)
+	nativeHomeFiles := true
+	opaqueSummary := ""
+	for _, path := range paths {
+		if homeFilesImportGitPath(path) {
+			change, ok := changed[path]
+			if !ok {
+				continue
+			}
+			// Bind exact opaque bytes through the proposed tree, while keeping
+			// arbitrary imported text/binary data out of a rendered Git patch.
+			content := ""
+			if change.NewMode != "000000" {
+				content, truncated, err = runBoundedGitEnvironment(ctx, repository, environment, domain.HomeFilesMaxFileBytes, "cat-file", "blob", change.NewObject)
+				if err != nil || truncated {
+					return domain.GitCommitProposal{}, errors.New("cannot inspect bounded imported commit payload")
+				}
+				if err := rejectSecretPatch(content); err != nil {
+					return domain.GitCommitProposal{}, err
+				}
+				if fmt.Sprintf("%x", sha256.Sum256([]byte(content))) != strings.TrimPrefix(path, domain.HomeFilesDirectoryName+"/imports/") {
+					return domain.GitCommitProposal{}, errors.New("imported payload digest differs from its content-addressed name")
+				}
+			}
+			oldSize := "0"
+			if change.OldMode != "000000" {
+				oldSize, truncated, err = runBoundedGitEnvironment(ctx, repository, environment, 128, "cat-file", "-s", change.OldObject)
+				if err != nil || truncated {
+					return domain.GitCommitProposal{}, errors.New("cannot inspect old imported payload size")
+				}
+			}
+			opaqueSummary += fmt.Sprintf("Imported payload %s: %s; mode %s -> %s; bytes %s -> %d; Git blob %s -> %s\n", path, change.Status, change.OldMode, change.NewMode, strings.TrimSpace(oldSize), len(content), change.OldObject, change.NewObject)
+			continue
+		}
+		diffArguments = append(diffArguments, path)
+		if path != domain.HomeFilesFileName {
+			nativeHomeFiles = false
+		}
+	}
+	limit := maximumGitDiffBytes
+	if nativeHomeFiles {
+		limit = 2 * domain.HomeFilesMaxBytes
+	}
+	diff := ""
+	diffTruncated := false
+	if len(diffArguments) > 8 {
+		diff, diffTruncated, err = runBoundedGitEnvironment(ctx, repository, environment, limit, diffArguments...)
+	}
 	if err != nil {
 		return domain.GitCommitProposal{}, fmt.Errorf("render proposed commit: %w", err)
 	}
 	if diffTruncated {
 		return domain.GitCommitProposal{}, errors.New("proposed commit diff exceeds the 256 KiB safety limit; commit these paths manually in smaller changes")
 	}
-	if strings.TrimSpace(diff) == "" {
+	if strings.TrimSpace(diff) == "" && opaqueSummary == "" {
 		return domain.GitCommitProposal{}, errors.New("selected paths do not differ from HEAD")
 	}
 	if err := rejectSecretPatch(diff); err != nil {
@@ -73,8 +143,12 @@ func (local Local) GitCommitProposal(ctx context.Context, repository string, pat
 	}
 	return domain.GitCommitProposal{
 		TreeID: strings.TrimSpace(tree),
-		Diff:   domain.GitDiff{Scope: "proposed-commit", Content: redactGitDiff(diff)},
+		Diff:   domain.GitDiff{Scope: "proposed-commit", Content: redactGitDiff(diff) + opaqueSummary},
 	}, nil
+}
+
+func homeFilesImportGitPath(path string) bool {
+	return strings.HasPrefix(path, domain.HomeFilesDirectoryName+"/imports/") && homeFilesHashPattern.MatchString(strings.TrimPrefix(path, domain.HomeFilesDirectoryName+"/imports/"))
 }
 
 func validateGitCommitPathTypes(repository string, paths []string) error {

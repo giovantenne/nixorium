@@ -112,6 +112,19 @@ func (m *GitCommitManager) Plan(ctx context.Context, repository, requestedPaths 
 			return report
 		}
 	}
+	if containsString(paths, domain.HomeFilesFileName) {
+		reader, ok := m.source.(interface{ ReadHomeFiles(string) ([]byte, error) })
+		if !ok {
+			return gitCommitPlanIssue(report, domain.HomeFilesFileName, "initial-file schema validation is unavailable")
+		}
+		content, err := reader.ReadHomeFiles(root)
+		if err != nil {
+			return gitCommitPlanIssue(report, domain.HomeFilesFileName, "cannot read the initial-file declaration safely")
+		}
+		if _, issues := domain.DecodeHomeFilesProfile(content); len(issues) > 0 {
+			return gitCommitPlanIssue(report, domain.HomeFilesFileName, "initial-file declaration is invalid; review it in Initial files")
+		}
+	}
 	proposal, err := m.source.GitCommitProposal(ctx, root, paths)
 	if err != nil {
 		return gitCommitPlanIssue(report, "proposal", err.Error())

@@ -66,4 +66,12 @@ pkgs.runCommand "nixorium-workspace-home" { nativeBuildInputs = [ pkgs.jq ]; } '
       "$out/manifest.json" > manifest.json
     install -m 0600 manifest.json "$out/manifest.json"
   ''}
+  # Match the reset engine's complete-tree limits before a seed can be built
+  # or deployed; extension copies count alongside additional student files.
+  count=$(find "$out/home" -printf '1\n' | wc -l)
+  size=$(find "$out/home" -printf '%s\n' | awk '{total += $1} END {printf "%.0f", total}')
+  if [ "$count" -gt 8192 ] || [ "$size" -gt 268435456 ]; then
+    echo "workspace seed: complete home exceeds reset engine entry or size limits" >&2
+    exit 1
+  fi
 ''

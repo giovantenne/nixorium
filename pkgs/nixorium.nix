@@ -24,6 +24,7 @@ in
       ../tests/lab-settings-validation-cases.json
       ../tests/software-preset-validation-cases.json
       ../tests/workspace-validation-cases.json
+      ../tests/home-files-validation-cases.json
       ../tests/usb-completed-session.json
     ];
   };

@@ -22,6 +22,7 @@ const (
 var managedDeploymentPaths = map[string]bool{
 	gitRecoveryFile:          true,
 	domain.WorkspaceFileName: true,
+	domain.HomeFilesFileName: true,
 	"lab-settings.json":      true,
 	"lab-software.json":      true,
 	"keys/cache-public-key":  true,
@@ -108,6 +109,7 @@ func gitReviewDiffArguments(staged bool) []string {
 	for _, privatePath := range privateDeploymentPaths {
 		arguments = append(arguments, ":(exclude,top)"+privatePath)
 	}
+	arguments = append(arguments, ":(exclude,top)"+domain.HomeFilesDirectoryName+"/imports")
 	return arguments
 }
 
@@ -146,7 +148,7 @@ func parseRawGitPorcelain(output string) ([]domain.GitChange, error) {
 		change := domain.GitChange{
 			Path:         path,
 			OriginalPath: original,
-			Managed:      managedDeploymentPaths[filepath.ToSlash(path)] || managedDeploymentPaths[filepath.ToSlash(original)],
+			Managed:      managedDeploymentPaths[filepath.ToSlash(path)] || managedDeploymentPaths[filepath.ToSlash(original)] || homeFilesImportGitPath(path) || homeFilesImportGitPath(original),
 			Private:      isPrivateDeploymentPath(path) || isPrivateDeploymentPath(original),
 		}
 		if x == '?' && y == '?' {
