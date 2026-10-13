@@ -152,6 +152,9 @@ func runReset(config Config, restore func(string, string, int, int) error) error
 	if err := restore(resetState+"/prepared", account.home, account.uid, account.gid); err != nil {
 		return fmt.Errorf("home restore incomplete; login must remain blocked: %w", err)
 	}
+	if err := applyHomeFilesModes(config.Seed, account.home); err != nil {
+		return fmt.Errorf("home file permissions incomplete; login must remain blocked: %w", err)
+	}
 	if err := os.Chmod(account.home, 0700); err != nil {
 		return err
 	}

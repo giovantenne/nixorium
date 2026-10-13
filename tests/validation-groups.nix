@@ -3,7 +3,7 @@
 {
   checks-data = [
     "config-schema" "settings-schema" "software-schema" "software-preset-schema"
-    "workspace-schema" "workspace-resolution" "desktop-profile"
+    "workspace-schema" "home-files-schema" "home-files-seed" "workspace-resolution" "desktop-profile"
     "workspace-seed" "workspace-seed-pinned"
   ];
   checks-lab = [ "mk-lab" ];
@@ -12,7 +12,7 @@
   checks-workspace-rejection = [ "workspace-rejection" ];
   checks-workspace-runtime = [ "workspace-runtime" ];
   checks-workspace-template = [ "workspace-template" ];
-  checks-workspace-systems = [ "workspace-offline" "workspace-systems" ];
+  checks-workspace-systems = [ "workspace-offline" "workspace-systems" "home-files-adoption" ];
   checks-home-reset = [ "home-reset-filesystem-vm" "workspace-reset-service-vm" ];
   checks-editor = [ "workspace-editor-vm" "programming-profile-vm" ];
   checks-management = [ "management-vm" "assistant-vm" "host-diagnostics-vm" "telemetry-vm" "onboarding-vm" ];

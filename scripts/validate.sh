@@ -103,6 +103,8 @@ run_quick_checks() {
     software-schema \
     software-preset-schema \
     workspace-schema \
+    home-files-schema \
+    home-files-seed \
     workspace-resolution \
     documentation-check \
     nixorium \

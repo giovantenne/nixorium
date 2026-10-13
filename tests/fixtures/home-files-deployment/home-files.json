@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {"destination": "Documents/lesson.bin", "source": "imports/0e65a074a920df375483f2139a86aad84b3932e03a5f08f013ef142de1d008a9"},
+    {"destination": "Documents/start.txt", "text": "Adopted by the existing deployment.\n"}
+  ]
+}

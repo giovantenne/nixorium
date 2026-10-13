@@ -18,6 +18,14 @@ args@{
   # to the system defaults.
   workspaceProfileJSON ? builtins.toJSON { schemaVersion = 1; },
   workspaceCatalog ? { schemaVersion = 1; baseline.schemaVersion = 1; applications = []; extensions = []; },
+  # Adopt tracked initial-file declarations on existing deployment flakes too.
+  # A missing declaration keeps the previous empty additional-file baseline.
+  homeFilesJSON ? let root = if builtins.isAttrs deploymentSelf then deploymentSelf.outPath else deploymentSelf;
+    in if builtins.pathExists (root + "/home-files.json") then builtins.readFile (root + "/home-files.json")
+      else builtins.toJSON { schemaVersion = 1; },
+  homeFilesRoot ? let root = if builtins.isAttrs deploymentSelf then deploymentSelf.outPath else deploymentSelf;
+    directory = root + "/home-files";
+    in if builtins.pathExists directory then /. + builtins.unsafeDiscardStringContext (toString directory) else null,
   clientGroups ? {},
   netbootModules ? [],
   installerSource ? null,
@@ -282,6 +290,26 @@ let
     else
       throw "mkLab files must be located inside the deployment or nixorium source tree: ${valueString}";
   renderPathList = values: "[ ${builtins.concatStringsSep " " (map renderPath values)} ]";
+  safeHomeFilesRoot =
+    if homeFilesRoot == null then true
+    else let
+      root = if lib.hasPrefix "${toString deploymentRoot}/" (toString homeFilesRoot) then deploymentRoot
+        else if lib.hasPrefix "${toString upstreamRoot}/" (toString homeFilesRoot) then upstreamRoot
+        else throw "home files: source root is outside the deployment";
+      parts = lib.splitString "/" (lib.removePrefix "${toString root}/" (toString homeFilesRoot));
+      walk = directory: remaining:
+        if remaining == [] then true
+        else let name = builtins.head remaining; in
+          ((builtins.readDir directory).${name} or null) == "directory"
+          && walk (directory + "/${name}") (builtins.tail remaining);
+    in walk root parts;
+  # Defer source inspection until a value is requested: forcing deploymentSelf
+  # while discovering the output names creates a recursive flake self.
+  checkedHomeFilesRoot =
+    assert homeFilesRoot == null || (builtins.isPath homeFilesRoot && builtins.isString (renderPath homeFilesRoot))
+      || throw "mkLab homeFilesRoot must be a path inside the deployment or upstream source";
+    assert safeHomeFilesRoot || throw "mkLab homeFilesRoot must not traverse symbolic links";
+    homeFilesRoot;
   renderModuleMap = entries: "{\n${builtins.concatStringsSep "\n" (lib.mapAttrsToList
     (name: modules: "    ${builtins.toJSON name} = ${renderPathList modules};")
     entries)}\n  }";
@@ -290,6 +318,8 @@ let
   softwareCatalogJson = builtins.toFile "software-catalog.json" (builtins.toJSON softwareCatalog);
   softwarePresetsJson = builtins.toFile "software-presets.json" (builtins.toJSON softwarePresetsConfig);
   workspaceProfileFile = builtins.toFile "workspace-profile.json" workspaceProfileJSON;
+  homeFilesProfile = import ./eval-home-files.nix { inherit lib; } homeFilesJSON;
+  homeFilesFile = builtins.toFile "home-files.json" homeFilesJSON;
   workspaceCatalogFile = builtins.toFile "workspace-catalog.json" (builtins.toJSON workspaceCatalog);
   homeResetEphemeralPathsJson = builtins.toFile "home-reset-ephemeral-paths.json"
     (builtins.toJSON homeResetEphemeralPaths);
@@ -488,6 +518,8 @@ let
     import ./build-workspace-home.nix { inherit lib; pkgs = softwarePkgs; } {
       resolution = workspaceResolution;
       inherit labSettings;
+      inherit homeFilesProfile;
+      homeFilesRoot = checkedHomeFilesRoot;
     };
   installerDiskoRuntimePackages = disko.lib.packages {
     disko.devices = import (upstreamRoot + "/lib/disko-layout.nix") {
@@ -617,6 +649,8 @@ let
           softwarePresets = builtins.fromJSON (builtins.readFile ./software-presets.json);
           workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
           workspaceCatalog = builtins.fromJSON (builtins.readFile ./workspace-catalog.json);
+          homeFilesJSON = builtins.readFile ./home-files.json;
+          homeFilesRoot = ${renderPath checkedHomeFilesRoot};
           homeResetEphemeralPaths = builtins.fromJSON (builtins.readFile ./home-reset-ephemeral-paths.json);
           clientGroups = builtins.fromJSON (builtins.readFile ./client-groups.json);
           publicKeys = {
@@ -656,6 +690,7 @@ let
     install -m 0644 ${softwarePresetsJson} "$out/software-presets.json"
     install -m 0644 ${workspaceProfileFile} "$out/workspace-profile.json"
     install -m 0644 ${workspaceCatalogFile} "$out/workspace-catalog.json"
+    install -m 0644 ${homeFilesFile} "$out/home-files.json"
     install -m 0644 ${homeResetEphemeralPathsJson} "$out/home-reset-ephemeral-paths.json"
     install -m 0644 ${clientGroupsJson} "$out/client-groups.json"
     install -m 0755 ${upstreamRoot}/setup.sh "$out/setup.sh"
@@ -907,6 +942,22 @@ builtins.mapAttrs (name: value:
     else builtins.deepSeq candidate.nixoriumWorkspace candidate.nixoriumWorkspace;
   nixoriumValidateWorkspaceCandidate = rawJSON:
     builtins.deepSeq (nixoriumResolveWorkspaceCandidate rawJSON) true;
+
+  nixoriumHomeFiles = {
+    schemaVersion = 1;
+    state = "prepared";
+    managedFile = "home-files.json";
+    declared = homeFilesProfile;
+    inherit studentUser;
+    targets = workspaceResolution.targets;
+    seed = toString workspaceSeed;
+  };
+  nixoriumResolveHomeFilesCandidate = rawJSON:
+    let candidate = import ./mk-lab.nix { inherit upstreamSelf nixpkgs disko; }
+      (args // { homeFilesJSON = rawJSON; });
+    in builtins.deepSeq candidate.nixoriumHomeFiles candidate.nixoriumHomeFiles;
+  nixoriumValidateHomeFilesCandidate = rawJSON:
+    builtins.deepSeq (nixoriumResolveHomeFilesCandidate rawJSON) true;
 
   nixoriumSearchSoftwarePackages = softwarePackageTools.search;
   nixoriumResolveSoftwarePackage = softwarePackageTools.describe;

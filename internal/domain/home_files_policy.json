@@ -1,0 +1,6 @@
+{
+  "protectedRoots": [".bashrc", ".profile", ".bash_profile", ".bash_login", ".bash_logout", ".zshrc", ".zprofile", ".zlogin", ".zshenv", ".gitconfig", ".config/user-dirs.dirs", ".config/user-dirs.locale", ".config/mimeapps.list", ".config/dconf", ".config/Code", ".vscode", ".local/npm", ".npm", ".config/autostart", ".config/systemd", ".local/share/systemd", ".config/environment.d", ".config/fish", ".local/share/keyrings"],
+  "sensitiveComponents": [".git", ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker", ".codex", ".agents", ".pi", ".opencode", ".npmrc", ".netrc", "auth.json", "credentials", "credentials.json", "lab-credentials.json", "secret-key", "admin-ssh"],
+  "sensitivePrefixes": [".env"],
+  "scaffoldDirectories": [".config", ".local", ".local/share", "Desktop", "Downloads", "Templates", "Public", "Documents", "Music", "Pictures", "Videos"]
+}

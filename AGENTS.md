@@ -605,7 +605,16 @@ any shard must block publication.
   client selection requires fresh inventory, planning and confirmation. Preserve
   existing automatic controller follow-up for Software/Update only. Never infer
   activation from an unchanged declaration or reuse stale success from a prior save.
-- `lib/build-workspace-seed.nix` builds the internal preference payload from a
+- Additional non-secret initial files use the separate
+  strict `home-files.json` declaration and `mkLab.homeFilesJSON`/`homeFilesRoot`.
+  Imported payloads are content-addressed regular files under
+  `home-files/imports`; inline text stays visible configuration. Compose them
+  into the existing common seed, preserve offline inputs and reject generated
+  path collisions, credentials and startup hooks. Never infer executability
+  from a source mode. Boot restoration owns files by the student and sets
+  `0600`/`0700`, with explicit executable files `0700`; no read-only guarantee,
+  source ACLs, capabilities or privilege bits. Saving never resets a session.
+- `lib/build-workspace-seed.nix` builds the preference payload from a
   resolved workspace. Keep its dconf source separate from the compiled user
   database so reset-time wallpaper selection can be composed without losing
   preferences. Check built extension manifests against resolved identities and

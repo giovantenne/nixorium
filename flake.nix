@@ -146,6 +146,7 @@
         softwareSchemaVersion = 1;
         softwarePresetSchemaVersion = 1;
         workspaceProfileSchemaVersion = 1;
+        homeFilesVersion = 1;
         workspaceCandidateVersion = 1;
         workspaceRuntimeVersion = 2;
         packageBase = {
@@ -163,6 +164,10 @@
         };
       };
       checks.${system} = {
+        home-files-adoption = import ./tests/home-files-adoption.nix { inherit pkgs mkWorkspaceLab; };
+        home-files-seed = import ./tests/home-files-seed.nix { inherit pkgs; };
+        home-files-schema = assert (import ./tests/eval-home-files.nix { inherit (pkgs) lib; });
+          pkgs.runCommand "nixorium-home-files-schema-test" {} ''touch "$out"'';
         desktop-profile = import ./tests/desktop-profile.nix { inherit pkgs; };
         workspace-seed = import ./tests/workspace-seed.nix { inherit pkgs; };
         workspace-seed-pinned = import ./tests/workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };

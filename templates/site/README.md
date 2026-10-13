@@ -345,6 +345,15 @@ No activation, client deployment, reboot or push is included. See
 
 The template supplies `workspace-catalog.nix` and an active
 `workspace-profile.json` matching Essential without requiring VS Code.
+Additional initial student files live in `home-files.json`; the template starts
+with an empty declaration. Each file carries inline `text` or a captured
+`source` under `home-files/imports/<sha256>`, plus optional explicit
+`executable`. Empty directories use `directories`. The same seed applies to
+the student account on the controller and all clients at their next normal
+boot. Files start private (`0600`), directories `0700`, and explicitly executable
+files `0700`. Students can change their session copies. Captured materials enter
+Git, the Nix store and the installer: use non-secret materials only. Original
+controller files are never watched or copied during a boot or live activation.
 Leave it unchanged for the defaults, or customize it under **Maintenance →
 Settings → Student workspace**. There is no separate personalization switch.
 Choosing Programming at installation (or in a template reset) copies

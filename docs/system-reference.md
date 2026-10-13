@@ -468,6 +468,8 @@ installer so client installation needs no second checkout.
 | `softwareCatalog` | Deployment-owned suggested packages shown before free search; each entry has `id`, `label`, and `summary` |
 | `softwarePresets` | Optional versioned deployment-owned software-profile catalog; each profile has an ID, label, description, and package IDs |
 | `workspaceProfileJSON` | Raw JSON text of the student preferences; defaults to `{"schemaVersion":1}` |
+| `homeFilesJSON` | Raw, strict JSON for additional initial student files; defaults to a present deployment `home-files.json`, otherwise an empty declaration |
+| `homeFilesRoot` | Optional source path for captured payloads; defaults to a present deployment `home-files` directory, otherwise `null` |
 | `workspaceCatalog` | Deployment-owned baseline/application/extension catalog; defaults to an empty catalog; no implicit package installation |
 | `clientGroups` | Named sets of evaluated client identities for software scopes and group modules |
 | `publicKeys` | Harmonia and SSH public-key paths |

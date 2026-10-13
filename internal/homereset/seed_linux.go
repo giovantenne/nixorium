@@ -2,6 +2,8 @@ package homereset
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,14 +17,16 @@ import (
 	"syscall"
 
 	"github.com/giovantenne/nixorium/internal/domain"
+	"golang.org/x/sys/unix"
 )
 
 var storePath = regexp.MustCompile(`^/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[A-Za-z0-9+._?=-]+(?:/[^\x00-\x20'\\]+)*$`)
 
 type seedManifest struct {
-	SchemaVersion int             `json:"schemaVersion"`
-	Profile       json.RawMessage `json:"profile"`
-	Extensions    []seedExtension `json:"extensions"`
+	SchemaVersion int                         `json:"schemaVersion"`
+	Profile       json.RawMessage             `json:"profile"`
+	Extensions    []seedExtension             `json:"extensions"`
+	HomeFiles     []domain.HomeFilesSeedEntry `json:"homeFiles,omitempty"`
 }
 
 type seedExtension struct {
@@ -104,7 +108,7 @@ func validateSeed(seed string) error {
 			return err
 		}
 	}
-	data, err := readBounded(seed+"/manifest.json", 128*1024)
+	data, err := readBounded(seed+"/manifest.json", domain.HomeFilesMaxBytes)
 	if err != nil {
 		return err
 	}
@@ -114,6 +118,9 @@ func validateSeed(seed string) error {
 	}
 	if manifest.SchemaVersion != 1 {
 		return errors.New("unsupported seed manifest")
+	}
+	if err := validateHomeFilesManifest(seed+"/home", manifest.HomeFiles, false); err != nil {
+		return err
 	}
 	profile, issues := domain.DecodeWorkspaceProfile(manifest.Profile)
 	if len(issues) != 0 {
@@ -221,6 +228,90 @@ func validateSeed(seed string) error {
 		return errors.New("declared extension payload is missing")
 	}
 	return nil
+}
+
+// Open every component without following links, even though the tree is
+// already confined and login remains blocked throughout restoration.
+func openHomeFile(root, relative string) (*os.File, error) {
+	fd, err := unix.Open(root, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return nil, err
+	}
+	parts := strings.Split(relative, "/")
+	for index, part := range parts {
+		flags := unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC | unix.O_NONBLOCK
+		if index < len(parts)-1 {
+			flags |= unix.O_DIRECTORY
+		}
+		next, err := unix.Openat(fd, part, flags, 0)
+		unix.Close(fd)
+		if err != nil {
+			return nil, err
+		}
+		fd = next
+	}
+	return os.NewFile(uintptr(fd), relative), nil
+}
+
+func validateHomeFilesManifest(home string, entries []domain.HomeFilesSeedEntry, applyModes bool) error {
+	if len(entries) > domain.HomeFilesMaxEntries {
+		return errors.New("too many additional seed files")
+	}
+	seen := map[string]bool{}
+	total := int64(0)
+	for _, entry := range entries {
+		if !domain.ValidHomeFilesDestination(entry.Destination, false) || seen[entry.Destination] ||
+			len(entry.SHA256) != 64 || entry.Size < 0 || entry.Size > domain.HomeFilesMaxFileBytes {
+			return errors.New("invalid additional seed file metadata")
+		}
+		if _, err := hex.DecodeString(entry.SHA256); err != nil {
+			return errors.New("invalid seed digest")
+		}
+		seen[entry.Destination] = true
+		total += entry.Size
+		if total > domain.HomeFilesMaxTotalBytes {
+			return errors.New("additional seed files exceed size limit")
+		}
+		file, err := openHomeFile(home, entry.Destination)
+		if err != nil {
+			return err
+		}
+		info, err := file.Stat()
+		if err != nil || !info.Mode().IsRegular() || info.Size() != entry.Size {
+			file.Close()
+			return errors.New("additional seed file differs from manifest")
+		}
+		hash := sha256.New()
+		_, err = io.Copy(hash, io.LimitReader(file, domain.HomeFilesMaxFileBytes+1))
+		if err != nil || hex.EncodeToString(hash.Sum(nil)) != entry.SHA256 {
+			file.Close()
+			return errors.New("additional seed file digest mismatch")
+		}
+		if applyModes {
+			mode := os.FileMode(0600)
+			if entry.Executable {
+				mode = 0700
+			}
+			err = file.Chmod(mode)
+		}
+		closeErr := file.Close()
+		if err != nil || closeErr != nil {
+			return errors.Join(err, closeErr)
+		}
+	}
+	return nil
+}
+
+func applyHomeFilesModes(seed, home string) error {
+	data, err := readBounded(seed+"/manifest.json", domain.HomeFilesMaxBytes)
+	if err != nil {
+		return err
+	}
+	var manifest seedManifest
+	if err := decodeStrict(data, &manifest); err != nil {
+		return err
+	}
+	return validateHomeFilesManifest(home, manifest.HomeFiles, true)
 }
 
 func seedRelative(seed, name string) string {

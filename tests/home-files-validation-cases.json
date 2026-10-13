@@ -1,0 +1,185 @@
+{
+  "valid": [
+    {
+      "name": "empty",
+      "json": "{\"schemaVersion\": 1}",
+      "normalized": {
+        "schemaVersion": 1
+      }
+    },
+    {
+      "name": "text-and-empty-dir",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"Documents/hello.txt\", \"text\": \"Hello\\n\"}], \"directories\": [\"Documents/empty\"]}",
+      "normalized": {
+        "schemaVersion": 1,
+        "files": [
+          {
+            "destination": "Documents/hello.txt",
+            "text": "Hello\n"
+          }
+        ],
+        "directories": [
+          "Documents/empty"
+        ]
+      }
+    },
+    {
+      "name": "config",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \".config/ghostty/config\", \"text\": \"theme = dark\", \"executable\": false}]}",
+      "normalized": {
+        "schemaVersion": 1,
+        "files": [
+          {
+            "destination": ".config/ghostty/config",
+            "text": "theme = dark"
+          }
+        ]
+      }
+    },
+    {
+      "name": "script",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"bin/lesson\", \"text\": \"#!/bin/sh\\nexit 0\\n\", \"executable\": true}]}",
+      "normalized": {
+        "schemaVersion": 1,
+        "files": [
+          {
+            "destination": "bin/lesson",
+            "text": "#!/bin/sh\nexit 0\n",
+            "executable": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "import",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"Pictures/a.png\", \"source\": \"imports/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}]}",
+      "normalized": {
+        "schemaVersion": 1,
+        "files": [
+          {
+            "destination": "Pictures/a.png",
+            "source": "imports/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "duplicate",
+      "json": "{\"schemaVersion\":1,\"schemaVersion\":1}"
+    },
+    {
+      "name": "escaped-duplicate",
+      "json": "{\"schemaVersion\":1,\"files\":[{\"destination\":\"a\",\"text\":\"x\",\"te\\u0078t\":\"y\"}]}"
+    },
+    {
+      "name": "wrong-case",
+      "json": "{\"SchemaVersion\":1}"
+    },
+    {
+      "name": "file-wrong-case",
+      "json": "{\"schemaVersion\":1,\"files\":[{\"Destination\":\"a\",\"text\":\"x\"}]}"
+    },
+    {
+      "name": "null",
+      "json": "{\"schemaVersion\":1,\"files\":null}"
+    },
+    {
+      "name": "unknown",
+      "json": "{\"schemaVersion\":1,\"owner\":\"student\"}"
+    },
+    {
+      "name": "union-neither",
+      "json": "{\"schemaVersion\":1,\"files\":[{\"destination\":\"a\"}]}"
+    },
+    {
+      "name": "union-both",
+      "json": "{\"schemaVersion\":1,\"files\":[{\"destination\":\"a\",\"text\":\"x\",\"source\":\"imports/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}]}"
+    },
+    {
+      "name": "absolute",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"/etc/evil\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "traversal",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"Documents/../a\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "empty-component",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a//b\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "slash",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\\\\b\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "control",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\\nb\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "shell",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \".bashrc\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "ssh",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"Documents/.ssh/authorized_keys\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "managed",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \".config/Code/User/settings.json\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "autostart",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \".config/autostart/a.desktop\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "systemd",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \".config/systemd/user/a.service\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "env",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"Documents/.env.local\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "parent",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \".config\", \"text\": \"x\"}]}"
+    },
+    {
+      "name": "private-key",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"text\": \"-----begin openssh private key-----\"}]}"
+    },
+    {
+      "name": "multiline-key",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"text\": \"hi\\n-----BEGIN OPENSSH PRIVATE KEY-----\\nbye\"}]}"
+    },
+    {
+      "name": "password-hash",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"text\": \"$6$bad\"}]}"
+    },
+    {
+      "name": "nul-text",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"text\": \"a\\u0000b\"}]}"
+    },
+    {
+      "name": "file-prefix",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"text\": \"x\"}], \"directories\": [\"a/b\"]}"
+    },
+    {
+      "name": "file-dir",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"text\": \"x\"}], \"directories\": [\"a\"]}"
+    },
+    {
+      "name": "bad-import",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"source\": \"../b\"}]}"
+    },
+    {
+      "name": "duplicate-dir",
+      "json": "{\"schemaVersion\": 1, \"directories\": [\"a\", \"a\"]}"
+    },
+    {
+      "name": "duplicate-file",
+      "json": "{\"schemaVersion\": 1, \"files\": [{\"destination\": \"a\", \"text\": \"x\"}, {\"destination\": \"a\", \"text\": \"y\"}]}"
+    }
+  ]
+}

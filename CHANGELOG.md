@@ -8,6 +8,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Additional initial student files and empty directories through strict
+  `home-files.json`, content-addressed captured payloads and inline configuration
+  text. The common controller/client student seed retains private ownership and
+  explicit executability, takes effect only at normal boot, and is preserved in
+  the offline installer.
+
 - Assistant can read bounded diagnostics from declared computers and inspect
   saved configuration history without changing systems or Git. Updated consent
   explains the new observations and best-effort filtering before sharing them.

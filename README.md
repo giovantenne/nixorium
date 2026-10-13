@@ -194,6 +194,7 @@ and the [security policy](SECURITY.md).
 **Customize and extend**
 
 - [System and extension reference](docs/system-reference.md): `lib.mkLab`, software profiles and the [student workspace](docs/system-reference.md#workspace-preparation)
+- [Initial student files](docs/student-home-files.md): deployment-owned files, configuration text and empty directories in the common boot seed
 - [Desktop profile](docs/desktop-profile.md)
 - [Management architecture](docs/management-architecture.md) and [decision records](docs/adr/)
 

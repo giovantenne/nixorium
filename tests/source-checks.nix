@@ -22,6 +22,7 @@ let
   workspaceSchemaTest = import ./eval-workspace-profile.nix {
     inherit (pkgs) lib;
   };
+  homeFilesSchemaTest = import ./eval-home-files.nix { inherit (pkgs) lib; };
   workspaceResolutionTest = import ./resolve-workspace-profile.nix {
     inherit (pkgs) lib;
     realPkgs = import nixpkgs.outPath { inherit system; config.allowUnfree = true; };
@@ -71,6 +72,10 @@ in
   workspace-schema = assert workspaceSchemaTest; pkgs.runCommand "nixorium-workspace-schema-test" {} ''
     touch "$out"
   '';
+  home-files-schema = assert homeFilesSchemaTest; pkgs.runCommand "nixorium-home-files-schema-test" {} ''
+    touch "$out"
+  '';
+  home-files-seed = import ./home-files-seed.nix { inherit pkgs; };
   workspace-resolution = assert workspaceResolutionTest; pkgs.runCommand "nixorium-workspace-resolution-test" {} ''
     touch "$out"
   '';

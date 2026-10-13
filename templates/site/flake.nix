@@ -27,6 +27,8 @@
       workspaceArguments = {
         workspaceProfileJSON = builtins.readFile ./workspace-profile.json;
         workspaceCatalog = import ./workspace-catalog.nix;
+        homeFilesJSON = builtins.readFile ./home-files.json;
+        homeFilesRoot = ./home-files;
       };
       mkDeployment = candidateLabConfig: candidateLabSoftware:
         nixorium.lib.mkLab ({
