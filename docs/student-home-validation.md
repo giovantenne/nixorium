@@ -41,8 +41,9 @@ Later qualification results belong in this ledger with their own evidence.
 | Locked static analysis and Go vulnerability checks | PASS | `scripts/security-check.sh`; no used vulnerable symbols reported |
 | Representative controller and client systems build together | PASS | Batched `pc99` and `pc01` toplevel builds |
 | Complete evaluation/quick gate on the final integration | PASS | `./scripts/validate.sh --eval` completed, including the quick/package/guidance checks and complete mkLab evaluation |
-| Four natural-language cases through the real OpenRouter-backed Assistant | NOT RUN | Qualification pending after local core freeze |
-| Exact frozen model-generated candidate restores across two boots, including student edits and executable choice | NOT RUN | Pending the real Assistant qualification output |
+| Local production-client preflight on exact core `f568aa4` | PASS | Native capability discovery, candidate evaluation, build and ready local review completed in a synthetic fixture; private qualification helper code is not part of this public ledger |
+| Four natural-language cases through the real OpenRouter-backed Assistant | NOT RUN | Awaiting explicit authorization to send private Assistant instructions and synthetic fixture context to the provider. Automatic approval review blocked startup before any request; cost USD 0 |
+| Exact frozen model-generated candidate restores across two boots, including student edits and executable choice | NOT RUN | Awaiting the authorized Assistant qualification output. Automatic approval review blocked startup before any provider request; cost USD 0 |
 | Physical controller/student hardware, real GNOME interaction and real classroom data | NOT RUN | Outside this synthetic qualification |
 | Power-loss or injected filesystem fsync failure during native multi-file publication | NOT RUN | Partial-result classification is covered above; this separate filesystem fault was not executed |
 
