@@ -345,15 +345,6 @@ No activation, client deployment, reboot or push is included. See
 
 The template supplies `workspace-catalog.nix` and an active
 `workspace-profile.json` matching Essential without requiring VS Code.
-Additional initial student files live in `home-files.json`; the template starts
-with an empty declaration. Each file carries inline `text` or a captured
-`source` under `home-files/imports/<sha256>`, plus optional explicit
-`executable`. Empty directories use `directories`. The same seed applies to
-the student account on the controller and all clients at their next normal
-boot. Files start private (`0600`), directories `0700`, and explicitly executable
-files `0700`. Students can change their session copies. Captured materials enter
-Git, the Nix store and the installer: use non-secret materials only. Original
-controller files are never watched or copied during a boot or live activation.
 Leave it unchanged for the defaults, or customize it under **Maintenance →
 Settings → Student workspace**. There is no separate personalization switch.
 Choosing Programming at installation (or in a template reset) copies
@@ -365,6 +356,22 @@ The example file is only a reset proposal, never a fallback for a missing or
 invalid saved profile. Validation checks preferences and prerequisites for
 the student on the controller and every client, including offline evaluation.
 Staff behavior remains unchanged.
+
+Additional initial student files live in `home-files.json`; the template starts
+with an empty declaration. Each file carries inline `text` or a captured
+`source` under `home-files/imports/<sha256>`, plus optional explicit
+`executable`. Empty directories use `directories`. The same seed applies to
+the student account on the controller and all clients at their next normal
+boot. Files start private (`0600`), directories `0700`, and explicitly executable
+files `0700`. Students can change their session copies. Captured materials enter
+Git, the Nix store and the installer: use non-secret materials only. Original
+controller files are never watched or copied during a boot or live activation.
+Use **Maintenance → Change settings → Student workspace → Initial files** to capture,
+review and save files or folders, explicitly update a source, or remove a
+declaration. Saving in the TUI records exactly these paths locally. CLI
+`home-files import plan` creates a review; `home-files plan` and `home-files apply`
+review and save an operator-provided candidate with its current token. CLI
+apply remains file-only. See the [initial-file proposal boundary](skills/nixorium-maintainer/references/student-home.md#additional-initial-files).
 
 A reviewed system deployment prepares an immutable seed;
 the next normal boot restores it for the student, including controller-only

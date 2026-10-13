@@ -15,6 +15,59 @@ payload. Do not put passwords, tokens, private keys or other confidential data
 in this configuration: payloads enter Git, the Nix store, installer and cache.
 Credential marker checks are best effort, not a confidentiality guarantee.
 
+## Controller workflow
+
+Open **Maintenance → Change settings → Student workspace → Initial files**. Add a
+local file or folder, choose a relative destination in the student home, and
+review the captured tree. Tab completes a typed source path; it never imports
+an example hint. Imported files start non-executable regardless of their source
+mode. Explicitly select any files that should be executable. Update captures a
+new source for the selected destination; Remove changes the declaration.
+Neither action deletes a student's current session files.
+
+The save review lists additions, replacements, removals and permission changes,
+then the complete resulting declaration. Confirming saves the manifest and
+captured copies and records exactly those paths in local Git. Existing edits
+to the managed files require Git inspection first; unrelated index paths remain
+unchanged. Controller application and client distribution are separate reviews.
+
+The CLI can capture and review without changing the deployment:
+
+```sh
+nixorium home-files import plan --repo . --source /PRIVATE_SOURCE_DIRECTORY/course --destination Documents/Course --json
+```
+
+Save that JSON report into a private file outside the deployment. The report
+contains a candidate and a content-bound review token. `--replace` explicitly
+replaces an already declared destination tree. A raw `home-files.json` candidate
+or a draft/report can also be reviewed:
+
+```sh
+nixorium home-files plan --repo . --file /PRIVATE_TEMP_DIRECTORY/home-files-review.json --json
+```
+
+After reviewing the complete result, the operator may save with its current
+token:
+
+```sh
+nixorium home-files apply --repo . --file /PRIVATE_TEMP_DIRECTORY/home-files-review.json --expect REVIEW_TOKEN
+```
+
+Interactive apply asks for confirmation; non-interactive apply needs explicit
+`--yes`. CLI apply writes the manifest and required copies only; it does not
+commit. Review and commit these exact paths before system application. The
+ordinary TUI performs that local record as part of its visible save.
+
+Capture IDs refer to private controller state, work across CLI processes, and
+expire after 24 hours. At most 16 captures are retained. Failed or cancelled
+captures clean their own files; abandoning a TUI draft discards its captures,
+and a verified TUI commit discards its used captures. Expired or unavailable
+captures require choosing the source again. Partial saves or unconfirmed commits
+require **Maintenance → Review Git changes** (`nixorium git review`), followed by a new
+review; never replay the earlier token. Publication places verified immutable
+copies first and replaces the manifest last, without claiming an atomic
+multi-file transaction.
+
 ## Declaration
 
 ```json
@@ -53,7 +106,8 @@ validation. When omitted, it reads a present deployment-owned `home-files.json`,
 otherwise an empty declaration. `mkLab.homeFilesRoot` is an optional path inside
 the deployment or upstream source tree, defaulting to a present deployment
 `home-files` directory. This adopts the feature on older deployment flakes
-without requiring a flake edit. Explicit arguments remain authoritative. The site template
+without requiring a flake edit. Explicit arguments remain authoritative. The site
+template
 passes its `home-files.json` and `./home-files`. Existing hand-written callers
 receive the same preference/scaffold behavior when both arguments are omitted.
 
@@ -69,3 +123,6 @@ and Git history. Inline text is visible configuration and can be prepared with
 the existing candidate file tools. Tool filtering does not isolate imported
 materials from arbitrary Nix expressions evaluated in a candidate: the files
 remain build inputs. Shared materials must therefore be non-secret.
+
+See [the scenario matrix](student-home-validation.md) for executed checks,
+commands and qualification limits.

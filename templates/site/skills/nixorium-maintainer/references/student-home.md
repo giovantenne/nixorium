@@ -13,10 +13,54 @@ Inspect the existing non-secret profile and pinned capabilities. Preserve
 unrelated preferences; omission inherits and empty lists explicitly clear.
 Never replace an invalid/missing profile with an example implicitly.
 
-Only supported schema fields may enter a candidate. Unknown application
-settings, arbitrary home files, new catalogs and Nix modules are outside this
-skill. Never edit live homes, staff settings assets or reset scripts, or capture
+Only supported schema fields may enter a candidate. Additional initial files
+use the separate capability-gated workflow below. New catalogs and Nix modules
+remain outside this skill. Never edit live homes, staff settings assets or reset
+scripts, or capture
 dconf databases, browser sessions, histories, credentials or project data.
+
+## Additional initial files
+
+On pins exporting `lib.homeFilesVersion = 1`, propose `home-files.json` alongside
+the existing workspace profile. It is a strict version-1 declaration with
+`files` and `directories`. A file requires a relative `destination` and exactly
+one of inline UTF-8 `text` or `source: "imports/<sha256>"`. Source references
+identify already captured non-secret materials under `home-files/imports`;
+they are not controller or student home paths. The agent may prepare small
+requested inline text and explain existing source references, but must not read
+or copy imported payload bytes. Do not create script launch hooks, credential
+locations or generated workspace collisions. Explicit executability is a
+separate reviewed choice, never inherited from a source.
+
+The common seed supplies the student account on the controller and all clients.
+Initial files are student-owned `0600`, directories `0700`, and explicit
+executables `0700`. Students can edit or chmod their session copies; these modes
+do not provide a read-only policy. Activation never replaces a live student
+home. The next normal boot restores the declaration after system application.
+Materials enter Git, the Nix store, installer and cache: only non-secret shared
+content belongs here.
+
+Hand local acquisition to the operator at **Maintenance → Change settings → Student
+workspace → Initial files**. The product captures a private copy, reviews its
+paths, sizes, digests and modes, and saves only after operator confirmation.
+Updating a source requires another explicit capture; original controller files
+are not watched. Capture IDs expire after 24 hours and refer to private local
+state, not source bytes included in an agent proposal. The agent must not run
+capture planning, apply, Git mutations or confirmations automatically.
+
+For a separate agent-prepared candidate, inspect current help and use only
+read-only review:
+
+```sh
+nixorium home-files plan --repo . --file /PRIVATE_TEMP_DIRECTORY/home-files.json --json
+```
+
+Hand the result to the operator. TUI confirmation also records exact paths
+locally; human CLI apply remains file-only. Controller application and client
+distribution retain separate reviews. Changed source or capture bytes require
+a fresh review; partial storage results require operator Git inspection, never
+token replay. Older pins need an operator-reviewed Nixorium update, rather than
+copied modules or login scripts.
 
 ## Review and save a profile
 
@@ -71,8 +115,9 @@ profile re-save; explain broad impact and hand off.
 ## Desktop, project content and reset failures
 
 Use supported desktop/dock/browser fields and existing application IDs.
-New assets, desktop modules, arbitrary project scaffolds and prepopulated npm
-content are outside the schema. Explain the limitation rather than adding
+New desktop modules and prepopulated npm content are outside the schema.
+Requested non-secret initial materials use the additional-file schema above.
+Explain other limitations rather than adding
 login scripts or changing staff settings.
 
 Student npm globals and agent credentials/state are ephemeral and excluded
