@@ -57,6 +57,9 @@ func (model dashboardModel) saveFollowupState() (saved bool, revision string) {
 	case dashboardWorkspace:
 		r := model.workspace.result
 		return !r.HasErrors() && !r.RecoveryRequired && r.State == "saved" && r.Recorded, r.Revision
+	case dashboardHomeFiles:
+		r := model.homeFiles.result
+		return !r.HasErrors() && !r.RecoveryRequired && r.State == "saved" && r.Recorded, r.Revision
 	}
 	return false, ""
 }

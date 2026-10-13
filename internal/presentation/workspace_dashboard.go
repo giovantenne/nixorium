@@ -127,6 +127,8 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 	}
 	if model.workspace.loaded.HasErrors() || model.workspace.loaded.Inspection == nil {
 		switch key.String() {
+		case "enter":
+			return model.openHomeFiles()
 		case "esc":
 			model.screen = dashboardSettings
 			model.message = ""
@@ -147,6 +149,9 @@ func (model dashboardModel) updateWorkspaceKey(key tea.KeyPressMsg) (tea.Model, 
 		case "down", "j":
 			model.workspace.group = min(len(workspaceGroups)-1, model.workspace.group+1)
 		case "enter":
+			if workspaceGroups[model.workspace.group] == "Initial files" {
+				return model.openHomeFiles()
+			}
 			model.workspace.cursor = 0
 			model.workspace.stage = workspaceFieldList
 			model.message = ""
@@ -260,8 +265,8 @@ func (model dashboardModel) workspaceView() string {
 			actions = []tuiAction{{key: "F1", label: "Help"}}
 		}
 	} else if w.loaded.HasErrors() || w.loaded.Inspection == nil {
-		lines = append(lines, "", "Workspace metadata could not be loaded.", "Check the deployment pin, catalog and prerequisites.")
-		actions = append([]tuiAction{{key: "r", label: "Retry"}}, actions...)
+		lines = append(lines, "", "Preference metadata could not be loaded.", "Check the deployment pin, catalog and prerequisites.", "", tuiSelection("Initial files", true, model.isDark))
+		actions = append([]tuiAction{{key: "Enter", label: "Initial files"}, {key: "r", label: "Retry preferences"}}, actions...)
 	} else {
 		resolved := w.loaded.Inspection.Resolution
 		switch w.stage {

@@ -16,7 +16,7 @@ type workspaceField struct {
 	choices []string
 }
 
-var workspaceGroups = []string{"Desktop", "Dock", "VSCode", "Browser"}
+var workspaceGroups = []string{"Desktop", "Dock", "VSCode", "Browser", "Initial files"}
 
 var workspaceFields = []workspaceField{
 	{"Desktop", "Favorite applications (ordered)", []string{"desktop", "favorites"}, "favorites", nil},

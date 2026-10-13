@@ -88,32 +88,38 @@ type DashboardActions struct {
 	// choice.
 	ApplyDeploymentQueued func(context.Context, domain.DeploymentPlanReport, func(domain.DeploymentProgress)) domain.DeploymentExecutionReport
 	// LoadDeferredUpdates and CancelDeferredUpdates show and edit the queue.
-	LoadDeferredUpdates    func(context.Context) domain.DeferredUpdateStatus
-	CancelDeferredUpdates  func([]string) error
-	PlanController         func(context.Context) domain.ControllerRebuildPlanReport
-	ApplyController        func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
-	LoadControllerProgress func() (domain.OperationProgress, error)
-	LoadServices           func(context.Context) domain.ServicesReport
-	RestartService         func(string) domain.ServiceActionReport
-	LoadLogs               func(context.Context) domain.OperationLogsReport
-	LoadLog                func(context.Context, string) domain.OperationLogReport
-	LoadGitReview          func(context.Context) domain.GitReviewReport
-	PlanGitCommit          func(context.Context, string) domain.GitCommitPlanReport
-	PlanGitDiscard         func(context.Context, string) domain.GitCommitPlanReport
-	ApplyGitDiscard        func(domain.GitCommitPlanReport) domain.GitCommitReport
-	ApplyGitCommit         func(domain.GitCommitPlanReport) domain.GitCommitReport
-	CheckUpdate            func(context.Context) domain.UpdateCheckReport
-	PlanUpdate             func(context.Context, string, bool, bool) domain.UpdatePlanReport
-	PlanUpdateWithProgress func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
-	SaveUpdate             func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	LoadPackageBase        func(context.Context) domain.PackageBaseStatus
-	PlanPackageBase        func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
-	SavePackageBase        func(domain.UpdatePlanReport) domain.UpdateApplyReport
-	SettingsRepairIssues   func() []domain.ValidationIssue
-	LoadSettings           func(context.Context) (domain.LabSettingsFile, error)
-	LoadWorkspace          func(context.Context) domain.WorkspacePlanReport
-	PlanWorkspace          func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
-	SaveWorkspace          func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
+	LoadDeferredUpdates     func(context.Context) domain.DeferredUpdateStatus
+	CancelDeferredUpdates   func([]string) error
+	PlanController          func(context.Context) domain.ControllerRebuildPlanReport
+	ApplyController         func(domain.ControllerRebuildPlanReport) domain.ControllerRebuildExecutionReport
+	LoadControllerProgress  func() (domain.OperationProgress, error)
+	LoadServices            func(context.Context) domain.ServicesReport
+	RestartService          func(string) domain.ServiceActionReport
+	LoadLogs                func(context.Context) domain.OperationLogsReport
+	LoadLog                 func(context.Context, string) domain.OperationLogReport
+	LoadGitReview           func(context.Context) domain.GitReviewReport
+	PlanGitCommit           func(context.Context, string) domain.GitCommitPlanReport
+	PlanGitDiscard          func(context.Context, string) domain.GitCommitPlanReport
+	ApplyGitDiscard         func(domain.GitCommitPlanReport) domain.GitCommitReport
+	ApplyGitCommit          func(domain.GitCommitPlanReport) domain.GitCommitReport
+	CheckUpdate             func(context.Context) domain.UpdateCheckReport
+	PlanUpdate              func(context.Context, string, bool, bool) domain.UpdatePlanReport
+	PlanUpdateWithProgress  func(context.Context, string, bool, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	SaveUpdate              func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	LoadPackageBase         func(context.Context) domain.PackageBaseStatus
+	PlanPackageBase         func(context.Context, string, bool, func(domain.UpdatePlanProgress)) domain.UpdatePlanReport
+	SavePackageBase         func(domain.UpdatePlanReport) domain.UpdateApplyReport
+	SettingsRepairIssues    func() []domain.ValidationIssue
+	LoadSettings            func(context.Context) (domain.LabSettingsFile, error)
+	LoadWorkspace           func(context.Context) domain.WorkspacePlanReport
+	PlanWorkspace           func(context.Context, domain.WorkspaceProfile) domain.WorkspacePlanReport
+	SaveWorkspace           func(domain.WorkspacePlanReport) domain.WorkspaceApplyReport
+	LoadHomeFiles           func(context.Context) domain.HomeFilesPlanReport
+	CaptureHomeFiles        func(context.Context, string, string) domain.HomeFilesCaptureReport
+	DiscardHomeFilesCapture func(context.Context, string) error
+	CompleteHomeFilesPath   func(context.Context, string) ([]string, error)
+	PlanHomeFiles           func(context.Context, domain.HomeFilesDraft) domain.HomeFilesPlanReport
+	SaveHomeFiles           func(domain.HomeFilesPlanReport) domain.HomeFilesApplyReport
 	// ResolveMarketplace downloads one Marketplace version into the store
 	// and proposes a pin; it never writes deployment files.
 	ResolveMarketplace     func(context.Context, string) domain.WorkspaceMarketplaceReport
@@ -196,6 +202,7 @@ const (
 	dashboardShutdownReview
 	dashboardShutdownResult
 	dashboardWorkspace
+	dashboardHomeFiles
 	dashboardSupport
 	dashboardTelemetry
 	dashboardTemplateReset
@@ -321,6 +328,7 @@ type maintenanceModel struct {
 	gitCommitPlan    domain.GitCommitPlanReport
 	gitCommitResult  domain.GitCommitReport
 	gitFromWorkspace bool
+	gitFromHomeFiles bool
 }
 
 // installationModel owns guided installation and PXE lifecycle state,
@@ -451,6 +459,7 @@ type dashboardModel struct {
 	updates                updateModel
 	settings               settingsModel
 	workspace              workspaceModel
+	homeFiles              homeFilesModel
 	updateNotification     domain.UpdateNotification
 	telemetry              telemetryModel
 	support                supportModel
@@ -1218,6 +1227,8 @@ func (model dashboardModel) View() tea.View {
 		content = model.softwareView()
 	case dashboardWorkspace:
 		content = model.workspaceView()
+	case dashboardHomeFiles:
+		content = model.homeFilesView()
 	case dashboardInternet:
 		content = model.internetView()
 	case dashboardLock:
@@ -1539,6 +1550,10 @@ func (model dashboardModel) gitReviewView() string {
 	}
 	path := []string{"Maintenance", "Changes"}
 	backLabel := "Maintenance"
+	if model.maintenance.gitFromHomeFiles {
+		path = []string{"Settings", "Student workspace", "Initial files", "Changes"}
+		backLabel = "Initial files"
+	}
 	if model.maintenance.gitFromWorkspace {
 		path = []string{"Settings", "Student workspace", "Changes"}
 		backLabel = "Workspace"

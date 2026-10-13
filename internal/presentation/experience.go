@@ -311,7 +311,7 @@ func (model dashboardModel) helpView() string {
 		lines = append(lines, "After saving, Enter opens a separate controller review; after verified application it opens client selection. Esc leaves the result.")
 	case dashboardWorkspace:
 		lines = append(lines,
-			"Choose Desktop, Dock, VSCode or Browser, then a supported field.",
+			"Choose Desktop, Dock, VSCode or Browser, then a supported field. Initial files opens the shared student-home content editor.",
 			"Inherit keeps the deployment baseline; Clear means an explicit empty list.",
 			"In a list: Space toggles, i inherits, c clears; Shift arrows reorder favorites.",
 			"Extensions: / searches all extensions available in this laboratory’s package versions.",
@@ -326,6 +326,16 @@ func (model dashboardModel) helpView() string {
 			"Enter then opens a separate controller review. Runtime opt-in, deployment and home reset are never automatic.",
 			"A partial save opens Git review for inspection; do not replay the old save or apply systems before recovery.")
 		lines = append(lines, "Packaged extension updates use Maintenance → Update system and packages, which can also change the editor, desktop and operating system.")
+	case dashboardHomeFiles:
+		lines = append(lines,
+			"a imports a local controller file or directory; Tab completes the source path. Destinations are relative to the student's home.",
+			"Choose non-secret educational materials. Imported copies enter the configuration, Nix store, installer and cache; never import keys or credentials.",
+			"Review every captured file and empty directory. Space changes executability for the selected file; the default is off.",
+			"u chooses a source again for the selected file or directory; d removes its declaration. The original source path is never saved.",
+			"Files are owned by the student: 0600 normally, 0700 when executable; directories 0700. Source permissions, ACLs, attributes and links are not inherited.",
+			"The student can edit these files and their modes during the session. Saving records only the reviewed copies locally.",
+			"v reviews the complete draft; type SAVE to save and record it. Computer application is separate, and the home is restored on the next boot.",
+			"Esc cancels reads and drafts. Cancelled or late reads cannot save. A partial save requires Git inspection before system application.")
 	case dashboardTemplateReset:
 		lines = append(lines,
 			"Choose a software preset from the exact framework revision already locked in this deployment.",
@@ -587,6 +597,8 @@ func (model dashboardModel) textEntry() bool {
 		return model.software.acceptsText()
 	case dashboardWorkspace:
 		return model.workspace.textEntry()
+	case dashboardHomeFiles:
+		return model.homeFiles.textEntry()
 	case dashboardTemplateReset:
 		return model.templateReset.stage == "review"
 	default:

@@ -908,6 +908,192 @@ Shift ↑/↓ changes the order of the selected favorite.
 Space Toggle  ·  i Inherit  ·  c Clear  ·  Enter Keep draft  ·  Esc Cancel field  ·  F1 Help
 ```
 
+## Initial files at 80x24
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+Captured 2 files · 2 directories · 8.1 KiB
+Captured copies are reviewed below; executability starts off.
+
+› Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
+  Documents/Lessons/run.sh · 96 B · 0600 · not executable
+  Documents/Lessons/ · 0700
+  Documents/Lessons/Empty/ · 0700
+1–4 of 4 captured entries
+
+Student ownership; source owner/group, permissions, ACLs and attributes
+are not inherited. Links and special files are rejected.
+
+↑/↓ Select  ·  Space Executable  ·  Enter Keep copies in draft
+Esc Cancel  ·  F1 Help
+```
+
+## Initial-file path completion
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+Choose a local controller file or directory.
+Import only non-secret educational materials.
+Copies are saved in Git, the Nix store, installer and cache.
+
+Source: /demo/materials/Lessons/_
+/demo/materials/Lessons/
+
+Tab Complete path  ·  Enter Continue  ·  Esc Cancel  ·  F1 Help
+```
+
+## Initial-file copy and executable review
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+Captured 2 files · 2 directories · 8.1 KiB
+Captured copies are reviewed below; executability starts off.
+
+  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
+› Documents/Lessons/run.sh · 96 B · 0700 · executable
+  Documents/Lessons/ · 0700
+  Documents/Lessons/Empty/ · 0700
+1–4 of 4 captured entries
+
+Student ownership; source owner/group, permissions, ACLs and attributes
+are not inherited. Links and special files are rejected.
+
+↑/↓ Select  ·  Space Executable  ·  Enter Keep copies in draft  ·  Esc Cancel  ·  F1 Help
+```
+
+## Initial-file declaration review
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+Initial files review: READY
+Student: student · controller + 2 clients (shared seed)
+Declaration changes:
+  add Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
+  add Documents/Lessons/run.sh · 96 B · 0700 · executable
+  add Documents/Lessons/Empty/ · 0 B · 0700 directory
+Student-owned files 0600; executable files 0700; directories 0700.
+Source owner/group, permissions, ACLs, attributes and links are not inherited.
+Copies enter Git, the Nix store, installer and cache. Never import secrets.
+Save changes local configuration only. Apply systems separately; files restore at next boot.
+Complete draft: 2 files · 2 directories · 8.1 KiB
+  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
+  Documents/Lessons/run.sh · 96 B · 0700 · executable
+  Documents/Lessons/ · 0700
+Review lines 1–14 of 21
+
+Save and record the manifest and reviewed copies locally.
+Type SAVE: _
+
+↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
+```
+
+## Initial-file removal and mode-change review
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+Initial files review: READY
+Student: student · controller + 2 clients (shared seed)
+Declaration changes:
+  remove Documents/Lessons/previous.pdf · 4.0 KiB · 0600 · not executable
+  replace Documents/Lessons/lesson.pdf · 4.0 KiB → 8.0 KiB · 0600 · not executable → 0600 · not executable
+  permissions Documents/Lessons/run.sh · 0600 · not executable → 0700 · executable
+  add Documents/Lessons/Empty/ · 0 B · 0700 directory
+Student-owned files 0600; executable files 0700; directories 0700.
+Source owner/group, permissions, ACLs, attributes and links are not inherited.
+Copies enter Git, the Nix store, installer and cache. Never import secrets.
+Save changes local configuration only. Apply systems separately; files restore at next boot.
+Complete draft: 2 files · 2 directories · 8.1 KiB
+  Documents/Lessons/lesson.pdf · 8.0 KiB · 0600 · not executable
+  Documents/Lessons/run.sh · 96 B · 0700 · executable
+Review lines 1–14 of 22
+
+Save and record the manifest and reviewed copies locally.
+Type SAVE: _
+
+↑/↓ Scroll  ·  Enter Save copies  ·  Esc Cancel  ·  F1 Help
+```
+
+## Initial-file protected save
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+
+⣾  Rechecking, saving and recording the reviewed initial files
+
+Elapsed: 0s · Cannot be interrupted; wait for the result.
+
+F1 Help
+```
+
+## Initial files saved without activation
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+✓ SAVED
+
+Initial-file manifest and reviewed copies saved and recorded locally.
+✓ Configuration — Saved locally
+! This controller — Needs applying
+○ Client computers — Not updated here; unknown until checked
+
+Current student sessions stay unchanged. After system application,
+the saved files are restored at the next boot.
+
+Enter Apply to this controller  ·  Esc Workspace  ·  F1 Help
+```
+
+## Initial-file partial save
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+! PARTIAL
+
+Captured copies saved; the local Git record could not be confirmed. Inspect Git before applying systems.
+! Configuration — Save needs recovery
+○ This controller — Unknown; not checked here
+○ Client computers — Unknown until checked; none updated here
+Inspect the local record before applying systems; never replay this save.
+
+Current student sessions stay unchanged. After system application,
+the saved files are restored at the next boot.
+
+g Inspect Git state  ·  Esc Workspace  ·  F1 Help
+```
+
+## Initial-file source refusal
+
+```text
+Nixorium  /  Settings  /  Student workspace  /  Initial files
+
+Initial files
+Choose a local controller file or directory.
+Import only non-secret educational materials.
+Copies are saved in Git, the Nix store, installer and cache.
+
+Source: /demo/materials_
+
+! The folder contains a symbolic link. Choose a clean materials folder without links, keys or credentials; no
+copies were added.
+
+Tab Complete path  ·  Enter Continue  ·  Esc Cancel  ·  F1 Help
+```
+
 ## Student workspace declaration review
 
 ```text

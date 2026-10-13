@@ -112,6 +112,10 @@ func renderGallery() string {
 	bundle := presentation.RenderDemoBundle(demoRevision, demoDate)
 	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderOnboardingDemo(demoRevision, 120, 30))
 	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderAssistantMenuDemo(demoRevision, 120, 30))
+	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderHomeFilesDemo(demoRevision, 120, 30))
+	compactHomeFiles := presentation.RenderHomeFilesDemo(demoRevision, 80, 24)
+	compactHomeFiles.ID = "student-initial-files-compact"
+	bundle.Scenarios = append(bundle.Scenarios, compactHomeFiles)
 	frames := []galleryFrame{
 		{title: "Operational disclaimer", scenarioID: "onboarding", label: "Read the operational disclaimer"},
 		{title: "Optional adoption statistics", scenarioID: "onboarding", label: "Choose optional adoption statistics"},
@@ -149,6 +153,15 @@ func renderGallery() string {
 		{title: "Restricted teacher dashboard", scenarioID: "classroom", label: "Overview"},
 		{title: "Teacher restart review", scenarioID: "classroom", label: "Review the client restart"},
 		{title: "Student workspace favorites", scenarioID: "student-workspace", label: "Keep only the editor in the draft favorites"},
+		{title: "Initial files at 80x24", scenarioID: "student-initial-files-compact", label: "Captured files and empty directories"},
+		{title: "Initial-file path completion", scenarioID: "student-initial-files", label: "Local source selection with completion"},
+		{title: "Initial-file copy and executable review", scenarioID: "student-initial-files", label: "Explicit executable choice for one file"},
+		{title: "Initial-file declaration review", scenarioID: "student-initial-files", label: "Initial-file save review"},
+		{title: "Initial-file removal and mode-change review", scenarioID: "student-initial-files", label: "Review removals, replacements and mode changes"},
+		{title: "Initial-file protected save", scenarioID: "student-initial-files", label: "Protected initial-file save"},
+		{title: "Initial files saved without activation", scenarioID: "student-initial-files", label: "Saved copies await separate system application"},
+		{title: "Initial-file partial save", scenarioID: "student-initial-files", label: "Partial initial-file save requires inspection"},
+		{title: "Initial-file source refusal", scenarioID: "student-initial-files", label: "Rejected source selection has an actionable next step"},
 		{title: "Student workspace declaration review", scenarioID: "student-workspace", label: "Review the declaration without activating a system"},
 		{title: "Student workspace saved and recorded, not deployed", scenarioID: "student-workspace", label: "Saved and recorded does not mean deployed"},
 		{title: "Separate controller review after a workspace save", scenarioID: "student-workspace", label: "Review controller application separately after saving"},

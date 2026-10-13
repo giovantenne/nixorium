@@ -136,6 +136,10 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		return model.finishSupportExport(message)
 	case dashboardWorkspacePlanMsg:
 		return model.finishWorkspacePlan(message)
+	case homeFilesReadMsg:
+		return model.finishHomeFilesRead(message)
+	case homeFilesSaveMsg:
+		return model.finishHomeFilesSave(message)
 	case dashboardWorkspaceSaveMsg:
 		return model.finishWorkspaceSave(message)
 	case dashboardWorkspaceSearchMsg:
@@ -1318,6 +1322,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 	if model.read.cancel == nil && model.screen == dashboardWorkspace && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
 		return model.updateWorkspaceKey(key)
 	}
+	if model.read.cancel == nil && model.screen == dashboardHomeFiles && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
+		return model.updateHomeFilesKey(key)
+	}
 	if model.read.cancel == nil && model.screen == dashboardTemplateReset && key.String() != "ctrl+c" && (key.String() != "q" || model.textEntry()) {
 		return model.updateTemplateResetKey(key)
 	}
@@ -1402,7 +1409,7 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		model.deployment.confirmation = ""
 		return model, nil
 	}
-	if (key.String() == "ctrl+c" || key.String() == "q") && ((model.busy != "" && !model.hasCancellableRead() && !model.installation.pxePreparing) || model.hostTrust.applying || model.deployment.applying || model.controller.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
+	if (key.String() == "ctrl+c" || key.String() == "q") && ((model.busy != "" && !model.hasCancellableRead() && !model.installation.pxePreparing) || model.hostTrust.applying || model.deployment.applying || model.controller.applying || model.updates.applying || model.settings.applying || model.workspace.saving || model.homeFiles.saving || model.support.saving || model.templateReset.saving || model.software.mutating() || model.shutdown.applying || model.internet.applying) {
 		model.message = "Changes are being applied. Wait for the result before closing Nixorium."
 		return model, nil
 	}

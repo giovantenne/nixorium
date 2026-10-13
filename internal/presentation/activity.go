@@ -102,6 +102,7 @@ func (model dashboardModel) cancelActivity() dashboardModel {
 	model.read.cancelRead()
 	model.inventory.cancelRead()
 	model.workspace.cancelRead()
+	model.homeFiles.requestID++
 	model.support.cancelRead()
 	model.templateReset.cancelRead()
 	if model.hostTrust.cancel != nil {

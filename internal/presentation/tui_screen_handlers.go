@@ -108,6 +108,7 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		})
 	case "g":
 		model.maintenance.gitFromWorkspace = model.screen == dashboardWorkspace
+		model.maintenance.gitFromHomeFiles = model.screen == dashboardHomeFiles
 		model.maintenance.gitCommitResult = domain.GitCommitReport{}
 		model.screen = dashboardGitReview
 		model.busy = "Reviewing Git changes without modifying the worktree"
@@ -962,6 +963,11 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 		if model.maintenance.gitCommitResult.Operation != "" {
 			switch key.String() {
 			case "enter", "esc", "left":
+				if model.maintenance.gitFromHomeFiles {
+					model.screen = dashboardHomeFiles
+					model.message = ""
+					return model, nil
+				}
 				if model.maintenance.gitFromWorkspace {
 					model.screen = dashboardWorkspace
 					model.message = ""
@@ -991,6 +997,11 @@ func (model dashboardModel) updateRepositoryScreenKey(key tea.KeyPressMsg) (tea.
 		maximum := maximumGitReviewScroll(model.maintenance.gitReview, model.gitReviewHeight())
 		switch key.String() {
 		case "esc", "left":
+			if model.maintenance.gitFromHomeFiles {
+				model.screen = dashboardHomeFiles
+				model.message = ""
+				return model, nil
+			}
 			if model.maintenance.gitFromWorkspace {
 				model.screen = dashboardWorkspace
 				model.message = ""
