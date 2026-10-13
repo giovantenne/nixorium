@@ -205,6 +205,37 @@ Known private paths and unsafe historical content are refused or omitted before
 capture. Hidden, untracked and student home files stay outside this tool; it
 never changes the index, worktree, refs or a remote.
 
+### Native initial home files
+
+On supported pinned upstreams, Assistant can author ordinary UTF-8 files and
+empty directories in `home-files.json` using its existing candidate file tools.
+The `home_files_v1` advisory capability uses the optional HTTP header; discovery
+reads only the input's pure `lib.homeFilesVersion` marker, with offline,
+no-lock-update and no-IFD evaluation, once per immutable conversation baseline.
+It never runs during TUI startup. Absent or unavailable metadata omits the
+capability, and the service gives clear Update Nixorium guidance rather than
+proposing declarations or ordinary-file copy services on older controllers.
+The existing evaluate, build and reviewed SAVE boundaries still apply.
+
+Local imports are opaque to model-facing file tools: `home-files/imports/` and
+identical blob aliases are withheld from read, list, search and Git history.
+The controller identifies import blobs throughout the baseline's ancestry, so
+renamed/copied payloads stay withheld even when neither compared endpoint
+contains the original import path. A bounded, unavailable or excessive history
+check fails closed instead of silently exposing bytes. Evaluation keeps the
+complete tracked source, including imports; inline text authored in the visible
+JSON remains readable. Import selection and byte inspection are local workflows.
+
+This is a file-tool privacy boundary, not a secret storage facility or an
+absolute sandbox against arbitrary Nix expressions. Imports are non-secret
+teaching materials committed to Git, copied into the Nix store and distributed
+to the applicable computers. The administrator reviews source metadata,
+destinations and executable choices locally; no original permissions, ACLs or
+extended attributes are restored. The native seed supplies student-owned files
+at 0600, directories at 0700 and explicitly executable files at 0700, at the
+ordinary boot reset. It never writes into a live student session or adds an
+autostart entry.
+
 ### Prepared npm baselines
 
 `prepare_npm` accepts `package`, `id`, and an optional exact `version` or tag

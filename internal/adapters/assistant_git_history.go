@@ -40,6 +40,7 @@ type assistantHistoryReader struct {
 	base       string
 	trees      map[string]*assistantHistoryTree
 	temporary  []string
+	imported   map[string]bool
 }
 
 // assistantHistoryGit never returns Git diagnostics, which can contain private
@@ -251,6 +252,9 @@ func (reader *assistantHistoryReader) changes(older, newer, path string, content
 	sort.Strings(paths)
 	blocked := map[string]bool{}
 	denied := map[string]bool{}
+	for object := range reader.imported {
+		denied[object] = true
+	}
 	for _, tree := range []*assistantHistoryTree{old, next, base} {
 		for object := range tree.denied {
 			denied[object] = true
@@ -394,6 +398,10 @@ func (reader *assistantHistoryReader) execute(limit int, revision, path string) 
 		return "", errors.New("invalid repository")
 	}
 	reader.repository = repository
+	reader.imported, err = assistantImportedBlobs(reader.ctx, repository, reader.base)
+	if err != nil {
+		return "", err
+	}
 	objectType, err := assistantHistoryGit(reader.ctx, repository, nil, 32, "cat-file", "-t", reader.base)
 	if err != nil || strings.TrimSpace(objectType) != "commit" {
 		return "", errors.New("invalid base")

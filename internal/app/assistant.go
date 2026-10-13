@@ -161,6 +161,11 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 		}
 	}
 	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1"}}
+	if discovery, ok := runner.Store.(interface {
+		HomeFilesSupported(context.Context, domain.AssistantConversation) bool
+	}); ok && discovery.HomeFilesSupported(ctx, conversation) {
+		contextData.Capabilities = append(contextData.Capabilities, "home_files_v1")
+	}
 	textBytes := 0
 	for step := 0; step < turn.Limits.Steps; step++ {
 		emitTranscriptSize()

@@ -34,6 +34,8 @@ type AssistantWorkspace struct {
 	base         map[string]assistantBaseFile
 	deleted      map[string]bool
 	modes        map[string]bool
+	deniedBlobs  map[string]bool
+	deniedPaths  map[string]bool
 }
 
 func (workspace *AssistantWorkspace) Close() error { return workspace.root.Close() }
@@ -162,7 +164,19 @@ func (store AssistantWorkspaceStore) Open(id string) (*AssistantWorkspace, error
 	if err != nil {
 		return nil, err
 	}
-	workspace := &AssistantWorkspace{Conversation: conversation, root: root, base: map[string]assistantBaseFile{}, deleted: map[string]bool{}, modes: map[string]bool{}}
+	denied, err := assistantWorkspaceImportPrivacy(ctx, &AssistantWorkspace{Conversation: conversation, root: root})
+	if err != nil {
+		return nil, errors.New("Assistant file privacy could not be checked. Start a new chat after checking the local repository history.")
+	}
+	workspace := &AssistantWorkspace{Conversation: conversation, root: root, base: map[string]assistantBaseFile{}, deleted: map[string]bool{}, modes: map[string]bool{}, deniedBlobs: denied, deniedPaths: map[string]bool{}}
+	// A hidden current blob remains hidden through visible copies as well.
+	for _, entry := range strings.Split(tree, "\x00") {
+		info, path, ok := strings.Cut(entry, "\t")
+		fields := strings.Fields(info)
+		if ok && len(fields) == 4 && domain.AssistantHiddenPath(path) {
+			workspace.deniedBlobs[fields[2]] = true
+		}
+	}
 	for _, entry := range strings.Split(tree, "\x00") {
 		if entry == "" {
 			continue
@@ -172,7 +186,8 @@ func (store AssistantWorkspaceStore) Open(id string) (*AssistantWorkspace, error
 		if !ok || len(fields) != 4 {
 			return nil, errors.New("invalid Assistant Git tree")
 		}
-		if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) {
+		if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedBlobs[fields[2]] {
+			workspace.deniedPaths[path] = true
 			continue
 		}
 		if fields[0] != "100644" && fields[0] != "100755" {
@@ -193,7 +208,7 @@ func (store AssistantWorkspaceStore) Open(id string) (*AssistantWorkspace, error
 		return nil, errors.New("invalid Assistant deleted files")
 	}
 	for _, path := range deleted {
-		if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || domain.AssistantReadOnlyPath(path) {
+		if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || domain.AssistantReadOnlyPath(path) {
 			return nil, errors.New("invalid Assistant deleted path")
 		}
 		workspace.deleted[path] = true
@@ -207,7 +222,7 @@ func (store AssistantWorkspaceStore) Open(id string) (*AssistantWorkspace, error
 			return nil, errors.New("invalid Assistant modes")
 		}
 		for path := range workspace.modes {
-			if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || domain.AssistantReadOnlyPath(path) {
+			if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || domain.AssistantReadOnlyPath(path) {
 				return nil, errors.New("invalid Assistant mode path")
 			}
 		}
@@ -247,7 +262,7 @@ func assistantText(data []byte) bool {
 	return true
 }
 func (workspace *AssistantWorkspace) raw(path string) ([]byte, error) {
-	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) {
+	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] {
 		return nil, fs.ErrPermission
 	}
 	if workspace.deleted[path] {
@@ -318,6 +333,9 @@ func (workspace *AssistantWorkspace) Read(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if assistantDeniedBlob(data, workspace.deniedBlobs) {
+		return nil, fs.ErrPermission
+	}
 	if !assistantText(data) {
 		return nil, errors.New("not_text")
 	}
@@ -360,7 +378,7 @@ func (workspace *AssistantWorkspace) Entries() ([]AssistantFileEntry, error) {
 		}
 		for _, entry := range entries {
 			path := prefix + entry.Name()
-			if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) {
+			if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] {
 				continue
 			}
 			if entry.IsDir() {
@@ -382,11 +400,22 @@ func (workspace *AssistantWorkspace) Entries() ([]AssistantFileEntry, error) {
 			file := os.NewFile(uintptr(fd), path)
 			safe := telemetrySafeFile(fd, unix.S_IFREG)
 			info, err := file.Stat()
+			var denied bool
+			if safe == nil && err == nil && info.Size() <= 512*1024 && len(workspace.deniedBlobs) != 0 {
+				data, readErr := io.ReadAll(io.LimitReader(file, 512*1024+1))
+				if readErr != nil {
+					file.Close()
+					return readErr
+				}
+				denied = assistantDeniedBlob(data, workspace.deniedBlobs)
+			}
 			file.Close()
 			if safe != nil || err != nil {
 				return fs.ErrPermission
 			}
-			if !workspace.deleted[path] {
+			if denied {
+				delete(files, path)
+			} else if !workspace.deleted[path] {
 				files[path] = int(info.Size())
 			}
 		}
@@ -412,7 +441,15 @@ func (workspace *AssistantWorkspace) saveDeleted() error {
 	return assistantWriteState(workspace.root, "deleted.json", data)
 }
 func (workspace *AssistantWorkspace) Write(path, content string, executable bool) error {
-	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || domain.AssistantReadOnlyPath(path) {
+	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || domain.AssistantReadOnlyPath(path) {
+		return fs.ErrPermission
+	}
+	for protected := range workspace.deniedPaths {
+		if strings.HasPrefix(protected, "home-files/imports/") && strings.HasPrefix(protected, path+"/") {
+			return fs.ErrPermission
+		}
+	}
+	if assistantDeniedBlob([]byte(content), workspace.deniedBlobs) {
 		return fs.ErrPermission
 	}
 	if len(content) > 512*1024 {
@@ -483,7 +520,7 @@ func (workspace *AssistantWorkspace) Write(path, content string, executable bool
 	return workspace.saveDeleted()
 }
 func (workspace *AssistantWorkspace) Delete(path string) error {
-	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || domain.AssistantReadOnlyPath(path) {
+	if !domain.ValidAssistantPath(path) || domain.AssistantHiddenPath(path) || workspace.deniedPaths[path] || domain.AssistantReadOnlyPath(path) {
 		return fs.ErrPermission
 	}
 	if _, err := workspace.raw(path); err != nil {

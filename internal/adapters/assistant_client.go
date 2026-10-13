@@ -67,7 +67,7 @@ func (client AssistantClient) request(ctx context.Context, method, path, token s
 			capabilities := []string{}
 			seen := map[string]bool{}
 			for _, capability := range step.Context.Capabilities {
-				if (capability == "prepare_npm_v1" || capability == "host_diagnostics_v1" || capability == "git_history_v1") && !seen[capability] {
+				if (capability == "prepare_npm_v1" || capability == "host_diagnostics_v1" || capability == "git_history_v1" || capability == "home_files_v1") && !seen[capability] {
 					capabilities = append(capabilities, capability)
 					seen[capability] = true
 				}

@@ -28,6 +28,9 @@ func ValidAssistantPath(path string) bool {
 	return true
 }
 func AssistantHiddenPath(path string) bool {
+	if path == "home-files/imports" || strings.HasPrefix(path, "home-files/imports/") {
+		return true
+	}
 	for _, part := range strings.Split(path, "/") {
 		if part == ".git" || part == "keys" || part == "lab-credentials.json" {
 			return true
