@@ -63,6 +63,7 @@ in
   workspace-seed-pinned = import ./workspace-seed.nix { inherit pkgs; usePinnedExtension = true; };
   home-reset-filesystem-vm = import ./home-reset-filesystem-vm.nix { inherit pkgs; };
   workspace-reset-service-vm = import ./workspace-reset-service-vm.nix { inherit pkgs; };
+  workspace-reset-service-tcg = import ./workspace-reset-service-vm.nix { inherit pkgs; useKVM = false; };
   workspace-editor-vm = import ./workspace-reset-service-vm.nix { inherit pkgs; editorQualification = true; };
   programming-profile-vm = import ./programming-profile-vm.nix { inherit pkgs; };
   session-state-vm = import ./session-state-vm.nix { inherit pkgs; };
