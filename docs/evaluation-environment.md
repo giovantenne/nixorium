@@ -24,8 +24,8 @@ deployment, and guest shutdown still need a recorded run. Expected results
 below are acceptance criteria, not observed successes.
 
 A VM run cannot establish physical firmware, NIC, switch, or disk compatibility.
-Use the existing [hardware validation plan](hardware-validation.md) for that
-next step and for the evidence format.
+Validate that compatibility separately on physical hardware and record the
+evidence.
 
 ## Host and prerequisites
 
@@ -349,7 +349,7 @@ snapshot history. It must not remove the downloaded ISO or any unrelated VM.
 
 ## Record the result; automation comes later
 
-Use the evidence fields and result matrix in [hardware validation](hardware-validation.md).
+Record each scenario's result, including skipped and failed steps.
 Record host OS, VirtualBox build, exact Minimal ISO digest, Nixorium commit,
 private deployment revision, actual adapter names, step results, logs, and final
 network state. Share a redacted report in existing

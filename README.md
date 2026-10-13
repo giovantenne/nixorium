@@ -189,7 +189,7 @@ and the [security policy](SECURITY.md).
 - [Update guide](docs/updates.md): Nixorium, NixOS and package updates
 - [Management interface](docs/tui-gallery.md) and [support reports](docs/support-report.md)
 - [Template reset](docs/deployment-template-reset.md) for an outdated deployment
-- [Operational disclaimer](DISCLAIMER.md) and [hardware validation plan](docs/hardware-validation.md)
+- [Operational disclaimer](DISCLAIMER.md)
 
 **Customize and extend**
 

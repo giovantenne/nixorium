@@ -1,9 +1,9 @@
 # Nixorium management architecture
 
 This document describes the management architecture and the boundaries that
-implementation must preserve. Code and tests define current behavior; the
-[hardware validation plan](hardware-validation.md) tracks the separate manual
-qualification requirements. Historical execution plans are not specifications.
+implementation must preserve. Code and tests define current behavior; manual
+VM and physical qualification requirements remain separate. Historical
+execution plans are not specifications.
 
 ## Baseline and implementation state
 
@@ -75,7 +75,7 @@ encrypted controller backups
 [private Git recovery](adr/0025-private-git-lab-backups.md)) and discard of mistaken
 uncommitted Git changes.
 See the [administrator guide](../templates/site/README.md) for operator
-procedures and [hardware validation](hardware-validation.md) for manual evidence.
+procedures. Record manual VM and physical evidence separately.
 
 Important constraints in the current implementation are:
 
