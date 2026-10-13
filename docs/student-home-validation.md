@@ -42,7 +42,7 @@ evidence and the runtime result are recorded separately below.
 | Locked static analysis and Go vulnerability checks | PASS | `scripts/security-check.sh`; no used vulnerable symbols reported |
 | Representative controller and client systems build together | PASS | Batched `pc99` and `pc01` toplevel builds |
 | Complete evaluation/quick gate on the final integration | PASS | `./scripts/validate.sh --eval` completed, including the quick/package/guidance checks and complete mkLab evaluation |
-| Local production-client preflight on exact core `f568aa4` | PASS | Native capability discovery, candidate evaluation, build and ready local review completed in a synthetic fixture; private qualification helper code is not part of this public ledger |
+| Local production-client preflight on exact core `f568aa4` | PASS | Native capability discovery, candidate evaluation and ready local review completed in a synthetic fixture. Build was partial: two build targets built, five targets blocked and home preparation skipped with `needs_other_builds`; private qualification helper code is not part of this public ledger |
 | Four natural-language cases through the real OpenRouter-backed Assistant | PASS | Exact frozen core `f568aa4`, production `openai/gpt-6.1-sol` at medium reasoning: requested text/application configuration/empty directory; opaque imported-source reuse; explicit executable choice; protected `.ssh/config` refusal with a safe `Documents/Corso/ssh-example.txt` alternative. All four evaluated successfully and reached ready local review |
 | Exact frozen model-generated candidate restores after student edits and executable choice | PASS | Original combined model-generated candidate: seven files and one empty directory, verified on three boots with two actual reboots after student mutations; exact hashes, UID 2000/GID 100, private modes, explicit executable restoration and offline operation |
 | Physical controller/student hardware, real GNOME interaction and real classroom data | NOT RUN | Outside this synthetic qualification |
@@ -54,8 +54,8 @@ import reuse), 0.048781 (executable choice) and 0.051846 (protected-path
 alternative), totaling **USD 0.212437**, within the USD 1 limit. Private Assistant
 instructions, credentials and qualification-helper code are not published here.
 
-The Assistant build tool reported partial builds: 3, 1, 3 and 2 systems built
-respectively, with five blocked systems in each case. Home preparation was
+The Assistant build tool reported partial builds: 3, 1, 3 and 2 build targets built
+respectively, with five blocked targets in each case. Home preparation was
 skipped with `needs_other_builds`. The successful candidate evaluations and
 ready local reviews therefore do not establish a full build of these four
 candidates; the separate frozen-candidate runtime check records its own outcome.
