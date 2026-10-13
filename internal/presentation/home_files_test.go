@@ -64,8 +64,13 @@ func TestHomeFilesNavigationRemainsAvailableAfterPreferenceFailure(t *testing.T)
 	m.screen = dashboardWorkspace
 	m.actions.LoadHomeFiles = nil
 	m, cmd = workspaceKey(m, demoCode(tea.KeyEnter))
-	if cmd != nil || !strings.Contains(m.message, "Update system and packages") {
+	if cmd != nil || !strings.Contains(m.message, "Update Nixorium") {
 		t.Fatal("older feature lacks actionable update guidance")
+	}
+	m = homeFilesFixture()
+	m.homeFiles.loaded = domain.HomeFilesPlanReport{State: "invalid"}
+	if !strings.Contains(m.View().Content, "Maintenance → Update Nixorium") {
+		t.Fatal("unsupported pin view names the package-base update instead of the core update")
 	}
 }
 

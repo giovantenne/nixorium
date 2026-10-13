@@ -23,7 +23,7 @@ func (model dashboardModel) homeFilesView() string {
 			actions = []tuiAction{{key: "F1", label: "Help"}}
 		}
 	} else if m.loaded.HasErrors() || m.loaded.Candidate == nil {
-		lines = append(lines, "", "Initial files could not be loaded.", "If the deployment pin lacks this feature, update Nixorium:", "Maintenance → Update system and packages.")
+		lines = append(lines, "", "Initial files could not be loaded.", "If the deployment pin lacks this feature, update Nixorium:", "Maintenance → Update Nixorium.")
 		actions = append([]tuiAction{{key: "r", label: "Retry"}}, actions...)
 	} else {
 		switch m.stage {

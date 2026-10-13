@@ -147,7 +147,7 @@ func (model dashboardModel) openHomeFiles() (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 	if model.actions.LoadHomeFiles == nil || model.actions.PlanHomeFiles == nil || model.actions.CaptureHomeFiles == nil || model.actions.SaveHomeFiles == nil {
-		model.message = "Initial files are unavailable. Ask the administrator to use Maintenance → Update system and packages to update Nixorium."
+		model.message = "Initial files are unavailable. Ask the administrator to use Maintenance → Update Nixorium."
 		return model, nil
 	}
 	model.screen = dashboardHomeFiles
