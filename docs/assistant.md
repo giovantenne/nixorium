@@ -5,21 +5,26 @@ changes from the administrator's Nixorium menu. It works on a private candidate
 workspace. You review the actual changes and choose whether to save them.
 Saving records a local Git commit and a backup; applying systems is separate.
 
-## Enable it on the controller
+## Availability on the controller
 
-Use a Nixorium version that provides Assistant and `nixoriumHostClasses`.
-In the deployment's existing `lab-settings.json`, set `assistant` to `true`
-inside the `lab` object, preserving the other settings:
+Assistant is offered by default on new installations. Existing deployments
+with an omitted `lab.assistant` setting also gain the menu after updating to
+Nixorium 3.4.0 or later and applying the controller through its ordinary review.
+An explicit `false` remains disabled, including across settings saves.
+
+To disable it, set `assistant` to `false` inside the `lab` object in the
+deployment's existing `lab-settings.json`, preserving the other settings:
 
 ```json
-"assistant": true
+"assistant": false
 ```
 
 Review and commit the configuration change, then use the ordinary controller
-application review. Once that controller configuration is active, **Assistant**
-appears as the fifth administrator menu entry (`m`). It is absent by default,
-on clients and from the teacher's classroom dashboard. Setting the option to
-false and applying the controller removes the menu entry.
+application review. Once that controller configuration is active, the menu
+entry is removed. Set it to `true` and apply the controller to enable it again.
+When enabled, **Assistant** is the fifth administrator menu entry (`m`);
+it is absent on clients and from the teacher's classroom dashboard.
+Menu availability does not activate an account, accept consent or send requests.
 
 The controller installs `/etc/nixorium/assistant.json` and creates the private
 state directory for `admin`. The service defaults to `https://assistant.nixorium.org/v1` and the

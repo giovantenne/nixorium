@@ -346,6 +346,10 @@ jq -e '
   .lab.keyboardLayout == "it" and
   .lab.consoleKeyMap == "it2"
 ' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
+# The template inherits the enabled Nix default; bootstrap preserves that omission.
+# tests/eval-lab-settings.nix checks its effective Assistant value.
+jq -e '.lab | has("assistant") | not' \
+  "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 jq -e '
   .schemaVersion == 1 and
   all(.packages[]; .scope.kind == "shared") and

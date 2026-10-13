@@ -72,34 +72,46 @@ func TestWriteSettingsIsAtomicAndPrivate(t *testing.T) {
 	}
 }
 
-func TestSettingsFilePreservesAssistantOptIn(t *testing.T) {
-	directory := t.TempDir()
-	local := Local{}
-	settings := adapterSettings()
-	enabled := true
-	settings.Lab.Assistant = &enabled
-	if err := local.WriteSettings(directory, settings); err != nil {
-		t.Fatal(err)
-	}
-	before, err := local.ReadSettings(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	loaded, issues := domain.DecodeLabSettings(before)
-	if len(issues) != 0 {
-		t.Fatal(issues)
-	}
-	loaded.Lab.HomepageURL = "https://changed.example.org"
-	if err := local.WriteSettingsIfUnchanged(directory, before, loaded); err != nil {
-		t.Fatal(err)
-	}
-	after, err := local.ReadSettings(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	decoded, issues := domain.DecodeLabSettings(after)
-	if len(issues) != 0 || !decoded.Lab.AssistantOn() || decoded.Lab.HomepageURL != loaded.Lab.HomepageURL {
-		t.Fatalf("Assistant opt-in lost during settings save: %+v, %v", decoded, issues)
+func TestSettingsFilePreservesAssistantAvailability(t *testing.T) {
+	on, off := true, false
+	for _, test := range []struct {
+		name      string
+		assistant *bool
+		enabled   bool
+	}{
+		{"omitted", nil, true}, {"enabled", &on, true}, {"disabled", &off, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := t.TempDir()
+			local := Local{}
+			settings := adapterSettings()
+			settings.Lab.Assistant = test.assistant
+			if err := local.WriteSettings(directory, settings); err != nil {
+				t.Fatal(err)
+			}
+			before, err := local.ReadSettings(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			loaded, issues := domain.DecodeLabSettings(before)
+			if len(issues) != 0 {
+				t.Fatal(issues)
+			}
+			loaded.Lab.HomepageURL = "https://changed.example.org"
+			if err := local.WriteSettingsIfUnchanged(directory, before, loaded); err != nil {
+				t.Fatal(err)
+			}
+			after, err := local.ReadSettings(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded, issues := domain.DecodeLabSettings(after)
+			if len(issues) != 0 || decoded.Lab.AssistantOn() != test.enabled ||
+				(decoded.Lab.Assistant == nil) != (test.assistant == nil) ||
+				decoded.Lab.HomepageURL != loaded.Lab.HomepageURL {
+				t.Fatalf("Assistant availability lost during settings save: %+v, %v", decoded, issues)
+			}
+		})
 	}
 }
 

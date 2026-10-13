@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// AssistantConfig describes the controller's installed, explicit opt-in.
+// AssistantConfig describes the controller's installed Assistant configuration.
 type AssistantConfig struct {
 	Enabled      bool
 	Endpoint     string

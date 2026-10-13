@@ -9,12 +9,12 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-func TestAssistantMenuIsExplicitAndAdministratorOnly(t *testing.T) {
+func TestAssistantMenuRequiresInstalledConfigAndAdministratorRole(t *testing.T) {
 	for _, test := range []struct {
 		name                        string
 		enabled, classroom, visible bool
 	}{
-		{"default", false, false, false}, {"enabled", true, false, true}, {"classroom", true, true, false},
+		{"missing-or-disabled-config", false, false, false}, {"enabled", true, false, true}, {"classroom", true, true, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			m := newDashboardModel(domain.StatusReport{}, domain.SetupReport{State: "ready"}, DashboardActions{
@@ -34,7 +34,7 @@ func TestAssistantMenuIsExplicitAndAdministratorOnly(t *testing.T) {
 			updated, _ := m.Update(keyPress(assistantTask.shortcut))
 			m = updated.(dashboardModel)
 			if (m.screen == dashboardAssistant) != test.visible {
-				t.Fatal("shortcut bypassed opt-in or classroom boundary")
+				t.Fatal("shortcut bypassed installed configuration or classroom boundary")
 			}
 			if test.visible {
 				updated, _ = m.Update(keyPress("esc"))

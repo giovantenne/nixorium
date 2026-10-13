@@ -42,8 +42,8 @@ let
           };
           assistant = lib.mkOption {
             type = lib.types.bool;
-            default = false;
-            description = "Optional Assistant subscription service in the administrator TUI";
+            default = true;
+            description = "Assistant menu on the controller (on unless set to false; activation and consent are separate)";
           };
           deploymentMode = lib.mkOption {
             type = lib.types.enum [ "laboratory" "controller" ];

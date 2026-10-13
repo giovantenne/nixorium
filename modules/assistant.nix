@@ -13,7 +13,7 @@
     };
   };
 
-  config = lib.mkIf (hostName == labSettings.masterHostName && (labSettings.assistant or false)) {
+  config = lib.mkIf (hostName == labSettings.masterHostName && (labSettings.assistant or true)) {
     environment.etc."nixorium/assistant.json" = {
       mode = "0444";
       text = builtins.toJSON {

@@ -29,10 +29,13 @@ reviewed refresh; updating the Nixorium input alone does not replace them.
 
 ## Optional Assistant
 
-Set `lab.assistant` to `true` in the existing `lab-settings.json` and apply the
-controller through its ordinary review. The optional subscription service then
-appears in the administrator menu. Activate it with the code shown after
-payment and accept its separate data-sharing consent. Review each proposal;
+Assistant appears in the administrator menu by default on new installations.
+Existing deployments with an omitted `lab.assistant` setting also gain the menu
+after updating Nixorium and applying the controller through its ordinary review.
+An explicit `false` keeps it disabled. Set `lab.assistant` to `false` in
+`lab-settings.json` and apply the controller to remove the menu entry; set it to
+`true` to enable it again. Activate the optional subscription service with the
+code shown after payment and accept its separate data-sharing consent. Review each proposal;
 saving creates a local commit and backup, with separate system-application
 and computer-update reviews afterwards.
 You can also activate the five-request, thirty-day free trial with its emailed
@@ -182,7 +185,11 @@ as the next step. In Software, Enter on a configured application opens its
 details and available actions. Removal and destination changes require a
 separate review. Client updates remain a separate operation.
 
-The optional Assistant subscription service is off by default; set `lab.assistant` to `true` in `lab-settings.json` and apply the controller to enable its administrator menu entry. This option is not in the settings editor.
+The Assistant menu is enabled by default on the controller. Using the optional
+service requires account activation and separate consent; no request is sent
+merely because the menu is available. Set `lab.assistant` to `false` in
+`lab-settings.json` and apply the controller to disable it. This option is not
+in the settings editor.
 
 ## Classroom view
 

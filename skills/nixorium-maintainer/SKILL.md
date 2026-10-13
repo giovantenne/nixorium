@@ -81,7 +81,8 @@ separate upstream task, not a local patch to safety mechanisms.
 
 ## Native Assistant is a separate operator workflow
 
-An opted-in controller can offer the subscription-based Assistant in Nixorium.
+The controller offers the Assistant menu unless `lab.assistant` is explicitly
+false. Account activation and consent for the optional service remain separate.
 Its confined candidate tools and reviewed local save belong to that native
 application, not to this external-agent skill. Explain the operator's next
 review when relevant; do not drive activation, consent, saving or recovery

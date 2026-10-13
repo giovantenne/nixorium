@@ -7,8 +7,13 @@ let
   };
   evaluates = settings:
     (builtins.tryEval (builtins.deepSeq (evalLabSettings settings) true)).success;
+  template = builtins.fromJSON (builtins.readFile ../templates/site/lab-settings.json);
 in
 assert evaluates valid;
+assert (evalLabSettings valid).assistant;
+assert (evalLabSettings template).assistant;
+assert (evalLabSettings (valid // { lab = valid.lab // { assistant = true; }; })).assistant;
+assert !(evalLabSettings (valid // { lab = valid.lab // { assistant = false; }; })).assistant;
 assert evaluates (valid // { lab = valid.lab // { assistant = true; }; });
 assert evaluates (valid // { lab = valid.lab // { assistant = false; }; });
 assert !(evaluates (valid // { lab = valid.lab // { assistant = "true"; }; }));

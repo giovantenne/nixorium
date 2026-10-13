@@ -1,7 +1,7 @@
 {
   "invalid": [
     {
-      "name": "Assistant opt-in must be boolean",
+      "name": "Assistant availability must be boolean",
       "overrides": { "assistant": "true" }
     },
     {

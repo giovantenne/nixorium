@@ -380,8 +380,10 @@ assert !((mkLab (baseArgs // { labConfig = labConfig // { classroomView = false;
 # It adds no network port: the controller reaches it through SSH.
 assert lib.hasInfix "tcp dport 22 accept"
   classroomViewLab.nixosConfigurations.pc01.config.networking.firewall.extraInputRules;
-# Assistant configuration and private state exist only on opted-in controllers.
-assert !(plainLab.nixosConfigurations.pc99.config.environment.etc ? "nixorium/assistant.json");
+# Assistant defaults on for controllers; explicit false and client roles stay off.
+assert plainLab.nixosConfigurations.pc99.config.environment.etc ? "nixorium/assistant.json";
+assert controllerOnly.environment.etc ? "nixorium/assistant.json";
+assert !(plainLab.nixosConfigurations.pc01.config.environment.etc ? "nixorium/assistant.json");
 assert !(assistantOffLab.nixosConfigurations.pc99.config.environment.etc ? "nixorium/assistant.json");
 assert !(assistantLab.nixosConfigurations.pc01.config.environment.etc ? "nixorium/assistant.json");
 assert assistantLab.nixosConfigurations.pc99.config.environment.etc."nixorium/assistant.json".mode == "0444";
@@ -399,6 +401,8 @@ assert builtins.fromJSON assistantTestLab.nixosConfigurations.pc99.config.enviro
 };
 assert builtins.elem "d /var/lib/nixorium/assistant 0700 admin users -"
   assistantLab.nixosConfigurations.pc99.config.systemd.tmpfiles.rules;
+assert builtins.elem "d /var/lib/nixorium/assistant 0700 admin users -"
+  plainLab.nixosConfigurations.pc99.config.systemd.tmpfiles.rules;
 assert !(builtins.elem "d /var/lib/nixorium/assistant 0700 admin users -"
   assistantLab.nixosConfigurations.pc01.config.systemd.tmpfiles.rules);
 assert !(builtins.elem "d /var/lib/nixorium/assistant 0700 admin users -"

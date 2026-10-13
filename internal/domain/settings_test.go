@@ -266,11 +266,20 @@ func TestClassroomViewIsOnUnlessTurnedOff(t *testing.T) {
 	}
 }
 
-func TestAssistantRequiresOptInAndSurvivesSettingsSave(t *testing.T) {
+func TestAssistantDefaultsOnAndSurvivesSettingsSave(t *testing.T) {
 	settings := validSettings()
 	data, err := MarshalLabSettings(settings)
-	if err != nil || strings.Contains(string(data), `"assistant"`) || settings.Lab.AssistantOn() {
+	if err != nil || strings.Contains(string(data), `"assistant"`) || !settings.Lab.AssistantOn() {
 		t.Fatalf("absent Assistant setting: %s, %v", data, err)
+	}
+	loaded, issues := DecodeLabSettings(data)
+	if len(issues) != 0 || loaded.Lab.Assistant != nil || !loaded.Lab.AssistantOn() {
+		t.Fatalf("decoded absent Assistant setting: %+v, %v", loaded.Lab.Assistant, issues)
+	}
+	loaded.Lab.HomepageURL = "https://changed.example.org"
+	saved, err := MarshalLabSettings(loaded)
+	if err != nil || strings.Contains(string(saved), `"assistant"`) {
+		t.Fatalf("absent Assistant setting changed on save: %s, %v", saved, err)
 	}
 	for _, enabled := range []bool{false, true} {
 		settings.Lab.Assistant = &enabled
@@ -288,13 +297,13 @@ func TestAssistantRequiresOptInAndSurvivesSettingsSave(t *testing.T) {
 			t.Fatalf("Assistant lost on save: %s, %v", saved, err)
 		}
 	}
-	on := true
-	changes := DiffLabSettings(LabSettingsFile{}, LabSettingsFile{Lab: LabSettings{Assistant: &on}})
+	off := false
+	changes := DiffLabSettings(LabSettingsFile{}, LabSettingsFile{Lab: LabSettings{Assistant: &off}})
 	found := false
 	for _, change := range changes {
-		found = found || (change.Field == "lab.assistant" && change.Before == false && change.After == true)
+		found = found || (change.Field == "lab.assistant" && change.Before == true && change.After == false)
 	}
 	if !found {
-		t.Fatalf("Assistant opt-in is not reviewed: %+v", changes)
+		t.Fatalf("disabling Assistant is not reviewed: %+v", changes)
 	}
 }

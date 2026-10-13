@@ -374,9 +374,12 @@ any shard must block publication.
   deployment mode 0700, exclude the student, reject repository/address/command
   selection over IPC, and never expose administrative TUI callbacks there.
 - Operation history records only typed safe summaries for important outcomes in an atomic mode-0600 newest-1000 store; it never copies raw report messages and never deletes detailed deployment logs. Browsing accepts only generated deployment-log basename IDs, caps discovery at 50 results and detail at a 64 KiB tail, validates owner/mode/type with no-follow opens, and sanitizes terminal controls. Keep persistence/filesystem inspection in adapters and list/detail navigation in presentation.
-- `lab.assistant` is off by default and preserved by settings saves. Only an
-  opted-in controller installs `/etc/nixorium/assistant.json` and its private
-  state directory. Service and subscription URL overrides are for staging/tests.
+- `lab.assistant` is on unless explicitly false and preserved by settings saves.
+  New installations and upgraded deployments with an omitted setting offer the
+  administrator menu after controller application. Only an enabled controller
+  installs `/etc/nixorium/assistant.json` and its private state directory;
+  account activation and consent remain explicit and separate. Service and
+  subscription URL overrides are for staging/tests.
   Account checks send no draft or files. Conversation sharing defaults to false
   and requires explicit saved consent; reports require their own whole-chat
   disclosure and confirmation. Upload only redacted saved transcripts through

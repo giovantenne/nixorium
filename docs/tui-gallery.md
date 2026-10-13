@@ -18,7 +18,8 @@ reads saved configuration and local service/Git state; inventory, client probes 
 readiness checks run when the selected task needs them. Deferred checks never
 imply that installation or deployment is ready.
 
-An opted-in controller adds Assistant (`m`). Its subscription and consent
+The controller offers Assistant (`m`) unless `lab.assistant` is explicitly false.
+Its account activation, subscription and consent
 checks precede content sharing. Ctrl+R reviews candidate changes and their Nix
 evaluation; SAVE records a local commit with a backup. Controller application
 and Update computers remain separate reviews. See [Assistant](assistant.md).

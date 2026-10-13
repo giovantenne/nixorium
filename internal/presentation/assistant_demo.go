@@ -5,11 +5,11 @@ import (
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
-// RenderAssistantMenuDemo uses the real opt-in navigation with no service calls.
+// RenderAssistantMenuDemo uses the installed controller menu with no service calls.
 func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	r := newDemoRecorder(actions, revision, width, height)
-	r.capture("Assistant appears only after controller opt-in", 1200)
+	r.capture("Assistant is available by default on the controller", 1200)
 	r.pressAndCapture(demoText(assistantTask.shortcut), "Open Assistant", 1200)
 	r.model.assistant.offer = demoAssistantOffer()
 	r.capture("The chat opens first, even before activation", 2500)
@@ -58,5 +58,5 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.capture("A failed evaluation prevents saving", 2500)
 	r.model.assistant.review.result = domain.TemplateResetResult{State: "saved", Revision: revision, BackupRef: "refs/nixorium/assistant-backups/example"}
 	r.capture("A local commit and backup precede separate application", 2500)
-	return DemoScenario{ID: "assistant-menu", Title: "Optional administrator Assistant", Description: "The installed controller opt-in adds the fifth administrator area; the classroom dashboard never offers it.", Frames: r.frames}
+	return DemoScenario{ID: "assistant-menu", Title: "Optional administrator Assistant", Description: "The controller offers the fifth administrator area by default; the classroom dashboard never offers it.", Frames: r.frames}
 }

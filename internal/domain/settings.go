@@ -35,9 +35,10 @@ func (settings LabSettings) ClassroomViewOn() bool {
 	return settings.ClassroomView == nil || *settings.ClassroomView
 }
 
-// AssistantOn requires an explicit opt-in to the subscription service.
+// AssistantOn tells whether the controller offers Assistant: it is on unless
+// the settings turn it off. Account activation and consent remain separate.
 func (settings LabSettings) AssistantOn() bool {
-	return settings.Assistant != nil && *settings.Assistant
+	return settings.Assistant == nil || *settings.Assistant
 }
 
 type LabSettings struct {

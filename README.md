@@ -46,9 +46,9 @@ Nixorium bridges that gap with a local-first workflow:
 **One configuration for the whole room.** On the controller, sign in as
 `admin` and open **Nixorium** from the dock, or run `nixorium` in a terminal.
 The guided menu groups everyday tasks into **Computers**, **Installation**,
-**Software** and **Maintenance**. **Assistant** is an optional paid add-on that
-helps you prepare lab customizations in plain language and review them before
-saving.
+**Software** and **Maintenance**. **Assistant** is an optional paid add-on, offered
+in the administrator menu by default. It helps you prepare lab customizations
+in plain language and review them before saving.
 
 The **Community Edition** is free and open source.
 

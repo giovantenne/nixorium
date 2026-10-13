@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Offer Assistant in the administrator menu by default on the controller.
+  New installations and upgraded deployments with an omitted `lab.assistant`
+  setting gain the menu after controller application; an explicit `false`
+  stays disabled. Account activation, consent and optional conversation sharing
+  remain separate explicit choices.
+
 ## [3.3.1] - 2026-10-13
 
 ### Added

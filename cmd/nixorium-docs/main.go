@@ -118,7 +118,7 @@ func renderGallery() string {
 		{title: "Unconfigured clients", scenarioID: "onboarding", label: "Configure clients before managing them"},
 		{title: "Channel update notification", scenarioID: "onboarding", label: "A dismissible update on the chosen channel"},
 		{title: "Overview", scenarioID: "software-all-clients", label: "Overview"},
-		{title: "Optional administrator Assistant", scenarioID: "assistant-menu", label: "Assistant appears only after controller opt-in"},
+		{title: "Optional administrator Assistant", scenarioID: "assistant-menu", label: "Assistant is available by default on the controller"},
 		{title: "Assistant chat before activation", scenarioID: "assistant-menu", label: "The chat opens first, even before activation"},
 		{title: "Assistant activation offer", scenarioID: "assistant-menu", label: "Choose a free trial, activation code or subscription"},
 		{title: "Assistant trial page", scenarioID: "assistant-menu", label: "Open the free trial page to register with your email"},

@@ -987,7 +987,7 @@ func demoSettings() domain.LabSettingsFile {
 	}}
 }
 
-// demoAssistantConfig mirrors an opted-in controller; demos never set
+// demoAssistantConfig mirrors an enabled controller; demos never set
 // AssistantService, so no scenario can reach the network.
 func demoAssistantConfig() domain.AssistantConfig {
 	return domain.AssistantConfig{Enabled: true,
