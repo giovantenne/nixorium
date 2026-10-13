@@ -37,6 +37,13 @@ func TestAssistantToolArguments(t *testing.T) {
 		{"read_file", `{"path":"a","path":"b"}`, false}, {"read_file", `{"path":"a","\u0070ath":"b"}`, false}, {"read_file", `{"path":null}`, false}, {"read_file", `{"path":"x","offset":1.5}`, false},
 		{"build", `{}`, true}, {"build", `{"command":"bash"}`, false},
 		{"lab_status", `{}`, true}, {"lab_status", `{"command":"bash"}`, false},
+		{"host_diagnostics", `{"host":"pc01","area":"system"}`, true},
+		{"host_diagnostics", `{"host":"pc01","area":"journal"}`, false},
+		{"host_diagnostics", `{"host":"pc01","area":"system","unit":"sshd"}`, false},
+		{"host_diagnostics", `{"host":"pc01","area":null}`, false},
+		{"host_diagnostics", `{"host":"pc01","area":"cache","area":"system"}`, false},
+		{"git_history", `{}`, true}, {"git_history", `{"limit":20,"path":"modules/course.nix"}`, true},
+		{"git_history", `{"limit":0}`, false}, {"git_history", `{"limit":21}`, false}, {"git_history", `{"limit":1.5}`, false}, {"git_history", `{"command":"show"}`, false},
 	} {
 		if got := ValidateAssistantArguments(test.name, []byte(test.args)); got != test.valid {
 			t.Fatalf("%s %s: %v", test.name, test.args, got)

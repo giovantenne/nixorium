@@ -72,6 +72,8 @@ The **Community Edition** is free and open source.
   ask for a change in plain language, review its files and Nix evaluation,
   then save it locally. Applying the controller and updating clients each
   require a separate review.
+  Assistant can also inspect bounded computer diagnostics and saved configuration
+  history after renewed consent, without changing systems or Git.
 
 Under the hood: NixOS builds every PC from the same description, Colmena
 deploys it, Harmonia serves the cache and Disko lays out the disks.

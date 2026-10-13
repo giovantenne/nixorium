@@ -29,7 +29,7 @@ in
   };
 
   vendorHash = "sha256-QSzcOVyA8bAvpE3EQvfSGOCggwPrHg5dOJdShAeW8jU=";
-  subPackages = [ "cmd/nixorium" "cmd/nixorium-classroom-agent" "cmd/nixorium-classroom-worker" "cmd/nixorium-home-reset" "cmd/nixorium-npm-resolver" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
+  subPackages = [ "cmd/nixorium" "cmd/nixorium-classroom-agent" "cmd/nixorium-classroom-worker" "cmd/nixorium-home-reset" "cmd/nixorium-host-diagnostics" "cmd/nixorium-npm-resolver" "cmd/nixorium-remote-validator" "cmd/nixorium-remote-worker" ];
 
   nativeBuildInputs = [ makeWrapper ];
   nativeCheckInputs = [ git ];

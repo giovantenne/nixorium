@@ -293,7 +293,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					m.assistant.activationKind, m.assistant.codeStep = "free trial", true
 					required = append(required, "Paste the code you receive by email.", "Activation code")
 				case "consent":
-					required = append(required, "Share my conversations", "Enter continue")
+					required = append(required, "Share my conversations", "Enter continue", "configuration history", "recent logs", "best effort", "Student home files", "90 days", "one request")
 				case "running":
 					m.assistant.started = time.Now()
 					m.assistant.entries = []assistantEntry{{role: "activity", text: "● Reading modules/course.nix"}, {role: "activity", text: "✗ Evaluation failed"}}

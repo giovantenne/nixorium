@@ -36,6 +36,11 @@ observation. Never read SSH keys or use raw SSH. If allowed observations cannot
 establish the result, report unknown. Historical success, a reachable port or a
 reported revision alone do not prove completed recovery.
 
+The native Assistant can offer bounded computer diagnostics and saved history
+after its own renewed disclosure. Its best-effort filtering does not make raw
+logs safe for this external agent; do not drive its consent or broaden this
+skill's observations. Ask the human operator to review any sensitive excerpt.
+
 ## Hidden effects and exclusions
 
 Do not classify a command by its name. USB status/reconcile may revoke

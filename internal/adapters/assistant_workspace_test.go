@@ -49,8 +49,10 @@ func assistantWorkspaceFixture(t *testing.T) (*AssistantWorkspace, AssistantWork
 	t.Helper()
 	repo := workspaceRepository(t)
 	for path, content := range map[string]string{
-		"lab-settings.json": `{"lab":{"name":"Synthetic","PASSWORD":"private-marker","nested":{"ApiToken":"private-marker","count":1}},"array":[{"credential":"private-marker"}]}`,
-		"flake.nix":         "{ outputs = _: {}; }\n", "keys/public": "hidden-marker", "modules/.env.local": "hidden-marker", "AGENTS.md": "Read-only instructions", ".gitignore": "ignored.txt\n", "binary.bin": "\x00\x01", "secrets-in-text.nix": "sk-example ghp_example Bearer abcdef_123 $6$salt$hash\n", "large.txt": strings.Repeat("a", 70000), "base-folder/child.nix": "{}",
+		"lab-settings.json":            `{"lab":{"name":"Synthetic","PASSWORD":"private-marker","nested":{"ApiToken":"private-marker","count":1}},"array":[{"credential":"private-marker"}]}`,
+		"lab-credentials.json":         `{"adminPassword":"tracked-credentials-marker"}`,
+		"modules/lab-credentials.json": `{"apiToken":"nested-tracked-credentials-marker"}`,
+		"flake.nix":                    "{ outputs = _: {}; }\n", "keys/public": "hidden-marker", "modules/.env.local": "hidden-marker", "AGENTS.md": "Read-only instructions", ".gitignore": "ignored.txt\n", "binary.bin": "\x00\x01", "secrets-in-text.nix": "sk-example ghp_example Bearer abcdef_123 $6$salt$hash\n", "large.txt": strings.Repeat("a", 70000), "base-folder/child.nix": "{}",
 	} {
 		writeGitReviewFile(t, repo, path, content)
 	}
@@ -134,10 +136,19 @@ func TestAssistantToolsFilterAndRedact(t *testing.T) {
 	w, _, _ := assistantWorkspaceFixture(t)
 	listed := assistantFileCall(t, w, "list_files", map[string]any{})
 	data, _ := json.Marshal(listed)
-	for _, hidden := range []string{"keys/public", ".env.local", "ignored.txt"} {
+	for _, hidden := range []string{"keys/public", "lab-credentials.json", ".env.local", "ignored.txt"} {
 		if strings.Contains(string(data), hidden) {
 			t.Fatal("hidden file listed")
 		}
+	}
+	for _, path := range []string{"lab-credentials.json", "modules/lab-credentials.json"} {
+		if read := assistantFileCall(t, w, "read_file", map[string]any{"path": path}); read["error"] != "protected_path" {
+			t.Fatal("tracked credential file was exposed", path, read)
+		}
+	}
+	credentialMatches := assistantFileCall(t, w, "search", map[string]any{"pattern": "tracked-credentials-marker"})
+	if credentialMatches["ok"] != true || len(credentialMatches["matches"].([]any)) != 0 {
+		t.Fatal("search exposed tracked credentials", credentialMatches)
 	}
 	settings := assistantFileCall(t, w, "read_file", map[string]any{"path": "lab-settings.json"})
 	s, _ := json.Marshal(settings)
@@ -168,12 +179,12 @@ func TestAssistantToolsFilterAndRedact(t *testing.T) {
 }
 func TestAssistantToolsRejectTraversalProtectedFilesAndSymlinks(t *testing.T) {
 	w, store, repo := assistantWorkspaceFixture(t)
-	for _, path := range []string{"../outside", "/tmp/outside", "a\\b", "a//b", "a/../b", "keys/public", ".git/config", "ignored.txt"} {
+	for _, path := range []string{"../outside", "/tmp/outside", "a\\b", "a//b", "a/../b", "keys/public", "lab-credentials.json", "modules/lab-credentials.json", ".git/config", "ignored.txt"} {
 		if assistantFileCall(t, w, "read_file", map[string]any{"path": path})["ok"] == true {
 			t.Fatal(path)
 		}
 	}
-	for _, path := range []string{"lab-settings.json", "flake.lock", "AGENTS.md", "CLAUDE.md", ".gitignore", ".gitattributes", ".gitmodules", "keys/public", ".env.private"} {
+	for _, path := range []string{"lab-settings.json", "lab-credentials.json", "modules/lab-credentials.json", "flake.lock", "AGENTS.md", "CLAUDE.md", ".gitignore", ".gitattributes", ".gitmodules", "keys/public", ".env.private"} {
 		for _, name := range []string{"write_file", "delete_file"} {
 			args := map[string]any{"path": path}
 			if name == "write_file" {

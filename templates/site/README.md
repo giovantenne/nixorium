@@ -47,6 +47,10 @@ conversations are kept for 90 days.
 Capable controllers can prepare a public npm CLI package/tag into an offline
 baseline restored after the normal student-home reset; review its exact version,
 scope and reported optional-feature limitations before saving.
+Assistant can inspect declared computer diagnostics and saved configuration
+history. Updated consent covers limited recent system logs and historical
+configuration contents; filtering is best effort, so sensitive text may remain.
+Student home files are not read. These observations do not change systems or Git.
 
 Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
 for privacy, host classes, tool limits, local retention and interrupted-save

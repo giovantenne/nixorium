@@ -45,7 +45,7 @@ func TestAssistantCapabilitiesHeaderPreservesLegacyStepAndSharingBodies(t *testi
 			t.Error("capabilities leaked into shared/request JSON")
 		}
 		if strings.HasSuffix(r.URL.Path, "/steps") {
-			if r.Header.Get("X-Nixorium-Capabilities") != "prepare_npm_v1" {
+			if r.Header.Get("X-Nixorium-Capabilities") != "prepare_npm_v1,host_diagnostics_v1,git_history_v1" {
 				t.Error("missing fixed header")
 			}
 			w.Header().Set("Content-Type", "text/event-stream")
@@ -59,7 +59,7 @@ func TestAssistantCapabilitiesHeaderPreservesLegacyStepAndSharingBodies(t *testi
 	}))
 	defer server.Close()
 	client := AssistantClient{Endpoint: server.URL + "/v1", Version: "3.3.0"}
-	payload := domain.AssistantStepRequest{Context: &domain.AssistantContext{Nixorium: "3.3.0", Files: []string{"flake.nix"}, Capabilities: []string{"prepare_npm_v1"}}, Messages: []domain.AssistantMessage{{Role: "user", Content: "Synthetic"}}}
+	payload := domain.AssistantStepRequest{Context: &domain.AssistantContext{Nixorium: "3.3.0", Files: []string{"flake.nix"}, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1", "git_history_v1", "unknown_v1", "HOST_DIAGNOSTICS_V1", "host_diagnostics_v1,unknown_v1"}}, Messages: []domain.AssistantMessage{{Role: "user", Content: "Synthetic"}}}
 	token := strings.Repeat("t", 43)
 	if err := client.Step(t.Context(), token, assistantTestTurnID, payload, func(domain.AssistantEvent) {}); err != nil {
 		t.Fatal(err)

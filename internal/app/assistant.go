@@ -70,6 +70,10 @@ func assistantActivity(call domain.AssistantToolCall) string {
 		return "Checking the laboratory state"
 	case "prepare_npm":
 		return "Preparing offline npm package " + args.Package
+	case "host_diagnostics":
+		return "Reading computer diagnostics"
+	case "git_history":
+		return "Reading saved configuration history"
 	}
 	return "Checking Assistant tool request"
 }
@@ -156,7 +160,7 @@ func (runner AssistantTurnRunner) Run(ctx context.Context, conversation domain.A
 			core = nil
 		}
 	}
-	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1"}}
+	contextData := &domain.AssistantContext{Nixorium: runner.Version, Core: core, Files: files, Capabilities: []string{"prepare_npm_v1", "host_diagnostics_v1", "git_history_v1"}}
 	textBytes := 0
 	for step := 0; step < turn.Limits.Steps; step++ {
 		emitTranscriptSize()

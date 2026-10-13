@@ -100,7 +100,8 @@ tool version only. The subsequent steps send the conversation, visible file
 names, requested file contents and tool results to the Assistant service and
 its AI provider. The service does not keep your configuration files. It keeps the text of your
 messages and Assistant's answers for 30 days to detect abuse, then deletes it.
-Whole conversations, including the files Assistant read, are kept for 90 days
+Whole conversations, including files, saved history and diagnostics Assistant
+read, are kept for 90 days
 only if you report an answer or turn on sharing. Sharing is off by default. Do not enter passwords or student data in a request.
 
 The model sees tracked files from the chat's base commit plus its own candidate
@@ -109,8 +110,9 @@ files. Untracked and ignored files, private-key paths, `keys/`, `.git`, `.ssh`,
 input locks, instruction files and Git control files are read-only. Sensitive
 settings fields are withheld; known token formats, password hashes and private
 key material are redacted from model-facing output. The laboratory token is
-kept separate from the transcript. Logs, student homes and arbitrary files
-outside the workspace are not tool inputs.
+kept separate from the transcript. Only bounded journal excerpts from fixed
+core units are diagnostic inputs; arbitrary logs, student home files and other
+files outside the workspace are not tool inputs.
 
 ## Subscription and payments
 
@@ -135,8 +137,9 @@ never block a response or change its result.
 After a final response, **/report** opens **Report this answer**. Choose
 **Helpful** or **Wrong** with Up/Down and optionally type up to 500 characters.
 The screen explains that sending includes the whole conversation: your
-messages, configuration contents read and check results, with passwords
-removed. Enter sends; Esc cancels. A report is retained for 90 days even when
+messages, configuration and history contents read, diagnostics and check
+results. Known secret patterns are filtered, but personal or sensitive text
+may remain. Enter sends; Esc cancels. A report is retained for 90 days even when
 ongoing sharing is off. Successful submission shows **Report sent. Thank you.**
 The laboratory token authenticates requests and is kept out of their bodies.
 
@@ -156,6 +159,8 @@ The model has fixed tools, with no shell or system-operation tool:
 | `build` | New non-cached candidate derivations after evaluation; bounded build logs, no activation |
 | `lab_status` | Read-only controller observations of the lab computers |
 | `prepare_npm` | Capable controllers only: prepare a public npm CLI package/tag and its tested offline dependency artifact |
+| `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
+| `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
 
 Paths must be relative, with no traversal, backslashes or control characters;
 the limit is 12 components and 512 bytes. A file cannot replace a directory
@@ -164,6 +169,41 @@ manage services, deploy computers, or save a proposal into the deployment.
 Evaluation errors are redacted and limited to 8 KiB. Passing evaluation proves
 that Nix can evaluate the candidate; it does not prove a successful build,
 activation, boot or safe behavior of arbitrary configuration code.
+
+### Computer diagnostics and saved history
+
+New controllers advertise `host_diagnostics_v1` and `git_history_v1` through the
+optional capabilities header; older services continue ordinary chats. Before
+these observations can leave the controller, existing users must accept the
+updated disclosure. Known secret patterns and common private identifiers are
+filtered, but filtering cannot guarantee removal of every personal or sensitive
+detail in logs or historical configuration. Student home files are not read.
+
+`host_diagnostics` takes an exact name from fresh evaluated inventory and one of
+`system`, `home_reset`, `updates`, `network`, `cache`, or `pxe`. Cache and PXE are
+controller-only. The native helper accepts only that area, using immutable
+systemd executable paths and fixed core unit lists. It reports service loading,
+state, result, exit status and timestamps; boot ID and deployment revision;
+numeric free space for fixed mounts; and available reset/update markers. It
+does not read reset snapshots or student home content. Recent journal excerpts
+are limited to 240 characters each and the observed boot. Credential,
+environment and command-line messages are omitted; common paths, URLs, email
+addresses and quoted identifiers are scrubbed. Remote reads use existing
+strict SSH trust without enrolling or updating keys. Unknown keys, unsupported
+roles, missing helpers, insufficient journal permissions and incomplete evidence
+remain explicit; an empty journal is not proof of service health. Apply an
+updated configuration through ordinary reviews to install the helper on older
+computers. This tool never restarts a service, changes a system or runs a queue.
+
+`git_history` reads only committed ancestors of the conversation's original
+base, with a default of ten and a maximum of twenty. An optional `path` is an
+exact visible relative file path. A selected revision must be a complete
+40- or 64-character lowercase ancestor object ID. The comparison is from that
+revision to the conversation base, with modes and sanitized unified diffs for
+at most twenty paths, bounded per-file inputs and an explicit truncation flag.
+Known private paths and unsafe historical content are refused or omitted before
+capture. Hidden, untracked and student home files stay outside this tool; it
+never changes the index, worktree, refs or a remote.
 
 ### Prepared npm baselines
 

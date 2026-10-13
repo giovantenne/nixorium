@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Assistant can read bounded diagnostics from declared computers and inspect
+  saved configuration history without changing systems or Git. Updated consent
+  explains the new observations and best-effort filtering before sharing them.
+
 ## [3.4.0] - 2026-10-13
 
 ### Changed

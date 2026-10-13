@@ -64,11 +64,16 @@ func (client AssistantClient) request(ctx context.Context, method, path, token s
 	if strings.HasSuffix(path, "/steps") {
 		request.Header.Set("Accept", "text/event-stream")
 		if step, ok := body.(domain.AssistantStepRequest); ok && step.Context != nil {
+			capabilities := []string{}
+			seen := map[string]bool{}
 			for _, capability := range step.Context.Capabilities {
-				if capability == "prepare_npm_v1" {
-					request.Header.Set("X-Nixorium-Capabilities", "prepare_npm_v1")
-					break
+				if (capability == "prepare_npm_v1" || capability == "host_diagnostics_v1" || capability == "git_history_v1") && !seen[capability] {
+					capabilities = append(capabilities, capability)
+					seen[capability] = true
 				}
+			}
+			if len(capabilities) > 0 {
+				request.Header.Set("X-Nixorium-Capabilities", strings.Join(capabilities, ","))
 			}
 		}
 	}

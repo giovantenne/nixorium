@@ -700,6 +700,11 @@ and reverting the declared profile are distinct operations.
 
 ## Optional Assistant
 
+Capable controllers offer read-only diagnostics for declared computers and
+bounded saved configuration history after renewed disclosure. Diagnostics use
+fixed core units and strict SSH trust; journal and historical-text filtering
+is best effort. See the [Assistant tool limits](assistant.md#tools-and-limits).
+
 Capable controllers offer bounded public npm CLI preparation. Its generated
 deployment module restores a reviewed offline baseline after home reset, without
 boot/login downloads; see the [tool limits](assistant.md#prepared-npm-baselines).

@@ -22,8 +22,10 @@ func TestAssistantSharingCheckboxAndSettingsAreExplicitAndPersistent(t *testing.
 	if m.assistant.sharing || !strings.Contains(m.View().Content, "[ ] "+assistantSharingText) {
 		t.Fatal("sharing not off by default")
 	}
-	if assistantConsentText != "Your messages, and the configuration files the assistant reads, are sent to\nthe Nixorium Assistant service and to its AI provider to prepare a proposal.\nThe service does not keep your configuration files. It keeps the text of\nyour messages and Assistant's answers for 30 days to detect abuse, then\ndeletes it. Whole conversations, including the files Assistant read, are kept\nfor 90 days only if you report an answer or turn on sharing below.\nPasswords and private keys in your deployment are never sent.\nLogs and student files are never read.\nEach message you send uses one request." {
-		t.Fatal("consent text changed")
+	for _, disclosure := range []string{"configuration history", "recent logs", "best effort", "Student home files are not read", "30 days", "90 days"} {
+		if !strings.Contains(assistantConsentText, disclosure) {
+			t.Fatalf("consent lacks %q", disclosure)
+		}
 	}
 	updated, _ := m.Update(keyPress("space"))
 	m = updated.(dashboardModel)
@@ -82,8 +84,13 @@ func TestAssistantReportConsentRatingCommentCancellationAndResult(t *testing.T) 
 	}
 	updated, _ = m.openAssistantReport()
 	m = updated.(dashboardModel)
-	if !strings.Contains(m.View().Content, "Report this answer") || assistantReportText != "This sends this whole conversation (your messages, the configuration contents Assistant read and its check results, with passwords removed) to Nixorium. It is kept for 90 days." {
-		t.Fatal("report text")
+	if !strings.Contains(m.View().Content, "Report this answer") {
+		t.Fatal("report absent")
+	}
+	for _, disclosure := range []string{"whole conversation", "history", "diagnostics", "may leave personal or sensitive text", "90 days"} {
+		if !strings.Contains(assistantReportText, disclosure) {
+			t.Fatal("report disclosure missing", disclosure)
+		}
 	}
 	updated, _ = m.Update(keyPress("esc"))
 	m = updated.(dashboardModel)

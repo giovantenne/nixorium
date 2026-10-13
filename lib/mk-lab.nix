@@ -169,12 +169,17 @@ let
   };
 
   baseHostModules = [
-    ({ lib, ... }:
+    ({ lib, hostName, ... }:
       {
         warnings = lib.optionals laboratoryEnabled (
           lib.optional (cachePublicKeyFile == null) "Missing cache public key"
           ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key");
-        environment.systemPackages = [ hostState hostSessionState hostCleanGenerations ];
+        environment.systemPackages = [ hostState hostSessionState hostCleanGenerations hostDiagnostics ];
+        environment.etc."nixorium-host-diagnostics.json".text = builtins.toJSON {
+          controller = hostName == masterHostName;
+          systemctl = "${bootstrapPkgs.systemd}/bin/systemctl";
+          journalctl = "${bootstrapPkgs.systemd}/bin/journalctl";
+        };
       }
       // lib.optionalAttrs (effectiveDeploymentRevision != null) {
         system.configurationRevision = effectiveDeploymentRevision;
@@ -564,6 +569,12 @@ let
       printf '%s\n%s\n' "$system_path" "$revision"
     '';
   };
+  # Clients need only this helper in their system profile. The controller also
+  # installs the complete package; use its identical target to avoid collisions.
+  hostDiagnostics = bootstrapPkgs.runCommand "nixorium-host-diagnostics" {} ''
+    mkdir -p "$out/bin"
+    ln -s ${nixoriumPackage}/bin/nixorium-host-diagnostics "$out/bin/nixorium-host-diagnostics"
+  '';
   hostSessionState = bootstrapPkgs.writeShellApplication {
     name = "nixorium-session-state";
     runtimeInputs = [ bootstrapPkgs.coreutils bootstrapPkgs.systemd bootstrapPkgs.util-linux bootstrapPkgs.glib ];

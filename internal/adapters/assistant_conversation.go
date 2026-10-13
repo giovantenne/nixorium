@@ -154,8 +154,9 @@ func (store AssistantWorkspaceStore) Cleanup(current ...string) error {
 }
 
 type AssistantWorkspaceTools struct {
-	Store     AssistantWorkspaceStore
-	LabStatus func(context.Context, string) string
+	Store       AssistantWorkspaceStore
+	LabStatus   func(context.Context, string) string
+	Diagnostics func(context.Context, string, string, string) string
 }
 
 func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation domain.AssistantConversation, call domain.AssistantToolCall) string {
@@ -182,6 +183,19 @@ func (tools AssistantWorkspaceTools) Execute(ctx context.Context, conversation d
 	}
 	result := ""
 	switch call.Name {
+	case "host_diagnostics", "git_history":
+		accepted, consentErr := tools.Store.ReadConsent()
+		if consentErr != nil || !accepted {
+			result = `{"ok":false,"error":"consent_required"}`
+		} else if call.Name == "git_history" {
+			result = AssistantGitHistory(ctx, workspace, call)
+		} else if tools.Diagnostics == nil {
+			result = `{"ok":false,"error":"diagnostics_unavailable"}`
+		} else {
+			var args struct{ Host, Area string }
+			json.Unmarshal(call.Arguments, &args)
+			result = tools.Diagnostics(ctx, workspace.Conversation.Repository, args.Host, args.Area)
+		}
 	case "prepare_npm":
 		result = prepareAssistantNpm(ctx, tools.Store, workspace, call)
 	case "lab_status":

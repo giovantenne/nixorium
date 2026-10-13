@@ -9,7 +9,7 @@ import (
 )
 
 const assistantSharingText = "Share my conversations with Nixorium for 90 days to improve Assistant"
-const assistantReportText = "This sends this whole conversation (your messages, the configuration contents Assistant read and its check results, with passwords removed) to Nixorium. It is kept for 90 days."
+const assistantReportText = "This sends the whole conversation to Nixorium, including your messages, configuration and history contents, diagnostics and check results Assistant read. Known secret patterns are filtered, but filtering may leave personal or sensitive text. It is kept for 90 days."
 
 type assistantReportMsg struct {
 	id  uint64

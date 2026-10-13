@@ -16,10 +16,13 @@ func TestAssistantPathBoundaries(t *testing.T) {
 			t.Fatal(path)
 		}
 	}
-	for _, path := range []string{".git/config", "keys/public", "modules/.env.local", ".ssh/id", "secret-key.old", "auth.json", "admin-ssh.pub", "skills/x", ".pi/x", ".codex/x", ".agents/x"} {
+	for _, path := range []string{".git/config", "keys/public", "lab-credentials.json", "modules/lab-credentials.json", "modules/.env.local", ".ssh/id", "secret-key.old", "auth.json", "admin-ssh.pub", "skills/x", ".pi/x", ".codex/x", ".agents/x"} {
 		if !AssistantHiddenPath(path) {
 			t.Fatal(path)
 		}
+	}
+	if AssistantHiddenPath("lab-credentials.json.notes") {
+		t.Fatal("credential filename boundary must be exact")
 	}
 	for _, path := range []string{"lab-settings.json", "flake.lock", "AGENTS.md", "CLAUDE.md", ".gitignore", ".gitattributes", ".gitmodules"} {
 		if !AssistantReadOnlyPath(path) || AssistantHiddenPath(path) {

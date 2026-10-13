@@ -30,6 +30,8 @@ func AssistantToolsV1() []AssistantToolDefinition {
 		definition("build", map[string]any{}, []string{}),
 		definition("lab_status", map[string]any{}, []string{}),
 		definition("prepare_npm", map[string]any{"package": str, "version": str, "id": str}, []string{"package", "id"}),
+		definition("host_diagnostics", map[string]any{"host": str, "area": map[string]any{"type": "string", "enum": []string{"system", "home_reset", "updates", "network", "cache", "pxe"}}}, []string{"host", "area"}),
+		definition("git_history", map[string]any{"limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 20}, "revision": str, "path": str}, []string{}),
 	}
 }
 func ValidateAssistantArguments(name string, data []byte) bool {
@@ -89,8 +91,20 @@ func ValidateAssistantArguments(name string, data []byte) bool {
 		rule := raw.(map[string]any)
 		switch rule["type"] {
 		case "string":
-			if _, ok := value.(string); !ok {
+			text, ok := value.(string)
+			if !ok {
 				return false
+			}
+			if enum, ok := rule["enum"].([]string); ok {
+				found := false
+				for _, allowed := range enum {
+					if text == allowed {
+						found = true
+					}
+				}
+				if !found {
+					return false
+				}
 			}
 		case "boolean":
 			if _, ok := value.(bool); !ok {

@@ -132,13 +132,13 @@ func TestAssistantSharingDefaultPersistenceAndConsentCompatibility(t *testing.T)
 			t.Fatal("toggle changed ordinary consent")
 		}
 	}
-	// Old consent records without the optional setting remain valid and private.
+	// Earlier disclosure must be accepted again before logs or history are shared.
 	os.WriteFile(filepath.Join(store.Directory, "consent.json"), []byte(`{"schemaVersion":1,"acceptedAt":"2026-10-10T00:00:00Z","textVersion":1}`), 0600)
 	if share, err := store.ReadSharing(); err != nil || share {
 		t.Fatal("legacy consent enabled sharing", err)
 	}
-	if accepted, err := store.ReadConsent(); err != nil || !accepted {
-		t.Fatal("legacy consent rejected", err)
+	if accepted, err := store.ReadConsent(); err != nil || accepted {
+		t.Fatal("legacy consent authorized new disclosure", err)
 	}
 	if err := store.WriteConsentSharing(true); err != nil {
 		t.Fatal(err)

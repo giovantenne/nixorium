@@ -76,6 +76,9 @@
       assistantVmTest = pkgs.testers.runNixOSTest (import ./tests/assistant-vm.nix {
         nixoriumPackage = defaultLab.packages.${system}.nixorium;
       });
+      hostDiagnosticsVmTest = pkgs.testers.runNixOSTest (import ./tests/host-diagnostics-vm.nix {
+        nixoriumPackage = defaultLab.packages.${system}.nixorium;
+      });
       managementVmTest = pkgs.testers.runNixOSTest (import ./tests/management-vm.nix {
         nixoriumPackage = defaultLab.packages.${system}.nixorium;
       });
@@ -236,6 +239,7 @@
         client-network-upgrade-vm = clientNetworkUpgradeVmTest;
         management-vm = managementVmTest;
         assistant-vm = assistantVmTest;
+        host-diagnostics-vm = hostDiagnosticsVmTest;
       };
       templates.site = {
         path = ./templates/site;

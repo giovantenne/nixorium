@@ -154,5 +154,53 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "name": "host_diagnostics",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "enum": [
+            "system",
+            "home_reset",
+            "updates",
+            "network",
+            "cache",
+            "pxe"
+          ],
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "area"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "git_history",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    }
   }
 ]

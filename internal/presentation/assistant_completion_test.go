@@ -74,7 +74,7 @@ func TestAssistantExplanations(t *testing.T) {
 	}
 	m.assistant.state = "report"
 	view = ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "Sends only this conversation, once.") || strings.Index(view, "Sends only") > strings.Index(view, "This sends this whole") {
+	if !strings.Contains(view, "Sends only this conversation, once.") || strings.Index(view, "Sends only") > strings.Index(view, "This sends the whole") {
 		t.Fatal("report distinction missing", view)
 	}
 	m.assistant.state = "sharing"

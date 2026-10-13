@@ -390,9 +390,18 @@ any shard must block publication.
   requires renewal or a manual agreement rather than a second subscription.
 - Assistant tools write only the private candidate, never the deployment.
   Preserve relative-path confinement, hidden credentials/untracked files and
-  read-only settings/locks/instructions, plus redaction of all model-facing
-  content and separation of the laboratory token. Seven fixed tools only:
-  no shell, service control, builds, activation, logs or student-home access.
+  read-only settings/locks/instructions, plus filtering of model-facing
+  content and separation of the laboratory token. Fixed typed tools only:
+  no arbitrary shell, service control, activation or student-home file access.
+  Capability-gated diagnostics use fresh declared inventory, strict existing
+  SSH trust, fixed core units, bounded current-boot journal excerpts, numeric
+  disk state and typed reset/update evidence. Never read arbitrary app logs,
+  environment or command-line fields; keep missing evidence explicit. Journal
+  filtering is best effort and the renewed version-2 consent must disclose that
+  personal or sensitive text can remain. Read-only Git history stays within
+  ancestors of the conversation base, visible safe paths and bounded sanitized
+  diffs; it never changes Git or contacts a remote. New observations require
+  renewed consent before entering the model transcript.
   Evaluate a temporary clone with IFD disabled and bounded time/output; compare
   `nixoriumHostClasses` representatives. `groupModules` assigns common module
   paths to existing clientGroups; compose overlaps deterministically, preserve

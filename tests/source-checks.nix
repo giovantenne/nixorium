@@ -126,6 +126,10 @@ in
     inherit nixoriumPackage;
     useKVM = false;
   });
+  host-diagnostics-vm-tcg = pkgs.testers.runNixOSTest (import ./host-diagnostics-vm.nix {
+    inherit nixoriumPackage;
+    useKVM = false;
+  });
   internet-management-vm-tcg = pkgs.testers.runNixOSTest (import ./management-vm.nix {
     inherit nixoriumPackage;
     useKVM = false;

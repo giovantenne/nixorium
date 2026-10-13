@@ -29,7 +29,7 @@ func ValidAssistantPath(path string) bool {
 }
 func AssistantHiddenPath(path string) bool {
 	for _, part := range strings.Split(path, "/") {
-		if part == ".git" || part == "keys" {
+		if part == ".git" || part == "keys" || part == "lab-credentials.json" {
 			return true
 		}
 		for _, prefix := range []string{".env", ".ssh", "secret-key", "auth.json", "admin-ssh", "skills", ".pi", ".codex", ".agents"} {
