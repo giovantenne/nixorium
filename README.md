@@ -8,10 +8,6 @@ every student PC over the local network, without direct Internet access on the
 students' side. Each PC then starts from its own disk, runs its applications
 locally and returns to a clean desktop at every boot.
 
-The **Community Edition** is free and open source. **Assistant** is an optional
-paid add-on integrated into the administrator menu, helping you prepare lab
-customizations in plain language and review them before saving.
-
 [Website](https://nixorium.org/) ·
 [Documentation](#documentation) ·
 [Contributing](CONTRIBUTING.md) ·
@@ -50,7 +46,11 @@ Nixorium bridges that gap with a local-first workflow:
 **One configuration for the whole room.** On the controller, sign in as
 `admin` and open **Nixorium** from the dock, or run `nixorium` in a terminal.
 The guided menu groups everyday tasks into **Computers**, **Installation**,
-**Software** and **Maintenance**, with **Assistant** as a fifth area when enabled.
+**Software** and **Maintenance**. **Assistant** is an optional paid add-on that
+helps you prepare lab customizations in plain language and review them before
+saving.
+
+The **Community Edition** is free and open source.
 
 ![The Nixorium administrator menu, with Computers, Installation, Software, Maintenance and the optional Assistant area enabled](docs/images/nixorium-tui.png)
 
