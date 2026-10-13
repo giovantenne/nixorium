@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-10-13
+
 ### Changed
 
 - Offer Assistant in the administrator menu by default on the controller.
@@ -13,6 +15,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   setting gain the menu after controller application; an explicit `false`
   stays disabled. Account activation, consent and optional conversation sharing
   remain separate explicit choices.
+
+### Documentation
+
+- Move the Assistant overview into the README's administrator section and
+  align the guides with the new default.
 
 ## [3.3.1] - 2026-10-13
 
@@ -1738,7 +1745,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.3.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/giovantenne/nixorium/compare/v3.3.1...v3.4.0
 [3.3.1]: https://github.com/giovantenne/nixorium/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/giovantenne/nixorium/compare/v3.2.3...v3.3.0
 [3.2.3]: https://github.com/giovantenne/nixorium/compare/v3.2.2...v3.2.3
