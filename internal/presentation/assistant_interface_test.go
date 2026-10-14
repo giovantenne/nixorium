@@ -300,7 +300,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 					required = append(required, "● Reading", "✗ Evaluation failed", "Working…")
 				case "proposal":
 					m.assistant.state = "chat"
-					m.assistant.entries = []assistantEntry{{role: "user", text: assistantExamples[0]}, {role: "assistant", text: "# Proposal\n**Ready**\n- Install `gimp`\n```nix\n{ course = 2; }\n```"}}
+					m.assistant.entries = []assistantEntry{{role: "user", text: assistantExamples[0]}, {role: "assistant", text: "# Proposal\n**Proposal ready**\n- Prepare `nodejs` and LAN-only TCP 3000\n```nix\n{ course = 2; }\n```"}}
 					m.assistant.changedFiles = 1
 					required = append(required, "Proposal ready · 1 file changed", "Ctrl+R to review")
 					if size[0] >= 120 {

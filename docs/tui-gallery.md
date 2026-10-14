@@ -6,6 +6,29 @@ inspect a laboratory, contact a computer, query a network, or execute an
 operation. Edit the surrounding explanation here; update the marked region
 with `scripts/generate-docs.sh --write`.
 
+The Assistant examples cover scoped software and LAN policy, diagnosis from
+observed update evidence, and an offline lesson environment restored at boot.
+They illustrate proposals; the displayed checks and outcomes are fixture data.
+The free Software workflow remains available for ordinary package selection.
+
+To regenerate the localized pricing captures, use an empty output directory and
+run the developer-only exporter from a clean source checkout:
+
+```sh
+nix --extra-experimental-features 'nix-command flakes' \
+  develop --file tests/source-checks.nix go-shell \
+  --command go run ./cmd/nixorium-demo \
+  --source-commit "$(git rev-parse HEAD)" \
+  --source-date "$(git show -s --format=%cs HEAD)" \
+  --assistant-output /tmp/nixorium-assistant-pricing
+```
+
+It exports `assistant.<locale>.<NNN>.ansi`, the typed message in
+`assistant.<locale>.txt`, and `assistant-manifest.json` with source identity,
+terminal size and the synthetic marker. The website's existing ANSI converter
+consumes these files. The pricing example uses six selected PCs; the smaller
+navigable dashboard demonstrates the same proposal on two of its four PCs.
+
 ## Workflow guide
 
 The first administrator launch shows the operational disclaimer (Enter accepts,
@@ -231,9 +254,9 @@ Inventory, updating computers, Internet access and power
 Assistant                                                                                              Not activated
 
 Try asking, for example:
-  Install GIMP and Inkscape on all student PCs
-  Block the Internet on pc01–pc06 every Tuesday 10–12
-  pc03 still shows the old wallpaper: what is wrong?
+  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
+  pc03 missed the last update: show the evidence and the next check
+  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
 
 
 
@@ -307,9 +330,9 @@ Enter activate · Esc back
 Assistant · Example laboratory                                                             Free trial · 3 of 10 left
 
 Try asking, for example:
-  Install GIMP and Inkscape on all student PCs
-  Block the Internet on pc01–pc06 every Tuesday 10–12
-  pc03 still shows the old wallpaper: what is wrong?
+  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
+  pc03 missed the last update: show the evidence and the next check
+  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
 
 
 
@@ -339,9 +362,9 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Assistant · Example laboratory                                                                      Free trial ended
 
 Try asking, for example:
-  Install GIMP and Inkscape on all student PCs
-  Block the Internet on pc01–pc06 every Tuesday 10–12
-  pc03 still shows the old wallpaper: what is wrong?
+  Prepare Node.js on pc01–pc06; open port 3000 only to the lab LAN
+  pc03 missed the last update: show the evidence and the next check
+  Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ! Your free trial has ended. Subscribe to continue:                                                              │
 │ https://assistant.nixorium.org/u/EjRWeJASNEjRWeJASNEjRWeJASNEjRWeJASNEjRW                                        │
@@ -418,7 +441,7 @@ or sensitive text. It is kept for 90 days.
   Wrong
 
 Comment (optional, max 500 characters)
-› The package check was helpful.
+› The scope review was helpful.
 
 ↑/↓ Rating  ·  Enter Send  ·  Esc Cancel  ·  F1 Help
 ```
@@ -426,28 +449,28 @@ Comment (optional, max 500 characters)
 ## Assistant candidate ready
 
 ```text
-Assistant                                                                                              Not activated
+Assistant · Your school                                                                            982 requests left
 
- Prepare the course for pc01.
+ Prepare Node.js on pc01–pc02; open port 3000 only to the lab LAN
 
-● Reading modules/course.nix
-● Writing modules/course.nix
-✓ Evaluation passed · changes pc01
+● Reading flake.nix and client scopes
+● Reading the lab network and interface
+● Resolving Node.js from the pinned package set
+● Drafting modules/web-lab.nix
+● Scoping the proposal to pc01–pc02
+● Preparing the proposal for native review
 
-● Prepared the course for pc01.
+● Proposal ready: Node.js on pc01–pc02.
 
+  - TCP 3000 accepts only the lab LAN on its declared interface.
+  - The controller and other PCs are unchanged.
 
-
-
-
-
-
-
+  Ctrl+R reviews and saves the proposal. Deployment needs a separate review; nothing is installed yet.
 
 
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Proposal ready · 1 file changed                                                                 Ctrl+R to review │
+│ Proposal ready · 2 files changed                                                                Ctrl+R to review │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │> Describe what your lab should do                                                                                │
@@ -461,16 +484,17 @@ Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• modules/course.nix changed
+• modules/web-lab.nix added
+• flake.nix changed
 
 Computers affected
-pc01
+pc01–pc02
 
 ✓ Checked by Nixorium: the configuration is valid
 Saving creates a local commit and a backup. Enter on the first choice also updates this controller; you then
 choose the computers.
-› Save and update the controller
-  Save only — update computers later
+  Save and update the controller
+› Save only — update computers later
   Technical details
   Back
 ↑↓ choose · Enter confirm · Esc back to the chat
@@ -482,19 +506,84 @@ choose the computers.
 Nixorium  /  Assistant  /  Review the proposal
 
 What changes
-• modules/course.nix changed
+• modules/web-lab.nix added
+• flake.nix changed
 
 Computers affected
-pc01
+pc01–pc02
 
 ✗ The configuration is not valid
 Saving creates a local commit and a backup. Enter on the first choice also updates this controller; you then
 choose the computers.
-› Save and update the controller
-  Save only — update computers later
+  Save and update the controller
+› Save only — update computers later
   Technical details
   Back
 ↑↓ choose · Enter confirm · Esc back to the chat
+```
+
+## Assistant diagnosis from evidence
+
+```text
+Assistant · Example laboratory                                                                     982 requests left
+
+ pc03 missed the last update: show the evidence and the next check
+
+● Reading pc03 update evidence
+
+● pc03 is out of date. Its observed revision is 000000000000; desired 0123456789ab. The cause is not established.
+
+  No failure log was supplied. Next: run the read-only updates diagnostic on pc03; check nix-daemon.service and its
+  current-boot journal before reviewing a retry. Nothing was changed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│> Describe what your lab should do                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
+```
+
+## Assistant offline lesson proposal
+
+```text
+Assistant · Example laboratory                                                                     982 requests left
+
+ Prepare offline Jupyter + pandas lessons; restore the student baseline at boot
+
+● Lesson proposal: a pinned Python environment with Jupyter + pandas, plus a notebook and CSV in home-files.json.
+
+  Review and save first. Prepare all dependencies and lesson files on the controller before going offline; deploy
+  separately. Lessons then need no downloads.
+
+  At boot, the student home returns to the lesson baseline. Student edits are lost; save work elsewhere before
+  restarting. No running session was reset.
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Proposal ready · 3 files changed                                                                Ctrl+R to review │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│> Describe what your lab should do                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Enter send · Alt+Enter new line · / commands · Ctrl+R review · Esc back
 ```
 
 ## Assistant saved configuration
@@ -502,11 +591,11 @@ choose the computers.
 ```text
 Nixorium  /  Assistant  /  Review the proposal
 
-Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. The controller was not updated.
-Try it on one computer first: Computers → Update computers, select a single computer, check it, then update the
+Saved in a local commit. Backup: refs/nixorium/assistant-backups/example. Computers were not updated.
+You can update them later from Computers → Update computers: try one computer first, check it, then update the
 others.
 
-Enter Apply to this controller  ·  Esc Chat  ·  F1 Help
+Enter Chat  ·  F1 Help
 ```
 
 ## Pinned package search

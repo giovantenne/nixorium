@@ -999,24 +999,8 @@ func demoAssistantOffer() domain.AssistantOffer {
 		TrialURL: "https://assistant.nixorium.org/trial", SubscribeURL: "https://nixorium.org/pricing/"}
 }
 
-// demoAssistantChat puts the model into the activated Assistant chat of a
-// controller with an annual subscription and given consent, showing a finished
-// proposal. It only fills local state, so no service is ever called.
+// demoAssistantChat fills the four-client graph with a scoped synthetic proposal.
+// It never calls a model, evaluates Nix or changes a computer.
 func demoAssistantChat(model *dashboardModel) {
-	model.assistant = newAssistantModel()
-	model.assistant.state = "chat"
-	model.assistant.account = domain.AssistantAccount{Name: "Your school", Plan: "annual", Status: "active", TurnsRemaining: 982}
-	model.assistant.offer = demoAssistantOffer()
-	model.assistant.entries = []assistantEntry{
-		{role: "user", text: "Install GIMP and Inkscape on all student PCs"},
-		{role: "activity", text: "● Reading modules/shared.nix"},
-		{role: "activity", text: "● Searching packages for gimp"},
-		{role: "activity", text: "● Searching packages for inkscape"},
-		{role: "activity", text: "● Writing modules/graphics.nix"},
-		{role: "activity", text: "✓ Evaluation passed · changes pc01–pc12"},
-		{role: "activity", text: "✓ Build check passed"},
-		{role: "assistant", text: "**Ready:** GIMP and Inkscape on the 12 student PCs.\n\n- Added `modules/graphics.nix`, imported by the student PCs.\n- The controller (the teacher’s PC) is unchanged.\n\nPress Ctrl+R to review and save."},
-	}
-	model.assistant.summary = "GIMP and Inkscape on the 12 student PCs."
-	model.assistant.changedFiles = 2
+	setDemoAssistantWebProposal(model, "pc01–pc02")
 }
