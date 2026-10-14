@@ -192,6 +192,10 @@ controller's static address.
 The declared client interface must carry the reviewed live IPv4 address.
 Connect Wi-Fi in the live ISO before the SSH workflow and arrange persistent
 system connectivity separately; live profiles and credentials are not copied.
+An installed client uses a wired Ethernet card unless a `clientIfaceName` or
+`hostIfaceNames` entry (see [Network interfaces](#network-interfaces)) names
+its interface; with the name of a wireless card, the lab address is applied to
+that card.
 After reboot, the configured static client address must be reachable for
 verification. Keep Wi-Fi secrets out of Git and the Nix store. PXE may be
 incompatible with Wi-Fi depending on hardware, firmware, and network setup;

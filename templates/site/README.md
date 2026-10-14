@@ -170,6 +170,25 @@ compatibility, not a new Nixorium release. Actual evaluation/build failures
 still block. See [UPDATES.md](UPDATES.md) for the complete TUI/CLI journey,
 one-time adoption for older deployments, independent packages and recovery.
 
+### Requirements for installing clients
+
+- **Network.** The controller and the clients share the lab network, and the
+  controller needs Internet for preparation and updates. For
+  [network boot](#install-computers-with-pxe), the clients need UEFI network
+  boot and the controller must be allowed to run ProxyDHCP beside the
+  institutional DHCP server, which stays authoritative; Wi-Fi may not support
+  it. [USB over SSH](#install-one-computer-from-usb-over-ssh) needs neither:
+  the live ISO only has to reach the controller over Ethernet or Wi-Fi.
+- **Storage.** Every computer boots in UEFI mode and its disk is erased after
+  you confirm it. The network installer offers only disks with room for the
+  client system plus 2 GiB. Keep free space on the controller (see
+  [Free disk space](#free-disk-space)) because every update adds a system
+  version.
+- **Console.** Network boot is guided on each client's own screen and keyboard.
+  For USB over SSH, keep the live ISO's physical console visible: you read its
+  address and compare its host key fingerprint there. Minimal (text console) is
+  preferable on a computer with 4 GB of RAM or less.
+
 ## Opening Nixorium
 
 On the controller, the administrator and the teacher open **Nixorium** from
@@ -584,7 +603,8 @@ student home reset chooses one of `assets.backgrounds` at random. No blur or
 background polling service is used. Super+arrow window shortcuts remain available.
 
 The login helper enables the three required extensions without replacing other
-enabled extensions. It applies the managed appearance keys once, at an
+enabled extensions. Client computers also enable Nixorium's classroom extension,
+which the core classroom view provides separately. It applies the managed appearance keys once, at an
 account's first login; staff may then customize them. Student accounts
 receive the defaults and a fresh random wallpaper after their ordinary home
 reset; the login helper preserves that wallpaper. All assets and
@@ -1087,7 +1107,12 @@ boot the official **NixOS 26.05 ISO**, either Minimal or Graphical (GNOME), for
 controller. Minimal is smaller and lighter: prefer it when the computer has
 4 GB of RAM or less, because the live system keeps the installer files in
 memory. Graphical is a larger download and needs more RAM. Connect Wi-Fi from
-the live console with `nmtui` first when needed. At its physical console run:
+the live console with `nmtui` first when needed. The installation itself works
+over Wi-Fi, but an installed client uses a wired Ethernet card unless its
+[network interface name](#configuration-and-first-run-setup) is set in the lab
+settings (`clientIfaceName`, or `hostIfaceNames` for one computer): with the
+name of a wireless card set, the static lab address is applied to that card,
+and verification after reboot needs that address. At its physical console run:
 
 ```sh
 passwd
@@ -1194,8 +1219,8 @@ nix run .#nixorium -- git commit plan --paths PATHS
 nix run .#nixorium -- git commit apply --paths PATHS --expect REVIEW_TOKEN
 nix run .#nixorium -- update check
 nix run .#nixorium -- update plan --target master
-nix run .#nixorium -- update plan --target v2.0.0
-nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
+nix run .#nixorium -- update plan --target v3.5.0
+nix run .#nixorium -- update apply --target v3.5.0 --expect REVIEW_TOKEN
 nix run .#nixorium -- setup
 nix run .#nixorium -- setup status
 nix run .#nixorium -- setup keys
@@ -1248,8 +1273,8 @@ Use the guided workflow from this private deployment repository:
 
 ```sh
 nix run .#nixorium -- update check
-nix run .#nixorium -- update plan --target v2.0.0
-nix run .#nixorium -- update apply --target v2.0.0 --expect REVIEW_TOKEN
+nix run .#nixorium -- update plan --target v3.5.0
+nix run .#nixorium -- update apply --target v3.5.0 --expect REVIEW_TOKEN
 ```
 
 `update check` explicitly enumerates the configured public upstream. The
@@ -1298,20 +1323,20 @@ The longer exact phrase remains part of the explicit CLI apply workflow.
 
 For a computed input declaration that the managed workflow conservatively
 refuses, use this advanced manual fallback. In this example the
-new upstream release is `v2.0.0-beta.4`; replace it with the tag you actually
+new upstream release is `v3.5.0`; replace it with the tag you actually
 want to install:
 
 ```sh
 git switch master
 git pull --ff-only
-git switch -c upgrade/nixorium-v2.0.0-beta.4
+git switch -c upgrade/nixorium-v3.5.0
 ```
 
 Open `flake.nix` and change the `inputs.nixorium.url` line so that it contains
 the new release tag:
 
 ```nix
-inputs.nixorium.url = "github:giovantenne/nixorium/v2.0.0-beta.4";
+inputs.nixorium.url = "github:giovantenne/nixorium/v3.5.0";
 ```
 
 Update only that input, review the lock-file change and validate every role:
@@ -1332,9 +1357,9 @@ If every build succeeds, commit and merge the tested upgrade:
 
 ```sh
 git add flake.nix flake.lock
-git commit -m "chore: update nixorium to v2.0.0-beta.4"
+git commit -m "chore: update nixorium to v3.5.0"
 git switch master
-git merge --ff-only upgrade/nixorium-v2.0.0-beta.4
+git merge --ff-only upgrade/nixorium-v3.5.0
 git push origin master
 ```
 

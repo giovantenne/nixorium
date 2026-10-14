@@ -4,9 +4,10 @@ Nixorium manages a room of Linux PCs like one machine.
 
 One PC in the room, the controller, keeps a single description of the lab:
 computers, accounts, software and the student desktop. It installs and updates
-every student PC over the local network, without direct Internet access on the
-students' side. Each PC then starts from its own disk, runs its applications
-locally and returns to a clean desktop at every boot.
+every student PC over the local network, so the student PCs need no Internet
+of their own: installation and updates work even where Internet is available
+only after a login. Each PC then starts from its own disk, runs its
+applications locally and returns to a clean desktop at every boot.
 
 [Website](https://nixorium.org/) ·
 [Documentation](#documentation) ·
@@ -124,9 +125,12 @@ first.
 
 Network installation also needs UEFI network boot on the clients and permission
 to run ProxyDHCP beside the existing DHCP server; Wi-Fi may not support it,
-and USB over SSH works without it. The
-[administrator guide](templates/site/README.md#first-setup) lists the network,
-storage and console requirements in full.
+and USB over SSH works without it, including over Wi-Fi. An installed client
+uses a wired card unless its
+[network interface name](templates/site/README.md#configuration-and-first-run-setup)
+is set in the lab settings. The
+[administrator guide](templates/site/README.md#requirements-for-installing-clients)
+lists the network, storage and console requirements in full.
 
 ## Quick start
 
@@ -192,6 +196,7 @@ and the [security policy](SECURITY.md).
 **Run a lab**
 
 - [Administrator guide](templates/site/README.md): setup, daily operation and customization
+- [Assistant](docs/assistant.md): describe a lab customization and review the proposal before saving
 - [Troubleshooting](docs/troubleshooting.md): failures, recovery and [backups](docs/troubleshooting.md#backups-and-restoration)
 - [Optional adoption statistics](docs/telemetry.md): preview, consent and privacy
 - [Update guide](docs/updates.md): Nixorium, NixOS and package updates

@@ -1,7 +1,9 @@
 # Assistant protocol v2.5
 
 The v2 endpoints and fields remain unchanged except for the additions below.
-The client executes the seven v1 deployment tools. The service alone executes
+The client executes the twelve v1 deployment tools listed in
+[assistant-tools-v1.json](assistant-tools-v1.json) and described in the
+[Assistant guide](assistant.md#tools-and-limits). The service alone executes
 `read_core`.
 
 ## Step context

@@ -19,7 +19,9 @@ The deployment-owned workstation module supplies a restrained GNOME 50 profile:
 - Tiling Assistant for snap assist and 8 px window gaps, with its panel indicator
   disabled. Existing Super+arrow window controls remain available.
 
-There are three managed Shell extensions in total. Packages, extension metadata
+The profile manages these three Shell extensions. Client computers also enable
+Nixorium's own classroom extension (`nixorium-classroom@nixorium.org`), supplied
+by the core classroom view module rather than by this profile. Packages, extension metadata
 and schemas come from the deployment's locked Nixpkgs; nothing is fetched at
 login. Appearance remains site policy, not an upstream GNOME mechanism.
 

@@ -162,6 +162,10 @@ The model has fixed tools, with no shell or system-operation tool:
 | `host_diagnostics` | One exact declared computer and a fixed area; read-only state and at most 50 current-boot journal entries, 32 KiB result, 60-second total timeout |
 | `git_history` | Up to 20 ancestors of this conversation's base; exact visible path filter and bounded sanitized comparison to a selected full revision; no remote access |
 
+The wire-level step context and service messages are specified in the
+[assistant protocol v2.5](assistant-protocol-v25.md); the tool schemas are in
+[assistant-tools-v1.json](assistant-tools-v1.json).
+
 Paths must be relative, with no traversal, backslashes or control characters;
 the limit is 12 components and 512 bytes. A file cannot replace a directory
 that still contains visible files. Tools cannot activate a system,

@@ -32,6 +32,12 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Align guide menu paths, the free trial size, Assistant shortcuts, the
   teacher's classroom controls and the student snapshot path with the current
   interface and code.
+- The restricted teacher dashboard in the interface gallery now lists all six
+  classroom tools, as a real teacher session does. The README states what the
+  student PCs need (no Internet of their own), lists the client installation
+  requirements in the administrator guide, explains how Wi-Fi clients are
+  configured, links the Assistant guide and its protocol note, and corrects the
+  count of managed Shell extensions and the example release tags.
 
 ## [3.5.0] - 2026-10-14
 

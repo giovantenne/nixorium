@@ -20,7 +20,7 @@ docs: document downstream migration
 refactor: split shared desktop modules
 test: cover invalid lab networks
 ci: validate offline installer equivalence
-chore: prepare v2.0.0-beta.4
+chore: prepare v3.5.0
 feat!: change the lab network schema
 ```
 
