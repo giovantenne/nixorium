@@ -47,7 +47,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("systemd-run --user -M student@ --unit=workbench /run/current-system/sw/bin/mysql-workbench")
     machine.wait_until_succeeds("grep -F 'System info' /home/student/.mysql/workbench/log/wb.log", timeout=120)
     machine.wait_until_succeeds("test -s /home/student/.mysql/workbench/server_instances.xml", timeout=60)
-    machine.sleep(10)
+    machine.wait_for_text("Unsupported Operating System")
     machine.send_key("esc")
     machine.screenshot("workbench-first-start")
     machine.succeed(user + "${clicker} 640 524")
@@ -59,12 +59,9 @@ pkgs.testers.runNixOSTest {
     machine.succeed(user + "${clicker} 487 582")
     machine.wait_until_succeeds("grep -F \"Opened connection 'Local instance 3306'\" /home/student/.mysql/workbench/log/wb.log", timeout=90)
     machine.fail("grep -F 'could not be connected' /home/student/.mysql/workbench/log/wb.log")
-    # The session is real: a query runs as root on the teaching server.
-    machine.sleep(5)
-    machine.succeed(user + "${clicker} 700 400")
-    machine.send_chars("SELECT CURRENT_USER();")
-    machine.send_key("ctrl-ret")
-    machine.wait_for_text("root@localhost")
-    machine.screenshot("workbench-query")
+    # The session is real: the server holds an authenticated root connection
+    # made by Workbench itself (not by the checking client).
+    machine.wait_until_succeeds("test \"$(mysql -u root -N -e \"SELECT COUNT(*) FROM performance_schema.session_connect_attrs a JOIN performance_schema.threads t ON t.PROCESSLIST_ID = a.PROCESSLIST_ID WHERE a.ATTR_NAME='program_name' AND a.ATTR_VALUE = 'MySQLWorkbench' AND t.PROCESSLIST_USER='root'\")\" -gt 0", timeout=60)
+    machine.screenshot("workbench-connected")
   '';
 }
