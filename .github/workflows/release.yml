@@ -119,6 +119,13 @@ jobs:
             echo "Release tag no longer points to the validated commit." >&2
             exit 1
           fi
+          # GitHub occasionally delivers the same tag push twice; the
+          # concurrency group serializes the runs, so the second one finds
+          # the release already published from this same commit.
+          if gh release view "v${VERSION}" > /dev/null 2>&1; then
+            echo "Release v${VERSION} is already published; nothing to do."
+            exit 0
+          fi
           RELEASE_ARGS=(
             "v${VERSION}"
             --verify-tag
