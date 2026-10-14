@@ -294,7 +294,7 @@ and mouse blocked, until **Stop sharing** or until you close the page.
 - `updateValidationHosts` in `mkLab`: extra validation hosts when private shared
   modules branch on host identity (explicit host modules are already covered)
 - `assets/logo.txt`: screensaver logo
-- `scripts/screensaver-monitor.sh`, `scripts/cmd-screensaver.sh`: screensaver idle monitor and effect loop, used straight from the Nix store
+- `scripts/screensaver-monitor.sh`, `scripts/cmd-screensaver.sh`: screensaver idle monitor and effect loop, used straight from the Nix store and always run through bash, so they do not need the executable bit
 
 These files are the lab's workstation profile. They are intentionally part of
 this private repository rather than Nixorium core, so package and policy changes

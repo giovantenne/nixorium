@@ -15,6 +15,14 @@ The project follows [Semantic Versioning](https://semver.org/).
   mentions `mkForce` or `mkOverride`; the save flow is unchanged. The Assistant
   guide documents the limits and the GRUB rollback.
 
+### Fixed
+
+- The lab screensaver service no longer depends on the executable bit of its
+  scripts: both are now run through bash. Labs that copied the 3.6.0 template
+  files and see `203/EXEC` in `systemctl --user status lab-screensaver` should
+  refresh `modules/screensaver.nix` and `scripts/screensaver-monitor.sh` from
+  the template (or run `chmod +x` on the two scripts).
+
 ## [3.6.0] - 2026-10-14
 
 ### Changed

@@ -10,8 +10,10 @@ set -euo pipefail
 #   On activity          -> kill screensaver
 #
 # The service passes the Nix store paths of the terminal script and the logo:
+#   SCREENSAVER_SHELL bash used to run SCREENSAVER_CMD (it needs no executable bit)
 #   SCREENSAVER_CMD   script that runs the effects inside the terminal
 #   SCREENSAVER_TEXT  text file the effects animate
+: "${SCREENSAVER_SHELL:=bash}"
 : "${SCREENSAVER_CMD:?SCREENSAVER_CMD is not set}"
 : "${SCREENSAVER_TEXT:?SCREENSAVER_TEXT is not set}"
 
@@ -54,7 +56,7 @@ launch_screensaver() {
     --window-padding-x=0 \
     --window-padding-y=0 \
     --gtk-titlebar=false \
-    -e "$SCREENSAVER_CMD" "$SCREENSAVER_TEXT" &
+    -e "$SCREENSAVER_SHELL" "$SCREENSAVER_CMD" "$SCREENSAVER_TEXT" &
 }
 
 kill_screensaver() {
