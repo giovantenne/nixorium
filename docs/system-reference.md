@@ -68,8 +68,8 @@ revision. It writes only ordinary `shared` declarations for the complete
 selected profile to `lab-software.json` before Git initialization, Nix
 evaluation, or disk changes. It refuses releases without bootstrap capability
 version 2. The supported
-bootstrap environment is the official NixOS Minimal ISO booted in UEFI mode,
-which starts in the required Linux text console. Keyboard is collected and
+bootstrap environment is the official NixOS Minimal ISO (Linux text console)
+or Graphical ISO (GNOME session) booted in UEFI mode. Keyboard is collected and
 activated first, then time zone is collected before account details, so all
 subsequent input uses the installed controller layout. The PXE environment
 later applies that same console keymap before local client enrollment. The

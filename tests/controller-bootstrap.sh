@@ -15,7 +15,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$MOCK_BIN" "${TARGET_ROOT}/home/admin"
+mkdir -p "$MOCK_BIN" "${TARGET_ROOT}/home/admin" \
+  "${TEST_ROOT}/gnome-target/home/admin" "${TEST_ROOT}/gnome-fail-target/home/admin" \
+  "${TEST_ROOT}/ssh-target/home/admin"
 
 cat > "${MOCK_BIN}/curl" <<'EOF'
 #!/usr/bin/env bash
@@ -102,12 +104,23 @@ fi
 EOF
 chmod +x "${MOCK_BIN}/loadkeys"
 
+cat > "${MOCK_BIN}/gsettings" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'gsettings %s\n' "$*" >> "$BOOTSTRAP_CALL_LOG"
+if [[ "${BOOTSTRAP_GSETTINGS_FAIL:-false}" == "true" ]]; then
+  exit 1
+fi
+EOF
+chmod +x "${MOCK_BIN}/gsettings"
+
 cat > "${MOCK_BIN}/sudo" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "chown" ]]; then
   exit 0
 fi
+printf 'sudo %s\n' "$*" >> "$BOOTSTRAP_CALL_LOG"
 exec "$@"
 EOF
 chmod +x "${MOCK_BIN}/sudo"
@@ -115,6 +128,7 @@ chmod +x "${MOCK_BIN}/sudo"
 export PATH="${MOCK_BIN}:$PATH"
 export DISPLAY=""
 export WAYLAND_DISPLAY=""
+unset SSH_CONNECTION SSH_TTY
 export BOOTSTRAP_CALL_LOG="$CALL_LOG"
 export BOOTSTRAP_INSTALLER_LOG="$INSTALLER_LOG"
 export BOOTSTRAP_REVISION="$REVISION"
@@ -123,7 +137,7 @@ export NIXORIUM_INSTALLER_EFI_DIRECTORY="${TEST_ROOT}/efi"
 mkdir -p "$NIXORIUM_INSTALLER_EFI_DIRECTORY"
 
 printf '%s\n' \
-  'it' 'Europe/Rome' '' '' \
+  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -139,24 +153,87 @@ fi
 grep -F "must match the selected release" "${TEST_ROOT}/mismatch.out" >/dev/null
 test ! -e "$CALL_LOG"
 
-if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
-  NIXORIUM_BOOTSTRAP_TTY="$BOOTSTRAP_INPUT" \
-  DISPLAY=:0 \
+# GNOME live session: the layout is set through gsettings as the user, never
+# through sudo, and the graphical terminal is no longer refused.
+GNOME_INPUT="${TEST_ROOT}/gnome-input"
+printf '%s\n' \
+  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
+  'admin-secret' 'admin-secret' \
+  'teacher-secret' 'teacher-secret' \
+  'student-secret' 'student-secret' \
+  '' '3' '' > "$GNOME_INPUT"
+NIXORIUM_TARGET_ROOT="${TEST_ROOT}/gnome-target" \
+  NIXORIUM_BOOTSTRAP_TTY="$GNOME_INPUT" \
+  WAYLAND_DISPLAY=wayland-0 \
   timeout --foreground --kill-after=2s 10s \
   "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
-  >"${TEST_ROOT}/graphical.out" 2>&1; then
-  echo "bootstrap accepted password setup from a graphical terminal" >&2
+  >"${TEST_ROOT}/gnome.out" 2>&1 || { cat "${TEST_ROOT}/gnome.out" >&2; exit 1; }
+grep -F "gsettings set org.gnome.desktop.input-sources sources [('xkb', 'it')]" "$CALL_LOG" >/dev/null
+grep -F "gsettings set org.gnome.desktop.input-sources current 0" "$CALL_LOG" >/dev/null
+if grep -E '^sudo gsettings|loadkeys' "$CALL_LOG" >/dev/null; then
+  echo "GNOME keyboard activation used sudo or loadkeys" >&2
   exit 1
 fi
-grep -F "cannot be verified safely from a graphical terminal" \
-  "${TEST_ROOT}/graphical.out" >/dev/null
-if grep -F "Step 3 of 5 · Passwords" "${TEST_ROOT}/graphical.out" >/dev/null; then
-  echo "bootstrap requested passwords in an unverified graphical layout" >&2
+if grep -F "graphical terminal" "${TEST_ROOT}/gnome.out" >/dev/null; then
+  echo "bootstrap still refuses graphical terminals" >&2
+  exit 1
+fi
+grep -F "Received: @ # [ ] { } \ | ò à è ù €" "${TEST_ROOT}/gnome.out" >/dev/null
+grep -F "Use the same keyboard you will use at the login screen." "${TEST_ROOT}/gnome.out" >/dev/null
+: > "$CALL_LOG"
+
+# gsettings failure: ask for the GNOME top bar menu (Enter) and carry on.
+sed '1a\
+' "$GNOME_INPUT" > "${TEST_ROOT}/gnome-fail-input"
+NIXORIUM_TARGET_ROOT="${TEST_ROOT}/gnome-fail-target" \
+  NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/gnome-fail-input" \
+  DISPLAY=:0 \
+  BOOTSTRAP_GSETTINGS_FAIL=true \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/gnome-fail.out" 2>&1 || { cat "${TEST_ROOT}/gnome-fail.out" >&2; exit 1; }
+grep -F "keyboard menu in the GNOME top bar" "${TEST_ROOT}/gnome-fail.out" >/dev/null
+grep -F "The controller is installed." "${TEST_ROOT}/gnome-fail.out" >/dev/null
+: > "$CALL_LOG"
+
+# SSH without a graphical session: no loadkeys, explanatory text.
+printf '%s\n' 'it' '@' '' 'Europe/Rome' '' '' \
+  'admin-secret' 'admin-secret' 'teacher-secret' 'teacher-secret' \
+  'student-secret' 'student-secret' '' '3' '' > "${TEST_ROOT}/ssh-input"
+NIXORIUM_TARGET_ROOT="${TEST_ROOT}/ssh-target" \
+  NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/ssh-input" \
+  SSH_CONNECTION="192.0.2.1 1 192.0.2.2 22" \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/ssh.out" 2>&1 || { cat "${TEST_ROOT}/ssh.out" >&2; exit 1; }
+grep -F "connected over SSH" "${TEST_ROOT}/ssh.out" >/dev/null
+if grep -E 'loadkeys|gsettings' "$CALL_LOG" >/dev/null; then
+  echo "SSH session tried to change the keyboard" >&2
   exit 1
 fi
 : > "$CALL_LOG"
 
-printf '%s\n\n\n\n' 'us' > "${TEST_ROOT}/truncated-input"
+# Answering no to the keyboard check returns to the layout choice.
+printf '%s\n' 'it' 'wrong' 'n' 'us' '@ # [ ] { } \ | ~ `' '' > "${TEST_ROOT}/keyboard-check-input"
+if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+  NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/keyboard-check-input" \
+  timeout --foreground --kill-after=2s 10s \
+  "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+  >"${TEST_ROOT}/keyboard-check.out" 2>&1; then
+  echo "bootstrap accepted truncated input after the keyboard check" >&2
+  exit 1
+fi
+test "$(grep -c -F 'Keyboard layout [' "${TEST_ROOT}/keyboard-check.out")" -eq 2
+grep -F "Received: wrong" "${TEST_ROOT}/keyboard-check.out" >/dev/null
+grep -F "loadkeys it2" "$CALL_LOG" >/dev/null
+grep -F "loadkeys us" "$CALL_LOG" >/dev/null
+if grep -F "Step 3 of 5 · Passwords" "${TEST_ROOT}/keyboard-check.out" >/dev/null; then
+  echo "bootstrap asked for passwords before the keyboard was confirmed" >&2
+  exit 1
+fi
+: > "$CALL_LOG"
+
+printf '%s\n\n\n\n\n' 'us' > "${TEST_ROOT}/truncated-input"
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/truncated-input" \
   timeout --foreground --kill-after=2s 10s \
@@ -188,7 +265,7 @@ fi
 : > "$CALL_LOG"
 
 printf '%s\n' \
-  'it' 'Europe/Rome' '' '' \
+  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -210,7 +287,7 @@ test ! -e "$INSTALLER_LOG"
 
 # Answering no to the review asks the questions again instead of cancelling.
 printf '%s\n' \
-  'it' 'Europe/Rome' '' '' \
+  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -253,7 +330,7 @@ fi
 grep -F "Finding the exact source of Nixorium master" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "Using Nixorium master, revision ${REVISION}" "${TEST_ROOT}/install.out" >/dev/null
 grep -F "Time zone [Europe/Rome]" "${TEST_ROOT}/install.out" >/dev/null
-grep -F "Recommended environment: official NixOS Minimal ISO in UEFI mode." \
+grep -F "Recommended environment: official NixOS ISO (Minimal or Graphical) in UEFI mode." \
   "${TEST_ROOT}/install.out" >/dev/null
 for UI_TEXT in \
   "Controller setup for a NixOS computer lab" \

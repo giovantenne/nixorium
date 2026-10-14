@@ -116,7 +116,8 @@ start with one controller and one client of your own.
 ## What you need
 
 Two 64-bit PCs with UEFI that you can erase (or two virtual machines), a USB
-stick with the official [NixOS Minimal ISO](https://nixos.org/download/#nixos-iso),
+stick with the official [NixOS ISO](https://nixos.org/download/#nixos-iso)
+(Minimal for a text console, or Graphical with GNOME),
 Internet on the controller, and a network where the two PCs reach each other.
 Installation erases the disk you confirm on each PC: back up anything you need
 first.
@@ -133,8 +134,8 @@ Verify **one client** before preparing the rest of the room. For a disposable
 trial on virtual machines, follow the
 [evaluation environment](docs/evaluation-environment.md).
 
-1. **Install the controller.** Boot the NixOS Minimal ISO in UEFI mode with
-   Internet access and run, in its text console:
+1. **Install the controller.** Boot the official NixOS ISO in UEFI mode, either
+   Minimal (text console) or Graphical (GNOME), with Internet access and run:
 
    ```sh
    curl -fsSL https://nixorium.org/install.sh | bash
@@ -142,8 +143,12 @@ trial on virtual machines, follow the
 
    The [bootstrap script](install.sh) asks for the keyboard layout first, then
    the time zone, accounts, passwords, an initial software profile and the
-   disk, which it erases only after you type `ERASE`. Use the Minimal ISO
-   console, not a terminal inside a graphical ISO.
+   disk, which it erases only after you type `ERASE`. Right after the keyboard
+   choice it asks you to type a test line, so you can confirm the symbols
+   before choosing passwords. The Graphical ISO is useful when a web browser is
+   needed to unlock a captive Internet portal: connect, unlock it in Firefox,
+   then open Terminal and run the command above. Ignore the "Install NixOS"
+   icon.
 
 2. **Configure the lab.** Reboot, sign in as `admin` and open **Nixorium** from
    the dock (or run `nixorium`). In **Installation**, choose **Network boot

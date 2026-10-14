@@ -17,6 +17,7 @@ BOOTSTRAP_STUDENT_USER="student"
 BOOTSTRAP_TIME_ZONE="America/New_York"
 BOOTSTRAP_KEYBOARD="us"
 BOOTSTRAP_CONSOLE_KEYMAP="us"
+BOOTSTRAP_ENVIRONMENT="console"
 BOOTSTRAP_ADMIN_HASH=""
 BOOTSTRAP_TEACHER_HASH=""
 BOOTSTRAP_STUDENT_HASH=""
@@ -184,7 +185,7 @@ hash_bootstrap_password() {
     printf '%s\n' "$PASSWORD" | openssl passwd -6 -stdin
   else
     ui_error "This live system cannot encrypt passwords (no mkpasswd or openssl)." \
-      "Start from the official NixOS Minimal ISO and run the command again."
+      "Start from an official NixOS ISO and run the command again."
     return 1
   fi
 }
@@ -231,7 +232,7 @@ prompt_bootstrap_password() {
     CONFIRMATION=""
     if [[ ! "$HASH" =~ ^\$6\$[^$]+\$[^$]+$ ]]; then
       ui_error "The password could not be encrypted correctly." \
-      "Start from the official NixOS Minimal ISO and run the command again."
+      "Start from an official NixOS ISO and run the command again."
       return 1
     fi
     printf -v "$TARGET_VAR" '%s' "$HASH"
@@ -240,15 +241,53 @@ prompt_bootstrap_password() {
   done
 }
 
-activate_bootstrap_keyboard() {
-  if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
-    ui_error "The selected keyboard cannot be verified safely from a graphical terminal." \
-      "Boot the official NixOS Minimal ISO, or switch to a Linux text console, then run the command again."
-    return 1
+# Where the installer runs decides how the keyboard layout is applied:
+# "gnome" (graphical live session), "ssh" (remote shell) or "console".
+detect_bootstrap_environment() {
+  if [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
+    BOOTSTRAP_ENVIRONMENT="gnome"
+  elif [[ -n "${SSH_CONNECTION:-}" || -n "${SSH_TTY:-}" ]]; then
+    BOOTSTRAP_ENVIRONMENT="ssh"
+  else
+    BOOTSTRAP_ENVIRONMENT="console"
   fi
+}
+
+# Set the GNOME session layout as the invoking user; never through sudo,
+# because root cannot reach the user's session bus.
+activate_gnome_keyboard() {
+  local SCHEMA="org.gnome.desktop.input-sources"
+
+  command -v gsettings >/dev/null 2>&1 || return 1
+  gsettings set "$SCHEMA" sources "[('xkb', '${BOOTSTRAP_KEYBOARD}')]" || return 1
+  # Forget the recently used sources so the new layout applies immediately.
+  gsettings set "$SCHEMA" mru-sources "[]" >/dev/null 2>&1 || true
+  gsettings set "$SCHEMA" current 0 || return 1
+}
+
+activate_bootstrap_keyboard() {
+  detect_bootstrap_environment
+  case "$BOOTSTRAP_ENVIRONMENT" in
+    gnome)
+      if activate_gnome_keyboard; then
+        ui_success "Keyboard set to $BOOTSTRAP_KEYBOARD for this session. The same layout is used after installation."
+      else
+        ui_feedback "Could not change the layout automatically."
+        ui_note "Choose '$BOOTSTRAP_KEYBOARD' from the keyboard menu in the GNOME top bar,"
+        ui_note "then press Enter to continue."
+        IFS= read -r -u "$BOOTSTRAP_INPUT_FD" _ || true
+      fi
+      return 0
+      ;;
+    ssh)
+      ui_note "You are connected over SSH: the keyboard of the computer you type on is used,"
+      ui_note "and its layout cannot be changed from here. Use the layout you will use at the login screen."
+      return 0
+      ;;
+  esac
   if ! command -v loadkeys >/dev/null 2>&1; then
     ui_error "This live system cannot change the keyboard layout (no loadkeys)." \
-      "Start from the official NixOS Minimal ISO and run the command again."
+      "Start from an official NixOS ISO and run the command again."
     return 1
   fi
   if ! sudo loadkeys "$BOOTSTRAP_CONSOLE_KEYMAP"; then
@@ -257,6 +296,49 @@ activate_bootstrap_keyboard() {
     return 1
   fi
   ui_success "Keyboard set to $BOOTSTRAP_KEYBOARD. It is used from now on and after installation."
+}
+
+# Let the owner see what the keyboard really produces before any password.
+# Returns 0 when the received line matches the pressed keys, 1 otherwise.
+check_bootstrap_keyboard() {
+  local SAMPLE
+  local RECEIVED
+  local ANSWER
+
+  case "$BOOTSTRAP_KEYBOARD" in
+    us) SAMPLE='@ # [ ] { } \ | ~ `' ;;
+    gb) SAMPLE='@ " # £ [ ] { } \ | ~' ;;
+    it) SAMPLE='@ # [ ] { } \ | ò à è ù €' ;;
+    fr) SAMPLE='@ # [ ] { } \ | é è à ù ç' ;;
+    de) SAMPLE='@ # [ ] { } \ | ä ö ü ß €' ;;
+    es) SAMPLE='@ # [ ] { } \ | ñ ç á é €' ;;
+  esac
+  echo
+  ui_note "Quick keyboard check. Type this line, then press Enter:"
+  ui_note "  ${SAMPLE}"
+  ui_prompt "Test line"
+  if ! IFS= read -r -u "$BOOTSTRAP_INPUT_FD" RECEIVED; then
+    echo >&2
+    ui_error "Setup input ended before all questions were answered."
+    exit 1
+  fi
+  ui_note "Received: ${RECEIVED}"
+  while true; do
+    ui_prompt "Does it match the keys you pressed?" "Y/n"
+    if ! IFS= read -r -u "$BOOTSTRAP_INPUT_FD" ANSWER; then
+      echo >&2
+      ui_error "Setup input ended before all questions were answered."
+      exit 1
+    fi
+    case "${ANSWER,,}" in
+      ""|y|yes) return 0 ;;
+      n|no)
+        ui_feedback "Let's choose the keyboard layout again."
+        return 1
+        ;;
+      *) ui_feedback "Type y for yes or n to choose the layout again." ;;
+    esac
+  done
 }
 
 suggest_time_zone() {
@@ -281,21 +363,26 @@ collect_regional_settings() {
   ui_note "  fr  French           de  German           es  Spanish"
   echo
   while true; do
-    if ! prompt_bootstrap_value "Keyboard layout" "$BOOTSTRAP_KEYBOARD" BOOTSTRAP_KEYBOARD; then
-      return 1
+    while true; do
+      if ! prompt_bootstrap_value "Keyboard layout" "$BOOTSTRAP_KEYBOARD" BOOTSTRAP_KEYBOARD; then
+        return 1
+      fi
+      case "$BOOTSTRAP_KEYBOARD" in
+        us) BOOTSTRAP_CONSOLE_KEYMAP="us"; break ;;
+        it) BOOTSTRAP_CONSOLE_KEYMAP="it2"; break ;;
+        gb) BOOTSTRAP_CONSOLE_KEYMAP="uk"; break ;;
+        fr) BOOTSTRAP_CONSOLE_KEYMAP="fr"; break ;;
+        de) BOOTSTRAP_CONSOLE_KEYMAP="de"; break ;;
+        es) BOOTSTRAP_CONSOLE_KEYMAP="es"; break ;;
+        *) ui_feedback "Type one of the codes above, for example it." ;;
+      esac
+    done
+    activate_bootstrap_keyboard || return 1
+    if check_bootstrap_keyboard; then
+      break
     fi
-    case "$BOOTSTRAP_KEYBOARD" in
-      us) BOOTSTRAP_CONSOLE_KEYMAP="us"; break ;;
-      it) BOOTSTRAP_CONSOLE_KEYMAP="it2"; break ;;
-      gb) BOOTSTRAP_CONSOLE_KEYMAP="uk"; break ;;
-      fr) BOOTSTRAP_CONSOLE_KEYMAP="fr"; break ;;
-      de) BOOTSTRAP_CONSOLE_KEYMAP="de"; break ;;
-      es) BOOTSTRAP_CONSOLE_KEYMAP="es"; break ;;
-      *) ui_feedback "Type one of the codes above, for example it." ;;
-    esac
   done
 
-  activate_bootstrap_keyboard || return 1
   suggest_time_zone
   echo
   ui_note "Time zone as Region/City, for example Europe/Rome or America/Chicago."
@@ -333,6 +420,7 @@ collect_accounts() {
 collect_passwords() {
   ui_step 3 "Passwords"
   ui_note "At least 8 characters each. What you type stays hidden."
+  ui_note "Use the same keyboard you will use at the login screen."
   ui_note "Keep the administrator password safe: you need it to manage the lab."
   echo
   prompt_bootstrap_password "Administrator password" BOOTSTRAP_ADMIN_HASH || return 1
@@ -353,7 +441,7 @@ collect_bootstrap_configuration() {
   exec {BOOTSTRAP_INPUT_FD}< "$BOOTSTRAP_TTY"
 
   echo
-  ui_note "${UI_MUTED}Recommended environment: official NixOS Minimal ISO in UEFI mode.${UI_RESET}"
+  ui_note "${UI_MUTED}Recommended environment: official NixOS ISO (Minimal or Graphical) in UEFI mode.${UI_RESET}"
   ui_note "Press Enter to keep the value shown in [brackets]."
 
   while true; do

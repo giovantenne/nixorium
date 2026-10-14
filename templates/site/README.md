@@ -70,13 +70,18 @@ then asks for the initial software profile before the first build or disk
 change. The selected profile becomes ordinary `shared` declarations in
 `lab-software.json`; bootstrap includes the complete profile without asking for
 package IDs, and it does not remain an active policy.
-Use the official [NixOS Minimal ISO](https://nixos.org/download/#nixos-iso) in
-UEFI mode for controller bootstrap. It provides the expected Linux text
-console: keyboard is the first settings prompt, the selected console keymap is
-applied, and time zone follows immediately before account details. The
-bootstrap stops if activation fails or the terminal belongs to an unverifiable
-graphical session; a terminal inside the Graphical ISO is not the supported
-path.
+Use the official [NixOS ISO](https://nixos.org/download/#nixos-iso) in UEFI
+mode for controller bootstrap: either the Minimal ISO (text console) or the
+Graphical ISO (GNOME). The Graphical ISO is useful when a browser is needed to
+unlock a captive Internet portal: connect, unlock it in Firefox, then open
+Terminal and run the command; ignore the "Install NixOS" icon. Keyboard is the
+first settings prompt. On the text console the matching console keymap is
+loaded; in a GNOME session the same XKB layout the installed system uses is
+set with `gsettings` as the signed-in user, and if that fails the installer asks
+you to pick the layout from the GNOME top bar. Over SSH the keyboard of the
+client you type on is used. A test line with layout-sensitive symbols is then
+echoed back and must be confirmed before any password is requested; time zone
+follows immediately before account details.
 Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
 The public Nix evaluator and the management command both reject empty required

@@ -11,6 +11,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 - **Maintenance → Change account passwords** opens the administrator, teacher
   and student password form directly; a new password takes effect after applying
   to the controller and updating the computers.
+
+- Controller bootstrap now runs from the official Graphical (GNOME) NixOS ISO as
+  well as the Minimal ISO, sets the GNOME session layout with `gsettings`, and
+  asks for a keyboard test line before the passwords.
+
 - Additional initial student files and empty directories through strict
   `home-files.json`, content-addressed captured payloads and inline configuration
   text. The common controller/client student seed retains private ownership and
