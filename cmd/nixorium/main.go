@@ -281,6 +281,7 @@ func runDashboardProgram(ctx context.Context, repository string, setupMode bool,
 	gitReviewManager := app.NewGitReviewManager(local)
 	gitCommitManager := app.NewGitCommitManager(local)
 	updateManager := app.NewUpdateManager(local)
+	updateManager.RunningVersion = nixoriumVersion
 	updateNotifications := app.NewUpdateNotificationManager(local)
 	baseSource := adapters.PackageBase{}
 	baseManager := app.NewPackageBaseManager(baseSource)

@@ -32,6 +32,7 @@ type UpdateCheckReport struct {
 	CurrentRef     string            `json:"currentRef,omitempty"`
 	CurrentRev     string            `json:"currentRevision,omitempty"`
 	CurrentChannel UpdateChannel     `json:"currentChannel,omitempty"`
+	VersionFloor   string            `json:"versionFloor,omitempty"`
 	Development    []UpdateRelease   `json:"development"`
 	Stable         []UpdateRelease   `json:"stable"`
 	Prerelease     []UpdateRelease   `json:"prerelease"`

@@ -177,6 +177,7 @@ func runPackageBaseCommand(ctx context.Context, repository string, options optio
 
 func runUpdateCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
 	manager := app.NewUpdateManager(adapters.Local{})
+	manager.RunningVersion = nixoriumVersion
 	var err error
 	switch options.subcommand {
 	case "check":

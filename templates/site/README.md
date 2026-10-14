@@ -1297,13 +1297,15 @@ controller candidate. A laboratory deployment retains the representative control
 Unknown modes, a client inventory in controller mode, or missing explicit
 controller readiness are rejected.
 Prereleases require `--allow-prerelease`; known downgrades require
-`--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
+`--allow-downgrade`; on a `master` or commit pin, releases older than the
+running Nixorium version count as downgrades. Apply repeats validation and changes only `flake.nix` and
 `flake.lock`; review and optionally commit them separately. It never branches,
 commits, pushes, activates, starts PXE, or deploys clients.
 The TUI's **Maintenance → Update Nixorium** task first fetches this bounded release
 list. `master` is clearly marked as the Development branch, stable releases are
 shown by default, and prereleases require explicit disclosure. The TUI has no
-editable target and does not offer downgrades. During validation it shows the
+editable target and does not offer downgrades, hiding releases older than the
+configured release (or the running version on a `master` pin). During validation it shows the
 candidate-lock, evaluation, representative-build, review, and final verification
 phases, including the required output count and elapsed time. Required outputs
 share one Nix build and the exact candidate lock; all must succeed. PXE

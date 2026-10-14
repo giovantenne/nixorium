@@ -1381,6 +1381,46 @@ func TestDashboardHidesNixoriumDowngrades(t *testing.T) {
 	}
 }
 
+func TestDashboardHidesReleasesOlderThanRunningVersionOnMasterPins(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready"), actions: DashboardActions{RunningVersion: "3.5.0"}}
+	report := domain.UpdateCheckReport{
+		State: "available", CurrentRef: "master", CurrentChannel: domain.UpdateChannelMoving, VersionFloor: "v3.5.0",
+		Development: []domain.UpdateRelease{{Tag: "master", Channel: domain.UpdateChannelMoving}},
+		Stable: []domain.UpdateRelease{
+			{Tag: "v3.6.0", Channel: domain.UpdateChannelStable},
+			{Tag: "v3.5.0", Channel: domain.UpdateChannelStable},
+			{Tag: "v3.4.0", Channel: domain.UpdateChannelStable, Downgrade: true},
+		},
+	}
+	updated, _ := model.Update(dashboardUpdateCheckMsg{report: report})
+	model = updated.(dashboardModel)
+	releases := model.availableUpdateReleases()
+	if len(releases) != 3 || releases[2].Tag != "v3.5.0" {
+		t.Fatalf("selectable releases = %+v", releases)
+	}
+	view := model.View().Content
+	if strings.Contains(view, "v3.4.0") || !strings.Contains(view, "Running version     3.5.0 (older releases are hidden)") || !strings.Contains(view, "Configured target   master") {
+		t.Fatalf("master-pinned update screen does not apply the version floor:\n%s", view)
+	}
+	for index, release := range releases {
+		if release.Tag == "v3.5.0" && updateReleaseStatus(report, release) != "" {
+			t.Fatalf("floor release %d is marked as configured: %q", index, updateReleaseStatus(report, release))
+		}
+	}
+}
+
+func TestDashboardRefusesOlderThanRunningVersionPlanOnMasterPins(t *testing.T) {
+	model := dashboardModel{report: testDashboardReport("ready")}
+	updated, command := model.Update(dashboardUpdatePlanMsg{report: domain.UpdatePlanReport{
+		State: "blocked", Target: "v3.4.0", CurrentRef: "master", CurrentChannel: domain.UpdateChannelMoving, Downgrade: true,
+		Issues: []domain.ValidationIssue{{Field: "target", Message: "target release is older than the running version v3.5.0; downgrade targets require explicit --allow-downgrade"}},
+	}})
+	model = updated.(dashboardModel)
+	if command != nil || model.screen != dashboardUpdate || !strings.Contains(model.message, "downgrades are not available in the TUI") || strings.Contains(model.message, "--allow-downgrade") {
+		t.Fatalf("older release reached review from a master pin: %+v", model)
+	}
+}
+
 func TestDashboardRefusesNixoriumDowngradeBeforeReview(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	updated, command := model.Update(dashboardUpdatePlanMsg{report: domain.UpdatePlanReport{

@@ -1858,9 +1858,13 @@ func (model dashboardModel) updateView() string {
 	}
 
 	releases := model.availableUpdateReleases()
+	runningLine := "Running interface   " + displayRunningVersion(model.actions.RunningVersion)
+	if floor := strings.TrimPrefix(model.updates.check.VersionFloor, "v"); floor != "" {
+		runningLine = "Running version     " + floor + " (older releases are hidden)"
+	}
 	lines = append(lines,
 		fmt.Sprintf("Configured target   %s", model.updates.check.CurrentRef),
-		"Running interface   "+displayRunningVersion(model.actions.RunningVersion),
+		runningLine,
 		tuiMuted("Source  "+model.updates.check.Upstream, model.isDark),
 		"",
 		tuiSection("Available updates", model.isDark),

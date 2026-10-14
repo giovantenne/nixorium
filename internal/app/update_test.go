@@ -198,6 +198,99 @@ func TestUpdateCheckMarksDowngradesUsingConfiguredSemanticVersion(t *testing.T) 
 	}
 }
 
+func TestUpdateCheckFloorsMovingRefsAtRunningVersion(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		current   string
+		running   string
+		target    string
+		downgrade bool
+		floor     string
+	}{
+		{"master older", "master", "3.5.0", "v3.4.9", true, "v3.5.0"},
+		{"master older prerelease", "master", "3.5.0", "v3.5.0-rc.1", true, "v3.5.0"},
+		{"master equal", "master", "3.5.0", "v3.5.0", false, "v3.5.0"},
+		{"master newer", "master", "3.5.0", "v3.5.1", false, "v3.5.0"},
+		{"master newer minor", "master", "3.5.0", "v3.10.0", false, "v3.5.0"},
+		{"commit older", strings.Repeat("a", 40), "3.5.0", "v3.4.0", true, "v3.5.0"},
+		{"commit equal", strings.Repeat("a", 40), "3.5.0", "v3.5.0", false, "v3.5.0"},
+		{"prerelease running older", "master", "3.5.0-rc.2", "v3.5.0-rc.1", true, "v3.5.0-rc.2"},
+		{"prerelease running final", "master", "3.5.0-rc.2", "v3.5.0", false, "v3.5.0-rc.2"},
+		{"development disables floor", "master", "development", "v1.0.0", false, ""},
+		{"empty disables floor", "master", "", "v1.0.0", false, ""},
+		{"unparsable disables floor", "master", "next", "v1.0.0", false, ""},
+		{"configured tag ignores floor", "v3.2.0", "3.5.0", "v3.3.0", false, ""},
+		{"configured tag still flags", "v3.2.0", "3.5.0", "v3.1.0", true, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := &fakeUpdateSource{
+				snapshot: domain.UpdateInputSnapshot{SourcePrefix: "owner/repo", CurrentRef: test.current},
+				releases: []domain.UpdateReleaseRef{{Tag: test.target}},
+			}
+			manager := NewUpdateManager(source)
+			manager.RunningVersion = test.running
+			report := manager.Check(context.Background(), ".")
+			releases := append(report.Stable, report.Prerelease...)
+			if report.HasErrors() || len(releases) != 1 || releases[0].Downgrade != test.downgrade || report.VersionFloor != test.floor {
+				t.Fatalf("check report = %+v, want downgrade %t floor %q", report, test.downgrade, test.floor)
+			}
+		})
+	}
+}
+
+func TestUpdatePlanRefusesReleasesOlderThanRunningVersionOnMovingRefs(t *testing.T) {
+	for _, current := range []string{"master", strings.Repeat("a", 40)} {
+		for _, test := range []struct {
+			target         string
+			allowDowngrade bool
+			state          string
+			downgrade      bool
+		}{
+			{"v3.4.0", false, "blocked", true},
+			{"v3.4.0", true, "ready", true},
+			{"v3.5.0", false, "ready", false},
+			{"v3.6.0", false, "ready", false},
+			{"master", false, "ready", false},
+		} {
+			t.Run(current[:min(len(current), 6)]+"/"+test.target, func(t *testing.T) {
+				source := &fakeUpdateSource{
+					revision: strings.Repeat("a", 40),
+					snapshot: domain.UpdateInputSnapshot{
+						SourceURL: "github:owner/repo", CurrentRef: current,
+						FlakeContent: []byte("old flake"), LockContent: []byte("old lock"), HasLock: true,
+					},
+					proposal: domain.UpdateProposal{FlakeContent: []byte("new flake"), LockContent: []byte("new lock")},
+				}
+				manager := NewUpdateManager(source)
+				manager.RunningVersion = "3.5.0"
+				plan := manager.Plan(context.Background(), ".", test.target, false, test.allowDowngrade)
+				if plan.State != test.state || plan.Downgrade != test.downgrade {
+					t.Fatalf("plan = %+v, want state %q downgrade %t", plan, test.state, test.downgrade)
+				}
+				if test.state == "blocked" && (source.prepared != 0 || len(plan.Issues) != 1 || !strings.Contains(plan.Issues[0].Message, "older than the running version v3.5.0")) {
+					t.Fatalf("blocked downgrade = %+v, prepared = %d", plan, source.prepared)
+				}
+				if test.state == "ready" && (source.prepared != 1 || (test.downgrade && plan.Confirmation != "DOWNGRADE")) {
+					t.Fatalf("ready plan = %+v, prepared = %d", plan, source.prepared)
+				}
+			})
+		}
+	}
+}
+
+func TestUpdatePlanWithoutRunningVersionKeepsMovingRefsUnfloored(t *testing.T) {
+	source := &fakeUpdateSource{
+		revision: strings.Repeat("a", 40),
+		snapshot: domain.UpdateInputSnapshot{CurrentRef: "master", FlakeContent: []byte("old flake"), LockContent: []byte("old lock"), HasLock: true},
+	}
+	manager := NewUpdateManager(source)
+	manager.RunningVersion = "development"
+	plan := manager.Plan(context.Background(), ".", "v0.1.0", false, false)
+	if plan.State != "ready" || plan.Downgrade {
+		t.Fatalf("development build plan = %+v", plan)
+	}
+}
+
 func TestUpdateCheckReportsDiscoveryFailureWithoutReleaseData(t *testing.T) {
 	source := &fakeUpdateSource{
 		snapshot:    domain.UpdateInputSnapshot{SourcePrefix: "owner/repo", CurrentRef: "master"},
