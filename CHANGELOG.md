@@ -18,6 +18,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   saved configuration history without changing systems or Git. Updated consent
   explains the new observations and best-effort filtering before sharing them.
 
+### Fixed
+
+- Local `systemctl` calls pass `--no-ask-password` and the command resets a
+  foreign `XDG_RUNTIME_DIR` (for example after `su admin` without a dash), so no
+  "Failed to add a watch for .../ask-password" message appears.
+
 ## [3.4.0] - 2026-10-13
 
 ### Changed

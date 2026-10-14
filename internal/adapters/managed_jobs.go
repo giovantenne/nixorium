@@ -53,7 +53,7 @@ func managedUnitOperation(name string) string {
 func readManagedJobUnits(ctx context.Context) ([]managedJobUnit, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, "systemctl", "show", "nixorium-prepare-pxe.service", "nixorium-apply-controller.service", "nixorium-apply-controller@*.service", "--property=Id,LoadState,ActiveState,ExecMainStartTimestamp", "--timestamp=us+utc", "--no-pager")
+	command := exec.CommandContext(ctx, "systemctl", systemctlArguments("show", "nixorium-prepare-pxe.service", "nixorium-apply-controller.service", "nixorium-apply-controller@*.service", "--property=Id,LoadState,ActiveState,ExecMainStartTimestamp", "--timestamp=us+utc", "--no-pager")...)
 	configureCommandCancellation(command)
 	command.Env = environmentWithValue(environmentWithValue(os.Environ(), "LC_ALL", "C"), "TZ", "UTC")
 	output := &boundedCommandBuffer{limit: 1024 * 1024}

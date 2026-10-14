@@ -225,7 +225,7 @@ dispatch_plan() {
   install -m 0600 /dev/null "$log_file"
   write_receipt "$operation_dir" "$operation_id" accepted preflight false false \
     "reviewed operation accepted by the independent live installer job"
-  if ! "$SYSTEMD_RUN" \
+  if ! "$SYSTEMD_RUN" --no-ask-password \
     --unit="nixorium-remote-install-$operation_id" --collect --no-block --quiet \
     --property=Type=exec --property=Restart=no --property=TimeoutStartSec=infinity \
     --property="StandardOutput=append:$log_file" --property="StandardError=append:$log_file" \
@@ -377,7 +377,7 @@ reboot_operation() {
       return 1
     }
   reboot_unit="nixorium-remote-reboot-$operation_id"
-  if ! "$SYSTEMD_RUN" \
+  if ! "$SYSTEMD_RUN" --no-ask-password \
     --unit="$reboot_unit" --collect --quiet --on-active=10s \
     --timer-property=AccuracySec=1s \
     --property=Type=oneshot --property=TimeoutStartSec=30s \

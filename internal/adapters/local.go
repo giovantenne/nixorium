@@ -141,7 +141,7 @@ func environmentWithValue(environment []string, name, value string) []string {
 
 func (Local) ServiceState(ctx context.Context, name string) domain.ServiceState {
 	state := domain.ServiceState{Name: name, State: "not-found"}
-	output, err := run(ctx, "systemctl", "show", name, "--property=LoadState", "--property=ActiveState", "--no-pager")
+	output, err := run(ctx, "systemctl", systemctlArguments("show", name, "--property=LoadState", "--property=ActiveState", "--no-pager")...)
 	if err != nil && strings.TrimSpace(output) == "" {
 		return state
 	}

@@ -68,6 +68,7 @@ type options struct {
 }
 
 func main() {
+	sanitizeRuntimeDir(os.Getenv, os.Setenv, os.Unsetenv, pathOwner, os.Getuid())
 	if len(os.Args) == 3 && os.Args[1] == classroomBrowserCommand {
 		os.Exit(runClassroomBrowser(os.Args[2]))
 	}

@@ -381,7 +381,7 @@ func loginBarrier(config Config, uid int) error {
 		return errors.New("untrusted login barrier")
 	}
 	for _, unit := range []string{"systemd-user-sessions.service", "display-manager.service"} {
-		output, err := commandOutput(config.Systemctl, "show", "--property=ActiveState", "--value", unit)
+		output, err := commandOutput(config.Systemctl, "show", "--property=ActiveState", "--value", "--no-ask-password", unit)
 		if err != nil {
 			return errors.New("cannot establish login service state")
 		}

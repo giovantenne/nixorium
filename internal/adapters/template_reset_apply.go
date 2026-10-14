@@ -51,7 +51,7 @@ func configurationCheckoutIdle(ctx context.Context) error {
 	// These units can continue serving an installation after its initiating TUI
 	// has closed. A template reset must not invalidate that preparation in flight.
 	for _, unit := range []string{"nixorium-pxe.service", "nixorium-pxe-network.service"} {
-		command := exec.CommandContext(ctx, "systemctl", "show", unit, "--property=LoadState", "--property=ActiveState", "--no-pager")
+		command := exec.CommandContext(ctx, "systemctl", systemctlArguments("show", unit, "--property=LoadState", "--property=ActiveState", "--no-pager")...)
 		out := &boundedCommandBuffer{limit: 4096}
 		command.Stdout, command.Stderr = out, &boundedCommandBuffer{limit: 4096}
 		if err := command.Run(); err != nil || out.truncated {

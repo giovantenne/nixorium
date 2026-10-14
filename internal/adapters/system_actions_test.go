@@ -70,3 +70,10 @@ func TestCleanupUnitAllowlistAcceptsOnlyReviewedDigest(t *testing.T) {
 		t.Fatal("invalid digest reached systemctl")
 	}
 }
+
+func TestSystemctlArgumentsDisableAskPassword(t *testing.T) {
+	got := systemctlArguments("show", "unit")
+	if len(got) != 3 || got[2] != "--no-ask-password" || got[0] != "show" {
+		t.Fatalf("unexpected arguments: %v", got)
+	}
+}

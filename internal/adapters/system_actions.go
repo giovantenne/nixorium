@@ -38,6 +38,13 @@ func (Local) ControlSystemUnit(ctx context.Context, verb, unit string) error {
 			return err
 		}
 	}
-	_, err := run(ctx, "systemctl", verb, unit)
+	_, err := run(ctx, "systemctl", systemctlArguments(verb, unit)...)
 	return err
+}
+
+// systemctlArguments appends --no-ask-password: Nixorium relies on sudo and
+// polkit rules, and the tty password agent would watch a runtime directory
+// that may belong to another user (for example after `su` without a dash).
+func systemctlArguments(arguments ...string) []string {
+	return append(append([]string{}, arguments...), "--no-ask-password")
 }

@@ -35,7 +35,7 @@ let
         # A completed client no longer depends on the controller cache/worker.
         # Keep its durable reservation and resume verification after this job.
         USB_WORKER_PAUSED=true
-        systemctl stop nixorium-remote-install.service \
+        systemctl --no-ask-password stop nixorium-remote-install.service \
           || fail "could not pause the completed USB installation worker"
       fi
     ''}
@@ -181,7 +181,7 @@ let
           # Release both locks before restarting the owner of the retained USB
           # reservation, including when validation/build/activation failed.
           exec 8>&- 9>&-
-          systemctl start --no-block nixorium-remote-install.service || true
+          systemctl --no-ask-password start --no-block nixorium-remote-install.service || true
         fi
       }
       trap cleanup_controller EXIT
@@ -529,7 +529,7 @@ let
         fi
       fi
 
-      systemctl is-active --quiet nixorium-harmonia.service \
+      systemctl --no-ask-password is-active --quiet nixorium-harmonia.service \
         || fail "Harmonia cache service is not active"
       curl --fail --silent --show-error --max-time 5 \
         "http://$DHCP_IP:$CACHE_PORT/nix-cache-info" | grep -q '^StoreDir:' \
@@ -641,7 +641,7 @@ let
       }
 
       ${operationGate false}
-      systemctl restart harmonia.service
+      systemctl --no-ask-password restart harmonia.service
     '';
   };
 
