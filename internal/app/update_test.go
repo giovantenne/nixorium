@@ -219,8 +219,15 @@ func TestUpdateCheckFloorsMovingRefsAtRunningVersion(t *testing.T) {
 		{"development disables floor", "master", "development", "v1.0.0", false, ""},
 		{"empty disables floor", "master", "", "v1.0.0", false, ""},
 		{"unparsable disables floor", "master", "next", "v1.0.0", false, ""},
-		{"configured tag ignores floor", "v3.2.0", "3.5.0", "v3.3.0", false, ""},
-		{"configured tag still flags", "v3.2.0", "3.5.0", "v3.1.0", true, ""},
+		{"older tag below floor hides between", "v3.2.0", "3.5.0", "v3.3.0", true, "v3.5.0"},
+		{"older tag below floor hides older", "v3.2.0", "3.5.0", "v3.1.0", true, "v3.5.0"},
+		{"older tag keeps itself selectable as current", "v3.2.0", "3.5.0", "v3.2.0", false, "v3.5.0"},
+		{"older tag shows floor", "v3.2.0", "3.5.0", "v3.5.0", false, "v3.5.0"},
+		{"older tag shows newer", "v3.2.0", "3.5.0", "v3.6.0", false, "v3.5.0"},
+		{"newer tag ignores floor", "v3.7.0", "3.5.0", "v3.6.0", true, ""},
+		{"newer tag keeps newer", "v3.7.0", "3.5.0", "v3.8.0", false, ""},
+		{"tag equal to running has no floor", "v3.5.0", "3.5.0", "v3.4.0", true, ""},
+		{"older tag with development build", "v3.2.0", "development", "v3.3.0", false, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			source := &fakeUpdateSource{
@@ -275,6 +282,49 @@ func TestUpdatePlanRefusesReleasesOlderThanRunningVersionOnMovingRefs(t *testing
 				}
 			})
 		}
+	}
+}
+
+func TestUpdatePlanRefusesReleasesOlderThanRunningVersionOnOlderTagPins(t *testing.T) {
+	for _, test := range []struct {
+		current        string
+		target         string
+		allowDowngrade bool
+		state          string
+		downgrade      bool
+		message        string
+	}{
+		{"v3.2.0", "v3.1.0", false, "blocked", true, "downgrade targets require explicit --allow-downgrade"},
+		{"v3.2.0", "v3.3.0", false, "blocked", true, "older than the running version v3.5.0"},
+		{"v3.2.0", "v3.3.0", true, "ready", true, ""},
+		{"v3.2.0", "v3.2.0", false, "blocked", false, "already configured"},
+		{"v3.2.0", "v3.5.0", false, "ready", false, ""},
+		{"v3.2.0", "v3.6.0", false, "ready", false, ""},
+		{"v3.7.0", "v3.6.0", false, "blocked", true, "downgrade targets require explicit --allow-downgrade"},
+		{"v3.7.0", "v3.8.0", false, "ready", false, ""},
+	} {
+		t.Run(test.current+"/"+test.target, func(t *testing.T) {
+			source := &fakeUpdateSource{
+				revision: strings.Repeat("a", 40),
+				snapshot: domain.UpdateInputSnapshot{
+					SourceURL: "github:owner/repo", CurrentRef: test.current,
+					FlakeContent: []byte("old flake"), LockContent: []byte("old lock"), HasLock: true,
+				},
+				proposal: domain.UpdateProposal{FlakeContent: []byte("new flake"), LockContent: []byte("new lock")},
+			}
+			manager := NewUpdateManager(source)
+			manager.RunningVersion = "3.5.0"
+			plan := manager.Plan(context.Background(), ".", test.target, false, test.allowDowngrade)
+			if plan.State != test.state || plan.Downgrade != test.downgrade {
+				t.Fatalf("plan = %+v, want state %q downgrade %t", plan, test.state, test.downgrade)
+			}
+			if test.message != "" && (len(plan.Issues) != 1 || !strings.Contains(plan.Issues[0].Message, test.message)) {
+				t.Fatalf("plan issues = %+v, want %q", plan.Issues, test.message)
+			}
+			if test.state == "blocked" && source.prepared != 0 {
+				t.Fatalf("blocked plan prepared %d candidates", source.prepared)
+			}
+		})
 	}
 }
 

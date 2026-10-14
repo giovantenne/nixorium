@@ -82,15 +82,19 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 	report.Upstream = "github:" + snapshot.SourcePrefix
 	report.CurrentRef = snapshot.CurrentRef
 	report.CurrentRev = snapshot.CurrentRev
-	baseline, baselineErr := parseUpdateRelease(snapshot.CurrentRef)
-	if baselineErr == nil {
-		report.CurrentChannel = baseline.Channel()
+	current, currentErr := parseUpdateRelease(snapshot.CurrentRef)
+	if currentErr == nil {
+		report.CurrentChannel = current.Channel()
 	} else {
 		report.CurrentChannel = domain.UpdateChannelMoving
-		if floor, ok := m.versionFloor(); ok {
-			baseline, baselineErr = floor, nil
-			report.VersionFloor = floor.Tag
-		}
+	}
+	// The baseline is the higher of the configured release and the running
+	// version, so neither a moving ref nor an older pin can reach a downgrade.
+	baseline, hasBaseline := current, currentErr == nil
+	floorActive := false
+	if floor, ok := m.versionFloor(); ok && (currentErr != nil || compareUpdateReleases(floor, current) > 0) {
+		baseline, hasBaseline, floorActive = floor, true, true
+		report.VersionFloor = floor.Tag
 	}
 	refs, err := m.source.DiscoverUpdateReleases(ctx, snapshot.SourcePrefix)
 	if err != nil {
@@ -106,7 +110,7 @@ func (m *UpdateManager) Check(ctx context.Context, repository string) domain.Upd
 			continue
 		}
 		item := domain.UpdateRelease{Tag: ref.Tag, ObjectID: ref.ObjectID, Channel: release.Channel()}
-		item.Downgrade = baselineErr == nil && compareUpdateReleases(release, baseline) < 0
+		item.Downgrade = hasBaseline && compareUpdateReleases(release, baseline) < 0 && !(floorActive && currentErr == nil && compareUpdateReleases(release, current) == 0)
 		if item.Channel == domain.UpdateChannelPrerelease {
 			report.Prerelease = append(report.Prerelease, item)
 		} else {
@@ -202,6 +206,14 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 	}
 	report.CurrentRef = snapshot.CurrentRef
 	report.CurrentRev = snapshot.CurrentRev
+	floor, floorOK := m.versionFloor()
+	refuseFloor := func(report domain.UpdatePlanReport) domain.UpdatePlanReport {
+		report.Downgrade = true
+		if !allowDowngrade {
+			report = updatePlanIssue(report, "target", fmt.Sprintf("target release is older than the running version %s; downgrade targets require explicit --allow-downgrade", floor.Tag))
+		}
+		return report
+	}
 	if current, parseErr := parseUpdateRelease(snapshot.CurrentRef); parseErr == nil {
 		report.CurrentChannel = current.Channel()
 		if report.TargetChannel != domain.UpdateChannelMoving {
@@ -213,17 +225,17 @@ func (m *UpdateManager) PlanWithProgress(ctx context.Context, repository, target
 				if !allowDowngrade {
 					report = updatePlanIssue(report, "target", "downgrade targets require explicit --allow-downgrade")
 				}
+			} else if floorOK && compareUpdateReleases(targetRelease, floor) < 0 {
+				// The configured release is older than the running version.
+				report = refuseFloor(report)
 			}
 		}
 	} else {
 		report.CurrentChannel = domain.UpdateChannelMoving
 		// A moving ref has no release order, so the running version is the floor.
 		// A release equal to the floor may be the same code as master and is allowed.
-		if floor, ok := m.versionFloor(); ok && report.TargetChannel != domain.UpdateChannelMoving && compareUpdateReleases(targetRelease, floor) < 0 {
-			report.Downgrade = true
-			if !allowDowngrade {
-				report = updatePlanIssue(report, "target", fmt.Sprintf("target release is older than the running version %s; downgrade targets require explicit --allow-downgrade", floor.Tag))
-			}
+		if floorOK && report.TargetChannel != domain.UpdateChannelMoving && compareUpdateReleases(targetRelease, floor) < 0 {
+			report = refuseFloor(report)
 		}
 	}
 	if len(report.Issues) > 0 {
