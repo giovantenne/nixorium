@@ -68,6 +68,5 @@
   defaultLocale = "en_US.UTF-8";
   extraLocale = "en_US.UTF-8";
   keyboardLayout = "us";
-  consoleKeyMap = "us";
 
 }

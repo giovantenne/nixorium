@@ -75,13 +75,15 @@ mode for controller bootstrap: either the Minimal ISO (text console) or the
 Graphical ISO (GNOME). The Graphical ISO is useful when a browser is needed to
 unlock a captive Internet portal: connect, unlock it in Firefox, then open
 Terminal and run the command; ignore the "Install NixOS" icon. Keyboard is the
-first settings prompt. On the text console the matching console keymap is
-loaded; in a GNOME session the same XKB layout the installed system uses is
-set with `gsettings` as the signed-in user, and if that fails the installer asks
-you to pick the layout from the GNOME top bar. Over SSH the keyboard of the
-client you type on is used. A test line with layout-sensitive symbols is then
-echoed back and must be confirmed before any password is requested; time zone
-follows immediately before account details.
+first settings prompt, chosen from a numbered list (English (US), English (UK),
+Italian, French, German, Spanish) and applied at once, before any password. On
+the text console the closest console keymap is loaded; in a GNOME session the
+same XKB layout the installed system uses is set with `gsettings` as the
+signed-in user, and if that fails the installer asks you to pick the layout
+from the GNOME top bar. Over SSH the keyboard of the client you type on is
+used. The installed system derives its text console from that XKB layout, so
+the console, GDM and GNOME type the same symbols. Time zone follows immediately
+before account details.
 Do not use it to disable an existing fleet without a reviewed migration.
 Older upstreams reject the new setting, so upgrade before opting in.
 The public Nix evaluator and the management command both reject empty required

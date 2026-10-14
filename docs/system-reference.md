@@ -69,10 +69,12 @@ selected profile to `lab-software.json` before Git initialization, Nix
 evaluation, or disk changes. It refuses releases without bootstrap capability
 version 2. The supported
 bootstrap environment is the official NixOS Minimal ISO (Linux text console)
-or Graphical ISO (GNOME session) booted in UEFI mode. Keyboard is collected and
-activated first, then time zone is collected before account details, so all
-subsequent input uses the installed controller layout. The PXE environment
-later applies that same console keymap before local client enrollment. The
+or Graphical ISO (GNOME session) booted in UEFI mode. Keyboard is chosen from a numbered list and
+applied first (`loadkeys` on the console, `gsettings` in GNOME), then time zone
+is collected before account details, so all subsequent input uses the installed
+controller layout. Installed systems and the PXE environment derive the text
+console from the same XKB layout (`console.useXkbConfig`); `lab.consoleKeyMap`
+is deprecated and ignored. The
 destructive confirmation precedes partitioning, locking, or
 controller-system transfer. Once Disko has mounted the target, the bootstrap
 places its evaluation cache and temporary swap there; `nixos-install` builds

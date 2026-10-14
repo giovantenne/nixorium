@@ -143,9 +143,10 @@ trial on virtual machines, follow the
 
    The [bootstrap script](install.sh) asks for the keyboard layout first, then
    the time zone, accounts, passwords, an initial software profile and the
-   disk, which it erases only after you type `ERASE`. Right after the keyboard
-   choice it asks you to type a test line, so you can confirm the symbols
-   before choosing passwords. The Graphical ISO is useful when a web browser is
+   disk, which it erases only after you type `ERASE`. The keyboard is
+   chosen from a short list and applied immediately, before the passwords, and
+   the installed system uses the same layout on its text console and at the
+   login screen. The Graphical ISO is useful when a web browser is
    needed to unlock a captive Internet portal: connect, unlock it in Firefox,
    then open Terminal and run the command above. Ignore the "Install NixOS"
    icon.

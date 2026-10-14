@@ -21,7 +21,7 @@ var settingsHelp = map[string]settingHelp{
 	"lab.teacherUser":         {"Teacher account name, distinct from administrator and student.", "teacher"},
 	"lab.studentUser":         {"Shared student account whose home is reset at computer startup.", "student"},
 	"lab.timeZone":            {"Local clock and daylight-saving rules for laboratory computers.", "Europe/Rome"},
-	"lab.keyboardLayout":      {"Keyboard layout used for typing; also selects a known console keymap.", "it"},
+	"lab.keyboardLayout":      {"Keyboard layout used for typing at the login screen, in the desktop and on the text console.", "it"},
 	"lab.homepageUrl":         {"Initial browser homepage in the student environment.", "https://school.example/"},
 	"lab.studentGitName":      {"Author name recorded by Git commits made as the student.", "Student"},
 	"lab.studentGitEmail":     {"Author email recorded by Git commits made as the student.", "student@example.org"},

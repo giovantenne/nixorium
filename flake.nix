@@ -178,6 +178,7 @@
         session-state-vm = import ./tests/session-state-vm.nix { inherit pkgs; };
         classroom-view-vm = import ./tests/classroom-view-vm.nix { inherit pkgs; };
         onboarding-vm = import ./tests/onboarding-vm.nix { inherit pkgs; };
+        console-keyboard-vm = import ./tests/console-keyboard-vm.nix { inherit pkgs; };
         telemetry-vm = import ./tests/telemetry-vm.nix { inherit pkgs; };
         clean-generations-vm = import ./tests/clean-generations-vm.nix { inherit pkgs; };
         config-schema = assert configSchemaTest; pkgs.runCommand "nixorium-config-schema-test" {} ''

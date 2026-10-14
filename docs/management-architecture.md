@@ -603,8 +603,8 @@ interface, so an already-active declarative controller address cannot mask the
 live DHCP lease. It groups 11 essential questions into Network, Laboratory,
 Accounts, Regional settings, and Preferences stages.
 Only time zone and keyboard layout are user choices in Regional settings; the
-US locale defaults remain internal and the console keymap follows known desktop
-keyboard selections. Both visible choices use offline Bubbles lists with fuzzy
+US locale defaults remain internal and the text console is derived from the
+chosen XKB layout (the former console keymap setting is deprecated and ignored). Both visible choices use offline Bubbles lists with fuzzy
 filtering, curated common values, and a validated custom path. Optional Git author identity retains the deployment
 template defaults instead of extending first run. The wizard retains entries
 across backward navigation, collects default credentials without echo, and

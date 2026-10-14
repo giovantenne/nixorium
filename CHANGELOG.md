@@ -13,8 +13,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   to the controller and updating the computers.
 
 - Controller bootstrap now runs from the official Graphical (GNOME) NixOS ISO as
-  well as the Minimal ISO, sets the GNOME session layout with `gsettings`, and
-  asks for a keyboard test line before the passwords.
+  well as the Minimal ISO, which helps when a browser is needed to unlock an
+  Internet portal. The keyboard is chosen from a readable numbered list and
+  applied before the passwords (`gsettings` in GNOME, the closest console
+  keymap otherwise).
 
 - Additional initial student files and empty directories through strict
   `home-files.json`, content-addressed captured payloads and inline configuration
@@ -25,6 +27,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Assistant can read bounded diagnostics from declared computers and inspect
   saved configuration history without changing systems or Git. Updated consent
   explains the new observations and best-effort filtering before sharing them.
+
+### Changed
+
+- The text console now follows the graphical keyboard layout
+  (`console.useXkbConfig`) on installed systems and the netboot installer, so a
+  password types the same on the console, at the login screen and in GNOME.
+  `lab.consoleKeyMap` is deprecated: still accepted, ignored and no longer
+  written by the setup.
 
 ### Fixed
 

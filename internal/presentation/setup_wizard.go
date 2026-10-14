@@ -663,11 +663,11 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		settings.Lab.ExtraLocale = value
 	case "lab.keyboardLayout":
 		settings.Lab.KeyboardLayout = value
-		if consoleKeyMap, found := consoleKeyMapForKeyboard(value); found {
-			settings.Lab.ConsoleKeyMap = consoleKeyMap
+		// Deprecated and ignored by Nix: the console follows the XKB layout.
+		// An existing value is kept in step so older releases still evaluate.
+		if settings.Lab.ConsoleKeyMap != "" {
+			settings.Lab.ConsoleKeyMap = value
 		}
-	case "lab.consoleKeyMap":
-		settings.Lab.ConsoleKeyMap = value
 	default:
 		return settings, errors.New("unsupported setting")
 	}
@@ -677,17 +677,4 @@ func setSettingField(settings domain.LabSettingsFile, field, value string) (doma
 		}
 	}
 	return settings, nil
-}
-
-func consoleKeyMapForKeyboard(layout string) (string, bool) {
-	keyMaps := map[string]string{
-		"us": "us",
-		"it": "it2",
-		"gb": "uk",
-		"fr": "fr",
-		"de": "de",
-		"es": "es",
-	}
-	keyMap, found := keyMaps[layout]
-	return keyMap, found
 }

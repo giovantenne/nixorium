@@ -310,8 +310,16 @@ assert hostOnlyInterfaceLab.nixosConfigurations.pc99.config.networking.interface
 assert builtins.length (lib.splitString "oifname" (import ../lib/client-internet-rules.nix { interface = null; networkCidr = "10.0.0.0/24"; })) == 2;
 assert lib.hasInfix "oifname \"enp2s0\" ip daddr 10.0.0.0/24 accept" (import ../lib/client-internet-rules.nix { interface = "enp2s0"; networkCidr = "10.0.0.0/24"; });
 assert lib.hasInfix "ip daddr 10.0.0.0/24 accept" (import ../lib/client-internet-rules.nix { interface = null; networkCidr = "10.0.0.0/24"; });
-assert keyboardLab.nixosConfigurations.pc99.config.console.keyMap == "it2";
-assert keyboardLab.nixosConfigurations.netboot.config.console.keyMap == "it2";
+# The console follows the XKB layout; a legacy consoleKeyMap ("it2" here) is
+# accepted but ignored, and plainLab omits it entirely.
+assert keyboardLab.nixosConfigurations.pc99.config.services.xserver.xkb.layout == "it";
+assert keyboardLab.nixosConfigurations.pc99.config.console.useXkbConfig;
+assert keyboardLab.nixosConfigurations.pc99.config.console.keyMap != "it2";
+assert keyboardLab.nixosConfigurations.netboot.config.services.xserver.xkb.layout == "it";
+assert keyboardLab.nixosConfigurations.netboot.config.console.useXkbConfig;
+assert keyboardLab.nixosConfigurations.netboot.config.console.keyMap != "it2";
+assert plainLab.nixosConfigurations.pc99.config.console.useXkbConfig;
+assert plainLab.nixosConfigurations.pc99.config.services.xserver.xkb.layout == "us";
 # The netboot console starts the guided installer once; it stays interactive.
 assert lib.hasInfix "sudo /installer/setup.sh" keyboardLab.nixosConfigurations.netboot.config.programs.bash.loginShellInit;
 assert lib.hasInfix "/dev/tty1" keyboardLab.nixosConfigurations.netboot.config.programs.bash.loginShellInit;

@@ -62,17 +62,25 @@ US internal locales and defer client networking and keys. Installers for older
 revisions remain on their legacy workflow rather than invoking an unsupported
 command.
 
-Keyboard is the first controller-setting prompt, and bootstrap must activate
-the selected console keymap successfully before collecting any other value.
+Keyboard is the first controller-setting prompt, chosen from a numbered list
+of readable names (English (US), English (UK), Italian, French, German,
+Spanish) that maps to one XKB layout. Bootstrap applies it before collecting
+any other value: on the text console with the closest `loadkeys` keymap, in a
+GNOME session of the Graphical ISO with `gsettings` as the signed-in user, and
+over SSH the keyboard of the SSH client is used. The installed system and the
+netboot installer derive the text console from the same XKB layout
+(`console.useXkbConfig`); `lab.consoleKeyMap` is deprecated, accepted and
+ignored.
 Time zone follows immediately, before account details and passwords. Bootstrap
-fails closed from graphical terminals whose compositor layout cannot be
-verified portably, and when `loadkeys` is unavailable or fails. This keeps all
+fails closed on the text console when `loadkeys` is unavailable or fails, and
+asks the operator to pick the layout from the GNOME top bar when `gsettings`
+fails. This keeps all
 subsequent input, especially passwords, aligned with the installed console/login
-layout after reboot. The generated netboot system applies the same
-`labSettings.consoleKeyMap`, so local client enrollment and destructive
-confirmation use the controller's configured text-console layout. The official
-NixOS Minimal ISO booted in UEFI mode is the supported controller-bootstrap
-environment; the Graphical ISO is not the documented path.
+layout after reboot. The generated netboot system derives its console from the same
+XKB layout, so local client enrollment and destructive
+confirmation use the controller's configured layout. The official
+NixOS Minimal ISO (text console) and Graphical ISO (GNOME session), booted in
+UEFI mode, are the supported controller-bootstrap environments.
 
 The operator TUI exposes five top-level tasks. Client installation owns the
 resumable laboratory configuration and never blocks using the controller.

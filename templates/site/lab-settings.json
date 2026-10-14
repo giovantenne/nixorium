@@ -18,7 +18,6 @@
     "timeZone": "America/New_York",
     "defaultLocale": "en_US.UTF-8",
     "extraLocale": "en_US.UTF-8",
-    "keyboardLayout": "us",
-    "consoleKeyMap": "us"
+    "keyboardLayout": "us"
   }
 }

@@ -39,8 +39,10 @@ evidence.
   closures may need more.
 - Download the official **NixOS 26.05 Minimal ISO, x86_64**, from
   [NixOS downloads](https://nixos.org/download/#nixos-iso). Verify its published
-  SHA-256 and record the exact filename and digest. Use the Minimal text console,
-  not a terminal inside the graphical installer.
+  SHA-256 and record the exact filename and digest. This evaluation records the
+  Minimal text console. The controller command also runs from a terminal in
+  the Graphical (GNOME) ISO, which is useful when a browser is needed to unlock
+  a captive Internet portal; use one ISO throughout and record which one.
 - Internet access on the host for the controller's NAT adapter. Builds and
   downloads are not assigned a completion-time estimate.
 - Local access to both VM consoles. Use a new VM folder for this evaluation;

@@ -154,8 +154,13 @@ let
             description = "XKB keyboard layout";
           };
           consoleKeyMap = lib.mkOption {
-            type = lib.types.str;
-            description = "Linux console keymap";
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = ''
+              Deprecated and ignored. The console follows keyboardLayout
+              through console.useXkbConfig; the key is accepted so existing
+              lab-settings.json files keep evaluating.
+            '';
           };
         };
       }
@@ -181,7 +186,6 @@ let
     "defaultLocale"
     "extraLocale"
     "keyboardLayout"
-    "consoleKeyMap"
   ];
   emptyRequiredFields = builtins.filter
     (name: !isNonEmpty config.${name})

@@ -98,6 +98,9 @@ cat > "${MOCK_BIN}/loadkeys" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'loadkeys %s\n' "$*" >> "$BOOTSTRAP_CALL_LOG"
+if [[ "${*: -1}" == "-" ]]; then
+  while IFS= read -r line; do printf 'overlay: %s\n' "$line" >> "$BOOTSTRAP_CALL_LOG"; done
+fi
 if [[ "${BOOTSTRAP_LOADKEYS_FAIL:-false}" == "true" ]]; then
   exit 1
 fi
@@ -137,7 +140,7 @@ export NIXORIUM_INSTALLER_EFI_DIRECTORY="${TEST_ROOT}/efi"
 mkdir -p "$NIXORIUM_INSTALLER_EFI_DIRECTORY"
 
 printf '%s\n' \
-  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
+  '3' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -157,7 +160,7 @@ test ! -e "$CALL_LOG"
 # through sudo, and the graphical terminal is no longer refused.
 GNOME_INPUT="${TEST_ROOT}/gnome-input"
 printf '%s\n' \
-  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
+  'it' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -178,7 +181,6 @@ if grep -F "graphical terminal" "${TEST_ROOT}/gnome.out" >/dev/null; then
   echo "bootstrap still refuses graphical terminals" >&2
   exit 1
 fi
-grep -F "Received: @ # [ ] { } \ | ò à è ù €" "${TEST_ROOT}/gnome.out" >/dev/null
 grep -F "Use the same keyboard you will use at the login screen." "${TEST_ROOT}/gnome.out" >/dev/null
 : > "$CALL_LOG"
 
@@ -197,7 +199,7 @@ grep -F "The controller is installed." "${TEST_ROOT}/gnome-fail.out" >/dev/null
 : > "$CALL_LOG"
 
 # SSH without a graphical session: no loadkeys, explanatory text.
-printf '%s\n' 'it' '@' '' 'Europe/Rome' '' '' \
+printf '%s\n' 'it' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' 'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' '' '3' '' > "${TEST_ROOT}/ssh-input"
 NIXORIUM_TARGET_ROOT="${TEST_ROOT}/ssh-target" \
@@ -213,27 +215,48 @@ if grep -E 'loadkeys|gsettings' "$CALL_LOG" >/dev/null; then
 fi
 : > "$CALL_LOG"
 
-# Answering no to the keyboard check returns to the layout choice.
-printf '%s\n' 'it' 'wrong' 'n' 'us' '@ # [ ] { } \ | ~ `' '' > "${TEST_ROOT}/keyboard-check-input"
+# The keyboard is a readable list: invalid answers are refused, a number and a
+# code both work, and the layout is applied immediately with no confirmation
+# step before the next question.
+printf '%s\n' '9' 'xx' '2' > "${TEST_ROOT}/keyboard-list-input"
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
-  NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/keyboard-check-input" \
+  NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/keyboard-list-input" \
   timeout --foreground --kill-after=2s 10s \
   "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
-  >"${TEST_ROOT}/keyboard-check.out" 2>&1; then
-  echo "bootstrap accepted truncated input after the keyboard check" >&2
+  >"${TEST_ROOT}/keyboard-list.out" 2>&1; then
+  echo "bootstrap accepted truncated input after the keyboard list" >&2
   exit 1
 fi
-test "$(grep -c -F 'Keyboard layout [' "${TEST_ROOT}/keyboard-check.out")" -eq 2
-grep -F "Received: wrong" "${TEST_ROOT}/keyboard-check.out" >/dev/null
-grep -F "loadkeys it2" "$CALL_LOG" >/dev/null
-grep -F "loadkeys us" "$CALL_LOG" >/dev/null
-if grep -F "Step 3 of 5 · Passwords" "${TEST_ROOT}/keyboard-check.out" >/dev/null; then
-  echo "bootstrap asked for passwords before the keyboard was confirmed" >&2
+grep -F "1  English (US)" "${TEST_ROOT}/keyboard-list.out" >/dev/null
+grep -F "3  Italian" "${TEST_ROOT}/keyboard-list.out" >/dev/null
+test "$(grep -c -F 'Type a number from 1 to 6' "${TEST_ROOT}/keyboard-list.out")" -eq 2
+grep -F "loadkeys uk" "$CALL_LOG" >/dev/null
+if grep -E "Does it match|Test line|Received:" "${TEST_ROOT}/keyboard-list.out" >/dev/null; then
+  echo "bootstrap still asks for a keyboard test line" >&2
+  exit 1
+fi
+if grep -F "Step 3 of 5 · Passwords" "${TEST_ROOT}/keyboard-list.out" >/dev/null; then
+  echo "bootstrap asked for passwords before the time zone" >&2
   exit 1
 fi
 : > "$CALL_LOG"
 
-printf '%s\n\n\n\n\n' 'us' > "${TEST_ROOT}/truncated-input"
+# Each layout loads its closest console keymap; Italian also gets the AltGr
+# overlay on stdin so { } [ ] ~ and the euro sign match the XKB layout.
+for CASE in '1:us' '2:uk' '3:it' '4:fr-pc' '5:de-latin1' '6:es'; do
+  printf '%s\n' "${CASE%%:*}" > "${TEST_ROOT}/keymap-case-input"
+  NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
+    NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/keymap-case-input" \
+    timeout --foreground --kill-after=2s 10s \
+    "$REPO_ROOT/install.sh" --release master --disk /dev/vda \
+    >/dev/null 2>&1 || true
+  grep -E "^loadkeys ${CASE#*:}( -)?\$" "$CALL_LOG" >/dev/null
+done
+grep -F "overlay: altgr keycode 8 = braceleft" "$CALL_LOG" >/dev/null
+: > "$CALL_LOG"
+
+
+printf '%s\n\n\n\n' 'us' > "${TEST_ROOT}/truncated-input"
 if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   NIXORIUM_BOOTSTRAP_TTY="${TEST_ROOT}/truncated-input" \
   timeout --foreground --kill-after=2s 10s \
@@ -255,7 +278,7 @@ if NIXORIUM_TARGET_ROOT="$TARGET_ROOT" \
   echo "bootstrap continued after console keymap activation failed" >&2
   exit 1
 fi
-grep -F "Could not activate console keymap 'it2'" \
+grep -F "Could not activate console keymap 'it'" \
   "${TEST_ROOT}/keymap-failure.out" >/dev/null
 if grep -F "Step 3 of 5 · Passwords" "${TEST_ROOT}/keymap-failure.out" >/dev/null || \
   grep -F "mkpasswd" "$CALL_LOG" >/dev/null; then
@@ -265,7 +288,7 @@ fi
 : > "$CALL_LOG"
 
 printf '%s\n' \
-  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
+  '3' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -287,7 +310,7 @@ test ! -e "$INSTALLER_LOG"
 
 # Answering no to the review asks the questions again instead of cancelling.
 printf '%s\n' \
-  'it' '@ # [ ] { } \ | ò à è ù €' '' 'Europe/Rome' '' '' \
+  '3' 'Europe/Rome' '' '' \
   'admin-secret' 'admin-secret' \
   'teacher-secret' 'teacher-secret' \
   'student-secret' 'student-secret' \
@@ -359,7 +382,7 @@ grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/scripts/inst
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/lib/disko-layout.nix" "$CALL_LOG" >/dev/null
 grep -F "flake init -t github:giovantenne/nixorium/${REVISION}#site" "$CALL_LOG" >/dev/null
 grep -F "raw.githubusercontent.com/giovantenne/nixorium/${REVISION}/flake.nix" "$CALL_LOG" >/dev/null
-grep -F "loadkeys it2" "$CALL_LOG" >/dev/null
+grep -F "loadkeys it -" "$CALL_LOG" >/dev/null
 KEYBOARD_PROMPT_LINE="$(grep -n -m1 -F 'Keyboard layout' "${TEST_ROOT}/install.out" | cut -d: -f1)"
 TIME_ZONE_PROMPT_LINE="$(grep -n -m1 -F 'Time zone' "${TEST_ROOT}/install.out" | cut -d: -f1)"
 TEACHER_PROMPT_LINE="$(grep -n -m1 -F 'Teacher username' "${TEST_ROOT}/install.out" | cut -d: -f1)"
@@ -367,7 +390,7 @@ if (( KEYBOARD_PROMPT_LINE >= TIME_ZONE_PROMPT_LINE || TIME_ZONE_PROMPT_LINE >= 
   echo "bootstrap did not ask for keyboard and time zone before account settings" >&2
   exit 1
 fi
-LOADKEYS_LINE="$(grep -n -m1 -F 'loadkeys it2' "$CALL_LOG" | cut -d: -f1)"
+LOADKEYS_LINE="$(grep -n -m1 -F 'loadkeys it -' "$CALL_LOG" | cut -d: -f1)"
 MKPASSWD_LINE="$(grep -n -m1 -F 'mkpasswd' "$CALL_LOG" | cut -d: -f1)"
 if (( LOADKEYS_LINE >= MKPASSWD_LINE )); then
   echo "bootstrap hashed a password before applying the selected keymap" >&2
@@ -407,8 +430,12 @@ grep -F '"pcCount": 0' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 grep -F '"keyboardLayout": "it"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
-grep -F '"consoleKeyMap": "it2"' \
-  "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
+# The console follows the XKB layout; the deprecated key is no longer written.
+if grep -F '"consoleKeyMap"' \
+  "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null; then
+  echo "bootstrap still writes consoleKeyMap" >&2
+  exit 1
+fi
 grep -F '"timeZone": "Europe/Rome"' \
   "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 grep -F '"admin":"$6$testsalt$hash12"' \
@@ -421,7 +448,7 @@ jq -e '
   .lab.pcCount == 0 and
   .lab.timeZone == "Europe/Rome" and
   .lab.keyboardLayout == "it" and
-  .lab.consoleKeyMap == "it2"
+  (.lab | has("consoleKeyMap") | not)
 ' "${TARGET_ROOT}/home/admin/nixorium-deployment/lab-settings.json" >/dev/null
 # The template inherits the enabled Nix default; bootstrap preserves that omission.
 # tests/eval-lab-settings.nix checks its effective Assistant value.

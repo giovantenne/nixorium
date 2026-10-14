@@ -25,7 +25,9 @@ in
     LC_TIME = labSettings.extraLocale;
   };
   services.xserver.xkb.layout = labSettings.keyboardLayout;
-  console.keyMap = labSettings.consoleKeyMap;
+  # The text console is derived from the XKB layout, so tty and GDM/GNOME type
+  # the same symbols.
+  console.useXkbConfig = true;
 
   services.xserver.enable = true;
   services.displayManager.gdm.enable = true;

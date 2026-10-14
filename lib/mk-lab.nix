@@ -99,7 +99,6 @@ let
   inherit (config) defaultLocale;
   inherit (config) extraLocale;
   inherit (config) keyboardLayout;
-  inherit (config) consoleKeyMap;
   inherit (config) classroomView;
   inherit (config) assistant;
 
@@ -168,7 +167,6 @@ let
     inherit defaultLocale;
     inherit extraLocale;
     inherit keyboardLayout;
-    inherit consoleKeyMap;
     inherit classroomView;
     inherit assistant;
     inherit cachePublicKey;
@@ -819,7 +817,9 @@ builtins.mapAttrs (name: value:
           # the installer uses that address explicitly for signed closure pulls.
           nix.settings.substituters = lib.mkForce [ ];
           networking.useDHCP = lib.mkForce true;
-          console.keyMap = labSettings.consoleKeyMap;
+          # The console follows the same XKB layout as the installed system.
+          services.xserver.xkb.layout = labSettings.keyboardLayout;
+          console.useXkbConfig = true;
           boot.zfs.forceImportRoot = false;
           services.openssh.enable = true;
           environment.systemPackages = [

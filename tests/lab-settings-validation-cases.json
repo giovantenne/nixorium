@@ -69,12 +69,6 @@
       "overrides": {
         "keyboardLayout": ""
       }
-    },
-    {
-      "name": "empty console keymap",
-      "overrides": {
-        "consoleKeyMap": ""
-      }
     }
   ]
 }

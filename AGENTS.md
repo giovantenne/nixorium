@@ -201,9 +201,11 @@ any shard must block publication.
   exclusions, before Git initialization, Nix evaluation, or disk installation.
   Version 1
   keeps the settings-only sequence. Both defer lab networking. Apply
-  the selected console keymap before any later input, fail closed when the console keymap
-  cannot be loaded, confirm the layout with an echoed test line, document the official NixOS Minimal ISO (console) and
-  Graphical ISO (GNOME session) as the supported bootstrap environments, and apply the same keymap to netboot;
+  the selected keyboard before any later input (`loadkeys` on the console,
+  `gsettings` in GNOME), fail closed when the console keymap cannot be loaded,
+  document the official NixOS Minimal ISO (console) and Graphical ISO (GNOME
+  session) as the supported bootstrap environments, and derive the console from
+  the XKB layout (`console.useXkbConfig`) on installed systems and netboot;
   see ADR 0015.
 
 - `flake.nix` exports `lib.mkLab`; host generation and deployment composition live in `lib/mk-lab.nix`.

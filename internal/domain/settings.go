@@ -70,7 +70,7 @@ type LabSettings struct {
 	DefaultLocale           string            `json:"defaultLocale"`
 	ExtraLocale             string            `json:"extraLocale"`
 	KeyboardLayout          string            `json:"keyboardLayout"`
-	ConsoleKeyMap           string            `json:"consoleKeyMap"`
+	ConsoleKeyMap           string            `json:"consoleKeyMap,omitempty"`
 }
 
 func (l LabSettings) ControllerInterface() string {
@@ -239,7 +239,6 @@ func (s LabSettingsFile) Validate() []ValidationIssue {
 		{"lab.defaultLocale", lab.DefaultLocale},
 		{"lab.extraLocale", lab.ExtraLocale},
 		{"lab.keyboardLayout", lab.KeyboardLayout},
-		{"lab.consoleKeyMap", lab.ConsoleKeyMap},
 	} {
 		if strings.TrimSpace(required.value) == "" {
 			add(required.field, "must not be empty")

@@ -178,7 +178,7 @@ func TestFreshTemplateUsesUSRegionalDefaults(t *testing.T) {
 		settings.Lab.DefaultLocale != "en_US.UTF-8" ||
 		settings.Lab.ExtraLocale != "en_US.UTF-8" ||
 		settings.Lab.KeyboardLayout != "us" ||
-		settings.Lab.ConsoleKeyMap != "us" {
+		settings.Lab.ConsoleKeyMap != "" {
 		t.Fatalf("fresh template regional defaults are not US defaults: %+v", settings.Lab)
 	}
 }

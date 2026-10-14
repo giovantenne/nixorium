@@ -33,5 +33,10 @@ assert !(evaluates (valid // { studentUser = valid.teacherUser; }));
 assert !(evaluates (valid // { adminPassword = "plaintext"; }));
 assert !(evaluates (valid // { homepageUrl = "example.org"; }));
 assert builtins.all (case: !(evaluates (valid // case.overrides))) sharedCases.invalid;
+# consoleKeyMap is deprecated and ignored: present (even empty) or absent is fine.
+assert !(valid ? consoleKeyMap);
+assert evaluates (valid // { consoleKeyMap = "it2"; });
+assert evaluates (valid // { consoleKeyMap = ""; });
+assert (evalLabConfig valid).consoleKeyMap == null;
 assert !(evaluates (valid // { unknownSetting = true; }));
 true

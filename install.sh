@@ -17,6 +17,7 @@ BOOTSTRAP_STUDENT_USER="student"
 BOOTSTRAP_TIME_ZONE="America/New_York"
 BOOTSTRAP_KEYBOARD="us"
 BOOTSTRAP_CONSOLE_KEYMAP="us"
+BOOTSTRAP_CONSOLE_OVERLAY=""
 BOOTSTRAP_ENVIRONMENT="console"
 BOOTSTRAP_ADMIN_HASH=""
 BOOTSTRAP_TEACHER_HASH=""
@@ -241,6 +242,57 @@ prompt_bootstrap_password() {
   done
 }
 
+# The installed system derives its text console from the XKB layout. The live
+# console has no XKB, so the closest kbd keymap is loaded, plus a few AltGr keys
+# that kbd places differently from XKB. Compared symbol by symbol against the
+# XKB layout (ckbcomp output vs loadkeys -m, nixpkgs kbd 2.9.0 and
+# xkeyboard-config 2.48):
+#   it  kbd "it" has the right letters and punctuation, but { } [ ] ~ and the
+#       euro sign sit elsewhere (the "it2" keymap moves - and / too, so it is
+#       not used); the overlay fixes AltGr+7/8/9/0, AltGr+ì and AltGr+E.
+#   gb  "uk"; the overlay adds AltGr+4 as euro.
+#   fr  "fr-pc"; the overlay adds AltGr+E as euro.
+#   de  "de-latin1"; the overlay adds AltGr+E as euro.
+#   es  "es"; the overlay adds AltGr+E as euro.
+#   us  "us"; no overlay.
+# Remaining differences are only the extra Shift+AltGr level of XKB (for
+# example AltGr+Shift+Z for <) and some dead-key accent combinations (fr, de,
+# es). Letters, digits and every symbol in the usual password range match.
+set_console_keymap_for_keyboard() {
+  BOOTSTRAP_CONSOLE_OVERLAY=""
+  case "$BOOTSTRAP_KEYBOARD" in
+    us) BOOTSTRAP_CONSOLE_KEYMAP="us" ;;
+    it)
+      BOOTSTRAP_CONSOLE_KEYMAP="it"
+      BOOTSTRAP_CONSOLE_OVERLAY=$'altgr keycode 8 = braceleft\naltgr keycode 9 = bracketleft\naltgr keycode 10 = bracketright\naltgr keycode 11 = braceright\naltgr keycode 13 = asciitilde\naltgr keycode 18 = U+20AC'
+      ;;
+    gb)
+      BOOTSTRAP_CONSOLE_KEYMAP="uk"
+      BOOTSTRAP_CONSOLE_OVERLAY=$'altgr keycode 5 = U+20AC\naltgr keycode 18 = U+20AC'
+      ;;
+    fr)
+      BOOTSTRAP_CONSOLE_KEYMAP="fr-pc"
+      BOOTSTRAP_CONSOLE_OVERLAY='altgr keycode 18 = U+20AC'
+      ;;
+    de)
+      BOOTSTRAP_CONSOLE_KEYMAP="de-latin1"
+      BOOTSTRAP_CONSOLE_OVERLAY='altgr keycode 18 = U+20AC'
+      ;;
+    es)
+      BOOTSTRAP_CONSOLE_KEYMAP="es"
+      BOOTSTRAP_CONSOLE_OVERLAY='altgr keycode 18 = U+20AC'
+      ;;
+  esac
+}
+
+load_console_keymap() {
+  if [[ -z "$BOOTSTRAP_CONSOLE_OVERLAY" ]]; then
+    sudo loadkeys "$BOOTSTRAP_CONSOLE_KEYMAP"
+  else
+    printf '%s\n' "$BOOTSTRAP_CONSOLE_OVERLAY" | sudo loadkeys "$BOOTSTRAP_CONSOLE_KEYMAP" -
+  fi
+}
+
 # Where the installer runs decides how the keyboard layout is applied:
 # "gnome" (graphical live session), "ssh" (remote shell) or "console".
 detect_bootstrap_environment() {
@@ -290,55 +342,12 @@ activate_bootstrap_keyboard() {
       "Start from an official NixOS ISO and run the command again."
     return 1
   fi
-  if ! sudo loadkeys "$BOOTSTRAP_CONSOLE_KEYMAP"; then
+  if ! load_console_keymap; then
     ui_error "Could not activate console keymap '$BOOTSTRAP_CONSOLE_KEYMAP'." \
       "No password has been asked yet. Check the live console and run the command again."
     return 1
   fi
   ui_success "Keyboard set to $BOOTSTRAP_KEYBOARD. It is used from now on and after installation."
-}
-
-# Let the owner see what the keyboard really produces before any password.
-# Returns 0 when the received line matches the pressed keys, 1 otherwise.
-check_bootstrap_keyboard() {
-  local SAMPLE
-  local RECEIVED
-  local ANSWER
-
-  case "$BOOTSTRAP_KEYBOARD" in
-    us) SAMPLE='@ # [ ] { } \ | ~ `' ;;
-    gb) SAMPLE='@ " # £ [ ] { } \ | ~' ;;
-    it) SAMPLE='@ # [ ] { } \ | ò à è ù €' ;;
-    fr) SAMPLE='@ # [ ] { } \ | é è à ù ç' ;;
-    de) SAMPLE='@ # [ ] { } \ | ä ö ü ß €' ;;
-    es) SAMPLE='@ # [ ] { } \ | ñ ç á é €' ;;
-  esac
-  echo
-  ui_note "Quick keyboard check. Type this line, then press Enter:"
-  ui_note "  ${SAMPLE}"
-  ui_prompt "Test line"
-  if ! IFS= read -r -u "$BOOTSTRAP_INPUT_FD" RECEIVED; then
-    echo >&2
-    ui_error "Setup input ended before all questions were answered."
-    exit 1
-  fi
-  ui_note "Received: ${RECEIVED}"
-  while true; do
-    ui_prompt "Does it match the keys you pressed?" "Y/n"
-    if ! IFS= read -r -u "$BOOTSTRAP_INPUT_FD" ANSWER; then
-      echo >&2
-      ui_error "Setup input ended before all questions were answered."
-      exit 1
-    fi
-    case "${ANSWER,,}" in
-      ""|y|yes) return 0 ;;
-      n|no)
-        ui_feedback "Let's choose the keyboard layout again."
-        return 1
-        ;;
-      *) ui_feedback "Type y for yes or n to choose the layout again." ;;
-    esac
-  done
 }
 
 suggest_time_zone() {
@@ -354,35 +363,45 @@ suggest_time_zone() {
   esac
 }
 
+keyboard_number() {
+  case "$1" in
+    us) echo 1 ;;
+    gb) echo 2 ;;
+    it) echo 3 ;;
+    fr) echo 4 ;;
+    de) echo 5 ;;
+    es) echo 6 ;;
+    *) echo 1 ;;
+  esac
+}
+
 collect_regional_settings() {
   local SUGGESTED_TIME_ZONE
+  local KEYBOARD_ANSWER
 
   ui_step 1 "Keyboard and time zone"
   ui_note "Keyboard layouts:"
-  ui_note "  us  English (US)     gb  English (UK)     it  Italian"
-  ui_note "  fr  French           de  German           es  Spanish"
+  ui_note "  1  English (US)     2  English (UK)     3  Italian"
+  ui_note "  4  French           5  German           6  Spanish"
   echo
+  ui_note "Type the number or the code (us, gb, it, fr, de, es)."
+  ui_note "The layout is applied now, before any password, and kept after installation."
   while true; do
-    while true; do
-      if ! prompt_bootstrap_value "Keyboard layout" "$BOOTSTRAP_KEYBOARD" BOOTSTRAP_KEYBOARD; then
-        return 1
-      fi
-      case "$BOOTSTRAP_KEYBOARD" in
-        us) BOOTSTRAP_CONSOLE_KEYMAP="us"; break ;;
-        it) BOOTSTRAP_CONSOLE_KEYMAP="it2"; break ;;
-        gb) BOOTSTRAP_CONSOLE_KEYMAP="uk"; break ;;
-        fr) BOOTSTRAP_CONSOLE_KEYMAP="fr"; break ;;
-        de) BOOTSTRAP_CONSOLE_KEYMAP="de"; break ;;
-        es) BOOTSTRAP_CONSOLE_KEYMAP="es"; break ;;
-        *) ui_feedback "Type one of the codes above, for example it." ;;
-      esac
-    done
-    activate_bootstrap_keyboard || return 1
-    if check_bootstrap_keyboard; then
-      break
+    if ! prompt_bootstrap_value "Keyboard layout" "$(keyboard_number "$BOOTSTRAP_KEYBOARD")" KEYBOARD_ANSWER; then
+      return 1
     fi
+    case "${KEYBOARD_ANSWER,,}" in
+      1|us) BOOTSTRAP_KEYBOARD="us"; break ;;
+      2|gb|uk) BOOTSTRAP_KEYBOARD="gb"; break ;;
+      3|it) BOOTSTRAP_KEYBOARD="it"; break ;;
+      4|fr) BOOTSTRAP_KEYBOARD="fr"; break ;;
+      5|de) BOOTSTRAP_KEYBOARD="de"; break ;;
+      6|es) BOOTSTRAP_KEYBOARD="es"; break ;;
+      *) ui_feedback "Type a number from 1 to 6, or a code such as it." ;;
+    esac
   done
-
+  set_console_keymap_for_keyboard
+  activate_bootstrap_keyboard || return 1
   suggest_time_zone
   echo
   ui_note "Time zone as Region/City, for example Europe/Rome or America/Chicago."
@@ -514,8 +533,13 @@ configure_bootstrap_settings() {
       '    "timeZone": '*) printf '    "timeZone": "%s",\n' "$BOOTSTRAP_TIME_ZONE" >> "$OUTPUT_FILE" ;;
       '    "defaultLocale": '*) printf '    "defaultLocale": "en_US.UTF-8",\n' >> "$OUTPUT_FILE" ;;
       '    "extraLocale": '*) printf '    "extraLocale": "en_US.UTF-8",\n' >> "$OUTPUT_FILE" ;;
-      '    "keyboardLayout": '*) printf '    "keyboardLayout": "%s",\n' "$BOOTSTRAP_KEYBOARD" >> "$OUTPUT_FILE" ;;
+      '    "keyboardLayout": '*)
+        printf '    "keyboardLayout": "%s"' "$BOOTSTRAP_KEYBOARD" >> "$OUTPUT_FILE"
+        if [[ "$LINE" == *, ]]; then printf ',' >> "$OUTPUT_FILE"; fi
+        printf '\n' >> "$OUTPUT_FILE"
+        ;;
       '    "consoleKeyMap": '*)
+        # Releases older than the XKB-derived console still read this key.
         printf '    "consoleKeyMap": "%s"' "$BOOTSTRAP_CONSOLE_KEYMAP" >> "$OUTPUT_FILE"
         if [[ "$LINE" == *, ]]; then printf ',' >> "$OUTPUT_FILE"; fi
         printf '\n' >> "$OUTPUT_FILE"
