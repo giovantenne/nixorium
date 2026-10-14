@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-10-14
+
 ### Added
 
 - **Maintenance → Change account passwords** opens the administrator, teacher
