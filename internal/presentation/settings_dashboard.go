@@ -317,6 +317,9 @@ func (model dashboardModel) settingsView() string {
 		)
 		lines = append(lines, saveStatusLines(model.settings.result.State, model.settings.result.RecoveryRequired, true, true, controllerVerifiedForSave(model.settings.result.Revision, model.controller.result))...)
 		lines = append(lines, "", "Review controller and client changes separately before applying.", "For network changes, check device names and local console access first.", "Keyboard and student-home changes may take effect at the next computer start.")
+		if passwordFieldChanged(model.settings.result) {
+			lines = append(lines, "", "A new password takes effect only after you apply the configuration to this controller and then update the computers.")
+		}
 		if model.message != "" {
 			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 		}
@@ -378,7 +381,11 @@ func (model dashboardModel) settingsPasswordsView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: []string{"Maintenance", "Settings", "Passwords"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Change password"}, {key: "Esc", label: "Settings"}, {key: "F1", label: "Help"}}})
+	path, back := []string{"Maintenance", "Settings", "Passwords"}, "Settings"
+	if model.settings.passwordsDirect {
+		path, back = []string{"Maintenance", "Account passwords"}, "Maintenance"
+	}
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Change password"}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) settingsReviewView() string {
@@ -453,4 +460,13 @@ func (model dashboardModel) settingsRepairIssues() []domain.ValidationIssue {
 		return nil
 	}
 	return model.actions.SettingsRepairIssues()
+}
+
+func passwordFieldChanged(result domain.ConfigurationSaveReport) bool {
+	for _, change := range result.Changes {
+		if change.Sensitive {
+			return true
+		}
+	}
+	return false
 }

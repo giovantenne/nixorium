@@ -907,6 +907,10 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		model.message = ""
 		model.screen = dashboardSettings
+		if model.settings.passwordsDirect {
+			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+			model.screen = dashboardSettingsPasswords
+		}
 		return model, nil
 	case dashboardSettingsPlanMsg:
 		model.busy = ""

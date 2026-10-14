@@ -23,7 +23,7 @@ increments it when collecting new passwords. An advanced `config plan` candidate
 with changed hashes must increment it too; keep such candidates outside Git.
 Missing credentials leave setup incomplete. If saving stops between replacing
 the private file and replacing the public settings, the versions differ and
-deployment is refused. Re-enter all passwords in Change settings → Passwords,
+deployment is refused. Re-enter all passwords in Maintenance → Change account passwords,
 review and save, then back up again; alternatively restore the last complete
 backup into a new directory. No manual coordination-file edits are required.
 

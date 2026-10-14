@@ -177,3 +177,37 @@ func TestSettingsInterfaceReviewShowsBothValuesAndWarning(t *testing.T) {
 		}
 	}
 }
+
+func TestMaintenancePasswordsTaskOpensPasswordsAndEscReturns(t *testing.T) {
+	found := false
+	for _, task := range administrationTasks {
+		found = found || (task.id == "passwords" && task.shortcut == "p" && task.title == "Change account passwords" && task.description == "Set new passwords for the administrator, teacher and student accounts")
+	}
+	if !found {
+		t.Fatal("Maintenance omits the account passwords task")
+	}
+	current := wizardSettings()
+	actions := DashboardActions{LoadSettings: func(context.Context) (domain.LabSettingsFile, error) { return current, nil }}
+	model := dashboardModel{report: testDashboardReport("ready"), actions: actions, width: 100, height: 30, screen: dashboardAdministration}
+	if !strings.Contains(model.View().Content, "Change account passwords") {
+		t.Fatalf("Maintenance view omits the task:\n%s", model.View().Content)
+	}
+	updated, command := model.Update(tea.KeyPressMsg{Text: "p"})
+	model = updated.(dashboardModel)
+	if command == nil || model.busy == "" {
+		t.Fatalf("settings load did not start: %+v", model.screen)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(dashboardModel)
+	if model.screen != dashboardSettingsPasswords {
+		t.Fatalf("screen = %v", model.screen)
+	}
+	if view := demoANSI.ReplaceAllString(model.View().Content, ""); !strings.Contains(view, "Esc Maintenance") {
+		t.Fatalf("passwords view lacks Maintenance return:\n%s", view)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	model = updated.(dashboardModel)
+	if model.screen != dashboardAdministration {
+		t.Fatalf("Esc screen = %v", model.screen)
+	}
+}

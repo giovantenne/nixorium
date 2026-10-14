@@ -284,6 +284,9 @@ type settingsModel struct {
 	applying         bool
 	returnScreen     dashboardScreen
 	collectPasswords bool
+	// passwordsDirect marks the Maintenance shortcut that opens the account
+	// passwords screen without showing the Settings menu first.
+	passwordsDirect bool
 	// repair lists problems of saved settings that no longer validate.
 	repair []domain.ValidationIssue
 }
@@ -1015,6 +1018,7 @@ func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
 	returnTo := model.settings.returnScreen
 	model.settings.returnScreen = dashboardHome
 	model.settings.collectPasswords = false
+	model.settings.passwordsDirect = false
 	model.message = ""
 	if returnTo == dashboardSetup {
 		model.screen = dashboardSetup

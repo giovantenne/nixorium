@@ -136,7 +136,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		return model.checkUpdates()
 	case "b":
 		return model.openPackageBase()
-	case "e":
+	case "e", "p":
+		model.settings.passwordsDirect = action == "p"
 		model.screen = dashboardSettings
 		model.settings.returnScreen = dashboardAdministration
 		model.settings.result = domain.ConfigurationSaveReport{}
@@ -635,6 +636,12 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		switch key.String() {
 		case "esc", "left":
 			model.message = ""
+			if model.settings.passwordsDirect {
+				model.settings.passwordsDirect = false
+				model.settings.returnScreen = dashboardHome
+				model.screen = dashboardAdministration
+				return model, nil
+			}
 			model.screen = dashboardSettings
 		case "enter":
 			choice, selected := model.settings.passwordMenu.selected()
