@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -254,8 +253,6 @@ func runCommand(ctx context.Context, arguments []string, stdout, stderr io.Write
 		return runConfigCommand(ctx, repository, options, stdout, stderr)
 	case "setup":
 		return runSetupCommand(ctx, repository, options, stdout, stderr)
-	case "bootstrap":
-		return runBootstrapConfigure(ctx, repository, stdout, stderr)
 	case "pxe":
 		return runPXECommand(ctx, repository, options, stdout, stderr)
 	default:
@@ -968,7 +965,7 @@ func parseArguments(arguments []string) (options, error) {
 				return options{}, errors.New("only one command may be selected")
 			}
 			result.command = arguments[index]
-		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "bootstrap", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "send", "classroom-view", "install", "support", "cleanup", "recovery", "template-reset", "backup":
+		case "doctor", "hosts", "deploy", "controller", "services", "logs", "git", "config", "setup", "pxe", "update", "package-base", "software", "workspace", "shutdown", "internet", "lock", "send", "classroom-view", "install", "support", "cleanup", "recovery", "template-reset", "backup":
 			if result.command != "" {
 				return options{}, errors.New("only one command may be selected")
 			}
@@ -1045,8 +1042,8 @@ func parseArguments(arguments []string) (options, error) {
 			}
 			result.subcommand = "keys"
 		case "configure":
-			if (result.command != "setup" && result.command != "bootstrap") || result.subcommand != "" {
-				return options{}, errors.New("configure must follow setup or bootstrap")
+			if result.command != "setup" || result.subcommand != "" {
+				return options{}, errors.New("configure must follow setup")
 			}
 			result.subcommand = "configure"
 		case "install-secrets":
@@ -1187,9 +1184,6 @@ func parseArguments(arguments []string) (options, error) {
 	}
 	if result.command == "config" && result.subcommand != "validate" && result.subcommand != "plan" && result.subcommand != "apply" {
 		return options{}, errors.New("config requires the validate, plan, or apply subcommand")
-	}
-	if result.command == "bootstrap" && result.subcommand != "configure" {
-		return options{}, errors.New("bootstrap requires the configure subcommand")
 	}
 	if result.file != "" && ((result.command != "config" && result.command != "workspace" && result.command != "send") || (result.subcommand != "plan" && result.subcommand != "apply")) {
 		return options{}, errors.New("--file is only valid with config, workspace or send plan/apply")
@@ -1543,7 +1537,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|bootstrap configure|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       home-files import plan --source <local-file-or-folder> --destination <relative-home-path> [--replace] [--json] captures materials for review")
 	fmt.Fprintln(writer, "       home-files plan --file <draft-or-profile.json> [--json] reviews shared student initial files")
@@ -1713,186 +1707,7 @@ func applyDetectedNetworkDefaults(settings domain.LabSettingsFile, detected doma
 	return settings
 }
 
-var bootstrapUserNamePattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
 var remoteInstallOperationIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
-
-func runBootstrapConfigure(ctx context.Context, repository string, stdout, stderr io.Writer) int {
-	local := adapters.Local{}
-	settingsManager := app.NewSettingsManager(local)
-	candidate, err := settingsManager.Current(repository)
-	if err != nil {
-		fmt.Fprintln(stderr, "Error: load controller settings:", err)
-		return 1
-	}
-	lineReader := bufio.NewReader(os.Stdin)
-	secretReader := presentation.TerminalSecretReader{Input: os.Stdin, Output: stdout}
-	if err := collectBootstrapConfiguration(ctx, lineReader, secretReader, local, local, stdout, &candidate); err != nil {
-		fmt.Fprintln(stderr, "Error:", err)
-		return 1
-	}
-
-	fmt.Fprintln(stdout, "")
-	fmt.Fprintln(stdout, "Controller installation review")
-	fmt.Fprintln(stdout, "  Administrator: admin")
-	fmt.Fprintf(stdout, "  Teacher:       %s\n", candidate.Lab.TeacherUser)
-	fmt.Fprintf(stdout, "  Student:       %s\n", candidate.Lab.StudentUser)
-	fmt.Fprintf(stdout, "  Time zone:     %s\n", candidate.Lab.TimeZone)
-	fmt.Fprintf(stdout, "  Keyboard:      %s\n", candidate.Lab.KeyboardLayout)
-	fmt.Fprintln(stdout, "  Passwords:     set locally and hidden")
-	fmt.Fprintln(stdout, "  Client setup:  available later from Nixorium")
-	confirmed, err := promptBootstrapConfirmation(lineReader, stdout)
-	if err != nil {
-		fmt.Fprintln(stderr, "Error: read controller installation confirmation:", err)
-		return 1
-	}
-	if !confirmed {
-		fmt.Fprintln(stderr, "Controller installation cancelled; no settings were changed.")
-		return 1
-	}
-
-	fmt.Fprintln(stdout, "Validating controller settings...")
-	plan := settingsManager.PlanSettings(ctx, repository, candidate)
-	if plan.HasErrors() {
-		presentation.ConfigPlanText(stderr, plan)
-		return 1
-	}
-	reviewManager := app.NewGitReviewManager(local)
-	commitManager := app.NewGitCommitManager(local)
-	saveManager := app.NewSettingsSaveManager(settingsManager, reviewManager, commitManager)
-	report := saveManager.Save(ctx, repository, candidate, plan)
-	if report.HasErrors() || (report.State != "saved" && report.State != "unchanged") {
-		fmt.Fprintln(stderr, "Error:", report.Message)
-		for _, issue := range report.Issues {
-			fmt.Fprintf(stderr, "  %s: %s\n", issue.Field, issue.Message)
-		}
-		return 1
-	}
-	fmt.Fprintln(stdout, "Controller settings saved. Installation can now start.")
-	return 0
-}
-
-type bootstrapKeyboardActivator interface {
-	ActivateBootstrapKeyboard(context.Context, string) error
-}
-
-func collectBootstrapConfiguration(ctx context.Context, reader *bufio.Reader, secrets app.SecretReader, hasher app.PasswordHasher, keyboardActivator bootstrapKeyboardActivator, output io.Writer, candidate *domain.LabSettingsFile) error {
-	fmt.Fprintln(output, "Nixorium controller setup")
-	fmt.Fprintln(output, "Recommended environment: official NixOS Minimal ISO in UEFI mode.")
-	fmt.Fprintln(output, "Choose the keyboard first, then the accounts and regional settings used after the first reboot.")
-	fmt.Fprintln(output, "The administrator account name is fixed as 'admin'.")
-
-	keyboard, consoleKeyMap, err := promptBootstrapKeyboard(reader, output, candidate.Lab.KeyboardLayout)
-	if err != nil {
-		return err
-	}
-	if err := keyboardActivator.ActivateBootstrapKeyboard(ctx, consoleKeyMap); err != nil {
-		return fmt.Errorf("activate the selected keyboard before continuing: %w", err)
-	}
-	fmt.Fprintf(output, "Active console keyboard: %s (%s).\n", keyboard, consoleKeyMap)
-	fmt.Fprintln(output, "All remaining input, including account passwords, uses this layout.")
-
-	teacher, err := promptBootstrapUser(reader, output, "Teacher username", candidate.Lab.TeacherUser, "")
-	if err != nil {
-		return err
-	}
-	student, err := promptBootstrapUser(reader, output, "Student username", candidate.Lab.StudentUser, teacher)
-	if err != nil {
-		return err
-	}
-	timeZone, err := promptBootstrapValue(reader, output, "Time zone", candidate.Lab.TimeZone)
-	if err != nil {
-		return err
-	}
-	candidate.Lab.DeploymentMode = "controller"
-	candidate.Lab.PCCount = 0
-	candidate.Lab.MasterDHCPIP = domain.MasterDHCPPlaceholder
-	candidate.Lab.TeacherUser = teacher
-	candidate.Lab.StudentUser = student
-	candidate.Lab.StudentGitName = student
-	candidate.Lab.TimeZone = timeZone
-	candidate.Lab.KeyboardLayout = keyboard
-	candidate.Lab.ConsoleKeyMap = consoleKeyMap
-	candidate.Lab.DefaultLocale = "en_US.UTF-8"
-	candidate.Lab.ExtraLocale = "en_US.UTF-8"
-	if err := collectSetupCredentials(ctx, secrets, hasher, output, candidate); err != nil {
-		return err
-	}
-	if issues := candidate.Validate(); len(issues) > 0 {
-		return fmt.Errorf("%s: %s", issues[0].Field, issues[0].Message)
-	}
-	return nil
-}
-
-func promptBootstrapUser(reader *bufio.Reader, output io.Writer, label, current, differentFrom string) (string, error) {
-	for {
-		value, err := promptBootstrapValue(reader, output, label, current)
-		if err != nil {
-			return "", err
-		}
-		if !bootstrapUserNamePattern.MatchString(value) {
-			fmt.Fprintln(output, "Use a lowercase Unix username (letters, numbers, '_' or '-').")
-			continue
-		}
-		if value == "root" || value == "admin" {
-			fmt.Fprintln(output, "That username is reserved by the controller.")
-			continue
-		}
-		if value == differentFrom {
-			fmt.Fprintln(output, "Teacher and student usernames must be different.")
-			continue
-		}
-		return value, nil
-	}
-}
-
-func promptBootstrapValue(reader *bufio.Reader, output io.Writer, label, current string) (string, error) {
-	fmt.Fprintf(output, "%s [%s]: ", label, current)
-	value, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	value = strings.TrimSpace(value)
-	if value == "" {
-		value = current
-	}
-	if value == "" {
-		return "", fmt.Errorf("%s cannot be empty", strings.ToLower(label))
-	}
-	return value, nil
-}
-
-func promptBootstrapKeyboard(reader *bufio.Reader, output io.Writer, current string) (string, string, error) {
-	keyMaps := map[string]string{"us": "us", "it": "it2", "gb": "uk", "fr": "fr", "de": "de", "es": "es"}
-	for {
-		fmt.Fprintln(output, "Keyboard choices: us, it, gb, fr, de, es")
-		value, err := promptBootstrapValue(reader, output, "Keyboard layout", current)
-		if err != nil {
-			return "", "", err
-		}
-		if keyMap, ok := keyMaps[value]; ok {
-			return value, keyMap, nil
-		}
-		fmt.Fprintln(output, "Choose one of the listed keyboard layouts.")
-	}
-}
-
-func promptBootstrapConfirmation(reader *bufio.Reader, output io.Writer) (bool, error) {
-	for {
-		fmt.Fprint(output, "Continue with these settings? [Y/n]: ")
-		value, err := reader.ReadString('\n')
-		if err != nil {
-			return false, err
-		}
-		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "", "y", "yes":
-			return true, nil
-		case "n", "no":
-			return false, nil
-		default:
-			fmt.Fprintln(output, "Enter y or n.")
-		}
-	}
-}
 
 func setupStartsBeforeDashboardInspection(report domain.SetupReport) bool {
 	switch report.CurrentStage {

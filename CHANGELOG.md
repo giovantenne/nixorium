@@ -36,6 +36,9 @@ The project follows [Semantic Versioning](https://semver.org/).
   `lab.consoleKeyMap` is deprecated: still accepted, ignored and no longer
   written by the setup.
 
+- Removed the unused `nixorium bootstrap configure` command; `install.sh` has
+  its own bootstrap prompts and never called it.
+
 ### Fixed
 
 - Local `systemctl` calls pass `--no-ask-password` and the command resets a

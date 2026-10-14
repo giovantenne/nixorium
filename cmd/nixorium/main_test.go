@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -15,95 +14,6 @@ import (
 	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
-
-func TestBootstrapConfigureArguments(t *testing.T) {
-	options, err := parseArguments([]string{"bootstrap", "configure", "--repo", "/deployment"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if options.command != "bootstrap" || options.subcommand != "configure" || options.repository != "/deployment" {
-		t.Fatalf("options = %+v", options)
-	}
-	if _, err := parseArguments([]string{"bootstrap"}); err == nil {
-		t.Fatal("bootstrap without configure was accepted")
-	}
-}
-
-func TestCollectBootstrapConfigurationCreatesReadyControllerSettings(t *testing.T) {
-	data, err := os.ReadFile("../../templates/site/lab-settings.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	candidate, issues := domain.DecodeLabSettings(data)
-	if len(issues) != 0 {
-		t.Fatalf("template issues = %+v", issues)
-	}
-	passwords := [][]byte{
-		[]byte("admin-password"), []byte("admin-password"),
-		[]byte("teacher-password"), []byte("teacher-password"),
-		[]byte("student-password"), []byte("student-password"),
-	}
-	secrets := &setupSecretReader{values: append([][]byte(nil), passwords...)}
-	hasher := &setupPasswordHasher{}
-	input := bufio.NewReader(strings.NewReader("it\nteacher\nstudent\nEurope/Rome\n"))
-	var output bytes.Buffer
-	keyboard := &setupKeyboardActivator{}
-	if err := collectBootstrapConfiguration(context.Background(), input, secrets, hasher, keyboard, &output, &candidate); err != nil {
-		t.Fatal(err)
-	}
-	if candidate.Lab.DeploymentMode != "controller" || candidate.Lab.PCCount != 0 || candidate.Lab.MasterDHCPIP != domain.MasterDHCPPlaceholder {
-		t.Fatalf("controller bootstrap = %+v", candidate.Lab)
-	}
-	if candidate.Lab.TeacherUser != "teacher" || candidate.Lab.StudentUser != "student" || candidate.Lab.TimeZone != "Europe/Rome" || candidate.Lab.KeyboardLayout != "it" || candidate.Lab.ConsoleKeyMap != "it2" {
-		t.Fatalf("chosen settings = %+v", candidate.Lab)
-	}
-	if candidate.Lab.DefaultLocale != "en_US.UTF-8" || candidate.Lab.ExtraLocale != "en_US.UTF-8" {
-		t.Fatalf("internal locales = %+v", candidate.Lab)
-	}
-	if hasher.calls != 3 || strings.Contains(output.String(), "admin-password") {
-		t.Fatalf("password handling: calls=%d output=%q", hasher.calls, output.String())
-	}
-	if len(keyboard.keyMaps) != 1 || keyboard.keyMaps[0] != "it2" || !strings.Contains(output.String(), "All remaining input, including account passwords, uses this layout") {
-		t.Fatalf("keyboard activation = %+v, output=%q", keyboard, output.String())
-	}
-	if !strings.Contains(output.String(), "official NixOS Minimal ISO") {
-		t.Fatalf("minimal ISO recommendation missing: %q", output.String())
-	}
-	if keyboardPrompt, teacherPrompt := strings.Index(output.String(), "Keyboard layout"), strings.Index(output.String(), "Teacher username"); keyboardPrompt < 0 || teacherPrompt < 0 || keyboardPrompt >= teacherPrompt {
-		t.Fatalf("keyboard was not the first settings prompt: %q", output.String())
-	}
-}
-
-func TestCollectBootstrapConfigurationStopsBeforePasswordsWhenKeyboardActivationFails(t *testing.T) {
-	data, err := os.ReadFile("../../templates/site/lab-settings.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	candidate, issues := domain.DecodeLabSettings(data)
-	if len(issues) != 0 {
-		t.Fatalf("template issues = %+v", issues)
-	}
-	secrets := &setupSecretReader{values: [][]byte{[]byte("must-not-be-read")}}
-	hasher := &setupPasswordHasher{}
-	keyboard := &setupKeyboardActivator{err: errors.New("loadkeys failed")}
-	input := bufio.NewReader(strings.NewReader("it\nteacher\nstudent\nEurope/Rome\n"))
-	err = collectBootstrapConfiguration(context.Background(), input, secrets, hasher, keyboard, &bytes.Buffer{}, &candidate)
-	if err == nil || !strings.Contains(err.Error(), "activate the selected keyboard before continuing") {
-		t.Fatalf("error = %v", err)
-	}
-	if hasher.calls != 0 || len(secrets.values) != 1 {
-		t.Fatalf("password input reached after activation failure: hasher=%d remaining=%d", hasher.calls, len(secrets.values))
-	}
-}
-
-func TestBootstrapConfirmationRejectsAmbiguousAnswer(t *testing.T) {
-	reader := bufio.NewReader(strings.NewReader("maybe\ny\n"))
-	var output bytes.Buffer
-	confirmed, err := promptBootstrapConfirmation(reader, &output)
-	if err != nil || !confirmed || !strings.Contains(output.String(), "Enter y or n") {
-		t.Fatalf("confirmed=%v err=%v output=%q", confirmed, err, output.String())
-	}
-}
 
 type setupSecretReader struct {
 	values [][]byte
@@ -134,16 +44,6 @@ func (r *setupSecretReader) ReadSecret(string) ([]byte, error) {
 
 type setupPasswordHasher struct {
 	calls int
-}
-
-type setupKeyboardActivator struct {
-	keyMaps []string
-	err     error
-}
-
-func (a *setupKeyboardActivator) ActivateBootstrapKeyboard(_ context.Context, keyMap string) error {
-	a.keyMaps = append(a.keyMaps, keyMap)
-	return a.err
 }
 
 func (h *setupPasswordHasher) HashPassword(context.Context, []byte) (string, error) {
