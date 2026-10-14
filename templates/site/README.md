@@ -38,11 +38,11 @@ An explicit `false` keeps it disabled. Set `lab.assistant` to `false` in
 code shown after payment and accept its separate data-sharing consent. Review each proposal;
 saving creates a local commit and backup, with separate system-application
 and computer-update reviews afterwards.
-You can also activate the five-request, thirty-day free trial with its emailed
+You can also activate the ten-request, thirty-day free trial with its emailed
 code. Assistant shows the remaining requests and a purchase link when the trial
 ends; conversion keeps the controller activated. Each account enables one lab.
-Conversation sharing is off by default. In the chat, Ctrl+P changes it and
-Ctrl+F reports a final answer with your explicit consent. Reports and shared
+Conversation sharing is off by default. In the chat, `/share` changes it and
+`/report` reports a final answer with your explicit consent. Reports and shared
 conversations are kept for 90 days.
 Capable controllers can prepare a public npm CLI package/tag into an offline
 baseline restored after the normal student-home reset; review its exact version,
@@ -112,8 +112,9 @@ The student session uses the network configured by the system but cannot change
 NetworkManager connections, radios, DNS, or other host network state through
 GNOME, `nmcli`, or `nmtui`. Teacher and administrator accounts retain network
 management access. On the controller, the teacher can also run `nixorium` from
-their own home to open a restricted classroom dashboard: computer inventory,
-temporary Internet control, and reviewed shutdown/restart actions only. The
+their own home to open a restricted classroom dashboard: the classroom view,
+computer inventory, temporary Internet control, screen locking, sending files
+and reviewed shutdown/restart actions only. The
 teacher never receives read access to the administrator's private deployment;
 configuration, software, Git, installation, deployment, updates, logs and
 controller maintenance remain unavailable. Student accounts cannot access the
@@ -216,7 +217,7 @@ As `admin` or the configured teacher, open **Computers → Internet access**
 to restrict browsing during a lesson,
 select clients, choose **block** or **unblock** with Tab, and review before
 applying. Internet returns after each client reboots. The lab's IPv4 subnet,
-SSH remains available; other IPv4/IPv6 destinations are blocked.
+including SSH, remains reachable; other IPv4/IPv6 destinations are blocked.
 Offline or outdated clients are reported and receive no queued command.
 Update the controller and clients before first use.
 
@@ -353,7 +354,7 @@ No activation, client deployment, reboot or push is included. See
 The template supplies `workspace-catalog.nix` and an active
 `workspace-profile.json` matching Essential without requiring VS Code.
 Leave it unchanged for the defaults, or customize it under **Maintenance →
-Settings → Student workspace**. There is no separate personalization switch.
+Change settings → Student workspace**. There is no separate personalization switch.
 Choosing Programming at installation (or in a template reset) copies
 `workspace-profile.programming.example.json` over it: VS Code and MySQL
 Workbench in the dock, editor defaults, and extensions for web/PHP, C/C++,
@@ -404,7 +405,7 @@ catalog, pin or profile requires a new review. Saving does not stage, commit,
 build, deploy or reset. See the
 [save procedure](skills/nixorium-maintainer/references/student-home.md#review-and-save-a-profile)
 for requirements and conflict/durability handling. The administrative TUI exposes
-the same save boundary at **Maintenance → Settings → Student workspace**.
+the same save boundary at **Maintenance → Change settings → Student workspace**.
 Choose Desktop, Dock, VSCode or Browser, keep each change in the
 draft, then review the complete proposal and confirm the save. “Inherit” uses
 the deployment baseline; “Clear” is an explicit empty list. VSCode → Other
@@ -440,7 +441,8 @@ Run the task-oriented dashboard from the repository root:
 nixorium
 ```
 
-The opening screen offers Computers, Installation, Software, and Maintenance.
+The opening screen offers Computers, Installation, Software, and Maintenance,
+plus Assistant unless `lab.assistant` is `false`.
 It does not scan clients or treat powered-off computers as unhealthy.
 `Up`/`Down` selects an area and task-local shortcuts appear only inside their
 owning area. `?` opens help; `F1` also works in text fields. Computer inventory
@@ -504,7 +506,8 @@ the saved configuration to the controller and then update the computers. Nixoriu
 terminal-only no-echo, confirmed, retryable hashing flow as first-run setup;
 plaintext never enters the Bubble Tea model. Both ordinary and password edits
 return to one Nix-validated, redacted review before the fingerprint-bound atomic
-replacement of `lab-settings.json`.
+replacement of `lab-settings.json`; password edits also replace the ignored
+`lab-credentials.json`.
 
 The TUI saves the managed file and its local history as one operation. Then
 rebuild the controller and deploy affected clients as appropriate. The Settings
@@ -512,7 +515,7 @@ action does not push, rebuild, activate, or deploy implicitly.
 
 ### Add or change software
 
-Open **Add or change software** to review configured choices, browse common
+Open **Software** to review configured choices, browse common
 suggestions, or search the wider package set locked by this deployment. Choose
 whether the declaration applies to this controller and all current/future
 clients (`shared`), only this controller (`controller`), every client without
@@ -521,7 +524,7 @@ The first two choices require an upstream exposing controller-software support;
 older upstreams retain their client-only choices. Existing declarations are not
 migrated or expanded automatically. Clients may all remain powered off, and
 shared/controller declarations work before any clients are configured.
-In **Selected**, Enter opens a package's details: `c` changes where it applies
+In **Configured**, Enter opens a package's details: `c` changes where it applies
 and `x` reviews its removal. Removing or moving a package that reaches this
 controller rebuilds the controller right after saving.
 
@@ -803,8 +806,8 @@ In every administrator screen, `r` refreshes what is shown (computer states,
 services, logs, Git review, network boot). After a result, `n` starts a new
 review and `s` completes an interrupted save; all keys that act are listed at
 the bottom of the screen. Maintenance shows everyday tasks first and groups
-**Apply to controller**, **Controller services**, **Review Git changes** and
-**Reset deployment template** under **Advanced**.
+**Free disk space**, **Apply to controller**, **Controller services**,
+**Review Git changes** and **Reset deployment template** under **Advanced**.
 
 ### Review and commit Git changes
 
@@ -1271,7 +1274,7 @@ Prereleases require `--allow-prerelease`; known downgrades require
 `--allow-downgrade`. Apply repeats validation and changes only `flake.nix` and
 `flake.lock`; review and optionally commit them separately. It never branches,
 commits, pushes, activates, starts PXE, or deploys clients.
-The TUI's **Update Nixorium** advanced tool first fetches this bounded release
+The TUI's **Maintenance → Update Nixorium** task first fetches this bounded release
 list. `master` is clearly marked as the Development branch, stable releases are
 shown by default, and prereleases require explicit disclosure. The TUI has no
 editable target and does not offer downgrades. During validation it shows the

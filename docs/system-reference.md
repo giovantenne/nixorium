@@ -30,8 +30,9 @@ requests.
 On the controller, `admin` owns the mode-0700 private deployment and the SSH
 identity used to manage clients. The teacher instead belongs to the
 `nixorium-classroom` group. Running `nixorium` without a readable deployment
-connects to a group-private local worker and opens only inventory, temporary
-Internet control, and reviewed client shutdown/restart. The worker runs as
+connects to a group-private local worker and opens only the classroom view,
+inventory, temporary Internet control, screen locking, sending files and
+reviewed client shutdown/restart. The worker runs as
 `admin`, validates every target against the fixed deployment, uses only fixed
 SSH helper/systemd commands, and shares the normal client-operation lock.
 Student accounts cannot traverse the runtime directory or connect to its
@@ -247,8 +248,8 @@ logind remains responsible for creating `/run/user/<uid>` and its contents.
 Administrators and the teacher can recover a file from the snapshot store:
 
 ```sh
-ls /var/lib/home-snapshots/snapshot-1/
-cp /var/lib/home-snapshots/snapshot-1/file.txt /home/<studentUser>/
+ls /var/lib/home-snapshots/workspace/snapshot-1/
+cp /var/lib/home-snapshots/workspace/snapshot-1/file.txt /home/<studentUser>/
 ```
 
 Docker images, npm's download cache, and user-installed global npm packages are
@@ -377,7 +378,7 @@ it the latest picture (`broadcast.frame`), so a slow computer skips
 pictures; a computer that is off or has nobody signed in is tried again
 every few seconds. The agent shows each picture through the Shell extension
 in a cover above everything, the lock included, with keyboard and mouse
-blocked. **Stop showing**, closing the page, the end of GNOME's sharing,
+blocked. **Stop sharing**, closing the page, the end of GNOME's sharing,
 ten seconds without pictures at the service or fifteen at the agent end
 the showing (`broadcast.stop`); a lock stays in place.
 

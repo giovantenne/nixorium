@@ -175,7 +175,7 @@ settings:
 
 | Setting | Value for this fixture |
 |---|---|
-| Laboratory network interface | Adapter 1, normally `enp0s3` |
+| Client computers' network interface | Leave empty (the default) |
 | Current controller DHCP address | `192.168.77.99` |
 | Static laboratory network address / prefix | `10.77.0.0` / `24` |
 | Number of client computers | `1` |
@@ -222,7 +222,7 @@ the client when instructed; select its installed disk in the EFI boot manager
 for subsequent starts. **PXE is for installation, not daily boot.**
 
 On the controller, stop PXE through **Installation → Network boot (PXE)**
-with **Stop PXE**. Expected: PXE listeners stop and `10.77.0.99/24` is restored on adapter
+with **Finish installation**. Expected: PXE listeners stop and `10.77.0.99/24` is restored on adapter
 1. Then boot the client from disk and sign in. On the client:
 
 ```sh
@@ -352,7 +352,7 @@ snapshot history. It must not remove the downloaded ISO or any unrelated VM.
 ## Record the result; automation comes later
 
 Record each scenario's result, including skipped and failed steps.
-Record host OS, VirtualBox build, exact Minimal ISO digest, Nixorium commit,
+Record host OS, VirtualBox build, exact ISO filename and digest, Nixorium commit,
 private deployment revision, actual adapter names, step results, logs, and final
 network state. Share a redacted report in existing
 [Discussions](https://github.com/giovantenne/nixorium/discussions), or a reproducible

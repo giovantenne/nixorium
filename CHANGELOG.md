@@ -27,6 +27,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   opens as `root` with the empty classroom password. A new `mysql-workbench-vm`
   check drives the real application in GNOME to cover it.
 
+### Documentation
+
+- Align guide menu paths, the free trial size, Assistant shortcuts, the
+  teacher's classroom controls and the student snapshot path with the current
+  interface and code.
+
 ## [3.5.0] - 2026-10-14
 
 ### Added

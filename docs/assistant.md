@@ -329,7 +329,7 @@ result.
 ## Review and save
 
 Start from a clean, committed deployment. If HEAD changes during a chat,
-start a new chat. Once files change, **Ctrl+R** opens **Assistant / Proposal**.
+start a new chat. Once files change, **Ctrl+R** opens **Review the proposal**.
 The assistant's summary is its opinion; **Checked by Nixorium** reports the
 locally computed file counts, affected computers and final evaluation result.
 Read the full comparison with arrows, PgUp/PgDn and Home/End.
@@ -371,7 +371,7 @@ bypass it. Recovery never applies the system.
 the token (0600), `consent.json`, and `conversations/<uuid>/`. Conversations
 hold metadata with the base commit, creation and last activity dates, title,
 save date and last final answer (up to 2,000 characters), a private transcript,
-`overlay/`, `deleted.json`, `modes.json`, `base-classes.json` and `base-drv.json`.
+`overlay/`, `deleted.json`, `modes.json`, `base-classes.json` and `base-drv-v25.json`.
 Temporary evaluation clones live inside the conversation and are removed when
 evaluation finishes. Local transcripts and candidates may contain private
 configuration; they are separate from the deployment and its Git history.
