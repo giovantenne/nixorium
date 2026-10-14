@@ -1409,29 +1409,6 @@ func TestDashboardHidesReleasesOlderThanRunningVersionOnMasterPins(t *testing.T)
 	}
 }
 
-func TestDashboardHidesReleasesOlderThanRunningVersionOnOlderTagPins(t *testing.T) {
-	model := dashboardModel{report: testDashboardReport("ready"), actions: DashboardActions{RunningVersion: "3.5.0"}}
-	report := domain.UpdateCheckReport{
-		State: "available", CurrentRef: "v3.2.0", CurrentChannel: domain.UpdateChannelStable, VersionFloor: "v3.5.0",
-		Stable: []domain.UpdateRelease{
-			{Tag: "v3.6.0", Channel: domain.UpdateChannelStable},
-			{Tag: "v3.5.0", Channel: domain.UpdateChannelStable},
-			{Tag: "v3.3.0", Channel: domain.UpdateChannelStable, Downgrade: true},
-			{Tag: "v3.2.0", Channel: domain.UpdateChannelStable},
-		},
-	}
-	updated, _ := model.Update(dashboardUpdateCheckMsg{report: report})
-	model = updated.(dashboardModel)
-	releases := model.availableUpdateReleases()
-	if len(releases) != 3 || releases[0].Tag != "v3.6.0" || releases[1].Tag != "v3.5.0" || releases[2].Tag != "v3.2.0" {
-		t.Fatalf("selectable releases = %+v", releases)
-	}
-	view := model.View().Content
-	if strings.Contains(view, "v3.3.0") || !strings.Contains(view, "Running version     3.5.0 (older releases are hidden)") || !strings.Contains(view, "v3.2.0") || !strings.Contains(view, "Current") {
-		t.Fatalf("older tag pin does not apply the version floor:\n%s", view)
-	}
-}
-
 func TestDashboardRefusesOlderThanRunningVersionPlanOnMasterPins(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready")}
 	updated, command := model.Update(dashboardUpdatePlanMsg{report: domain.UpdatePlanReport{

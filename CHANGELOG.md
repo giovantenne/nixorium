@@ -18,11 +18,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   only when `modules/screensaver.nix`, `scripts/screensaver-monitor.sh` and
   `scripts/cmd-screensaver.sh` are refreshed from the template, and
   `scripts/launch-screensaver.sh` is removed.
-- Update Nixorium no longer offers releases older than the running version,
-  whether the deployment follows `master`, a commit, or a tag older than the
-  running program. The update screen shows the running version, and
-  `nixorium update plan` and `apply` refuse such releases without
-  `--allow-downgrade`; the TUI never allows a downgrade.
+- Update Nixorium no longer offers releases older than the running version when
+  the deployment follows `master` or a commit. The update screen shows the
+  running version, and `nixorium update plan` and `apply` refuse such releases
+  without `--allow-downgrade`; the TUI never allows a downgrade.
 - The NixOS Minimal ISO is no longer required. Documentation and screens now
   say to use the official NixOS 26.05 ISO, either Minimal or Graphical (GNOME),
   booted in UEFI mode, for the controller and for USB over SSH. Minimal is

@@ -46,12 +46,10 @@ Open Maintenance:
 1. **Update Nixorium** discovers the configured upstream's releases. Select
    the release and validate it. This never refreshes the root nixpkgs pin.
    Releases older than the configured release are hidden, including older
-   prereleases. The running Nixorium version is also a floor: releases older
-   than it are hidden, which covers a deployment that follows `master` or a
-   commit (no Semantic Version ordering) and a tag pinned below the running
-   version. The higher of the two applies, and the screen shows the running
-   version when the floor does. A release equal to the running version stays
-   available, and the configured tag stays listed as current. The TUI never
+   prereleases. When the deployment follows `master` or a commit, which have
+   no Semantic Version ordering, the running Nixorium version is the floor
+   instead: older releases are hidden and the screen shows the running version.
+   A release equal to the running version stays available. The TUI never
    authorizes a downgrade. Development builds without a release version apply
    no floor.
 2. **Update system and packages** shows the current channel and revision.
