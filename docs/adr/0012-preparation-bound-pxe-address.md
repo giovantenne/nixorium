@@ -51,4 +51,4 @@ configured hint. A lease change after preparation still makes start fail closed
 and requires preparation again. The PXE transport remains a trusted local-LAN
 boot boundary, while signed Nix paths prevent the selected cache endpoint from
 silently substituting untrusted client closures. Physical DHCP/ProxyDHCP
-coexistence remains subject to the documented hardware test matrix.
+coexistence still needs separate verification on the target hardware and network.

@@ -206,8 +206,8 @@ chain, then the Nixorium installer console.
 
 If native EFI network boot does not discover ProxyDHCP, record that failure.
 Do not silently substitute a different firmware or bridge onto a school
-network; the hardware validation plan treats an iPXE ISO as a separate
-compatibility scenario.
+network. Treat an iPXE ISO as a separate compatibility scenario, not a pass
+for native EFI network boot.
 
 In the downloaded console, check `ip -4 route` (no default route), then run
 the client installer specified in the official quick start. Select **pc01**.
