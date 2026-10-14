@@ -140,7 +140,7 @@ The existing controller time zone and keyboard are reused. Importing existing
 keys is available under **Maintenance → Change settings → Controller keys**.
 PXE asks for confirmation before temporarily changing the controller network;
 the client installer confirms identity and disk erasure locally. USB/SSH selects
-one configured identity, verifies the live Minimal ISO's physical fingerprint,
+one configured identity, verifies the live ISO's physical fingerprint,
 and requires its own content-bound disk review before dispatch.
 
 You can press `q` at any safe point. While PXE is active, leaving it active is a
@@ -1079,9 +1079,12 @@ client-side fallback fetch.
 ### Install one computer from USB over SSH
 
 Use this path when UEFI network boot is unavailable. On the selected computer,
-boot the official **NixOS 26.05 Minimal ISO** for `x86_64-linux` in UEFI mode
-with Ethernet or Wi-Fi connectivity to the controller. Connect Wi-Fi from the
-live console with `nmtui` first when needed. At its physical console run:
+boot the official **NixOS 26.05 ISO**, either Minimal or Graphical (GNOME), for
+`x86_64-linux` in UEFI mode with Ethernet or Wi-Fi connectivity to the
+controller. Minimal is smaller and lighter: prefer it when the computer has
+4 GB of RAM or less, because the live system keeps the installer files in
+memory. Graphical is a larger download and needs more RAM. Connect Wi-Fi from
+the live console with `nmtui` first when needed. At its physical console run:
 
 ```sh
 passwd

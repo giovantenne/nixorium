@@ -6,6 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The NixOS Minimal ISO is no longer required. Documentation and screens now
+  say to use the official NixOS 26.05 ISO, either Minimal or Graphical (GNOME),
+  booted in UEFI mode, for the controller and for USB over SSH. Minimal is
+  preferred for USB over SSH on computers with 4 GB of RAM or less.
+
 ### Fixed
 
 - MySQL Workbench in the Programming profile now connects to the local teaching

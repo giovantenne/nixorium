@@ -119,7 +119,7 @@ func (model dashboardModel) remoteInstallView() string {
 		// small screens: each command is one row with what it is for.
 		lines = append(lines, "",
 			tuiSection("On the PC to install ("+remote.host+")", model.isDark),
-			"Boot NixOS Minimal 26.05 from USB (UEFI), connect it to the network, run:",
+			"Boot NixOS 26.05 (Minimal or Graphical) from USB (UEFI), connect it to the network, run:",
 		)
 		lines = append(lines, tuiFields(model.isDark,
 			[2]string{"1", tuiFieldValue("passwd", model.isDark) + tuiMuted("   set a temporary password", model.isDark)},

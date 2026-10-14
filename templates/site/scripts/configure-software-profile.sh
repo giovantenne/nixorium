@@ -26,7 +26,7 @@ configure_site_software_profile() {
   local TEMPORARY_FILE
 
   if ! command -v jq >/dev/null 2>&1; then
-    echo "Error: software profile selection requires jq from the official NixOS Minimal ISO." >&2
+    echo "Error: software profile selection requires jq from the official NixOS ISO." >&2
     return 1
   fi
   if [[ ! "$INPUT_FD" =~ ^[0-9]+$ ]]; then

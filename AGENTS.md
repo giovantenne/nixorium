@@ -225,8 +225,10 @@ any shard must block publication.
   omit interface names, and installers skip the name check. Keep these paths
   consistent (ADR 0017).
 - The controller has two relevant IPs: `masterIp` (the static network address plus `masterHostNumber`) used by Colmena and the binary cache for day-to-day deploys, and `masterDhcpIp` (the initial institutional DHCP address/hint) used only during PXE/netboot client installation. `nixorium pxe prepare` prefers that hint when it is live, otherwise accepts exactly one usable non-static, non-link-local IPv4 candidate, and binds the observed address plus immutable store paths to the exact deployment Git revision. Managed iPXE passes that prepared address to the offline installer at boot.
-- USB/SSH installation supports the official NixOS 26.05 Minimal ISO on
-  `x86_64-linux`, UEFI, and reachable Ethernet or Wi-Fi networking. Bind the
+- USB/SSH installation supports the official NixOS 26.05 Minimal or Graphical (GNOME) ISO on
+  `x86_64-linux`, UEFI, and reachable Ethernet or Wi-Fi networking (prefer
+  Minimal on computers with 4 GB of RAM or less: the live system keeps the
+  installer files in memory). Bind the
   reviewed live address to the declared interface, not its wired/wireless type.
   Wi-Fi credentials are not imported from the live ISO; arrange installed-system
   connectivity separately without putting secrets in Git or the Nix store.

@@ -86,7 +86,7 @@ func (model dashboardModel) availableComputerTasks() []dashboardTask {
 
 var installationAreaTasks = []dashboardTask{
 	{id: "pxe", shortcut: "p", title: "Network boot (PXE)", description: "Prepare, start or finish network installation; recover interrupted networking here"},
-	{id: "usb", shortcut: "u", title: "USB over SSH", description: "Install one physically identified computer using the official Minimal ISO"},
+	{id: "usb", shortcut: "u", title: "USB over SSH", description: "Install one physically identified computer from the official NixOS ISO"},
 }
 
 // Maintenance lists frequent tasks first; advanced tools follow in a

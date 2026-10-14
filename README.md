@@ -167,7 +167,8 @@ trial on virtual machines, follow the
 3. **Install the first client.** With network boot, start the client from the
    network; the installer opens on its screen, asks which configured computer
    it is and erases the disk after you type `ERASE`. With USB over SSH, boot
-   the client from the Minimal ISO and follow the controller, which checks the
+   the client from the official NixOS ISO (Minimal or Graphical; Minimal is
+   better on a computer with 4 GB of RAM or less) and follow the controller, which checks the
    client's fingerprint before using any password. Both procedures are in the
    administrator guide: [network boot](templates/site/README.md#install-computers-with-pxe)
    and [USB over SSH](templates/site/README.md#install-one-computer-from-usb-over-ssh).

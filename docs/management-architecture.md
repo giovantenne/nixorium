@@ -883,7 +883,7 @@ secret in the public netboot closure.
 
 The USB path is a controller-orchestrated installation for one configured host,
 not a second deployment transport. The client boots the official NixOS 26.05
-Minimal ISO for `x86_64-linux` in UEFI mode with Ethernet or Wi-Fi connectivity.
+Minimal or Graphical ISO for `x86_64-linux` in UEFI mode with Ethernet or Wi-Fi connectivity.
 The operator reads its canonical IPv4 address from the physical console and sets a temporary
 live password. The controller performs a credential-free SSH host-key exchange,
 shows the observed Ed25519 fingerprint, and requires the operator to compare it

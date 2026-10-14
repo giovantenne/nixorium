@@ -62,7 +62,7 @@ func runUSBInstallStart(ctx context.Context, host string, stdout, stderr io.Writ
 	}
 	defer terminal.Close()
 	reader := bufio.NewReaderSize(terminal, 4096)
-	fmt.Fprintln(terminal, "Boot the official NixOS Minimal ISO in UEFI mode, enable SSH, and read its Ed25519 fingerprint from the local console.")
+	fmt.Fprintln(terminal, "Boot the official NixOS ISO (Minimal or Graphical) in UEFI mode, enable SSH, and read its Ed25519 fingerprint from the local console.")
 	address, err := promptRemoteInstallValue(reader, terminal, "Live IPv4 address")
 	if err != nil {
 		fmt.Fprintln(stderr, "Error:", err)

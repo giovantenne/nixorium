@@ -182,7 +182,8 @@ either side until its provenance is understood.
 
 ## A USB/SSH live client cannot be verified
 
-Use only the official NixOS 26.05 Minimal ISO for `x86_64-linux`, booted in
+Use the official NixOS 26.05 ISO for `x86_64-linux`, either Minimal or
+Graphical (GNOME), booted in
 UEFI mode with Ethernet or Wi-Fi connectivity. Connect Wi-Fi with `nmtui` in
 the live environment first. Keep its physical console visible and recheck:
 

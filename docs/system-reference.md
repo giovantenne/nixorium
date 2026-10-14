@@ -181,7 +181,8 @@ carries the live address. See ADR 0017.
 ## USB/SSH client installation boundary
 
 The supported remote-install environment is the official NixOS 26.05 Minimal
-ISO for `x86_64-linux`, booted with UEFI and Ethernet or Wi-Fi connectivity.
+or Graphical (GNOME) ISO for `x86_64-linux`, booted with UEFI and Ethernet or
+Wi-Fi connectivity. Prefer Minimal on computers with 4 GB of RAM or less.
 The controller must be a configured laboratory controller with a healthy signed Harmonia
 cache; controller-only deployments and arbitrary rescue environments are not
 accepted. This workflow does not depend on PXE services or alter the
