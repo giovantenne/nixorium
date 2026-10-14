@@ -8,6 +8,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The lab screensaver no longer locks the session after 10 idle minutes. It
+  starts after 5 idle minutes and stops on any activity; nothing else happens.
+  The template now has two scripts instead of three (the launcher is part of
+  the idle monitor), and the scripts and the logo are used straight from the
+  Nix store instead of copies under `/etc/lab`. Existing deployments get this
+  only when `modules/screensaver.nix`, `scripts/screensaver-monitor.sh` and
+  `scripts/cmd-screensaver.sh` are refreshed from the template, and
+  `scripts/launch-screensaver.sh` is removed.
 - Update Nixorium no longer offers releases older than the running version,
   whether the deployment follows `master`, a commit, or a tag older than the
   running program. The update screen shows the running version, and
@@ -62,8 +70,7 @@ The project follows [Semantic Versioning](https://semver.org/).
   effect fills the whole terminal, so the newline that Terminal Text Effects
   prints at the end scrolled the finished picture up a row before it was
   cleared. The template script now suppresses that newline and keeps the cursor
-  hidden. Existing deployments get the fix when `scripts/cmd-screensaver.sh` is
-  refreshed from the template.
+  hidden.
 
 ### Documentation
 

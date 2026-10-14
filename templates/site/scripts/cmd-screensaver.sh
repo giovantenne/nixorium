@@ -3,8 +3,9 @@ set -euo pipefail
 
 # Run the lab screensaver using random TTE effects.
 # This script is meant to be launched inside a fullscreen terminal.
+# Usage: cmd-screensaver.sh TEXT_FILE
 
-SCREENSAVER_TEXT="/etc/lab/screensaver.txt"
+SCREENSAVER_TEXT="${1:?Usage: cmd-screensaver.sh TEXT_FILE}"
 
 if [[ ! -f "$SCREENSAVER_TEXT" ]]; then
   echo "Error: $SCREENSAVER_TEXT not found" >&2

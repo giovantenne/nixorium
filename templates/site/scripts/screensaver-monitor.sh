@@ -1,23 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Monitor GNOME idle time and launch TTE screensaver + lock screen.
+# Monitor GNOME idle time and run the TTE screensaver.
 # Replaces GNOME's built-in screensaver with a custom TTE animation.
+# It never locks the session.
 #
 # Timeline:
 #   IDLE_SCREENSAVER_MS -> launch screensaver
-#   IDLE_LOCK_MS        -> lock screen (loginctl lock-session)
 #   On activity          -> kill screensaver
+#
+# The service passes the Nix store paths of the terminal script and the logo:
+#   SCREENSAVER_CMD   script that runs the effects inside the terminal
+#   SCREENSAVER_TEXT  text file the effects animate
+: "${SCREENSAVER_CMD:?SCREENSAVER_CMD is not set}"
+: "${SCREENSAVER_TEXT:?SCREENSAVER_TEXT is not set}"
 
-# Idle thresholds (milliseconds)
+# Idle threshold (milliseconds)
 IDLE_SCREENSAVER_MS=300000
-IDLE_LOCK_MS=600000
 
 SCREENSAVER_CLASS="org.nixorium.screensaver"
 POLL_INTERVAL=2
 
 SCREENSAVER_ACTIVE=false
-LOCK_SENT=false
 
 get_idle_ms() {
   gdbus call --session \
@@ -28,33 +32,44 @@ get_idle_ms() {
 }
 
 launch_screensaver() {
-  if ! pgrep -f "$SCREENSAVER_CLASS" >/dev/null 2>&1; then
-    /etc/lab/launch-screensaver.sh &
+  # Skip if already running
+  if pgrep -f "$SCREENSAVER_CLASS" >/dev/null 2>&1; then
+    return
   fi
+
+  # Fullscreen Ghostty running the screensaver. The text path is an argument
+  # because the window may be created by an already running Ghostty process.
+  # Palette colors 0 and 8 are forced to pure black to avoid grey lines in TTE
+  # effects.
+  ghostty \
+    --class="$SCREENSAVER_CLASS" \
+    --fullscreen=true \
+    --font-size=18 \
+    --background=#000000 \
+    --foreground=#f38d70 \
+    --cursor-color=#000000 \
+    --palette=0=#000000 \
+    --palette=8=#000000 \
+    --mouse-hide-while-typing=true \
+    --window-padding-x=0 \
+    --window-padding-y=0 \
+    --gtk-titlebar=false \
+    -e "$SCREENSAVER_CMD" "$SCREENSAVER_TEXT" &
 }
 
 kill_screensaver() {
   pkill -f "$SCREENSAVER_CLASS" 2>/dev/null || true
 }
 
-lock_screen() {
-  loginctl lock-session 2>/dev/null || true
-}
-
 while true; do
   IDLE_MS=$(get_idle_ms)
 
-  if [[ "$IDLE_MS" -ge "$IDLE_LOCK_MS" ]] && [[ "$LOCK_SENT" == "false" ]]; then
-    kill_screensaver
-    lock_screen
-    LOCK_SENT=true
-  elif [[ "$IDLE_MS" -ge "$IDLE_SCREENSAVER_MS" ]] && [[ "$SCREENSAVER_ACTIVE" == "false" ]]; then
+  if [[ "$IDLE_MS" -ge "$IDLE_SCREENSAVER_MS" ]] && [[ "$SCREENSAVER_ACTIVE" == "false" ]]; then
     launch_screensaver
     SCREENSAVER_ACTIVE=true
   elif [[ "$IDLE_MS" -lt "$IDLE_SCREENSAVER_MS" ]] && [[ "$SCREENSAVER_ACTIVE" == "true" ]]; then
     kill_screensaver
     SCREENSAVER_ACTIVE=false
-    LOCK_SENT=false
   fi
 
   sleep "$POLL_INTERVAL"

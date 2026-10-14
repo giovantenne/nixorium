@@ -283,13 +283,14 @@ and mouse blocked, until **Stop sharing** or until you close the page.
 - `modules/workstation.nix`: GNOME desktop icons, persistent dock, application policy, favorites and shortcuts
 - `modules/development.nix`: shell, npm and rootless Docker policy
 - `modules/home-profile.nix`: MIME defaults and writable per-user VS Code settings/extensions
-- `modules/screensaver.nix`: Ghostty/TTE lab screensaver supplied by every built-in profile
+- `modules/screensaver.nix`: Ghostty/TTE lab screensaver supplied by every built-in profile (starts after 5 idle minutes and never locks the session)
 - `clientGroups` in `flake.nix`: named client scopes used by guided software
 - `groupModules` in `flake.nix`: common modules for members of those client groups
 - `hostModules` in `flake.nix`: individual hosts
 - `updateValidationHosts` in `mkLab`: extra validation hosts when private shared
   modules branch on host identity (explicit host modules are already covered)
 - `assets/logo.txt`: screensaver logo
+- `scripts/screensaver-monitor.sh`, `scripts/cmd-screensaver.sh`: screensaver idle monitor and effect loop, used straight from the Nix store
 
 These files are the lab's workstation profile. They are intentionally part of
 this private repository rather than Nixorium core, so package and policy changes
@@ -588,7 +589,7 @@ rules and folder listings. The server runs as the student account and listens
 on this computer only; the folder is emptied with the rest of the home at every
 boot, and on the controller it serves the student account's folder.
 
-Every profile includes Git, the Ghostty/TTE lab screensaver and Node.js (and
+Every profile includes Git, the Ghostty/TTE lab screensaver (which never locks the session) and Node.js (and
 npm); Programming also includes the Pi and OpenCode coding agents. Git is available to every user and is also a runtime
 dependency of the controller management workflows. The screensaver therefore
 remains active in Essential as well as the larger profiles. Desktop Icons NG, Dash to Dock and
