@@ -11,11 +11,6 @@ in
   # changing VirtualBox support in production configurations.
   virtualisation.virtualbox.guest.enable = lib.mkForce false;
 
-  boot.initrd.availableKernelModules = [
-    "virtio_blk"
-    "virtio_pci"
-  ];
-
   # Reproduce the ownership hazard that site activation used to have: GNU
   # install assigns the final file to the user but creates missing parent
   # directories as root. The production ownership activation must reconcile

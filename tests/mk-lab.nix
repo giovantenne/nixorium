@@ -557,6 +557,10 @@ assert nestedSoftware.id == "python3Packages.numpy";
 assert nestedSoftware.availability == "available";
 assert allowedUnfreeSoftware.availability == "available";
 assert bambuStudioSoftware.availability == "available";
+assert builtins.all
+  (config: builtins.all (module: builtins.elem module config.boot.initrd.availableKernelModules)
+    [ "virtio_blk" "virtio_pci" "virtio_scsi" ])
+  [ subnetLab.nixosConfigurations.pc99.config subnetLab.nixosConfigurations.pc01.config ];
 assert rejectsUnknownHost;
 assert rejectsInvalidSoftwareCatalog;
 assert rejectsUnsafeHomeResetPath;

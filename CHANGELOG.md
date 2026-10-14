@@ -15,6 +15,10 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Controllers and clients now boot as QEMU, KVM or Proxmox guests with virtio
+  disks. The installed initrd lacked the virtio storage drivers, so it timed out
+  waiting for the root partition and dropped to emergency mode. Physical PCs and
+  VirtualBox were not affected.
 - MySQL Workbench in the Programming profile now connects to the local teaching
   server. The desktop has no secret service (gnome-keyring is disabled), and
   without one Workbench refused its offered "Local instance" connection with
