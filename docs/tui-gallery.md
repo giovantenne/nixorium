@@ -944,14 +944,17 @@ Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 Nixorium  /  Computers
 
 Classroom controls
-Check computers, control temporary Internet access, or review a shutdown or restart. Administrative configuration
-is not available here.
+Check computers, watch and lock students' screens, send files, control temporary Internet access, or review a
+shutdown or restart. Administrative configuration is not available here.
 
-› [h] Computer inventory
+› [v] Classroom view
+  [h] Computer inventory
   [x] Power controls
   [i] Internet access
+  [l] Lock screens
+  [s] Send files
 
-Check reachability and compare observed systems with the intended revision
+See, control and lock the students' screens, show yours, send your desktop
 
 ↑/↓ Select  ·  Enter Open  ·  F1 Help  ·  q Quit
 ```

@@ -211,6 +211,29 @@ func renderSupportDemo(revision string, width, height int) DemoScenario {
 func renderClassroomDemo(revision string, width, height int) DemoScenario {
 	actions := demoActions()
 	actions.ClassroomMode = true
+	// A real teacher session also wires the classroom view, screen locking and
+	// file sending, so the dashboard lists them. This scenario never opens them.
+	unused := func(name string) { panic("demo callback invoked without a synthetic implementation: " + name) }
+	actions.OpenClassroomView = func(context.Context) (string, error) {
+		unused("OpenClassroomView")
+		return "", nil
+	}
+	actions.PlanLock = func(context.Context, string, domain.LockAction) domain.LockPlan {
+		unused("PlanLock")
+		return domain.LockPlan{}
+	}
+	actions.ApplyLock = func(domain.LockPlan) domain.LockReport {
+		unused("ApplyLock")
+		return domain.LockReport{}
+	}
+	actions.PlanShare = func(context.Context, string, string) domain.SharePlan {
+		unused("PlanShare")
+		return domain.SharePlan{}
+	}
+	actions.ApplyShare = func(domain.SharePlan) domain.ShareReport {
+		unused("ApplyShare")
+		return domain.ShareReport{}
+	}
 	actions.PlanPower = func(ctx context.Context, requested string, policy domain.ShutdownSessionPolicy, action domain.ClientPowerAction) domain.ShutdownPlanReport {
 		return domain.ShutdownPlanReport{
 			SchemaVersion: domain.SchemaVersion, Operation: "restart-plan", State: "ready", Repository: "/demo/lab", Requested: requested,
@@ -228,6 +251,7 @@ func renderClassroomDemo(revision string, width, height int) DemoScenario {
 	r := newDemoRecorder(actions, revision, width, height)
 	r.model.screen = dashboardComputersArea
 	r.capture("Overview", 1600)
+	r.key(demoCode(tea.KeyDown))
 	r.pressAndCapture(demoCode(tea.KeyDown), "Choose Power controls", 700)
 	r.key(demoCode(tea.KeyEnter))
 	r.capture("Select clients for a classroom power action", 1800)
@@ -243,7 +267,7 @@ func renderClassroomDemo(revision string, width, height int) DemoScenario {
 	return DemoScenario{
 		ID:          "classroom",
 		Title:       "Use the restricted teacher dashboard",
-		Description: "The teacher sees only inventory, Internet and reviewed power controls. This example restarts one client without exposing deployment or controller administration.",
+		Description: "The teacher sees only the classroom tools: inventory, Internet, power, classroom view, screen locking and file sending. This example restarts one client without exposing deployment or controller administration.",
 		Frames:      r.frames,
 	}
 }
