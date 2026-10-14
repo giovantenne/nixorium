@@ -48,12 +48,16 @@ while true; do
   # Ensure each effect starts from a stable full-screen origin.
   reset_canvas
 
+  # The canvas is the full terminal height, so TTE's trailing newline (--no-eol)
+  # would scroll the finished picture up one row. The cursor stays hidden.
   tte -i "$SCREENSAVER_TEXT" \
     --frame-rate 120 \
     --canvas-width 0 \
     --canvas-height 0 \
     --anchor-canvas c \
     --anchor-text c \
+    --no-eol \
+    --no-restore-cursor \
     "$EFFECT" 2>/dev/null &
   TTE_PID=$!
 

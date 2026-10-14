@@ -58,6 +58,12 @@ The project follows [Semantic Versioning](https://semver.org/).
   ever contacting MySQL. Sessions now set `WB_NO_KEYRING`, so the connection
   opens as `root` with the empty classroom password. A new `mysql-workbench-vm`
   check drives the real application in GNOME to cover it.
+- The lab screensaver no longer jumps up one line when an effect finishes. The
+  effect fills the whole terminal, so the newline that Terminal Text Effects
+  prints at the end scrolled the finished picture up a row before it was
+  cleared. The template script now suppresses that newline and keeps the cursor
+  hidden. Existing deployments get the fix when `scripts/cmd-screensaver.sh` is
+  refreshed from the template.
 
 ### Documentation
 
