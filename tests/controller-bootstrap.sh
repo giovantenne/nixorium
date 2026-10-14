@@ -75,6 +75,8 @@ printf 'nix %s\n' "$*" >> "$BOOTSTRAP_CALL_LOG"
 case "$*" in
   *"flake init -t github:giovantenne/nixorium/${BOOTSTRAP_REVISION}#site")
     cp -a "$BOOTSTRAP_TEMPLATE/." .
+    # Like the real nix flake init, write every file without its executable bit.
+    find . -type f -exec chmod a-x {} +
     ;;
   *)
     echo "unexpected nix call: $*" >&2
@@ -481,5 +483,24 @@ if grep -R -F -e 'admin-secret' -e 'teacher-secret' -e 'student-secret' \
   exit 1
 fi
 test -f "${TARGET_ROOT}/home/admin/nixorium-deployment/flake.lock"
+# New laboratories keep the template's executable bits on disk and in Git.
+template_executables=0
+while IFS= read -r -d '' template_file; do
+  relative="${template_file#"${BOOTSTRAP_TEMPLATE}/"}"
+  deployed="${TARGET_ROOT}/home/admin/nixorium-deployment/${relative}"
+  [[ -f "$deployed" ]] || continue
+  index_mode="$(git -C "${TARGET_ROOT}/home/admin/nixorium-deployment" ls-files -s -- "$relative" | cut -d' ' -f1)"
+  if [[ -x "$template_file" ]]; then
+    template_executables=$((template_executables + 1))
+    if [[ ! -x "$deployed" || "$index_mode" != 100755 ]]; then
+      echo "template script lost its executable bit: ${relative} (index ${index_mode})" >&2
+      exit 1
+    fi
+  elif [[ -x "$deployed" || ( -n "$index_mode" && "$index_mode" != 100644 ) ]]; then
+    echo "template file became executable: ${relative} (index ${index_mode})" >&2
+    exit 1
+  fi
+done < <(find "$BOOTSTRAP_TEMPLATE" -type f -print0)
+test "$template_executables" -ge 2
 
 echo "Controller bootstrap tests passed."

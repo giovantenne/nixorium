@@ -35,6 +35,10 @@ The project follows [Semantic Versioning](https://semver.org/).
   `203/EXEC` in `systemctl --user status lab-screensaver`. Refresh
   `modules/screensaver.nix` and `scripts/screensaver-monitor.sh` from the
   template, or run `chmod +x` on the two scripts and commit.
+- New laboratories keep the executable bit of the template scripts: the
+  bootstrap restores it on `scripts/cmd-screensaver.sh` and
+  `scripts/screensaver-monitor.sh` after `nix flake init`, which writes every
+  template file without it, so the first commit records them as executable.
 
 ## [3.6.0] - 2026-10-14
 

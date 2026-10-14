@@ -837,6 +837,13 @@ curl -fsSL "$DISKO_LAYOUT_URL" -o "$TEMP_DISKO_LAYOUT"
     echo "Error: could not configure the generated deployment for ${DECLARED_UPSTREAM_REF}." >&2
     exit 1
   fi
+  # nix flake init writes every file without its executable bit; restore it
+  # on the template scripts that are executable in the template.
+  for TEMPLATE_SCRIPT in scripts/cmd-screensaver.sh scripts/screensaver-monitor.sh; do
+    if [[ -f "$TEMPLATE_SCRIPT" ]]; then
+      chmod +x "$TEMPLATE_SCRIPT"
+    fi
+  done
   configure_bootstrap_settings lab-settings.json
   PROFILE_HELPER="scripts/configure-software-profile.sh"
   if [[ ! -r "$PROFILE_HELPER" ]]; then
