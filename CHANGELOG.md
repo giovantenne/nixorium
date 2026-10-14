@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+
+- The Assistant guide now states that the free trial is per laboratory: the same
+  email address can register several laboratories, each under its own name.
+
 ## [3.6.1] - 2026-10-14
 
 ### Added

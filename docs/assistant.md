@@ -80,7 +80,8 @@ laboratories of one school can be told apart; an empty name removes it.
 The service sets the size and length of the free trial and shows them when you
 activate: on the trial choice in Assistant, on the `/trial` page and in the
 email with your code (currently ten requests for thirty days). There is one
-trial per email address, and a trial keeps the requests and end date it started
+trial per laboratory: the same email address can register several laboratories,
+each under its own name, and a trial keeps the requests and end date it started
 with. Register with your email, school name and privacy consent on the
 service's `/trial` page, then enter the code delivered by email. Before using
 the code, you can submit the form again to replace it if delivery failed.
