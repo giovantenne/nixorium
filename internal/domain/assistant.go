@@ -20,15 +20,28 @@ type AssistantAccount struct {
 	Status         string `json:"status,omitempty"`
 	PeriodEnd      string `json:"periodEnd"`
 	TurnsRemaining int    `json:"turnsRemaining,omitempty"`
-	UpgradeURL     string `json:"upgradeUrl,omitempty"`
+	// TrialRequests is the request allowance of a trial account, sent only by
+	// services that announce configurable trials; zero means unknown.
+	TrialRequests int    `json:"trialRequests,omitempty"`
+	UpgradeURL    string `json:"upgradeUrl,omitempty"`
 }
 
+// AssistantOffer is announced by the service. TrialRequests is zero only for
+// the installed fallback used when the offer cannot be fetched; TrialDays is
+// zero when the service does not announce the trial length.
 type AssistantOffer struct {
 	PriceText     string `json:"priceText"`
 	TrialRequests int    `json:"trialRequests"`
+	TrialDays     int    `json:"trialDays,omitempty"`
 	TrialURL      string `json:"trialUrl"`
 	SubscribeURL  string `json:"subscribeUrl"`
 }
+
+// Bounds of the trial terms the client accepts from the service.
+const (
+	AssistantTrialRequestsMax = 1000
+	AssistantTrialDaysMax     = 3650
+)
 
 type AssistantActivation struct {
 	Token   string           `json:"token"`

@@ -74,7 +74,7 @@ func TestAssistantSubscriptionHeaderStatusPrecedence(t *testing.T) {
 		{"trial", "active", "subscription_inactive", 3, "Free trial ended", true},
 		{"trial", "active", "quota_exhausted", 3, "Free trial ended", true},
 		{"trial", "active", "", 0, "Free trial ended", true},
-		{"trial", "active", "", 3, "Free trial · 3 of 10 left", false},
+		{"trial", "active", "", 3, "Free trial · 3 left", false},
 	} {
 		t.Run(test.plan+"/"+test.status+"/"+test.code+"/"+test.want, func(t *testing.T) {
 			m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("render sent HTTP") })
@@ -85,5 +85,23 @@ func TestAssistantSubscriptionHeaderStatusPrecedence(t *testing.T) {
 				t.Fatalf("quota=(%q, %t), want (%q, %t)", got, warn, test.want, test.warn)
 			}
 		})
+	}
+}
+
+func TestAssistantTrialQuotaUsesTheAccountAllowance(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("render sent HTTP") })
+	for _, test := range []struct {
+		remaining, allowance int
+		want                 string
+	}{
+		{3, 0, "Free trial · 3 left"},
+		{3, 10, "Free trial · 3 of 10 left"},
+		{29, 30, "Free trial · 29 of 30 left"},
+		{1000, 1000, "Free trial · 1000 of 1000 left"},
+	} {
+		m.assistant.account = domain.AssistantAccount{Plan: "trial", Status: "active", TurnsRemaining: test.remaining, TrialRequests: test.allowance}
+		if got, _ := m.assistantQuotaText(); got != test.want {
+			t.Fatalf("quota=%q, want %q", got, test.want)
+		}
 	}
 }

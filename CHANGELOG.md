@@ -12,6 +12,13 @@ The project follows [Semantic Versioning](https://semver.org/).
   say to use the official NixOS 26.05 ISO, either Minimal or Graphical (GNOME),
   booted in UEFI mode, for the controller and for USB over SSH. Minimal is
   preferred for USB over SSH on computers with 4 GB of RAM or less.
+- Assistant accepts the free trial size announced by the service (1 to 1,000
+  requests) instead of rejecting any offer other than ten requests, and shows
+  the announced size and length on the trial choice and the account's own
+  allowance in the header (**Free trial · N of M left**). Controllers now send
+  their version with every Assistant request, so the service can raise the
+  trial without breaking older controllers. When the offer cannot be fetched,
+  the trial choice no longer states a number.
 
 ### Fixed
 

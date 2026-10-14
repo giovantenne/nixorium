@@ -1019,7 +1019,7 @@ func demoAssistantConfig() domain.AssistantConfig {
 }
 
 func demoAssistantOffer() domain.AssistantOffer {
-	return domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 10,
+	return domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 10, TrialDays: 30,
 		TrialURL: "https://assistant.nixorium.org/trial", SubscribeURL: "https://nixorium.org/pricing/"}
 }
 

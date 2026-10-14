@@ -388,8 +388,10 @@ any shard must block publication.
   disclosure and confirmation. Upload only redacted saved transcripts through
   typed callbacks, never the laboratory token; sharing failures stay silent and
   never block a turn. Report/share contents are kept by the service for 90 days.
-  Trial quota and purchase links come
-  from the service; conversion preserves activation, and annual quota exhaustion
+  Trial size, length, quota and purchase links come from the service; never
+  hard-code them in the client, which sends `X-Nixorium-Client-Version` so the
+  service keeps older controllers on their fixed ten-request offer. Conversion
+  preserves activation, and annual quota exhaustion
   requires renewal or a manual agreement rather than a second subscription.
 - Assistant tools write only the private candidate, never the deployment.
   Preserve relative-path confinement, hidden credentials/untracked files and

@@ -154,8 +154,9 @@ func TestAssistantServiceE2E(t *testing.T) {
 
 	var token string
 	t.Run("offer", func(t *testing.T) {
+		// The configured trial terms are announced to clients that send their version.
 		offer, err := client.Offer(ctx)
-		if err != nil || offer.TrialRequests != 10 {
+		if err != nil || offer.TrialRequests < 1 || offer.TrialDays < 1 {
 			t.Fatal(err, offer)
 		}
 	})
@@ -168,7 +169,7 @@ func TestAssistantServiceE2E(t *testing.T) {
 		// Regression: activation used to omit status and turnsRemaining, so
 		// the TUI header showed "Free trial ended" for a valid trial.
 		account := activation.Account
-		if account.Plan != "trial" || account.Status != "active" || account.TurnsRemaining != 10 || account.PeriodEnd == "" || account.Name == "" {
+		if account.Plan != "trial" || account.Status != "active" || account.TurnsRemaining != 10 || account.TrialRequests != 10 || account.PeriodEnd == "" || account.Name == "" {
 			t.Fatalf("incomplete activation account: %+v", account)
 		}
 		_, err = client.Activate(ctx, env.trial)
@@ -181,7 +182,7 @@ func TestAssistantServiceE2E(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if account.Status != "active" || account.TurnsRemaining != 10 || account.Plan != "trial" || account.UpgradeURL == "" {
+		if account.Status != "active" || account.TurnsRemaining != 10 || account.TrialRequests != 10 || account.Plan != "trial" || account.UpgradeURL == "" {
 			t.Fatalf("unexpected account: %+v", account)
 		}
 		_, err = client.Account(ctx, strings.Repeat("x", 43))

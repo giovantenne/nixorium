@@ -216,7 +216,7 @@ func TestAssistantTrialActivationConsentAndAccountRefresh(t *testing.T) {
 			if r.Method != http.MethodGet || r.Header.Get("Authorization") != "Bearer "+flowToken {
 				t.Error("unexpected account request")
 			}
-			fmt.Fprintf(w, `{"account":{"name":"Synthetic School","labName":"Lab 1","plan":"trial","status":"active","periodEnd":"2099-01-01","turnsRemaining":10,"upgradeUrl":%q}}`, "http://"+r.Host+shortPath)
+			fmt.Fprintf(w, `{"account":{"name":"Synthetic School","labName":"Lab 1","plan":"trial","status":"active","periodEnd":"2099-01-01","turnsRemaining":10,"trialRequests":10,"upgradeUrl":%q}}`, "http://"+r.Host+shortPath)
 		default:
 			t.Errorf("activation/account lifecycle reached content route %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)

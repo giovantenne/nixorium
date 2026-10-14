@@ -35,7 +35,7 @@ func RenderAssistantMenuDemo(revision string, width, height int) DemoScenario {
 	r.model.assistant.reportComment.Reset()
 	r.model.assistant.state = "chat"
 	r.model.assistant.input.Reset()
-	r.model.assistant.account = domain.AssistantAccount{Name: "Example laboratory", Plan: "trial", Status: "active", TurnsRemaining: 3}
+	r.model.assistant.account = domain.AssistantAccount{Name: "Example laboratory", Plan: "trial", Status: "active", TurnsRemaining: 3, TrialRequests: 10}
 	r.capture("Check remaining free trial requests", 2500)
 	r.model.assistant.account.TurnsRemaining = 0
 	r.model.assistant.account.UpgradeURL = "https://assistant.nixorium.org/u/EjRWeJASNEjRWeJASNEjRWeJASNEjRWeJASNEjRW"

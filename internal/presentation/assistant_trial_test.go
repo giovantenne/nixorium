@@ -34,6 +34,7 @@ func TestAssistantTrialAccountAndPurchaseGate(t *testing.T) {
 				account := domain.AssistantAccount{Name: "Synthetic", Plan: test.plan, Status: test.status, PeriodEnd: "2099-01-01", TurnsRemaining: test.remaining}
 				if test.plan == "trial" {
 					account.UpgradeURL = link
+					account.TrialRequests = 30
 				}
 				json.NewEncoder(w).Encode(map[string]any{"account": account})
 			})
@@ -55,7 +56,7 @@ func TestAssistantTrialAccountAndPurchaseGate(t *testing.T) {
 			if test.plan == "trial" {
 				quota = "Free trial ended"
 				if test.status == "active" && test.remaining > 0 {
-					quota = fmt.Sprintf("Free trial · %d of 10 left", test.remaining)
+					quota = fmt.Sprintf("Free trial · %d of 30 left", test.remaining)
 				}
 			}
 			if !strings.Contains(m.View().Content, quota) {
@@ -123,7 +124,7 @@ func TestAssistantTrialLayoutsAndStaleAccount(t *testing.T) {
 
 func TestAssistantAccountRefreshAfterTurnAndConversion(t *testing.T) {
 	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) {})
-	account := domain.AssistantAccount{Plan: "trial", Status: "active", TurnsRemaining: 4}
+	account := domain.AssistantAccount{Plan: "trial", Status: "active", TurnsRemaining: 4, TrialRequests: 10}
 	m.actions.AssistantService.ReadToken = func() (string, error) { return flowToken, nil }
 	m.actions.AssistantService.Account = func(context.Context, string) (domain.AssistantAccount, error) { return account, nil }
 	m.assistant.state = "running"
@@ -159,5 +160,33 @@ func TestAssistantTrialEndedLinkStaysOnOneLine(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("upgrade link broken across lines:\n%s", rendered)
+	}
+}
+
+func TestAssistantWelcomeShowsAnnouncedTrialTerms(t *testing.T) {
+	m, _ := assistantFlowFixture(t, func(http.ResponseWriter, *http.Request) { t.Fatal("render sent HTTP") })
+	m.assistant.state = "welcome"
+	m.assistant.account = domain.AssistantAccount{}
+	for _, test := range []struct {
+		offer       domain.AssistantOffer
+		err         error
+		want, avoid string
+	}{
+		{domain.AssistantOffer{TrialRequests: 30, TrialDays: 90, TrialURL: "https://assistant.example/trial", SubscribeURL: "https://example.org/assistant/"}, nil,
+			"Start a free trial · 30 requests for 90 days, no payment", "10 requests"},
+		{domain.AssistantOffer{TrialRequests: 10, TrialURL: "https://assistant.example/trial", SubscribeURL: "https://example.org/assistant/"}, nil,
+			"Start a free trial · 10 requests, no payment", " days"},
+		// An unavailable offer keeps the installed links but states no number.
+		{domain.AssistantOffer{}, fmt.Errorf("offline"), "Start a free trial · no payment", "requests"},
+	} {
+		updated, _ := m.finishAssistantOffer(assistantOfferMsg{id: m.assistant.id, offer: test.offer, err: test.err})
+		next := updated.(dashboardModel)
+		view := ansi.Strip(next.View().Content)
+		if !strings.Contains(view, test.want) || strings.Contains(view, test.avoid) {
+			t.Fatalf("welcome view lacks %q or shows %q:\n%s", test.want, test.avoid, view)
+		}
+		if test.err != nil && next.assistant.offer.TrialURL == "" {
+			t.Fatal("fallback offer lost the installed trial link")
+		}
 	}
 }

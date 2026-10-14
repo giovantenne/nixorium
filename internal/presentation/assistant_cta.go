@@ -72,7 +72,7 @@ func (model dashboardModel) assistantGateView() string {
 		width = 100
 	}
 	offer := model.assistant.offer
-	if offer.TrialRequests == 0 {
+	if offer.TrialURL == "" {
 		offer = model.fallbackAssistantOffer()
 	}
 	title, body, hint := "Welcome to Assistant", "", "↑↓ choose · Enter confirm · Esc back"
@@ -83,7 +83,7 @@ func (model dashboardModel) assistantGateView() string {
 		if offer.PriceText != "" {
 			subscribe += " · " + offer.PriceText
 		}
-		for i, choice := range []string{fmt.Sprintf("Start a free trial · %d requests, no payment", offer.TrialRequests), "I have an activation code", subscribe} {
+		for i, choice := range []string{assistantTrialChoice(offer), "I have an activation code", subscribe} {
 			body += tuiSelection(choice, i == model.assistant.welcomeCursor, model.isDark) + "\n"
 		}
 	case "consent":
@@ -122,4 +122,16 @@ func (model dashboardModel) assistantGateView() string {
 	capacity := max(1, model.height-2-lipgloss.Height(header)-2)
 	body = lipgloss.NewStyle().MaxHeight(capacity).Render(body)
 	return lipgloss.NewStyle().Padding(1, 2).Render(header + body + "\n" + tuiMuted(hint, model.isDark))
+}
+
+// assistantTrialChoice shows the trial terms announced by the service, or no
+// number when the offer could not be fetched.
+func assistantTrialChoice(offer domain.AssistantOffer) string {
+	switch {
+	case offer.TrialRequests > 0 && offer.TrialDays > 0:
+		return fmt.Sprintf("Start a free trial · %d requests for %d days, no payment", offer.TrialRequests, offer.TrialDays)
+	case offer.TrialRequests > 0:
+		return fmt.Sprintf("Start a free trial · %d requests, no payment", offer.TrialRequests)
+	}
+	return "Start a free trial · no payment"
 }

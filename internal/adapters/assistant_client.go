@@ -26,6 +26,7 @@ var assistantTurnPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0
 var assistantUpgradeExpiryPattern = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
 var assistantUpgradeSignaturePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 var assistantShortUpgradePathPattern = regexp.MustCompile(`^/u/[A-Za-z0-9_-]{40}$`)
+var assistantClientVersionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$`)
 
 func assistantProtocolError() error {
 	return &domain.AssistantError{Code: "protocol_error", Message: "The Assistant service returned an invalid response."}
@@ -61,6 +62,11 @@ func (client AssistantClient) request(ctx context.Context, method, path, token s
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
+	// The version tells the service that this client accepts any announced trial
+	// size and the optional trial fields; older controllers send no header.
+	if assistantClientVersionPattern.MatchString(client.Version) {
+		request.Header.Set("X-Nixorium-Client-Version", client.Version)
+	}
 	if strings.HasSuffix(path, "/steps") {
 		request.Header.Set("Accept", "text/event-stream")
 		if step, ok := body.(domain.AssistantStepRequest); ok && step.Context != nil {
@@ -135,7 +141,8 @@ func (client AssistantClient) Activate(ctx context.Context, code string) (domain
 	if err = assistantResponse(response, 200, &result); err != nil {
 		return domain.AssistantActivation{}, err
 	}
-	if !assistantTokenPattern.MatchString(result.Token) || result.Account.Name == "" || result.Account.Plan == "" || result.Account.PeriodEnd == "" {
+	if !assistantTokenPattern.MatchString(result.Token) || result.Account.Name == "" || result.Account.Plan == "" || result.Account.PeriodEnd == "" ||
+		!validAssistantTrialRequests(result.Account) {
 		return domain.AssistantActivation{}, assistantProtocolError()
 	}
 	return result, nil
@@ -155,7 +162,9 @@ func (client AssistantClient) Offer(ctx context.Context) (domain.AssistantOffer,
 		return err == nil && link.Host != "" && link.User == nil && link.Fragment == "" && link.Opaque == "" &&
 			(link.Scheme == "https" || (link.Scheme == "http" && (link.Hostname() == "localhost" || link.Hostname() == "127.0.0.1")))
 	}
-	if offer.TrialRequests != 10 || !validLink(offer.TrialURL) || !validLink(offer.SubscribeURL) {
+	if offer.TrialRequests < 1 || offer.TrialRequests > domain.AssistantTrialRequestsMax ||
+		offer.TrialDays < 0 || offer.TrialDays > domain.AssistantTrialDaysMax ||
+		!validLink(offer.TrialURL) || !validLink(offer.SubscribeURL) {
 		return domain.AssistantOffer{}, assistantProtocolError()
 	}
 	return offer, nil
@@ -182,7 +191,17 @@ func (client AssistantClient) checkedAccount(account domain.AssistantAccount) (d
 	if account.UpgradeURL != "" && (account.Plan != "trial" || !client.validUpgradeURL(account.UpgradeURL)) {
 		return domain.AssistantAccount{}, assistantProtocolError()
 	}
+	if !validAssistantTrialRequests(account) {
+		return domain.AssistantAccount{}, assistantProtocolError()
+	}
 	return account, nil
+}
+
+// validAssistantTrialRequests accepts an absent allowance or one within the
+// announced trial range on a trial account.
+func validAssistantTrialRequests(account domain.AssistantAccount) bool {
+	return account.TrialRequests == 0 ||
+		(account.Plan == "trial" && account.TrialRequests > 0 && account.TrialRequests <= domain.AssistantTrialRequestsMax)
 }
 
 // SetLabName names this laboratory (an empty name clears it) and returns the

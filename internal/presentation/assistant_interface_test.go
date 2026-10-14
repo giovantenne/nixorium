@@ -280,7 +280,7 @@ func TestAssistantInterfaceGallery(t *testing.T) {
 				m.width, m.height, m.isDark = size[0], size[1], dark
 				m.assistant.state = state
 				m.assistant.offer = domain.AssistantOffer{PriceText: "360 € + VAT per lab / year", TrialRequests: 10, TrialURL: "https://assistant.example/trial", SubscribeURL: "https://example.org/assistant/"}
-				m.assistant.account = domain.AssistantAccount{Name: "Synthetic laboratory", Plan: "trial", Status: "active", TurnsRemaining: 1}
+				m.assistant.account = domain.AssistantAccount{Name: "Synthetic laboratory", Plan: "trial", Status: "active", TurnsRemaining: 1, TrialRequests: 10}
 				m.assistant.input.Reset()
 				required := []string{"Assistant", "Esc"}
 				switch state {

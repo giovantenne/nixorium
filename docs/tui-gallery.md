@@ -289,7 +289,7 @@ Welcome to Assistant
 
 Activate Assistant to send your request.
 
-› Start a free trial · 10 requests, no payment
+› Start a free trial · 10 requests for 30 days, no payment
   I have an activation code
   Subscribe · 360 € + VAT per lab / year
 

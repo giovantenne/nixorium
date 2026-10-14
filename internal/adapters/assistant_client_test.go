@@ -350,3 +350,42 @@ func TestAssistantClientSetLabName(t *testing.T) {
 		t.Fatal("invalid token accepted")
 	}
 }
+
+func TestAssistantAccountTrialAllowanceValidation(t *testing.T) {
+	token := strings.Repeat("a", 43)
+	for _, test := range []struct {
+		plan    string
+		trial   int
+		valid   bool
+		comment string
+	}{
+		{"trial", 0, true, "older services omit the allowance"},
+		{"trial", 30, true, "announced allowance"},
+		{"trial", 1000, true, "largest allowance"},
+		{"trial", 1001, false, "allowance above the accepted range"},
+		{"trial", -1, false, "negative allowance"},
+		{"annual", 30, false, "allowance on a non-trial account"},
+	} {
+		t.Run(test.comment, func(t *testing.T) {
+			account := fmt.Sprintf(`{"name":"Synthetic School","plan":%q,"status":"active","periodEnd":"2099-01-01","turnsRemaining":5,"trialRequests":%d}`, test.plan, test.trial)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v1/activate" {
+					fmt.Fprintf(w, `{"token":%q,"account":%s}`, token, account)
+					return
+				}
+				fmt.Fprintf(w, `{"account":%s}`, account)
+			}))
+			defer server.Close()
+			client := AssistantClient{Endpoint: server.URL + "/v1", Version: "3.6.0"}
+			fetched, err := client.Account(t.Context(), token)
+			activated, activationErr := client.Activate(t.Context(), "synthetic-code")
+			if test.valid {
+				if err != nil || activationErr != nil || fetched.TrialRequests != test.trial || activated.Account.TrialRequests != test.trial {
+					t.Fatalf("valid allowance rejected: %+v %v %+v %v", fetched, err, activated, activationErr)
+				}
+			} else if err == nil || activationErr == nil {
+				t.Fatalf("invalid allowance accepted: %v %v", err, activationErr)
+			}
+		})
+	}
+}

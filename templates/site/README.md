@@ -38,8 +38,9 @@ An explicit `false` keeps it disabled. Set `lab.assistant` to `false` in
 code shown after payment and accept its separate data-sharing consent. Review each proposal;
 saving creates a local commit and backup, with separate system-application
 and computer-update reviews afterwards.
-You can also activate the ten-request, thirty-day free trial with its emailed
-code. Assistant shows the remaining requests and a purchase link when the trial
+You can also activate the free trial with its emailed code. The service shows
+the trial size and length when you activate (currently ten requests for thirty
+days). Assistant shows the remaining requests and a purchase link when the trial
 ends; conversion keeps the controller activated. Each account enables one lab.
 Conversation sharing is off by default. In the chat, `/share` changes it and
 `/report` reports a final answer with your explicit consent. Reports and shared

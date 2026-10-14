@@ -26,8 +26,10 @@ type assistantConsentMsg struct {
 	err error
 }
 
+// fallbackAssistantOffer uses the installed links when the service offer is
+// unavailable. The trial size is unknown then, so it is left at zero.
 func (model dashboardModel) fallbackAssistantOffer() domain.AssistantOffer {
-	return domain.AssistantOffer{TrialRequests: 10, SubscribeURL: model.actions.Assistant.SubscribeURL,
+	return domain.AssistantOffer{SubscribeURL: model.actions.Assistant.SubscribeURL,
 		TrialURL: strings.TrimSuffix(strings.TrimRight(model.actions.Assistant.Endpoint, "/"), "/v1") + "/trial"}
 }
 func (model dashboardModel) loadAssistantOffer() tea.Cmd {

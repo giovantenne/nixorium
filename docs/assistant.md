@@ -77,11 +77,15 @@ longer valid, and the next send asks to activate again. `/code` opens activation
 school name in the header, on invoices and emails and in support, so several
 laboratories of one school can be told apart; an empty name removes it.
 
-The free trial includes ten requests for thirty days, with one trial per email
-address. Register with your email, school name and privacy consent on the
+The service sets the size and length of the free trial and shows them when you
+activate: on the trial choice in Assistant, on the `/trial` page and in the
+email with your code (currently ten requests for thirty days). There is one
+trial per email address, and a trial keeps the requests and end date it started
+with. Register with your email, school name and privacy consent on the
 service's `/trial` page, then enter the code delivered by email. Before using
 the code, you can submit the form again to replace it if delivery failed.
-After activation, the screen shows **Free trial · N of 10 left**. An ended trial
+After activation, the screen shows **Free trial · N of M left**, where M is the
+trial allowance the service reports for your account. An ended trial
 shows **Free trial ended**; exhausted annual quota shows **No requests left**.
 The controller checks account metadata without sending your draft or files,
 and refreshes that count after a request.
@@ -95,8 +99,10 @@ wait for renewal or contact `hello@nixorium.org` for a manual agreement.
 Each account enables one laboratory; a replacement code for a reinstalled
 controller disables the previous token while preserving quota and period.
 
-Each admitted turn first opens through a request containing client version and
-tool version only. The subsequent steps send the conversation, visible file
+Every Assistant request carries the Nixorium version in the
+`X-Nixorium-Client-Version` header, so the service can announce trial terms
+that older controllers would not accept. Each admitted turn first opens through
+a request containing client version and tool version only. The subsequent steps send the conversation, visible file
 names, requested file contents and tool results to the Assistant service and
 its AI provider. The service does not keep your configuration files. It keeps the text of your
 messages and Assistant's answers for 30 days to detect abuse, then deletes it.
