@@ -204,6 +204,19 @@ func (model dashboardModel) assistantProposalHosts() string {
 	}
 	return text
 }
+
+const assistantCoreOverrideWarning = "⚠ Core override: this proposal forces NixOS options set by Nixorium. It is unsupported and may stop working after a Nixorium update. Update one computer first; if it does not boot or loses the network, pick the previous generation in the GRUB menu on that computer."
+
+// assistantCoreOverrideNotice is empty unless the plan lists files that
+// mention mkForce or mkOverride; it only informs and never blocks saving.
+func (model dashboardModel) assistantCoreOverrideNotice() string {
+	files := model.assistant.review.plan.CoreOverrideFiles
+	if len(files) == 0 {
+		return ""
+	}
+	text := assistantCoreOverrideWarning + "\nFiles with overrides: " + strings.Join(files, ", ")
+	return lipgloss.NewStyle().Bold(true).Foreground(newTUITheme(model.isDark).attention).Render(text)
+}
 func (model dashboardModel) assistantReviewLines() []string {
 	p := model.assistant.review.plan
 	hosts := strings.Join(p.ChangedHosts, ", ")
@@ -214,7 +227,11 @@ func (model dashboardModel) assistantReviewLines() []string {
 	if !p.Evaluation.OK {
 		evaluation = "failed\n" + p.Evaluation.Error
 	}
-	content := fmt.Sprintf("Summary from the assistant\n%s\n\nChecked by Nixorium\nFiles: %d added, %d changed, %d removed\nComputers whose system changes: %s\nNix evaluation: %s\n\nFull comparison\n%s", assistantDisplayText(model.assistant.summary), len(p.Added), len(p.Changed), len(p.Removed), hosts, evaluation, p.Diff)
+	override := ""
+	if len(p.CoreOverrideFiles) > 0 {
+		override = assistantCoreOverrideWarning + "\nFiles with overrides: " + strings.Join(p.CoreOverrideFiles, ", ") + "\n\n"
+	}
+	content := fmt.Sprintf("Summary from the assistant\n%s\n\n%sChecked by Nixorium\nFiles: %d added, %d changed, %d removed\nComputers whose system changes: %s\nNix evaluation: %s\n\nFull comparison\n%s", assistantDisplayText(model.assistant.summary), override, len(p.Added), len(p.Changed), len(p.Removed), hosts, evaluation, p.Diff)
 	return strings.Split(lipgloss.NewStyle().Width(max(20, min(106, model.width-10))).Render(assistantLinkify(assistantDisplayText(content))), "\n")
 }
 func (model dashboardModel) assistantReviewView() string {
@@ -266,9 +283,12 @@ func (model dashboardModel) assistantReviewView() string {
 			body += "• " + point + "\n"
 		}
 		body += "\nComputers affected\n" + model.assistantProposalHosts()
-		fixed = "✓ Checked by Nixorium: the configuration is valid"
+		if notice := model.assistantCoreOverrideNotice(); notice != "" {
+			fixed = notice + "\n"
+		}
+		fixed += "✓ Checked by Nixorium: the configuration is valid"
 		if !r.plan.Evaluation.OK {
-			fixed = "✗ The configuration is not valid"
+			fixed = strings.TrimSuffix(fixed, "✓ Checked by Nixorium: the configuration is valid") + "✗ The configuration is not valid"
 		}
 		fixed += "\nSaving creates a local commit and a backup. Enter on the first choice also updates this controller; you then choose the computers.\n"
 		for i, label := range []string{"Save and update the controller", "Save only — update computers later", "Technical details", "Back"} {

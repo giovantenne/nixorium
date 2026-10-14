@@ -80,6 +80,7 @@ func PlanAssistantSave(ctx context.Context, store AssistantWorkspaceStore, conve
 	if len(changes) == 0 {
 		return fail("The assistant has not changed any file.")
 	}
+	plan.CoreOverrideFiles = domain.AssistantCoreOverrideFiles(proposal.Candidate, append(append([]string{}, plan.Added...), plan.Changed...))
 	plan.Evaluation, _ = EvaluateAssistantCandidate(ctx, w)
 	plan.ChangedHosts = plan.Evaluation.ChangedHosts
 	// Bind the evaluation and review to the same overlay bytes and modes.

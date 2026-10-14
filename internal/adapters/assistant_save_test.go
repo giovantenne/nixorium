@@ -144,3 +144,21 @@ func TestAssistantSaveRefusesChangedReview(t *testing.T) {
 		})
 	}
 }
+
+func TestAssistantSavePlanListsCoreOverrideFiles(t *testing.T) {
+	_, _, _, plan := assistantSaveFixture(t)
+	if len(plan.CoreOverrideFiles) != 0 || plan.CoreOverrideFiles == nil {
+		t.Fatalf("unexpected override files: %#v", plan.CoreOverrideFiles)
+	}
+	w, store, _ := assistantEvaluationFixture(t, false)
+	if err := w.Write("forced.nix", "{ lib, ... }: { networking.firewall.enable = lib.mkForce false; }", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Write("calm.nix", "{ value = 1; }", false); err != nil {
+		t.Fatal(err)
+	}
+	plan = PlanAssistantSave(t.Context(), store, w.Conversation.ID)
+	if plan.State != "ready" || strings.Join(plan.CoreOverrideFiles, ",") != "forced.nix" {
+		t.Fatalf("plan: %+v", plan)
+	}
+}

@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"regexp"
+	"sort"
 	"time"
 )
 
@@ -204,18 +205,39 @@ type AssistantEvaluation struct {
 }
 
 type AssistantSavePlan struct {
-	State          string                `json:"state"`
-	Message        string                `json:"message"`
-	Repository     string                `json:"repository"`
-	ConversationID string                `json:"conversationId"`
-	Base           string                `json:"base"`
-	Added          []string              `json:"added"`
-	Changed        []string              `json:"changed"`
-	Removed        []string              `json:"removed"`
-	ChangedHosts   []string              `json:"changedHosts"`
-	Evaluation     AssistantEvaluation   `json:"evaluation"`
-	Diff           string                `json:"diff"`
-	ReviewToken    string                `json:"reviewToken"`
-	ExpiresAt      time.Time             `json:"expiresAt"`
-	Proposal       TemplateResetProposal `json:"-"`
+	State          string   `json:"state"`
+	Message        string   `json:"message"`
+	Repository     string   `json:"repository"`
+	ConversationID string   `json:"conversationId"`
+	Base           string   `json:"base"`
+	Added          []string `json:"added"`
+	Changed        []string `json:"changed"`
+	Removed        []string `json:"removed"`
+	ChangedHosts   []string `json:"changedHosts"`
+	// CoreOverrideFiles lists added or changed files that mention a NixOS
+	// option override (see AssistantCoreOverrideFiles); it is only a warning.
+	CoreOverrideFiles []string              `json:"coreOverrideFiles"`
+	Evaluation        AssistantEvaluation   `json:"evaluation"`
+	Diff              string                `json:"diff"`
+	ReviewToken       string                `json:"reviewToken"`
+	ExpiresAt         time.Time             `json:"expiresAt"`
+	Proposal          TemplateResetProposal `json:"-"`
+}
+
+var assistantCoreOverride = regexp.MustCompile(`\bmk(?:Force|Override)\b`)
+
+// AssistantCoreOverrideFiles returns, sorted, the paths whose candidate text
+// mentions mkForce or mkOverride (with or without the lib. prefix). The match
+// is deliberately simple: a mention in a comment or a string counts too, so the
+// warning errs on the side of showing. Symlinks are ignored.
+func AssistantCoreOverrideFiles(candidate map[string]TemplateFile, paths []string) []string {
+	found := []string{}
+	for _, path := range paths {
+		file, ok := candidate[path]
+		if ok && file.Mode != "120000" && assistantCoreOverride.Match(file.Data) {
+			found = append(found, path)
+		}
+	}
+	sort.Strings(found)
+	return found
 }

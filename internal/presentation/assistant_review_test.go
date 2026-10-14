@@ -406,3 +406,43 @@ func TestAssistantReviewLoadsControllerIdentity(t *testing.T) {
 		t.Fatal("controller identity unavailable")
 	}
 }
+
+func TestAssistantReviewWarnsAboutCoreOverrides(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 40}} {
+		m := assistantReviewFixture()
+		m.width, m.height = size[0], size[1]
+		view := ansi.Strip(m.View().Content)
+		if strings.Contains(view, "Core override") {
+			t.Fatalf("%v: warning without overrides: %s", size, view)
+		}
+		m.assistant.review.plan.CoreOverrideFiles = []string{"modules/force.nix"}
+		view = ansi.Strip(m.View().Content)
+		flat := strings.Join(strings.Fields(view), " ")
+		for _, want := range []string{"⚠ Core override: this proposal forces NixOS options set by Nixorium.", "unsupported", "Update one computer first", "previous generation in the GRUB menu", "modules/force.nix", "Save and update the controller", "Save only — update computers later"} {
+			if !strings.Contains(flat, want) {
+				t.Fatalf("%v missing %q:\n%s", size, want, view)
+			}
+		}
+		if strings.Index(flat, "Core override") > strings.Index(flat, "Save and update the controller") {
+			t.Fatalf("%v: warning must precede the save actions: %s", size, view)
+		}
+		if lipgloss.Width(view) > size[0] || lipgloss.Height(view) > size[1] {
+			t.Fatalf("%v overflow: %s", size, view)
+		}
+		// The technical view repeats the warning.
+		m.assistant.review.details = true
+		if view = ansi.Strip(m.View().Content); !strings.Contains(strings.Join(strings.Fields(view), " "), "Core override") {
+			t.Fatalf("%v: details lack the warning: %s", size, view)
+		}
+	}
+}
+
+func TestAssistantSaveFlowIsUnchangedByCoreOverrideWarning(t *testing.T) {
+	c := &assistantChain{}
+	m := assistantChainFixture(c)
+	m.assistant.review.plan.CoreOverrideFiles = []string{"modules/force.nix"}
+	m = runChain(t, m)
+	if c.saves != 1 || c.plans != 1 || c.applies != 1 || m.screen != dashboardDeployReview {
+		t.Fatalf("calls: %+v screen=%v", *c, m.screen)
+	}
+}

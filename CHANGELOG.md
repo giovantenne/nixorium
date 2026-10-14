@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Assistant has an opt-in "core override mode" for extreme cases: after you
+  write "I accept core overrides" in a conversation, it may propose a private
+  module that forces a NixOS option set by the Nixorium core. The proposal
+  review now warns, above the save choices, when an added or changed file
+  mentions `mkForce` or `mkOverride`; the save flow is unchanged. The Assistant
+  guide documents the limits and the GRUB rollback.
+
 ## [3.6.0] - 2026-10-14
 
 ### Changed

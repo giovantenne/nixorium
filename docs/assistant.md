@@ -360,6 +360,37 @@ selection with fresh inventory and another review. Neither action runs
 automatically. Use a new chat for further proposals after saving, since the
 previous conversation remains tied to its original base commit.
 
+### Core override mode
+
+By default the Assistant only extends Nixorium's supported mechanisms. In
+extreme cases it can propose overriding a NixOS option that the Nixorium core
+sets, from a private module in your deployment (`lib.mkForce` or
+`lib.mkOverride` in `sharedModules`, `clientModules`, `controllerModules`,
+`groupModules` or `hostModules`). This mode is off by default and applies to one
+conversation only. You enable it by writing "I accept core overrides" (Italian:
+"Accetto override del core"); it ends with "I no longer accept core overrides"
+or a new chat.
+
+Each such proposal includes a **Core override** section listing the forced
+options and the affected computers, why the change is unsupported (it is outside
+Nixorium's tests, and a Nixorium update can change the option and silently void
+the override) and the rollback path. The review also shows a warning, with the
+files that mention `mkForce` or `mkOverride`, above the save choices. The check
+is a plain text match, so a mention in a comment or a string counts too; the
+warning is informational and the save flow is unchanged.
+
+The Assistant never edits or patches Nixorium itself, and never overrides the
+controller's management channel (SSH access, keys, firewall protection, cache
+signing), credentials, or the student home reset in a way that could block
+login.
+
+Evaluation and build prove that the configuration builds, not that it boots or
+works: update one computer first. If a PC does not boot or loses the network
+after applying, restart it and choose the previous system generation in the GRUB
+boot menu, PC by PC, the controller included, then fix the configuration before
+applying again. A client that has lost its network cannot be repaired remotely
+from the controller.
+
 ## Interrupted save
 
 Keep the backup and `.git/nixorium-template-reset.json`. An Assistant save

@@ -52,6 +52,10 @@ Assistant can inspect declared computer diagnostics and saved configuration
 history. Updated consent covers limited recent system logs and historical
 configuration contents; filtering is best effort, so sensitive text may remain.
 Student home files are not read. These observations do not change systems or Git.
+In extreme cases, and only after you write "I accept core overrides" in a
+conversation, Assistant may propose a private module that forces an option set
+by the Nixorium core; this is unsupported, the review warns about it, and you
+should update one computer first (see the guide for the rollback path).
 
 Read the [Assistant guide](https://github.com/giovantenne/nixorium/blob/master/docs/assistant.md)
 for privacy, host classes, tool limits, local retention and interrupted-save
