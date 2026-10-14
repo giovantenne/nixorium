@@ -356,7 +356,7 @@ partition_disk() {
 }
 
 resolve_system() {
-  local PATH_INFO REPORTED_PATH
+  local PATH_INFO REPORTED_PATH CACHE_URL
   SELECTED_SYSTEM_PATH=$(
     nix --extra-experimental-features "nix-command flakes" \
       eval "${REPO_ROOT}#nixosConfigurations.${SELECTED_HOST}.config.system.build.toplevel.outPath" \
@@ -368,11 +368,28 @@ resolve_system() {
     echo "Error: evaluation returned an invalid system path for ${SELECTED_HOST}." >&2
     return 1
   fi
-  PATH_INFO=$(
+  # Client systems are never in this netboot store: they live in the
+  # controller's signed binary cache, so the closure is queried there.
+  CACHE_URL="http://${LAB_CONTROLLER_DHCP_IP}:${LAB_CACHE_PORT}"
+  if ! nix --extra-experimental-features "nix-command flakes" \
+    store info --store "$CACHE_URL" \
+    --option connect-timeout 10 >/dev/null 2>&1; then
+    echo "Error: The controller's binary cache at ${LAB_CONTROLLER_DHCP_IP}:${LAB_CACHE_PORT} is not reachable." >&2
+    echo "Check the network and that client preparation finished on the controller." >&2
+    return 1
+  fi
+  if ! PATH_INFO=$(
     nix --extra-experimental-features "nix-command flakes" \
-      path-info --closure-size "$SELECTED_SYSTEM_PATH" \
-      --offline
-  )
+      path-info --store "$CACHE_URL" --closure-size "$SELECTED_SYSTEM_PATH" \
+      --option connect-timeout 10 \
+      --option trusted-public-keys "$CACHE_KEY" \
+      --option require-sigs true \
+      2>/dev/null
+  ); then
+    echo "Error: The controller has not prepared ${SELECTED_HOST} for this configuration." >&2
+    echo "On the controller run Installation -> Prepare clients again, then restart this installer." >&2
+    return 1
+  fi
   read -r REPORTED_PATH SYSTEM_CLOSURE_BYTES <<< "$PATH_INFO"
   if [[ "$REPORTED_PATH" != "$SELECTED_SYSTEM_PATH" ]] ||
     ! [[ "$SYSTEM_CLOSURE_BYTES" =~ ^[0-9]+$ ]] ||

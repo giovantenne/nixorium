@@ -95,7 +95,7 @@
           ".pi"
         ];
         publicKeys = {
-          cache = ./public-key;
+          cache = ./tests/fixtures/remote-vm-cache-public-key;
           ssh = ./id_ed25519.pub;
         };
         hostModules.pc01 = [

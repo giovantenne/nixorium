@@ -45,6 +45,11 @@ The project follows [Semantic Versioning](https://semver.org/).
   foreign `XDG_RUNTIME_DIR` (for example after `su admin` without a dash), so no
   "Failed to add a watch for .../ask-password" message appears.
 
+- PXE client installer checks the prepared client system in the controller's
+  binary cache instead of the netboot store, which never contains it. It now
+  tells apart an unreachable cache from a client the controller has not
+  prepared, and tests no longer pre-seed the system in the netboot image.
+
 ## [3.4.0] - 2026-10-13
 
 ### Changed

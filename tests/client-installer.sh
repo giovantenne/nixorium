@@ -333,6 +333,8 @@ test_offline_system_resolution_precedes_system_install() (
     if [[ " $* " == *" eval "* ]]; then
       printf '%s' /nix/store/00000000000000000000000000000000-nixos-system-pc01-test
       printf '%s\n' "$@" > "${FIXTURE_DIR}/nix-eval-arguments"
+    elif [[ " $* " == *" store info "* ]]; then
+      printf '%s\n' "$@" > "${FIXTURE_DIR}/nix-store-info-arguments"
     else
       printf '%s\t%s\n' /nix/store/00000000000000000000000000000000-nixos-system-pc01-test 10737418240
       printf '%s\n' "$@" > "${FIXTURE_DIR}/nix-path-info-arguments"
@@ -347,11 +349,46 @@ test_offline_system_resolution_precedes_system_install() (
   grep -Fxq -- '--offline' "${FIXTURE_DIR}/nix-eval-arguments"
   grep -Fxq 'path-info' "${FIXTURE_DIR}/nix-path-info-arguments"
   grep -Fxq -- '--closure-size' "${FIXTURE_DIR}/nix-path-info-arguments"
-  grep -Fxq -- '--offline' "${FIXTURE_DIR}/nix-path-info-arguments"
+  grep -Fxq -- '--store' "${FIXTURE_DIR}/nix-store-info-arguments"
+  grep -Fxq -- '--store' "${FIXTURE_DIR}/nix-path-info-arguments"
+  grep -Fxq 'http://192.0.2.10:5000' "${FIXTURE_DIR}/nix-path-info-arguments"
+  grep -Fxq "$CACHE_KEY" "${FIXTURE_DIR}/nix-path-info-arguments"
+  ! grep -Fxq -- '--offline' "${FIXTURE_DIR}/nix-path-info-arguments"
   test "$SYSTEM_CLOSURE_BYTES" -eq 10737418240
   test "$REQUIRED_DISK_BYTES" -eq 12884901888
   test "$(printf '%s\n' nixos-install --system /nix/store/00000000000000000000000000000000-nixos-system-pc01-test --option substituters http://192.0.2.10:5000 --option trusted-public-keys "$CACHE_KEY" --option fallback false --no-channel-copy --no-root-passwd)" = "$(cat "$ACTION_LOG")"
   ! grep -q -- '--flake' "$ACTION_LOG"
+)
+
+test_system_resolution_reports_cache_failures() (
+  new_fixture
+  trap 'rm -rf "$FIXTURE_DIR"' EXIT
+  load_test_installer
+  source "${REPO_ROOT}/setup.sh"
+  SELECTED_HOST=pc01
+  LAB_CONTROLLER_DHCP_IP=192.0.2.10
+  LAB_CACHE_PORT=5000
+  CACHE_KEY=cache.example:test-key
+  local mode
+  nix() {
+    if [[ " $* " == *" eval "* ]]; then
+      printf '%s' /nix/store/00000000000000000000000000000000-nixos-system-pc01-test
+    elif [[ " $* " == *" store info "* ]]; then
+      [[ "$mode" != unreachable ]]
+    else
+      return 1
+    fi
+  }
+
+  mode=unreachable
+  if resolve_system 2> "${FIXTURE_DIR}/unreachable.log"; then return 1; fi
+  grep -Fq "The controller's binary cache at 192.0.2.10:5000 is not reachable" "${FIXTURE_DIR}/unreachable.log"
+  grep -Fq "Check the network and that client preparation finished on the controller." "${FIXTURE_DIR}/unreachable.log"
+
+  mode=missing
+  if resolve_system 2> "${FIXTURE_DIR}/missing.log"; then return 1; fi
+  grep -Fq "The controller has not prepared pc01 for this configuration" "${FIXTURE_DIR}/missing.log"
+  grep -Fq "Installation -> Prepare clients again, then restart this installer." "${FIXTURE_DIR}/missing.log"
 )
 
 test_precompiled_disko_receives_validated_basename() (
@@ -381,6 +418,7 @@ test_too_small_disk_is_refused_before_mutation
 test_embedded_metadata_avoids_nix_evaluation
 test_runtime_controller_address_overrides_embedded_hint
 test_offline_system_resolution_precedes_system_install
+test_system_resolution_reports_cache_failures
 test_precompiled_disko_receives_validated_basename
 
 echo "Client installer tests passed."

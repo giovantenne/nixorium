@@ -1,17 +1,41 @@
 { installerBundle, clientSystem, diskoPackage, diskoRuntimePackages }:
+let
+  # Fixed test-only signing material shared with the remote installer VM test.
+  # It authenticates only closures served by this isolated VM test.
+  cacheSecretKey = "nixorium-remote-vm-1:LyFjyE1IpGYQenMUqGQKq0fZSXr5uaoqIldXReT6v1wsQKHQIF/ewV58htcET9bsFyS9r9jMjxsRZVnv3sSXfA==";
+  cachePublicKey = builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ./fixtures/remote-vm-cache-public-key);
+in
 {
   name = "nixorium-client-installer";
 
   nodes = {
+    # The controller's binary cache. The netboot installer never holds client
+    # systems; it must fetch the prepared closure from here.
+    cache = { pkgs, ... }: {
+      virtualisation.additionalPaths = [ clientSystem ];
+      environment.systemPackages = [ pkgs.iproute2 pkgs.jq ];
+      networking.firewall.allowedTCPPorts = [ 5000 ];
+      services.harmonia.cache = {
+        enable = true;
+        signKeyPaths = [ (pkgs.writeText "client-vm-cache-secret" cacheSecretKey) ];
+        settings.bind = "[::]:5000";
+      };
+      system.stateVersion = "25.11";
+    };
+
     installer = { pkgs, ... }: {
       virtualisation = {
-        additionalPaths = [ installerBundle clientSystem ];
+        additionalPaths = [ installerBundle ];
+        # Evaluating the client system writes its derivations into the store, and the
+        # image no longer carries the system, so leave room (blocks and inodes).
+        diskSize = 8192;
         memorySize = 4096;
         emptyDiskImages = [ 20480 ];
         useBootLoader = true;
         useEFIBoot = true;
       };
 
+      boot.growPartition = true;
       boot.loader.systemd-boot.enable = true;
       boot.loader.efi.canTouchEfiVariables = true;
       environment.systemPackages = [
@@ -20,6 +44,8 @@
         pkgs.jq
         pkgs.nix
         pkgs.nixos-install-tools
+        pkgs.python3
+        pkgs.curl
         pkgs.sudo
         pkgs.util-linux
       ] ++ diskoRuntimePackages;
@@ -29,9 +55,7 @@
       system.activationScripts.installClientFixture.text = ''
         install -d -m 0755 /installer
         cp -a ${installerBundle}/. /installer/
-        printf '%s\n' \
-          'cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16Zx7i9I7rP6rbD8=' \
-          > /installer/public-key
+        printf '%s\n' '${cachePublicKey}' > /installer/public-key
         chmod 0644 /installer/public-key
       '';
 
@@ -75,11 +99,18 @@
   testScript = ''
     import os
 
+    cache.start()
+    cache.wait_for_unit("harmonia.socket")
     installer.start()
     installer.wait_for_unit("multi-user.target")
+    # The partition is grown at boot; grow the filesystem (blocks and inodes) too.
+    installer.succeed("resize2fs /dev/vda2")
     installer.succeed("test -d /sys/firmware/efi")
     installer.succeed("lsblk -dnro PATH,TYPE | grep -Fx '/dev/vdb disk'")
-    installer.succeed("test -e ${clientSystem}")
+    # The netboot store does not contain the client system.
+    installer.fail("test -e ${clientSystem}")
+    cache.succeed("test -e ${clientSystem}")
+    cache_ip = cache.succeed("ip -j -4 address show dev eth1 | jq -r '.[0].addr_info[0].local'").strip()
     installer.succeed("test -d /sys/class/net/eth1")
     # No client interface name is configured and the fallback name (enp0s3) does
     # not exist here: the installer must not require it (ADR 0017).
@@ -92,6 +123,28 @@
     installer.fail("grep -F 'DESTRUCTIVE REVIEW' /tmp/client-interface-mismatch.log")
     installer.succeed("test -z \"$(lsblk -nrpo FSTYPE /dev/vdb)\"")
     installer.succeed("cp /tmp/lab-meta.original.json /installer/lab-meta.json")
+
+    def point_installer_at_cache(address, port):
+      installer.succeed(f"jq '.controller.dhcpIp = \"{address}\" | .network.cachePort = {port}' /tmp/lab-meta.original.json > /installer/lab-meta.json")
+
+    # A controller whose cache is not listening is reported as unreachable.
+    point_installer_at_cache(cache_ip, 5999)
+    installer.fail("/etc/nixorium-test/run-client-installer > /tmp/cache-unreachable.log 2>&1")
+    installer.succeed(f"grep -F \"The controller's binary cache at {cache_ip}:5999 is not reachable.\" /tmp/cache-unreachable.log")
+    installer.fail("grep -F 'DESTRUCTIVE REVIEW' /tmp/cache-unreachable.log")
+    # A reachable cache that lacks the prepared closure asks for preparation.
+    installer.succeed("mkdir -p /tmp/empty-cache; printf 'StoreDir: /nix/store\\nWantMassQuery: 1\\nPriority: 30\\n' > /tmp/empty-cache/nix-cache-info")
+    installer.succeed("systemd-run --unit=empty-cache python3 -m http.server 5001 --bind 127.0.0.1 --directory /tmp/empty-cache")
+    installer.wait_until_succeeds("curl -fsS http://127.0.0.1:5001/nix-cache-info")
+    point_installer_at_cache("127.0.0.1", 5001)
+    installer.fail("/etc/nixorium-test/run-client-installer > /tmp/cache-missing.log 2>&1")
+    installer.succeed("grep -F 'The controller has not prepared pc01 for this configuration.' /tmp/cache-missing.log")
+    installer.succeed("grep -F 'Prepare clients again, then restart this installer.' /tmp/cache-missing.log")
+    installer.fail("grep -F 'DESTRUCTIVE REVIEW' /tmp/cache-missing.log")
+    installer.succeed("systemctl stop empty-cache")
+    installer.succeed("test -z \"$(lsblk -nrpo FSTYPE /dev/vdb)\"")
+    # The real controller cache serves the signed closure.
+    point_installer_at_cache(cache_ip, 5000)
     installer.succeed("set -o pipefail; /etc/nixorium-test/run-client-installer 2>&1 | tee /tmp/client-installer.log")
     installer.succeed("grep -F 'detected automatically' /tmp/client-installer.log")
     installer.succeed("grep -F 'DESTRUCTIVE REVIEW' /tmp/client-installer.log")
@@ -99,7 +152,11 @@
     installer.succeed("grep -F '[2/3] Installing pc01' /tmp/client-installer.log")
     installer.succeed("grep -F '[3/3] Verifying' /tmp/client-installer.log")
     installer.succeed("grep -F 'SUCCESS: pc01 is installed on /dev/vdb' /tmp/client-installer.log")
-    installer.succeed("test -e /mnt/nix/var/nix/profiles/system")
+    # The profile links are absolute; they resolve inside the target, not here.
+    installer.succeed("test -L /mnt/nix/var/nix/profiles/system && test \"$(readlink /mnt/nix/var/nix/profiles/system-1-link)\" = ${clientSystem}")
+    installer.succeed("test -e /mnt${clientSystem}")
+    # It reached the target through the cache, never through the netboot store.
+    installer.fail("test -e ${clientSystem}")
     installer.succeed("lsblk -nrpo PATH,FSTYPE /dev/vdb | grep -E '/dev/vdb[12] '")
     installer.succeed("umount -R /mnt")
     installer.succeed("sync")
