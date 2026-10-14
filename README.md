@@ -160,8 +160,9 @@ trial on virtual machines, follow the
    (PXE)** or **USB over SSH**; the first time, the guided flow asks for the
    laboratory settings, creates the keys, activates the controller and
    prepares the clients. Teacher and student account names are reused from
-   first setup; change them under **Maintenance → Change settings → Accounts**, and change
-   account passwords under **Maintenance → Change account passwords**.
+   first setup; change them under **Maintenance → Change settings → Accounts →
+   Change account names**, and change account passwords under **Maintenance →
+   Change settings → Accounts → Change account passwords**.
 
    Optionally use **Maintenance → Back up lab** and choose an **encrypted file**
    (for example on a USB drive), or a **private GitHub/GitLab repository** that

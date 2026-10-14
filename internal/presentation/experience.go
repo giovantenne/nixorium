@@ -307,7 +307,8 @@ func (model dashboardModel) helpView() string {
 		for _, group := range routineSettingsGroups {
 			lines = append(lines, group.shortcut+"  "+group.label)
 		}
-		lines = append(lines, "p  Account passwords", "y  Controller keys", "/  Search categories; Esc clears the search before leaving")
+		lines = append(lines, "y  Controller keys", "/  Search categories; Esc clears the search before leaving")
+		lines = append(lines, "Accounts opens a small menu: n changes the teacher and student user names, p changes account passwords.")
 		lines = append(lines, "After saving, Enter opens a separate controller review; after verified application it opens client selection. Esc leaves the result.")
 	case dashboardWorkspace:
 		lines = append(lines,
@@ -346,8 +347,17 @@ func (model dashboardModel) helpView() string {
 			"The guided home is enabled in configuration only. Apply systems and reboot separately; no push.",
 			"The result offers a separate controller review, then client selection after verified application. Esc leaves without applying.",
 			"An interrupted reset requires recovery; preserve the backup ref and .git/nixorium-template-reset.json.")
+	case dashboardSettingsAccounts:
+		lines = append(lines,
+			"n  Change account names: edit the teacher and student user names, then review and save.",
+			"p  Change account passwords: choose the administrator, teacher or student account.",
+			"A new password takes effect only after you apply the configuration to this controller and then update the computers.",
+			"Esc returns to Settings.")
 	case dashboardSettingsPasswords:
 		lines = append(lines, "a  Administrator", "t  Teacher", "s  Student", "Selecting an account opens protected password input; it does not save changes.")
+		if model.settings.returnScreen != dashboardSetup && !model.installation.flow {
+			lines = append(lines, "After review and save, apply the configuration to this controller, then update the computers. Esc returns to Accounts.")
+		}
 	case dashboardPXE:
 		lines = append(lines, "Enter next step   p configure/prepare   s review start   x stop   n recover network   r refresh", "l progress details while preparing; q closes only the view")
 	case dashboardController:

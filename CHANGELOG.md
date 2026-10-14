@@ -15,13 +15,26 @@ The project follows [Semantic Versioning](https://semver.org/).
   mentions `mkForce` or `mkOverride`; the save flow is unchanged. The Assistant
   guide documents the limits and the GRUB rollback.
 
+### Changed
+
+- **Maintenance** no longer lists **Change account passwords**, and the `p`
+  shortcut on the **Change settings** screen is gone. Account names and
+  passwords now live together under **Maintenance → Change settings →
+  Accounts**, a small menu with **Change account names** (`n`) and **Change
+  account passwords** (`p`); `Esc` goes back one level. Both keep their review
+  and save; a new password still takes effect only after you apply the
+  configuration to the controller and update the computers. The first-setup
+  password step is unchanged.
+
 ### Fixed
 
 - The lab screensaver service no longer depends on the executable bit of its
-  scripts: both are now run through bash. Labs that copied the 3.6.0 template
-  files and see `203/EXEC` in `systemctl --user status lab-screensaver` should
-  refresh `modules/screensaver.nix` and `scripts/screensaver-monitor.sh` from
-  the template (or run `chmod +x` on the two scripts).
+  scripts: both are now run through bash. Every laboratory initialised from
+  the 3.6.0 template is affected, because the bootstrap's copy of the template
+  (`nix flake init`) drops the executable bit; the service then fails with
+  `203/EXEC` in `systemctl --user status lab-screensaver`. Refresh
+  `modules/screensaver.nix` and `scripts/screensaver-monitor.sh` from the
+  template, or run `chmod +x` on the two scripts and commit.
 
 ## [3.6.0] - 2026-10-14
 

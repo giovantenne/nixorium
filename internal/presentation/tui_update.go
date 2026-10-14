@@ -874,6 +874,7 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		model.settings.current = message.settings
 		model.settings.repair = message.repair
 		model.settings.menu = newRoutineSettingsMenu(model.isDark, model.width, model.height)
+		model.settings.fromAccounts = false
 		if model.installation.startingLabSetup {
 			model.installation.startingLabSetup = false
 			if model.installation.method == "pxe" && message.settings.InstallationSettingsComplete() {
@@ -907,10 +908,6 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		model.message = ""
 		model.screen = dashboardSettings
-		if model.settings.passwordsDirect {
-			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
-			model.screen = dashboardSettingsPasswords
-		}
 		return model, nil
 	case dashboardSettingsPlanMsg:
 		model.busy = ""
@@ -1197,6 +1194,9 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		if model.screen == dashboardSettingsPasswords {
 			model.settings.passwordMenu.setSize(model.width, model.height)
 		}
+		if model.screen == dashboardSettingsAccounts {
+			model.settings.accountsMenu.setSize(model.width, model.height)
+		}
 		if model.screen == dashboardSettingsEdit {
 			updated, _ := model.settings.editor.Update(message)
 			model.settings.editor = updated.(settingsWizardModel)
@@ -1213,6 +1213,11 @@ func (model dashboardModel) updateConfigurationMessage(message tea.Msg) (tea.Mod
 		}
 		if model.screen == dashboardSettingsPasswords {
 			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+		}
+		if model.screen == dashboardSettingsAccounts {
+			selected := model.settings.accountsMenu.list.Index()
+			model.settings.accountsMenu = newRoutineAccountsMenu(model.isDark, model.width, model.height)
+			model.settings.accountsMenu.list.Select(selected)
 		}
 		if model.screen == dashboardSettingsEdit {
 			updated, _ := model.settings.editor.Update(message)
@@ -1270,6 +1275,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 		}
 		if model.screen == dashboardSettingsPasswords {
 			model.settings.passwordMenu, _ = model.settings.passwordMenu.update(message)
+		}
+		if model.screen == dashboardSettingsAccounts {
+			model.settings.accountsMenu, _ = model.settings.accountsMenu.update(message)
 		}
 		if model.screen == dashboardSettingsEdit {
 			updated, command := model.settings.editor.Update(message)

@@ -92,8 +92,7 @@ var installationAreaTasks = []dashboardTask{
 // Maintenance lists frequent tasks first; advanced tools follow in a
 // visually separate group so the default selection is never destructive.
 var administrationTasks = []dashboardTask{
-	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, accounts, regional values, browser, Git and controller keys"},
-	{id: "passwords", shortcut: "p", title: "Change account passwords", description: "Set new passwords for the administrator, teacher and student accounts"},
+	{id: "settings", shortcut: "e", title: "Change settings", description: "Network, account names and passwords, regional values, browser, Git and controller keys"},
 	{id: "diagnostics", shortcut: "i", title: "Diagnostics", description: "Check the lab and see recovery instructions"},
 	{id: "package-base", shortcut: "b", title: "Update system and packages", description: "Refresh the NixOS base or review a channel migration"},
 	{id: "update", shortcut: "u", title: "Update Nixorium", description: "Choose master or a release fetched from the configured upstream"},

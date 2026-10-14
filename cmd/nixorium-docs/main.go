@@ -113,6 +113,7 @@ func renderGallery() string {
 	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderOnboardingDemo(demoRevision, 120, 30))
 	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderAssistantMenuDemo(demoRevision, 120, 30))
 	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderHomeFilesDemo(demoRevision, 120, 30))
+	bundle.Scenarios = append(bundle.Scenarios, presentation.RenderAccountSettingsDemo(demoRevision, 120, 30))
 	compactHomeFiles := presentation.RenderHomeFilesDemo(demoRevision, 80, 24)
 	compactHomeFiles.ID = "student-initial-files-compact"
 	bundle.Scenarios = append(bundle.Scenarios, compactHomeFiles)
@@ -154,6 +155,9 @@ func renderGallery() string {
 		{title: "Shutdown with active sessions", scenarioID: "shutdown", label: "Active sessions will shut down; unreachable clients are not sent"},
 		{title: "Restricted teacher dashboard", scenarioID: "classroom", label: "Overview"},
 		{title: "Teacher restart review", scenarioID: "classroom", label: "Review the client restart"},
+		{title: "Settings accounts menu", scenarioID: "account-settings", label: "Accounts: names or passwords"},
+		{title: "Change account names", scenarioID: "account-settings", label: "Change account names"},
+		{title: "Change account passwords", scenarioID: "account-settings", label: "Change account passwords"},
 		{title: "Student workspace favorites", scenarioID: "student-workspace", label: "Keep only the editor in the draft favorites"},
 		{title: "Initial files at 80x24", scenarioID: "student-initial-files-compact", label: "Captured files and empty directories"},
 		{title: "Initial-file path completion", scenarioID: "student-initial-files", label: "Local source selection with completion"},

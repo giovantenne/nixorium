@@ -29,7 +29,7 @@ func (c LabCredentials) Ready() bool {
 
 func (c LabCredentials) Validate() error {
 	if c.Version < 1 || !c.Ready() {
-		return errors.New("account credentials are incomplete; set all passwords in Maintenance → Change settings → Passwords")
+		return errors.New("account credentials are incomplete; set all passwords in Maintenance → Change settings → Accounts → Change account passwords")
 	}
 	return nil
 }

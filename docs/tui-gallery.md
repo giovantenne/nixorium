@@ -982,6 +982,58 @@ Press Enter to restart 1 computer.
 Enter Send requests  ·  u Unknown sessions  ·  Esc Cancel  ·  F1 Help
 ```
 
+## Settings accounts menu
+
+```text
+Nixorium  /  Maintenance  /  Settings  /  Accounts
+
+Accounts
+Choose what to change for the laboratory accounts.
+
+› [n] Change account names
+  [p] Change account passwords
+
+Teacher and student user names
+
+↑/↓ Select  ·  Enter Open  ·  Esc Settings  ·  F1 Help
+```
+
+## Change account names
+
+```text
+Nixorium  /  Maintenance  /  Settings  /  Accounts  /  Names
+
+Step 1 of 2  Accounts
+
+Teacher user name
+Teacher account name, distinct from administrator and student.
+
+› teacher█
+
+Enter Continue  ·  Shift+Tab Previous  ·  Esc Cancel  ·  F1 Help
+```
+
+## Change account passwords
+
+```text
+Nixorium  /  Maintenance  /  Settings  /  Accounts  /  Passwords
+
+Change account passwords
+Choose the account whose password you want to change.
+Your password stays hidden while you type.
+A new password takes effect only after you apply the configuration
+to this controller and then update the computers.
+
+› [a] Administrator
+  Controller administrator account
+  [t] Teacher
+  Classroom teacher account
+  [s] Student
+  Classroom student account
+
+↑/↓ Select  ·  Enter Change password  ·  Esc Accounts  ·  F1 Help
+```
+
 ## Student workspace favorites
 
 ```text

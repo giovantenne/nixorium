@@ -87,7 +87,11 @@ func TestSettingsShortcutsDoNotStealNavigationOrSearch(t *testing.T) {
 			t.Fatal("hidden category shortcut")
 		}
 		next, _ := m.Update(tea.KeyPressMsg{Text: group.shortcut})
-		if next.(dashboardModel).screen != dashboardSettingsEdit {
+		want := dashboardSettingsEdit
+		if group.id == "accounts" {
+			want = dashboardSettingsAccounts // Names and passwords submenu.
+		}
+		if next.(dashboardModel).screen != want {
 			t.Fatalf("%s did not open", group.id)
 		}
 	}

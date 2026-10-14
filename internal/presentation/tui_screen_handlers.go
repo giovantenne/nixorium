@@ -136,8 +136,8 @@ func (model dashboardModel) openMaintenanceTask(action string) (tea.Model, tea.C
 		return model.checkUpdates()
 	case "b":
 		return model.openPackageBase()
-	case "e", "p":
-		model.settings.passwordsDirect = action == "p"
+	case "e":
+		model.settings.fromAccounts = false
 		model.screen = dashboardSettings
 		model.settings.returnScreen = dashboardAdministration
 		model.settings.result = domain.ConfigurationSaveReport{}
@@ -167,6 +167,15 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			if key.String() == group.shortcut {
 				model.settings.menu.list.ResetFilter()
 				model.settings.menu.list.Select(index)
+				key = tea.KeyPressMsg{Code: tea.KeyEnter}
+				break
+			}
+		}
+	}
+	if model.screen == dashboardSettingsAccounts && model.settings.accountsMenu.initialized {
+		for index, choice := range routineAccountsChoices {
+			if key.String() == choice.shortcut {
+				model.settings.accountsMenu.list.Select(index)
 				key = tea.KeyPressMsg{Code: tea.KeyEnter}
 				break
 			}
@@ -536,17 +545,15 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			if group.id == "workspace" {
 				return model.openWorkspace()
 			}
-			model.settings.editor = newSettingsEditorModel(model.settings.current, group.fields, "Maintenance / Settings / "+group.label)
-			model.settings.editor.width = model.width
-			model.settings.editor.height = model.height
-			model.settings.editor.isDark = model.isDark
-			model.settings.editor.prepareCurrentField()
-			model.message = ""
-			model.screen = dashboardSettingsEdit
-		case "p":
-			model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
-			model.message = ""
-			model.screen = dashboardSettingsPasswords
+			if group.id == "accounts" {
+				model.settings.accountsMenu = newRoutineAccountsMenu(model.isDark, model.width, model.height)
+				model.settings.fromAccounts = false
+				model.message = ""
+				model.screen = dashboardSettingsAccounts
+				return model, nil
+			}
+			model.settings.fromAccounts = false
+			model = model.openSettingsEditor(group.fields, "Maintenance / Settings / "+group.label)
 		case "y":
 			if model.actions.LoadSetupKeys == nil {
 				model.message = "Controller key management is not available in this session."
@@ -576,6 +583,9 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			} else {
 				model.message = "Settings edit cancelled; no file changed."
 				model.screen = dashboardSettings
+				if model.settings.fromAccounts {
+					model.screen = dashboardSettingsAccounts
+				}
 			}
 			return model, nil
 		}
@@ -636,13 +646,10 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 		switch key.String() {
 		case "esc", "left":
 			model.message = ""
-			if model.settings.passwordsDirect {
-				model.settings.passwordsDirect = false
-				model.settings.returnScreen = dashboardHome
-				model.screen = dashboardAdministration
-				return model, nil
-			}
 			model.screen = dashboardSettings
+			if model.settings.fromAccounts {
+				model.screen = dashboardSettingsAccounts
+			}
 		case "enter":
 			choice, selected := model.settings.passwordMenu.selected()
 			if !selected {
@@ -660,6 +667,29 @@ func (model dashboardModel) updatePrimaryScreenKey(key tea.KeyPressMsg) (tea.Mod
 			})
 		default:
 			model.settings.passwordMenu, _ = model.settings.passwordMenu.update(key)
+		}
+	case dashboardSettingsAccounts:
+		switch key.String() {
+		case "esc", "left":
+			model.message = ""
+			model.settings.fromAccounts = false
+			model.screen = dashboardSettings
+		case "enter":
+			choice, selected := model.settings.accountsMenu.selected()
+			if !selected {
+				model.message = "Select what to change."
+				return model, nil
+			}
+			model.settings.fromAccounts = true
+			model.message = ""
+			if choice.id == "passwords" {
+				model.settings.passwordMenu = newRoutinePasswordMenu(model.isDark, model.width, model.height)
+				model.screen = dashboardSettingsPasswords
+				return model, nil
+			}
+			model = model.openSettingsEditor(accountsSettingsGroup().fields, "Maintenance / Settings / Accounts / Names")
+		default:
+			model.settings.accountsMenu, _ = model.settings.accountsMenu.update(key)
 		}
 	case dashboardSettingsReview:
 		switch strings.ToLower(key.String()) {

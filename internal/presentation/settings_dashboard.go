@@ -64,7 +64,7 @@ var routineSettingsGroups = []routineSettingsGroup{
 		id:          "accounts",
 		shortcut:    "a",
 		label:       "Accounts",
-		description: "Teacher and student account names",
+		description: "Account names and passwords",
 		fields: []settingsField{
 			{id: "lab.teacherUser", group: "Accounts", label: "Teacher user name"},
 			{id: "lab.studentUser", group: "Accounts", label: "Student user name"},
@@ -130,6 +130,28 @@ var routinePasswordChoices = []routinePasswordChoice{
 }
 
 type routinePasswordMenu struct {
+	list        list.Model
+	initialized bool
+}
+
+// routineAccountsChoice is one entry of the Settings → Accounts submenu.
+type routineAccountsChoice struct {
+	id          string
+	shortcut    string
+	label       string
+	description string
+}
+
+func (item routineAccountsChoice) Title() string       { return menuTitle(item.shortcut, item.label) }
+func (item routineAccountsChoice) Description() string { return item.description }
+func (item routineAccountsChoice) FilterValue() string { return item.label }
+
+var routineAccountsChoices = []routineAccountsChoice{
+	{id: "names", shortcut: "n", label: "Change account names", description: "Teacher and student user names"},
+	{id: "passwords", shortcut: "p", label: "Change account passwords", description: "Administrator, teacher and student passwords"},
+}
+
+type routineAccountsMenu struct {
 	list        list.Model
 	initialized bool
 }
@@ -231,6 +253,60 @@ func (menu routinePasswordMenu) update(message tea.Msg) (routinePasswordMenu, te
 	return menu, command
 }
 
+func newRoutineAccountsMenu(isDark bool, width, height int) routineAccountsMenu {
+	items := make([]list.Item, 0, len(routineAccountsChoices))
+	for _, choice := range routineAccountsChoices {
+		items = append(items, choice)
+	}
+	// Like the Settings menu: rows show their shortcut and name, and the
+	// selected row's description follows the list.
+	delegate := tuiListDelegate(isDark)
+	delegate.ShowDescription = false
+	menu := list.New(items, delegate, settingsMenuWidth(width), min(len(routineAccountsChoices)+3, routineMenuHeight(height)))
+	menu.Title = "Accounts"
+	menu.SetShowTitle(false)
+	menu.SetShowStatusBar(false)
+	menu.SetShowHelp(false)
+	menu.SetFilteringEnabled(false)
+	themeList(&menu, isDark)
+	return routineAccountsMenu{list: menu, initialized: true}
+}
+
+func (menu *routineAccountsMenu) setSize(width, height int) {
+	if !menu.initialized {
+		return
+	}
+	menu.list.SetSize(settingsMenuWidth(width), min(len(routineAccountsChoices)+3, routineMenuHeight(height)))
+}
+
+func (menu routineAccountsMenu) selected() (routineAccountsChoice, bool) {
+	if !menu.initialized {
+		return routineAccountsChoice{}, false
+	}
+	item, ok := menu.list.SelectedItem().(routineAccountsChoice)
+	return item, ok
+}
+
+func (menu routineAccountsMenu) update(message tea.Msg) (routineAccountsMenu, tea.Cmd) {
+	if !menu.initialized {
+		return menu, nil
+	}
+	updated, command := menu.list.Update(message)
+	menu.list = updated
+	return menu, command
+}
+
+// accountsSettingsGroup returns the Accounts category, whose fields are the
+// teacher and student user names edited by Change account names.
+func accountsSettingsGroup() routineSettingsGroup {
+	for _, group := range routineSettingsGroups {
+		if group.id == "accounts" {
+			return group
+		}
+	}
+	return routineSettingsGroup{}
+}
+
 type settingsPasswordCommand struct {
 	action    SettingsPasswordAction
 	account   string
@@ -299,6 +375,8 @@ func (model dashboardModel) settingsView() string {
 		return model.renderShell(model.settings.editor.shell())
 	case dashboardSettingsPasswords:
 		return model.settingsPasswordsView()
+	case dashboardSettingsAccounts:
+		return model.settingsAccountsView()
 	case dashboardSettingsReview:
 		return model.settingsReviewView()
 	}
@@ -348,7 +426,26 @@ func (model dashboardModel) settingsView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "p", label: "Passwords"}, {key: "y", label: "Controller keys"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}})
+	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Edit"}, {key: "/", label: "Search"}, {key: "y", label: "Controller keys"}, {key: "Esc", label: backLabel}, {key: "F1", label: "Help"}}})
+}
+
+// settingsAccountsView is the Settings → Accounts submenu: account names and
+// account passwords are separate forms with their own review.
+func (model dashboardModel) settingsAccountsView() string {
+	lines := []string{
+		tuiTitle("Accounts", model.isDark),
+		"Choose what to change for the laboratory accounts.",
+		"",
+		trimBlankLines(model.settings.accountsMenu.list.View()),
+	}
+	if choice, ok := model.settings.accountsMenu.selected(); ok {
+		lines = append(lines, "", tuiMuted(choice.description, model.isDark))
+	}
+	notices := []tuiNotice{}
+	if model.message != "" {
+		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+	}
+	return model.renderShell(tuiShell{path: []string{"Maintenance", "Settings", "Accounts"}, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Open"}, {key: "Esc", label: "Settings"}, {key: "F1", label: "Help"}}})
 }
 
 func (model dashboardModel) settingsPasswordsView() string {
@@ -371,9 +468,11 @@ func (model dashboardModel) settingsPasswordsView() string {
 		return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "Enter", label: "Collect passwords"}, {key: "Esc", label: cancelLabel}, {key: "F1", label: "Help"}}})
 	}
 	lines := []string{
-		tuiTitle("Change password", model.isDark),
+		tuiTitle("Change account passwords", model.isDark),
 		"Choose the account whose password you want to change.",
 		"Your password stays hidden while you type.",
+		"A new password takes effect only after you apply the configuration",
+		"to this controller and then update the computers.",
 		"",
 		model.settings.passwordMenu.list.View(),
 	}
@@ -381,10 +480,7 @@ func (model dashboardModel) settingsPasswordsView() string {
 	if model.message != "" {
 		notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
 	}
-	path, back := []string{"Maintenance", "Settings", "Passwords"}, "Settings"
-	if model.settings.passwordsDirect {
-		path, back = []string{"Maintenance", "Account passwords"}, "Maintenance"
-	}
+	path, back := []string{"Maintenance", "Settings", "Accounts", "Passwords"}, "Accounts"
 	return model.renderShell(tuiShell{path: path, body: strings.Join(lines, "\n"), notices: notices, actions: []tuiAction{{key: "↑/↓", label: "Select"}, {key: "Enter", label: "Change password"}, {key: "Esc", label: back}, {key: "F1", label: "Help"}}})
 }
 
@@ -469,4 +565,16 @@ func passwordFieldChanged(result domain.ConfigurationSaveReport) bool {
 		}
 	}
 	return false
+}
+
+// openSettingsEditor opens the routine form for one settings category.
+func (model dashboardModel) openSettingsEditor(fields []settingsField, title string) dashboardModel {
+	model.settings.editor = newSettingsEditorModel(model.settings.current, fields, title)
+	model.settings.editor.width = model.width
+	model.settings.editor.height = model.height
+	model.settings.editor.isDark = model.isDark
+	model.settings.editor.prepareCurrentField()
+	model.message = ""
+	model.screen = dashboardSettingsEdit
+	return model
 }

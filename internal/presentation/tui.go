@@ -183,6 +183,7 @@ const (
 	dashboardSettingsEdit
 	dashboardSettingsPasswords
 	dashboardSettingsReview
+	dashboardSettingsAccounts
 	dashboardPXE
 	dashboardPXEStartReview
 	dashboardPXELeaveReview
@@ -278,15 +279,16 @@ type settingsModel struct {
 	candidate        domain.LabSettingsFile
 	menu             routineSettingsMenu
 	passwordMenu     routinePasswordMenu
+	accountsMenu     routineAccountsMenu
 	editor           settingsWizardModel
 	plan             domain.ConfigPlanReport
 	result           domain.ConfigurationSaveReport
 	applying         bool
 	returnScreen     dashboardScreen
 	collectPasswords bool
-	// passwordsDirect marks the Maintenance shortcut that opens the account
-	// passwords screen without showing the Settings menu first.
-	passwordsDirect bool
+	// fromAccounts marks a names form or password list opened from the
+	// Accounts submenu, so Esc returns there instead of to Settings.
+	fromAccounts bool
 	// repair lists problems of saved settings that no longer validate.
 	repair []domain.ValidationIssue
 }
@@ -1018,7 +1020,7 @@ func (model dashboardModel) returnFromSettings() (tea.Model, tea.Cmd) {
 	returnTo := model.settings.returnScreen
 	model.settings.returnScreen = dashboardHome
 	model.settings.collectPasswords = false
-	model.settings.passwordsDirect = false
+	model.settings.fromAccounts = false
 	model.message = ""
 	if returnTo == dashboardSetup {
 		model.screen = dashboardSetup
@@ -1265,7 +1267,7 @@ func (model dashboardModel) View() tea.View {
 		content = model.gitReviewView()
 	case dashboardUpdate, dashboardUpdateReview:
 		content = model.updateView()
-	case dashboardSettings, dashboardSettingsEdit, dashboardSettingsPasswords, dashboardSettingsReview:
+	case dashboardSettings, dashboardSettingsEdit, dashboardSettingsPasswords, dashboardSettingsReview, dashboardSettingsAccounts:
 		content = model.settingsView()
 	case dashboardPXE, dashboardPXEStartReview, dashboardPXELeaveReview:
 		content = model.pxeView()

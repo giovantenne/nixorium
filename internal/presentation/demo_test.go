@@ -178,3 +178,44 @@ func demoFrameWithLabel(frames []DemoFrame, label string) DemoFrame {
 	}
 	return DemoFrame{}
 }
+
+func TestAccountSettingsDemoFollowsTheAccountsSubmenu(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 30}, {180, 45}} {
+		scenario := RenderAccountSettingsDemo(strings.Repeat("a", 40), size[0], size[1])
+		for _, frame := range scenario.Frames {
+			if lipgloss.Width(frame.ANSI) > size[0] || lipgloss.Height(frame.ANSI) > size[1] {
+				t.Fatalf("%s/%s overflows %dx%d", scenario.ID, frame.Label, size[0], size[1])
+			}
+		}
+	}
+	scenario := RenderAccountSettingsDemo(strings.Repeat("a", 40), 120, 30)
+	if scenario.Frames[0].Label != "Overview" {
+		t.Fatal("account settings demo does not start from the overview")
+	}
+	want := map[string]string{
+		"Open Maintenance":             "Change settings",
+		"Accounts: names or passwords": "Maintenance  /  Settings  /  Accounts",
+		"Change account names":         "Maintenance  /  Settings  /  Accounts  /  Names",
+		"Change account passwords":     "Maintenance  /  Settings  /  Accounts  /  Passwords",
+		"Esc returns to Accounts":      "[p] Change account passwords",
+	}
+	for label, text := range want {
+		found := false
+		for _, frame := range scenario.Frames {
+			if frame.Label == label {
+				found = true
+				if !strings.Contains(frame.Text, text) {
+					t.Fatalf("frame %q omits %q:\n%s", label, text, frame.Text)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("account settings demo omits frame %q", label)
+		}
+	}
+	for _, frame := range scenario.Frames {
+		if frame.Label == "Open Maintenance" && strings.Contains(frame.Text, "Change account passwords") {
+			t.Fatalf("Maintenance still lists account passwords:\n%s", frame.Text)
+		}
+	}
+}

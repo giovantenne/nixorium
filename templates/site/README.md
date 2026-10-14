@@ -499,7 +499,7 @@ spinner and the current plain-language action.
 | **Computers** | Inspect, distribute, control Internet access, or shut down/restart selected clients |
 | **Installation** | Configure the lab, install through PXE or USB/SSH, and recover interrupted installation state |
 | **Software** | Review configured packages, search the pin, choose scope, and save/apply changes; Chromium, Ghostty, Git and the screensaver's effects are always installed and cannot be removed |
-| **Maintenance** | Change settings and account passwords, update/rebuild the controller, inspect services, Git, logs, and diagnostics |
+| **Maintenance** | Change settings (including account names and passwords), update/rebuild the controller, inspect services, Git, logs, and diagnostics |
 
 Every task menu shows its direct shortcut beside the title. `Esc` returns to
 the parent area; `F1` opens contextual help even while typing. Software tabs
@@ -524,9 +524,11 @@ Browser, or Git changes. Regional fields reuse the offline searchable
 selectors from first-run setup. Git author names and email addresses live here
 instead of extending the initial setup path.
 
-To change a password, open **Maintenance → Change account passwords** (`p`) or
-choose `p` in Settings; either way you change exactly one administrator,
-teacher, or student password. A new password takes effect only after you apply
+**Accounts** opens a small menu with two entries. **Change account names** (`n`)
+edits the teacher and student user names. To change a password, open
+**Maintenance → Change settings → Accounts → Change account passwords** (`p`)
+and choose exactly one administrator, teacher, or student account. `Esc` goes
+back one level. A new password takes effect only after you apply
 the saved configuration to the controller and then update the computers. Nixorium temporarily suspends the dashboard and uses the same
 terminal-only no-echo, confirmed, retryable hashing flow as first-run setup;
 plaintext never enters the Bubble Tea model. Both ordinary and password edits
