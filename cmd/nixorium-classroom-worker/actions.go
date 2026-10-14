@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -26,8 +27,19 @@ const (
 	actionSendFiles     = "send-files"
 	actionShowScreen    = "show-screen"
 	maxActionComputers  = 200
-	// powerLabelTime keeps "Restarting…" on a card while the computer is away.
+	// powerLabelTime is the longest "Restarting…" or "Shutting down…" stays
+	// on a card; the label usually ends sooner, when the state shows the
+	// computer off or back (see labelsFor).
 	powerLabelTime = 3 * time.Minute
+)
+
+// Outcomes of a computer in an action's result, which the page counts in
+// its one-line notice.
+const (
+	outcomeDone    = "done"
+	outcomeOff     = "off"
+	outcomeSkipped = "skipped"
+	outcomeFailed  = "failed"
 )
 
 type classroomHandler func(context.Context, domain.ClassroomRequest) domain.ClassroomResponse
@@ -56,6 +68,8 @@ type actionRow struct {
 	Name string `json:"name"`
 	Note string `json:"note,omitempty"`
 	Skip bool   `json:"skip,omitempty"`
+	// Outcome is set in results only: done, off, skipped or failed.
+	Outcome string `json:"outcome,omitempty"`
 }
 
 // actionReview is what the confirmation dialog shows.
@@ -82,6 +96,10 @@ type computerLabels struct {
 	internet    string
 	power       string
 	powerExpiry time.Time
+	// powerRestart: the label waits for the computer to come back;
+	// powerAway: the computer has stopped answering since the restart.
+	powerRestart bool
+	powerAway    bool
 }
 
 func decodePageJSON(writer http.ResponseWriter, request *http.Request, value any) bool {
@@ -331,7 +349,7 @@ func powerReview(plan domain.ShutdownPlanReport) (actionReview, pendingAction) {
 		row := actionRow{Name: target.Name}
 		switch {
 		case !target.Eligible:
-			row.Skip, row.Note = true, "Switched off or not reachable."
+			row.Skip, row.Note = true, app.ClassroomOffDetail
 		case target.Session == domain.ShutdownSessionActive:
 			row.Note = "Someone is using it: unsaved work is lost."
 		case target.Session == domain.ShutdownSessionUnknown:
@@ -394,7 +412,7 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		}
 		result.State, result.Message, result.Broadcast = "started", "Your screen is being shown.", id
 		for _, target := range pending.broadcast.Targets {
-			result.Rows = append(result.Rows, actionRow{Name: target.Name})
+			result.Rows = append(result.Rows, actionRow{Name: target.Name, Outcome: outcomeDone})
 		}
 	case pending.share != nil:
 		operation.Operation = domain.ClassroomShareApplyOperation
@@ -406,8 +424,12 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		}
 		report := response.ShareReport
 		result.State, result.Message = report.State, report.Message
+		planned := map[string]plannedTarget{}
+		for _, target := range pending.share.Targets {
+			planned[target.Name] = plannedTarget{eligible: target.Eligible, detail: target.Detail}
+		}
 		for _, target := range report.Targets {
-			result.Rows = append(result.Rows, actionRow{Name: target.Name, Note: target.Detail, Skip: target.State != "delivered"})
+			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "delivered", target.Detail, planned[target.Name]))
 		}
 	case pending.lock != nil:
 		operation.Operation = domain.ClassroomLockApplyOperation
@@ -419,8 +441,12 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		}
 		report := response.LockReport
 		result.State, result.Message = report.State, report.Message
+		planned := map[string]plannedTarget{}
+		for _, target := range pending.lock.Targets {
+			planned[target.Name] = plannedTarget{eligible: target.Eligible, detail: target.Detail}
+		}
 		for _, target := range report.Targets {
-			result.Rows = append(result.Rows, actionRow{Name: target.Name, Note: outcomeText(target.State, target.Detail), Skip: target.State != "verified"})
+			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "verified", outcomeText(target.State, target.Detail), planned[target.Name]))
 		}
 	case pending.internet != nil:
 		operation.InternetPlan = pending.internet
@@ -431,8 +457,14 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		}
 		report := response.InternetReport
 		result.State, result.Message = report.State, report.Message
+		// The review called every computer it left out switched off or
+		// not reachable.
+		planned := map[string]plannedTarget{}
+		for _, target := range pending.internet.Targets {
+			planned[target.Name] = plannedTarget{eligible: target.Eligible, detail: app.ClassroomOffDetail}
+		}
 		for _, target := range report.Targets {
-			result.Rows = append(result.Rows, actionRow{Name: target.Name, Note: outcomeText(target.State, target.Detail), Skip: target.State != "verified"})
+			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "verified", outcomeText(target.State, target.Detail), planned[target.Name]))
 			if target.State == "verified" {
 				server.setLabel(target.Name, func(labels *computerLabels) {
 					labels.internet = pending.internet.Action.DesiredState()
@@ -453,11 +485,16 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		if pending.power.Action == domain.ClientRestart {
 			label = "Restarting…"
 		}
+		planned := map[string]plannedTarget{}
+		for _, target := range pending.power.Targets {
+			planned[target.Name] = plannedTarget{eligible: target.Eligible, detail: app.ClassroomOffDetail}
+		}
 		for _, target := range report.Targets {
-			result.Rows = append(result.Rows, actionRow{Name: target.Name, Note: outcomeText(target.State, target.Detail), Skip: target.State != "accepted"})
+			result.Rows = append(result.Rows, resultRow(target.Name, target.State == "accepted", outcomeText(target.State, target.Detail), planned[target.Name]))
 			if target.State == "accepted" {
 				server.setLabel(target.Name, func(labels *computerLabels) {
 					labels.power, labels.powerExpiry = label, server.now().Add(powerLabelTime)
+					labels.powerRestart, labels.powerAway = pending.power.Action == domain.ClientRestart, false
 					// After a restart the Internet block is on again.
 					labels.internet = ""
 				})
@@ -467,6 +504,35 @@ func (server *viewServer) applyAction(writer http.ResponseWriter, request *http.
 		result.State, result.Message = "failed", "Unknown action."
 	}
 	writePageJSON(writer, result)
+}
+
+// plannedTarget is what the review found about one computer.
+type plannedTarget struct {
+	eligible bool
+	detail   string
+}
+
+// resultRow is one computer of an action's result. A computer the review
+// left out keeps the review's reason, which the teacher saw before
+// confirming, and counts as off or skipped rather than failed.
+func resultRow(name string, done bool, note string, planned plannedTarget) actionRow {
+	row := actionRow{Name: name, Note: note, Skip: !done, Outcome: outcomeDone}
+	switch {
+	case done:
+	case !planned.eligible:
+		if planned.detail != "" {
+			row.Note = planned.detail
+		}
+		row.Outcome = outcomeSkipped
+		if planned.detail == app.ClassroomOffDetail {
+			row.Outcome = outcomeOff
+		}
+	case note == app.ClassroomOffDetail:
+		row.Outcome = outcomeOff
+	default:
+		row.Outcome = outcomeFailed
+	}
+	return row
 }
 
 func outcomeText(state, detail string) string {
@@ -492,16 +558,33 @@ func (server *viewServer) setLabel(name string, change func(*computerLabels)) {
 	server.labels[name] = labels
 }
 
-// labelsFor returns the card labels of a computer; expired ones disappear.
-func (server *viewServer) labelsFor(name string) (string, string) {
+// labelsFor returns the card labels of a computer in its current state.
+// A power label ends as soon as the state shows the action done: a computer
+// being shut down that stops answering is off, and a restarting one that
+// stopped answering and answers again is back. Otherwise it expires after
+// powerLabelTime.
+func (server *viewServer) labelsFor(name, state string) (string, string) {
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
-	labels := server.labels[name]
-	power := labels.power
-	if server.now().After(labels.powerExpiry) {
-		power = ""
+	labels, found := server.labels[name]
+	if !found || labels.power == "" {
+		return labels.internet, ""
 	}
-	return labels.internet, power
+	switch {
+	case server.now().After(labels.powerExpiry):
+		labels.power = ""
+	case state == app.ClassroomUnreachable && !labels.powerRestart:
+		labels.power = ""
+	case state == app.ClassroomUnreachable:
+		labels.powerAway = true
+	case labels.powerAway && state != app.ClassroomConnecting:
+		labels.power = ""
+	}
+	if labels.power == "" {
+		labels.powerExpiry, labels.powerRestart, labels.powerAway = time.Time{}, false, false
+	}
+	server.labels[name] = labels
+	return labels.internet, labels.power
 }
 
 // shareChosen has the page's own user choose a file or folder through that

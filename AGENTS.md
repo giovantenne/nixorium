@@ -676,8 +676,9 @@ any shard must block publication.
   reaches the page, and each review is applied at most once. By owner
   decision the page confirms with one explicit button, without a typed word,
   after a review that names computers whose session is active or unknown;
-  the TUI keeps its own confirmation. The page shows the outcome as a brief
-  notice, not a dialog. The
+  the TUI keeps its own confirmation. The page shows the outcome as a
+  one-line notice that counts the computers (each one under Details), not a
+  dialog; a click or Esc closes it. The
   teacher's lock is the classroom extension's full-screen cover with a modal
   grab, requested by the agent on the session bus; logout and restart always
   end it. It is a classroom aid, not a security boundary: the session's own

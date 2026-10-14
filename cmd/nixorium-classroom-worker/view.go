@@ -167,7 +167,7 @@ func (server *viewServer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		}
 		list := make([]pageComputer, 0, len(computers))
 		for _, computer := range computers {
-			internet, power := server.labelsFor(computer.Name)
+			internet, power := server.labelsFor(computer.Name, computer.State)
 			list = append(list, pageComputer{ClassroomComputer: computer, Internet: internet, Power: power, Showing: showing[computer.Name]})
 		}
 		header.Set("Content-Type", "application/json")

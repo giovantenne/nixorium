@@ -40,7 +40,10 @@ const (
 // ErrClassroomNotViewed means input arrived for a computer nobody is viewing.
 var ErrClassroomNotViewed = errors.New("this computer is not open in the classroom view")
 
-// Computer states shown to the teacher.
+// Computer states shown to the teacher. ClassroomLocked is the student's own
+// GNOME lock screen (after a while without use, or Super+L), which GNOME
+// refuses to capture; the teacher's lock is the Locked flag of a viewed
+// computer instead.
 const (
 	ClassroomConnecting  = "connecting"
 	ClassroomViewing     = "viewing"
@@ -50,6 +53,9 @@ const (
 	ClassroomLocked      = "locked"
 	ClassroomFailed      = "failed"
 )
+
+// ClassroomOffDetail explains a computer that did not answer at all.
+const ClassroomOffDetail = "Switched off or not reachable."
 
 // ClassroomViewHub keeps one agent channel per client while the overview is
 // open, refreshing thumbnails; every channel closes when nobody looks.
@@ -272,5 +278,5 @@ func classroomFailureState(err error) (string, string) {
 			return ClassroomFailed, "The screen could not be captured."
 		}
 	}
-	return ClassroomUnreachable, "Switched off or not reachable."
+	return ClassroomUnreachable, ClassroomOffDetail
 }

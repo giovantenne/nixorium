@@ -15,6 +15,7 @@ const viewerActions = document.querySelector('.viewer-actions');
 const controllingNotice = document.getElementById('viewer-controlling');
 const fullscreenButton = document.getElementById('viewer-fullscreen');
 const viewerPanel = document.getElementById('viewer-panel');
+const viewerScreen = document.getElementById('viewer-screen');
 const cards = new Map();
 let selected = null;
 const screenName = new URLSearchParams(location.search).get('screen');
@@ -25,10 +26,63 @@ const stateText = {
   viewing: '',
   'no-session': 'Nobody is signed in',
   'no-agent': 'Classroom view is not running here',
-  locked: "The student's screen lock is on",
-  unreachable: 'Switched off or not reachable',
+  // The student's own lock screen (after a while without use, or Super+L):
+  // GNOME does not let it be captured.
+  locked: 'Idle',
+  unreachable: 'Off or not reachable',
   failed: 'The screen could not be captured',
 };
+
+// An icon over the screen tells the states apart at a glance: the
+// student's idle lock screen (a moon, over the dimmed last picture), the
+// teacher's lock (a padlock over the live picture) and a computer that is
+// off (a power symbol instead of the picture).
+const covers = {
+  idle: { icon: 'moon', caption: 'Idle', title: "The student's screen lock is on: the computer was left unused, or the student locked it. The screen shows again once the student unlocks it." },
+  lock: { icon: 'lock', caption: '', title: 'Locked: the student sees "Eyes on the teacher".' },
+  off: { icon: 'power', caption: 'Off or not reachable', title: 'Switched off or not reachable.' },
+};
+
+function coverOf(computer) {
+  if (computer.state === 'unreachable') return 'off';
+  if (computer.state === 'locked') return 'idle';
+  if (computer.state === 'viewing' && computer.locked) return 'lock';
+  return '';
+}
+
+function makeCover(parent) {
+  const element = document.createElement('div');
+  element.className = 'cover';
+  element.hidden = true;
+  const icon = document.createElement('span');
+  icon.className = 'icon';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [name, value] of Object.entries({ fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) svg.setAttribute(name, value);
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  svg.append(use);
+  icon.append(svg);
+  const caption = document.createElement('span');
+  caption.className = 'caption';
+  element.append(icon, caption);
+  parent.append(element);
+  return { element, use, caption, kind: null };
+}
+
+function setCover(cover, kind) {
+  if (cover.kind === kind) return;
+  cover.kind = kind;
+  cover.element.hidden = !kind;
+  if (!kind) return;
+  const look = covers[kind];
+  cover.element.className = 'cover ' + kind;
+  cover.use.setAttribute('href', '#icon-' + look.icon);
+  cover.caption.textContent = look.caption;
+  cover.caption.hidden = !look.caption;
+}
+
+const viewerCover = makeCover(viewerScreen);
 
 // Computers chosen with their check boxes for the toolbar actions.
 const chosen = new Set();
@@ -70,6 +124,7 @@ function card(computer) {
   image.hidden = true;
   const placeholder = document.createElement('span');
   screen.append(image, placeholder);
+  const cover = makeCover(screen);
   button.append(screen);
   button.addEventListener('click', () => openWindow(computer.name));
   const label = document.createElement('div');
@@ -90,7 +145,7 @@ function card(computer) {
   badges.className = 'badges';
   item.append(button, label, badges);
   grid.append(item);
-  entry = { item, check, image, placeholder, state, badges, badgeText: '', imageAt: 0 };
+  entry = { item, button, check, image, placeholder, cover, state, badges, badgeText: '', imageAt: 0 };
   cards.set(computer.name, entry);
   return entry;
 }
@@ -101,25 +156,49 @@ function screenAge(computer) {
   return seconds < 60 ? '' : 'No change for ' + Math.round(seconds / 60) + ' min';
 }
 
+// Refresh asks for a clean redraw: cards of computers no longer listed go,
+// and every card's labels are drawn again.
+let redraw = false;
+
 function render(computers) {
   let viewing = 0;
+  if (redraw) {
+    redraw = false;
+    const listed = new Set(computers.map((computer) => computer.name));
+    for (const [name, entry] of cards) {
+      if (listed.has(name)) {
+        entry.badgeText = null;
+      } else {
+        entry.item.remove();
+        cards.delete(name);
+        chosen.delete(name);
+      }
+    }
+  }
   for (const computer of computers) {
     const entry = card(computer);
     const text = stateText[computer.state] ?? computer.detail;
-    // Without an image the screen area already says why; avoid repeating it.
-    entry.state.textContent = computer.state === 'viewing' ? screenAge(computer) : (computer.hasImage ? text : '');
+    const cover = coverOf(computer);
+    // The screen area already says why when it has no picture or an icon
+    // with its own words; avoid repeating it.
+    entry.state.textContent = computer.state === 'viewing' ? screenAge(computer) : (computer.hasImage && !cover ? text : '');
     entry.state.classList.toggle('warning', computer.state !== 'viewing' && computer.state !== 'connecting');
     if (computer.hasImage && computer.imageAt !== entry.imageAt && !selected) {
       entry.imageAt = computer.imageAt;
       entry.image.src = '/api/thumbnail?name=' + encodeURIComponent(computer.name) + '&at=' + computer.imageAt;
-      entry.image.hidden = false;
-      entry.placeholder.textContent = '';
-    } else if (!computer.hasImage) {
-      entry.placeholder.textContent = text;
     }
+    // A picture that is no longer live is dimmed; a computer that is off
+    // shows no picture at all.
+    entry.image.hidden = !entry.imageAt;
+    entry.image.classList.toggle('stale', computer.state !== 'viewing' && computer.state !== 'connecting');
+    entry.image.classList.toggle('gone', cover === 'off');
+    entry.placeholder.textContent = entry.imageAt || cover ? '' : text;
+    setCover(entry.cover, cover);
+    entry.button.title = 'Open the screen of ' + computer.name + (cover ? '. ' + covers[cover].title : '');
     const labels = [];
     if (computer.showing) labels.push('Sharing your screen');
-    if (computer.locked) labels.push('Locked');
+    // The teacher's lock is known only while the screen answers.
+    if (computer.locked && (computer.state === 'viewing' || computer.state === 'locked')) labels.push('Locked');
     if (computer.internet === 'blocked') labels.push('Internet off');
     if (computer.power) labels.push(computer.power);
     if (labels.join('|') !== entry.badgeText) {
@@ -133,7 +212,7 @@ function render(computers) {
     }
     if (computer.state === 'viewing') viewing += 1;
     if (computer.name === selected) {
-      viewerDetail.textContent = computer.state === 'viewing' ? (computer.locked ? 'Locked' : '') : text;
+      viewerDetail.textContent = computer.state === 'viewing' ? (computer.locked ? 'Locked' : '') : (cover ? '' : text);
       // A computer that is off or restarting accepts nothing; without a
       // student session only Internet and power apply. The last picture
       // stays, dimmed, so the teacher sees it is no longer live.
@@ -144,8 +223,12 @@ function render(computers) {
       const canControl = computer.state === 'viewing' && !computer.locked;
       if (!canControl && controlling) setControl(false);
       controlButton.disabled = !canControl;
-      controlButton.title = computer.locked ? 'Unlock this computer to take control.' : (canControl ? '' : text);
-      viewerImage.classList.toggle('stale', !session);
+      if (computer.state === 'locked') controlButton.title = covers.idle.title;
+      else controlButton.title = computer.locked ? 'Unlock this computer to take control.' : (canControl ? '' : text);
+      viewerImage.classList.toggle('stale', computer.state !== 'viewing');
+      viewerImage.classList.toggle('gone', cover === 'off');
+      setCover(viewerCover, cover);
+      viewerScreen.title = cover ? covers[cover].title : '';
       viewerActions.classList.toggle('disabled', !reachable);
       if (!reachable) viewerActions.open = false;
       // This computer's menu offers only the change that applies.
@@ -169,6 +252,10 @@ const actionMessage = document.getElementById('action-message');
 const actionRows = document.getElementById('action-rows');
 const actionWarnings = document.getElementById('action-warnings');
 const toast = document.getElementById('toast');
+const toastLine = document.getElementById('toast-line');
+const toastMessage = document.getElementById('toast-message');
+const toastDetails = document.getElementById('toast-details');
+const toastRows = document.getElementById('toast-rows');
 let toastTimer = 0;
 const actionCancel = document.getElementById('action-cancel');
 const actionConfirm = document.getElementById('action-confirm');
@@ -235,19 +322,67 @@ async function runAction(action, computers, transfer) {
   }
 }
 
-// The outcome appears briefly at the bottom, longer when some computers
-// did not take the action; no dialog needs closing.
-function showToast(text, problem) {
-  toast.textContent = text;
-  toast.classList.toggle('problem', Boolean(problem));
-  toast.hidden = false;
+// The outcome appears at the bottom as one line, with each computer under
+// Details. A success goes away by itself, sooner when every computer took
+// the action; a failure stays until the teacher clicks it or presses Esc.
+function hideToast() {
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, problem ? 10000 : 4000);
+  toast.hidden = true;
+}
+
+function showToast(line, { message = '', rows = [], problem = false, sticky = false } = {}) {
+  toastLine.textContent = line;
+  toastMessage.textContent = message;
+  toastMessage.hidden = !message;
+  showRows(toastRows, rows);
+  toastDetails.hidden = rows.length === 0;
+  toastDetails.open = false;
+  toast.classList.toggle('problem', problem || sticky);
+  toast.hidden = false;
+  toast.scrollTop = 0;
+  clearTimeout(toastTimer);
+  if (!sticky) toastTimer = setTimeout(hideToast, problem ? 10000 : 4000);
+}
+
+// Details opens without closing the notice, and keeps it while it is read.
+toast.addEventListener('click', (event) => {
+  if (!toastDetails.contains(event.target)) hideToast();
+});
+toastDetails.addEventListener('toggle', () => {
+  if (toastDetails.open) clearTimeout(toastTimer);
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !toast.hidden && !controlling && !actionDialog.open) hideToast();
+});
+
+const outcomeWords = { done: 'done', off: 'switched off or not reachable', skipped: 'skipped', failed: 'failed' };
+const detailOrder = ['failed', 'skipped', 'off', 'done'];
+
+// One line such as "Lock: 8 done · 12 switched off or not reachable · 1 failed";
+// under Details, the computers that need a look come first.
+function showResult(title, result) {
+  const outcomeOf = (row) => (row.outcome in outcomeWords ? row.outcome : (row.skip ? 'failed' : 'done'));
+  const rows = (result.rows || []).slice().sort((a, b) => detailOrder.indexOf(outcomeOf(a)) - detailOrder.indexOf(outcomeOf(b)));
+  const counts = {};
+  for (const row of rows) counts[outcomeOf(row)] = (counts[outcomeOf(row)] || 0) + 1;
+  const finished = result.state === 'completed' || result.state === 'started';
+  const failed = Boolean(counts.failed) || (rows.length === 0 && !finished);
+  const parts = Object.keys(outcomeWords).filter((outcome) => counts[outcome]).map((outcome) => counts[outcome] + ' ' + outcomeWords[outcome]);
+  let line = result.message || (finished ? 'Done.' : 'The action did not complete.');
+  if (parts.length) line = title + ': ' + parts.join(' · ');
+  showToast(line, {
+    // The controller's own words matter when something failed.
+    message: parts.length && failed ? result.message || '' : '',
+    rows,
+    problem: rows.some((row) => row.skip),
+    sticky: failed,
+  });
 }
 
 actionConfirm.addEventListener('click', async () => {
   if (!actionID) return;
   const id = actionID;
+  const title = actionTitle.textContent;
   actionID = '';
   actionConfirm.hidden = true;
   actionMessage.textContent = 'Working…';
@@ -255,9 +390,7 @@ actionConfirm.addEventListener('click', async () => {
     const result = await postJSON('/api/actions/apply', { id });
     if (result.broadcast) startCasting(result.broadcast);
     const missed = (result.rows || []).filter((row) => row.skip);
-    let text = result.message || (result.state === 'completed' ? 'Done.' : 'The action did not complete.');
-    if (missed.length) text += ' Not done on ' + missed.map((row) => row.name + (row.note ? ' (' + row.note.replace(/\.$/, '') + ')' : '')).join(', ') + '.';
-    showToast(text, missed.length > 0 || (result.state !== 'completed' && result.state !== 'started'));
+    showResult(title, result);
     // Computers that did not take the action stay selected for a retry.
     if (!screenMode && result.rows && result.rows.length) {
       chosen.clear();
@@ -265,7 +398,7 @@ actionConfirm.addEventListener('click', async () => {
       updateSelection();
     }
   } catch (error) {
-    showToast('The controller did not answer; the result is unknown. Check the computers before trying again.', true);
+    showToast('The controller did not answer; the result is unknown. Check the computers before trying again.', { sticky: true });
   }
   actionDialog.close();
 });
@@ -644,22 +777,56 @@ function notice(text) {
   }
 }
 
+// The page asks for the computers every two seconds. Every answer, or its
+// absence, schedules the next request, so the page never stops following
+// the computers; a request that hangs is given up after a while.
+let refreshTimer = 0;
+let refreshing = null;
+let failures = 0;
+
 async function refresh() {
+  clearTimeout(refreshTimer);
+  // A forced refresh replaces a request still waiting.
+  if (refreshing) refreshing.abort();
+  const request = new AbortController();
+  refreshing = request;
+  const giveUp = setTimeout(() => request.abort(), 15000);
   try {
-    const response = await fetch('/api/computers', { cache: 'no-store' });
+    const response = await fetch('/api/computers', { cache: 'no-store', signal: request.signal });
     if (response.status === 403) {
+      // Still asked again: opening the classroom view from Nixorium again
+      // gives this browser a valid session while the same service runs.
+      failures = 0;
       notice('This page has expired. Close this window and open the classroom view again from Nixorium.');
-      return;
+    } else {
+      if (!response.ok) throw new Error(String(response.status));
+      const data = await response.json();
+      if (request !== refreshing) return;
+      failures = 0;
+      notice('');
+      render(data.computers);
     }
-    if (!response.ok) throw new Error(String(response.status));
-    const data = await response.json();
-    notice('');
-    render(data.computers);
   } catch (error) {
+    if (request !== refreshing) return;
+    failures += 1;
     notice('The controller is not answering; trying again.');
+    if (failures > 1 && !screenMode) summary.textContent = 'Reconnecting…';
+  } finally {
+    clearTimeout(giveUp);
   }
-  setTimeout(refresh, 2000);
+  if (request !== refreshing) return;
+  refreshing = null;
+  refreshTimer = setTimeout(refresh, 2000);
 }
+
+// Refresh asks again at once and draws every card anew, without the
+// notice of the last action.
+document.getElementById('refresh').addEventListener('click', () => {
+  hideToast();
+  redraw = true;
+  summary.textContent = 'Refreshing…';
+  refresh();
+});
 
 if (screenMode) showScreen(screenName);
 refresh();

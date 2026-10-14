@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/giovantenne/nixorium/internal/app"
 	"github.com/giovantenne/nixorium/internal/domain"
 )
 
@@ -107,10 +108,15 @@ func TestPageActionsReviewThenApplyOnce(t *testing.T) {
 	if err := json.Unmarshal(apply.Body.Bytes(), &result); err != nil || result.State != "partial" || len(result.Rows) != 2 || result.Rows[0].Note != "Done." || !result.Rows[1].Skip {
 		t.Fatalf("result = %s", apply.Body.String())
 	}
-	if internet, _ := server.labelsFor("pc01"); internet != "blocked" {
+	// The notice counts the computers: the one the review left out is off,
+	// with the review's reason rather than a technical one.
+	if result.Rows[0].Outcome != outcomeDone || result.Rows[1].Outcome != outcomeOff || result.Rows[1].Note != app.ClassroomOffDetail {
+		t.Fatalf("outcomes = %+v", result.Rows)
+	}
+	if internet, _ := server.labelsFor("pc01", app.ClassroomViewing); internet != "blocked" {
 		t.Fatalf("pc01 label = %q", internet)
 	}
-	if internet, _ := server.labelsFor("pc02"); internet != "" {
+	if internet, _ := server.labelsFor("pc02", app.ClassroomViewing); internet != "" {
 		t.Fatalf("pc02 label = %q", internet)
 	}
 	// The same review cannot be applied twice.
@@ -145,12 +151,92 @@ func TestPagePowerActionWarnsAboutWorkInTheReview(t *testing.T) {
 	if !strings.Contains(applied.Body.String(), `"completed"`) {
 		t.Fatalf("apply = %s", applied.Body.String())
 	}
-	if _, power := server.labelsFor("pc01"); power != "Restarting…" {
+	if _, power := server.labelsFor("pc01", app.ClassroomViewing); power != "Restarting…" {
 		t.Fatalf("power label = %q", power)
 	}
+	// A computer that never seems to go away loses the label in the end.
 	server.now = func() time.Time { return time.Now().Add(powerLabelTime + time.Minute) }
-	if _, power := server.labelsFor("pc01"); power != "" {
+	if _, power := server.labelsFor("pc01", app.ClassroomViewing); power != "" {
 		t.Fatalf("expired power label = %q", power)
+	}
+}
+
+// stateViewSource lists pc01 in the state the test sets.
+type stateViewSource struct {
+	fakeViewSource
+	state *string
+}
+
+func (source stateViewSource) Computers(context.Context) ([]app.ClassroomComputer, error) {
+	return []app.ClassroomComputer{{Name: "pc01", State: *source.state, HasImage: true}}, nil
+}
+
+func TestPagePowerLabelEndsWhenTheComputerIsOffOrBack(t *testing.T) {
+	for _, test := range []struct {
+		action string
+		// states the page sees after the action, and the label of each.
+		states []string
+		labels []string
+	}{
+		{"shutdown",
+			[]string{app.ClassroomViewing, app.ClassroomUnreachable, app.ClassroomUnreachable},
+			[]string{"Shutting down…", "", ""}},
+		{"restart",
+			[]string{app.ClassroomViewing, app.ClassroomUnreachable, app.ClassroomConnecting, app.ClassroomNoSession, app.ClassroomViewing},
+			[]string{"Restarting…", "Restarting…", "Restarting…", "", ""}},
+		{"restart",
+			[]string{app.ClassroomLocked, app.ClassroomUnreachable, app.ClassroomViewing},
+			[]string{"Restarting…", "Restarting…", ""}},
+	} {
+		fake := &fakeActions{}
+		server, host, cookie := openedViewServer(t, fake)
+		state := app.ClassroomViewing
+		server.source = stateViewSource{state: &state}
+		origin := "http://" + host
+		var review actionReview
+		plan := actionPost(server, host, cookie, origin, "/api/actions/plan", `{"action":"`+test.action+`","computers":["pc01"]}`)
+		if err := json.Unmarshal(plan.Body.Bytes(), &review); err != nil || !review.Ready {
+			t.Fatalf("%s review = %s", test.action, plan.Body.String())
+		}
+		if apply := actionPost(server, host, cookie, origin, "/api/actions/apply", `{"id":"`+review.ID+`"}`); !strings.Contains(apply.Body.String(), `"completed"`) {
+			t.Fatalf("%s apply = %s", test.action, apply.Body.String())
+		}
+		for index, next := range test.states {
+			state = next
+			var list struct {
+				Computers []struct {
+					Power string `json:"power"`
+				} `json:"computers"`
+			}
+			response := viewRequest(server, "/api/computers", host, cookie)
+			if err := json.Unmarshal(response.Body.Bytes(), &list); err != nil || len(list.Computers) != 1 {
+				t.Fatalf("computers = %s", response.Body.String())
+			}
+			if list.Computers[0].Power != test.labels[index] {
+				t.Fatalf("%s, %s (step %d): label %q, want %q", test.action, next, index, list.Computers[0].Power, test.labels[index])
+			}
+		}
+	}
+}
+
+func TestResultRowsCountOffSkippedAndFailedComputers(t *testing.T) {
+	for _, test := range []struct {
+		done    bool
+		note    string
+		planned plannedTarget
+		outcome string
+		shown   string
+	}{
+		{true, "Locked.", plannedTarget{eligible: true}, outcomeDone, "Locked."},
+		{false, "Unavailable in the reviewed plan; nothing was sent.", plannedTarget{detail: app.ClassroomOffDetail}, outcomeOff, app.ClassroomOffDetail},
+		{false, "Unavailable in the reviewed plan; nothing was sent.", plannedTarget{detail: "Nobody is signed in."}, outcomeSkipped, "Nobody is signed in."},
+		{false, app.ClassroomOffDetail, plannedTarget{eligible: true}, outcomeOff, app.ClassroomOffDetail},
+		{false, "The computer did not confirm; check it before trying again.", plannedTarget{eligible: true}, outcomeFailed, "The computer did not confirm; check it before trying again."},
+	} {
+		row := resultRow("pc01", test.done, test.note, test.planned)
+		if row.Outcome != test.outcome || row.Note != test.shown || row.Skip == test.done {
+			t.Fatalf("%+v: row = %+v", test, row)
+		}
 	}
 }
 
@@ -192,6 +278,9 @@ func TestPageLocksSelectedComputers(t *testing.T) {
 	var result actionResult
 	if err := json.Unmarshal(apply.Body.Bytes(), &result); err != nil || result.State != "partial" || result.Rows[0].Note != "Locked." || result.Rows[0].Skip || !result.Rows[1].Skip {
 		t.Fatalf("result = %s", apply.Body.String())
+	}
+	if result.Rows[1].Outcome != outcomeSkipped || result.Rows[1].Note != "Nobody is signed in." {
+		t.Fatalf("skipped row = %+v", result.Rows[1])
 	}
 	if request := fake.requests[1]; request.Operation != domain.ClassroomLockApplyOperation || request.LockPlan == nil || request.LockPlan.ReviewToken != "sha256:lock" {
 		t.Fatalf("apply request = %+v", request)

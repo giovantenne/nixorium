@@ -178,5 +178,5 @@ func lockUnavailable(err error) string {
 			return "The classroom view is not running on this computer."
 		}
 	}
-	return "Switched off or not reachable."
+	return ClassroomOffDetail
 }

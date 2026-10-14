@@ -311,6 +311,20 @@ loopback address only; the one-time token becomes an HttpOnly, same-site
 session cookie, foreign `Host` headers are refused, and a strict content
 security policy allows only the page's own files.
 
+Each card shows its computer's state over the picture. GNOME refuses to
+capture a session behind its own lock screen (the student pressed Super+L, or
+the session was left unused long enough to lock, for example by the site
+template's screensaver): the agent answers `screen-locked`, and the card dims
+the last picture under a moon with **Idle**. The teacher's lock (below) keeps
+the live picture, with a padlock in its corner and a **Locked** label. A
+computer that is switched off or not reachable shows a power symbol and **Off
+or not reachable** instead of its last picture; other pictures that are no
+longer live (nobody signed in, for example) are dimmed. The page asks for the
+cards every two seconds and keeps asking when the controller does not answer,
+giving up on a request after 15 seconds; after two failed requests in a row
+the summary says **Reconnecting…**. **Refresh** asks at once, closes the
+notice of the last action and draws every card again.
+
 Clicking a computer opens it in its own browser window, refreshed about ten
 times a second at up to 1920 pixels; the agent sends a frame only when the
 screen changed, and the overview and the large view share one capture. The
@@ -333,8 +347,15 @@ computers whose session is active or unknown. While the page is open, the
 service reads every computer's real Internet state every 30 seconds with the
 same read-only check as the Internet review, so "Internet off" also follows
 changes made from the TUI or by a restart. One explicit button (such as
-"Restart 3 computers") confirms, and the outcome appears as a brief notice
-that names the computers that did not take the action.
+"Restart 3 computers") confirms. The outcome appears as a notice with one
+line that counts the computers done, switched off or not reachable, skipped
+(nobody signed in, for example) and failed, such as "Lock: 8 done · 12
+switched off or not reachable · 1 failed", with each computer under
+**Details**. A click on the notice, outside Details, or Esc closes it; it
+closes by itself unless a computer failed. After **Restart** or **Shut
+down**, a card shows "Restarting…" or "Shutting down…" until the computer
+comes back from the restart or stops answering after the shutdown, and for
+at most three minutes.
 
 **Lock** asks the agent to have the bundled Shell extension cover the whole
 screen with "Eyes on the teacher" and take the keyboard and mouse (a modal

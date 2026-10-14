@@ -8,6 +8,11 @@
 <script src="/app.js" defer></script>
 </head>
 <body>
+<svg class="icons" aria-hidden="true">
+  <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a6.8 6.8 0 0 0 10.8 10.8z"/></symbol>
+  <symbol id="icon-power" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.7 6.7a7.5 7.5 0 1 0 10.6 0"/></symbol>
+</svg>
 <header>
   <div class="title">
     <h1>Classroom view</h1>
@@ -45,6 +50,7 @@
         <button type="button" data-action="shutdown">Shut down</button>
       </div>
     </details>
+    <button type="button" id="refresh" title="Ask every computer for its state again now">Refresh</button>
   </div>
 </header>
 <main>
@@ -74,7 +80,9 @@
     <button type="button" id="viewer-fullscreen">Full screen</button>
     <button type="button" id="viewer-close">Close</button>
   </div>
-  <img id="viewer-image" alt="" tabindex="0">
+  <div id="viewer-screen" class="viewer-screen">
+    <img id="viewer-image" alt="" tabindex="0">
+  </div>
 </section>
 <dialog id="action-dialog" aria-labelledby="action-title">
   <h2 id="action-title"></h2>
@@ -86,6 +94,14 @@
     <button type="button" id="action-confirm" class="primary" hidden></button>
   </div>
 </dialog>
-<div id="toast" class="toast" role="status" hidden></div>
+<div id="toast" class="toast" role="status" title="Click to close" hidden>
+  <span class="toast-close" aria-hidden="true">×</span>
+  <p id="toast-line"></p>
+  <p id="toast-message" hidden></p>
+  <details id="toast-details">
+    <summary>Details</summary>
+    <ul id="toast-rows"></ul>
+  </details>
+</div>
 </body>
 </html>

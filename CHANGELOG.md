@@ -24,9 +24,29 @@ The project follows [Semantic Versioning](https://semver.org/).
   their version with every Assistant request, so the service can raise the
   trial without breaking older controllers. When the offer cannot be fetched,
   the trial choice no longer states a number.
+- The classroom view tells computer states apart with icons over the screen.
+  A student's own lock screen (after a while without use, or Super+L) dims the
+  last picture under a moon with **Idle** instead of "The student's screen
+  lock is on"; the teacher's lock keeps the live picture with a padlock and
+  the **Locked** label; a computer that is off shows a power symbol and **Off
+  or not reachable** instead of its last picture. The same applies in a
+  computer's own window.
+- The notice after a classroom view action is one line, such as "Lock: 8
+  done · 12 switched off or not reachable · 1 failed", with each computer
+  under **Details**; it never grows past a third of the window, closes with
+  a click or Esc, and stays until closed only when a computer failed.
+- The classroom view has a **Refresh** button that asks for every computer
+  at once and draws the cards again. When the controller does not answer,
+  the summary says **Reconnecting…** and the page keeps asking.
 
 ### Fixed
 
+- "Shutting down…" and "Restarting…" no longer stay on classroom view cards
+  for three minutes whatever the computer does: the label ends as soon as the
+  computer stops answering after a shutdown, or comes back after a restart.
+  The page also no longer stops following the computers for good after one
+  "expired" answer from the controller, and gives up on a request that hangs
+  after 15 seconds instead of waiting for it.
 - Controllers and clients now boot as QEMU, KVM or Proxmox guests with virtio
   disks. The installed initrd lacked the virtio storage drivers, so it timed out
   waiting for the root partition and dropped to emergency mode. Physical PCs and
