@@ -6,6 +6,16 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- MySQL Workbench in the Programming profile now connects to the local teaching
+  server. The desktop has no secret service (gnome-keyring is disabled), and
+  without one Workbench refused its offered "Local instance" connection with
+  "Cannot Connect to Database Server ... The name is not activatable" before
+  ever contacting MySQL. Sessions now set `WB_NO_KEYRING`, so the connection
+  opens as `root` with the empty classroom password. A new `mysql-workbench-vm`
+  check drives the real application in GNOME to cover it.
+
 ## [3.5.0] - 2026-10-14
 
 ### Added

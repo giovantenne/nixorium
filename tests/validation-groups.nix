@@ -14,7 +14,7 @@
   checks-workspace-template = [ "workspace-template" ];
   checks-workspace-systems = [ "workspace-offline" "workspace-systems" "home-files-adoption" ];
   checks-home-reset = [ "home-reset-filesystem-vm" "workspace-reset-service-vm" ];
-  checks-editor = [ "workspace-editor-vm" "programming-profile-vm" ];
+  checks-editor = [ "workspace-editor-vm" "programming-profile-vm" "mysql-workbench-vm" ];
   checks-management = [ "management-vm" "assistant-vm" "host-diagnostics-vm" "telemetry-vm" "onboarding-vm" ];
   checks-session = [ "console-keyboard-vm" "session-state-vm" "clean-generations-vm" "classroom-view-vm" ];
   checks-installer = [ "client-installer" "client-installer-vm" "client-network-upgrade-vm" ];

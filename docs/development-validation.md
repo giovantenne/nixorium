@@ -315,8 +315,11 @@ debuggers that write into their own folder), every one activates offline in
 the pinned VS Code, the C/C++, Java, Python and PHP toolchains run as the
 student, PHP loads Xdebug and mysqli, and the teaching MySQL server listens on
 loopback only, survives a rebuild-time tmpfiles pass and is empty after boot.
-It does not cover GNOME, MySQL Workbench or Marketplace pins, which depend on
-an external service; check a Marketplace extension on one computer instead.
+It does not cover GNOME or Marketplace pins, which depend on an external
+service; check a Marketplace extension on one computer instead. MySQL
+Workbench has its own check, `mysql-workbench-vm`: in a real GNOME login
+without a secret service it opens the connection the application offers on
+first start and runs a query as `root`.
 
 ```sh
 nix --extra-experimental-features 'nix-command flakes' \

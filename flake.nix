@@ -175,6 +175,7 @@
         workspace-reset-service-vm = import ./tests/workspace-reset-service-vm.nix { inherit pkgs; };
         workspace-editor-vm = import ./tests/workspace-reset-service-vm.nix { inherit pkgs; editorQualification = true; };
         programming-profile-vm = import ./tests/programming-profile-vm.nix { inherit pkgs; };
+        mysql-workbench-vm = import ./tests/mysql-workbench-vm.nix { inherit pkgs; };
         session-state-vm = import ./tests/session-state-vm.nix { inherit pkgs; };
         classroom-view-vm = import ./tests/classroom-view-vm.nix { inherit pkgs; };
         onboarding-vm = import ./tests/onboarding-vm.nix { inherit pkgs; };

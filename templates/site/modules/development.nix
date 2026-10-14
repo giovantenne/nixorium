@@ -40,6 +40,11 @@ in
       mysqlx-bind-address = "127.0.0.1";
     };
   };
+  # The desktop has no secret service (no keyring prompts on shared accounts).
+  # Without one, MySQL Workbench fails every connection with "The name is not
+  # activatable" before it contacts the server; this makes it skip the
+  # keychain and connect with the empty classroom password.
+  environment.sessionVariables.WB_NO_KEYRING = lib.mkIf (has "mysql-workbench") "1";
   # The "!" limits removal to boot: a rebuild never empties a running server.
   systemd.tmpfiles.rules = lib.optional (has "mysql84") "R! /var/lib/mysql - - - - -";
 
