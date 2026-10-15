@@ -17,8 +17,8 @@ func TestOverviewDistinguishesConfigurationFromPendingApplication(t *testing.T) 
 		{domain.SetupStageNetwork, "Computer installation is not configured yet", true},
 		{domain.SetupStageKeys, "Computer installation is not configured yet", true},
 		{domain.SetupStageValidate, "Computer installation is not configured yet", true},
-		{domain.SetupStageApply, "Saved configuration needs applying to this controller", false},
-		{domain.SetupStageReview, "Managed configuration has uncommitted changes", false},
+		{domain.SetupStageApply, "The controller is not running its saved configuration", false},
+		{domain.SetupStageReview, "The configuration has unsaved changes", false},
 	} {
 		t.Run(test.stage, func(t *testing.T) {
 			model := newDashboardModel(testDashboardReport("stopped"), domain.SetupReport{State: "action-required", CurrentStage: test.stage}, DashboardActions{}, false)
@@ -44,7 +44,7 @@ func TestOverviewClearsSavedRevisionThatTheControllerAlreadyRuns(t *testing.T) {
 	model.screen = dashboardHome
 	revision := "222c026dcb9046c902363ee5120d7c03e4854ea2"
 	model.noteControllerSave(revision)
-	if view := model.View().Content; !strings.Contains(view, "Saved configuration needs applying") {
+	if view := model.View().Content; !strings.Contains(view, "not running its saved configuration") {
 		t.Fatalf("unapplied revision was not reported: %s", view)
 	}
 	updated, _ := model.Update(dashboardControllerPlanMsg{report: domain.ControllerRebuildPlanReport{Operation: "controller-plan", State: "current", Current: true, Revision: revision}})
@@ -54,7 +54,7 @@ func TestOverviewClearsSavedRevisionThatTheControllerAlreadyRuns(t *testing.T) {
 	if model.screen != dashboardHome {
 		t.Fatal("did not return to Overview after controller review")
 	}
-	if view := model.View().Content; strings.Contains(view, "Saved configuration needs applying") {
+	if view := model.View().Content; strings.Contains(view, "not running its saved configuration") {
 		t.Fatalf("revision already running on the controller is still reported: %s", view)
 	}
 }

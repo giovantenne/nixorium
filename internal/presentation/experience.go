@@ -467,6 +467,7 @@ func (model dashboardModel) frame(content string) string {
 }
 
 func (model dashboardModel) renderShell(shell tuiShell) string {
+	shell = model.withResultSituation(shell)
 	if model.busy != "" && model.screen != dashboardDisclaimer {
 		if !strings.Contains(shell.body, model.busy) && !strings.Contains(shell.fixedBody, model.busy) {
 			shell.fixedBody = strings.TrimSpace(model.busyView() + "\n" + shell.fixedBody)

@@ -12,7 +12,7 @@ func TestOverviewShowsUnfinishedUSBInstallation(t *testing.T) {
 	model := dashboardModel{report: testDashboardReport("ready"), usbReserved: true, width: 120, height: 30}
 	found := false
 	for _, task := range model.pendingTasks() {
-		found = found || (task.id == "pending-usb" && strings.Contains(task.title, "USB installation is unfinished"))
+		found = found || (task.id == "pending-usb" && strings.Contains(task.title, "USB installation was not finished"))
 	}
 	if !found {
 		t.Fatalf("pending tasks = %+v", model.pendingTasks())

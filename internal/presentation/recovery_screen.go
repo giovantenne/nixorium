@@ -104,7 +104,7 @@ func (model dashboardModel) updateRecovery(key tea.KeyPressMsg) (tea.Model, tea.
 		if next, command, opened := model.recoveryFlow(condition); opened {
 			return next, command
 		}
-		model.message = condition.Next.Action
+		model.message = condition.Next.Action + "."
 	}
 	return model, nil
 }

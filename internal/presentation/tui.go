@@ -490,7 +490,10 @@ type dashboardModel struct {
 	recovery       domain.RecoveryReport
 	recoveryCursor int
 	recoveryReview recoveryReview
-	backup         backupModel
+	// noticeDetails shows the technical text of a situation notice on a
+	// result screen (d); it resets when the screen or its message changes.
+	noticeDetails bool
+	backup        backupModel
 }
 
 type dashboardStatusMsg struct {
@@ -780,6 +783,9 @@ func (model dashboardModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	updated, command := model.updateState(message)
 	next := updated.(dashboardModel)
+	if next.screen != model.screen || next.message != model.message {
+		next.noticeDetails = false
+	}
 	if model.screen == dashboardAssistant && next.screen == dashboardAssistant &&
 		model.assistant.historyScroll > 0 && next.assistant.historyScroll == model.assistant.historyScroll &&
 		next.assistant.id == model.assistant.id {
@@ -1822,7 +1828,7 @@ func (model dashboardModel) updateView() string {
 		}
 		notices := []tuiNotice{}
 		if model.message != "" {
-			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+			notices = append(notices, failureNotice(model.updateFailurePrefix(), model.message))
 		}
 		retry := tuiAction{key: "n", label: "New update"}
 		if model.updates.result.RecoveryRequired {
@@ -2192,7 +2198,7 @@ func (model dashboardModel) controllerView() string {
 			lines = append(lines, model.operationProgressView(model.controller.progress, "Last controller apply")...)
 		}
 		if model.message != "" {
-			notices = append(notices, tuiNotice{kind: tuiStatusAttention, title: model.message})
+			notices = append(notices, failureNotice("The controller was not updated", model.message))
 		}
 		detailsLabel := "Show details"
 		if model.controller.details {
@@ -2539,14 +2545,14 @@ func (model dashboardModel) deployView() string {
 		for _, computer := range summary.Computers {
 			lines = append(lines, "", computer.Name+" — "+computer.Outcome, "  "+computer.Guidance)
 		}
-		if model.message != "" {
-			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusNeutral, title: model.message})
+		if model.message != "" || model.deployment.result.RecoveryRequired {
+			shell.notices = append(shell.notices, model.deploymentResultNotice())
 		}
 		shell.body = strings.Join(lines, "\n")
 		shell.actions = []tuiAction{{key: "n", label: "New review"}, {key: "l", label: "Logs"}, {key: "Enter", label: "Computers"}, {key: "F1", label: "Help"}}
 		if model.deployment.result.RecoveryRequired {
+			// No new review until the interrupted one is reviewed.
 			shell.actions = shell.actions[1:]
-			shell.notices = append(shell.notices, tuiNotice{kind: tuiStatusAttention, title: "Recovery required before another operation", detail: "An active revision alone does not prove activation completed. See TROUBLESHOOTING.md: Interrupted client deployment."})
 		}
 		return model.renderShell(shell)
 	}

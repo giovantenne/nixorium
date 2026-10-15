@@ -62,7 +62,7 @@ func TestOverviewAndMaintenanceUseStableShell(t *testing.T) {
 	m := experienceFixture(2)
 	m.report.PXE.Mode = "recovery-required"
 	view := m.View().Content
-	if !strings.Contains(view, "Controller network recovery required") || !strings.Contains(view, "Enter") {
+	if !strings.Contains(view, "Network installation is still active") || !strings.Contains(view, "Enter") {
 		t.Fatalf("overview pending action is not separated from its action bar:\n%s", view)
 	}
 }
@@ -791,7 +791,7 @@ func TestExperienceStatesAndDisclosure(t *testing.T) {
 	}
 	m = experienceFixture(2)
 	m.report.PXE.Mode = "recovery-required"
-	if !strings.Contains(m.View().Content, "Controller network recovery required") {
+	if !strings.Contains(m.View().Content, "Network installation is still active") {
 		t.Fatal("error not prominent")
 	}
 	m = experienceFixture(2)

@@ -229,10 +229,10 @@ func setupOverviewNotice(setup domain.SetupReport) (tuiNotice, bool) {
 		notice.title = "Computer installation is not configured yet"
 		notice.detail = "Choose Installation to complete the laboratory configuration."
 	case domain.SetupStageReview:
-		notice.title = "Managed configuration has uncommitted changes"
+		notice.title = situationTitle("GIT-DIRTY")
 		notice.detail = "Open Maintenance > Review Git changes to review and save them."
 	case domain.SetupStageApply:
-		notice.title = "Saved configuration needs applying to this controller"
+		notice.title = situationTitle("CONTROLLER-NOT-APPLIED")
 		notice.detail = "Open Maintenance > Apply to controller for a fresh review."
 	default:
 		// Network boot files are needed only for PXE installation; a lab

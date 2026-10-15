@@ -819,9 +819,9 @@ pc02 — Not reached
   Check power and networking. The update outcome is not known; this does not prove the computer is off or
 unchanged. Activation completion is unconfirmed; use reviewed recovery, not a retry.
 
-! Recovery required before another operation
-  An active revision alone does not prove activation completed. See TROUBLESHOOTING.md: Interrupted client
-deployment.
+! The computers were not updated: the update was interrupted.
+  Nixorium does not know how it ended on every computer, so it stops every other operation until you review it.
+  Next: Review the interrupted update (Overview)
 
 l Logs  ·  Enter Computers  ·  F1 Help
 ```

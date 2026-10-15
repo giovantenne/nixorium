@@ -43,7 +43,7 @@ func TestDeploymentStopRequiresSeparateConfirmationAndPreservesRecovery(t *testi
 		Operation: "deploy-apply", State: "failed", RecoveryRequired: true,
 	}})
 	model = updated.(dashboardModel)
-	if model.deployment.applying || strings.Contains(model.View().Content, "New review") || !strings.Contains(model.View().Content, "Recovery required") {
+	if model.deployment.applying || strings.Contains(model.View().Content, "New review") || !strings.Contains(model.View().Content, "Review the interrupted update") {
 		t.Fatalf("unsafe recovery view:\n%s", model.View().Content)
 	}
 	updated, _ = model.Update(keyPress("r"))

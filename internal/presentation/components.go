@@ -2,7 +2,6 @@ package presentation
 
 import (
 	"fmt"
-	"github.com/giovantenne/nixorium/internal/domain"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -175,6 +174,15 @@ type tuiNotice struct {
 	kind   tuiStatusKind
 	title  string
 	detail string
+	// prefix says what the screen tried ("The controller was not updated")
+	// when the notice reports a catalogued situation.
+	prefix string
+	// code names the situation when the caller already knows it; plain
+	// keeps the text as it is even when it resembles a catalogued one.
+	code  string
+	plain bool
+	// headline replaces the composed first line of a situation notice.
+	headline string
 }
 
 type tuiAction struct {
@@ -188,6 +196,12 @@ type tuiShell struct {
 	fixedBody string
 	notices   []tuiNotice
 	actions   []tuiAction
+	// jump: Enter opens the screen of the situation shown in a notice.
+	jump bool
+	// detailsKey: d toggles the technical text of a situation notice;
+	// without it that text is always shown, muted.
+	detailsKey bool
+	details    bool
 }
 
 type tuiShellRegions struct {
@@ -222,6 +236,10 @@ func buildTUIShellRegions(shell tuiShell, width int, darkBackground bool) tuiShe
 		for index, notice := range shell.notices {
 			if index > 0 {
 				lines = append(lines, "")
+			}
+			if step, found := noticeSituation(notice); found {
+				lines = append(lines, situationNoticeLines(notice, step, shell, darkBackground)...)
+				continue
 			}
 			lines = append(lines, tuiNoticeTitle(notice.title, notice.kind, darkBackground))
 			if notice.detail != "" {
@@ -318,27 +336,6 @@ func tuiHelpBinding(keys []string, label, description string) key.Binding {
 		key.WithKeys(keys...),
 		key.WithHelp(label, description),
 	)
-}
-
-// noticeNextStep names the way forward for a recognized blocker, unless the
-// notice already gives one.
-func noticeNextStep(notice tuiNotice) string {
-	if notice.kind == tuiStatusSuccess {
-		return ""
-	}
-	text := notice.title + " " + notice.detail
-	if strings.Contains(text, "Next:") {
-		return ""
-	}
-	step, found := domain.NextStepFor(text)
-	if !found {
-		return ""
-	}
-	line := "Next: " + step.Action
-	if step.TUI != "" {
-		line += " (" + step.TUI + ")"
-	}
-	return line
 }
 
 func tuiNoticeText(value string, kind tuiStatusKind, dark bool) string {

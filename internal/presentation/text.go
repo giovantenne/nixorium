@@ -437,7 +437,11 @@ func DeploymentExecutionText(writer io.Writer, report domain.DeploymentExecution
 		fmt.Fprintln(writer, "Retry:           safe after reviewing current host state and a fresh deploy plan")
 	}
 	if report.RecoveryRequired {
-		fmt.Fprintln(writer, "Recovery:        required before another operation; see TROUBLESHOOTING.md: Interrupted client deployment")
+		step, _ := domain.NextStepByCode("DEPLOY-PENDING")
+		fmt.Fprintln(writer, "Recovery:        required before another operation")
+		fmt.Fprintln(writer, step.Title+".")
+		fmt.Fprintln(writer, step.Why)
+		fmt.Fprintln(writer, "Next: "+step.Command)
 	}
 	for _, issue := range report.Issues {
 		fmt.Fprintf(writer, "BLOCKED: %s: %s\n", issue.Field, issue.Message)

@@ -104,7 +104,7 @@ func TestDeploymentPerComputerResultsAndRecoveryRemainScrollable(t *testing.T) {
 		model.deployment.result.State = "failed"
 		model.deployment.result.Phase = domain.DeploymentPhaseApply
 		view = model.View().Content
-		if strings.Contains(view, "New review") || strings.Contains(view, "pc01 — Updated") || !strings.Contains(view, "Recovery required") {
+		if strings.Contains(view, "New review") || strings.Contains(view, "pc01 — Updated") || !strings.Contains(view, "Review the interrupted update") {
 			t.Fatalf("recovery weakened: %s", view)
 		}
 		updated, command := model.Update(demoText("r"))

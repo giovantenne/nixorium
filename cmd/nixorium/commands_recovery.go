@@ -8,11 +8,23 @@ import (
 
 	"github.com/giovantenne/nixorium/internal/adapters"
 	"github.com/giovantenne/nixorium/internal/app"
+	"github.com/giovantenne/nixorium/internal/domain"
 	"github.com/giovantenne/nixorium/internal/presentation"
 )
 
+// deploymentRecoverer is the reviewed recovery of an interrupted client
+// update (app.DeploymentRecoveryManager).
+type deploymentRecoverer interface {
+	Plan(context.Context, string, bool) domain.DeploymentRecoveryPlan
+	Apply(context.Context, domain.DeploymentRecoveryPlan, string) domain.DeploymentRecoveryResult
+}
+
 func runDeploymentRecoveryCommand(ctx context.Context, repository string, options options, stdout, stderr io.Writer) int {
 	manager := app.NewDeploymentRecoveryManager(adapters.Local{}).ForProcess(os.Getpid())
+	return deploymentRecoveryCommand(ctx, manager, repository, options, os.Stdin, presentation.IsInteractive(os.Stdin), operationRecordMessage, stdout, stderr)
+}
+
+func deploymentRecoveryCommand(ctx context.Context, manager deploymentRecoverer, repository string, options options, input io.Reader, interactive bool, record func(string, any) string, stdout, stderr io.Writer) int {
 	plan := manager.Plan(ctx, repository, options.acknowledgeUnreachable)
 	if options.subcommand == "recover-plan" || plan.State != "ready" {
 		if options.json {
@@ -30,19 +42,19 @@ func runDeploymentRecoveryCommand(ctx context.Context, repository string, option
 		return 1
 	}
 	if !options.yes {
-		if !presentation.IsInteractive(os.Stdin) {
+		if !interactive {
 			fmt.Fprintln(stderr, "deploy recover apply requires an interactive terminal or --yes.")
 			return 2
 		}
 		presentation.DeploymentRecoveryPlanText(stderr, plan)
-		approved, err := presentation.ConfirmWord(os.Stdin, stderr, plan.Confirmation)
+		approved, err := presentation.ConfirmDeploymentRecovery(input, stderr)
 		if err != nil || !approved {
-			fmt.Fprintln(stderr, "Confirmation did not match; nothing was changed.")
+			fmt.Fprintln(stderr, "Not marked as reviewed; nothing was changed.")
 			return 1
 		}
 	}
 	result := manager.Apply(ctx, plan, options.expect)
-	result.Message = operationRecordMessage(result.Message, result)
+	result.Message = record(result.Message, result)
 	if options.json {
 		_ = presentation.JSON(stdout, result)
 	} else {

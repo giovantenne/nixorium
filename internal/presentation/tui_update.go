@@ -217,6 +217,7 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 		model.busy = ""
 		if model.recoveryReview.kind == "deploy" {
 			model.recoveryReview.deployPlan = message.deploy
+			model.recoveryReview.usbHost = message.usbHost
 		} else {
 			model.recoveryReview.resetPlan = message.reset
 		}
@@ -546,6 +547,15 @@ func (model dashboardModel) updateState(message tea.Msg) (tea.Model, tea.Cmd) {
 			if len(names) > 0 {
 				return model.checkDeploymentUSB(strings.Join(names, ","), true)
 			}
+		}
+		// An apply that left its pending record goes straight to the review
+		// of that record, with the failure shown above the plan.
+		if message.report.RecoveryRequired && model.actions.PlanDeploymentRecovery != nil {
+			next, command := model.openDeploymentRecovery()
+			opened := next.(dashboardModel)
+			opened.recoveryReview.failure = message.report.Message
+			opened.recoveryReview.returnTo, opened.recoveryReview.returnMessage, opened.recoveryReview.returnSet = dashboardDeploy, message.report.Message, true
+			return opened, tea.Batch(command, model.observeRecoveryInBackground())
 		}
 		// Updates queued for switched-off computers appear on the overview now,
 		// not only after reopening Nixorium.
@@ -1365,6 +1375,9 @@ func (model dashboardModel) updateKeyState(message tea.Msg) (tea.Model, tea.Cmd)
 			model.message = "Loading information. Press Esc to cancel, or F1 for help."
 			return model, nil
 		}
+	}
+	if next, command, handled := model.updateResultSituation(key.String()); handled {
+		return next, command
 	}
 	if model.screen == dashboardTelemetry && (model.telemetry.applying || (key.String() != "ctrl+c" && key.String() != "q")) {
 		return model.updateTelemetryKey(key)

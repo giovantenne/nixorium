@@ -49,13 +49,13 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 		}
 	}
 	if model.usbReserved {
-		add("pending-usb", "A USB installation is unfinished", "Open it to resume, verify or close it. Other computer operations wait until then.")
+		add("pending-usb", situationTitle("USB-RESERVED"), "Open it to resume, verify or close it. Other computer operations wait until then.")
 	}
 	switch model.report.PXE.Mode {
 	case "active":
-		add("pending-pxe", "Network installation is active", "Review the installation session before restoring normal networking.")
+		add("pending-pxe", situationTitle("PXE-ACTIVE"), "Review the installation session before restoring normal networking.")
 	case "recovery-required", "degraded":
-		add("pending-pxe", "Controller network recovery required", "Inspect the installation session; recovery remains separately confirmed.")
+		add("pending-pxe", situationTitle("PXE-ACTIVE"), "The controller network needs recovery. Inspect the installation session; recovery remains separately confirmed.")
 	}
 	// Controller setup evidence enters the same ordered observation as saves
 	// and reviews; never revive it by reading the older setup report again.
@@ -67,17 +67,23 @@ func (model dashboardModel) pendingTasks() []dashboardTask {
 		add(id, notice.title, notice.detail)
 	}
 	if model.report.Git.Dirty {
-		add("pending-git", "Configuration has uncommitted changes", "Last local Git observation; inspect paths before recording anything.")
+		add("pending-git", situationTitle("GIT-DIRTY"), "Last local Git observation; inspect paths before recording anything.")
 	}
 	// Low disk space is shown in Maintenance, next to Free disk space.
 	if model.controllerObservation == controllerOverviewPending {
-		add("pending-controller", "Saved configuration needs applying to this controller", "Observed in this session. Open a fresh controller review.")
+		add("pending-controller", situationTitle("CONTROLLER-NOT-APPLIED"), "Observed in this session. Open a fresh controller review.")
 	}
 	if model.report.PXEPreparation.Present && !model.report.PXEPreparation.Ready {
 		add("pending-pxe", "Installation files need preparing", "Previously checked installation files are stale or invalid; review them again.")
 	}
 	// The last client check is a reminder, not work: Computer inventory shows it.
 	return tasks
+}
+
+// situationTitle is the catalogue sentence for a situation code.
+func situationTitle(code string) string {
+	step, _ := domain.NextStepByCode(code)
+	return step.Title
 }
 
 func (model dashboardModel) usbReservationPresent() bool {
