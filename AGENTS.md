@@ -537,9 +537,40 @@ release is not finished until the site follows it.
   `networkPrefixLength` and `masterHostNumber` when the saved client count is
   nonzero, both in planning and before writing a reviewed candidate. Reducing
   the candidate count must not bypass this rule. This is separate from schema
-  validation and does not implement network migration. Interface reviews must
+  validation; the refusal is the `NETWORK-LOCKED` situation. The only
+  exception is a change of laboratory network: a base/prefix change whose
+  candidate `lab.networkTransition` names exactly the saved base/prefix (and,
+  while a record is saved, only a return to its previous network). The record
+  makes the configuration dual (controller on both addresses, clients trusting
+  both controller addresses, new cache first); without it every host must stay
+  byte-identical to the single-network configuration. Without clients it is
+  ignored with a warning in Nix and refused by the Go validator. The
+  controller number stays locked. An undo restores the previous network and
+  removes the record in one candidate. During a change every client also
+  keeps its previous address (by-type clients reapply the changed profile),
+  so the update that moves it keeps its SSH session and an undo finds it.
+  The guided change (`internal/app/network_migration.go`, Maintenance →
+  Change network addressing, `nixorium network migrate`) is a sequence of
+  reviewed saves followed by the ordinary controller and deployment reviews;
+  it never applies a system itself, refuses to finish while a client is not
+  on the new network with the saved configuration, and keeps undo possible
+  until then (ADR 0028). During a change labMeta decoding copies each
+  client's previous address into `HostMeta.PreviousIP`: every per-computer
+  probe tries the new address first, then the previous one, and Colmena
+  reaches a computer on the previous network through `HostName` entries in
+  its SSH configuration. Trusted host keys are copied from the previous to
+  the new address in the managed known-hosts file before any contact there;
+  never replace a different key or relax checking. Interface reviews must
   explain connectivity risks; never recommend a universal controller-first
-  order for network changes.
+  order for network changes. Device-name and DHCP-hint changes get a read-only
+  network preflight in the plan (`networkPreflight`): `/sys/class/net` plus
+  bounded `ip -4 -j address` on the controller, the fixed read-only device
+  listing over the inventory's bounded parallel SSH for affected reachable
+  clients (only clients configured by name; by-type clients are not probed).
+  The settings save manager refuses a controller device that is not a present
+  wired device, and a device missing on a reachable client unless exactly that
+  computer is acknowledged; unreachable clients are listed, never blocking.
+  `config apply` does not run the preflight.
 - `lib/eval-workspace-profile.nix` accepts raw JSON text so duplicate keys are
   rejected before they can disappear in `builtins.fromJSON`. Keep it aligned
   with `internal/domain/workspace.go` through `tests/workspace-validation-cases.json`.

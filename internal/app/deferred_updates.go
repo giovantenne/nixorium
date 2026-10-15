@@ -50,7 +50,7 @@ func (m *DeferredUpdateManager) Queue(plan domain.DeploymentPlanReport, hosts []
 		if !found {
 			return fmt.Errorf("%s is not part of the reviewed update", host)
 		}
-		queued = append(queued, domain.DeferredUpdate{Host: host, IP: target.IP, Revision: plan.Revision, QueuedAt: m.now().UTC()})
+		queued = append(queued, domain.DeferredUpdate{Host: host, IP: target.IP, PreviousIP: target.PreviousIP, Revision: plan.Revision, QueuedAt: m.now().UTC()})
 	}
 	return m.store.Mutate(func(queue *domain.DeferredUpdateQueue) error {
 		for _, update := range queued {
@@ -135,7 +135,7 @@ func (m *DeferredUpdateManager) Run(ctx context.Context, repository string) doma
 		case !update.Due(m.now()):
 			report.Results = append(report.Results, domain.DeferredUpdateOutcome{Host: update.Host, State: "waiting", Detail: "retrying later after: " + update.LastError})
 		default:
-			candidates = append(candidates, domain.HostMeta{Name: update.Host, IP: update.IP})
+			candidates = append(candidates, domain.HostMeta{Name: update.Host, IP: update.IP, PreviousIP: update.PreviousIP})
 		}
 	}
 	probes := m.source.SSHStatus(ctx, candidates, m.timeout)

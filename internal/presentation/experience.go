@@ -293,6 +293,12 @@ func (model dashboardModel) helpView() string {
 			"Type CLEAN on the review to start. Computers that are off are never queued. After the result: n new review.")
 	case dashboardShare:
 		lines = append(lines, "Type the path of a file or folder (it starts at your home), Enter; then Space selects clients, a selects all, Enter reviews and Enter sends.", "A folder arrives with its name and contents; hidden files and links inside it are left out; at most 2000 items and 500 MB. Students get their own copy, never executable; existing names are kept as \"name (2)\".", "Computers that are off or have nobody signed in are listed and skipped. A restart empties the student's home.")
+	case dashboardNetworkChange:
+		lines = append(lines, "Type the new network as address/prefix, for example 10.1.0.0/24, then Enter reviews it. Every computer keeps its number.",
+			"The review checks every computer: c continues without those that are off (they move when they are next updated, or are queued). Enter saves the step; no computer changes yet.",
+			"Then apply to the controller (it answers on both networks) and update the computers (each moves to its new address), each with its own review and typed confirmation.",
+			"During the change Enter opens the next step; f finishes when every computer is on the new network; u undoes the change, which is possible until it is finished.",
+			"After finishing, prepare network installation again before installing a computer by PXE.")
 	case dashboardDeferredUpdates:
 		lines = append(lines, "These computers were off when an update was reviewed. Every minute the controller tries those that answer, one at a time, with the same build, check and record as Update computers.", "A computer marked as changed is not updated: the configuration moved on after queueing. Review the update again.", "x removes the selected computer, X removes all; they keep their current system. r refreshes.")
 	case dashboardLock:
@@ -349,6 +355,12 @@ func (model dashboardModel) helpView() string {
 			"The guided home is enabled in configuration only. Apply systems and reboot separately; no push.",
 			"The result offers a separate controller review, then client selection after verified application. Esc leaves without applying.",
 			"An interrupted reset requires recovery; preserve the backup ref and .git/nixorium-template-reset.json.")
+	case dashboardSettingsReview:
+		lines = append(lines,
+			"Enter saves the reviewed settings; Esc cancels without changing any file.",
+			"Network check: after a change of network device or controller DHCP address, Nixorium reads the controller's devices and asks each computer that answers whether it has the named device. Nothing is changed.",
+			"A device the controller does not have blocks the save. A device missing on a computer that answers blocks it until you press c to save anyway for the computers listed; c again undoes that.",
+			"Computers that do not answer are listed: check them at their screen. Update one computer first and check it answers before updating the others.")
 	case dashboardSettingsAccounts:
 		lines = append(lines,
 			"n  Change account names: edit the teacher and student user names, then review and save.",

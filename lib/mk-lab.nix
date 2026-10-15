@@ -102,12 +102,13 @@ let
   inherit (config) classroomView;
   inherit (config) assistant;
 
-  networkOctets = map lib.toInt (lib.splitString "." networkBase);
-  networkAddress =
-    builtins.elemAt networkOctets 0 * 16777216
-      + builtins.elemAt networkOctets 1 * 65536
-      + builtins.elemAt networkOctets 2 * 256
-      + builtins.elemAt networkOctets 3;
+  ipv4ToInt = address:
+    let octets = map lib.toInt (lib.splitString "." address);
+    in builtins.elemAt octets 0 * 16777216
+      + builtins.elemAt octets 1 * 65536
+      + builtins.elemAt octets 2 * 256
+      + builtins.elemAt octets 3;
+  networkAddress = ipv4ToInt networkBase;
   ipv4FromInt = address:
     builtins.concatStringsSep "." (map toString [
       (builtins.div address 16777216)
@@ -138,6 +139,28 @@ let
   clientNumbers = pcNumbers;
   clientIps = map mkHostIp clientNumbers;
 
+  # A change of laboratory network in progress (managed by the guided change).
+  # The same host numbers keep their previous addresses on the previous
+  # network: the controller and every client carry both, clients trust both
+  # controller addresses. Without clients the record is ignored and reported.
+  networkTransitionRecord = config.networkTransition;
+  networkTransitionIgnored = networkTransitionRecord != null && pcCount == 0;
+  networkTransition =
+    if networkTransitionRecord == null || networkTransitionIgnored then null
+    else {
+      base = networkTransitionRecord.previousBase;
+      prefixLength = networkTransitionRecord.previousPrefixLength;
+      masterIp = previousMasterIp;
+      # Each client's previous address, by host name.
+      hostIps = builtins.listToAttrs (lib.zipListsWith
+        (n: ip: { name = "pc${padNumber n}"; value = ip; })
+        clientNumbers previousClientIps);
+    };
+  mkPreviousHostIp = number:
+    ipv4FromInt (ipv4ToInt networkTransitionRecord.previousBase + number);
+  previousMasterIp = mkPreviousHostIp masterHostNumber;
+  previousClientIps = map mkPreviousHostIp clientNumbers;
+
   labSettings = {
     inherit deploymentMode;
     inherit masterIp;
@@ -147,6 +170,7 @@ let
     inherit networkBase;
     inherit networkPrefixLength;
     inherit clientIps;
+    inherit networkTransition;
     inherit pcCount;
     inherit ifaceName;
     inherit controllerIfaceName;
@@ -179,7 +203,9 @@ let
       {
         warnings = lib.optionals laboratoryEnabled (
           lib.optional (cachePublicKeyFile == null) "Missing cache public key"
-          ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key");
+          ++ lib.optional (adminSshKeyFile == null) "Missing admin SSH public key")
+          ++ lib.optional networkTransitionIgnored
+            "lab.networkTransition is ignored because no client computers are configured; remove it from lab-settings.json";
         environment.systemPackages = [ hostState hostSessionState hostCleanGenerations hostDiagnostics ];
         environment.etc."nixorium-host-diagnostics.json".text = builtins.toJSON {
           controller = hostName == masterHostName;
@@ -260,6 +286,16 @@ let
       clientIfaceName = if clientIfaceName == null then ifaceName else clientIfaceName;
       inherit cachePort;
       inherit pxeHttpPort;
+    } // lib.optionalAttrs (networkTransition != null) {
+      # Present only during a change of laboratory network.
+      transition = {
+        base = networkTransition.base;
+        prefixLength = networkTransition.prefixLength;
+        controllerIp = previousMasterIp;
+        inherit (networkTransitionRecord) startedAt;
+        clients = lib.zipListsWith (n: ip: { name = "pc${padNumber n}"; inherit ip; })
+          clientNumbers previousClientIps;
+      };
     };
     users = {
       student = studentUser;

@@ -33,6 +33,14 @@ assert !(evaluates (valid // { studentUser = valid.teacherUser; }));
 assert !(evaluates (valid // { adminPassword = "plaintext"; }));
 assert !(evaluates (valid // { homepageUrl = "example.org"; }));
 assert builtins.all (case: !(evaluates (valid // case.overrides))) sharedCases.invalid;
+# A change of laboratory network: valid previous network, offset or zoned time.
+assert (evalLabConfig valid).networkTransition == null;
+assert evaluates (valid // { networkTransition = { previousBase = "10.1.0.0"; previousPrefixLength = 24; startedAt = "2026-10-15T08:00:00Z"; }; });
+assert evaluates (valid // { networkTransition = { previousBase = "192.168.0.0"; previousPrefixLength = 16; startedAt = "2026-10-15T10:00:00.5+02:00"; }; });
+assert (evalLabConfig (valid // { networkTransition = { previousBase = "10.1.0.0"; previousPrefixLength = 24; startedAt = "2026-10-15T08:00:00Z"; }; })).networkTransition.previousBase == "10.1.0.0";
+# Without clients the record is ignored (mkLab warns), not validated further.
+assert evaluates (valid // { deploymentMode = "controller"; pcCount = 0; networkTransition = { previousBase = "10.0.0.0"; previousPrefixLength = 24; startedAt = "later"; }; });
+assert !(evaluates (valid // { deploymentMode = "controller"; pcCount = 0; networkTransition = { previousBase = "10.1.0.0"; }; }));
 # consoleKeyMap is deprecated and ignored: present (even empty) or absent is fine.
 assert !(valid ? consoleKeyMap);
 assert evaluates (valid // { consoleKeyMap = "it2"; });

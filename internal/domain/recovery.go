@@ -78,4 +78,7 @@ const (
 	// RecoveryDeferredUpdates: computers wait for a queued update; it blocks
 	// nothing.
 	RecoveryDeferredUpdates = "deferred-updates"
+	// RecoveryNetworkChanging: a change of laboratory network is saved and
+	// not finished; it blocks nothing.
+	RecoveryNetworkChanging = "network-changing"
 )

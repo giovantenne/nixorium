@@ -179,6 +179,43 @@ the profile; use `hostIfaceNames` for such computers. The installer and the
 USB/SSH preparation skip the name check for these clients and use the card that
 carries the live address. See ADR 0017.
 
+### Laboratory network transition
+
+While computers move from one laboratory network to another, the settings
+hold a `lab.networkTransition` record
+(`{ "previousBase": "10.0.0.0", "previousPrefixLength": 24, "startedAt": "<RFC 3339>" }`)
+next to the new `networkBase` and `networkPrefixLength`, and the configuration
+is dual. Every host keeps its host number on both networks. The controller
+carries its new and its previous address on the laboratory interface; its
+firewall is interface-scoped, so SSH, the cache and PXE ports are open on both,
+and the cache listens on every address. Clients take the new address and keep
+the previous one next to it (a second address on a named interface,
+`address2` of the `nixorium-lab` profile otherwise, which is applied to the
+running card with `nmcli device reapply` when the profile changes), so the
+update that moves a client keeps its connection and an undo finds every client
+on the restored network. They accept SSH from both controller addresses (two `ip saddr` rules, in the
+firewall allow list and in the `nixorium-client-access` guard), list the new
+controller cache first and the previous one second, and keep both networks
+reachable under the temporary Internet block. PXE preparation and network
+installation keep using the new controller address only: prepare network
+installation again after the change. `labSettings.networkTransition` gives
+modules `{ base, prefixLength, masterIp, hostIps }` of the previous network
+(`hostIps` maps each client name to its previous address), or `null`;
+`labMeta.network.transition` (present only during a change) lists the previous
+controller address and each client's previous address for management tools.
+The previous network must be a valid IPv4 network different from and not
+overlapping the current one, hold every configured host number and exclude the
+controller DHCP address; without client computers the record is ignored (the
+evaluation warns and the management command refuses to save it). Settings
+changes accept a new network base or prefix while computers are configured
+only together with a record naming the saved network, and during a change only
+a return to its previous network, or an undo that restores the previous network
+and removes the record. Without the record the configuration is exactly the
+single-network one; an address a client no longer needs after the record is
+removed disappears at its next start. The guided change (Maintenance → Change
+network addressing, `nixorium network migrate`) writes and removes the record;
+see ADR 0028 and the administrator guide.
+
 ## USB/SSH client installation boundary
 
 The supported remote-install environment is the official NixOS 26.05 Minimal

@@ -156,7 +156,7 @@ func TestSettingsBlockedNetworkChangeReturnsWithoutSaving(t *testing.T) {
 	if command != nil || model.screen != dashboardSettings || model.settings.current.Lab.NetworkBase != base.Lab.NetworkBase {
 		t.Fatal("blocked change did not preserve saved settings")
 	}
-	if !strings.Contains(model.message, "Keep the saved value") || strings.Contains(model.message, "lab.networkBase:") {
+	if !strings.Contains(model.message, "keep the saved value") || strings.Contains(model.message, "lab.networkBase:") {
 		t.Fatalf("unclear refusal: %s", model.message)
 	}
 }
