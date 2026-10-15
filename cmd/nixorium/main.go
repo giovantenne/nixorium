@@ -831,6 +831,9 @@ func parseArguments(arguments []string) (options, error) {
 	if len(arguments) > 0 && arguments[0] == "telemetry" {
 		return parseTelemetryArguments(arguments[1:])
 	}
+	if len(arguments) >= 2 && arguments[0] == "git" && arguments[1] == "undo" {
+		return parseGitUndoArguments(arguments[2:])
+	}
 	if len(arguments) > 0 && arguments[0] == "host-key" {
 		return parseHostTrustArguments(arguments[1:])
 	}
@@ -1569,7 +1572,7 @@ func readCandidateSettings(path string) ([]byte, error) {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|network migrate plan|network migrate start|network migrate status|network migrate finish|network migrate undo|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
+	fmt.Fprintln(writer, "Usage: nixorium [status|hosts|doctor|install usb prepare|install usb start|install usb status|install usb reconcile|install usb reboot|install usb verify|install usb cancel|install usb close|software catalog|software search|software presets|software plan|software apply|software preset plan|software preset apply|shutdown plan|shutdown apply|restart plan|restart apply|internet plan|internet apply|lock plan|lock apply|send plan|send apply|classroom-view|cleanup plan|cleanup apply|recovery status|backup create|backup verify|backup restore|deploy recover plan|deploy recover apply|template-reset recover plan|template-reset recover apply|deploy plan|deploy apply|controller plan|controller apply|services|services restart cache|logs|logs show|git review|git commit plan|git commit apply|git discard plan|git discard apply|git undo plan|git undo apply|update check|update plan|update apply|package-base status|package-base plan|package-base apply|workspace plan|workspace apply|workspace marketplace|home-files import plan|home-files plan|home-files apply|host-key plan|host-key apply|network migrate plan|network migrate start|network migrate status|network migrate finish|network migrate undo|support preview|support export|config validate|config plan|config apply|setup|setup configure|setup status|setup keys|setup install-secrets|setup apply|pxe prepare|pxe start|pxe stop|pxe recover] [options]")
 	fmt.Fprintln(writer, "       workspace plan --file <candidate.json> previews student preferences without saving")
 	fmt.Fprintln(writer, "       home-files import plan --source <local-file-or-folder> --destination <relative-home-path> [--replace] [--json] captures materials for review")
 	fmt.Fprintln(writer, "       home-files plan --file <draft-or-profile.json> [--json] reviews shared student initial files")
@@ -1633,6 +1636,8 @@ func usage(writer io.Writer) {
 	fmt.Fprintln(writer, "       git commit apply --paths <paths> --expect <review-token> [--yes]")
 	fmt.Fprintln(writer, "       git discard plan --paths <paths> restores files to the last commit after review")
 	fmt.Fprintln(writer, "       git discard apply --paths <paths> --expect <review-token> [--yes]")
+	fmt.Fprintln(writer, "       git undo plan [--json] reviews undoing the last saved change")
+	fmt.Fprintln(writer, "       git undo apply --expect <review-token> [--yes] [--json] saves the undo; then apply to the controller and update computers")
 	fmt.Fprintln(writer, "       update check explicitly queries the configured public upstream")
 	fmt.Fprintln(writer, "       update plan --target <vMAJOR.MINOR.PATCH[-PRERELEASE]>")
 	fmt.Fprintln(writer, "       update apply --target <release> --expect <review-token> [--yes]")
