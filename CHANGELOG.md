@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-10-15
+
 ### Added
 
 - Assistant can download a public file once on the controller and pin its
@@ -1985,7 +1987,8 @@ the changes below.
 - Key-only SSH access and immutable declarative users.
 - Separate public and private material for SSH, Harmonia, and Veyon.
 
-[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.6.1...HEAD
+[Unreleased]: https://github.com/giovantenne/nixorium/compare/v3.7.0...HEAD
+[3.7.0]: https://github.com/giovantenne/nixorium/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/giovantenne/nixorium/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/giovantenne/nixorium/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/giovantenne/nixorium/compare/v3.4.0...v3.5.0
