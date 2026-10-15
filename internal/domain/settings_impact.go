@@ -31,7 +31,7 @@ func SettingsTransitionIssues(base, candidate LabSettingsFile) []ValidationIssue
 	if base.Lab.PCCount <= 0 {
 		return nil
 	}
-	migration := movesFromSavedNetwork(base, candidate)
+	migration := movesFromSavedNetwork(base, candidate) || undoesSavedChange(base, candidate)
 	var issues []ValidationIssue
 	for _, change := range DiffLabSettings(base, candidate) {
 		switch change.Field {
@@ -66,6 +66,17 @@ func movesFromSavedNetwork(base, candidate LabSettingsFile) bool {
 		return candidate.Lab.NetworkBase == saved.PreviousBase && candidate.Lab.NetworkPrefix == saved.PreviousPrefixLength
 	}
 	return true
+}
+
+// undoesSavedChange reports whether the candidate undoes the saved change of
+// laboratory network: it restores the previous network and removes the
+// record. Until the controller is applied it keeps both addresses, and
+// clients keep the previous address during the change, so every computer
+// stays reachable on the restored network.
+func undoesSavedChange(base, candidate LabSettingsFile) bool {
+	saved := base.Lab.NetworkTransition
+	return saved != nil && candidate.Lab.NetworkTransition == nil &&
+		candidate.Lab.NetworkBase == saved.PreviousBase && candidate.Lab.NetworkPrefix == saved.PreviousPrefixLength
 }
 
 func configuredComputers(computers int) string {

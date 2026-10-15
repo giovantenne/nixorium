@@ -141,6 +141,13 @@ var nextSteps = map[string]NextStep{
 		Action: "Keep the saved network values here and move the computers with the guided change of the laboratory network",
 		TUI:    "Maintenance → Change network addressing",
 	},
+	"NETWORK-CHANGING": {
+		Code:   "NETWORK-CHANGING",
+		Title:  "The laboratory network is being changed",
+		Why:    "Until the change is finished the controller answers on both networks, so computers still on the previous one stay reachable.",
+		Action: "Continue the change of laboratory network: update the computers, then finish or undo it",
+		TUI:    "Maintenance → Change network addressing", Command: "nixorium network migrate status", Screen: RecoveryNetworkChanging,
+	},
 	"EVAL-FAILED": {
 		Code:   "EVAL-FAILED",
 		Title:  "The configuration has an error",

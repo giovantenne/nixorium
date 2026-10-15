@@ -368,6 +368,12 @@ func HostsText(writer io.Writer, report domain.HostsReport) {
 		if host.HostKeyCondition == domain.HostKeyChanged {
 			fmt.Fprintln(writer, "    SSH key changed: verify physical identity before a reviewed host-key plan. Never bypass host-key checking.")
 		}
+		switch host.Network {
+		case domain.HostNetworkPrevious:
+			fmt.Fprintf(writer, "    still on the previous network: answers only on %s\n", host.PreviousIP)
+		case domain.HostNetworkUnknown:
+			fmt.Fprintf(writer, "    answers on neither %s nor its previous address %s\n", host.IP, host.PreviousIP)
+		}
 		if host.CurrentSystem != "" {
 			fmt.Fprintf(writer, "    current: %s\n", host.CurrentSystem)
 		}

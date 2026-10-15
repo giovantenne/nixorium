@@ -78,6 +78,7 @@ and JSON issues carry a `next` object with the same code and texts; the JSON
 | `PXE-ACTIVE` | Network installation is still active | Finish the network installation, or recover the controller network ([The controller network is inconsistent](#the-controller-network-is-inconsistent)) |
 | `SETTINGS-INVALID` | The laboratory settings are not valid | Repair the settings ([Configuration is invalid](#configuration-is-invalid)) |
 | `NETWORK-LOCKED` | The laboratory network cannot be changed while computers are configured | Keep the saved network values in Settings and move the computers with the guided change of the laboratory network (Maintenance → Change network addressing); the controller number stays locked, device names and the controller DHCP address can still change |
+| `NETWORK-CHANGING` | The laboratory network is being changed | Continue the change (Maintenance → Change network addressing; `nixorium network migrate status`): apply to the controller, update the computers, then finish or undo it (administrator guide, "Changing the laboratory network") |
 | `CLIENT-UNCONFIRMED` | A computer did not confirm the request | Check the computer in Computer inventory before trying again |
 | `DISK-LOW` | The controller is low on disk space | Free disk space (Maintenance → Free disk space) |
 | `CONTROLLER-NOT-APPLIED` | The controller is not running its saved configuration | Apply the saved configuration to the controller ([Controller apply failed](#controller-apply-failed)) |

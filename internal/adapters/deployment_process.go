@@ -137,7 +137,7 @@ func runDeploymentPhase(ctx context.Context, plan domain.DeploymentPlanReport, p
 	command.Stdout, command.Stderr = output, output
 	var directory, pending *os.File
 	if phase == domain.DeploymentPhaseApply {
-		cleanup, err := configureColmenaSSH(command)
+		cleanup, err := configureColmenaSSH(command, colmenaRedirects(plan))
 		if err != nil {
 			return fmt.Errorf("prepare Colmena SSH policy: %w", err)
 		}

@@ -6,6 +6,10 @@ func ComputerCondition(h HostStatus) (Level, string, string) {
 	if h.HostKeyCondition == HostKeyChanged {
 		return LevelError, "SSH key changed", "Do not update this computer until its identity is verified. If it was deliberately reinstalled, compare its physical-console fingerprint and review this computer's SSH trust."
 	}
+	if h.Network == HostNetworkPrevious && h.SSH == SSHAvailable {
+		guidance := "It answers only on its previous address " + h.PreviousIP + ". Update it; if it already runs the saved configuration, restart it. Maintenance → Change network addressing shows every computer."
+		return LevelWarning, "Still on the previous network", guidance
+	}
 	if h.Reachability == ReachabilityUnreachable {
 		return LevelWarning, "Could not be reached", "Check that the computer is powered on and connected to the lab network."
 	}

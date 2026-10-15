@@ -51,9 +51,14 @@ type NetworkTransitionMeta struct {
 }
 
 type HostMeta struct {
-	Name      string `json:"name"`
-	IP        string `json:"ip"`
-	Interface string `json:"ifaceName,omitempty"`
+	Name string `json:"name"`
+	IP   string `json:"ip"`
+	// PreviousIP is the computer's address on the previous laboratory network
+	// during a change of laboratory network. The evaluated metadata lists it
+	// under Network.Transition; decoding labMeta copies it here, so every
+	// per-computer probe can try the new address first and this one second.
+	PreviousIP string `json:"previousIp,omitempty"`
+	Interface  string `json:"ifaceName,omitempty"`
 	// InterfaceExplicit is false when no client or per-computer interface name
 	// is configured: the installed system then uses the wired card whatever
 	// its name, and Interface is only the template fallback. Metadata that
@@ -87,6 +92,9 @@ type SSHProbe struct {
 	Reachability Reachability    `json:"reachability"`
 	SSH          SSHAvailability `json:"ssh"`
 	Detail       string          `json:"detail,omitempty"`
+	// Network says which address answered during a change of laboratory
+	// network; it is empty otherwise.
+	Network HostNetwork `json:"network,omitempty"`
 }
 
 type DeploymentCurrency string
@@ -102,6 +110,9 @@ type HostSystemProbe struct {
 	SystemPath       string           `json:"systemPath,omitempty"`
 	Revision         string           `json:"revision,omitempty"`
 	Detail           string           `json:"detail,omitempty"`
+	// Network says which address answered during a change of laboratory
+	// network; it is empty otherwise.
+	Network HostNetwork `json:"network,omitempty"`
 }
 
 type HostDeploymentSummary struct {
@@ -111,11 +122,16 @@ type HostDeploymentSummary struct {
 }
 
 type HostStatus struct {
-	HostKeyCondition     HostKeyCondition          `json:"hostKeyCondition,omitempty"`
-	Name                 string                    `json:"name"`
-	IP                   string                    `json:"ip"`
-	Role                 string                    `json:"role"`
-	Reachability         Reachability              `json:"reachability"`
+	HostKeyCondition HostKeyCondition `json:"hostKeyCondition,omitempty"`
+	Name             string           `json:"name"`
+	IP               string           `json:"ip"`
+	PreviousIP       string           `json:"previousIp,omitempty"`
+	Role             string           `json:"role"`
+	Reachability     Reachability     `json:"reachability"`
+	// Network is set during a change of laboratory network: "current" when
+	// the computer answers on its new address, "previous" when it answers
+	// only on its previous one and "unknown" when neither answers.
+	Network              HostNetwork               `json:"network,omitempty"`
 	SSH                  SSHAvailability           `json:"ssh"`
 	Deployment           DeploymentCurrency        `json:"deployment"`
 	CurrentSystem        string                    `json:"currentSystem,omitempty"`

@@ -34,6 +34,8 @@ type assistantObservedHost struct {
 	CurrentRevision      string                    `json:"currentRevision"`
 	LastSuccessfulUpdate string                    `json:"lastSuccessfulUpdate,omitempty"`
 	Detail               string                    `json:"detail"`
+	// Network is set during a change of laboratory network.
+	Network domain.HostNetwork `json:"network,omitempty"`
 }
 
 var assistantStatusPrivateDetail = regexp.MustCompile(`(?:/[^\s"'<>]+|SHA256:[A-Za-z0-9+/=]+|(?:ssh-(?:rsa|ed25519)|ecdsa-sha2-\S+)\s+[A-Za-z0-9+/=]+)`)
@@ -69,6 +71,7 @@ func (status AssistantLabStatus) Execute(ctx context.Context, repository string)
 			SSH: host.SSH, Deployment: host.Deployment,
 			CurrentRevision: host.CurrentRevision[:min(len(host.CurrentRevision), 12)],
 			Detail:          assistantStatusDetail(host.Detail),
+			Network:         host.Network,
 		}
 		if host.LastSuccessfulDeploy != nil {
 			observed.LastSuccessfulUpdate = host.LastSuccessfulDeploy.VerifiedAt.UTC().Format(time.RFC3339)
